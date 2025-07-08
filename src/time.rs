@@ -308,6 +308,7 @@ enum Activity {
 }
 struct NetworkContext {
     tcp_line_buffer: Vec<u8>,
+    tcp_headers_buffer: Vec<u8>,
     curl_stdout_buf: String,
     curl_stderr_buf: String,
 }
@@ -406,6 +407,7 @@ impl AppState {
         let mut message_buffer = String::with_capacity(256);
         let mut network_context = NetworkContext {
             tcp_line_buffer: Vec::with_capacity(256),
+            tcp_headers_buffer: Vec::with_capacity(1024),
             curl_stdout_buf: String::with_capacity(4096),
             curl_stderr_buf: String::with_capacity(1024),
         };
@@ -824,7 +826,11 @@ fn fetch_server_time_sample_curl(
         server_time,
     })
 }
-fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
+fn tcp_attempt(
+    line_buffer: &mut Vec<u8>,
+    full_headers: &mut Vec<u8>,
+    host: &str,
+) -> Result<TimeSample> {
     let tcp_host_uri = host.strip_prefix("http://").unwrap_or(host);
     let (tcp_host_no_port, _) = tcp_host_uri.split_once(':').unwrap_or((tcp_host_uri, ""));
     let socket_addr_result: ioResult<net::SocketAddr> =
@@ -846,7 +852,7 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
     stream_writer.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
     stream_writer.flush()?;
     let mut stream_reader = BufReader::new(&stream);
-    let mut full_headers = Vec::with_capacity(1024);
+    full_headers.clear();
     loop {
         line_buffer.clear();
         let bytes_read = stream_reader.read_until(b'\n', line_buffer)?;
@@ -904,7 +910,12 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
     if host.len() >= 8 && host[..8].eq_ignore_ascii_case("https://") {
         return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx);
     }
-    tcp_attempt(&mut net_ctx.tcp_line_buffer, host).or_else(|_| {
+    tcp_attempt(
+        &mut net_ctx.tcp_line_buffer,
+        &mut net_ctx.tcp_headers_buffer,
+        host,
+    )
+    .or_else(|_| {
         if !is_curl_available() {
             return Err(Error::SyncFailed(
                 "TCP 연결에 실패했고 curl을 사용할 수 없습니다.".into(),
@@ -945,16 +956,25 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
             "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into(),
         ));
     };
-    const MONTHS: [&str; 12] = [
-        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
-    ];
-    let month = MONTHS
-        .iter()
-        .position(|&m| m.eq_ignore_ascii_case(month_str))
-        .map(|i| i as u32 + 1)
-        .ok_or_else(|| {
-            Error::Parse(format!("HTTP Date 파싱 실패: 알 수 없는 월 형식 '{month_str}'").into())
-        })?;
+    let month = match month_str.to_ascii_lowercase().as_bytes() {
+        b"jan" => 1,
+        b"feb" => 2,
+        b"mar" => 3,
+        b"apr" => 4,
+        b"may" => 5,
+        b"jun" => 6,
+        b"jul" => 7,
+        b"aug" => 8,
+        b"sep" => 9,
+        b"oct" => 10,
+        b"nov" => 11,
+        b"dec" => 12,
+        _ => {
+            return Err(Error::Parse(
+                format!("HTTP Date 파싱 실패: 알 수 없는 월 형식 '{month_str}'").into(),
+            ));
+        }
+    };
     let days = days_from_civil(year, month, day);
     let timestamp_secs =
         i64::from(days) * 86400 + i64::from(h) * 3600 + i64::from(m) * 60 + i64::from(s);
