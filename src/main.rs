@@ -203,7 +203,7 @@ fn main() -> Result<ExitCode> {
     }
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
-    if !Path::new(FILE_NAME).exists() {
+    if !Path::new(FILE_NAME).try_exists()? {
         *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?;
     }
     Ok(())
@@ -697,8 +697,10 @@ fn read_parse_f64(prompt: &str, buffer: &mut String) -> Result<f64> {
         print!("{prompt}");
         stdout().flush()?;
         match read_line_reuse("", buffer)?.parse::<f64>() {
-            Ok(n) if n.is_finite() => return Ok(n),
-            _ => eprintln!("유효한 유한 실수 값을 입력해야 합니다 (NaN 또는 무한대는 제외).\n"),
+            Ok(n) if n.is_finite() && !n.is_subnormal() => return Ok(n),
+            _ => {
+                eprintln!("유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).\n")
+            }
         }
     }
 }
