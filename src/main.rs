@@ -1,5 +1,6 @@
 use std::{
     arch::x86_64::{_rdrand64_step, _rdseed64_step},
+    array,
     char::from_u32,
     error::Error,
     fmt::{Display, Formatter, Result as fmtResult},
@@ -39,6 +40,8 @@ static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
 static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| stdout().is_terminal());
+static TWO_DIGITS: LazyLock<[[u8; 2]; 100]> =
+    LazyLock::new(|| array::from_fn(|i| [b'0' + (i / 10) as u8, b'0' + (i % 10) as u8]));
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const BUFFER_SIZE: usize = size_of_val(&[0u8; 1016]);
@@ -79,16 +82,6 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const DIGITS: &[u8; 10] = b"0123456789";
-const TWO_DIGITS: [[u8; 2]; 100] = {
-    let mut tbl = [[0u8; 2]; 100];
-    let mut i = 0;
-    while i < 100 {
-        tbl[i][0] = b'0' + (i / 10) as u8;
-        tbl[i][1] = b'0' + (i % 10) as u8;
-        i += 1;
-    }
-    tbl
-};
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
