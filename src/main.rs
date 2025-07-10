@@ -87,6 +87,8 @@ struct RandomDataSet {
     num_64: u64,
     seen_lotto: u64,
     seen_lotto7: u64,
+    seen_euro_millions_main: u64,
+    seen_euro_millions_lucky: u64,
     kor_coords: (f64, f64),
     world_coords: (f64, f64),
     numeric_password: u32,
@@ -101,6 +103,8 @@ struct RandomDataSet {
     galaxy_z: u16,
     lotto7_numbers: [u8; 7],
     lotto_numbers: [u8; 6],
+    euro_millions_main_numbers: [u8; 5],
+    euro_millions_lucky_stars: [u8; 2],
     numeric_password_digits: u8,
     planet_number: u8,
     nms_portal_yy: u8,
@@ -111,6 +115,7 @@ impl RandomDataSet {
             && self.lotto_numbers[5] != 0
             && self.lotto7_numbers[6] != 0
             && self.password[7] != '\0'
+            && self.euro_millions_main_numbers[4] != 0
     }
 }
 struct RandomBitBuffer {
@@ -239,9 +244,36 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     fill_data_fields_from_u64(num, &mut data);
     let mut supplemental: Option<RandomBitBuffer> = None;
     while !data.is_complete() {
-        supplemental = Some(RandomBitBuffer::new()?);
-        if let Some(ref supp) = supplemental {
-            fill_data_fields_from_u64(supp.value, &mut data);
+        let new_supp = RandomBitBuffer::new()?;
+        fill_data_fields_from_u64(new_supp.value, &mut data);
+        supplemental = Some(new_supp);
+    }
+    let mut lucky_star_source = if let Some(ref supp) = supplemental {
+        supp.value.reverse_bits()
+    } else {
+        num.reverse_bits()
+    };
+    'lucky_star_loop: loop {
+        for byte in lucky_star_source.to_be_bytes() {
+            if byte > 251 {
+                continue;
+            }
+            if process_lotto_numbers(
+                byte,
+                12,
+                &mut data.euro_millions_lucky_stars,
+                &mut data.seen_euro_millions_lucky,
+            ) && data.euro_millions_lucky_stars[1] != 0
+            {
+                break 'lucky_star_loop;
+            }
+        }
+        if data.euro_millions_lucky_stars[1] == 0 && supplemental.is_some() {
+            let new_supp = RandomBitBuffer::new()?;
+            lucky_star_source = new_supp.value.reverse_bits();
+            supplemental = Some(new_supp);
+        } else {
+            break;
         }
     }
     let mut hangul = ['\0'; 4];
@@ -326,6 +358,9 @@ fn fill_data_fields_from_u64(mut v: u64, data: &mut RandomDataSet) {
     for _ in 0..8 {
         let byte = (v >> 56) as u8;
         v <<= 8;
+        if byte > 251 {
+            continue;
+        }
         if byte > 249 {
             continue;
         }
@@ -335,6 +370,17 @@ fn fill_data_fields_from_u64(mut v: u64, data: &mut RandomDataSet) {
             if data.is_complete() {
                 return;
             }
+        }
+        if data.euro_millions_main_numbers[4] == 0
+            && process_lotto_numbers(
+                byte,
+                50,
+                &mut data.euro_millions_main_numbers,
+                &mut data.seen_euro_millions_main,
+            )
+            && data.is_complete()
+        {
+            return;
         }
         if byte > 224 {
             continue;
@@ -445,6 +491,7 @@ fn format_output<W: Write>(writer: &mut W, data: &RandomDataSet, use_colors: boo
             "8자리 비밀번호: {21}{22}{23}{24}{25}{26}{27}{28}\n",
             "로또 번호: {29} {30} {31} {32} {33} {34}\n",
             "일본 로또 7 번호: {35} {36} {37} {38} {39} {40} {41}\n",
+            "유로밀리언 번호: {72} {73} {74} {75} {76} + {77} {78}\n",
             "한글 음절 4글자: {42}{43}{44}{45}\n",
             "대한민국 위경도: {46}, {47}\n",
             "세계 위경도: {48}, {49}\n",
@@ -524,7 +571,14 @@ fn format_output<W: Write>(writer: &mut W, data: &RandomDataSet, use_colors: boo
         data.galaxy_x,
         data.galaxy_y,
         data.galaxy_z,
-        data.solar_system_index
+        data.solar_system_index,
+        data.euro_millions_main_numbers[0],
+        data.euro_millions_main_numbers[1],
+        data.euro_millions_main_numbers[2],
+        data.euro_millions_main_numbers[3],
+        data.euro_millions_main_numbers[4],
+        data.euro_millions_lucky_stars[0],
+        data.euro_millions_lucky_stars[1]
     )?;
     Ok(())
 }
