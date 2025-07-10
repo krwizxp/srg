@@ -354,10 +354,8 @@ fn rdrand_impl() -> Result<u64> {
 fn no_hw_rng() -> Result<u64> {
     Err("RDSEED·RDRAND 모두 미지원합니다.".into())
 }
-fn fill_data_fields_from_u64(mut v: u64, data: &mut RandomDataSet) {
-    for _ in 0..8 {
-        let byte = (v >> 56) as u8;
-        v <<= 8;
+fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
+    for byte in v.to_be_bytes() {
         if byte > 251 {
             continue;
         }
