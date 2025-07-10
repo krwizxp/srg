@@ -268,7 +268,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                 break 'lucky_star_loop;
             }
         }
-        if data.euro_millions_lucky_stars[1] == 0 && supplemental.is_some() {
+        if data.euro_millions_lucky_stars[1] == 0 {
             let new_supp = RandomBitBuffer::new()?;
             lucky_star_source = new_supp.value.reverse_bits();
             supplemental = Some(new_supp);
