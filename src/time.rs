@@ -956,35 +956,24 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
             "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into(),
         ));
     };
-    let month_bytes = month_str.as_bytes();
-    let month = if month_bytes.eq_ignore_ascii_case(b"jan") {
-        1
-    } else if month_bytes.eq_ignore_ascii_case(b"feb") {
-        2
-    } else if month_bytes.eq_ignore_ascii_case(b"mar") {
-        3
-    } else if month_bytes.eq_ignore_ascii_case(b"apr") {
-        4
-    } else if month_bytes.eq_ignore_ascii_case(b"may") {
-        5
-    } else if month_bytes.eq_ignore_ascii_case(b"jun") {
-        6
-    } else if month_bytes.eq_ignore_ascii_case(b"jul") {
-        7
-    } else if month_bytes.eq_ignore_ascii_case(b"aug") {
-        8
-    } else if month_bytes.eq_ignore_ascii_case(b"sep") {
-        9
-    } else if month_bytes.eq_ignore_ascii_case(b"oct") {
-        10
-    } else if month_bytes.eq_ignore_ascii_case(b"nov") {
-        11
-    } else if month_bytes.eq_ignore_ascii_case(b"dec") {
-        12
-    } else {
-        return Err(Error::Parse(
-            format!("HTTP Date 파싱 실패: 알 수 없는 월 형식 '{month_str}'").into(),
-        ));
+    let month = match month_str.as_bytes() {
+        s if s.eq_ignore_ascii_case(b"jan") => 1,
+        s if s.eq_ignore_ascii_case(b"feb") => 2,
+        s if s.eq_ignore_ascii_case(b"mar") => 3,
+        s if s.eq_ignore_ascii_case(b"apr") => 4,
+        s if s.eq_ignore_ascii_case(b"may") => 5,
+        s if s.eq_ignore_ascii_case(b"jun") => 6,
+        s if s.eq_ignore_ascii_case(b"jul") => 7,
+        s if s.eq_ignore_ascii_case(b"aug") => 8,
+        s if s.eq_ignore_ascii_case(b"sep") => 9,
+        s if s.eq_ignore_ascii_case(b"oct") => 10,
+        s if s.eq_ignore_ascii_case(b"nov") => 11,
+        s if s.eq_ignore_ascii_case(b"dec") => 12,
+        _ => {
+            return Err(Error::Parse(
+                "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
+            ));
+        }
     };
     let days = days_from_civil(year, month, day);
     let timestamp_secs =
