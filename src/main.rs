@@ -224,15 +224,20 @@ fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<M
 }
 fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<(u64, RandomDataSet)> {
     let (num_64, data) = generate_random_data()?;
-    let mut buffer = [0; BUFFER_SIZE];
+    let mut file_buffer = [0; BUFFER_SIZE];
+    let file_len = format_data_into_buffer(&data, &mut file_buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        let len = format_data_into_buffer(&data, &mut buffer, false)?;
-        write_buffer_to_file_guard(&mut file_guard, &buffer[..len])?;
+        write_buffer_to_file_guard(&mut file_guard, &file_buffer[..file_len])?;
         file_guard.flush()?;
     }
-    let len = format_data_into_buffer(&data, &mut buffer, *IS_TERMINAL)?;
-    write_slice_to_console(&buffer[..len])?;
+    if *IS_TERMINAL {
+        let mut console_buffer = [0; BUFFER_SIZE];
+        let console_len = format_data_into_buffer(&data, &mut console_buffer, true)?;
+        write_slice_to_console(&console_buffer[..console_len])?;
+    } else {
+        write_slice_to_console(&file_buffer[..file_len])?;
+    }
     Ok((num_64, data))
 }
 fn generate_random_data() -> Result<(u64, RandomDataSet)> {
