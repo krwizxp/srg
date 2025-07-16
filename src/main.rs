@@ -11,7 +11,6 @@ use std::{
     path::Path,
     process::ExitCode,
     result::Result as stdResult,
-    str::from_utf8,
     sync::{
         LazyLock, Mutex, MutexGuard,
         atomic::{AtomicU64, Ordering},
@@ -921,8 +920,8 @@ fn print_progress(
         (progress * 100.0).floor() as u32,
         completed,
         total,
-        from_utf8(&elapsed_buf[..elapsed_len])?,
-        from_utf8(&eta_buf[..eta_len])?,
+        String::from_utf8_lossy(&elapsed_buf[..elapsed_len]),
+        String::from_utf8_lossy(&eta_buf[..eta_len]),
     )?;
     out.flush()?;
     Ok(())
