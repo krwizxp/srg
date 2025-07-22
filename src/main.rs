@@ -406,13 +406,13 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if byte > 187 {
             continue;
         }
-        if data.password_len < 8 {
-            if let Some(ch) = from_u32(u32::from(byte % 94 + 33)) {
-                data.password[data.password_len as usize] = ch;
-                data.password_len += 1;
-                if data.is_complete() {
-                    return;
-                }
+        if data.password_len < 8
+            && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
+        {
+            data.password[data.password_len as usize] = ch;
+            data.password_len += 1;
+            if data.is_complete() {
+                return;
             }
         }
     }
