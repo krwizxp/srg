@@ -93,6 +93,7 @@ struct RandomDataSet {
     numeric_password: u32,
     glyph_string: [char; 12],
     password: [char; 8],
+    password_len: u8,
     hangul_syllables: [char; 4],
     solar_system_index: u16,
     nms_portal_zzz: u16,
@@ -405,13 +406,13 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if byte > 187 {
             continue;
         }
-        if data.password[7] == '\0'
-            && let Some(index) = data.password.iter().position(|&c| c == '\0')
-            && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
-        {
-            data.password[index] = ch;
-            if data.is_complete() {
-                return;
+        if data.password_len < 8 {
+            if let Some(ch) = from_u32(u32::from(byte % 94 + 33)) {
+                data.password[data.password_len as usize] = ch;
+                data.password_len += 1;
+                if data.is_complete() {
+                    return;
+                }
             }
         }
     }
@@ -769,11 +770,17 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
         }
     }
 }
-fn generate_and_send_random_data(sender: &SyncSender<([u8; BUFFER_SIZE], usize)>) -> Result<()> {
+fn generate_and_send_random_data(
+    sender: &SyncSender<(Box<[u8; BUFFER_SIZE]>, usize)>,
+) -> Result<()> {
     let (_, data) = generate_random_data()?;
-    let mut buffer = [0; BUFFER_SIZE];
-    let len = format_data_into_buffer(&data, &mut buffer, false)?;
-    sender.send((buffer, len))?;
+    let mut buffer = Box::new([0; BUFFER_SIZE]);
+    let len = format_data_into_buffer(&data, &mut *buffer, false)?;
+    sender
+        .send((buffer, len))
+        .map_err(|_| -> Box<dyn Error + Send + Sync + 'static> {
+            Box::from("채널 전송 실패")
+        })?;
     Ok(())
 }
 fn regenerate_multiple(
@@ -795,8 +802,9 @@ fn regenerate_multiple(
     }
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
-    let (sender, receiver) =
-        sync_channel::<([u8; BUFFER_SIZE], usize)>((multi_thread_count as usize).clamp(1, 32768));
+    let (sender, receiver) = sync_channel::<(Box<[u8; BUFFER_SIZE]>, usize)>(
+        (multi_thread_count as usize).clamp(1, 32768),
+    );
     let start_time = Instant::now();
     let completed = AtomicU64::new(0);
     let mut last_generated_num: Option<u64> = None;
