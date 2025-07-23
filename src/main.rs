@@ -771,17 +771,11 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
         }
     }
 }
-fn generate_and_send_random_data(
-    sender: &SyncSender<(Box<[u8; BUFFER_SIZE]>, usize)>,
-) -> Result<()> {
+fn generate_and_send_random_data(sender: &SyncSender<([u8; BUFFER_SIZE], usize)>) -> Result<()> {
     let (_, data) = generate_random_data()?;
-    let mut buffer = Box::new([0; BUFFER_SIZE]);
-    let len = format_data_into_buffer(&data, &mut *buffer, false)?;
-    sender
-        .send((buffer, len))
-        .map_err(|_| -> Box<dyn Error + Send + Sync + 'static> {
-            Box::from("채널 전송 실패")
-        })?;
+    let mut buffer = [0; BUFFER_SIZE];
+    let len = format_data_into_buffer(&data, &mut buffer, false)?;
+    sender.send((buffer, len))?;
     Ok(())
 }
 fn regenerate_multiple(
@@ -803,9 +797,8 @@ fn regenerate_multiple(
     }
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
-    let (sender, receiver) = sync_channel::<(Box<[u8; BUFFER_SIZE]>, usize)>(
-        (multi_thread_count as usize).clamp(1, 32768),
-    );
+    let (sender, receiver) =
+        sync_channel::<([u8; BUFFER_SIZE], usize)>((multi_thread_count as usize).clamp(1, 32768));
     let start_time = Instant::now();
     let completed = AtomicU64::new(0);
     let mut last_generated_num: Option<u64> = None;
