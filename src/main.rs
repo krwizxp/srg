@@ -367,12 +367,12 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if byte > 249 {
             continue;
         }
-        if data.numeric_password_digits < 6 {
+        if data.numeric_password_digits < 6 && {
             data.numeric_password = data.numeric_password * 10 + u32::from(byte % 10);
             data.numeric_password_digits += 1;
-            if data.is_complete() {
-                return;
-            }
+            data.is_complete()
+        } {
+            return;
         }
         if data.euro_millions_main_numbers[4] == 0
             && process_lotto_numbers(
@@ -408,12 +408,13 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         }
         if data.password_len < 8
             && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
-        {
-            data.password[data.password_len as usize] = ch;
-            data.password_len += 1;
-            if data.is_complete() {
-                return;
+            && {
+                data.password[data.password_len as usize] = ch;
+                data.password_len += 1;
+                data.is_complete()
             }
+        {
+            return;
         }
     }
 }
