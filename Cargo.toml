@@ -5,6 +5,6 @@ edition = "2024"
 
 [profile.release]
 codegen-units = 1
-lto = true
+lto = fat
 panic = "abort"
 strip = true
