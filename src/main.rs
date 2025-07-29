@@ -367,9 +367,6 @@ fn no_hw_rng() -> Result<u64> {
 }
 fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
     for byte in v.to_be_bytes() {
-        if byte > 251 {
-            continue;
-        }
         if byte > 249 {
             continue;
         }
