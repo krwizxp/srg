@@ -81,7 +81,6 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const DIGITS: &[u8; 10] = b"0123456789";
-
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
@@ -89,12 +88,12 @@ struct RandomDataSet {
     seen_lotto7: u64,
     seen_euro_millions_main: u64,
     seen_euro_millions_lucky: u64,
+    kor_coords: (f64, f64),
+    world_coords: (f64, f64),
     lotto_next_idx: usize,
     lotto7_next_idx: usize,
     euro_main_next_idx: usize,
     euro_lucky_next_idx: usize,
-    kor_coords: (f64, f64),
-    world_coords: (f64, f64),
     numeric_password: u32,
     glyph_string: [char; 12],
     password: [char; 8],
@@ -110,9 +109,9 @@ struct RandomDataSet {
     euro_millions_main_numbers: [u8; 5],
     euro_millions_lucky_stars: [u8; 2],
     numeric_password_digits: u8,
+    password_len: u8,
     planet_number: u8,
     nms_portal_yy: u8,
-    password_len: u8,
 }
 impl RandomDataSet {
     fn is_complete(&self) -> bool {
