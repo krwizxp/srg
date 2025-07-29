@@ -81,6 +81,7 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const DIGITS: &[u8; 10] = b"0123456789";
+
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
@@ -88,12 +89,15 @@ struct RandomDataSet {
     seen_lotto7: u64,
     seen_euro_millions_main: u64,
     seen_euro_millions_lucky: u64,
+    lotto_next_idx: usize,
+    lotto7_next_idx: usize,
+    euro_main_next_idx: usize,
+    euro_lucky_next_idx: usize,
     kor_coords: (f64, f64),
     world_coords: (f64, f64),
     numeric_password: u32,
     glyph_string: [char; 12],
     password: [char; 8],
-    password_len: u8,
     hangul_syllables: [char; 4],
     solar_system_index: u16,
     nms_portal_zzz: u16,
@@ -108,14 +112,15 @@ struct RandomDataSet {
     numeric_password_digits: u8,
     planet_number: u8,
     nms_portal_yy: u8,
+    password_len: u8,
 }
 impl RandomDataSet {
     fn is_complete(&self) -> bool {
         self.numeric_password_digits >= 6
-            && self.lotto_numbers[5] != 0
-            && self.lotto7_numbers[6] != 0
-            && self.password[7] != '\0'
-            && self.euro_millions_main_numbers[4] != 0
+            && self.lotto_next_idx >= 6
+            && self.lotto7_next_idx >= 7
+            && self.password_len >= 8
+            && self.euro_main_next_idx >= 5
     }
 }
 struct RandomBitBuffer {
@@ -268,12 +273,13 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                 12,
                 &mut data.euro_millions_lucky_stars,
                 &mut data.seen_euro_millions_lucky,
-            ) && data.euro_millions_lucky_stars[1] != 0
+                &mut data.euro_lucky_next_idx,
+            ) && data.euro_lucky_next_idx >= 2
             {
                 break 'lucky_star_loop;
             }
         }
-        if data.euro_millions_lucky_stars[1] == 0 {
+        if data.euro_lucky_next_idx < 2 {
             let new_supp = RandomBitBuffer::new()?;
             lucky_star_source = new_supp.value.reverse_bits();
             supplemental = Some(new_supp);
@@ -374,12 +380,13 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         } {
             return;
         }
-        if data.euro_millions_main_numbers[4] == 0
+        if data.euro_main_next_idx < 5
             && process_lotto_numbers(
                 byte,
                 50,
                 &mut data.euro_millions_main_numbers,
                 &mut data.seen_euro_millions_main,
+                &mut data.euro_main_next_idx,
             )
             && data.is_complete()
         {
@@ -388,8 +395,14 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if byte > 224 {
             continue;
         }
-        if data.lotto_numbers[5] == 0
-            && process_lotto_numbers(byte, 45, &mut data.lotto_numbers, &mut data.seen_lotto)
+        if data.lotto_next_idx < 6
+            && process_lotto_numbers(
+                byte,
+                45,
+                &mut data.lotto_numbers,
+                &mut data.seen_lotto,
+                &mut data.lotto_next_idx,
+            )
             && data.is_complete()
         {
             return;
@@ -397,8 +410,14 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if byte > 221 {
             continue;
         }
-        if data.lotto7_numbers[6] == 0
-            && process_lotto_numbers(byte, 37, &mut data.lotto7_numbers, &mut data.seen_lotto7)
+        if data.lotto7_next_idx < 7
+            && process_lotto_numbers(
+                byte,
+                37,
+                &mut data.lotto7_numbers,
+                &mut data.seen_lotto7,
+                &mut data.lotto7_next_idx,
+            )
             && data.is_complete()
         {
             return;
@@ -418,18 +437,26 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         }
     }
 }
-fn process_lotto_numbers(byte: u8, modulus: u8, numbers: &mut [u8], seen: &mut u64) -> bool {
+fn process_lotto_numbers(
+    byte: u8,
+    modulus: u8,
+    numbers: &mut [u8],
+    seen: &mut u64,
+    next_idx: &mut usize,
+) -> bool {
+    if *next_idx >= numbers.len() {
+        return false;
+    }
     let number = (byte % modulus) + 1;
     let mask = bit(number);
     if (*seen & mask) == 0 {
-        if let Some(idx) = numbers.iter().position(|&n| n == 0) {
-            numbers[idx] = number;
-            *seen |= mask;
-            if idx == numbers.len() - 1 {
-                numbers.sort_unstable();
-            }
-            return true;
+        numbers[*next_idx] = number;
+        *seen |= mask;
+        *next_idx += 1;
+        if *next_idx == numbers.len() {
+            numbers.sort_unstable();
         }
+        return true;
     }
     false
 }
