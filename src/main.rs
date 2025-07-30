@@ -326,15 +326,18 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_xxx);
     data.galaxy_y = galaxy_coord::<0x81, 0x7F>(data.nms_portal_yy as u16);
     data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_zzz);
-    for i in 0..12 {
-        data.glyph_string[i] = GLYPHS[(match i {
-            0 => data.planet_number as u64,
-            1 => (data.solar_system_index >> 8) as u64,
-            2 => (data.solar_system_index >> 4) as u64,
-            3 => data.solar_system_index as u64,
-            _ => num >> (36 - (i as u8 - 4) * 4),
-        } & 0xF) as usize];
-    }
+    data.glyph_string
+        .iter_mut()
+        .enumerate()
+        .for_each(|(i, slot)| {
+            *slot = GLYPHS[(match i {
+                0 => data.planet_number as u64,
+                1 => (data.solar_system_index >> 8) as u64,
+                2 => (data.solar_system_index >> 4) as u64,
+                3 => data.solar_system_index as u64,
+                _ => num >> (36 - (i as u8 - 4) * 4),
+            } & 0xF) as usize];
+        });
     Ok((num, data))
 }
 fn get_hardware_random() -> Result<u64> {
@@ -699,12 +702,13 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         current_seed ^= get_hardware_random()?;
         indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize);
     }
-    for i in 0..n {
-        println!(
-            "{} -> {}",
-            players_array[i], results_array[indices_slice[i]]
-        );
-    }
+    players_array
+        .iter()
+        .take(n)
+        .zip(indices_slice.iter())
+        .for_each(|(player, &result_index)| {
+            println!("{player} -> {result}", result = results_array[result_index]);
+        });
     Ok(())
 }
 fn parse_comma_separated(input: &str) -> impl Iterator<Item = &str> {

@@ -272,11 +272,17 @@ impl ServerTime {
         let dt = self.calculate_display_time()?;
         write!(
             w,
-            "{:04}-{:02}-{:02}({}) {:02}:{:02}:{:02}",
-            dt.year, dt.month, dt.day_of_month, dt.day_of_week_str, dt.hour, dt.minute, dt.second
+            "{year:04}-{month:02}-{day:02}({day_str}) {hour:02}:{min:02}:{sec:02}",
+            year = dt.year,
+            month = dt.month,
+            day = dt.day_of_month,
+            day_str = dt.day_of_week_str,
+            hour = dt.hour,
+            min = dt.minute,
+            sec = dt.second
         )?;
         if show_millis {
-            write!(w, ".{:03}", dt.millis)?;
+            write!(w, ".{millis:03}", millis = dt.millis)?;
         }
         Ok(())
     }
@@ -494,8 +500,8 @@ impl AppState {
         self.calibration_failure_count = 0;
         let _ = write!(
             msg_buf,
-            "[완료] RTT 기준값: {}ms. 2단계: 정밀 보정을 시작합니다.",
-            avg_rtt.as_millis()
+            "[완료] RTT 기준값: {rtt_ms}ms. 2단계: 정밀 보정을 시작합니다.",
+            rtt_ms = avg_rtt.as_millis()
         );
         (Activity::CalibrateOnTick, Some(msg_buf))
     }
