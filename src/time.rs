@@ -620,7 +620,7 @@ impl AppState {
         let live_rtt = Duration::from_nanos(new_rtt_nanos as u64);
         self.live_rtt = Some(live_rtt);
         let effective_rtt = live_rtt.max(sample.rtt);
-        let one_way_delay = effective_rtt.div_f64(2.0);
+        let one_way_delay = effective_rtt / 2;
         match target_time.duration_since(current_server_time) {
             Ok(duration_until_target) if duration_until_target <= one_way_delay => {
                 let log_msg = format!(
