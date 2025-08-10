@@ -43,7 +43,7 @@ static TWO_DIGITS: LazyLock<[[u8; 2]; 100]> =
     LazyLock::new(|| array::from_fn(|i| [b'0' + (i / 10) as u8, b'0' + (i % 10) as u8]));
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
-const BUFFER_SIZE: usize = size_of_val(&[0u8; 1016]);
+const BUFFER_SIZE: usize = 1016;
 const fn bit(n: u8) -> u64 {
     1u64 << n
 }
@@ -151,8 +151,7 @@ impl Display for HexCodeFormatter<'_> {
         if self.use_colors {
             write!(
                 f,
-                "{RGB_PREFIX}{r};{g};{b}{SGR_SUFFIX}#{hex1:06X}{COLOR_RESET} \
-                 {RGB_PREFIX}{r2};{g2};{b2}{SGR_SUFFIX}#{hex2:06X}{COLOR_RESET}",
+                "{RGB_PREFIX}{r};{g};{b}{SGR_SUFFIX}#{hex1:06X}{COLOR_RESET} {RGB_PREFIX}{r2};{g2};{b2}{SGR_SUFFIX}#{hex2:06X}{COLOR_RESET}",
             )
         } else {
             write!(f, "#{hex1:06X} #{hex2:06X}")
@@ -175,36 +174,32 @@ fn main() -> Result<ExitCode> {
                     "1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: ",
                     &mut input_buffer,
                 )? {
-                    "1" => {
-                        generate_random_integer(num_64, &mut input_buffer)?;
-                    }
-                    "2" => {
-                        generate_random_float(num_64, &mut input_buffer)?;
-                    }
+                    "1" => generate_random_integer(num_64, &mut input_buffer)?,
+                    "2" => generate_random_float(num_64, &mut input_buffer)?,
                     _ => {
-                        println!("무작위 숫자 생성을 취소합니다.");
+                        println!("무작위 숫자 생성을 취소합니다.")
                     }
                 }
             }
             "3" => {
                 ensure_file_exists_and_reopen(&file_mutex)?;
-                num_64 = process_single_random_data(&file_mutex)?.0;
+                num_64 = process_single_random_data(&file_mutex)?.0
             }
             "4" => {
                 ensure_file_exists_and_reopen(&file_mutex)?;
-                num_64 = regenerate_multiple(&file_mutex, &mut input_buffer)?;
+                num_64 = regenerate_multiple(&file_mutex, &mut input_buffer)?
             }
             "5" => {
                 if let Err(e) = time::run() {
-                    eprintln!("서버 시간 확인 중 오류 발생: {e}");
+                    eprintln!("서버 시간 확인 중 오류 발생: {e}")
                 }
             }
             "6" => match remove_file(FILE_NAME) {
                 Ok(_) => {
-                    println!("파일 '{FILE_NAME}'를 삭제했습니다.");
+                    println!("파일 '{FILE_NAME}'를 삭제했습니다.")
                 }
                 Err(e) => {
-                    eprintln!("{e}");
+                    eprintln!("{e}")
                 }
             },
             _ => return Ok(ExitCode::SUCCESS),
@@ -213,7 +208,7 @@ fn main() -> Result<ExitCode> {
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
     if !Path::new(FILE_NAME).try_exists()? {
-        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?;
+        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?
     }
     Ok(())
 }
@@ -233,14 +228,14 @@ fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<(u6
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
         write_buffer_to_file_guard(&mut file_guard, &file_buffer[..file_len])?;
-        file_guard.flush()?;
+        file_guard.flush()?
     }
     if *IS_TERMINAL {
         let mut console_buffer = [0; BUFFER_SIZE];
         let console_len = format_data_into_buffer(&data, &mut console_buffer, true)?;
-        write_slice_to_console(&console_buffer[..console_len])?;
+        write_slice_to_console(&console_buffer[..console_len])?
     } else {
-        write_slice_to_console(&file_buffer[..file_len])?;
+        write_slice_to_console(&file_buffer[..file_len])?
     }
     Ok((num_64, data))
 }
@@ -255,7 +250,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     while !data.is_complete() {
         let new_supp = RandomBitBuffer::new()?;
         fill_data_fields_from_u64(new_supp.value, &mut data);
-        supplemental = Some(new_supp);
+        supplemental = Some(new_supp)
     }
     let mut lucky_star_source = if let Some(ref supp) = supplemental {
         supp.value.reverse_bits()
@@ -281,7 +276,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
         if data.euro_lucky_next_idx < 2 {
             let new_supp = RandomBitBuffer::new()?;
             lucky_star_source = new_supp.value.reverse_bits();
-            supplemental = Some(new_supp);
+            supplemental = Some(new_supp)
         } else {
             break;
         }
@@ -291,7 +286,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
         let mut index = ((num >> (48 - 16 * i)) & 0xFFFF) as u32;
         while index > 55859 {
             if supplemental.is_none() {
-                supplemental = Some(RandomBitBuffer::new()?);
+                supplemental = Some(RandomBitBuffer::new()?)
             }
             if let Some(supp) = supplemental.as_ref() {
                 if let Some(valid_index) = (0..4)
@@ -301,11 +296,11 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                     index = valid_index;
                     break;
                 } else {
-                    supplemental = Some(RandomBitBuffer::new()?);
+                    supplemental = Some(RandomBitBuffer::new()?)
                 }
             }
         }
-        *slot = from_u32(0xAC00 + (index % 11172)).ok_or("한글 음절 변환 실패")?;
+        *slot = from_u32(0xAC00 + (index % 11172)).ok_or("한글 음절 변환 실패")?
     }
     data.hangul_syllables = hangul;
     let upper_32_bits = num >> 32;
@@ -336,7 +331,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                 2 => (data.solar_system_index >> 4) as u64,
                 3 => data.solar_system_index as u64,
                 _ => num >> (36 - (i as u8 - 4) * 4),
-            } & 0xF) as usize];
+            } & 0xF) as usize]
         });
     Ok((num, data))
 }
@@ -350,7 +345,7 @@ fn get_hardware_random() -> Result<u64> {
 fn rdseed_impl() -> Result<u64> {
     let mut v: u64 = 0;
     while unsafe { _rdseed64_step(&mut v) } != 1 {
-        spin_loop();
+        spin_loop()
     }
     Ok(v)
 }
@@ -360,7 +355,7 @@ fn rdrand_impl() -> Result<u64> {
         if unsafe { _rdrand64_step(&mut v) } == 1 {
             return Ok(v);
         }
-        spin_loop();
+        spin_loop()
     }
     Err("RDRAND 실패".into())
 }
@@ -453,7 +448,7 @@ fn process_lotto_numbers(
         *seen |= mask;
         *next_idx += 1;
         if *next_idx == numbers.len() {
-            numbers.sort_unstable();
+            numbers.sort_unstable()
         }
         return true;
     }
@@ -478,7 +473,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             .as_ref()
             .is_none_or(|supp| supp.bits_remaining < BITS)
         {
-            *supplemental = Some(RandomBitBuffer::new()?);
+            *supplemental = Some(RandomBitBuffer::new()?)
         }
         if let Some(supp) = supplemental.as_mut() {
             let extracted = (supp.value >> (supp.bits_remaining - BITS)) & mask;
@@ -653,14 +648,14 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
                 validation_success = false;
                 break;
             }
-            temp_count = i + 1;
+            temp_count = i + 1
         }
         if !validation_success {
             continue;
         }
         if !(2..=MAX_PLAYERS).contains(&temp_count) {
             if temp_count < 2 {
-                eprintln!("플레이어 수는 최소 2명이어야 합니다.");
+                eprintln!("플레이어 수는 최소 2명이어야 합니다.")
             }
             continue;
         }
@@ -669,7 +664,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             .take(n)
             .enumerate()
         {
-            players_array[i] = player_slice;
+            players_array[i] = player_slice
         }
         break;
     }
@@ -688,26 +683,26 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             .take(n)
             .enumerate()
         {
-            results_array[i] = result_slice;
+            results_array[i] = result_slice
         }
         break;
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
     for (i, slot) in indices_slice.iter_mut().enumerate() {
-        *slot = i;
+        *slot = i
     }
     let mut current_seed = num_64;
     for i in (1..n).rev() {
         current_seed ^= get_hardware_random()?;
-        indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize);
+        indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize)
     }
     players_array
         .iter()
         .take(n)
         .zip(indices_slice.iter())
         .for_each(|(player, &result_index)| {
-            println!("{player} -> {result}", result = results_array[result_index]);
+            println!("{player} -> {result}", result = results_array[result_index])
         });
     Ok(())
 }
@@ -728,14 +723,14 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
         if n >= MIN_ALLOWED_VALUE {
             break n;
         }
-        eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n");
+        eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n")
     };
     let max_value = loop {
         let n = read_parse_i64("최댓값을 입력해 주세요: ", input_buffer)?;
         if n >= min_value {
             break n;
         }
-        eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n");
+        eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
     };
     let range_size = max_value.wrapping_sub(min_value).wrapping_add(1) as u64;
     let rand_offset = if range_size == 0 {
@@ -765,7 +760,7 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
         if num >= min_value {
             break num;
         } else {
-            eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n");
+            eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
         }
     };
     let scale = (get_hardware_random()? ^ seed_modifier) as f64 / (u64::MAX as f64);
@@ -836,7 +831,7 @@ fn regenerate_multiple(
             while let Ok((data_buffer, data_len)) = receiver.recv() {
                 write_buffer_to_file_guard(&mut file_guard, &data_buffer[..data_len])?;
                 while let Ok((more_buffer, more_len)) = receiver.try_recv() {
-                    write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?;
+                    write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?
                 }
             }
             let (final_num_64, final_data) = generate_random_data()?;
@@ -861,7 +856,7 @@ fn regenerate_multiple(
                         &mut [0u8; 16],
                         &mut [0u8; 16],
                     )?;
-                    sleep(Duration::from_millis(100));
+                    sleep(Duration::from_millis(100))
                 }
                 Ok(())
             }))
@@ -888,7 +883,7 @@ fn regenerate_multiple(
         }
         drop(sender);
         if let Some(handle) = progress_thread {
-            join_thread(handle, "진행률 스레드 패닉 발생")?;
+            join_thread(handle, "진행률 스레드 패닉 발생")?
         }
         let (num, data) = join_thread(writer_thread, "쓰기 스레드 패닉 발생")?;
         last_generated_num = Some(num);
@@ -908,11 +903,11 @@ fn regenerate_multiple(
     if *IS_TERMINAL {
         let mut buffer = [0; BUFFER_SIZE];
         let bytes_written_console = format_data_into_buffer(&final_data, &mut buffer, true)?;
-        write_slice_to_console(&buffer[..bytes_written_console])?;
+        write_slice_to_console(&buffer[..bytes_written_console])?
     } else {
         let mut buffer = [0; BUFFER_SIZE];
         let bytes_written_file = format_data_into_buffer(&final_data, &mut buffer, false)?;
-        write_slice_to_console(&buffer[..bytes_written_file])?;
+        write_slice_to_console(&buffer[..bytes_written_file])?
     }
     Ok(last_generated_num.ok_or("최종 데이터의 num_64를 가져오지 못했습니다.")?)
 }
