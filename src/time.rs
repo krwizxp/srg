@@ -324,7 +324,7 @@ fn ask_for_target_time(input_buf: &mut String) -> ioResult<Option<SystemTime>> {
         input_buf,
         |s| {
             if s.is_empty() {
-                return Ok(None)
+                return Ok(None);
             }
             let mut parts = s.split(':');
             if let (Some(h_str), Some(m_str), Some(s_str)) =
@@ -486,13 +486,13 @@ impl AppState {
                 Ok(_) => {}
                 Err(e) => {
                     let _ = write!(msg_buf, "RTT 샘플 수집 실패: {e}");
-                    return transition_to_retry(msg_buf)
+                    return transition_to_retry(msg_buf);
                 }
             }
             thread::sleep(Duration::from_millis(ADAPTIVE_POLL_MILLIS))
         }
         if sample_count == 0 {
-            return transition_to_retry("유효한 RTT 샘플을 얻지 못했습니다.")
+            return transition_to_retry("유효한 RTT 샘플을 얻지 못했습니다.");
         }
         let total_rtt: Duration = samples.iter().take(sample_count).map(|s| s.rtt).sum();
         let avg_rtt = total_rtt / (sample_count as u32);
@@ -520,9 +520,9 @@ impl AppState {
                 if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
                     return transition_to_retry(
                         "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
-                    )
+                    );
                 }
-                return (Activity::CalibrateOnTick, None)
+                return (Activity::CalibrateOnTick, None);
             }
         };
         if let Some(prev_sample) = self.last_sample
@@ -535,20 +535,20 @@ impl AppState {
         {
             self.server_time = Some(st);
             self.next_full_sync_at = Instant::now() + Duration::from_secs(FULL_SYNC_INTERVAL_SECS);
-            return (Activity::Predicting, Some("[성공] 정밀 보정 완료!"))
+            return (Activity::Predicting, Some("[성공] 정밀 보정 완료!"));
         }
         self.last_sample = Some(current_sample);
         (Activity::CalibrateOnTick, None)
     }
     fn handle_predicting<'a>(&mut self, msg_buf: &'a mut String) -> (Activity, Option<&'a str>) {
         let Some(server_time) = self.server_time.as_ref() else {
-            return (Activity::MeasureBaselineRtt, None)
+            return (Activity::MeasureBaselineRtt, None);
         };
         let estimated_server_time = match server_time.current_server_time() {
             Ok(t) => t,
             Err(e) => {
                 let _ = write!(msg_buf, "[오류] 예측 중 시간 계산 실패: {e}");
-                return transition_to_retry(msg_buf)
+                return transition_to_retry(msg_buf);
             }
         };
         if let Some(target_time) = self.target_time.take_if(|target| {
@@ -560,7 +560,7 @@ impl AppState {
             return (
                 Activity::FinalCountdown { target_time },
                 Some("최종 카운트다운 시작!"),
-            )
+            );
         }
         if Instant::now() >= self.next_full_sync_at {
             self.server_time = None;
@@ -595,21 +595,21 @@ impl AppState {
             Ok(s) => s,
             Err(e) => {
                 let _ = write!(msg_buf, "카운트다운 샘플 획득 실패: {e}");
-                return (Activity::FinalCountdown { target_time }, Some(msg_buf))
+                return (Activity::FinalCountdown { target_time }, Some(msg_buf));
             }
         };
         let Some(st) = self.server_time.as_mut() else {
             return (
                 Activity::MeasureBaselineRtt,
                 Some("[오류] 내부 상태 불일치: server_time 없음"),
-            )
+            );
         };
         *st = st.recalibrate_with_rtt(sample.rtt);
         let current_server_time = match st.current_server_time() {
             Ok(t) => t,
             Err(e) => {
                 let _ = write!(msg_buf, "카운트다운 시간 계산 실패: {e}");
-                return (Activity::FinalCountdown { target_time }, Some(msg_buf))
+                return (Activity::FinalCountdown { target_time }, Some(msg_buf));
             }
         };
         let old_rtt = self.live_rtt.unwrap_or(sample.rtt);
@@ -683,9 +683,7 @@ pub fn run() -> Result<()> {
     }
     #[cfg(target_os = "windows")]
     if !is_curl_available() {
-        eprintln!(
-            "[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다."
-        )
+        eprintln!("[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다.")
     }
     #[cfg(target_os = "linux")]
     if !is_xdotool_available() {
@@ -807,7 +805,7 @@ fn fetch_server_time_sample_curl(
                 "curl {context} 실패, 상태: {status}"
             );
         }
-        return Err(Error::Curl(mem::take(&mut net_ctx.curl_stderr_buf)))
+        return Err(Error::Curl(mem::take(&mut net_ctx.curl_stderr_buf)));
     }
     let (headers_part, time_starttransfer_str) = net_ctx
         .curl_stdout_buf
@@ -863,11 +861,11 @@ fn tcp_attempt(
         line_buffer.clear();
         let bytes_read = stream_reader.read_until(b'\n', line_buffer)?;
         if bytes_read == 0 {
-            break
+            break;
         }
         full_headers.extend_from_slice(line_buffer);
         if line_buffer == b"\r\n" {
-            break
+            break;
         }
     }
     let response_received_inst = Instant::now();
@@ -879,7 +877,7 @@ fn tcp_attempt(
                 response_received_inst,
                 rtt: rtt_for_sample,
                 server_time,
-            })
+            });
         }
     }
     Err(Error::HeaderNotFound("Date (TCP)".into()))
@@ -914,7 +912,7 @@ fn fetch_server_time_sample_curl_with_fallback(
 }
 fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<TimeSample> {
     if host.len() >= 8 && host[..8].eq_ignore_ascii_case("https://") {
-        return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx)
+        return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx);
     }
     tcp_attempt(
         &mut net_ctx.tcp_line_buffer,
@@ -925,7 +923,7 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
         if !is_curl_available() {
             return Err(Error::SyncFailed(
                 "TCP 연결에 실패했고 curl을 사용할 수 없습니다.".into(),
-            ))
+            ));
         }
         fetch_server_time_sample_curl_with_fallback(host, net_ctx)
     })
@@ -941,7 +939,7 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     ) else {
         return Err(Error::Parse(
             "HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into(),
-        ))
+        ));
     };
     let mut time_parts = time_str.split(':');
     let (Some(h_str), Some(m_str), Some(s_str)) =
@@ -949,7 +947,7 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     else {
         return Err(Error::Parse(
             "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into(),
-        ))
+        ));
     };
     let (Ok(day), Ok(year), Ok(h), Ok(m), Ok(s)) = (
         day_str.parse::<u32>(),
@@ -960,7 +958,7 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     ) else {
         return Err(Error::Parse(
             "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into(),
-        ))
+        ));
     };
     let month = match month_str.as_bytes() {
         s if s.eq_ignore_ascii_case(b"jan") => 1,
@@ -978,7 +976,7 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         _ => {
             return Err(Error::Parse(
                 "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
-            ))
+            ));
         }
     };
     let days = days_from_civil(year, month, day);

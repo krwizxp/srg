@@ -260,7 +260,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     'lucky_star_loop: loop {
         for byte in lucky_star_source.to_be_bytes() {
             if byte > 251 {
-                continue
+                continue;
             }
             if process_lotto_numbers(
                 byte,
@@ -270,7 +270,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                 &mut data.euro_lucky_next_idx,
             ) && data.euro_lucky_next_idx >= 2
             {
-                break 'lucky_star_loop
+                break 'lucky_star_loop;
             }
         }
         if data.euro_lucky_next_idx < 2 {
@@ -278,7 +278,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
             lucky_star_source = new_supp.value.reverse_bits();
             supplemental = Some(new_supp)
         } else {
-            break
+            break;
         }
     }
     let mut hangul = ['\0'; 4];
@@ -294,7 +294,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                     .find(|&candidate| candidate <= 55859)
                 {
                     index = valid_index;
-                    break
+                    break;
                 } else {
                     supplemental = Some(RandomBitBuffer::new()?)
                 }
@@ -353,7 +353,7 @@ fn rdrand_impl() -> Result<u64> {
     let mut v: u64 = 0;
     for _ in 0..10 {
         if unsafe { _rdrand64_step(&mut v) } == 1 {
-            return Ok(v)
+            return Ok(v);
         }
         spin_loop()
     }
@@ -365,14 +365,14 @@ fn no_hw_rng() -> Result<u64> {
 fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
     for byte in v.to_be_bytes() {
         if byte > 249 {
-            continue
+            continue;
         }
         if data.numeric_password_digits < 6 && {
             data.numeric_password = data.numeric_password * 10 + u32::from(byte % 10);
             data.numeric_password_digits += 1;
             data.is_complete()
         } {
-            return
+            return;
         }
         if data.euro_main_next_idx < 5
             && process_lotto_numbers(
@@ -384,10 +384,10 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
             )
             && data.is_complete()
         {
-            return
+            return;
         }
         if byte > 224 {
-            continue
+            continue;
         }
         if data.lotto_next_idx < 6
             && process_lotto_numbers(
@@ -399,10 +399,10 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
             )
             && data.is_complete()
         {
-            return
+            return;
         }
         if byte > 221 {
-            continue
+            continue;
         }
         if data.lotto7_next_idx < 7
             && process_lotto_numbers(
@@ -414,10 +414,10 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
             )
             && data.is_complete()
         {
-            return
+            return;
         }
         if byte > 187 {
-            continue
+            continue;
         }
         if data.password_len < 8
             && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
@@ -427,7 +427,7 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
                 data.is_complete()
             }
         {
-            return
+            return;
         }
     }
 }
@@ -439,7 +439,7 @@ fn process_lotto_numbers(
     next_idx: &mut usize,
 ) -> bool {
     if *next_idx >= numbers.len() {
-        return false
+        return false;
     }
     let number = (byte % modulus) + 1;
     let mask = bit(number);
@@ -450,7 +450,7 @@ fn process_lotto_numbers(
         if *next_idx == numbers.len() {
             numbers.sort_unstable()
         }
-        return true
+        return true;
     }
     false
 }
@@ -466,7 +466,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         .map(|&shift| (num >> shift) & mask)
         .find(|&v| v <= max_value)
     {
-        return Ok(value)
+        return Ok(value);
     }
     loop {
         if supplemental
@@ -479,7 +479,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             let extracted = (supp.value >> (supp.bits_remaining - BITS)) & mask;
             supp.bits_remaining -= BITS;
             if extracted <= max_value {
-                return Ok(extracted)
+                return Ok(extracted);
             }
         }
     }
@@ -646,18 +646,18 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             if i >= MAX_PLAYERS {
                 eprintln!("플레이어 수가 최대 {MAX_PLAYERS}명을 초과했습니다.");
                 validation_success = false;
-                break
+                break;
             }
             temp_count = i + 1
         }
         if !validation_success {
-            continue
+            continue;
         }
         if !(2..=MAX_PLAYERS).contains(&temp_count) {
             if temp_count < 2 {
                 eprintln!("플레이어 수는 최소 2명이어야 합니다.")
             }
-            continue
+            continue;
         }
         n = temp_count;
         for (i, player_slice) in parse_comma_separated(player_input_buffer)
@@ -666,7 +666,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         {
             players_array[i] = player_slice
         }
-        break
+        break;
     }
     let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
     loop {
@@ -677,7 +677,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         .count();
         if temp_count != n {
             eprintln!("결과값의 개수({temp_count})가 플레이어 수({n})와 일치하지 않습니다.\n");
-            continue
+            continue;
         }
         for (i, result_slice) in parse_comma_separated(&result_input_buffer)
             .take(n)
@@ -685,7 +685,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         {
             results_array[i] = result_slice
         }
-        break
+        break;
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
@@ -721,14 +721,14 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
             input_buffer,
         )?;
         if n >= MIN_ALLOWED_VALUE {
-            break n
+            break n;
         }
         eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n")
     };
     let max_value = loop {
         let n = read_parse_i64("최댓값을 입력해 주세요: ", input_buffer)?;
         if n >= min_value {
-            break n
+            break n;
         }
         eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
     };
@@ -758,7 +758,7 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
     let max_value: f64 = loop {
         let num = read_parse_f64("최댓값을 입력해 주세요: ", input_buffer)?;
         if num >= min_value {
-            break num
+            break num;
         } else {
             eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
         }
@@ -789,7 +789,7 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
     loop {
         let m = ((get_hardware_random()? ^ seed_mod) as u128) * s as u128;
         if (m as u64) >= threshold {
-            return Ok((m >> 64) as u64)
+            return Ok((m >> 64) as u64);
         }
     }
 }
@@ -815,7 +815,7 @@ fn regenerate_multiple(
     };
     if requested_count == 1 {
         ensure_file_exists_and_reopen(file_mutex)?;
-        return process_single_random_data(file_mutex).map(|(num, _)| num)
+        return process_single_random_data(file_mutex).map(|(num, _)| num);
     }
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
@@ -919,7 +919,7 @@ fn print_progress(
     eta_buf: &mut [u8],
 ) -> Result<()> {
     if !*IS_TERMINAL {
-        return Ok(())
+        return Ok(());
     }
     let elapsed_secs = start_time.elapsed().as_secs_f64();
     let progress = if total == 0 {
@@ -953,7 +953,7 @@ fn print_progress(
 fn format_time_into(seconds: f64, buf: &mut [u8]) -> IoRst<usize> {
     if !seconds.is_finite() || seconds < 0.0 {
         buf[..7].copy_from_slice(INVALID_TIME);
-        return Ok(7)
+        return Ok(7);
     }
     let deci: u64 = (seconds * 10.0).round() as u64;
     let minutes = (deci / 600).min(99) as usize;
