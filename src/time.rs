@@ -944,22 +944,18 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
     })
 }
 fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
+    const ERR_BAD_FORMAT: &str = "HTTP Date 파싱 실패: 형식이 올바르지 않습니다.";
+    const ERR_NUM_CONV: &str = "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.";
+    const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
+    const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
+    const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     let mut parts = raw_date.split_ascii_whitespace();
-    let _weekday = parts
-        .next()
-        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
-    let day_str = parts
-        .next()
-        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
-    let month_str = parts
-        .next()
-        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
-    let year_str = parts
-        .next()
-        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
-    let time_str = parts
-        .next()
-        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    let mut expect_part = |msg: &'static str| parts.next().ok_or(Error::Parse(Cow::Borrowed(msg)));
+    let _weekday = expect_part(ERR_BAD_FORMAT)?;
+    let day_str = expect_part(ERR_BAD_FORMAT)?;
+    let month_str = expect_part(ERR_BAD_FORMAT)?;
+    let year_str = expect_part(ERR_BAD_FORMAT)?;
+    let time_str = expect_part(ERR_BAD_FORMAT)?;
     fn parse_u32_digits(s: &str) -> Option<u32> {
         let mut v = 0u32;
         if s.is_empty() {
@@ -973,36 +969,22 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         }
         Some(v)
     }
-    let day = parse_u32_digits(day_str).ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into())
-    })?;
-    let year = year_str.parse::<i32>().map_err(|_| {
-        Error::Parse("HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into())
-    })?;
+    let day = parse_u32_digits(day_str).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
+    let year = year_str
+        .parse::<i32>()
+        .map_err(|_| Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
     let mut time_parts = time_str.split(':');
-    let h = parse_u32_digits(time_parts.next().ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?)
-    .ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?;
-    let m = parse_u32_digits(time_parts.next().ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?)
-    .ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?;
-    let s = parse_u32_digits(time_parts.next().ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?)
-    .ok_or_else(|| {
-        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
-    })?;
+    let mut expect_time =
+        |msg: &'static str| time_parts.next().ok_or(Error::Parse(Cow::Borrowed(msg)));
+    let h = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let m = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let s = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
     let mb = month_str.as_bytes();
     if mb.len() < 3 {
-        return Err(Error::Parse(
-            "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
-        ));
+        return Err(Error::Parse(Cow::Borrowed(ERR_MONTH)));
     }
     let a = mb[0].to_ascii_lowercase();
     let b = mb[1].to_ascii_lowercase();
@@ -1020,18 +1002,27 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         (b'o', b'c', b't') => 10,
         (b'n', b'o', b'v') => 11,
         (b'd', b'e', b'c') => 12,
-        _ => {
-            return Err(Error::Parse(
-                "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
-            ));
-        }
+        _ => return Err(Error::Parse(Cow::Borrowed(ERR_MONTH))),
     };
     let days = days_from_civil(year, month, day);
     let timestamp_secs =
         i64::from(days) * 86400 + i64::from(h) * 3600 + i64::from(m) * 60 + i64::from(s);
-    UNIX_EPOCH
-        .checked_add(Duration::from_secs(timestamp_secs as u64))
-        .ok_or_else(|| Error::Parse("HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.".into()))
+    let ts_i128 = i128::from(timestamp_secs);
+    if ts_i128 >= 0 {
+        let secs_u64 = ts_i128 as u64;
+        UNIX_EPOCH
+            .checked_add(Duration::from_secs(secs_u64))
+            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
+    } else {
+        let abs_i128 = (-ts_i128) as i128;
+        if abs_i128 < 0 || abs_i128 as u128 > u128::from(u64::MAX) {
+            return Err(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)));
+        }
+        let abs_secs = abs_i128 as u64;
+        UNIX_EPOCH
+            .checked_sub(Duration::from_secs(abs_secs))
+            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
+    }
 }
 fn days_from_civil(y: i32, m: u32, d: u32) -> i32 {
     let y = if m <= 2 { y - 1 } else { y };
