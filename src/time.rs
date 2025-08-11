@@ -2,12 +2,12 @@ use std::{
     borrow::Cow,
     error,
     fmt::{self, Write},
-    io::{self, BufRead, BufReader, Read, Result as ioResult, Write as ioWrite},
+    io::{self, BufRead, BufReader, Result as ioResult, Write as ioWrite},
     mem,
     net::{self, TcpStream},
     process::{Command, Stdio},
     result as stdresult, str,
-    sync::mpsc,
+    sync::{LazyLock, mpsc},
     thread,
     time::{Duration, Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
@@ -318,6 +318,16 @@ struct NetworkContext {
     curl_stdout_buf: String,
     curl_stderr_buf: String,
 }
+static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("curl"));
+#[cfg(target_os = "linux")]
+static XDO_TOOL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("xdotool"));
+fn is_curl_available() -> bool {
+    *CURL_AVAILABLE
+}
+#[cfg(target_os = "linux")]
+fn is_xdotool_available() -> bool {
+    *XDO_TOOL_AVAILABLE
+}
 fn ask_for_target_time(input_buf: &mut String) -> ioResult<Option<SystemTime>> {
     get_validated_input(
         "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
@@ -417,7 +427,30 @@ impl AppState {
             curl_stdout_buf: String::with_capacity(4096),
             curl_stderr_buf: String::with_capacity(1024),
         };
-        while rx.try_recv().is_err() {
+        loop {
+            let activity_poll = match activity {
+                Activity::MeasureBaselineRtt
+                | Activity::CalibrateOnTick
+                | Activity::FinalCountdown { .. } => Duration::from_millis(ADAPTIVE_POLL_MILLIS),
+                _ => Duration::from_millis(DISPLAY_UPDATE_MILLIS),
+            };
+            let now = Instant::now();
+            let elapsed = now.duration_since(last_display_update);
+            let remaining_display = if elapsed >= DISPLAY_INTERVAL {
+                Duration::from_millis(0)
+            } else {
+                DISPLAY_INTERVAL - elapsed
+            };
+            let poll_timeout = if activity_poll < remaining_display {
+                activity_poll
+            } else {
+                remaining_display
+            };
+            match rx.recv_timeout(poll_timeout) {
+                Ok(()) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
             let now = Instant::now();
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
                 if let Some(st) = &self.server_time {
@@ -451,13 +484,6 @@ impl AppState {
                 println!("\n{console_msg}")
             }
             activity = next_activity;
-            let sleep_duration = match activity {
-                Activity::MeasureBaselineRtt
-                | Activity::CalibrateOnTick
-                | Activity::FinalCountdown { .. } => Duration::from_millis(ADAPTIVE_POLL_MILLIS),
-                _ => Duration::from_millis(DISPLAY_UPDATE_MILLIS),
-            };
-            thread::sleep(sleep_duration)
         }
         Ok(())
     }
@@ -742,13 +768,6 @@ fn is_command_available(command: &str) -> bool {
         .status()
         .is_ok_and(|s| s.success())
 }
-#[cfg(target_os = "linux")]
-fn is_xdotool_available() -> bool {
-    is_command_available("xdotool")
-}
-fn is_curl_available() -> bool {
-    is_command_available("curl")
-}
 fn find_date_header_value(line: &[u8]) -> Option<&str> {
     if line.len() > 5 && line[..5].eq_ignore_ascii_case(b"date:") {
         str::from_utf8(&line[5..]).ok().map(|s| s.trim())
@@ -764,52 +783,38 @@ fn fetch_server_time_sample_curl(
     net_ctx.curl_stdout_buf.clear();
     net_ctx.curl_stderr_buf.clear();
     let time_before_curl_call_inst = Instant::now();
-    let mut timeout_buf = [0u8; 20];
-    let timeout_str = {
-        let len = {
-            let mut cursor = io::Cursor::new(&mut timeout_buf[..]);
-            write!(cursor, "{TCP_TIMEOUT_SECS}")?;
-            cursor.position() as usize
-        };
-        str::from_utf8(&timeout_buf[..len])
-            .map_err(|_| Error::Parse("내부 오류: 타임아웃을 문자열로 변환 실패".into()))?
-    };
-    let mut child = Command::new("curl")
+    let timeout_str = TCP_TIMEOUT_SECS.to_string();
+    let output = Command::new("curl")
         .args([
             "-sI",
             "--ssl-no-revoke",
             "-L",
             "--max-time",
-            timeout_str,
+            &timeout_str,
             "--connect-timeout",
-            timeout_str,
+            &timeout_str,
             "-w",
             "\n%{time_starttransfer}",
             url_str,
         ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    if let Some(mut stdout) = child.stdout.take() {
-        stdout.read_to_string(&mut net_ctx.curl_stdout_buf)?;
-    }
-    let status = child.wait()?;
-    if !status.success() {
-        if let Some(mut stderr) = child.stderr.take() {
-            stderr.read_to_string(&mut net_ctx.curl_stderr_buf)?;
-        }
+        .output()?;
+    let stdout_cow = String::from_utf8_lossy(&output.stdout);
+    net_ctx.curl_stdout_buf.push_str(&stdout_cow);
+    let stderr_cow = String::from_utf8_lossy(&output.stderr);
+    net_ctx.curl_stderr_buf.push_str(&stderr_cow);
+    if !output.status.success() {
         if net_ctx.curl_stderr_buf.trim().is_empty() {
             net_ctx.curl_stderr_buf.clear();
             let _ = write!(
                 &mut net_ctx.curl_stderr_buf,
-                "curl {context} 실패, 상태: {status}"
+                "curl {context} 실패, 상태: {}",
+                output.status
             );
         }
         return Err(Error::Curl(mem::take(&mut net_ctx.curl_stderr_buf)));
     }
-    let (headers_part, time_starttransfer_str) = net_ctx
-        .curl_stdout_buf
-        .trim_end()
+    let stdout_trim = net_ctx.curl_stdout_buf.trim_end();
+    let (headers_part, time_starttransfer_str) = stdout_trim
         .rsplit_once('\n')
         .ok_or_else(|| Error::Parse("curl 응답에서 time_starttransfer 정보 누락".into()))?;
     let time_starttransfer_secs: f64 = time_starttransfer_str
@@ -835,6 +840,7 @@ fn tcp_attempt(
     full_headers: &mut Vec<u8>,
     host: &str,
 ) -> Result<TimeSample> {
+    full_headers.clear();
     let tcp_host_uri = host.strip_prefix("http://").unwrap_or(host);
     let (tcp_host_no_port, _) = tcp_host_uri.split_once(':').unwrap_or((tcp_host_uri, ""));
     let socket_addr_result: ioResult<net::SocketAddr> =
@@ -850,28 +856,21 @@ fn tcp_attempt(
     stream.set_read_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
     stream.set_write_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
     let mut stream_writer = io::BufWriter::new(&stream);
-    let request_sent_inst = Instant::now();
     stream_writer.write_all(b"HEAD / HTTP/1.1\r\nHost: ")?;
     stream_writer.write_all(tcp_host_no_port.as_bytes())?;
     stream_writer.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
     stream_writer.flush()?;
+    let request_sent_inst = Instant::now();
     let mut stream_reader = BufReader::new(&stream);
-    full_headers.clear();
     loop {
         line_buffer.clear();
         let bytes_read = stream_reader.read_until(b'\n', line_buffer)?;
         if bytes_read == 0 {
             break;
         }
-        full_headers.extend_from_slice(line_buffer);
-        if line_buffer == b"\r\n" {
-            break;
-        }
-    }
-    let response_received_inst = Instant::now();
-    let rtt_for_sample = response_received_inst.duration_since(request_sent_inst);
-    for line in full_headers.split(|&b| b == b'\n') {
-        if let Some(date_str) = find_date_header_value(line) {
+        if let Some(date_str) = find_date_header_value(line_buffer) {
+            let response_received_inst = Instant::now();
+            let rtt_for_sample = response_received_inst.duration_since(request_sent_inst);
             let server_time = parse_http_date_to_systemtime(date_str)?;
             return Ok(TimeSample {
                 response_received_inst,
@@ -879,6 +878,10 @@ fn tcp_attempt(
                 server_time,
             });
         }
+        if line_buffer == b"\r\n" {
+            break;
+        }
+        full_headers.extend_from_slice(line_buffer);
     }
     Err(Error::HeaderNotFound("Date (TCP)".into()))
 }
