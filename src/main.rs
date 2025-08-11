@@ -44,9 +44,6 @@ static TWO_DIGITS: LazyLock<[[u8; 2]; 100]> =
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const BUFFER_SIZE: usize = 1016;
-const fn bit(n: u8) -> u64 {
-    1u64 << n
-}
 const fn bitmask_const<const B: u8>() -> u64 {
     if B == 0 {
         0
@@ -442,7 +439,7 @@ fn process_lotto_numbers(
         return false;
     }
     let number = (byte % modulus) + 1;
-    let mask = bit(number);
+    let mask = 1u64 << number;
     if (*seen & mask) == 0 {
         numbers[*next_idx] = number;
         *seen |= mask;
@@ -937,6 +934,8 @@ fn print_progress(
     let filled = ((progress * BAR_WIDTH as f64).floor() as usize).min(BAR_WIDTH);
     let bar = BAR_FULL[filled];
     let mut out = stdout().lock();
+    let elapsed_str = str::from_utf8(&elapsed_buf[..elapsed_len]).unwrap_or("--:--.-");
+    let eta_str = str::from_utf8(&eta_buf[..eta_len]).unwrap_or("--:--.-");
     write!(
         out,
         "\r{} {:>3}% ({}/{}) | 소요: {} | ETA: {} \x1b[K",
@@ -944,8 +943,8 @@ fn print_progress(
         (progress * 100.0).floor() as u32,
         completed,
         total,
-        String::from_utf8_lossy(&elapsed_buf[..elapsed_len]),
-        String::from_utf8_lossy(&eta_buf[..eta_len]),
+        elapsed_str,
+        eta_str,
     )?;
     out.flush()?;
     Ok(())
