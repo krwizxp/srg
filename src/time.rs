@@ -233,8 +233,8 @@ impl ServerTime {
         let old_rtt_nanos = self.baseline_rtt.as_nanos();
         let new_rtt_nanos = new_rtt.as_nanos();
         let smoothed_rtt_nanos = (old_rtt_nanos * 7 + new_rtt_nanos * 3) / 10;
-        let smoothed_rtt =
-            Duration::from_nanos(u64::try_from(smoothed_rtt_nanos).unwrap_or(u64::MAX));
+        let capped = smoothed_rtt_nanos.min(u128::from(u64::MAX));
+        let smoothed_rtt = Duration::from_nanos(capped as u64);
         ServerTime {
             baseline_rtt: smoothed_rtt,
             ..self.clone()
@@ -434,8 +434,8 @@ impl AppState {
                 | Activity::FinalCountdown { .. } => Duration::from_millis(ADAPTIVE_POLL_MILLIS),
                 _ => Duration::from_millis(DISPLAY_UPDATE_MILLIS),
             };
-            let now = Instant::now();
-            let elapsed = now.duration_since(last_display_update);
+            let before_wait = Instant::now();
+            let elapsed = before_wait.duration_since(last_display_update);
             let remaining_display = if elapsed >= DISPLAY_INTERVAL {
                 Duration::from_millis(0)
             } else {
@@ -608,7 +608,7 @@ impl AppState {
         if let Some(action) = self.trigger_action {
             trigger_action(action)
         }
-        let _ = write!(msg_buf, "{log_message}");
+        msg_buf.push_str(log_message);
         (Activity::Finished, Some(msg_buf))
     }
     fn handle_final_countdown<'a>(
@@ -672,7 +672,8 @@ impl AppState {
         (Activity::Predicting, Some("액션 완료. 예측 모드 전환."))
     }
     fn handle_retrying(retry_at: Instant) -> (Activity, Option<&'static str>) {
-        if Instant::now() >= retry_at {
+        let now = Instant::now();
+        if now >= retry_at {
             (
                 Activity::MeasureBaselineRtt,
                 Some("[재시도] 동기화를 다시 시작합니다."),
@@ -798,11 +799,12 @@ fn fetch_server_time_sample_curl(
             url_str,
         ])
         .output()?;
-    let stdout_cow = String::from_utf8_lossy(&output.stdout);
-    net_ctx.curl_stdout_buf.push_str(&stdout_cow);
-    let stderr_cow = String::from_utf8_lossy(&output.stderr);
-    net_ctx.curl_stderr_buf.push_str(&stderr_cow);
+    let stdout_bytes = output.stdout;
+    let stderr_bytes = output.stderr;
     if !output.status.success() {
+        net_ctx
+            .curl_stderr_buf
+            .push_str(&String::from_utf8_lossy(&stderr_bytes));
         if net_ctx.curl_stderr_buf.trim().is_empty() {
             net_ctx.curl_stderr_buf.clear();
             let _ = write!(
@@ -813,19 +815,30 @@ fn fetch_server_time_sample_curl(
         }
         return Err(Error::Curl(mem::take(&mut net_ctx.curl_stderr_buf)));
     }
-    let stdout_trim = net_ctx.curl_stdout_buf.trim_end();
-    let (headers_part, time_starttransfer_str) = stdout_trim
-        .rsplit_once('\n')
+    net_ctx
+        .curl_stdout_buf
+        .push_str(&String::from_utf8_lossy(&stdout_bytes));
+    let mut end = stdout_bytes.len();
+    while end > 0 && stdout_bytes[end - 1].is_ascii_whitespace() {
+        end -= 1;
+    }
+    let pos = stdout_bytes[..end]
+        .iter()
+        .rposition(|&b| b == b'\n')
         .ok_or_else(|| Error::Parse("curl 응답에서 time_starttransfer 정보 누락".into()))?;
+    let headers_part = &stdout_bytes[..pos];
+    let time_starttransfer_part = &stdout_bytes[pos + 1..end];
+    let time_starttransfer_str = std::str::from_utf8(time_starttransfer_part)
+        .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
     let time_starttransfer_secs: f64 = time_starttransfer_str
         .trim()
         .parse()
         .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
     let rtt_reported_by_curl = Duration::from_secs_f64(time_starttransfer_secs.max(0.000001));
     let date_header_str_slice = headers_part
-        .lines()
+        .split(|&b| b == b'\n')
         .rev()
-        .find_map(|line| find_date_header_value(line.as_bytes()))
+        .find_map(|line| find_date_header_value(line))
         .ok_or_else(|| Error::HeaderNotFound("curl 응답에서 Date 헤더를 찾을 수 없음".into()))?;
     let server_time = parse_http_date_to_systemtime(date_header_str_slice)?;
     let response_received_inst = time_before_curl_call_inst + rtt_reported_by_curl;
@@ -852,14 +865,13 @@ fn tcp_attempt(
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Host not found"))
         };
     let socket_addr = socket_addr_result?;
-    let stream = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(TCP_TIMEOUT_SECS))?;
+    let mut stream =
+        TcpStream::connect_timeout(&socket_addr, Duration::from_secs(TCP_TIMEOUT_SECS))?;
     stream.set_read_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
     stream.set_write_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
-    let mut stream_writer = io::BufWriter::new(&stream);
-    stream_writer.write_all(b"HEAD / HTTP/1.1\r\nHost: ")?;
-    stream_writer.write_all(tcp_host_no_port.as_bytes())?;
-    stream_writer.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
-    stream_writer.flush()?;
+    stream.write_all(b"HEAD / HTTP/1.1\r\nHost: ")?;
+    stream.write_all(tcp_host_no_port.as_bytes())?;
+    stream.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
     let request_sent_inst = Instant::now();
     let mut stream_reader = BufReader::new(&stream);
     loop {
@@ -932,50 +944,82 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
     })
 }
 fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
-    let mut parts = raw_date.split_whitespace();
-    let (Some(_weekday), Some(day_str), Some(month_str), Some(year_str), Some(time_str)) = (
-        parts.next(),
-        parts.next(),
-        parts.next(),
-        parts.next(),
-        parts.next(),
-    ) else {
-        return Err(Error::Parse(
-            "HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into(),
-        ));
-    };
+    let mut parts = raw_date.split_ascii_whitespace();
+    let _weekday = parts
+        .next()
+        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    let day_str = parts
+        .next()
+        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    let month_str = parts
+        .next()
+        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    let year_str = parts
+        .next()
+        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    let time_str = parts
+        .next()
+        .ok_or_else(|| Error::Parse("HTTP Date 파싱 실패: 형식이 올바르지 않습니다.".into()))?;
+    fn parse_u32_digits(s: &str) -> Option<u32> {
+        let mut v = 0u32;
+        if s.is_empty() {
+            return None;
+        }
+        for &b in s.as_bytes() {
+            if !b.is_ascii_digit() {
+                return None;
+            }
+            v = v * 10 + (b - b'0') as u32;
+        }
+        Some(v)
+    }
+    let day = parse_u32_digits(day_str).ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into())
+    })?;
+    let year = year_str.parse::<i32>().map_err(|_| {
+        Error::Parse("HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into())
+    })?;
     let mut time_parts = time_str.split(':');
-    let (Some(h_str), Some(m_str), Some(s_str)) =
-        (time_parts.next(), time_parts.next(), time_parts.next())
-    else {
+    let h = parse_u32_digits(time_parts.next().ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?)
+    .ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?;
+    let m = parse_u32_digits(time_parts.next().ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?)
+    .ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?;
+    let s = parse_u32_digits(time_parts.next().ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?)
+    .ok_or_else(|| {
+        Error::Parse("HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into())
+    })?;
+    let mb = month_str.as_bytes();
+    if mb.len() < 3 {
         return Err(Error::Parse(
-            "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)".into(),
+            "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
         ));
-    };
-    let (Ok(day), Ok(year), Ok(h), Ok(m), Ok(s)) = (
-        day_str.parse::<u32>(),
-        year_str.parse::<i32>(),
-        h_str.parse::<u32>(),
-        m_str.parse::<u32>(),
-        s_str.parse::<u32>(),
-    ) else {
-        return Err(Error::Parse(
-            "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.".into(),
-        ));
-    };
-    let month = match month_str.as_bytes() {
-        s if s.eq_ignore_ascii_case(b"jan") => 1,
-        s if s.eq_ignore_ascii_case(b"feb") => 2,
-        s if s.eq_ignore_ascii_case(b"mar") => 3,
-        s if s.eq_ignore_ascii_case(b"apr") => 4,
-        s if s.eq_ignore_ascii_case(b"may") => 5,
-        s if s.eq_ignore_ascii_case(b"jun") => 6,
-        s if s.eq_ignore_ascii_case(b"jul") => 7,
-        s if s.eq_ignore_ascii_case(b"aug") => 8,
-        s if s.eq_ignore_ascii_case(b"sep") => 9,
-        s if s.eq_ignore_ascii_case(b"oct") => 10,
-        s if s.eq_ignore_ascii_case(b"nov") => 11,
-        s if s.eq_ignore_ascii_case(b"dec") => 12,
+    }
+    let a = mb[0].to_ascii_lowercase();
+    let b = mb[1].to_ascii_lowercase();
+    let c = mb[2].to_ascii_lowercase();
+    let month = match (a, b, c) {
+        (b'j', b'a', b'n') => 1,
+        (b'f', b'e', b'b') => 2,
+        (b'm', b'a', b'r') => 3,
+        (b'a', b'p', b'r') => 4,
+        (b'm', b'a', b'y') => 5,
+        (b'j', b'u', b'n') => 6,
+        (b'j', b'u', b'l') => 7,
+        (b'a', b'u', b'g') => 8,
+        (b's', b'e', b'p') => 9,
+        (b'o', b'c', b't') => 10,
+        (b'n', b'o', b'v') => 11,
+        (b'd', b'e', b'c') => 12,
         _ => {
             return Err(Error::Parse(
                 "HTTP Date 파싱 실패: 알 수 없는 월 형식".into(),
