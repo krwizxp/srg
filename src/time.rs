@@ -853,7 +853,7 @@ fn tcp_attempt(
     full_headers: &mut Vec<u8>,
     host: &str,
 ) -> Result<TimeSample> {
-    full_headers.clear();
+    let request_start_inst = Instant::now();
     let tcp_host_uri = host.strip_prefix("http://").unwrap_or(host);
     let (tcp_host_no_port, _) = tcp_host_uri.split_once(':').unwrap_or((tcp_host_uri, ""));
     let socket_addr_result: ioResult<net::SocketAddr> =
@@ -872,8 +872,8 @@ fn tcp_attempt(
     stream.write_all(b"HEAD / HTTP/1.1\r\nHost: ")?;
     stream.write_all(tcp_host_no_port.as_bytes())?;
     stream.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
-    let request_sent_inst = Instant::now();
     let mut stream_reader = BufReader::new(&stream);
+    full_headers.clear();
     loop {
         line_buffer.clear();
         let bytes_read = stream_reader.read_until(b'\n', line_buffer)?;
@@ -882,7 +882,7 @@ fn tcp_attempt(
         }
         if let Some(date_str) = find_date_header_value(line_buffer) {
             let response_received_inst = Instant::now();
-            let rtt_for_sample = response_received_inst.duration_since(request_sent_inst);
+            let rtt_for_sample = response_received_inst.duration_since(request_start_inst);
             let server_time = parse_http_date_to_systemtime(date_str)?;
             return Ok(TimeSample {
                 response_received_inst,
