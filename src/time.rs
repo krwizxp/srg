@@ -771,7 +771,7 @@ fn is_command_available(command: &str) -> bool {
 }
 fn find_date_header_value(line: &[u8]) -> Option<&str> {
     if line.len() > 5 && line[..5].eq_ignore_ascii_case(b"date:") {
-        str::from_utf8(&line[5..]).ok().map(|s| s.trim())
+        str::from_utf8(&line[5..]).ok().map(|s| s.trim_ascii())
     } else {
         None
     }

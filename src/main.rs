@@ -1,11 +1,11 @@
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::{_rdrand64_step, _rdseed64_step};
 use std::{
-    arch::x86_64::{_rdrand64_step, _rdseed64_step},
     array,
     char::from_u32,
     error::Error,
     fmt::{Display, Formatter, Result as fmtResult},
-    fs::{File, remove_file},
-    hint::spin_loop,
+    fs::File,
     io::{BufWriter, Error as ioErr, IsTerminal, Result as IoRst, Write, stdin, stdout},
     is_x86_feature_detected,
     path::Path,
@@ -25,7 +25,8 @@ enum RngSource {
     RdRand,
     None,
 }
-static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| {
+#[cfg(target_arch = "x86_64")]
+static RNG_SOURCE: std::sync::LazyLock<RngSource> = std::sync::LazyLock::new(|| {
     if is_x86_feature_detected!("rdseed") {
         RngSource::RdSeed
     } else if is_x86_feature_detected!("rdrand") {
@@ -35,6 +36,8 @@ static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| {
         RngSource::None
     }
 });
+#[cfg(not(target_arch = "x86_64"))]
+static RNG_SOURCE: std::sync::LazyLock<RngSource> = std::sync::LazyLock::new(|| RngSource::None);
 static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
@@ -78,6 +81,11 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const DIGITS: &[u8; 10] = b"0123456789";
+#[cfg(target_arch = "x86_64")]
+const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 기타: 종료\n선택해 주세요: ";
+#[cfg(not(target_arch = "x86_64"))]
+const MENU: &str = "\n5: 서버 시간 확인, 기타(1~4, 6 제외): 종료\n(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n선택해 주세요: ";
+
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
@@ -157,48 +165,85 @@ impl Display for HexCodeFormatter<'_> {
 }
 fn main() -> Result<ExitCode> {
     let file_mutex = Mutex::new(open_or_create_file()?);
+    #[cfg(target_arch = "x86_64")]
     let mut num_64 = process_single_random_data(&file_mutex)?.0;
+    #[cfg(not(target_arch = "x86_64"))]
+    let mut num_64: u64 = 0;
     let mut input_buffer = String::new();
     loop {
-        match read_line_reuse(
-            "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 기타: 종료\n선택해 주세요: ",
-            &mut input_buffer,
-        )? {
-            "1" => ladder_game(num_64, &mut input_buffer)?,
+        match read_line_reuse(MENU, &mut input_buffer)? {
+            "1" => {
+                #[cfg(target_arch = "x86_64")]
+                {
+                    ladder_game(num_64, &mut input_buffer)?;
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                }
+            }
             "2" => {
-                println!("\n무작위 숫자 생성 타입 선택:");
-                match read_line_reuse(
-                    "1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: ",
-                    &mut input_buffer,
-                )? {
-                    "1" => generate_random_integer(num_64, &mut input_buffer)?,
-                    "2" => generate_random_float(num_64, &mut input_buffer)?,
-                    _ => {
-                        println!("무작위 숫자 생성을 취소합니다.")
+                #[cfg(target_arch = "x86_64")]
+                {
+                    println!("\n무작위 숫자 생성 타입 선택:");
+                    match read_line_reuse(
+                        "1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: ",
+                        &mut input_buffer,
+                    )? {
+                        "1" => generate_random_integer(num_64, &mut input_buffer)?,
+                        "2" => generate_random_float(num_64, &mut input_buffer)?,
+                        _ => println!("무작위 숫자 생성을 취소합니다."),
                     }
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
                 }
             }
             "3" => {
-                ensure_file_exists_and_reopen(&file_mutex)?;
-                num_64 = process_single_random_data(&file_mutex)?.0
+                #[cfg(target_arch = "x86_64")]
+                {
+                    ensure_file_exists_and_reopen(&file_mutex)?;
+                    num_64 = process_single_random_data(&file_mutex)?.0;
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                }
             }
             "4" => {
-                ensure_file_exists_and_reopen(&file_mutex)?;
-                num_64 = regenerate_multiple(&file_mutex, &mut input_buffer)?
+                #[cfg(target_arch = "x86_64")]
+                {
+                    ensure_file_exists_and_reopen(&file_mutex)?;
+                    num_64 = regenerate_multiple(&file_mutex, &mut input_buffer)?;
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                }
             }
             "5" => {
                 if let Err(e) = time::run() {
-                    eprintln!("서버 시간 확인 중 오류 발생: {e}")
+                    eprintln!("서버 시간 확인 중 오류 발생: {e}");
                 }
             }
-            "6" => match remove_file(FILE_NAME) {
-                Ok(_) => {
-                    println!("파일 '{FILE_NAME}'를 삭제했습니다.")
+            "6" => {
+                #[cfg(target_arch = "x86_64")]
+                {
+                    match std::fs::remove_file(FILE_NAME) {
+                        Ok(_) => {
+                            println!("파일 '{FILE_NAME}'를 삭제했습니다.")
+                        }
+                        Err(e) => {
+                            eprintln!("{e}")
+                        }
+                    }
                 }
-                Err(e) => {
-                    eprintln!("{e}")
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
                 }
-            },
+            }
             _ => return Ok(ExitCode::SUCCESS),
         }
     }
@@ -339,22 +384,32 @@ fn get_hardware_random() -> Result<u64> {
         RngSource::None => no_hw_rng(),
     }
 }
+#[cfg(target_arch = "x86_64")]
 fn rdseed_impl() -> Result<u64> {
-    let mut v: u64 = 0;
+    let mut v = 0u64;
     while unsafe { _rdseed64_step(&mut v) } != 1 {
-        spin_loop()
+        std::hint::spin_loop()
     }
     Ok(v)
 }
+#[cfg(not(target_arch = "x86_64"))]
+fn rdseed_impl() -> Result<u64> {
+    no_hw_rng()
+}
+#[cfg(target_arch = "x86_64")]
 fn rdrand_impl() -> Result<u64> {
-    let mut v: u64 = 0;
+    let mut v = 0u64;
     for _ in 0..10 {
         if unsafe { _rdrand64_step(&mut v) } == 1 {
             return Ok(v);
         }
-        spin_loop()
+        std::hint::spin_loop();
     }
     Err("RDRAND 실패".into())
+}
+#[cfg(not(target_arch = "x86_64"))]
+fn rdrand_impl() -> Result<u64> {
+    no_hw_rng()
 }
 fn no_hw_rng() -> Result<u64> {
     Err("RDSEED·RDRAND 모두 미지원합니다.".into())
