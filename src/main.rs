@@ -171,7 +171,7 @@ fn main() -> Result<ExitCode> {
     let mut num_64: u64 = 0;
     let mut input_buffer = String::new();
     loop {
-        match read_line_reuse(MENU, &mut input_buffer)? {
+        match read_line_reuse(format_args!("{MENU}"), &mut input_buffer)? {
             "1" => {
                 #[cfg(target_arch = "x86_64")]
                 {
@@ -187,7 +187,7 @@ fn main() -> Result<ExitCode> {
                 {
                     println!("\n무작위 숫자 생성 타입 선택:");
                     match read_line_reuse(
-                        "1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: ",
+                        format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
                         &mut input_buffer,
                     )? {
                         "1" => generate_random_integer(num_64, &mut input_buffer)?,
@@ -674,10 +674,14 @@ fn write_slice_to_console(data_slice: &[u8]) -> IoRst<()> {
     stdout_lock.flush()?;
     Ok(())
 }
-fn read_line_reuse<'a>(prompt: &str, buffer: &'a mut String) -> IoRst<&'a str> {
+fn read_line_reuse<'a>(prompt: std::fmt::Arguments, buffer: &'a mut String) -> IoRst<&'a str> {
     buffer.clear();
-    print!("{prompt}");
-    stdout().flush()?;
+    {
+        let mut out = stdout().lock();
+        use std::io::Write as _;
+        write!(out, "{}", prompt)?;
+        out.flush()?;
+    }
     stdin().read_line(buffer)?;
     Ok(buffer.trim())
 }
@@ -690,7 +694,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         let mut temp_count = 0;
         let mut validation_success = true;
         for (i, _) in parse_comma_separated(read_line_reuse(
-            "\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~128명): ",
+            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~128명): "),
             player_input_buffer,
         )?)
         .enumerate()
@@ -700,14 +704,14 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
                 validation_success = false;
                 break;
             }
-            temp_count = i + 1
+            temp_count = i + 1;
         }
         if !validation_success {
             continue;
         }
         if !(2..=MAX_PLAYERS).contains(&temp_count) {
             if temp_count < 2 {
-                eprintln!("플레이어 수는 최소 2명이어야 합니다.")
+                eprintln!("플레이어 수는 최소 2명이어야 합니다.");
             }
             continue;
         }
@@ -716,14 +720,14 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             .take(n)
             .enumerate()
         {
-            players_array[i] = player_slice
+            players_array[i] = player_slice;
         }
         break;
     }
     let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
     loop {
         let temp_count = parse_comma_separated(read_line_reuse(
-            &format!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
+            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
             &mut result_input_buffer,
         )?)
         .count();
@@ -735,26 +739,26 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             .take(n)
             .enumerate()
         {
-            results_array[i] = result_slice
+            results_array[i] = result_slice;
         }
         break;
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
     for (i, slot) in indices_slice.iter_mut().enumerate() {
-        *slot = i
+        *slot = i;
     }
     let mut current_seed = num_64;
     for i in (1..n).rev() {
         current_seed ^= get_hardware_random()?;
-        indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize)
+        indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize);
     }
     players_array
         .iter()
         .take(n)
         .zip(indices_slice.iter())
         .for_each(|(player, &result_index)| {
-            println!("{player} -> {result}", result = results_array[result_index])
+            println!("{player} -> {result}", result = results_array[result_index]);
         });
     Ok(())
 }
@@ -769,7 +773,7 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
     );
     let min_value = loop {
         let n = read_parse_i64(
-            &format!("최솟값을 입력해 주세요 ({MIN_ALLOWED_VALUE} 이상): "),
+            format_args!("최솟값을 입력해 주세요 ({MIN_ALLOWED_VALUE} 이상): "),
             input_buffer,
         )?;
         if n >= MIN_ALLOWED_VALUE {
@@ -778,7 +782,7 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
         eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n")
     };
     let max_value = loop {
-        let n = read_parse_i64("최댓값을 입력해 주세요: ", input_buffer)?;
+        let n = read_parse_i64(format_args!("최댓값을 입력해 주세요: "), input_buffer)?;
         if n >= min_value {
             break n;
         }
@@ -794,11 +798,15 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
     println!("무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})");
     Ok(())
 }
-fn read_parse_i64(prompt: &str, buffer: &mut String) -> Result<i64> {
+fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i64> {
     loop {
-        print!("{prompt}");
-        stdout().flush()?;
-        match read_line_reuse("", buffer)?.parse::<i64>() {
+        {
+            let mut out = stdout().lock();
+            use std::io::Write as _;
+            write!(out, "{}", prompt)?;
+            out.flush()?;
+        }
+        match read_line_reuse(format_args!(""), buffer)?.parse::<i64>() {
             Ok(n) => return Ok(n),
             Err(_) => eprintln!("유효한 정수 형식이 아닙니다.\n"),
         }
@@ -806,9 +814,9 @@ fn read_parse_i64(prompt: &str, buffer: &mut String) -> Result<i64> {
 }
 fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Result<()> {
     println!("\n무작위 실수 생성기");
-    let min_value: f64 = read_parse_f64("최솟값을 입력해 주세요: ", input_buffer)?;
+    let min_value: f64 = read_parse_f64(format_args!("최솟값을 입력해 주세요: "), input_buffer)?;
     let max_value: f64 = loop {
-        let num = read_parse_f64("최댓값을 입력해 주세요: ", input_buffer)?;
+        let num = read_parse_f64(format_args!("최댓값을 입력해 주세요: "), input_buffer)?;
         if num >= min_value {
             break num;
         } else {
@@ -824,11 +832,15 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
     println!("무작위 실수({min_value} ~ {max_value}): {result}");
     Ok(())
 }
-fn read_parse_f64(prompt: &str, buffer: &mut String) -> Result<f64> {
+fn read_parse_f64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<f64> {
     loop {
-        print!("{prompt}");
-        stdout().flush()?;
-        match read_line_reuse("", buffer)?.parse::<f64>() {
+        {
+            let mut out = stdout().lock();
+            use std::io::Write as _;
+            write!(out, "{}", prompt)?;
+            out.flush()?;
+        }
+        match read_line_reuse(format_args!(""), buffer)?.parse::<f64>() {
             Ok(n) if n.is_finite() && !n.is_subnormal() => return Ok(n),
             _ => {
                 eprintln!("유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).\n")
@@ -859,7 +871,7 @@ fn regenerate_multiple(
     let requested_count: u64 = loop {
         print!("\n생성할 데이터 개수를 입력해 주세요: ");
         stdout().flush()?;
-        match read_line_reuse("", input_buffer)?.parse::<u64>() {
+        match read_line_reuse(format_args!(""), input_buffer)?.parse::<u64>() {
             Ok(0) => eprintln!("1 이상의 값을 입력해 주세요."),
             Ok(n) => break n,
             Err(_) => eprintln!("유효한 숫자를 입력해 주세요."),

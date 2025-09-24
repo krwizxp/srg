@@ -603,12 +603,12 @@ impl AppState {
     fn trigger_and_finish<'a>(
         &self,
         msg_buf: &'a mut String,
-        log_message: &str,
+        log_message: fmt::Arguments,
     ) -> (Activity, Option<&'a str>) {
         if let Some(action) = self.trigger_action {
             trigger_action(action)
         }
-        msg_buf.push_str(log_message);
+        let _ = msg_buf.write_fmt(log_message);
         (Activity::Finished, Some(msg_buf))
     }
     fn handle_final_countdown<'a>(
@@ -649,21 +649,25 @@ impl AppState {
         let one_way_delay = effective_rtt / 2;
         match target_time.duration_since(current_server_time) {
             Ok(duration_until_target) if duration_until_target <= one_way_delay => {
-                let log_msg = format!(
-                    "\n>>> 액션 실행! (목표 도달까지 {:.1}ms 남음) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
-                    duration_until_target.as_secs_f64() * 1000.0,
-                    one_way_delay.as_secs_f64() * 1000.0,
-                    sample.rtt.as_secs_f64() * 1000.0
-                );
-                self.trigger_and_finish(msg_buf, &log_msg)
+                self.trigger_and_finish(
+     msg_buf,
+     format_args!(
+         "\n>>> 액션 실행! (목표 도달까지 {:.1}ms 남음) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
+         duration_until_target.as_secs_f64() * 1000.0,
+         one_way_delay.as_secs_f64() * 1000.0,
+         sample.rtt.as_secs_f64() * 1000.0
+     )
+)
             }
             Err(_) => {
-                let log_msg = format!(
-                    "\n>>> 액션 실행! (시간 초과) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
-                    one_way_delay.as_secs_f64() * 1000.0,
-                    sample.rtt.as_secs_f64() * 1000.0
-                );
-                self.trigger_and_finish(msg_buf, &log_msg)
+                self.trigger_and_finish(
+     msg_buf,
+     format_args!(
+         "\n>>> 액션 실행! (시간 초과) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
+         one_way_delay.as_secs_f64() * 1000.0,
+         sample.rtt.as_secs_f64() * 1000.0
+     )
+)
             }
             _ => (Activity::FinalCountdown { target_time }, None),
         }
