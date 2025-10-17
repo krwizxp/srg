@@ -349,8 +349,8 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     let upper_ratio = (upper_32_bits as f64) * U32_MAX_INV;
     let lower_ratio = ((num & 0xFFFF_FFFF) as f64) * U32_MAX_INV;
     data.kor_coords = (
-        33.1123557596338 + 5.5013535429421 * upper_ratio,
-        124.609717678567 + 7.263065469715 * lower_ratio,
+        32.122778 + 6.488055 * upper_ratio,
+        124.609722 + 7.263056 * lower_ratio,
     );
     data.world_coords = (-90.0 + 180.0 * upper_ratio, -180.0 + 360.0 * lower_ratio);
     data.planet_number =
