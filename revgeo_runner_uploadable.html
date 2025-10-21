@@ -41,7 +41,6 @@
       <button id="start" class="primary" disabled>조회 시작</button>
       <button id="stop" disabled>중지</button>
       <button id="export" disabled>CSV 내보내기</button>
-      <button id="links" disabled>링크 CSV 내보내기</button>
     </div>
     <div class="row" style="margin-top:8px;">
       <div class="progress" style="flex:1 1 auto;"><div id="bar"></div></div>
@@ -56,7 +55,7 @@
         <tr>
           <th>set</th><th>idx</th><th>lat</th><th>lon</th>
           <th>시·도</th><th>시·군·구</th><th>읍·면·동(가능 시)</th>
-          <th>전체주소</th><th>원본링크</th>
+          <th>전체주소</th><th>지도링크</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -69,9 +68,7 @@ const fileEl = $("#file");
 const parseBtn = $("#parse");
 const startBtn = $("#start");
 const stopBtn = $("#stop");
-const exportBtn = $("#export");
-const linksBtn = $("#links");
-const statusEl = $("#status");
+const exportBtn = $("#export");const statusEl = $("#status");
 const bar = $("#bar");
 const countsEl = $("#counts");
 const tbody = document.querySelector("#tbl tbody");
@@ -131,10 +128,10 @@ function updateCounts() {
 
 function appendRow(row) {
   const tr = document.createElement("tr");
-  const keys = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","원본링크"];
+  const keys = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","지도링크"];
   for (const k of keys) {
     const td = document.createElement("td");
-    if (k === "원본링크") {
+    if (k === "지도링크") {
       const a = document.createElement("a");
       a.href = row[k];
       a.target = "_blank";
@@ -155,7 +152,7 @@ function csvEscape(s) {
 }
 
 function exportCSV(arr, filename) {
-  const header = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","원본링크"];
+  const header = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","지도링크"];
   const lines = [header.join(",")];
   for (const r of arr) {
     lines.push(header.map(k => csvEscape(r[k])).join(","));
@@ -166,24 +163,6 @@ function exportCSV(arr, filename) {
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
-
-function exportLinksCSV() {
-  const rows = [];
-  for (const r of [...parsed.KR, ...parsed.WORLD]) {
-    rows.push({ set: r.set, idx: r.idx, lat: r.lat, lon: r.lon, nominatim_url: nominatimURL(r.lat, r.lon) });
-  }
-  const header = ["set","idx","lat","lon","nominatim_url"];
-  const lines = [header.join(",")];
-  for (const r of rows) {
-    lines.push(header.map(k => csvEscape(r[k])).join(","));
-  }
-  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "revgeo_links_from_upload.csv"; a.click();
-  URL.revokeObjectURL(url);
-}
-
 function pick(addr, ks) {
   for (const k of ks) {
     if (addr && addr[k]) return addr[k];
@@ -206,6 +185,7 @@ async function runLookups() {
     if (stopFlag) break;
     const r = rows[i];
     const url = nominatimURL(r.lat, r.lon);
+    const gmap = mapsURL(r.lat, r.lon);
 
     let sido="", sigungu="", emd="", disp="";
     try {
@@ -228,7 +208,7 @@ async function runLookups() {
     const out = {
       set: r.set, idx: r.idx, lat: r.lat, lon: r.lon,
       "시·도": sido, "시·군·구": sigungu, "읍·면·동(가능 시)": emd,
-      "전체주소": disp, "원본링크": url
+      "전체주소": disp, "지도링크": gmap
     };
     results.push(out);
     appendRow(out);
@@ -251,7 +231,6 @@ fileEl.addEventListener("change", async () => {
   parseBtn.disabled = !fileEl.files || !fileEl.files[0];
   startBtn.disabled = true;
   exportBtn.disabled = true;
-  linksBtn.disabled = true;
   statusEl.textContent = fileEl.files && fileEl.files[0] ? `"${fileEl.files[0].name}" 선택됨 — 파일 분석을 눌러주세요.` : "파일을 선택해 주세요.";
 });
 
@@ -267,11 +246,9 @@ parseBtn.addEventListener("click", async () => {
     if (kr.length + world.length === 0) {
       statusEl.textContent = "좌표 패턴을 찾지 못했습니다. ('대한민국 위경도:' 또는 '전세계/세계/글로벌 위경도:' 라벨 확인)";
       startBtn.disabled = true;
-      linksBtn.disabled = true;
     } else {
       statusEl.textContent = "분석 완료. '조회 시작'으로 역지오코딩을 실행하세요.";
       startBtn.disabled = false;
-      linksBtn.disabled = false;
     }
   } catch (e) {
     statusEl.textContent = "파일 읽기 실패: " + e;
@@ -281,7 +258,12 @@ parseBtn.addEventListener("click", async () => {
 startBtn.addEventListener("click", runLookups);
 stopBtn.addEventListener("click", () => { stopFlag = true; });
 exportBtn.addEventListener("click", () => exportCSV(results, "revgeo_results_from_upload.csv"));
-linksBtn.addEventListener("click", exportLinksCSV);
+
+function mapsURL(lat, lon) {
+  // Cross-platform Google Maps URL (works on desktop & mobile)
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+}
+
 </script>
 </body>
 </html>
