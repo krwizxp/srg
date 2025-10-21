@@ -1,0 +1,287 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>업로드형 역지오코딩 도구 — random_data.txt 호환</title>
+<style>
+  :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: var(--fg); }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p { color: var(--muted); margin: 4px 0 14px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 10px 0 16px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .sp { flex: 1 1 auto; }
+  input[type=number] { width: 90px; padding:6px 8px; border-radius: 8px; border:1px solid var(--line); }
+  input[type=file] { padding:6px 8px; border-radius: 8px; border:1px dashed var(--line); }
+  button { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: #f8fafc; cursor: pointer; }
+  button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; }
+  th { background: #f3f4f6; position: sticky; top: 0; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .status { margin-top: 6px; color: var(--muted); }
+  .progress { height: 10px; background: #eee; border-radius: 6px; overflow: hidden; border:1px solid var(--line); }
+  .progress > div { height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
+  .caps { font-variant: all-small-caps; letter-spacing: .5px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <h1>업로드형 역지오코딩 도구</h1>
+  <p>random_data.txt와 동일한 형식의 텍스트를 업로드하여 내부의 좌표를 자동 인식하고, OSM Nominatim으로 역지오코딩 후 CSV로 내보냅니다.</p>
+
+  <div class="card">
+    <div class="row" style="gap:12px;">
+      <input id="file" type="file" accept=".txt,.log,.csv,.tsv,.json,.md,.yaml,.yml,.ini,.conf,.cfg,.rtf,.text" />
+      <span class="sp"></span>
+      <label class="caps">지연(ms): <input id="delay" type="number" value="1100" min="200" step="100" /></label>
+      <button id="parse" disabled>파일 분석</button>
+      <button id="start" class="primary" disabled>조회 시작</button>
+      <button id="stop" disabled>중지</button>
+      <button id="export" disabled>CSV 내보내기</button>
+      <button id="links" disabled>링크 CSV 내보내기</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <div class="progress" style="flex:1 1 auto;"><div id="bar"></div></div>
+    </div>
+    <div class="status" id="status">파일을 선택해 주세요.</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><div class="sp"></div><div id="counts" class="caps">KR: 0 • WORLD: 0 • 총계: 0</div></div>
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>set</th><th>idx</th><th>lat</th><th>lon</th>
+          <th>시·도</th><th>시·군·구</th><th>읍·면·동(가능 시)</th>
+          <th>전체주소</th><th>원본링크</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+const $ = (q) => document.querySelector(q);
+const fileEl = $("#file");
+const parseBtn = $("#parse");
+const startBtn = $("#start");
+const stopBtn = $("#stop");
+const exportBtn = $("#export");
+const linksBtn = $("#links");
+const statusEl = $("#status");
+const bar = $("#bar");
+const countsEl = $("#counts");
+const tbody = document.querySelector("#tbl tbody");
+
+let parsed = { KR: [], WORLD: [] };
+let stopFlag = false;
+let results = [];
+
+// Regexes (global, order-preserving via exec)
+const reKR = /대한민국\s*위경도:\s*([\-0-9.]+)\s*,\s*([\-0-9.]+)/g;
+const reWORLD = /(전세계|세계|글로벌)\s*위경도:\s*([\-0-9.]+)\s*,\s*([\-0-9.]+)/g;
+
+function readFile() {
+  return new Promise((resolve, reject) => {
+    const f = fileEl.files && fileEl.files[0];
+    if (!f) return reject(new Error("파일이 선택되지 않았습니다."));
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error("파일을 읽을 수 없습니다."));
+    reader.readAsText(f, "utf-8");
+  });
+}
+
+function clearTable() {
+  tbody.innerHTML = "";
+  results = [];
+  bar.style.width = "0%";
+  statusEl.textContent = "대기 중…";
+}
+
+function collect(text, regex, latGroup, lonGroup, setLabel) {
+  const arr = [];
+  regex.lastIndex = 0;
+  let m;
+  while ((m = regex.exec(text)) !== null) {
+    const lat = parseFloat(m[latGroup]);
+    const lon = parseFloat(m[lonGroup]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      arr.push({ set: setLabel, lat, lon, pos: m.index });
+    }
+  }
+  // Assign indices by encounter order
+  arr.sort((a,b) => a.pos - b.pos);
+  arr.forEach((r, i) => r.idx = i + 1);
+  return arr;
+}
+
+function nominatimURL(lat, lon) {
+  return `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ko`;
+}
+
+function updateCounts() {
+  const k = parsed.KR.length;
+  const w = parsed.WORLD.length;
+  countsEl.textContent = `KR: ${k} • WORLD: ${w} • 총계: ${k+w}`;
+}
+
+function appendRow(row) {
+  const tr = document.createElement("tr");
+  const keys = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","원본링크"];
+  for (const k of keys) {
+    const td = document.createElement("td");
+    if (k === "원본링크") {
+      const a = document.createElement("a");
+      a.href = row[k];
+      a.target = "_blank";
+      a.textContent = "링크";
+      td.appendChild(a);
+    } else {
+      td.textContent = row[k] == null ? "" : String(row[k]);
+    }
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+
+function csvEscape(s) {
+  if (s == null) return "";
+  s = String(s);
+  return (s.includes('"') || s.includes(",") || s.includes("\n")) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+function exportCSV(arr, filename) {
+  const header = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","원본링크"];
+  const lines = [header.join(",")];
+  for (const r of arr) {
+    lines.push(header.map(k => csvEscape(r[k])).join(","));
+  }
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportLinksCSV() {
+  const rows = [];
+  for (const r of [...parsed.KR, ...parsed.WORLD]) {
+    rows.push({ set: r.set, idx: r.idx, lat: r.lat, lon: r.lon, nominatim_url: nominatimURL(r.lat, r.lon) });
+  }
+  const header = ["set","idx","lat","lon","nominatim_url"];
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    lines.push(header.map(k => csvEscape(r[k])).join(","));
+  }
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "revgeo_links_from_upload.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pick(addr, ks) {
+  for (const k of ks) {
+    if (addr && addr[k]) return addr[k];
+  }
+  return "";
+}
+
+async function runLookups() {
+  stopFlag = false;
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  exportBtn.disabled = true;
+
+  const delay = parseInt($("#delay").value, 10) || 1100;
+  const rows = [...parsed.KR, ...parsed.WORLD];
+  results = [];
+  tbody.innerHTML = "";
+
+  for (let i=0; i<rows.length; i++) {
+    if (stopFlag) break;
+    const r = rows[i];
+    const url = nominatimURL(r.lat, r.lon);
+
+    let sido="", sigungu="", emd="", disp="";
+    try {
+      const resp = await fetch(url, { headers: {} });
+      if (!resp.ok) {
+        disp = `(HTTP ${resp.status}) 요청 실패`;
+      } else {
+        const data = await resp.json();
+        const a = data.address || {};
+        disp = data.display_name || "";
+        // Map to KR-style fields with worldwide fallbacks
+        sido   = pick(a, ["state","province","region"]);
+        sigungu= pick(a, ["city_district","county","city","municipality","state_district"]);
+        emd    = pick(a, ["town","suburb","village","hamlet","neighbourhood","quarter"]);
+      }
+    } catch (e) {
+      disp = "(네트워크 오류) " + e;
+    }
+
+    const out = {
+      set: r.set, idx: r.idx, lat: r.lat, lon: r.lon,
+      "시·도": sido, "시·군·구": sigungu, "읍·면·동(가능 시)": emd,
+      "전체주소": disp, "원본링크": url
+    };
+    results.push(out);
+    appendRow(out);
+
+    statusEl.textContent = `진행: ${i+1}/${rows.length}`;
+    bar.style.width = ((i+1)/rows.length*100).toFixed(1) + "%";
+
+    // courteous throttling
+    await new Promise(r => setTimeout(r, delay));
+  }
+
+  exportBtn.disabled = false;
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  statusEl.textContent = "완료 또는 중지됨.";
+}
+
+fileEl.addEventListener("change", async () => {
+  clearTable();
+  parseBtn.disabled = !fileEl.files || !fileEl.files[0];
+  startBtn.disabled = true;
+  exportBtn.disabled = true;
+  linksBtn.disabled = true;
+  statusEl.textContent = fileEl.files && fileEl.files[0] ? `"${fileEl.files[0].name}" 선택됨 — 파일 분석을 눌러주세요.` : "파일을 선택해 주세요.";
+});
+
+parseBtn.addEventListener("click", async () => {
+  clearTable();
+  try {
+    const text = await readFile();
+    const kr = collect(text, reKR, 1, 2, "KR");
+    const world = collect(text, reWORLD, 2, 3, "WORLD");
+    parsed = { KR: kr, WORLD: world };
+    updateCounts();
+
+    if (kr.length + world.length === 0) {
+      statusEl.textContent = "좌표 패턴을 찾지 못했습니다. ('대한민국 위경도:' 또는 '전세계/세계/글로벌 위경도:' 라벨 확인)";
+      startBtn.disabled = true;
+      linksBtn.disabled = true;
+    } else {
+      statusEl.textContent = "분석 완료. '조회 시작'으로 역지오코딩을 실행하세요.";
+      startBtn.disabled = false;
+      linksBtn.disabled = false;
+    }
+  } catch (e) {
+    statusEl.textContent = "파일 읽기 실패: " + e;
+  }
+});
+
+startBtn.addEventListener("click", runLookups);
+stopBtn.addEventListener("click", () => { stopFlag = true; });
+exportBtn.addEventListener("click", () => exportCSV(results, "revgeo_results_from_upload.csv"));
+linksBtn.addEventListener("click", exportLinksCSV);
+</script>
+</body>
+</html>
