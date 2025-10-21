@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>업로드형 역지오코딩 도구 — random_data.txt 호환</title>
+<title>업로드형 역지오코딩 도구 — random_data.txt 호환 (태그 표시)</title>
 <style>
   :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: var(--fg); }
@@ -26,11 +25,12 @@
   .progress { height: 10px; background: #eee; border-radius: 6px; overflow: hidden; border:1px solid var(--line); }
   .progress > div { height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
   .caps { font-variant: all-small-caps; letter-spacing: .5px; color: var(--muted); }
+  .tags-cell { max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
   <h1>업로드형 역지오코딩 도구</h1>
-  <p>random_data.txt와 동일한 형식의 텍스트를 업로드하여 내부의 좌표를 자동 인식하고, OSM Nominatim으로 역지오코딩 후 CSV로 내보냅니다.</p>
+  <p>SRG가 생성하는 random_data.txt와 동일한 형식의 텍스트 파일을 업로드하여 내부의 좌표를 자동 인식하고, OSM Nominatim으로 역지오코딩 후 CSV로 내보냅니다.</p>
 
   <div class="card">
     <div class="row" style="gap:12px;">
@@ -54,7 +54,8 @@
       <thead>
         <tr>
           <th>set</th><th>idx</th><th>lat</th><th>lon</th>
-          <th>시·도</th><th>시·군·구</th><th>읍·면·동(가능 시)</th>
+          <th>시·도</th><th>시·군·구</th><th>읍·면·동·리</th>
+          <th>지물 태그</th>
           <th>전체주소</th><th>지도링크</th>
         </tr>
       </thead>
@@ -117,7 +118,8 @@ function collect(text, regex, latGroup, lonGroup, setLabel) {
 }
 
 function nominatimURL(lat, lon) {
-  return `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ko`;
+  // extratags=1 로 OSM 지물 태그를 함께 요청
+  return `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&extratags=1&accept-language=ko`;
 }
 
 function updateCounts() {
@@ -128,7 +130,7 @@ function updateCounts() {
 
 function appendRow(row) {
   const tr = document.createElement("tr");
-  const keys = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","지도링크"];
+  const keys = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동·리","지물 태그","전체주소","지도링크"];
   for (const k of keys) {
     const td = document.createElement("td");
     if (k === "지도링크") {
@@ -139,6 +141,7 @@ function appendRow(row) {
       td.appendChild(a);
     } else {
       td.textContent = row[k] == null ? "" : String(row[k]);
+      if (k === "지물 태그") td.className = "tags-cell";
     }
     tr.appendChild(td);
   }
@@ -152,7 +155,7 @@ function csvEscape(s) {
 }
 
 function exportCSV(arr, filename) {
-  const header = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동(가능 시)","전체주소","지도링크"];
+  const header = ["set","idx","lat","lon","시·도","시·군·구","읍·면·동·리","지물 태그","전체주소","지도링크"];
   const lines = [header.join(",")];
   for (const r of arr) {
     lines.push(header.map(k => csvEscape(r[k])).join(","));
@@ -168,6 +171,34 @@ function pick(addr, ks) {
     if (addr && addr[k]) return addr[k];
   }
   return "";
+}
+
+// 주된 OSM 키만 추려 key=value 문자열로 요약
+function summarizeTags(data) {
+  const primaryKeys = ["amenity","highway","shop","building","railway","aeroway","waterway","natural","landuse","leisure","place","tourism","man_made","historic","power","boundary","barrier","office","public_transport","route","healthcare","emergency","military","sport","craft"];
+  const out = [];
+  const cat = data.category || "";
+  const typ = data.type || "";
+  if (cat && typ) out.push(`${cat}=${typ}`);
+  const extras = data.extratags || {};
+  // 같은 정보가 extratags에도 있으면 중복 방지
+  if (extras && extras[cat] && extras[cat] === typ) {
+    // already represented
+  } else if (!cat && extras) {
+    // category/type가 없으면 primary key 중 첫 번째를 대표로 사용
+    for (const k of primaryKeys) {
+      if (extras[k]) { out.push(`${k}=${extras[k]}`); break; }
+    }
+  }
+  // 나머지 주요 키를 추가로 나열 (최대 4개까지)
+  for (const k of primaryKeys) {
+    if (extras[k]) {
+      const kv = `${k}=${extras[k]}`;
+      if (!out.includes(kv)) out.push(kv);
+    }
+    if (out.length >= 5) break;
+  }
+  return out.join("; ");
 }
 
 async function runLookups() {
@@ -187,7 +218,7 @@ async function runLookups() {
     const url = nominatimURL(r.lat, r.lon);
     const gmap = mapsURL(r.lat, r.lon);
 
-    let sido="", sigungu="", emd="", disp="";
+    let sido="", sigungu="", emd="", disp="", tagStr="";
     try {
       const resp = await fetch(url, { headers: {} });
       if (!resp.ok) {
@@ -200,6 +231,8 @@ async function runLookups() {
         sido   = pick(a, ["state","province","region"]);
         sigungu= pick(a, ["city_district","county","city","municipality","state_district"]);
         emd    = pick(a, ["town","suburb","village","hamlet","neighbourhood","quarter"]);
+        // OSM 지물 태그 요약
+        tagStr = summarizeTags(data);
       }
     } catch (e) {
       disp = "(네트워크 오류) " + e;
@@ -207,7 +240,8 @@ async function runLookups() {
 
     const out = {
       set: r.set, idx: r.idx, lat: r.lat, lon: r.lon,
-      "시·도": sido, "시·군·구": sigungu, "읍·면·동(가능 시)": emd,
+      "시·도": sido, "시·군·구": sigungu, "읍·면·동·리": emd,
+      "지물 태그": tagStr,
       "전체주소": disp, "지도링크": gmap
     };
     results.push(out);
