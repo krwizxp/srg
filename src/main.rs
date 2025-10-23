@@ -170,8 +170,9 @@ fn main() -> Result<ExitCode> {
     #[cfg(not(target_arch = "x86_64"))]
     let mut num_64: u64 = 0;
     let mut input_buffer = String::new();
+    let menu_prompt = format_args!("{MENU}");
     loop {
-        match read_line_reuse(format_args!("{MENU}"), &mut input_buffer)? {
+        match read_line_reuse(menu_prompt, &mut input_buffer)? {
             "1" => {
                 #[cfg(target_arch = "x86_64")]
                 {
@@ -690,14 +691,13 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     let n: usize;
     let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
     let mut result_input_buffer = String::new();
+    let players_prompt =
+        format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~128명): ");
     loop {
         let mut temp_count = 0;
         let mut validation_success = true;
-        for (i, _) in parse_comma_separated(read_line_reuse(
-            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~128명): "),
-            player_input_buffer,
-        )?)
-        .enumerate()
+        for (i, _) in
+            parse_comma_separated(read_line_reuse(players_prompt, player_input_buffer)?).enumerate()
         {
             if i >= MAX_PLAYERS {
                 eprintln!("플레이어 수가 최대 {MAX_PLAYERS}명을 초과했습니다.");
@@ -725,12 +725,12 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         break;
     }
     let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+    let result_prompt =
+        format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): ");
     loop {
-        let temp_count = parse_comma_separated(read_line_reuse(
-            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-            &mut result_input_buffer,
-        )?)
-        .count();
+        let temp_count =
+            parse_comma_separated(read_line_reuse(result_prompt, &mut result_input_buffer)?)
+                .count();
         if temp_count != n {
             eprintln!("결과값의 개수({temp_count})가 플레이어 수({n})와 일치하지 않습니다.\n");
             continue;
@@ -800,13 +800,7 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
 }
 fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i64> {
     loop {
-        {
-            let mut out = stdout().lock();
-            use std::io::Write as _;
-            write!(out, "{}", prompt)?;
-            out.flush()?;
-        }
-        match read_line_reuse(format_args!(""), buffer)?.parse::<i64>() {
+        match read_line_reuse(prompt, buffer)?.parse::<i64>() {
             Ok(n) => return Ok(n),
             Err(_) => eprintln!("유효한 정수 형식이 아닙니다.\n"),
         }
@@ -814,9 +808,11 @@ fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i6
 }
 fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Result<()> {
     println!("\n무작위 실수 생성기");
-    let min_value: f64 = read_parse_f64(format_args!("최솟값을 입력해 주세요: "), input_buffer)?;
+    let fmin_prompt = format_args!("최솟값을 입력해 주세요: ");
+    let fmax_prompt = format_args!("최댓값을 입력해 주세요: ");
+    let min_value: f64 = read_parse_f64(fmin_prompt, input_buffer)?;
     let max_value: f64 = loop {
-        let num = read_parse_f64(format_args!("최댓값을 입력해 주세요: "), input_buffer)?;
+        let num = read_parse_f64(fmax_prompt, input_buffer)?;
         if num >= min_value {
             break num;
         } else {
@@ -834,13 +830,7 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
 }
 fn read_parse_f64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<f64> {
     loop {
-        {
-            let mut out = stdout().lock();
-            use std::io::Write as _;
-            write!(out, "{}", prompt)?;
-            out.flush()?;
-        }
-        match read_line_reuse(format_args!(""), buffer)?.parse::<f64>() {
+        match read_line_reuse(prompt, buffer)?.parse::<f64>() {
             Ok(n) if n.is_finite() && !n.is_subnormal() => return Ok(n),
             _ => {
                 eprintln!("유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).\n")
@@ -869,9 +859,8 @@ fn regenerate_multiple(
     input_buffer: &mut String,
 ) -> Result<u64> {
     let requested_count: u64 = loop {
-        print!("\n생성할 데이터 개수를 입력해 주세요: ");
-        stdout().flush()?;
-        match read_line_reuse(format_args!(""), input_buffer)?.parse::<u64>() {
+        let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
+        match read_line_reuse(count_prompt, input_buffer)?.parse::<u64>() {
             Ok(0) => eprintln!("1 이상의 값을 입력해 주세요."),
             Ok(n) => break n,
             Err(_) => eprintln!("유효한 숫자를 입력해 주세요."),
