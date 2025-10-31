@@ -11,8 +11,8 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
-const FULL_SYNC_INTERVAL_SECS: u64 = 300;
-const RETRY_DELAY_SECS: u64 = 10;
+const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
+const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT_SECS: u64 = 5;
 const DISPLAY_UPDATE_MILLIS: u64 = 45;
 const NUM_SAMPLES: usize = 10;
@@ -247,7 +247,8 @@ impl ServerTime {
     fn calculate_display_time(&self) -> Result<DisplayableTime> {
         let current_time = self.current_server_time()?;
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
-        let total_seconds_kst = since_epoch.as_secs() as i64 + 9 * 3600;
+        let total_seconds_kst =
+            since_epoch.as_secs() as i64 + Duration::from_hours(9).as_secs() as i64;
         let millis = since_epoch.subsec_millis();
         let days_since_epoch = total_seconds_kst.div_euclid(86400);
         let day_of_week_num = (days_since_epoch + 4).rem_euclid(7);
@@ -354,12 +355,13 @@ fn ask_for_target_time(input_buf: &mut String) -> ioResult<Option<SystemTime>> {
                     .duration_since(UNIX_EPOCH)
                     .map_err(|_| "시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.")?;
                 let today_start_secs_utc =
-                    (since_epoch.as_secs() + 9 * 3600) / 86400 * 86400 - 9 * 3600;
+                    ((since_epoch.as_secs() + Duration::from_hours(9).as_secs()) / 86400 * 86400)
+                        - Duration::from_hours(9).as_secs();
                 let target_secs_of_day = u64::from(h * 3600 + m * 60 + s);
                 let mut target_time =
                     UNIX_EPOCH + Duration::from_secs(today_start_secs_utc + target_secs_of_day);
                 if now_local > target_time {
-                    target_time += Duration::from_secs(86400)
+                    target_time += Duration::from_hours(24)
                 }
                 Ok(Some(target_time))
             } else {
@@ -560,7 +562,7 @@ impl AppState {
             && let Ok(st) = ServerTime::from_tick_sample(current_sample, baseline_rtt)
         {
             self.server_time = Some(st);
-            self.next_full_sync_at = Instant::now() + Duration::from_secs(FULL_SYNC_INTERVAL_SECS);
+            self.next_full_sync_at = Instant::now() + FULL_SYNC_INTERVAL;
             return (Activity::Predicting, Some("[성공] 정밀 보정 완료!"));
         }
         self.last_sample = Some(current_sample);
@@ -730,7 +732,7 @@ pub fn run() -> Result<()> {
 fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
     (
         Activity::Retrying {
-            retry_at: Instant::now() + Duration::from_secs(RETRY_DELAY_SECS),
+            retry_at: Instant::now() + RETRY_DELAY,
         },
         Some(msg),
     )
