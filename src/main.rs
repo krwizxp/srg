@@ -257,13 +257,10 @@ fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<
     Ok(())
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
-    let f = File::options()
-        .create(true)
-        .append(true)
-        .read(true)
-        .open(FILE_NAME)?;
-    f.lock()?;
-    Ok(BufWriter::with_capacity(1_048_576, f))
+    Ok(BufWriter::with_capacity(
+        1048576,
+        File::options().create(true).append(true).open(FILE_NAME)?,
+    ))
 }
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
     mutex.lock().map_err(|_| Box::from(context_msg))
