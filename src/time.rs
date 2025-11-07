@@ -837,7 +837,7 @@ fn fetch_server_time_sample_curl(
     let time_starttransfer_str = std::str::from_utf8(time_starttransfer_part)
         .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
     let time_starttransfer_secs: f64 = time_starttransfer_str
-        .trim()
+        .trim_ascii()
         .parse()
         .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
     let rtt_reported_by_curl = Duration::from_secs_f64(time_starttransfer_secs.max(0.000001));

@@ -48,12 +48,14 @@ type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const BUFFER_SIZE: usize = 1016;
 const fn bitmask_const<const B: u8>() -> u64 {
-    if B == 0 {
+    let b: u32 = {
+        let b = B as u32;
+        if b > 64 { 64 } else { b }
+    };
+    if b == 0 {
         0
-    } else if B >= 64 {
-        !0
     } else {
-        (!0u64) >> (64 - B)
+        u64::MAX.unbounded_shr(64 - b)
     }
 }
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
@@ -85,7 +87,6 @@ const DIGITS: &[u8; 10] = b"0123456789";
 const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 기타: 종료\n선택해 주세요: ";
 #[cfg(not(target_arch = "x86_64"))]
 const MENU: &str = "\n5: 서버 시간 확인, 기타(1~4, 6 제외): 종료\n(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n선택해 주세요: ";
-
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
@@ -256,10 +257,13 @@ fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<
     Ok(())
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
-    Ok(BufWriter::with_capacity(
-        1048576,
-        File::options().create(true).append(true).open(FILE_NAME)?,
-    ))
+    let f = File::options()
+        .create(true)
+        .append(true)
+        .read(true)
+        .open(FILE_NAME)?;
+    f.lock()?;
+    Ok(BufWriter::with_capacity(1_048_576, f))
 }
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
     mutex.lock().map_err(|_| Box::from(context_msg))
