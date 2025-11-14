@@ -617,17 +617,12 @@
       const lonStr = String(lon);
       const zoom = 16;
       const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
+      const title = encodeURIComponent(`${latStr} ${lonStr}`);
       const urlsByKey = {
         Google: `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`,
         OSM: `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`,
-        Naver: (() => {
-          const title = encodeURIComponent(`${latStr},${lonStr}`);
-          return `https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}`;
-        })(),
-        Kakao: (() => {
-          const kakaoTitle = encodeURIComponent(`${latStr} ${lonStr}`);
-          return `https://map.kakao.com/link/map/${kakaoTitle},${latStr},${lonStr}`;
-        })(),
+        Naver: `https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}`,
+        Kakao: `https://map.kakao.com/link/map/${title},${latStr},${lonStr}`,
       };
       return MAP_PROVIDERS.map(p => ({
         label: p.key,
