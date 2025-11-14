@@ -17,6 +17,7 @@
       --warn: #f59e0b;
       --err: #ef4444;
       --shadow: 0 10px 20px rgba(0, 0, 0, .25), 0 0 0 1px rgba(15, 23, 42, .8);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
     @media (prefers-color-scheme: light) {
@@ -102,7 +103,7 @@
     }
 
     header code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       padding: 1px 4px;
       border-radius: 4px;
@@ -250,7 +251,7 @@
       background: rgba(15, 23, 42, .8);
       color: var(--fg);
       padding: 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
 
@@ -388,7 +389,7 @@
     }
 
     .tags-cell {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: var(--font-mono);
       font-size: 12.5px;
       color: var(--muted);
     }
@@ -431,7 +432,7 @@
     }
 
     footer code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: var(--font-mono);
       font-size: 11px;
     }
   </style>
@@ -534,6 +535,22 @@
     const REQUEST_TIMEOUT_MS = 10_000;
     const RATE_LIMIT_DELAY_MS = 1_000;
     const REVERSE_ZOOM = 14;
+    const BASE_COLUMNS = [
+      '구분',
+      '순번',
+      '좌표 (위도,경도)',
+      '시·도',
+      '시·군·구',
+      '읍·면·동·리',
+      '지물 태그',
+      '전체주소',
+    ];
+    const MAP_PROVIDERS = [
+      { key: 'Google', header: '지도링크(Google)' },
+      { key: 'OSM', header: '지도링크(OSM)' },
+      { key: 'Naver', header: '지도링크(Naver)' },
+      { key: 'Kakao', header: '지도링크(Kakao)' },
+    ];
     let records = [];
     let results = [];
     let stopFlag = false;
@@ -551,9 +568,18 @@
       if (type === 'error') el.classList.add('err');
       else if (type === 'warn') el.classList.add('warn');
     }
+    function resetProcessingState(total) {
+      results = [];
+      currentIndex = 0;
+      paused = false;
+      processedCount = 0;
+      successCount = 0;
+      clearTable();
+      setProgress(0, total);
+      updateCounts();
+    }
     function setControlsIdle(message, type = 'info') {
       running = false;
-      paused = false;
       stopFlag = false;
       setStatus(message, type);
       els.start.disabled = false;
@@ -591,17 +617,19 @@
       const lonStr = String(lon);
       const zoom = 16;
       const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
-      const osm = `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`;
-      const naver = `https://map.naver.com/v5/search/${latStr},${lonStr}`;
-      const kakaoTitle = encodeURIComponent(`${latStr} ${lonStr}`);
-      const kakao = `https://map.kakao.com/link/map/${kakaoTitle},${latStr},${lonStr}`;
-      const g = `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`;
-      return [
-        { label: 'Google', url: g },
-        { label: 'OSM', url: osm },
-        { label: 'Naver', url: naver },
-        { label: 'Kakao', url: kakao },
-      ];
+      const urlsByKey = {
+        Google: `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`,
+        OSM: `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`,
+        Naver: `https://map.naver.com/v5/search/${latStr},${lonStr}`,
+        Kakao: (() => {
+          const kakaoTitle = encodeURIComponent(`${latStr} ${lonStr}`);
+          return `https://map.kakao.com/link/map/${kakaoTitle},${latStr},${lonStr}`;
+        })(),
+      };
+      return MAP_PROVIDERS.map(p => ({
+        label: p.key,
+        url: urlsByKey[p.key],
+      }));
     }
     async function fetchReverseWithRetry(lat, lon, signal) {
       const buildUrl = () => {
@@ -639,17 +667,7 @@
     }
     function appendRow(row) {
       const tr = document.createElement('tr');
-      const keys = [
-        "구분",
-        "순번",
-        "좌표 (위도,경도)",
-        "시·도",
-        "시·군·구",
-        "읍·면·동·리",
-        "지물 태그",
-        "전체주소",
-        "지도링크"
-      ];
+      const keys = [...BASE_COLUMNS, '지도링크'];
       for (const k of keys) {
         const isRowHeader = (k === '순번');
         const cellTag = (k === '지도링크') ? 'td' : (isRowHeader ? 'th' : 'td');
@@ -686,18 +704,8 @@
     function toCSV(rows) {
       if (!rows.length) return '';
       const headers = [
-        '구분',
-        '순번',
-        '좌표 (위도,경도)',
-        '시·도',
-        '시·군·구',
-        '읍·면·동·리',
-        '지물 태그',
-        '전체주소',
-        '지도링크(Google)',
-        '지도링크(OSM)',
-        '지도링크(Naver)',
-        '지도링크(Kakao)',
+        ...BASE_COLUMNS,
+        ...MAP_PROVIDERS.map(p => p.header),
       ];
       const escape = (s) => {
         if (s == null) return '';
@@ -709,20 +717,9 @@
       for (const r of rows) {
         const links = Array.isArray(r['지도링크']) ? r['지도링크'] : [];
         const linkMap = Object.fromEntries(links.map(l => [l.label, l.url]));
-        const rowVals = [
-          r['구분'],
-          r['순번'],
-          r['좌표 (위도,경도)'],
-          r['시·도'],
-          r['시·군·구'],
-          r['읍·면·동·리'],
-          r['지물 태그'],
-          r['전체주소'],
-          linkMap['Google'] || '',
-          linkMap['OSM'] || '',
-          linkMap['Naver'] || '',
-          linkMap['Kakao'] || '',
-        ];
+        const baseVals = BASE_COLUMNS.map(col => r[col]);
+        const linkVals = MAP_PROVIDERS.map(p => linkMap[p.key] || '');
+        const rowVals = [...baseVals, ...linkVals];
         lines.push(rowVals.map(escape).join(','));
       }
       return lines.join('\n');
@@ -790,6 +787,20 @@
       }
       return out;
     }
+    function buildResultRow(kind, r, extra) {
+      const base = {
+        '구분': kind,
+        '순번': r.idx,
+        '좌표 (위도,경도)': `${r.lat},${r.lon}`,
+        '시·도': '',
+        '시·군·구': '',
+        '읍·면·동·리': '',
+        '지물 태그': '',
+        '전체주소': '',
+        '지도링크': [],
+      };
+      return { ...base, ...extra };
+    }
     async function processNext() {
       if (!running || inFlight) return;
       if (!records.length || currentIndex >= records.length) {
@@ -809,17 +820,14 @@
         const addr = data.address ?? {};
         const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
         const linkset = mapLinks(lat, lon);
-        const row = {
-          '구분': r.set,
-          '순번': r.idx,
-          '좌표 (위도,경도)': `${lat},${lon}`,
+        const row = buildResultRow(r.set, r, {
           '시·도': sido,
           '시·군·구': sigungu,
           '읍·면·동·리': eupmyeon,
           '지물 태그': tag,
           '전체주소': data.display_name || '',
           '지도링크': linkset,
-        };
+        });
         pushResultRow(row);
         if (!paused && running) {
           setStatus(`처리 중… (${currentIndex}/${records.length})`);
@@ -833,17 +841,9 @@
         if (stopFlag && isAbort) {
           return;
         }
-        const row = {
-          '구분': '에러',
-          '순번': r.idx,
-          '좌표 (위도,경도)': `${lat},${lon}`,
-          '시·도': '',
-          '시·군·구': '',
-          '읍·면·동·리': '',
-          '지물 태그': '',
+        const row = buildResultRow('에러', r, {
           '전체주소': msg,
-          '지도링크': [],
-        };
+        });
         pushResultRow(row);
         if (!paused && running && !stopFlag) {
           setStatus(`에러 발생: (${currentIndex}/${records.length}) ${msg}`, 'error');
@@ -896,17 +896,9 @@
       const parsed = extractCoordinates(text);
       if (!parsed.length) {
         records = [];
-        results = [];
-        currentIndex = 0;
-        paused = false;
-        processedCount = 0;
-        successCount = 0;
-        clearTable();
-        setProgress(0, 0);
-        updateCounts();
+        resetProcessingState(0);
         els.coords.value = '';
         els.start.disabled = true;
-        els.exportBtn.disabled = true;
         setStatus(
           '좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.',
           'warn'
@@ -922,39 +914,21 @@
       els.coords.value = records
         .map(r => `${r.lat},${r.lon}`)
         .join('\n');
-      results = [];
-      currentIndex = 0;
-      paused = false;
-      processedCount = 0;
-      successCount = 0;
-      clearTable();
-      updateCounts();
-      setProgress(0, records.length);
-      setStatus(`분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`);
-      els.start.disabled = false;
-      els.pause.disabled = true;
-      els.resume.disabled = true;
-      els.stop.disabled = true;
-      els.exportBtn.disabled = true;
+      resetProcessingState(records.length);
+      setControlsIdle(
+        `분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`
+      );
     });
     els.start.addEventListener('click', () => {
       if (!records.length) return;
       stopFlag = false;
-      paused = false;
       running = true;
-      currentIndex = 0;
-      results = [];
-      processedCount = 0;
-      successCount = 0;
-      clearTable();
-      setProgress(0, records.length);
-      updateCounts();
+      resetProcessingState(records.length);
       setStatus('조회 시작…');
       els.start.disabled = true;
       els.pause.disabled = false;
       els.resume.disabled = true;
       els.stop.disabled = false;
-      els.exportBtn.disabled = true;
       setTableState('running');
       processNext();
     });
