@@ -620,7 +620,10 @@
       const urlsByKey = {
         Google: `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`,
         OSM: `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`,
-        Naver: `https://map.naver.com/v5/search/${latStr},${lonStr}`,
+        Naver: (() => {
+          const title = encodeURIComponent(`${latStr},${lonStr}`);
+          return `https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}`;
+        })(),
         Kakao: (() => {
           const kakaoTitle = encodeURIComponent(`${latStr} ${lonStr}`);
           return `https://map.kakao.com/link/map/${kakaoTitle},${latStr},${lonStr}`;
