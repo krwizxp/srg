@@ -593,10 +593,15 @@
       return lat >= 32 && lat <= 39 && lon >= 124 && lon <= 132;
     }
     function mapLinks(lat, lon) {
-      const osm = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`;
-      const naver = `https://map.naver.com/p/?c=${lon},${lat},16,0,0,0,dh`;
-      const kakao = `https://map.kakao.com/link/map/${lat},${lon}`;
-      const g = `https://www.google.com/maps?q=${lat},${lon}`;
+      const latStr = String(lat);
+      const lonStr = String(lon);
+      const zoom = 16;
+      const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
+      const osm = `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`;
+      const naver = `https://map.naver.com/v5/search/${latStr},${lonStr}`;
+      const kakaoTitle = encodeURIComponent(`${latStr} ${lonStr}`);
+      const kakao = `https://map.kakao.com/link/map/${kakaoTitle},${latStr},${lonStr}`;
+      const g = `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`;
       return [
         { label: 'Google', url: g },
         { label: 'OSM', url: osm },
