@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="ko">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light dark" />
-  <title>업로드형 역지오코딩 도구 (CSV: 지도 링크 분리)</title>
+  <title>SRG 데이터 역지오코딩 도구</title>
   <style>
     :root {
-      --bg: #0b1220;
       --card: #0f172a;
       --line: #1f2937;
       --muted: #9ca3af;
@@ -16,34 +16,144 @@
       --accent-2: #34d399;
       --warn: #f59e0b;
       --err: #ef4444;
-      --shadow: 0 10px 20px rgba(0,0,0,.25), 0 6px 6px rgba(0,0,0,.22);
+      --shadow: 0 10px 20px rgba(0, 0, 0, .25), 0 0 0 1px rgba(15, 23, 42, .8);
     }
+
     @media (prefers-color-scheme: light) {
       :root {
-        --bg: #f8fafc;
-        --card: #ffffff;
-        --line: #e5e7eb;
+        --card: #f9fafb;
+        --line: #d1d5db;
         --muted: #6b7280;
-        --fg: #0f172a;
+        --fg: #111827;
         --accent: #2563eb;
-        --accent-2: #059669;
-        --warn: #b45309;
-        --err: #b91c1c;
-        --shadow: 0 8px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+        --accent-2: #16a34a;
+        --warn: #d97706;
+        --err: #dc2626;
+        --shadow: 0 10px 20px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .7);
+      }
+
+      body {
+        background: radial-gradient(circle at top left, #e5e7eb, #f9fafb);
       }
     }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; padding: 24px;
-      color: var(--fg);
-      background: var(--bg);
-      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, '맑은 고딕', sans-serif;
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
     }
-    header { max-width: 1200px; margin: 0 auto 16px auto; }
-    header h1 { margin: 0 0 4px 0; font-weight: 800; font-size: 24px; letter-spacing: -0.2px; }
-    header p { margin: 0; color: var(--muted); }
-    main { max-width: 1200px; margin: 0 auto; display: grid; gap: 16px; }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      background: radial-gradient(circle at top left, #1f2937, #020617);
+      color: var(--fg);
+      color-scheme: light dark;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+
+    main,
+    header,
+    footer {
+      width: min(1100px, 100%);
+    }
+
+    header {
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top left, rgba(37, 99, 235, .35), rgba(15, 23, 42, .96));
+      border: 1px solid rgba(148, 163, 184, .7);
+      box-shadow: var(--shadow);
+    }
+
+    @media (prefers-color-scheme: light) {
+      header {
+        background: radial-gradient(circle at top left, rgba(191, 219, 254, .8), rgba(249, 250, 251, .98));
+      }
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    #results-title {
+      margin: 0 0 8px;
+    }
+
+    header code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, .7);
+      border: 1px solid rgba(148, 163, 184, .7);
+    }
+
+    @media (prefers-color-scheme: light) {
+      header code {
+        background: rgba(243, 244, 246, .9);
+        border-color: rgba(148, 163, 184, .8);
+      }
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr);
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    @media (width <=900px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    section {
+      position: relative;
+      overflow: hidden;
+    }
+
+    section::before {
+      content: "";
+      position: absolute;
+      inset: -60px;
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, .16), transparent 60%),
+        radial-gradient(circle at bottom right, rgba(52, 211, 153, .12), transparent 60%);
+      opacity: .9;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    @media (prefers-color-scheme: light) {
+      section::before {
+        opacity: .7;
+        mix-blend-mode: normal;
+      }
+    }
+
     .card {
       background: var(--card);
       border: 1px solid var(--line);
@@ -51,165 +161,357 @@
       padding: 14px;
       box-shadow: var(--shadow);
     }
-    .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .sp { flex: 1; }
-    .caps { font-variant: all-small-caps; letter-spacing: .4px; color: var(--muted); }
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
-    input[type="number"], input[type="file"], button {
+
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .sp {
+      flex: 1;
+    }
+
+    .caps {
+      font-variant: all-small-caps;
+      letter-spacing: .4px;
+      color: var(--muted);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--fg);
+    }
+
+    input[type="file"],
+    button {
       border-radius: 10px;
       border: 1px solid var(--line);
       background: transparent;
       color: var(--fg);
       padding: 10px 12px;
     }
-    input[type="file"] { padding: 8px; }
-    input[type="number"] { width: 120px; }
+
+    input[type="file"] {
+      padding: 8px;
+    }
+
     button {
       cursor: pointer;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+      background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
       transition: transform .08s ease, filter .15s ease;
     }
-    button.primary { border-color: var(--accent); }
+
     button:disabled {
-      opacity: .55; cursor: not-allowed; filter: grayscale(.4);
+      opacity: .5;
+      cursor: default;
+      filter: grayscale(.6);
     }
-    button:not(:disabled):active { transform: translateY(1px) scale(.99); }
 
-    /* ---- Progress (always visible) ---- */
-    .progress-wrap { display: flex; align-items: center; gap: 10px; }
-    progress {
-      width: 320px; height: 14px;
-      appearance: none; -webkit-appearance: none;
-      border: none; background: transparent;
+    button:not(:disabled):hover {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
     }
-    progress::-webkit-progress-bar {
-      background-color: rgba(255,255,255,.10);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    progress::-webkit-progress-value { background-color: var(--accent); border-radius: 999px; }
-    progress::-moz-progress-bar { background-color: var(--accent); border-radius: 999px; }
-    progress { color: var(--accent); }
 
-    .status { margin-top: 8px; color: var(--muted); min-height: 1.5em; min-height: 1lh; }
-    table {
+    button:focus-visible,
+    input[type="file"]:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    textarea {
       width: 100%;
-      border-collapse: collapse;
+      min-height: 110px;
+      border-radius: 10px;
       border: 1px solid var(--line);
-      border-radius: 12px;
-      overflow: hidden;
-      table-layout: auto;
+      background: rgba(15, 23, 42, .8);
+      color: var(--fg);
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
     }
+
+    textarea::placeholder {
+      color: rgba(156, 163, 175, .8);
+    }
+
+    @media (prefers-color-scheme: light) {
+      textarea {
+        background: rgba(249, 250, 251, .96);
+      }
+    }
+
+    progress {
+      width: 100%;
+      height: 8px;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    progress::-webkit-progress-bar {
+      background-color: rgba(15, 23, 42, .85);
+      border-radius: 999px;
+      border: 1px solid var(--line);
+    }
+
+    progress::-webkit-progress-value {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 999px;
+    }
+
+    progress::-moz-progress-bar {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 999px;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+
+    .status.err {
+      color: var(--err);
+    }
+
+    .status.warn {
+      color: var(--warn);
+    }
+
+    .counts {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .counts strong {
+      color: var(--fg);
+    }
+
+    .table-wrap {
+      max-height: 460px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(15, 23, 42, .85);
+      box-shadow: var(--shadow);
+    }
+
+    .table-wrap:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      .table-wrap {
+        background: rgba(249, 250, 251, .96);
+      }
+    }
+
+    .table-wrap[data-state="idle"]:not(:has(tbody tr))::after {
+      content: "아직 결과가 없습니다. 좌표를 추출하고 조회를 시작해 주세요.";
+      display: block;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+      min-width: 760px;
+    }
+
+    caption {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
     thead th {
-      position: sticky; top: 0; z-index: 1;
+      position: sticky;
+      top: 0;
+      z-index: 1;
       text-align: left;
       padding: 10px 12px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
-    
+      background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
     }
+
     tbody td {
       padding: 10px 12px;
       vertical-align: top;
       word-break: break-word;
     }
-    tbody tr:last-child { border-bottom: 0; }
-    tbody tr { border-bottom: 1px dashed var(--line); }
-    tbody tr:last-child { border-bottom: 0; }
-    tbody tr:nth-child(even) { background: var(--card); background: color-mix(in oklab, var(--card), black 2%); }
+
+    tbody tr {
+      border-bottom: 1px dashed var(--line);
+    }
+
+    tbody tr:last-child {
+      border-bottom: 0;
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--card);
+      background: color-mix(in oklab, var(--card), black 2%);
+    }
+
     .tags-cell {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 12.5px;
       color: var(--muted);
     }
-    .nowrap { white-space: nowrap; }
-    .nowrap a { white-space: nowrap; }
-    .ellipsis { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-    footer { max-width: 1200px; margin: 6px auto 0 auto; color: var(--muted); font-size: 13px; }
-    code.k { background: var(--card); background: color-mix(in oklab, var(--card), black 6%); padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); }
+
+    .nowrap {
+      white-space: nowrap;
+    }
+
+    .nowrap a {
+      white-space: nowrap;
+    }
+
+    .ellipsis {
+      max-width: 22ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    a:focus-visible {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+
+    footer {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    footer code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+    }
   </style>
 </head>
+
 <body>
   <header>
-    <h1>업로드형 역지오코딩 도구</h1>
-    <p><strong>SRG의 random_data.txt에서</strong> 좌표를 추출해 <em>1초 간격</em>으로 Nominatim(OpenStreetMap) API를 호출하여 주소를 구합니다.</p>
+    <h1>SRG 데이터 역지오코딩 도구</h1>
+    <p><strong>SRG의 random_data.txt에서</strong> 좌표를 추출해 Nominatim(OpenStreetMap) API를 호출하여 주소를 구합니다.</p>
   </header>
-
   <main>
     <section class="card" aria-labelledby="controls-title">
       <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
-
-      <form class="row" onsubmit="return false"><fieldset class="row"><legend class="sr-only">파일 업로드 및 실행</legend>
-        <label for="file" class="sr-only">파일 선택</label>
-        <input id="file" type="file" accept=".txt,.log,.csv,.tsv,.json,.md,.yaml,.yml,.ini,.conf,.cfg,.rtf,.text" />
-
-        <span class="sp"></span>
-
-        <label for="delay" class="caps">지연(ms):</label>
-        <input id="delay" type="number" inputmode="numeric" min="1000" step="100" value="1100" />
-
-        <button id="parse" type="button" disabled>파일 분석</button>
-        <button id="start" type="button" class="primary" disabled>조회 시작</button>
-        <button id="pause" type="button" disabled>일시정지</button>
-        <button id="resume" type="button" disabled>재개</button>
-        <button id="stop" type="button" disabled>중지</button>
-        <button id="export" type="button" disabled>CSV 내보내기</button>
-      </fieldset></form>
-
-      <div class="progress-wrap" style="margin-top:8px;">
-        <progress id="prog" aria-describedby="prog-label" max="100" value="0" aria-label="진행률">0%</progress>
-        <span id="prog-label" class="caps">0%</span>
+      <form class="row">
+        <fieldset class="row">
+          <legend class="sr-only">파일 업로드 및 실행</legend>
+          <label for="file">random_data.txt</label>
+          <input type="file" id="file" accept=".txt" />
+          <div class="row">
+            <button type="button" id="parse">좌표 추출</button>
+            <button type="button" id="start" disabled>조회 시작</button>
+            <button type="button" id="pause" disabled>일시정지</button>
+            <button type="button" id="resume" disabled>재개</button>
+            <button type="button" id="stop" disabled>중지</button>
+            <button type="button" id="export" disabled>CSV 내보내기</button>
+          </div>
+        </fieldset>
+      </form>
+      <div>
+        <label for="coords">
+          <span class="caps">추출된 좌표 (lat,lon)</span>
+        </label>
+        <textarea id="coords" readonly placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea>
       </div>
-
-      <div class="status" id="status" role="status" aria-live="polite" aria-atomic="true">파일을 선택해 주세요.</div>
+      <div class="row" style="align-items:flex-end; margin-top:8px;">
+        <div class="sp">
+          <div class="caps" id="prog-label">진행 상황</div>
+          <progress id="prog" value="0" max="100" aria-labelledby="prog-label"></progress>
+        </div>
+        <div class="counts" id="counts">
+          총 <strong>0</strong>건 중
+          <strong>0</strong>건 완료,
+          <strong>0</strong>건 실패,
+          <strong>0</strong>건 미처리
+        </div>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
     </section>
-
-    <section class="card">
-      <div class="row" style="margin-bottom:8px;">
-        <div class="sp"></div>
-        <output id="counts" class="caps" aria-live="polite">KR: 0 • WORLD: 0 • 총계: 0</output>
+    <section class="card" aria-labelledby="results-title">
+      <h2 id="results-title" class="caps">결과 표</h2>
+      <div class="table-wrap" role="region" aria-label="역지오코딩 결과" tabindex="0" data-state="idle">
+        <table id="tbl">
+          <caption>각 좌표별로 분류, 주소, 행정구역, 지도 링크를 표시합니다.</caption>
+          <thead>
+            <tr>
+              <th scope="col">구분</th>
+              <th scope="col">순번</th>
+              <th scope="col">좌표 (위도,경도)</th>
+              <th scope="col">시·도</th>
+              <th scope="col">시·군·구</th>
+              <th scope="col">읍·면·동·리</th>
+              <th scope="col">지물 태그</th>
+              <th scope="col">전체주소</th>
+              <th scope="col">지도링크</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
-
-      <table id="tbl">
-        <caption class="sr-only">좌표와 역지오코딩 결과 목록</caption>
-        <thead>
-          <tr>
-            <th scope="col">구분</th>
-            <th scope="col">순번</th>
-            <th scope="col">좌표 (위도,경도)</th>
-            <th scope="col">시·도</th>
-            <th scope="col" class="nowrap">시·군·구</th>
-            <th scope="col" class="nowrap">읍·면·동·리</th>
-            <th scope="col">지물 태그</th>
-            <th scope="col">전체주소</th>
-            <th scope="col" class="nowrap">지도링크</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
     </section>
   </main>
-
   <footer>
-    <p>서비스 품질을 위해 너무 빠른 요청은 제한될 수 있습니다. 공용 API 사용 정책을 존중해 주세요. (<code class="k">nominatim.openstreetmap.org</code> 1req/sec 권장) • 실패 시 자동으로 짧은 대기 후 재시도합니다.</p>
+    <p>서비스 품질을 위해 너무 빠른 요청은 제한될 수 있습니다. 공용 API 사용 정책을 존중해 주세요. (<code>nominatim.openstreetmap.org</code> 1req/sec 권장) •
+      실패 시 자동으로 짧은 대기 후 재시도합니다.</p>
   </footer>
-
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
-
   <script type="module">
     const els = {
+      form: document.querySelector('form'),
       file: document.getElementById('file'),
-      delay: document.getElementById('delay'),
       parse: document.getElementById('parse'),
       start: document.getElementById('start'),
       pause: document.getElementById('pause'),
@@ -221,54 +523,80 @@
       prog: document.getElementById('prog'),
       progLabel: document.getElementById('prog-label'),
       tbody: document.querySelector('#tbl tbody'),
+      coords: document.getElementById('coords'),
+      tableWrap: document.querySelector('.table-wrap'),
     };
-
-    /** App state */
-    let records = [];       // {set, idx, lat, lon}
-    let results = [];       // finalized rows for table/csv
-    let stopFlag = false;   // stop everything
-    let paused = false;     // pause between iterations
-    let running = false;    // overall running state
-    let controller = null;  // AbortController for fetch
-    let currentIndex = 0;   // progress pointer
-
-    const KR_BOUND = { latMin: 33.0, latMax: 39.7, lonMin: 124.0, lonMax: 132.1 };
-
-    function isKR(lat, lon) {
-      return lat >= KR_BOUND.latMin && lat <= KR_BOUND.latMax && lon >= KR_BOUND.lonMin && lon <= KR_BOUND.lonMax;
+    function setTableState(state) {
+      if (!els.tableWrap) return;
+      els.tableWrap.setAttribute('data-state', state);
     }
-
-    function setStatus(msg, tone = 'info') {
-      const color = tone === 'warn' ? 'var(--warn)' : tone === 'err' ? 'var(--err)' : 'var(--muted)';
-      els.status.style.color = color;
-      els.status.textContent = msg;
+    if (els.form) {
+      els.form.addEventListener('submit', (event) => {
+        event.preventDefault();
+      });
     }
-
+    const nf = new Intl.NumberFormat('ko-KR');
+    const MAX_RETRY = 3;
+    const REQUEST_TIMEOUT_MS = 10_000;
+    const RATE_LIMIT_DELAY_MS = 1_000;
+    const REVERSE_ZOOM = 14;
+    let records = [];
+    let results = [];
+    let stopFlag = false;
+    let paused = false;
+    let running = false;
+    let controller = null;
+    let currentIndex = 0;
+    let inFlight = false;
+    let processedCount = 0;
+    let successCount = 0;
+    function setStatus(msg, type = 'info') {
+      const el = els.status;
+      el.textContent = msg;
+      el.classList.remove('err', 'warn');
+      if (type === 'error') el.classList.add('err');
+      else if (type === 'warn') el.classList.add('warn');
+    }
+    function setControlsIdle(message, type = 'info') {
+      running = false;
+      paused = false;
+      stopFlag = false;
+      setStatus(message, type);
+      els.start.disabled = false;
+      els.pause.disabled = true;
+      els.resume.disabled = true;
+      els.stop.disabled = true;
+      setTableState('idle');
+    }
+    function updateCounts() {
+      const total = records.length;
+      const processed = processedCount;
+      const success = successCount;
+      const fail = Math.max(0, processed - success);
+      const remaining = Math.max(0, total - processed);
+      els.counts.innerHTML =
+        `총 <strong>${nf.format(total)}</strong>건 중 ` +
+        `<strong>${nf.format(success)}</strong>건 완료, ` +
+        `<strong>${nf.format(fail)}</strong>건 실패, ` +
+        `<strong>${nf.format(remaining)}</strong>건 미처리`;
+      els.exportBtn.disabled = processed === 0;
+    }
     function setProgress(done, total) {
       const pct = total ? Math.round((done / total) * 100) : 0;
       els.prog.value = pct;
-      els.progLabel.textContent = pct + '%';
-      els.prog.textContent = pct + '%';
+      els.progLabel.textContent = `진행 상황 ${pct}%`;
     }
-
-    function updateCounts() {
-      let kr = 0, world = 0;
-      for (const r of records) {
-        if (r.set === 'KR') kr++; else world++;
-      }
-      els.counts.value = `KR: ${kr} • WORLD: ${world} • 총계: ${records.length}`;
-      els.counts.textContent = els.counts.value;
-    }
-
     function clearTable() {
-      els.tbody.innerHTML = '';
+      while (els.tbody.firstChild) els.tbody.removeChild(els.tbody.firstChild);
     }
-
+    function isKR(lat, lon) {
+      return lat >= 32 && lat <= 39 && lon >= 124 && lon <= 132;
+    }
     function mapLinks(lat, lon) {
-      const g = `https://maps.google.com/?q=${lat},${lon}`;
-      const osm = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=16`;
-      const naver = `https://map.naver.com/v5/search/${encodeURIComponent(lat + ', ' + lon)}`;
-      const kakao = `https://map.kakao.com/?q=${lat},${lon}`;
+      const osm = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`;
+      const naver = `https://map.naver.com/p/?c=${lon},${lat},16,0,0,0,dh`;
+      const kakao = `https://map.kakao.com/link/map/${lat},${lon}`;
+      const g = `https://www.google.com/maps?q=${lat},${lon}`;
       return [
         { label: 'Google', url: g },
         { label: 'OSM', url: osm },
@@ -276,62 +604,68 @@
         { label: 'Kakao', url: kakao },
       ];
     }
-
     async function fetchReverseWithRetry(lat, lon, signal) {
       const buildUrl = () => {
         const url = new URL('https://nominatim.openstreetmap.org/reverse');
         url.searchParams.set('format', 'jsonv2');
         url.searchParams.set('lat', String(lat));
         url.searchParams.set('lon', String(lon));
-        url.searchParams.set('zoom', '14');
+        url.searchParams.set('zoom', String(REVERSE_ZOOM));
         url.searchParams.set('addressdetails', '1');
         url.searchParams.set('accept-language', 'ko');
         return url;
       };
       let attempt = 0;
-      while (attempt < 3) {
-        if (stopFlag) throw new Error('중지됨');
+      while (attempt < MAX_RETRY) {
         attempt++;
-        try {
-          const resp = await fetch(buildUrl(), { signal, headers: { 'Accept': 'application/json' } });
-          if (!resp.ok) {
-            if (resp.status === 429 || resp.status >= 500) throw new Error('HTTP ' + resp.status);
-            // Other non-OK (404 etc.) – return as-is
-            return await resp.json();
-          }
-          return await resp.json();
-        } catch (e) {
-          // Pause/backoff before retry, respecting polite delay rules
-          const backoff = Math.min(4000, 1000 * attempt + 500);
-          setStatus(`지연 또는 오류 감지, 자동 재시도 중… (시도 ${attempt}/3)`, 'warn');
-          await new Promise(res => setTimeout(res, backoff));
+        const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+        const combinedSignal = signal
+          ? AbortSignal.any([signal, timeoutSignal])
+          : timeoutSignal;
+        const res = await fetch(buildUrl(), {
+          headers: {
+            'Accept': 'application/json',
+          },
+          signal: combinedSignal,
+        });
+        if (res.ok) return res.json();
+        if (res.status === 429 || res.status >= 500) {
+          await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS * attempt));
           continue;
         }
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
       throw new Error('재시도 후 실패');
     }
-
     function appendRow(row) {
       const tr = document.createElement('tr');
-      const keys = ["구분","순번","좌표 (위도,경도)","시·도","시·군·구","읍·면·동·리","지물 태그","전체주소","지도링크"];
+      const keys = [
+        "구분",
+        "순번",
+        "좌표 (위도,경도)",
+        "시·도",
+        "시·군·구",
+        "읍·면·동·리",
+        "지물 태그",
+        "전체주소",
+        "지도링크"
+      ];
       for (const k of keys) {
         const isRowHeader = (k === '순번');
-        // 지도링크는 항상 데이터 셀로 처리
         const cellTag = (k === '지도링크') ? 'td' : (isRowHeader ? 'th' : 'td');
         const td = document.createElement(cellTag);
-        if (isRowHeader && cellTag === 'th') td.setAttribute('scope','row');
+        if (isRowHeader && cellTag === 'th') td.setAttribute('scope', 'row');
         if (k === '지도링크') {
           td.classList.add('nowrap');
           const links = row[k];
           if (Array.isArray(links)) {
             links.forEach((it, i) => {
               const a = document.createElement('a');
-              a.href = it.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+              a.href = it.url;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
               a.textContent = it.label;
-              if (Array.isArray(row['좌표 (위도,경도)'])) {
-                // not used, just in case future refactor
-              }
-              // aria-label with lat/lon for screen readers
               const latlon = String(row['좌표 (위도,경도)']);
               a.setAttribute('aria-label', `${it.label} 지도 새 창에서 열기 (${latlon})`);
               td.appendChild(a);
@@ -341,17 +675,31 @@
         } else {
           td.textContent = row[k] ?? '';
           if (k === '지물 태그') td.className = 'tags-cell';
-          if (k === '읍·면·동·리') { td.classList.add('nowrap', 'ellipsis'); td.title = row[k] ?? ''; }
+          if (k === '읍·면·동·리') {
+            td.classList.add('nowrap', 'ellipsis');
+            td.title = row[k] ?? '';
+          }
         }
         tr.appendChild(td);
       }
       els.tbody.appendChild(tr);
     }
-
     function toCSV(rows) {
       if (!rows.length) return '';
-      // Build headers explicitly and exclude the UI-only "지도링크" aggregate column
-      const headers = Object.keys(rows[0]).filter(h => h !== '지도링크');
+      const headers = [
+        '구분',
+        '순번',
+        '좌표 (위도,경도)',
+        '시·도',
+        '시·군·구',
+        '읍·면·동·리',
+        '지물 태그',
+        '전체주소',
+        '지도링크(Google)',
+        '지도링크(OSM)',
+        '지도링크(Naver)',
+        '지도링크(Kakao)',
+      ];
       const escape = (s) => {
         if (s == null) return '';
         s = String(s);
@@ -360,84 +708,64 @@
       };
       const lines = [headers.join(',')];
       for (const r of rows) {
-        lines.push(headers.map(h => escape(r[h])).join(','));
+        const links = Array.isArray(r['지도링크']) ? r['지도링크'] : [];
+        const linkMap = Object.fromEntries(links.map(l => [l.label, l.url]));
+        const rowVals = [
+          r['구분'],
+          r['순번'],
+          r['좌표 (위도,경도)'],
+          r['시·도'],
+          r['시·군·구'],
+          r['읍·면·동·리'],
+          r['지물 태그'],
+          r['전체주소'],
+          linkMap['Google'] || '',
+          linkMap['OSM'] || '',
+          linkMap['Naver'] || '',
+          linkMap['Kakao'] || '',
+        ];
+        lines.push(rowVals.map(escape).join(','));
       }
       return lines.join('\n');
     }
-
     function exportCSV() {
       const csv = toCSV(results);
-      if (!csv) { setStatus('내보낼 데이터가 없습니다.', 'warn'); return; }
-      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const now = new Date();
-      const stamp = now.toISOString().replace(/[:T]/g, '-').slice(0,19);
-      a.href = url;
-      a.download = `reverse_geocoded_${stamp}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    // --- File parsing ---
-    els.file.addEventListener('change', () => {
-      els.parse.disabled = !els.file.files?.length;
-      setStatus(els.parse.disabled ? '파일을 선택해 주세요.' : '분석을 시작할 준비가 되었습니다.');
-    });
-
-    els.parse.addEventListener('click', async () => {
-      const file = els.file.files?.[0];
-      if (!file) return;
-      setStatus('파일 읽는 중…');
-      const text = await file.text();
-      setStatus('좌표 추출 중…');
-      const parsed = extractCoordinates(text);
-      if (!parsed.length) {
-        setStatus('좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.', 'warn');
-        els.start.disabled = true;
-        els.exportBtn.disabled = true;
+      if (!csv) {
+        setStatus('내보낼 데이터가 없습니다.', 'warn');
         return;
       }
-      // index & set
-      records = parsed.map((p, i) => ({
-        set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'),
-        idx: i + 1,
-        lat: p.lat,
-        lon: p.lon
-      }));
-      results = [];
-      clearTable();
-      updateCounts();
-      setProgress(0, records.length);
-      setStatus(`분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`);
-      // Button states
-      els.start.disabled = false;
-      els.pause.disabled = true;
-      els.resume.disabled = true;
-      els.stop.disabled = true;
-      els.exportBtn.disabled = true;
-    });
-
-    // Heuristics:
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reverse_geocode_results.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setStatus('CSV 파일을 다운로드했습니다.');
+    }
     function extractCoordinates(text) {
       const out = [];
       const push = (lat, lon, setLabel) => {
-        if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+        if (
+          Number.isFinite(lat) && Number.isFinite(lon) &&
+          Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+        ) {
           out.push({ lat, lon, setLabel });
         }
       };
-
-      // 1) 라벨 우선
       const krRe = /대한민국\s*위경도\s*[:：]\s*([+\-]?\d+(?:\.\d+)?)\s*[,，]\s*([+\-]?\d+(?:\.\d+)?)/gi;
       const worldRe = /세계\s*위경도\s*[:：]\s*([+\-]?\d+(?:\.\d+)?)\s*[,，]\s*([+\-]?\d+(?:\.\d+)?)/gi;
       let m;
-      while ((m = krRe.exec(text)) !== null) push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
-      while ((m = worldRe.exec(text)) !== null) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
+      while ((m = krRe.exec(text)) !== null) {
+        push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
+      }
+      while ((m = worldRe.exec(text)) !== null) {
+        push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
+      }
       if (out.length) return out;
-
-      // 2) CSV header detection
       const lines = text.split(/\r?\n/);
       const firstLine = lines.find(l => l.trim().length);
       if (firstLine && /lat|longitude|위도|경도/i.test(firstLine)) {
@@ -456,101 +784,32 @@
           if (out.length) return out;
         }
       }
-
-      // 3) 일반 페어 (콤마만 허용, pair 내 최소 하나는 소수점 포함)
-      const pairRe = /([+\-]?(?:90(?:\.\d+)?|[0-8]?\d(?:\.\d+)?))\s*[,，]\s*([+\-]?(?:180(?:\.\d+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/g;
+      const pairRe =
+        /([+\-]?(?:90(?:\.\d+)?|[0-8]?\d(?:\.\d+)?))\s*[,，]\s*([+\-]?(?:180(?:\.\d+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/g;
       while ((m = pairRe.exec(text)) !== null) {
-        const snippet = m[0];
-        if (!snippet.includes('.')) continue; // 정수-정수는 스킵
         push(parseFloat(m[1]), parseFloat(m[2]));
       }
       return out;
     }
-
-    // --- Reverse geocoding control flow with pause/resume ---
-    els.start.addEventListener('click', () => {
-      if (!records.length) return;
-      stopFlag = false;
-      paused = false;
-      running = true;
-      currentIndex = 0;
-      results = [];
-      clearTable();
-      setProgress(0, records.length);
-      setStatus('역지오코딩 시작… (1초 간격)');
-      // buttons
-      els.start.disabled = true;
-      els.pause.disabled = false;
-      els.resume.disabled = true;
-      els.stop.disabled = false;
-      els.parse.disabled = true;
-      els.file.disabled = true;
-      els.exportBtn.disabled = true;
-      processNext();
-    });
-
-    els.pause.addEventListener('click', () => {
-      if (!running) return;
-      paused = true;
-      setStatus(`일시정지됨: ${currentIndex}/${records.length} 처리 완료. 재개하려면 "재개"를 누르세요.`, 'warn');
-      els.pause.disabled = true;
-      els.resume.disabled = false;
-    });
-
-    els.resume.addEventListener('click', () => {
-      if (!running || !paused) return;
-      paused = false;
-      setStatus('재개합니다…');
-      els.pause.disabled = false;
-      els.resume.disabled = true;
-      processNext();
-    });
-
-    els.stop.addEventListener('click', () => {
-      if (!running) return;
-      stopFlag = true;
-      try { controller?.abort(); } catch {}
-      running = false;
-      paused = false;
-      setStatus('사용자 중지로 종료했습니다.', 'warn');
-      // buttons
-      els.start.disabled = false;
-      els.pause.disabled = true;
-      els.resume.disabled = true;
-      els.stop.disabled = true;
-      els.parse.disabled = false;
-      els.file.disabled = false;
-      els.exportBtn.disabled = results.length === 0;
-    });
-
     async function processNext() {
-      if (stopFlag || paused || currentIndex >= records.length) {
-        if (!paused && !stopFlag && currentIndex >= records.length) {
-          running = false;
-          setStatus('모든 처리가 완료되었습니다.');
-          els.start.disabled = false;
-          els.pause.disabled = true;
-          els.resume.disabled = true;
-          els.stop.disabled = true;
-          els.parse.disabled = false;
-          els.file.disabled = false;
-          els.exportBtn.disabled = results.length === 0;
-        }
+      if (!running || inFlight) return;
+      if (!records.length || currentIndex >= records.length) {
+        setControlsIdle('모든 처리가 완료되었습니다.');
         return;
       }
-
       const r = records[currentIndex];
-      controller = new AbortController();
       const { lat, lon } = r;
+      controller = new AbortController();
+      inFlight = true;
       try {
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+        if (!running || stopFlag) {
+          return;
+        }
         const data = await fetchReverseWithRetry(lat, lon, controller.signal);
-
         const addr = data.address ?? {};
         const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
-
         const linkset = mapLinks(lat, lon);
-        const toUrl = (label) => (linkset.find(x => x.label === label)?.url || '');
-
         const row = {
           '구분': r.set,
           '순번': r.idx,
@@ -560,70 +819,172 @@
           '읍·면·동·리': eupmyeon,
           '지물 태그': tag,
           '전체주소': data.display_name || '',
-          // per-site columns for CSV
-          '구글 지도': toUrl('Google'),
-          '오픈스트리트맵': toUrl('OSM'),
-          '네이버 지도': toUrl('Naver'),
-          '카카오맵': toUrl('Kakao'),
-          // UI aggregate
-          '지도링크': linkset
+          '지도링크': linkset,
         };
-        results.push(row);
-        appendRow(row);
-        setStatus(`진행: ${currentIndex + 1}/${records.length} (순번 ${r.idx})`);
+        pushResultRow(row);
+        if (!paused && running) {
+          setStatus(`처리 중… (${currentIndex}/${records.length})`);
+        }
       } catch (err) {
-        if (controller?.signal.aborted) {
+        console.error(err);
+        const msg = err && (err.message || String(err));
+        const isAbort =
+          err.name === 'AbortError' ||
+          /aborted/i.test(msg || '');
+        if (stopFlag && isAbort) {
           return;
-        } else {
-          const linkset = mapLinks(lat, lon);
-          const toUrl = (label) => (linkset.find(x => x.label === label)?.url || '');
-          const row = {
-            '구분': r.set,
-            '순번': r.idx,
-            '좌표 (위도,경도)': `${lat},${lon}`,
-            '시·도': '',
-            '시·군·구': '',
-            '읍·면·동·리': '',
-            '지물 태그': '',
-            '전체주소': '',
-            '구글 지도': toUrl('Google'),
-            '오픈스트리트맵': toUrl('OSM'),
-            '네이버 지도': toUrl('Naver'),
-            '카카오맵': toUrl('Kakao'),
-            '지도링크': linkset
-          };
-          results.push(row);
-          appendRow(row);
-          setStatus(`오류 발생 (순번 ${r.idx}): ${err.message} — 자동 재시도 후 실패`, 'err');
+        }
+        const row = {
+          '구분': '에러',
+          '순번': r.idx,
+          '좌표 (위도,경도)': `${lat},${lon}`,
+          '시·도': '',
+          '시·군·구': '',
+          '읍·면·동·리': '',
+          '지물 태그': '',
+          '전체주소': msg,
+          '지도링크': [],
+        };
+        pushResultRow(row);
+        if (!paused && running && !stopFlag) {
+          setStatus(`에러 발생: (${currentIndex}/${records.length}) ${msg}`, 'error');
         }
       } finally {
-        controller = null;
-      }
-
-      currentIndex++;
-      setProgress(currentIndex, records.length);
-
-      if (!stopFlag && !paused && currentIndex < records.length) {
-        const ms = Math.max(1000, Number(els.delay.value) || 1100);
-        await new Promise(res => setTimeout(res, ms));
-        processNext();
-      } else if (!paused && currentIndex >= records.length) {
-        running = false;
-        setStatus('모든 처리가 완료되었습니다.');
-        els.start.disabled = false;
-        els.pause.disabled = true;
-        els.resume.disabled = true;
-        els.stop.disabled = true;
-        els.parse.disabled = false;
-        els.file.disabled = false;
-        els.exportBtn.disabled = results.length === 0;
-      } else if (paused) {
-        setStatus(`일시정지됨: ${currentIndex}/${records.length} 처리 완료. 재개하려면 "재개"를 누르세요.`, 'warn');
+        inFlight = false;
+        updateCounts();
+        if (stopFlag) {
+          setControlsIdle('중지되었습니다.', 'warn');
+          return;
+        }
+        if (paused && running) {
+          setStatus(
+            `일시정지됨: ${currentIndex}/${records.length} 처리 완료. 재개하려면 "재개"를 누르세요.`,
+            'warn'
+          );
+          els.resume.disabled = false;
+          return;
+        }
+        if (running && !paused) {
+          processNext();
+        }
       }
     }
-
+    function pushResultRow(row) {
+      results.push(row);
+      if (row['구분'] !== '에러') {
+        successCount++;
+      }
+      processedCount++;
+      appendRow(row);
+      currentIndex++;
+      setProgress(currentIndex, records.length);
+    }
+    els.parse.addEventListener('click', async () => {
+      if (running) {
+        setStatus('현재 역지오코딩이 진행 중입니다. 중지 후 다시 좌표를 추출해 주세요.', 'warn');
+        return;
+      }
+      els.start.disabled = true;
+      els.exportBtn.disabled = true;
+      const file = els.file.files?.[0];
+      if (!file) {
+        setStatus('먼저 random_data.txt 파일을 선택해 주세요.', 'warn');
+        return;
+      }
+      setStatus('파일 읽는 중…');
+      const text = await file.text();
+      setStatus('좌표 추출 중…');
+      const parsed = extractCoordinates(text);
+      if (!parsed.length) {
+        records = [];
+        results = [];
+        currentIndex = 0;
+        paused = false;
+        processedCount = 0;
+        successCount = 0;
+        clearTable();
+        setProgress(0, 0);
+        updateCounts();
+        els.coords.value = '';
+        els.start.disabled = true;
+        els.exportBtn.disabled = true;
+        setStatus(
+          '좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.',
+          'warn'
+        );
+        return;
+      }
+      records = parsed.map((p, i) => ({
+        set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'),
+        idx: i + 1,
+        lat: p.lat,
+        lon: p.lon
+      }));
+      els.coords.value = records
+        .map(r => `${r.lat},${r.lon}`)
+        .join('\n');
+      results = [];
+      currentIndex = 0;
+      paused = false;
+      processedCount = 0;
+      successCount = 0;
+      clearTable();
+      updateCounts();
+      setProgress(0, records.length);
+      setStatus(`분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`);
+      els.start.disabled = false;
+      els.pause.disabled = true;
+      els.resume.disabled = true;
+      els.stop.disabled = true;
+      els.exportBtn.disabled = true;
+    });
+    els.start.addEventListener('click', () => {
+      if (!records.length) return;
+      stopFlag = false;
+      paused = false;
+      running = true;
+      currentIndex = 0;
+      results = [];
+      processedCount = 0;
+      successCount = 0;
+      clearTable();
+      setProgress(0, records.length);
+      updateCounts();
+      setStatus('조회 시작…');
+      els.start.disabled = true;
+      els.pause.disabled = false;
+      els.resume.disabled = true;
+      els.stop.disabled = false;
+      els.exportBtn.disabled = true;
+      setTableState('running');
+      processNext();
+    });
+    els.pause.addEventListener('click', () => {
+      if (!running) return;
+      paused = true;
+      setStatus('일시정지 중입니다. 현재 진행 중인 요청까지 마무리한 뒤 멈춥니다.', 'warn');
+      els.pause.disabled = true;
+      els.resume.disabled = true;
+    });
+    els.resume.addEventListener('click', () => {
+      if (!running || !paused || stopFlag) return;
+      paused = false;
+      setStatus('재개합니다…');
+      els.pause.disabled = false;
+      els.resume.disabled = true;
+      processNext();
+    });
+    els.stop.addEventListener('click', () => {
+      if (!running) return;
+      stopFlag = true;
+      if (inFlight && controller) {
+        controller.abort();
+        setStatus('중지 요청됨. 현재 요청을 취소하는 중입니다…', 'warn');
+      } else {
+        setControlsIdle('중지되었습니다.', 'warn');
+      }
+    });
     els.exportBtn.addEventListener('click', exportCSV);
-
     function toKoreanAddressParts(a, data) {
       const sido = a.state || a.region || a.province || a.county || a.city || '';
       const sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
@@ -641,4 +1002,5 @@
     }
   </script>
 </body>
+
 </html>
