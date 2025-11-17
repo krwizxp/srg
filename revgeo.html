@@ -527,7 +527,6 @@
       tableWrap: document.querySelector('.table-wrap'),
     };
     function setTableState(state) {
-      if (!els.tableWrap) return;
       els.tableWrap.setAttribute('data-state', state);
     }
     const nf = new Intl.NumberFormat('ko-KR');
@@ -957,10 +956,22 @@
     });
     els.exportBtn.addEventListener('click', exportCSV);
     function toKoreanAddressParts(a, data) {
-      const sido = a.state || a.region || a.province || a.county || a.city || '';
-      const sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
-      const eupmyeon =
-        a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '';
+      const countryCode = (a.country_code || '').toLowerCase();
+      const isKR = countryCode === 'kr' || a.country === '대한민국';
+      let sido = '';
+      let sigungu = '';
+      let eupmyeon = '';
+      if (isKR) {
+        sido = a.state || a.region || a.province || '';
+        sigungu = a.city || a.county || a.district || a.municipality || '';
+        const emd = a.suburb || a.neighbourhood || a.city_district || a.town || a.township || '';
+        const ri = a.village || a.hamlet || '';
+        eupmyeon = [emd, ri].filter(Boolean).join(' ');
+      } else {
+        sido = a.state || a.region || a.province || a.county || a.city || '';
+        sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
+        eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '';
+      }
       let tag = '';
       if (data && typeof data === 'object') {
         const name = data.name || a.attraction || a.building || '';
