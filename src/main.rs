@@ -688,12 +688,12 @@ fn read_line_reuse<'a>(prompt: std::fmt::Arguments, buffer: &'a mut String) -> I
     Ok(buffer.trim())
 }
 fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
-    const MAX_PLAYERS: usize = 128;
+    const MAX_PLAYERS: usize = 512;
     let n: usize;
     let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
     let mut result_input_buffer = String::new();
     let players_prompt =
-        format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~128명): ");
+        format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): ");
     loop {
         let mut temp_count = 0;
         let mut validation_success = true;
