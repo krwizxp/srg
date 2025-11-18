@@ -52,7 +52,7 @@
     }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      font-family: system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
       background: radial-gradient(circle at top left, #1f2937, #020617);
       color: var(--fg);
       color-scheme: light dark;
@@ -170,6 +170,11 @@
       flex-wrap: wrap;
     }
 
+    .row-progress {
+      align-items: flex-end;
+      margin-top: 8px;
+    }
+
     fieldset {
       margin: 0;
       padding: 0;
@@ -193,9 +198,9 @@
       padding: 0;
       margin: -1px;
       overflow: hidden;
-      clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
+      clip-path: inset(50%);
     }
 
     label {
@@ -370,7 +375,7 @@
     tbody td {
       padding: 10px 12px;
       vertical-align: top;
-      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     tbody tr {
@@ -465,7 +470,7 @@
         </label>
         <textarea id="coords" readonly placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea>
       </div>
-      <div class="row" style="align-items:flex-end; margin-top:8px;">
+      <div class="row row-progress">
         <div class="sp">
           <div class="caps" id="prog-label">진행 상황 0%</div>
           <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label" aria-valuemin="0"
@@ -831,14 +836,14 @@
           setStatus(`처리 중… (${currentIndex}/${records.length})`);
         }
       } catch (err) {
-        console.error(err);
         const msg = err && (err.message || String(err));
         const isAbort =
-          err.name === 'AbortError' ||
-          /aborted/i.test(msg || '');
+          err && (err.name === 'AbortError' ||
+            /aborted/i.test(msg || ''));
         if (stopFlag && isAbort) {
           return;
         }
+        console.error(err);
         const row = buildResultRow('에러', r, {
           '전체주소': msg,
         });
