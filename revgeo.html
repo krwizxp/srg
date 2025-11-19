@@ -8,34 +8,20 @@
   <title>SRG 데이터 역지오코딩 도구</title>
   <style>
     :root {
-      --card: #0f172a;
-      --line: #1f2937;
-      --muted: #9ca3af;
-      --fg: #e5e7eb;
-      --accent: #60a5fa;
-      --accent-2: #34d399;
-      --warn: #f59e0b;
-      --err: #ef4444;
-      --shadow: 0 10px 20px rgba(0, 0, 0, .25), 0 0 0 1px rgba(15, 23, 42, .8);
+      color-scheme: light dark;
+      --card: light-dark(#f9fafb, #0f172a);
+      --line: light-dark(#d1d5db, #1f2937);
+      --muted: light-dark(#6b7280, #9ca3af);
+      --fg: light-dark(#111827, #e5e7eb);
+      --accent: light-dark(#2563eb, #60a5fa);
+      --accent-2: light-dark(#16a34a, #34d399);
+      --warn: light-dark(#d97706, #f59e0b);
+      --err: light-dark(#dc2626, #ef4444);
+      --shadow: light-dark(0 10px 20px rgba(15, 23, 42, .08),
+          0 10px 20px rgba(0, 0, 0, .25));
+      --shadow-border: light-dark(rgba(148, 163, 184, .7),
+          rgba(15, 23, 42, .8));
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root {
-        --card: #f9fafb;
-        --line: #d1d5db;
-        --muted: #6b7280;
-        --fg: #111827;
-        --accent: #2563eb;
-        --accent-2: #16a34a;
-        --warn: #d97706;
-        --err: #dc2626;
-        --shadow: 0 10px 20px rgba(15, 23, 42, .08), 0 0 0 1px rgba(148, 163, 184, .7);
-      }
-
-      body {
-        background: radial-gradient(circle at top left, #e5e7eb, #f9fafb);
-      }
     }
 
     *,
@@ -53,9 +39,9 @@
 
     body {
       font-family: system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
-      background: radial-gradient(circle at top left, #1f2937, #020617);
+      background: light-dark(radial-gradient(circle at top left, #e5e7eb, #f9fafb),
+          radial-gradient(circle at top left, #1f2937, #020617));
       color: var(--fg);
-      color-scheme: light dark;
       padding: 16px;
       display: flex;
       flex-direction: column;
@@ -72,50 +58,38 @@
     header {
       padding: 10px 14px;
       border-radius: 14px;
-      background: radial-gradient(circle at top left, rgba(37, 99, 235, .35), rgba(15, 23, 42, .96));
-      border: 1px solid rgba(148, 163, 184, .7);
-      box-shadow: var(--shadow);
-    }
+      background: light-dark(radial-gradient(circle at top left, rgba(191, 219, 254, .8), rgba(249, 250, 251, .98)),
+          radial-gradient(circle at top left, rgba(37, 99, 235, .35), rgba(15, 23, 42, .96)));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
 
-    @media (prefers-color-scheme: light) {
-      header {
-        background: radial-gradient(circle at top left, rgba(191, 219, 254, .8), rgba(249, 250, 251, .98));
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -.02em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-    }
 
-    header h1 {
-      margin: 0;
-      font-size: 18px;
-      letter-spacing: -.02em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      p {
+        margin-block-start: 4px;
+        font-size: 13px;
+        color: var(--muted);
+      }
 
-    header p {
-      margin: 4px 0 0;
-      font-size: 13px;
-      color: var(--muted);
+      code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: light-dark(rgba(243, 244, 246, .9), rgba(15, 23, 42, .7));
+        border: 1px solid light-dark(rgba(148, 163, 184, .8), rgba(148, 163, 184, .7));
+      }
     }
 
     #results-title {
       margin: 0 0 8px;
-    }
-
-    header code {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      padding: 1px 4px;
-      border-radius: 4px;
-      background: rgba(15, 23, 42, .7);
-      border: 1px solid rgba(148, 163, 184, .7);
-    }
-
-    @media (prefers-color-scheme: light) {
-      header code {
-        background: rgba(243, 244, 246, .9);
-        border-color: rgba(148, 163, 184, .8);
-      }
     }
 
     main {
@@ -123,10 +97,8 @@
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr);
       gap: 12px;
       align-items: flex-start;
-    }
 
-    @media (width <=900px) {
-      main {
+      @media (width <=900px) {
         grid-template-columns: minmax(0, 1fr);
       }
     }
@@ -134,24 +106,22 @@
     section {
       position: relative;
       overflow: hidden;
-    }
 
-    section::before {
-      content: "";
-      position: absolute;
-      inset: -60px;
-      background:
-        radial-gradient(circle at top left, rgba(96, 165, 250, .16), transparent 60%),
-        radial-gradient(circle at bottom right, rgba(52, 211, 153, .12), transparent 60%);
-      opacity: .9;
-      pointer-events: none;
-      mix-blend-mode: screen;
-    }
+      &::before {
+        content: "";
+        position: absolute;
+        inset: -60px;
+        background:
+          radial-gradient(circle at top left, rgba(96, 165, 250, .16), transparent 60%),
+          radial-gradient(circle at bottom right, rgba(52, 211, 153, .12), transparent 60%);
+        opacity: .9;
+        mix-blend-mode: screen;
+        pointer-events: none;
 
-    @media (prefers-color-scheme: light) {
-      section::before {
-        opacity: .7;
-        mix-blend-mode: normal;
+        @media (prefers-color-scheme: light) {
+          opacity: .7;
+          mix-blend-mode: normal;
+        }
       }
     }
 
@@ -160,7 +130,7 @@
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 14px;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
     }
 
     .row {
@@ -168,11 +138,11 @@
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
-    }
 
-    .row-progress {
-      align-items: flex-end;
-      margin-top: 8px;
+      &.row-progress {
+        align-items: flex-end;
+        margin-block-start: 8px;
+      }
     }
 
     fieldset {
@@ -221,24 +191,39 @@
     }
 
     input[type="file"] {
-      padding: 8px;
+      padding: 6px;
+
+      &::file-selector-button {
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.06));
+        color: var(--fg);
+        padding: 6px 10px;
+        margin-inline-end: 10px;
+        cursor: pointer;
+        transition: background .2s;
+
+        &:hover {
+          background: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
+        }
+      }
     }
 
     button {
       cursor: pointer;
       background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
       transition: transform .08s ease, filter .15s ease;
-    }
 
-    button:disabled {
-      opacity: .5;
-      cursor: default;
-      filter: grayscale(.6);
-    }
+      &:disabled {
+        opacity: .5;
+        cursor: default;
+        filter: grayscale(.6);
+      }
 
-    button:not(:disabled):hover {
-      transform: translateY(-1px);
-      filter: brightness(1.1);
+      &:not(:disabled):hover {
+        transform: translateY(-1px);
+        filter: brightness(1.1);
+      }
     }
 
     button:focus-visible,
@@ -253,20 +238,14 @@
       min-height: 110px;
       border-radius: 10px;
       border: 1px solid var(--line);
-      background: rgba(15, 23, 42, .8);
+      background: light-dark(rgba(249, 250, 251, .96), rgba(15, 23, 42, .8));
       color: var(--fg);
       padding: 8px;
       font-family: var(--font-mono);
       font-size: 12px;
-    }
 
-    textarea::placeholder {
-      color: rgba(156, 163, 175, .8);
-    }
-
-    @media (prefers-color-scheme: light) {
-      textarea {
-        background: rgba(249, 250, 251, .96);
+      &::placeholder {
+        color: rgba(156, 163, 175, .8);
       }
     }
 
@@ -279,40 +258,40 @@
       background-color: rgba(15, 23, 42, .85);
       overflow: hidden;
       position: relative;
-    }
 
-    .progress-bar::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      transform-origin: left;
-      transform: scaleX(calc(var(--value) / 100));
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      border-radius: inherit;
+      &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform-origin: left;
+        transform: scaleX(calc(var(--value) / 100));
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        border-radius: inherit;
+      }
     }
 
     .status {
-      margin-top: 8px;
+      margin-block-start: 8px;
       font-size: 13px;
       color: var(--muted);
       min-height: 1.2em;
-    }
 
-    .status.err {
-      color: var(--err);
-    }
+      &.err {
+        color: var(--err);
+      }
 
-    .status.warn {
-      color: var(--warn);
+      &.warn {
+        color: var(--warn);
+      }
     }
 
     .counts {
       font-size: 12px;
       color: var(--muted);
-    }
 
-    .counts strong {
-      color: var(--fg);
+      strong {
+        color: var(--fg);
+      }
     }
 
     .table-wrap {
@@ -320,29 +299,23 @@
       overflow: auto;
       border-radius: 12px;
       border: 1px solid var(--line);
-      background: rgba(15, 23, 42, .85);
-      box-shadow: var(--shadow);
-    }
+      background: light-dark(rgba(249, 250, 251, .96), rgba(15, 23, 42, .85));
+      box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
 
-    .table-wrap:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .table-wrap {
-        background: rgba(249, 250, 251, .96);
+      &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
       }
-    }
 
-    .table-wrap[data-state="idle"]:not(:has(tbody tr))::after {
-      content: "아직 결과가 없습니다. 좌표를 추출하고 조회를 시작해 주세요.";
-      display: block;
-      padding: 24px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 13px;
-      pointer-events: none;
+      &[data-state="idle"]:not(:has(tbody tr))::after {
+        content: "아직 결과가 없습니다. 좌표를 추출하고 조회를 시작해 주세요.";
+        display: block;
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        pointer-events: none;
+      }
     }
 
     table {
@@ -367,6 +340,7 @@
       padding: 10px 12px;
       border-bottom: 1px solid var(--line);
       background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
+      background-color: var(--card);
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
@@ -380,15 +354,18 @@
 
     tbody tr {
       border-bottom: 1px dashed var(--line);
-    }
 
-    tbody tr:last-child {
-      border-bottom: 0;
-    }
+      &:last-child {
+        border-bottom: 0;
+      }
 
-    tbody tr:nth-child(even) {
-      background: var(--card);
-      background: color-mix(in oklab, var(--card), black 2%);
+      &:nth-child(even) {
+        background: color-mix(in srgb, var(--card), black 3%);
+
+        @media (prefers-color-scheme: light) {
+          background: color-mix(in srgb, var(--card), black 2%);
+        }
+      }
     }
 
     .tags-cell {
@@ -398,10 +375,6 @@
     }
 
     .nowrap {
-      white-space: nowrap;
-    }
-
-    .nowrap a {
       white-space: nowrap;
     }
 
@@ -416,27 +389,27 @@
     a {
       color: var(--accent);
       text-decoration: none;
-    }
 
-    a:hover {
-      text-decoration: underline;
-    }
+      &:hover {
+        text-decoration: underline;
+      }
 
-    a:focus-visible {
-      outline: 2px solid var(--accent-2);
-      outline-offset: 2px;
-      border-radius: 3px;
+      &:focus-visible {
+        outline: 2px solid var(--accent-2);
+        outline-offset: 2px;
+        border-radius: 3px;
+      }
     }
 
     footer {
       font-size: 11px;
       color: var(--muted);
       text-align: right;
-    }
 
-    footer code {
-      font-family: var(--font-mono);
-      font-size: 11px;
+      code {
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
     }
   </style>
 </head>
@@ -761,11 +734,11 @@
       };
       const krRe = /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
       const worldRe = /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
-      let m;
-      while ((m = krRe.exec(text)) !== null) {
+      const pairRe = /([+-]?(?:90(?:\.\d+)?|[0-8]?\d(?:\.\d+)?))\s*[,，]\s*([+-]?(?:180(?:\.\d+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/g;
+      for (const m of text.matchAll(krRe)) {
         push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
       }
-      while ((m = worldRe.exec(text)) !== null) {
+      for (const m of text.matchAll(worldRe)) {
         push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
       }
       if (out.length) return out;
@@ -787,9 +760,7 @@
           if (out.length) return out;
         }
       }
-      const pairRe =
-        /([+-]?(?:90(?:\.\d+)?|[0-8]?\d(?:\.\d+)?))\s*[,，]\s*([+-]?(?:180(?:\.\d+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/g;
-      while ((m = pairRe.exec(text)) !== null) {
+      for (const m of text.matchAll(pairRe)) {
         push(parseFloat(m[1]), parseFloat(m[2]));
       }
       return out;
