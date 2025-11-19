@@ -243,6 +243,8 @@
       padding: 8px;
       font-family: var(--font-mono);
       font-size: 12px;
+      field-sizing: content;
+      max-block-size: 400px;
 
       &::placeholder {
         color: rgba(156, 163, 175, .8);
@@ -350,6 +352,7 @@
       padding: 10px 12px;
       vertical-align: top;
       overflow-wrap: break-word;
+      text-wrap: pretty;
     }
 
     tbody tr {
@@ -422,21 +425,23 @@
   <main>
     <section class="card" aria-labelledby="controls-title">
       <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
-      <form class="row">
-        <fieldset class="row">
-          <legend class="sr-only">파일 업로드 및 실행</legend>
-          <label for="file">random_data.txt</label>
-          <input type="file" id="file" accept=".txt">
-          <div class="row">
-            <button type="button" id="parse">좌표 추출</button>
-            <button type="button" id="start" disabled>조회 시작</button>
-            <button type="button" id="pause" disabled>일시정지</button>
-            <button type="button" id="resume" disabled>재개</button>
-            <button type="button" id="stop" disabled>중지</button>
-            <button type="button" id="export" disabled>CSV 내보내기</button>
-          </div>
-        </fieldset>
-      </form>
+      <search>
+        <form class="row">
+          <fieldset class="row">
+            <legend class="sr-only">파일 업로드 및 실행</legend>
+            <label for="file">random_data.txt</label>
+            <input type="file" id="file" accept=".txt">
+            <div class="row">
+              <button type="button" id="parse">좌표 추출</button>
+              <button type="button" id="start" disabled>조회 시작</button>
+              <button type="button" id="pause" disabled>일시정지</button>
+              <button type="button" id="resume" disabled>재개</button>
+              <button type="button" id="stop" disabled>중지</button>
+              <button type="button" id="export" disabled>CSV 내보내기</button>
+            </div>
+          </fieldset>
+        </form>
+      </search>
       <div>
         <label for="coords">
           <span class="caps">추출된 좌표 (lat,lon)</span>
