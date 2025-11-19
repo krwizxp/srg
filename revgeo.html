@@ -5,16 +5,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9fafb">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a">
+  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
   <title>SRG 데이터 역지오코딩 도구</title>
   <style>
     :root {
       color-scheme: light dark;
-      --card: light-dark(#f9fafb, #0f172a);
-      --line: light-dark(#d1d5db, #1f2937);
-      --muted: light-dark(#6b7280, #9ca3af);
-      --fg: light-dark(#111827, #e5e7eb);
-      --accent: light-dark(#2563eb, #60a5fa);
-      --accent-2: light-dark(#16a34a, #34d399);
+      --card: light-dark(oklch(98% 0.01 240), oklch(15% 0.04 250));
+      --line: light-dark(oklch(88% 0.02 240), oklch(25% 0.04 250));
+      --muted: light-dark(oklch(55% 0.05 240), oklch(70% 0.05 240));
+      --fg: light-dark(oklch(15% 0.03 240), oklch(92% 0.01 240));
+      --accent: light-dark(oklch(60% 0.2 260), oklch(70% 0.15 250));
+      --accent-2: light-dark(oklch(60% 0.18 150), oklch(75% 0.15 150));
       --warn: light-dark(#d97706, #f59e0b);
       --err: light-dark(#dc2626, #ef4444);
       --shadow: light-dark(0 10px 20px rgba(15, 23, 42, .08),
@@ -22,6 +25,13 @@
       --shadow-border: light-dark(rgba(148, 163, 184, .7),
           rgba(15, 23, 42, .8));
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      interpolate-size: allow-keywords;
+    }
+
+    @property --value {
+      syntax: '<number>';
+      inherits: true;
+      initial-value: 0;
     }
 
     *,
@@ -37,11 +47,18 @@
       min-height: 100%;
     }
 
+    html {
+      scrollbar-color: var(--muted) transparent;
+      scrollbar-width: thin;
+    }
+
     body {
       font-family: system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
-      background: light-dark(radial-gradient(circle at top left, #e5e7eb, #f9fafb),
-          radial-gradient(circle at top left, #1f2937, #020617));
+      font-variant-numeric: tabular-nums;
+      background: light-dark(radial-gradient(circle at top left, oklch(95% 0.01 240), oklch(99% 0 0)),
+          radial-gradient(circle at top left, oklch(20% 0.04 250), oklch(10% 0.02 260)));
       color: var(--fg);
+      accent-color: var(--accent);
       padding: 16px;
       display: flex;
       flex-direction: column;
@@ -58,8 +75,8 @@
     header {
       padding: 10px 14px;
       border-radius: 14px;
-      background: light-dark(radial-gradient(circle at top left, rgba(191, 219, 254, .8), rgba(249, 250, 251, .98)),
-          radial-gradient(circle at top left, rgba(37, 99, 235, .35), rgba(15, 23, 42, .96)));
+      background: light-dark(radial-gradient(circle at top left, oklch(90% 0.05 250 / 0.8), oklch(98% 0 0 / 0.98)),
+          radial-gradient(circle at top left, oklch(30% 0.1 260 / 0.35), oklch(15% 0.04 250 / 0.96)));
       border: 1px solid var(--line);
       box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
 
@@ -70,6 +87,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        text-wrap: balance;
       }
 
       p {
@@ -97,8 +115,10 @@
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr);
       gap: 12px;
       align-items: flex-start;
+      container-type: inline-size;
+      container-name: main-grid;
 
-      @media (width <=900px) {
+      @container main-grid (width <=900px) {
         grid-template-columns: minmax(0, 1fr);
       }
     }
@@ -112,8 +132,8 @@
         position: absolute;
         inset: -60px;
         background:
-          radial-gradient(circle at top left, rgba(96, 165, 250, .16), transparent 60%),
-          radial-gradient(circle at bottom right, rgba(52, 211, 153, .12), transparent 60%);
+          radial-gradient(circle at top left, oklch(70% 0.2 260 / 0.16), transparent 60%),
+          radial-gradient(circle at bottom right, oklch(70% 0.2 150 / 0.12), transparent 60%);
         opacity: .9;
         mix-blend-mode: screen;
         pointer-events: none;
@@ -179,6 +199,7 @@
       gap: 6px;
       font-size: 13px;
       color: var(--fg);
+      user-select: none;
     }
 
     input[type="file"],
@@ -188,6 +209,12 @@
       background: transparent;
       color: var(--fg);
       padding: 10px 12px;
+      user-select: none;
+      caret-color: var(--accent);
+
+      &:active {
+        transform: translateY(1px);
+      }
     }
 
     input[type="file"] {
@@ -245,6 +272,8 @@
       font-size: 12px;
       field-sizing: content;
       max-block-size: 400px;
+      caret-color: var(--accent);
+      transition: height 0.3s ease, min-height 0.3s ease;
 
       &::placeholder {
         color: rgba(156, 163, 175, .8);
@@ -260,6 +289,7 @@
       background-color: rgba(15, 23, 42, .85);
       overflow: hidden;
       position: relative;
+      transition: --value 0.3s ease-out;
 
       &::before {
         content: "";
@@ -273,6 +303,7 @@
     }
 
     .status {
+      display: block;
       margin-block-start: 8px;
       font-size: 13px;
       color: var(--muted);
@@ -299,10 +330,14 @@
     .table-wrap {
       max-height: 460px;
       overflow: auto;
+      content-visibility: auto;
+      contain-intrinsic-size: 0 460px;
       border-radius: 12px;
       border: 1px solid var(--line);
       background: light-dark(rgba(249, 250, 251, .96), rgba(15, 23, 42, .85));
       box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
+      scrollbar-gutter: stable;
+      overscroll-behavior: contain;
 
       &:focus-visible {
         outline: 2px solid var(--accent);
@@ -341,11 +376,21 @@
       text-align: left;
       padding: 10px 12px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
-      background-color: var(--card);
+      background-color: color-mix(in srgb, var(--card), transparent 20%);
+      backdrop-filter: blur(8px);
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
+      animation: scroll-shadow linear both;
+      animation-timeline: scroll();
+      animation-range: 0px 20px;
+    }
+
+    @keyframes scroll-shadow {
+      to {
+        box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.1);
+        border-bottom-color: transparent;
+      }
     }
 
     tbody td {
@@ -353,6 +398,14 @@
       vertical-align: top;
       overflow-wrap: break-word;
       text-wrap: pretty;
+    }
+
+    tbody th {
+      vertical-align: top;
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: normal;
+      color: var(--muted);
     }
 
     tbody td:nth-child(3) {
@@ -367,17 +420,21 @@
 
     tbody tr {
       border-bottom: 1px dashed var(--line);
+      transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+      opacity: 1;
+      transform: translateY(0);
+
+      @starting-style {
+        opacity: 0;
+        transform: translateY(10px);
+      }
 
       &:last-child {
         border-bottom: 0;
       }
 
       &:nth-child(even) {
-        background: color-mix(in srgb, var(--card), black 3%);
-
-        @media (prefers-color-scheme: light) {
-          background: color-mix(in srgb, var(--card), black 2%);
-        }
+        background: oklch(from var(--card) calc(l - 0.015) c h);
       }
     }
 
@@ -402,6 +459,8 @@
     a {
       color: var(--accent);
       text-decoration: none;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
 
       &:hover {
         text-decoration: underline;
@@ -456,7 +515,7 @@
         <label for="coords">
           <span class="caps">추출된 좌표 (lat,lon)</span>
         </label>
-        <textarea id="coords" readonly placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea>
+        <textarea id="coords" readonly spellcheck="false" placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea>
       </div>
       <div class="row row-progress">
         <div class="sp">
@@ -465,14 +524,14 @@
             aria-valuemax="100" aria-valuenow="0">
           </div>
         </div>
-        <div class="counts" id="counts">
+        <output class="counts" id="counts">
           총 <strong>0</strong>건 중
           <strong>0</strong>건 완료,
           <strong>0</strong>건 실패,
           <strong>0</strong>건 미처리
-        </div>
+        </output>
       </div>
-      <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
     </section>
     <section class="card" aria-labelledby="results-title">
       <h2 id="results-title" class="caps">결과 표</h2>
@@ -550,6 +609,7 @@
     let running = false;
     let controller = null;
     let currentIndex = 0;
+    let resumeHandler = null;
     let inFlight = false;
     let processedCount = 0;
     let successCount = 0;
@@ -705,7 +765,7 @@
       const escape = (s) => {
         if (s == null) return '';
         s = String(s);
-        if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        if (/[",\n]/.test(s)) return '"' + s.replaceAll('"', '""') + '"';
         return s;
       };
       const lines = [headers.join(',')];
@@ -749,7 +809,7 @@
       };
       const krRe = /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
       const worldRe = /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
-      const pairRe = /([+-]?(?:90(?:\.\d+)?|[0-8]?\d(?:\.\d+)?))\s*[,，]\s*([+-]?(?:180(?:\.\d+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/g;
+      const pairRe = /([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
       for (const m of text.matchAll(krRe)) {
         push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
       }
@@ -794,67 +854,58 @@
       };
       return { ...base, ...extra };
     }
-    async function processNext() {
-      if (!running || inFlight) return;
-      if (!records.length || currentIndex >= records.length) {
-        setControlsIdle('모든 처리가 완료되었습니다.');
-        return;
+    async function runProcessingLoop() {
+      for (let i = currentIndex; i < records.length; i++) {
+        if (!running || stopFlag) break;
+        if (paused && resumeHandler) {
+          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다.', 'warn');
+          await resumeHandler.promise;
+        }
+        if (!running || stopFlag) break;
+        currentIndex = i;
+        const r = records[i];
+        const { lat, lon } = r;
+        controller = new AbortController();
+        inFlight = true;
+        try {
+          await sleep(RATE_LIMIT_DELAY_MS);
+          if (!running || stopFlag) break;
+          if (!paused) {
+            setStatus(`처리 중… (${i + 1}/${records.length})`);
+          }
+
+          const data = await fetchReverseWithRetry(lat, lon, controller.signal);
+          const addr = data.address ?? {};
+          const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
+          const linkset = mapLinks(lat, lon);
+          const row = buildResultRow(r.set, r, {
+            '시·도': sido,
+            '시·군·구': sigungu,
+            '읍·면·동·리': eupmyeon,
+            '지물 태그': tag,
+            '전체주소': data.display_name || '',
+            '지도링크': linkset,
+          });
+          pushResultRow(row);
+        } catch (err) {
+          const msg = err && (err.message || String(err));
+          const isAbort = err && (err.name === 'AbortError' || /aborted/i.test(msg));
+          if (stopFlag && isAbort) break;
+          console.error(err);
+          const row = buildResultRow('에러', r, { '전체주소': msg });
+          pushResultRow(row);
+          if (!stopFlag) {
+            setStatus(`에러 발생: (${i + 1}/${records.length}) ${msg}`, 'error');
+          }
+        } finally {
+          inFlight = false;
+          updateCounts();
+        }
       }
-      const r = records[currentIndex];
-      const { lat, lon } = r;
-      controller = new AbortController();
-      inFlight = true;
-      try {
-        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
-        if (!running || stopFlag) {
-          return;
-        }
-        const data = await fetchReverseWithRetry(lat, lon, controller.signal);
-        const addr = data.address ?? {};
-        const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
-        const linkset = mapLinks(lat, lon);
-        const row = buildResultRow(r.set, r, {
-          '시·도': sido,
-          '시·군·구': sigungu,
-          '읍·면·동·리': eupmyeon,
-          '지물 태그': tag,
-          '전체주소': data.display_name || '',
-          '지도링크': linkset,
-        });
-        pushResultRow(row);
-        if (!paused && running) {
-          setStatus(`처리 중… (${currentIndex}/${records.length})`);
-        }
-      } catch (err) {
-        const msg = err && (err.message || String(err));
-        const isAbort =
-          err && (err.name === 'AbortError' ||
-            /aborted/i.test(msg || ''));
-        if (stopFlag && isAbort) {
-          return;
-        }
-        console.error(err);
-        const row = buildResultRow('에러', r, {
-          '전체주소': msg,
-        });
-        pushResultRow(row);
-        if (!paused && running && !stopFlag) {
-          setStatus(`에러 발생: (${currentIndex}/${records.length}) ${msg}`, 'error');
-        }
-      } finally {
-        inFlight = false;
-        updateCounts();
-        if (stopFlag) {
-          setControlsIdle('중지되었습니다.', 'warn');
-        } else if (paused && running) {
-          setStatus(
-            `일시정지됨: ${currentIndex}/${records.length} 처리 완료. 재개하려면 "재개"를 누르세요.`,
-            'warn'
-          );
-          els.resume.disabled = false;
-        } else if (running && !paused) {
-          processNext();
-        }
+      if (stopFlag) {
+        setControlsIdle('중지되었습니다.', 'warn');
+      } else if (currentIndex >= records.length - 1) {
+        setControlsIdle('모든 처리가 완료되었습니다.');
       }
     }
     function pushResultRow(row) {
@@ -867,49 +918,71 @@
       currentIndex++;
       setProgress(currentIndex, records.length);
     }
+    async function yieldToMain() {
+      if ('scheduler' in window && 'yield' in window.scheduler) {
+        await window.scheduler.yield();
+      } else {
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
     els.parse.addEventListener('click', async () => {
-      if (running) {
-        setStatus('현재 역지오코딩이 진행 중입니다. 중지 후 다시 좌표를 추출해 주세요.', 'warn');
-        return;
-      }
-      els.start.disabled = true;
-      els.exportBtn.disabled = true;
-      const file = els.file.files?.[0];
-      if (!file) {
-        setStatus('먼저 random_data.txt 파일을 선택해 주세요.', 'warn');
-        return;
-      }
-      setStatus('파일 읽는 중…');
-      const text = await file.text();
-      setStatus('좌표 추출 중…');
-      const parsed = extractCoordinates(text);
-      if (!parsed.length) {
-        records = [];
-        resetProcessingState(0);
-        els.coords.value = '';
+      try {
+        if (running) {
+          setStatus('현재 역지오코딩이 진행 중입니다. 중지 후 다시 좌표를 추출해 주세요.', 'warn');
+          return;
+        }
         els.start.disabled = true;
-        setStatus(
-          '좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.',
-          'warn'
+        els.exportBtn.disabled = true;
+        const file = els.file.files?.[0];
+        if (!file) {
+          setStatus('먼저 random_data.txt 파일을 선택해 주세요.', 'warn');
+          return;
+        }
+        setStatus('파일 읽는 중…');
+        const text = await file.text();
+        setStatus('좌표 추출 중…');
+        await yieldToMain();
+        const parsed = extractCoordinates(text);
+        if (!parsed.length) {
+          records = [];
+          resetProcessingState(0);
+          els.coords.value = '';
+          els.start.disabled = true;
+          setStatus(
+            '좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.',
+            'warn'
+          );
+          return;
+        }
+        records = parsed.map((p, i) => ({
+          set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'),
+          idx: i + 1,
+          lat: p.lat,
+          lon: p.lon
+        }));
+        els.coords.value = records
+          .map(r => `${r.lat},${r.lon}`)
+          .join('\n');
+        resetProcessingState(records.length);
+        setControlsIdle(
+          `분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`
         );
-        return;
+      } catch (err) {
+        console.error(err);
+        setStatus(`오류 발생: ${err.message}`, 'error');
+        els.start.disabled = true;
       }
-      records = parsed.map((p, i) => ({
-        set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'),
-        idx: i + 1,
-        lat: p.lat,
-        lon: p.lon
-      }));
-      els.coords.value = records
-        .map(r => `${r.lat},${r.lon}`)
-        .join('\n');
-      resetProcessingState(records.length);
-      setControlsIdle(
-        `분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`
-      );
     });
     els.start.addEventListener('click', () => {
-      if (!records.length) return;
+      if (!document.startViewTransition) {
+        startProcessing();
+      } else {
+        document.startViewTransition(() => {
+          startProcessing();
+        });
+      }
+    });
+    function startProcessing() {
       stopFlag = false;
       running = true;
       resetProcessingState(records.length);
@@ -919,22 +992,32 @@
       els.resume.disabled = true;
       els.stop.disabled = false;
       setTableState('running');
-      processNext();
-    });
+      runProcessingLoop();
+    }
     els.pause.addEventListener('click', () => {
       if (!running) return;
       paused = true;
-      setStatus('일시정지 중입니다. 현재 진행 중인 요청까지 마무리한 뒤 멈춥니다.', 'warn');
+      if (!resumeHandler) {
+        resumeHandler = Promise.withResolvers();
+      }
+      if (inFlight) {
+        setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn');
+      } else {
+        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다.', 'warn');
+      }
       els.pause.disabled = true;
-      els.resume.disabled = true;
+      els.resume.disabled = false;
     });
     els.resume.addEventListener('click', () => {
-      if (!running || !paused || stopFlag) return;
+      if (!running || !paused) return;
       paused = false;
       setStatus('재개합니다…');
+      if (resumeHandler) {
+        resumeHandler.resolve();
+        resumeHandler = null;
+      }
       els.pause.disabled = false;
       els.resume.disabled = true;
-      processNext();
     });
     els.stop.addEventListener('click', () => {
       if (!running) return;
@@ -990,8 +1073,10 @@
         if (name) parts.push(name);
         if (addType && addType !== name) parts.push(addType);
         else if (category && category !== name) parts.push(category);
-
-        tag = parts.join(' · ');
+        if (parts.length > 0) {
+          const formatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
+          tag = formatter.format(parts);
+        }
       }
       return { sido, sigungu, eupmyeon, tag };
     }
