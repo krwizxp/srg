@@ -115,12 +115,8 @@
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr);
       gap: 12px;
       align-items: flex-start;
-      container-type: inline-size;
-      container-name: main-grid;
-      width: 100%;
-      max-width: 1100px;
 
-      @container main-grid (max-width: 900px) {
+      @media (width <=900px) {
         grid-template-columns: minmax(0, 1fr);
       }
     }
