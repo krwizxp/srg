@@ -355,6 +355,16 @@
       text-wrap: pretty;
     }
 
+    tbody td:nth-child(3) {
+      width: min-content;
+      min-width: 85px;
+      white-space: normal;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.35;
+      color: var(--muted);
+    }
+
     tbody tr {
       border-bottom: 1px dashed var(--line);
 
@@ -774,7 +784,7 @@
       const base = {
         '구분': kind,
         '순번': r.idx,
-        '좌표 (위도,경도)': `${r.lat},${r.lon}`,
+        '좌표 (위도,경도)': `${r.lat}, ${r.lon}`,
         '시·도': '',
         '시·군·구': '',
         '읍·면·동·리': '',
