@@ -624,7 +624,7 @@
       const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
       const title = encodeURIComponent(`${latStr} ${lonStr}`);
       const urlsByKey = {
-        Google: `https://www.google.com/maps/search/?api=1&query=${latStr},${lonStr}`,
+        Google: `https://www.google.com/maps?q=${latStr},${lonStr}`,
         OSM: `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`,
         Naver: `https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}`,
         Kakao: `https://map.kakao.com/link/map/${title},${latStr},${lonStr}`,
@@ -968,9 +968,25 @@
       let sigungu = '';
       let eupmyeon = '';
       if (isKR) {
-        sido = a.state || a.region || a.province || '';
-        sigungu = a.city || a.county || a.district || a.municipality || '';
-        const emd = a.suburb || a.neighbourhood || a.city_district || a.town || a.township || '';
+        sido = a.province || a.state || a.region || '';
+        let tmpCity = a.city || a.county || a.municipality || '';
+        let tmpGu = a.district || a.borough || a.suburb || '';
+        const specialCities = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'];
+        const isSpecialCity = specialCities.some(c => tmpCity.includes(c));
+        if (!sido && isSpecialCity) {
+          sido = tmpCity;
+          sigungu = tmpGu;
+        } else {
+          sigungu = tmpCity;
+          if (tmpCity && tmpGu && tmpCity !== tmpGu) {
+            if (!sigungu.includes(tmpGu)) {
+              sigungu += ' ' + tmpGu;
+            }
+          } else if (!sigungu) {
+            sigungu = tmpGu;
+          }
+        }
+        const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
         const ri = a.village || a.hamlet || '';
         eupmyeon = [emd, ri].filter(Boolean).join(' ');
       } else {
@@ -984,7 +1000,12 @@
         const addType = data.addresstype || '';
         const category = data.category || '';
         const type = data.type || '';
-        tag = [name, addType || category || type].filter(Boolean).join(' · ');
+        const parts = [];
+        if (name) parts.push(name);
+        if (addType && addType !== name) parts.push(addType);
+        else if (category && category !== name) parts.push(category);
+
+        tag = parts.join(' · ');
       }
       return { sido, sigungu, eupmyeon, tag };
     }
