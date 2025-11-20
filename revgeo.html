@@ -75,6 +75,17 @@
         gap: 12px;
         align-items: center;
       }
+
+      ::selection {
+        background-color: oklch(70% 0.15 250);
+        color: white;
+      }
+
+      @media (prefers-color-scheme: light) {
+        ::selection {
+          background-color: oklch(60% 0.2 260);
+        }
+      }
     }
 
     @layer layout {
@@ -495,17 +506,6 @@
           outline-offset: 2px;
           border-radius: 3px;
         }
-      }
-    }
-
-    ::selection {
-      background-color: oklch(70% 0.15 250);
-      color: white;
-    }
-
-    @media (prefers-color-scheme: light) {
-      ::selection {
-        background-color: oklch(60% 0.2 260);
       }
     }
   </style>
