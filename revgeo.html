@@ -1128,8 +1128,13 @@
     els.exportBtn.addEventListener('click', exportCSV);
     els.file.addEventListener('change', () => {
       if (els.file.files.length > 0) {
-        const name = els.file.files[0].name;
-        setStatus(`파일이 선택되었습니다: ${name} (단축키 P를 눌러 추출하세요)`);
+        const f = els.file.files[0];
+        if (f.type && !f.type.startsWith('text/')) {
+          setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
+          els.file.value = '';
+          return;
+        }
+        setStatus(`파일이 선택되었습니다: ${f.name} (단축키 P를 눌러 추출하세요)`);
       }
     });
     const dropZone = document.body;
@@ -1149,6 +1154,7 @@
         const f = files[0];
         if (f.type && !f.type.startsWith('text/')) {
           setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
+          els.file.value = '';
           return;
         }
         els.file.files = files;
