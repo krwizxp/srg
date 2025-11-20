@@ -25,7 +25,6 @@
       html,
       body {
         margin: 0;
-        padding: 0;
         min-height: 100dvh;
       }
 
@@ -67,8 +66,7 @@
       body {
         font-family: system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
         font-variant-numeric: tabular-nums;
-        background: light-dark(radial-gradient(circle at top left, oklch(95% 0.01 240), oklch(99% 0 0)),
-            radial-gradient(circle at top left, oklch(20% 0.04 250), oklch(10% 0.02 260)));
+        background: radial-gradient(circle at top left, light-dark(oklch(95% 0.01 240), oklch(20% 0.04 250)), light-dark(oklch(99% 0 0), oklch(10% 0.02 260)));
         color: var(--fg);
         accent-color: var(--accent);
         padding: 16px;
@@ -76,11 +74,6 @@
         flex-direction: column;
         gap: 12px;
         align-items: center;
-      }
-
-      ::selection {
-        background-color: var(--accent);
-        color: white;
       }
     }
 
@@ -95,8 +88,7 @@
       header {
         padding: 10px 14px;
         border-radius: 14px;
-        background: light-dark(radial-gradient(circle at top left, oklch(90% 0.05 250 / 0.8), oklch(98% 0 0 / 0.98)),
-            radial-gradient(circle at top left, oklch(30% 0.1 260 / 0.35), oklch(15% 0.04 250 / 0.96)));
+        background: radial-gradient(circle at top left, light-dark(oklch(90% 0.05 250 / 0.8), oklch(30% 0.1 260 / 0.35)), light-dark(oklch(98% 0 0 / 0.98), oklch(15% 0.04 250 / 0.96)));
         border: 1px solid var(--line);
         box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
 
@@ -172,7 +164,7 @@
         }
       }
 
-.card {
+      .card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 14px;
@@ -350,10 +342,10 @@
         }
       }
 
-.table-wrap {
+      .table-wrap {
         flex: 1;
         min-height: 0;
-        max-height: min(500px, 60vh); 
+        max-height: min(500px, 60vh);
         overflow: auto;
         content-visibility: auto;
         contain-intrinsic-size: 0 460px;
@@ -363,6 +355,7 @@
         box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
         scrollbar-gutter: stable;
         overscroll-behavior: contain;
+
         &:focus-visible {
           outline: 2px solid var(--accent);
           outline-offset: 3px;
@@ -502,6 +495,17 @@
           outline-offset: 2px;
           border-radius: 3px;
         }
+      }
+    }
+
+    ::selection {
+      background-color: oklch(70% 0.15 250);
+      color: white;
+    }
+
+    @media (prefers-color-scheme: light) {
+      ::selection {
+        background-color: oklch(60% 0.2 260);
       }
     }
   </style>
@@ -880,7 +884,7 @@
       for (let i = currentIndex; i < records.length; i++) {
         if (!running || stopFlag) break;
         if (paused && resumeHandler) {
-          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 \S\로 재개)', 'warn');
+          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
           await resumeHandler.promise;
         }
         if (!running || stopFlag) break;
@@ -986,7 +990,7 @@
           .join('\n');
         resetProcessingState(records.length);
         setControlsIdle(
-          `분석 완료: ${records.length}개 좌표 발견. "조회 시작(단축키 \S\)"을 누르세요.`
+          `분석 완료: ${records.length}개 좌표 발견. "조회 시작(단축키 S)"을 누르세요.`
         );
       } catch (err) {
         console.error(err);
@@ -1024,7 +1028,7 @@
       if (inFlight) {
         setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn');
       } else {
-        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 \S\로 재개)', 'warn');
+        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
       }
       els.pause.disabled = true;
       els.resume.disabled = false;
