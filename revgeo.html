@@ -24,7 +24,7 @@
       body {
         margin: 0;
         padding: 0;
-        min-height: 100%;
+        min-height: 100dvh;
       }
 
       fieldset {
@@ -45,10 +45,8 @@
         --accent-2: light-dark(oklch(60% 0.18 150), oklch(75% 0.15 150));
         --warn: light-dark(#d97706, #f59e0b);
         --err: light-dark(#dc2626, #ef4444);
-        --shadow: light-dark(0 10px 20px rgba(15, 23, 42, .08),
-            0 10px 20px rgba(0, 0, 0, .25));
-        --shadow-border: light-dark(rgba(148, 163, 184, .7),
-            rgba(15, 23, 42, .8));
+        --shadow: light-dark(0 10px 20px rgba(15, 23, 42, .08), 0 10px 20px rgba(0, 0, 0, .25));
+        --shadow-border: light-dark(rgba(148, 163, 184, .7), rgba(15, 23, 42, .8));
         --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         interpolate-size: allow-keywords;
       }
@@ -71,7 +69,6 @@
             radial-gradient(circle at top left, oklch(20% 0.04 250), oklch(10% 0.02 260)));
         color: var(--fg);
         accent-color: var(--accent);
-
         padding: 16px;
         display: flex;
         flex-direction: column;
@@ -484,6 +481,7 @@
         text-decoration: none;
         text-decoration-thickness: 1px;
         text-underline-offset: 2px;
+        text-underline-position: from-font;
 
         &:hover {
           text-decoration: underline;
@@ -514,8 +512,8 @@
             <label for="file">random_data.txt</label>
             <input type="file" id="file" accept=".txt">
             <div class="row">
-              <button type="button" id="parse">좌표 추출</button>
-              <button type="button" id="start" disabled>조회 시작</button>
+              <button type="button" id="parse" enterkeyhint="done">좌표 추출</button>
+              <button type="button" id="start" enterkeyhint="go" disabled>조회 시작</button>
               <button type="button" id="pause" disabled>일시정지</button>
               <button type="button" id="resume" disabled>재개</button>
               <button type="button" id="stop" disabled>중지</button>
@@ -595,6 +593,7 @@
       els.tableWrap.setAttribute('data-state', state);
     }
     const nf = new Intl.NumberFormat('ko-KR');
+    const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
     const MAX_RETRY = 3;
     const REQUEST_TIMEOUT_MS = 10000;
     const RATE_LIMIT_DELAY_MS = 1000;
@@ -871,7 +870,7 @@
       for (let i = currentIndex; i < records.length; i++) {
         if (!running || stopFlag) break;
         if (paused && resumeHandler) {
-          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다.', 'warn');
+          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 \S\로 재개)', 'warn');
           await resumeHandler.promise;
         }
         if (!running || stopFlag) break;
@@ -884,9 +883,8 @@
           await sleep(RATE_LIMIT_DELAY_MS);
           if (!running || stopFlag) break;
           if (!paused) {
-            setStatus(`처리 중… (${i + 1}/${records.length})`);
+            setStatus(`처리 중… (${i + 1}/${records.length}) (단축키: S=일시정지, Esc=중지)`);
           }
-
           const data = await fetchReverseWithRetry(lat, lon, controller.signal);
           const addr = data.address ?? {};
           const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
@@ -978,7 +976,7 @@
           .join('\n');
         resetProcessingState(records.length);
         setControlsIdle(
-          `분석 완료: ${records.length}개 좌표 발견. "조회 시작"을 눌러 역지오코딩을 진행하세요.`
+          `분석 완료: ${records.length}개 좌표 발견. "조회 시작(단축키 \S\)"을 누르세요.`
         );
       } catch (err) {
         console.error(err);
@@ -999,7 +997,7 @@
       stopFlag = false;
       running = true;
       resetProcessingState(records.length);
-      setStatus('조회 시작…');
+      setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
       els.start.disabled = true;
       els.pause.disabled = false;
       els.resume.disabled = true;
@@ -1016,7 +1014,7 @@
       if (inFlight) {
         setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn');
       } else {
-        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다.', 'warn');
+        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 \S\로 재개)', 'warn');
       }
       els.pause.disabled = true;
       els.resume.disabled = false;
@@ -1024,7 +1022,7 @@
     els.resume.addEventListener('click', () => {
       if (!running || !paused) return;
       paused = false;
-      setStatus('재개합니다…');
+      setStatus('재개합니다… (단축키 Esc로 중지)');
       if (resumeHandler) {
         resumeHandler.resolve();
         resumeHandler = null;
@@ -1035,6 +1033,11 @@
     els.stop.addEventListener('click', () => {
       if (!running) return;
       stopFlag = true;
+      if (paused && resumeHandler) {
+        resumeHandler.resolve();
+        resumeHandler = null;
+        paused = false;
+      }
       if (inFlight && controller) {
         controller.abort();
         setStatus('중지 요청됨. 현재 요청을 취소하는 중입니다…', 'warn');
@@ -1043,6 +1046,62 @@
       }
     });
     els.exportBtn.addEventListener('click', exportCSV);
+    els.file.addEventListener('change', () => {
+      if (els.file.files.length > 0) {
+        const name = els.file.files[0].name;
+        setStatus(`파일이 선택되었습니다: ${name} (단축키 P를 눌러 추출하세요)`);
+      }
+    });
+    const dropZone = document.body;
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.opacity = '0.8';
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.style.opacity = '1';
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.opacity = '1';
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        const f = files[0];
+        if (f.type && !f.type.startsWith('text/')) {
+          setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
+          return;
+        }
+        els.file.files = files;
+        setStatus(`파일이 선택되었습니다: ${f.name} (단축키 P를 눌러 추출하세요)`);
+      }
+    });
+    window.addEventListener('keydown', (e) => {
+      const active = document.activeElement;
+      if (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && active.type === 'text')) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === 'p' && !els.parse.disabled) {
+        e.preventDefault();
+        els.parse.click();
+      }
+      if (e.key === 'Escape' && !els.stop.disabled) {
+        e.preventDefault();
+        els.stop.click();
+      }
+      if (key === 's') {
+        if (!els.resume.disabled) {
+          e.preventDefault();
+          els.resume.click();
+        } else if (!els.pause.disabled) {
+          e.preventDefault();
+          els.pause.click();
+        } else if (!els.start.disabled) {
+          e.preventDefault();
+          els.start.click();
+        }
+      }
+    });
     function toKoreanAddressParts(a, data) {
       const countryCode = (a.country_code || '').toLowerCase();
       const isKR = countryCode === 'kr' || a.country === '대한민국';
@@ -1087,8 +1146,7 @@
         if (addType && addType !== name) parts.push(addType);
         else if (category && category !== name) parts.push(category);
         if (parts.length > 0) {
-          const formatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
-          tag = formatter.format(parts);
+          tag = listFormatter.format(parts);
         }
       }
       return { sido, sigungu, eupmyeon, tag };
