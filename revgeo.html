@@ -130,7 +130,7 @@
         display: grid;
         grid-template-columns: minmax(380px, 520px) 1fr;
         gap: 12px;
-        align-items: flex-start;
+        align-items: stretch;
 
         @media (max-width: 900px) {
           grid-template-columns: minmax(0, 1fr);
@@ -172,12 +172,14 @@
         }
       }
 
-      .card {
+.card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 14px;
         box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
+        display: flex;
+        flex-direction: column;
       }
 
       .row {
@@ -348,8 +350,10 @@
         }
       }
 
-      .table-wrap {
-        max-height: 460px;
+.table-wrap {
+        flex: 1;
+        min-height: 0;
+        max-height: min(500px, 60vh); 
         overflow: auto;
         content-visibility: auto;
         contain-intrinsic-size: 0 460px;
@@ -359,7 +363,6 @@
         box-shadow: var(--shadow), 0 0 0 1px var(--shadow-border);
         scrollbar-gutter: stable;
         overscroll-behavior: contain;
-
         &:focus-visible {
           outline: 2px solid var(--accent);
           outline-offset: 3px;
