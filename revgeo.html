@@ -9,25 +9,9 @@
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org">
   <link rel="icon" type="image/png"
-    href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAHNJREFUeF7t20EKgDAMBdGxV/P+l+NBBC2CilB383ZDw8S8tE1qZq4ys7Wz1vp9gHMAjIyAMwCMjIAzAIyMgDMAjIyAMwCMjIAzAIyMgDMAjIyAMwCMjIAzAIyMgDMAjIyAMwCMjIAzAIyMgDMAjIyAM8A+wA18Ywf1i9/55gAAAABJRU5ErkJggg==">
-  <script>
-    (function () {
-      var canvas = document.createElement('canvas');
-      canvas.width = 180;
-      canvas.height = 180;
-      var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, 180, 180);
-      ctx.fillStyle = '#60a5fa';
-      var p = new Path2D('M90 35c-28 0-50 22-50 50 0 28 50 80 50 80s50-52 50-80c0-28-22-50-50-50zm0 68c-10 0-18-8-18-18s8-18 18-18 18 8 18 18-8 18-18 18z');
-      ctx.fill(p);
-      var iconUrl = canvas.toDataURL('image/png');
-      var link = document.createElement('link');
-      link.rel = 'apple-touch-icon';
-      link.href = iconUrl;
-      document.head.appendChild(link);
-    })();
-  </script>
+    href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABmJLR0QA/wD/AP+gvaeTAAAAB3RJTUUH6QsVFRwzp02w1gAAAjZJREFUaN7t2z9oE1EcwPHvS/6jFqzVwqBVqxbBWbOji5s6OYiToIuLm5sOInRwEByki4ODi4uDi4ODi4uDi4ODi4uDi4ODi4uDi4ODi6WColCS5+GQtE1zk7u7S/J+4ZDA3fF+7/d+7/e+u4KqqniVbO8FmADr/x0wDabBNJgG02AaTINpMA2mwTSYBtNgGkyDaTANpsE0mAZ7A0ylUilV1a+q+ihJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkmS/d0jSjqSspLSkHUkHkh5L2pP0StK6pA+SviXJ8/zW4uLiM2PMkTFmQ9KqpA1J65JWSqXSk61W602CIAh7e3uPjTEHwFfgnqR9/9s/gZ9CiJ+9Xu+NMeawpP39/H4+hLBYrVZf+75/Q9KRg/z8Y0kLvu/fLJfLL4wx+5IOfO93wF8hxG+1Wu2F7/t3JB350e/8g6S5IAhuTU9Pv5ybmztsjDks6dCPfvdv4Jvv+7eKxeILScf+53f/lqR53/dvlMvlF8aYQ5K+d73/70II32q12vMgCG5JOnmQ3/9T0nwQBLcqleqzMAxPSjrzvd//K4TwrVarsxCCJ54xZsbzPI8gCI7V6/Vjvu8fK5fLR8vl8lHgEHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHAYYw6Yf8w0mAh4JyIC3omIgHciIuCdiAh4JyIC3omIgHciIuCdiAh4J6Kqqv4A99+103kC9GIAAAAASUVORK5CYII=">
+  <link rel="apple-touch-icon"
+    href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABmJLR0QA/wD/AP+gvaeTAAAAB3RJTUUH6QsVFRwzp02w1gAAAjZJREFUaN7t2z9oE1EcwPHvS/6jFqzVwqBVqxbBWbOji5s6OYiToIuLm5sOInRwEByki4ODi4uDi4ODi4uDi4ODi4uDi4ODi4uDi4ODi6WColCS5+GQtE1zk7u7S/J+4ZDA3fF+7/d+7/e+u4KqqniVbO8FmADr/x0wDabBNJgG02AaTINpMA2mwTSYBtNgGkyDaTANpsE0mAZ7A0ylUilV1a+q+ihJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkmS/d0jSjqSspLSkHUkHkh5L2pP0StK6pA+SviXJ8/zW4uLiM2PMkTFmQ9KqpA1J65JWSqXSk61W602CIAh7e3uPjTEHwFfgnqR9/9s/gZ9CiJ+9Xu+NMeawpP39/H4+hLBYrVZf+75/Q9KRg/z8Y0kLvu/fLJfLL4wx+5IOfO93wF8hxG+1Wu2F7/t3JB350e/8g6S5IAhuTU9Pv5ybmztsjDks6dCPfvdv4Jvv+7eKxeILScf+53f/lqR53/dvlMvlF8aYQ5K+d73/70II32q12vMgCG5JOnmQ3/9T0nwQBLcqleqzMAxPSjrzvd//K4TwrVarsxCCJ54xZsbzPI8gCI7V6/Vjvu8fK5fLR8vl8lHgEHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHA4hHAYYw6Yf8w0mAh4JyIC3omIgHciIuCdiAh4JyIC3omIgHciIuCdiAh4J6Kqqv4A99+103kC9GIAAAAASUVORK5CYII=">
   <title>SRG 데이터 역지오코딩 도구</title>
   <style>
     @layer reset, theme, layout, components, utilities;
