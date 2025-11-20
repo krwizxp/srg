@@ -587,6 +587,21 @@
   </footer>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
+    const CONFIG = {
+      MAX_RETRY: 3,
+      REQUEST_TIMEOUT_MS: 10000,
+      RATE_LIMIT_DELAY_MS: 1000,
+      REVERSE_ZOOM: 14,
+      SPECIAL_CITIES: ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'],
+      MAP_TEMPLATES: {
+        Google: 'https://www.google.com/maps?q=${latStr},${lonStr}',
+        OSM: 'https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}',
+        Naver: 'https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}',
+        Kakao: 'https://map.kakao.com/link/map/${title},${latStr},${lonStr}',
+      }
+    };
+    const nf = new Intl.NumberFormat('ko-KR');
+    const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
     const els = {
       file: document.getElementById('file'),
       parse: document.getElementById('parse'),
@@ -603,24 +618,8 @@
       coords: document.getElementById('coords'),
       tableWrap: document.querySelector('.table-wrap'),
     };
-    function setTableState(state) {
-      els.tableWrap.setAttribute('data-state', state);
-    }
-    const nf = new Intl.NumberFormat('ko-KR');
-    const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
-    const MAX_RETRY = 3;
-    const REQUEST_TIMEOUT_MS = 10000;
-    const RATE_LIMIT_DELAY_MS = 1000;
-    const REVERSE_ZOOM = 14;
     const BASE_COLUMNS = [
-      '구분',
-      '순번',
-      '좌표 (위도,경도)',
-      '시·도',
-      '시·군·구',
-      '읍·면·동·리',
-      '지물 태그',
-      '전체주소',
+      '구분', '순번', '좌표 (위도,경도)', '시·도', '시·군·구', '읍·면·동·리', '지물 태그', '전체주소',
     ];
     const MAP_PROVIDERS = [
       { key: 'Google', header: '지도링크(Google)' },
@@ -645,6 +644,9 @@
       el.classList.remove('err', 'warn');
       if (type === 'error') el.classList.add('err');
       else if (type === 'warn') el.classList.add('warn');
+    }
+    function setTableState(state) {
+      els.tableWrap.setAttribute('data-state', state);
     }
     function resetProcessingState(total) {
       results = [];
@@ -697,21 +699,28 @@
       const zoom = 16;
       const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
       const title = encodeURIComponent(`${latStr} ${lonStr}`);
-      const urlsByKey = {
-        Google: `https://www.google.com/maps?q=${latStr},${lonStr}`,
-        OSM: `https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}`,
-        Naver: `https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}`,
-        Kakao: `https://map.kakao.com/link/map/${title},${latStr},${lonStr}`,
+      const replaceTemplate = (tmpl) => {
+        return tmpl
+          .replace(/\$\{latStr\}/g, latStr)
+          .replace(/\$\{lonStr\}/g, lonStr)
+          .replace(/\$\{zoom\}/g, zoom)
+          .replace(/\$\{osmQuery\}/g, osmQuery)
+          .replace(/\$\{title\}/g, title);
       };
       return MAP_PROVIDERS.map(p => ({
         label: p.key,
-        url: urlsByKey[p.key],
+        url: replaceTemplate(CONFIG.MAP_TEMPLATES[p.key] || ''),
       }));
     }
     function sleep(ms) {
-      return new Promise(function (resolve) {
-        setTimeout(resolve, ms);
-      });
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    async function yieldToMain() {
+      if ('scheduler' in window && 'yield' in window.scheduler) {
+        await window.scheduler.yield();
+      } else {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
     async function fetchReverseWithRetry(lat, lon, signal) {
       const buildUrl = () => {
@@ -719,15 +728,15 @@
         url.searchParams.set('format', 'jsonv2');
         url.searchParams.set('lat', String(lat));
         url.searchParams.set('lon', String(lon));
-        url.searchParams.set('zoom', String(REVERSE_ZOOM));
+        url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM));
         url.searchParams.set('addressdetails', '1');
         url.searchParams.set('accept-language', 'ko');
         return url;
       };
       let attempt = 0;
-      while (attempt < MAX_RETRY) {
+      while (attempt < CONFIG.MAX_RETRY) {
         attempt++;
-        const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+        const timeoutSignal = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
         const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
         const res = await fetch(buildUrl(), {
           headers: { 'Accept': 'application/json' },
@@ -735,7 +744,7 @@
         });
         if (res.ok) return res.json();
         if (res.status === 429 || res.status >= 500) {
-          await sleep(RATE_LIMIT_DELAY_MS * attempt);
+          await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt);
           continue;
         }
         const text = await res.text();
@@ -743,85 +752,60 @@
       }
       throw new Error('재시도 후 실패');
     }
-    function appendRow(row) {
-      const tr = document.createElement('tr');
-      const keys = [...BASE_COLUMNS, '지도링크'];
-      for (const k of keys) {
-        const isRowHeader = (k === '순번');
-        const cellTag = (k === '지도링크') ? 'td' : (isRowHeader ? 'th' : 'td');
-        const td = document.createElement(cellTag);
-        if (isRowHeader && cellTag === 'th') td.setAttribute('scope', 'row');
-        if (k === '지도링크') {
-          td.classList.add('nowrap');
-          const links = row[k];
-          if (Array.isArray(links)) {
-            for (let i = 0; i < links.length; i++) {
-              const it = links[i];
-              const a = document.createElement('a');
-              a.href = it.url;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              a.textContent = it.label;
-              const latlon = String(row['좌표 (위도,경도)']);
-              a.setAttribute('aria-label', `${it.label} 지도 새 창에서 열기 (${latlon})`);
-              td.appendChild(a);
-              if (i < links.length - 1) {
-                td.appendChild(document.createTextNode(' · '));
-              }
-            }
+    function getKoreanAdminArea(a) {
+      let sido = a.province || a.state || a.region || '';
+      let tmpCity = a.city || a.county || a.municipality || '';
+      let tmpGu = a.district || a.borough || a.suburb || '';
+      let sigungu = '';
+      const isSpecialCity = CONFIG.SPECIAL_CITIES.some(c => tmpCity.includes(c));
+      if (!sido && isSpecialCity) {
+        sido = tmpCity;
+        sigungu = tmpGu;
+      } else {
+        sigungu = tmpCity;
+        if (tmpCity && tmpGu && tmpCity !== tmpGu) {
+          if (!sigungu.includes(tmpGu)) {
+            sigungu += ' ' + tmpGu;
           }
-        } else {
-          td.textContent = row[k] ?? '';
-          if (k === '지물 태그') td.className = 'tags-cell';
-          if (k === '읍·면·동·리') {
-            td.classList.add('nowrap', 'ellipsis');
-            td.title = row[k] ?? '';
-          }
+        } else if (!sigungu) {
+          sigungu = tmpGu;
         }
-        tr.appendChild(td);
       }
-      els.tbody.appendChild(tr);
+      const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
+      const ri = a.village || a.hamlet || '';
+      const eupmyeon = [emd, ri].filter(Boolean).join(' ');
+      return { sido, sigungu, eupmyeon };
     }
-    function toCSV(rows) {
-      if (!rows.length) return '';
-      const headers = [
-        ...BASE_COLUMNS,
-        ...MAP_PROVIDERS.map(p => p.header),
-      ];
-      const escape = (s) => {
-        if (s == null) return '';
-        s = String(s);
-        if (/[",\n]/.test(s)) return '"' + s.replaceAll('"', '""') + '"';
-        return s;
-      };
-      const lines = [headers.join(',')];
-      for (const r of rows) {
-        const links = Array.isArray(r['지도링크']) ? r['지도링크'] : [];
-        const linkMap = Object.fromEntries(links.map(l => [l.label, l.url]));
-        const baseVals = BASE_COLUMNS.map(col => r[col]);
-        const linkVals = MAP_PROVIDERS.map(p => linkMap[p.key] || '');
-        const rowVals = [...baseVals, ...linkVals];
-        lines.push(rowVals.map(escape).join(','));
+    function getFeatureTag(a, data) {
+      if (!data || typeof data !== 'object') return '';
+      const parts = [];
+      const name = data.name || a.attraction || a.building;
+      const addType = data.addresstype;
+      const category = data.category;
+      if (name) parts.push(name);
+      if (addType && addType !== name) parts.push(addType);
+      else if (category && category !== name) parts.push(category);
+      if (parts.length > 0) {
+        return listFormatter.format(parts);
       }
-      return lines.join('\n');
+      return '';
     }
-    function exportCSV() {
-      const csv = toCSV(results);
-      if (!csv) {
-        setStatus('내보낼 데이터가 없습니다.', 'warn');
-        return;
+    function toKoreanAddressParts(a, data) {
+      const countryCode = (a.country_code || '').toLowerCase();
+      const isKR = countryCode === 'kr' || a.country === '대한민국';
+      let result = { sido: '', sigungu: '', eupmyeon: '', tag: '' };
+      if (isKR) {
+        const admin = getKoreanAdminArea(a);
+        result.sido = admin.sido;
+        result.sigungu = admin.sigungu;
+        result.eupmyeon = admin.eupmyeon;
+      } else {
+        result.sido = a.state || a.region || a.province || a.county || a.city || '';
+        result.sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
+        result.eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '';
       }
-      const bom = '\uFEFF';
-      const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'reverse_geocode_results.csv';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setStatus('CSV 파일을 다운로드했습니다.');
+      result.tag = getFeatureTag(a, data);
+      return result;
     }
     function extractCoordinates(text) {
       const out = [];
@@ -880,6 +864,105 @@
       };
       return { ...base, ...extra };
     }
+    function appendRow(row) {
+      const tr = document.createElement('tr');
+      const keys = [...BASE_COLUMNS, '지도링크'];
+      for (const k of keys) {
+        const isRowHeader = (k === '순번');
+        const cellTag = (k === '지도링크') ? 'td' : (isRowHeader ? 'th' : 'td');
+        const td = document.createElement(cellTag);
+        if (isRowHeader && cellTag === 'th') td.setAttribute('scope', 'row');
+        if (k === '지도링크') {
+          td.classList.add('nowrap');
+          const links = row[k];
+          if (Array.isArray(links)) {
+            for (let i = 0; i < links.length; i++) {
+              const it = links[i];
+              const a = document.createElement('a');
+              a.href = it.url;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              a.textContent = it.label;
+              const latlon = String(row['좌표 (위도,경도)']);
+              a.setAttribute('aria-label', `${it.label} 지도 새 창에서 열기 (${latlon})`);
+              td.appendChild(a);
+              if (i < links.length - 1) {
+                td.appendChild(document.createTextNode(' · '));
+              }
+            }
+          }
+        } else {
+          td.textContent = row[k] ?? '';
+          if (k === '지물 태그') td.className = 'tags-cell';
+          if (k === '읍·면·동·리') {
+            td.classList.add('nowrap', 'ellipsis');
+            td.title = row[k] ?? '';
+          }
+        }
+        tr.appendChild(td);
+      }
+      els.tbody.appendChild(tr);
+    }
+    function toCSV(rows) {
+      if (!rows || !rows.length) return '';
+      const headers = [
+        ...BASE_COLUMNS,
+        ...MAP_PROVIDERS.map(p => p.header),
+      ];
+      const escape = (s) => {
+        if (s == null) return '';
+        s = String(s);
+        if (/[",\n]/.test(s)) {
+          return '"' + s.replaceAll('"', '""') + '"';
+        }
+        return s;
+      };
+      const lines = [headers.join(',')];
+      for (const r of rows) {
+        const links = (r['지도링크'] && Array.isArray(r['지도링크'])) ? r['지도링크'] : [];
+        const linkMap = Object.fromEntries(links.map(l => [l.label, l.url]));
+        const baseVals = BASE_COLUMNS.map(col => r[col]);
+        const linkVals = MAP_PROVIDERS.map(p => linkMap[p.key] || '');
+        const rowVals = [...baseVals, ...linkVals];
+        lines.push(rowVals.map(escape).join(','));
+      }
+      return lines.join('\n');
+    }
+    function exportCSV() {
+      try {
+        if (!results || results.length === 0) {
+          setStatus('내보낼 데이터가 없습니다. 먼저 조회 시작을 눌러주세요.', 'warn');
+          return;
+        }
+        const csv = toCSV(results);
+        if (!csv) {
+          setStatus('CSV 데이터 생성에 실패했습니다.', 'error');
+          return;
+        }
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'reverse_geocode_results.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus('CSV 파일을 다운로드했습니다.');
+      } catch (err) {
+        console.error('CSV Export Error:', err);
+        setStatus(`내보내기 중 오류가 발생했습니다: ${err.message}`, 'error');
+      }
+    }
+    function pushResultRow(row) {
+      results.push(row);
+      if (row['구분'] !== '에러') successCount++;
+      processedCount++;
+      appendRow(row);
+      currentIndex++;
+      setProgress(currentIndex, records.length);
+    }
     async function runProcessingLoop() {
       for (let i = currentIndex; i < records.length; i++) {
         if (!running || stopFlag) break;
@@ -894,7 +977,7 @@
         controller = new AbortController();
         inFlight = true;
         try {
-          await sleep(RATE_LIMIT_DELAY_MS);
+          await sleep(CONFIG.RATE_LIMIT_DELAY_MS);
           if (!running || stopFlag) break;
           if (!paused) {
             setStatus(`처리 중… (${i + 1}/${records.length}) (단축키: S=일시정지, Esc=중지)`);
@@ -933,22 +1016,17 @@
         setControlsIdle('모든 처리가 완료되었습니다.');
       }
     }
-    function pushResultRow(row) {
-      results.push(row);
-      if (row['구분'] !== '에러') {
-        successCount++;
-      }
-      processedCount++;
-      appendRow(row);
-      currentIndex++;
-      setProgress(currentIndex, records.length);
-    }
-    async function yieldToMain() {
-      if ('scheduler' in window && 'yield' in window.scheduler) {
-        await window.scheduler.yield();
-      } else {
-        await new Promise(r => setTimeout(r, 0));
-      }
+    function startProcessing() {
+      stopFlag = false;
+      running = true;
+      resetProcessingState(records.length);
+      setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
+      els.start.disabled = true;
+      els.pause.disabled = false;
+      els.resume.disabled = true;
+      els.stop.disabled = false;
+      setTableState('running');
+      runProcessingLoop();
     }
     els.parse.addEventListener('click', async () => {
       try {
@@ -1007,18 +1085,6 @@
         });
       }
     });
-    function startProcessing() {
-      stopFlag = false;
-      running = true;
-      resetProcessingState(records.length);
-      setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
-      els.start.disabled = true;
-      els.pause.disabled = false;
-      els.resume.disabled = true;
-      els.stop.disabled = false;
-      setTableState('running');
-      runProcessingLoop();
-    }
     els.pause.addEventListener('click', () => {
       if (!running) return;
       paused = true;
@@ -1116,55 +1182,6 @@
         }
       }
     });
-    function toKoreanAddressParts(a, data) {
-      const countryCode = (a.country_code || '').toLowerCase();
-      const isKR = countryCode === 'kr' || a.country === '대한민국';
-      let sido = '';
-      let sigungu = '';
-      let eupmyeon = '';
-      if (isKR) {
-        sido = a.province || a.state || a.region || '';
-        let tmpCity = a.city || a.county || a.municipality || '';
-        let tmpGu = a.district || a.borough || a.suburb || '';
-        const specialCities = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'];
-        const isSpecialCity = specialCities.some(c => tmpCity.includes(c));
-        if (!sido && isSpecialCity) {
-          sido = tmpCity;
-          sigungu = tmpGu;
-        } else {
-          sigungu = tmpCity;
-          if (tmpCity && tmpGu && tmpCity !== tmpGu) {
-            if (!sigungu.includes(tmpGu)) {
-              sigungu += ' ' + tmpGu;
-            }
-          } else if (!sigungu) {
-            sigungu = tmpGu;
-          }
-        }
-        const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
-        const ri = a.village || a.hamlet || '';
-        eupmyeon = [emd, ri].filter(Boolean).join(' ');
-      } else {
-        sido = a.state || a.region || a.province || a.county || a.city || '';
-        sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
-        eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '';
-      }
-      let tag = '';
-      if (data && typeof data === 'object') {
-        const name = data.name || a.attraction || a.building || '';
-        const addType = data.addresstype || '';
-        const category = data.category || '';
-        const type = data.type || '';
-        const parts = [];
-        if (name) parts.push(name);
-        if (addType && addType !== name) parts.push(addType);
-        else if (category && category !== name) parts.push(category);
-        if (parts.length > 0) {
-          tag = listFormatter.format(parts);
-        }
-      }
-      return { sido, sigungu, eupmyeon, tag };
-    }
   </script>
 </body>
 
