@@ -8,8 +8,6 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9fafb">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org">
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%230f172a'/%3E%3Cpath d='M90 35c-28 0-50 22-50 50 0 28 50 80 50 80s50-52 50-80c0-28-22-50-50-50zm0 68c-10 0-18-8-18-18s8-18 18-18 18 8 18 18-8 18-18 18z' fill='%2360a5fa'/%3E%3C/svg%3E">
   <script>
     (function () {
       var canvas = document.createElement('canvas');
@@ -21,10 +19,17 @@
       ctx.fillStyle = '#60a5fa';
       var p = new Path2D('M90 35c-28 0-50 22-50 50 0 28 50 80 50 80s50-52 50-80c0-28-22-50-50-50zm0 68c-10 0-18-8-18-18s8-18 18-18 18 8 18 18-8 18-18 18z');
       ctx.fill(p);
-      var link = document.createElement('link');
-      link.rel = 'apple-touch-icon';
-      link.href = canvas.toDataURL('image/png');
-      document.head.appendChild(link);
+      var iconUrl = canvas.toDataURL('image/png');
+      function addLink(rel, url) {
+        var link = document.createElement('link');
+        link.rel = rel;
+        link.href = url;
+        link.type = 'image/png';
+        document.head.appendChild(link);
+      }
+      addLink('icon', iconUrl);
+      addLink('apple-touch-icon', iconUrl);
+      addLink('apple-touch-icon-precomposed', iconUrl);
     })();
   </script>
   <title>SRG 데이터 역지오코딩 도구</title>
@@ -881,45 +886,6 @@
       };
       return { ...base, ...extra };
     }
-    function appendRow(row) {
-      const tr = document.createElement('tr');
-      const keys = [...BASE_COLUMNS, '지도링크'];
-      for (const k of keys) {
-        const isRowHeader = (k === '순번');
-        const cellTag = (k === '지도링크') ? 'td' : (isRowHeader ? 'th' : 'td');
-        const td = document.createElement(cellTag);
-        if (isRowHeader && cellTag === 'th') td.setAttribute('scope', 'row');
-        if (k === '지도링크') {
-          td.classList.add('nowrap');
-          const links = row[k];
-          if (Array.isArray(links)) {
-            for (let i = 0; i < links.length; i++) {
-              const it = links[i];
-              const a = document.createElement('a');
-              a.href = it.url;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              a.textContent = it.label;
-              const latlon = String(row['좌표 (위도,경도)']);
-              a.setAttribute('aria-label', `${it.label} 지도 새 창에서 열기 (${latlon})`);
-              td.appendChild(a);
-              if (i < links.length - 1) {
-                td.appendChild(document.createTextNode(' · '));
-              }
-            }
-          }
-        } else {
-          td.textContent = row[k] ?? '';
-          if (k === '지물 태그') td.className = 'tags-cell';
-          if (k === '읍·면·동·리') {
-            td.classList.add('nowrap', 'ellipsis');
-            td.title = row[k] ?? '';
-          }
-        }
-        tr.appendChild(td);
-      }
-      els.tbody.appendChild(tr);
-    }
     function toCSV(rows) {
       if (!rows || !rows.length) return '';
       const headers = [
@@ -1171,7 +1137,6 @@
         const f = files[0];
         if (f.type && !f.type.startsWith('text/')) {
           setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
-          els.file.value = '';
           return;
         }
         els.file.files = files;
@@ -1203,6 +1168,12 @@
           e.preventDefault();
           els.start.click();
         }
+      }
+    });
+    window.addEventListener('beforeunload', (e) => {
+      if (running || (results.length > 0 && processedCount > 0)) {
+        e.preventDefault();
+        e.returnValue = '';
       }
     });
   </script>
