@@ -591,24 +591,6 @@
   </footer>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
-    (function generateAppleTouchIcon() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 180;
-      canvas.height = 180;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.roundRect(0, 0, 180, 180, 40);
-      ctx.fill();
-      ctx.fillStyle = '#60a5fa';
-      const p = new Path2D('M90 30c-28 0-50 22-50 50 0 28 50 80 50 80s50-52 50-80c0-28-22-50-50-50zm0 68c-10 0-18-8-18-18s8-18 18-18 18 8 18 18-8 18-18 18z');
-      ctx.translate(0, 10);
-      ctx.fill(p);
-      const link = document.createElement('link');
-      link.rel = 'apple-touch-icon';
-      link.href = canvas.toDataURL('image/png');
-      document.head.appendChild(link);
-    })();
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10000,
