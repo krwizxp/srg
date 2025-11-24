@@ -662,7 +662,7 @@
         const RX_CSV = /[",\n]/;
         const CONFIG = { MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'] };
         const MAP_PROVIDERS = [
-            { key: 'Google', header: '지도링크(Google)', url: (lat, lon) => `https://www.google.com/maps?q=$${lat},${lon}` },
+            { key: 'Google', header: '지도링크(Google)', url: (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}` },
             { key: 'OSM', header: '지도링크(OSM)', url: (lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}` },
             { key: 'Naver', header: '지도링크(Naver)', url: (lat, lon) => `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}` },
             { key: 'Kakao', header: '지도링크(Kakao)', url: (lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}` }
