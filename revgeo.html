@@ -719,8 +719,9 @@
         };
         const AppState = {
             records: [], results: [], droppedFile: null, status: 'idle', controller: null, resumeResolve: null, inFlight: false, renderReq: null,
-            get isRunning() { return this.status === 'running' || this.status === 'paused'; },
+            get isRunning() { return this.status === 'running' || this.status === 'paused' || this.status === 'pausing'; },
             get isPaused() { return this.status === 'paused'; },
+            get isPausing() { return this.status === 'pausing'; },
             get isStopping() { return this.status === 'stopping'; },
             reset() { this.results = []; this.status = 'idle'; this.controller = null; this.resumeResolve = null; this.inFlight = false; this.renderReq = null; },
             setRecords(newRecords) { this.records = newRecords; this.reset(); updateUIState(); },
@@ -733,13 +734,13 @@
             const hasRecords = AppState.records.length > 0;
             const hasResults = AppState.results.length > 0;
             const { parse, start, pause, resume, stop, exportBtn, tableWrap } = domElements;
-            parse.disabled = s === 'running' || s === 'paused';
-            start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'stopping';
+            parse.disabled = s === 'running' || s === 'paused' || s === 'pausing';
+            start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'pausing' || s === 'stopping';
             pause.disabled = s !== 'running';
             resume.disabled = s !== 'paused';
             stop.disabled = s === 'idle' || s === 'stopping';
             exportBtn.disabled = !hasResults;
-            if (s === 'running') tableWrap.setAttribute('data-state', 'running');
+            if (s === 'running' || s === 'pausing') tableWrap.setAttribute('data-state', 'running');
             else if (s === 'idle' && !hasResults) tableWrap.setAttribute('data-state', 'idle');
         }
         function setStatus(msg, type = 'info') {
@@ -762,6 +763,7 @@
                 domElements.prog.style.setProperty("--value", pct);
                 domElements.prog.setAttribute("aria-valuenow", String(pct));
                 domElements.progLabel.textContent = `진행 상황 ${pct}%`;
+                if (AppState.isRunning && !AppState.isPaused) setStatus(`처리 중… (${processed}/${total}) (단축키: S=일시정지, Esc=중지)`);
                 updateUIState();
                 AppState.renderReq = null;
             });
@@ -791,11 +793,9 @@
             if (out.length) return out;
             const lineBreakRegex = /\r?\n/g;
             let match;
-            let lineCount = 0;
             let firstLineEnd = -1;
             while ((match = lineBreakRegex.exec(text)) !== null) {
                 if (text.substring(match.index - (match.index > 0 ? 1 : 0), match.index).trim().length > 0) { firstLineEnd = match.index; break; }
-                lineCount++;
             }
             if (firstLineEnd === -1) firstLineEnd = text.length;
             const firstLine = text.substring(0, firstLineEnd).trim();
@@ -804,7 +804,7 @@
                 const idxLat = hdr.findIndex(h => COORD_REGEX.LAT_KEY.test(h));
                 const idxLon = hdr.findIndex(h => COORD_REGEX.LON_KEY.test(h));
                 if (idxLat >= 0 && idxLon >= 0) {
-                    let prevIndex = lineBreakRegex.lastIndex;
+                    let prevIndex = lineBreakRegex.lastIndex || firstLineEnd;
                     let loopCount = 0;
                     while ((match = lineBreakRegex.exec(text)) !== null) {
                         if (++loopCount % 5000 === 0) await yieldToMain();
@@ -875,7 +875,8 @@
             const startIndex = AppState.results.length;
             for (let i = startIndex; i < AppState.records.length; i++) {
                 if (!AppState.isRunning || AppState.isStopping) break;
-                if (AppState.isPaused) {
+                if (AppState.isPausing) {
+                    AppState.setStatus('paused');
                     setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
                     await new Promise(r => AppState.resumeResolve = r);
                     domElements.resume.disabled = true; domElements.pause.disabled = false;
@@ -887,6 +888,14 @@
                 AppState.inFlight = true;
                 try {
                     if (i > startIndex) await sleep(CONFIG.RATE_LIMIT_DELAY_MS, AppState.controller.signal);
+                    if (!AppState.isRunning || AppState.isStopping) break;
+                    if (AppState.isPausing) {
+                        AppState.setStatus('paused');
+                        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
+                        await new Promise(r => AppState.resumeResolve = r);
+                        domElements.resume.disabled = true; domElements.pause.disabled = false;
+                        setStatus('재개합니다… (단축키 Esc로 중지)');
+                    }
                     if (!AppState.isRunning || AppState.isStopping) break;
                     if (!AppState.isPaused) setStatus(`처리 중… (${i + 1}/${AppState.records.length}) (단축키: S=일시정지, Esc=중지)`);
                     const data = await fetchReverseWithRetry(r.lat, r.lon, AppState.controller.signal);
@@ -918,12 +927,20 @@
             if (!rows || !rows.length) return [];
             const headerCols = COL_DEFS.filter(c => !c.noCsv);
             const mapHeaders = MAP_PROVIDERS.map(p => p.header);
-            const escape = (s) => { if (s == null) return ''; s = String(s); return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
             const lines = [[...headerCols.map(c => c.label), ...mapHeaders].join(',') + '\n'];
             for (const r of rows) {
-                const baseVals = headerCols.map(c => c.val(r));
-                const mapVals = MAP_PROVIDERS.map(p => p.url(r.lat, r.lon));
-                lines.push([...baseVals, ...mapVals].map(escape).join(',') + '\n');
+                let rowStr = '';
+                for (let i = 0; i < headerCols.length; i++) {
+                    const s = headerCols[i].val(r);
+                    const str = String(s ?? '');
+                    rowStr += (RX_CSV.test(str) ? '"' + str.replaceAll('"', '""') + '"' : str) + ',';
+                }
+                for (let i = 0; i < MAP_PROVIDERS.length; i++) {
+                    const s = MAP_PROVIDERS[i].url(r.lat, r.lon);
+                    const str = String(s ?? '');
+                    rowStr += (RX_CSV.test(str) ? '"' + str.replaceAll('"', '""') + '"' : str) + (i < MAP_PROVIDERS.length - 1 ? ',' : '');
+                }
+                lines.push(rowStr + '\n');
             }
             return lines;
         }
@@ -931,7 +948,8 @@
             try {
                 const blobData = toCSV(AppState.results);
                 if (!blobData.length) return setStatus('내보낼 데이터가 없습니다.', 'warn');
-                const url = URL.createObjectURL(new Blob(['\uFEFF', ...blobData], { type: 'text/csv;charset=utf-8' }));
+                blobData.unshift('\uFEFF');
+                const url = URL.createObjectURL(new Blob(blobData, { type: 'text/csv;charset=utf-8' }));
                 const a = document.createElement('a'); a.href = url;
                 const now = new Date();
                 const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0];
@@ -959,7 +977,7 @@
             } catch (err) { console.error(err); setStatus(`오류 발생: ${err.message}`, 'error'); }
         });
         domElements.start.addEventListener('click', () => { document.startViewTransition ? document.startViewTransition(startProcessing) : startProcessing(); });
-        domElements.pause.addEventListener('click', () => { if (!AppState.isRunning) return; AppState.setStatus('paused'); if (AppState.inFlight) setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn'); });
+        domElements.pause.addEventListener('click', () => { if (!AppState.isRunning) return; AppState.setStatus('pausing'); if (AppState.inFlight) setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn'); });
         domElements.resume.addEventListener('click', () => { if (!AppState.isPaused) return; AppState.setStatus('running'); if (AppState.resumeResolve) { AppState.resumeResolve(); AppState.resumeResolve = null; } });
         domElements.stop.addEventListener('click', () => {
             if (!AppState.isRunning) return;
