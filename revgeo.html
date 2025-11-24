@@ -2,1266 +2,986 @@
 <html lang="ko">
 
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f9fafb" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" as="style" crossorigin
-    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9" />
-  <title>SRG 데이터 역지오코딩 도구</title>
-  <style>
-    @layer reset, theme, layout, components, utilities;
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>SRG 데이터 역지오코딩 도구</title>
+    <link rel="preconnect" href="https://nominatim.openstreetmap.org">
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9" />
+    <style>
+        @layer reset, theme, layout, components, utilities;
 
-    @layer reset {
+        @layer reset {
 
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-      }
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+            }
 
-      html,
-      body {
-        margin: 0;
-        min-height: 100dvh;
-      }
+            html,
+            body {
+                margin: 0;
+                min-height: 100dvh;
+            }
 
-      fieldset {
-        margin: 0;
-        padding: 0;
-        border: 0;
-      }
+            fieldset {
+                margin: 0;
+                padding: 0;
+                border: 0;
+            }
 
-      button,
-      input,
-      textarea {
-        font-family: inherit;
-      }
-    }
-
-    @layer theme {
-      :root {
-        color-scheme: light dark;
-        --bg-grad-start: light-dark(oklch(97% 0.01 240), oklch(12% 0.02 240));
-        --bg-grad-end: light-dark(oklch(92% 0.02 250), oklch(8% 0.03 260));
-        --card-bg: light-dark(rgba(255, 255, 255, 0.7), rgba(30, 41, 59, 0.6));
-        --card-border: light-dark(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1));
-        --fg: light-dark(oklch(20% 0.02 260), oklch(92% 0.01 240));
-        --muted: light-dark(oklch(50% 0.05 260), oklch(65% 0.04 260));
-        --line: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
-        --accent: light-dark(oklch(55% 0.22 270), oklch(65% 0.18 260));
-        --accent-glow: light-dark(oklch(55% 0.22 270 / 0.4), oklch(65% 0.18 260 / 0.4));
-        --success: light-dark(oklch(60% 0.18 150), oklch(70% 0.15 150));
-        --warn: light-dark(oklch(65% 0.18 50), oklch(75% 0.15 50));
-        --err: light-dark(oklch(55% 0.22 25), oklch(65% 0.2 25));
-        --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.03);
-        --shadow-md: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
-        --glass: blur(12px) saturate(180%);
-        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-      }
-
-      body {
-        background: linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
-        color: var(--fg);
-        padding: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        align-items: center;
-        letter-spacing: -0.01em;
-        overflow-x: hidden;
-      }
-
-      @media (max-width: 600px) {
-        body {
-          padding: 16px;
-          gap: 16px;
-        }
-      }
-    }
-
-    @layer layout {
-
-      main,
-      header,
-      footer {
-        width: min(1400px, 100%);
-      }
-
-      header {
-        padding: 20px 24px;
-        border-radius: 20px;
-        background: var(--card-bg);
-        backdrop-filter: var(--glass);
-        border: 1px solid var(--card-border);
-        box-shadow: var(--shadow-sm);
-        display: flex;
-        align-items: center;
-        gap: 18px;
-
-        h1 {
-          margin: 0;
-          font-size: 20px;
-          font-weight: 700;
-          line-height: 1.2;
+            button,
+            input,
+            textarea {
+                font-family: inherit;
+            }
         }
 
-        p {
-          margin-top: 4px;
-          font-size: 14px;
-          color: var(--muted);
+        @layer theme {
+            :root {
+                color-scheme: light dark;
+                --bg-grad-start: light-dark(oklch(97% 0.01 240), oklch(12% 0.02 240));
+                --bg-grad-end: light-dark(oklch(92% 0.02 250), oklch(8% 0.03 260));
+                --card-bg: light-dark(rgba(255, 255, 255, 0.7), rgba(30, 41, 59, 0.6));
+                --card-border: light-dark(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1));
+                --fg: light-dark(oklch(20% 0.02 260), oklch(92% 0.01 240));
+                --muted: light-dark(oklch(50% 0.05 260), oklch(65% 0.04 260));
+                --line: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
+                --accent: light-dark(oklch(55% 0.22 270), oklch(65% 0.18 260));
+                --accent-glow: light-dark(oklch(55% 0.22 270 / 0.4), oklch(65% 0.18 260 / 0.4));
+                --success: light-dark(oklch(60% 0.18 150), oklch(70% 0.15 150));
+                --warn: light-dark(oklch(65% 0.18 50), oklch(75% 0.15 50));
+                --err: light-dark(oklch(55% 0.22 25), oklch(65% 0.2 25));
+                --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.03);
+                --shadow-md: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+                --glass: blur(12px) saturate(180%);
+                font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            }
+
+            body {
+                background: linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
+                color: var(--fg);
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+                align-items: center;
+                letter-spacing: -0.01em;
+                overflow-x: hidden;
+            }
+
+            @media (max-width: 600px) {
+                body {
+                    padding: 16px;
+                    gap: 16px;
+                }
+            }
         }
 
-        svg {
-          color: var(--accent);
-          filter: drop-shadow(0 0 8px var(--accent-glow));
-        }
-      }
+        @layer layout {
 
-      main {
-        display: grid;
-        grid-template-columns: 420px 1fr;
-        gap: 20px;
-        align-items: stretch;
-      }
+            main,
+            header,
+            footer {
+                width: min(1400px, 100%);
+            }
 
-      main>section {
-        min-width: 0;
-      }
+            header {
+                padding: 20px 24px;
+                border-radius: 20px;
+                background: var(--card-bg);
+                backdrop-filter: var(--glass);
+                border: 1px solid var(--card-border);
+                box-shadow: var(--shadow-sm);
+                display: flex;
+                align-items: center;
+                gap: 18px;
 
-      @media (max-width: 900px) {
-        main {
-          grid-template-columns: 1fr;
-        }
-      }
+                h1 {
+                    margin: 0;
+                    font-size: 20px;
+                    font-weight: 700;
+                    line-height: 1.2;
+                }
 
-      footer {
-        text-align: center;
-        font-size: 12px;
-        color: var(--muted);
-        opacity: 0.8;
-      }
-    }
+                p {
+                    margin-top: 4px;
+                    font-size: 14px;
+                    color: var(--muted);
+                }
 
-    @layer components {
-      .card {
-        background: var(--card-bg);
-        backdrop-filter: var(--glass);
-        border: 1px solid var(--card-border);
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: var(--shadow-md);
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        max-width: 100%;
-        height: 600px;
-        overflow: hidden;
-      }
+                svg {
+                    color: var(--accent);
+                    filter: drop-shadow(0 0 8px var(--accent-glow));
+                }
+            }
 
-      .card>div:has(#coords) {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-      }
+            main {
+                display: grid;
+                grid-template-columns: 420px 1fr;
+                gap: 20px;
+                align-items: stretch;
 
-      form.row {
-        width: 100%;
-      }
+                >section {
+                    min-width: 0;
+                }
+            }
 
-      fieldset.row {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        width: 100%;
-      }
+            @media (max-width: 900px) {
+                main {
+                    grid-template-columns: 1fr;
+                }
+            }
 
-      fieldset .row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-        width: 100%;
-      }
-
-      .row-progress {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 12px;
-      }
-
-      .row-progress>.sp {
-        flex: 1;
-        min-width: 0;
-      }
-
-      #counts {
-        flex: 0 0 auto;
-        font-size: 11px;
-        text-align: right;
-        line-height: 1.3;
-        white-space: nowrap;
-        letter-spacing: -0.03em;
-      }
-
-      .card-header {
-        display: flex;
-        align-items: baseline;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      #results-title {
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0;
-        color: var(--fg);
-      }
-
-      .header-desc {
-        margin: 0;
-        font-size: 13px;
-        color: var(--muted);
-        font-weight: 400;
-      }
-
-      label {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--fg);
-        margin-bottom: 4px;
-        display: block;
-      }
-
-      input[type="file"],
-      textarea,
-      button {
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: light-dark(rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.2));
-        color: var(--fg);
-        padding: 10px 14px;
-        transition: all 0.2s;
-        font-size: 13px;
-      }
-
-      input[type="file"] {
-        padding: 6px;
-        width: 100%;
-
-        &::file-selector-button {
-          border-radius: 8px;
-          border: none;
-          background: var(--accent);
-          color: white;
-          padding: 6px 12px;
-          margin-right: 12px;
-          font-weight: 600;
-          cursor: pointer;
+            footer {
+                text-align: center;
+                font-size: 12px;
+                color: var(--muted);
+                opacity: 0.8;
+            }
         }
 
-        &::file-selector-button:hover {
-          filter: brightness(1.1);
+        @layer components {
+            .card {
+                background: var(--card-bg);
+                backdrop-filter: var(--glass);
+                border: 1px solid var(--card-border);
+                border-radius: 20px;
+                padding: 24px;
+                box-shadow: var(--shadow-md);
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                max-width: 100%;
+                height: 600px;
+                overflow: hidden;
+
+                >div:has(#coords) {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                }
+
+                .card-header {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 12px;
+                    flex-wrap: wrap;
+
+                    #results-title {
+                        font-size: 20px;
+                        font-weight: 700;
+                        margin: 0;
+                        color: var(--fg);
+                    }
+
+                    .header-desc {
+                        margin: 0;
+                        font-size: 13px;
+                        color: var(--muted);
+                        font-weight: 400;
+                    }
+                }
+            }
+
+            form.row {
+                width: 100%;
+            }
+
+            fieldset.row {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                width: 100%;
+
+                .row {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 8px;
+                    width: 100%;
+                }
+            }
+
+            label {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--fg);
+                margin-bottom: 4px;
+                display: block;
+            }
+
+            input[type="file"],
+            textarea,
+            button {
+                border-radius: 12px;
+                border: 1px solid var(--line);
+                background: light-dark(rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.2));
+                color: var(--fg);
+                padding: 10px 14px;
+                transition: all 0.2s;
+                font-size: 13px;
+            }
+
+            input[type="file"] {
+                padding: 6px;
+                width: 100%;
+
+                &::file-selector-button {
+                    border-radius: 8px;
+                    border: none;
+                    background: var(--accent);
+                    color: white;
+                    padding: 6px 12px;
+                    margin-right: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+
+                    &:hover {
+                        filter: brightness(1.1);
+                    }
+                }
+            }
+
+            textarea {
+                width: 100%;
+                height: 100%;
+                flex: 1;
+                overflow-y: auto;
+                font-family: "Pretendard Mono", monospace;
+                line-height: 1.5;
+                resize: none;
+
+                &:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                    box-shadow: 0 0 0 3px var(--accent-glow);
+                }
+            }
+
+            button {
+                cursor: pointer;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                min-width: 0;
+                white-space: nowrap;
+                padding: 12px 4px;
+                background: light-dark(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.05));
+
+                &:hover:not(:disabled) {
+                    background: light-dark(#fff, rgba(255, 255, 255, 0.1));
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                }
+
+                &:active:not(:disabled) {
+                    transform: translateY(0);
+                }
+
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    filter: grayscale(1);
+                }
+
+                &#parse,
+                &#start {
+                    background: var(--accent);
+                    color: white;
+                    border-color: transparent;
+                    box-shadow: 0 4px 10px var(--accent-glow);
+
+                    &:hover:not(:disabled) {
+                        filter: brightness(1.1);
+                        box-shadow: 0 6px 14px var(--accent-glow);
+                    }
+                }
+
+                &#stop {
+                    color: var(--err);
+
+                    &:hover:not(:disabled) {
+                        background: light-dark(rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.2));
+                    }
+                }
+            }
+
+            .row-progress {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 12px;
+
+                >.sp {
+                    flex: 1;
+                    min-width: 0;
+                }
+            }
+
+            #counts {
+                flex: 0 0 auto;
+                font-size: 11px;
+                text-align: right;
+                line-height: 1.3;
+                white-space: nowrap;
+                letter-spacing: -0.03em;
+            }
+
+            .progress-bar {
+                --value: 0;
+                width: 100%;
+                height: 6px;
+                border-radius: 99px;
+                background: var(--line);
+                overflow: hidden;
+                position: relative;
+                margin-top: 6px;
+
+                &::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    transform-origin: left;
+                    transform: scaleX(calc(var(--value) / 100));
+                    background: linear-gradient(90deg, var(--accent), var(--success));
+                    transition: transform 0.3s ease;
+                    will-change: transform;
+                }
+            }
+
+            .status {
+                margin-top: 10px;
+                font-size: 13px;
+                padding: 10px 14px;
+                border-radius: 8px;
+                background: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05));
+                border-left: 3px solid var(--muted);
+                animation: fadeIn 0.3s ease;
+                word-break: break-all;
+
+                &.err {
+                    color: var(--err);
+                    border-color: var(--err);
+                    background: light-dark(oklch(95% 0.1 25), rgba(220, 38, 38, 0.1));
+                }
+
+                &.warn {
+                    color: var(--warn);
+                    border-color: var(--warn);
+                    background: light-dark(oklch(98% 0.1 50), rgba(245, 158, 11, 0.1));
+                }
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(5px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .table-wrap {
+                flex: 1;
+                width: 100%;
+                border-radius: 16px;
+                border: 1px solid var(--line);
+                background: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
+                height: 100%;
+                min-height: 0;
+                overflow: auto;
+                position: relative;
+                content-visibility: auto;
+                contain-intrinsic-size: 42px;
+
+                &[data-state="idle"] {
+                    table {
+                        display: none;
+                    }
+
+                    &::after {
+                        content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100%;
+                        color: var(--muted);
+                        font-size: 14px;
+                    }
+                }
+
+                &[data-state="running"] {
+                    border-color: var(--accent);
+                }
+            }
+
+            table {
+                width: 100%;
+                min-width: 880px;
+                table-layout: fixed;
+                border-collapse: separate;
+                border-spacing: 0;
+                font-size: 13px;
+
+                thead th,
+                tbody td,
+                tbody th {
+                    padding: 12px 10px;
+                    border-bottom: 1px solid var(--line);
+                    border-right: 1px solid var(--line);
+
+                    &:last-child {
+                        border-right: none;
+                    }
+                }
+
+                thead th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    background: var(--card-bg);
+                    backdrop-filter: blur(8px);
+                    text-align: left;
+                    font-weight: 600;
+                    color: var(--muted);
+                    white-space: nowrap;
+
+                    &:first-child {
+                        border-top-left-radius: 16px;
+                    }
+
+                    &:last-child {
+                        border-top-right-radius: 16px;
+                    }
+
+                    &:nth-child(1) {
+                        width: 40px;
+                        text-align: center;
+                    }
+
+                    &:nth-child(2) {
+                        width: 45px;
+                        text-align: center;
+                    }
+
+                    &:nth-child(3) {
+                        width: 135px;
+                    }
+
+                    &:nth-child(4) {
+                        width: 65px;
+                    }
+
+                    &:nth-child(5),
+                    &:nth-child(6) {
+                        width: 75px;
+                    }
+
+                    &:nth-child(7) {
+                        width: 80px;
+                    }
+
+                    &:nth-child(8) {
+                        width: auto;
+                        min-width: 200px;
+                    }
+
+                    &:nth-child(9) {
+                        width: 200px;
+                    }
+                }
+
+                tbody {
+
+                    td,
+                    th {
+                        color: var(--fg);
+                        vertical-align: top;
+                        font-weight: normal;
+                        white-space: normal;
+                        word-break: keep-all;
+                        overflow-wrap: break-word;
+                    }
+
+                    td:nth-child(1),
+                    th:nth-child(2) {
+                        text-align: center;
+                    }
+
+                    td:nth-child(3),
+                    td:nth-child(5) {
+                        word-break: break-all;
+                    }
+
+                    td:nth-child(9) {
+                        white-space: nowrap;
+                    }
+
+                    tr:hover {
+                        background: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.03));
+                    }
+
+                    tr:last-child {
+
+                        td,
+                        th {
+                            border-bottom: none;
+                        }
+                    }
+                }
+            }
+
+            .tag-badge {
+                display: inline-block;
+                font-family: "Pretendard Mono", monospace;
+                font-size: 11px;
+                font-weight: 500;
+                color: var(--fg);
+                background: transparent;
+                padding: 0;
+                white-space: normal;
+                word-break: break-all;
+                text-align: center;
+            }
+
+            .tags-cell {
+                padding-top: 10px;
+            }
+
+            a {
+                color: var(--accent);
+                text-decoration: none;
+                font-weight: 500;
+                white-space: nowrap;
+
+                &:hover {
+                    color: var(--success);
+                    text-decoration: underline;
+                }
+            }
         }
-      }
 
-      button {
-        cursor: pointer;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        min-width: 0;
-        white-space: nowrap;
-        padding: 12px 4px;
-        background: light-dark(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.05));
+        @layer utilities {
+            .caps {
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--muted);
+            }
 
-        &:hover:not(:disabled) {
-          background: light-dark(#fff, rgba(255, 255, 255, 0.1));
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            .sr-only {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
         }
-
-        &:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        &:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-          filter: grayscale(1);
-        }
-
-        &#parse,
-        &#start {
-          background: var(--accent);
-          color: white;
-          border-color: transparent;
-          box-shadow: 0 4px 10px var(--accent-glow);
-
-          &:hover:not(:disabled) {
-            filter: brightness(1.1);
-            box-shadow: 0 6px 14px var(--accent-glow);
-          }
-        }
-
-        &#stop {
-          color: var(--err);
-
-          &:hover:not(:disabled) {
-            background: light-dark(rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.2));
-          }
-        }
-      }
-
-      textarea {
-        width: 100%;
-        height: 100%;
-        flex: 1;
-        overflow-y: auto;
-        font-family: "Pretendard Mono", monospace;
-        line-height: 1.5;
-        resize: none;
-
-        &:focus {
-          outline: none;
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-      }
-
-      .progress-bar {
-        --value: 0;
-        width: 100%;
-        height: 6px;
-        border-radius: 99px;
-        background: var(--line);
-        overflow: hidden;
-        position: relative;
-        margin-top: 6px;
-
-        &::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          transform-origin: left;
-          transform: scaleX(calc(var(--value) / 100));
-          background: linear-gradient(90deg, var(--accent), var(--success));
-          transition: transform 0.3s ease;
-        }
-      }
-
-      .status {
-        margin-top: 10px;
-        font-size: 13px;
-        padding: 10px 14px;
-        border-radius: 8px;
-        background: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05));
-        border-left: 3px solid var(--muted);
-        animation: fadeIn 0.3s ease;
-        word-break: break-all;
-
-        &.err {
-          color: var(--err);
-          border-color: var(--err);
-          background: light-dark(oklch(95% 0.1 25), rgba(220, 38, 38, 0.1));
-        }
-
-        &.warn {
-          color: var(--warn);
-          border-color: var(--warn);
-          background: light-dark(oklch(98% 0.1 50), rgba(245, 158, 11, 0.1));
-        }
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(5px);
-        }
-
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .table-wrap {
-        flex: 1;
-        width: 100%;
-        border-radius: 16px;
-        border: 1px solid var(--line);
-        background: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
-        height: 100%;
-        min-height: 0;
-        overflow: auto;
-
-        &[data-state="idle"]:empty::after {
-          content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          color: var(--muted);
-          font-size: 14px;
-        }
-      }
-
-      table {
-        width: 100%;
-        min-width: 880px;
-        table-layout: fixed;
-        border-collapse: separate;
-        border-spacing: 0;
-        font-size: 13px;
-      }
-
-      thead th {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        background: var(--card-bg);
-        backdrop-filter: blur(8px);
-        padding: 12px 10px;
-        text-align: left;
-        font-weight: 600;
-        color: var(--muted);
-        border-bottom: 1px solid var(--line);
-        white-space: nowrap;
-        border-right: 1px solid var(--line);
-      }
-
-      thead th:last-child {
-        border-right: none;
-      }
-
-      thead th:nth-child(1) {
-        width: 40px;
-        text-align: center;
-      }
-
-      thead th:nth-child(2) {
-        width: 45px;
-        text-align: center;
-      }
-
-      thead th:nth-child(3) {
-        width: 135px;
-      }
-
-      thead th:nth-child(4) {
-        width: 65px;
-      }
-
-      thead th:nth-child(5) {
-        width: 75px;
-      }
-
-      thead th:nth-child(6) {
-        width: 75px;
-      }
-
-      thead th:nth-child(7) {
-        width: 80px;
-      }
-
-      thead th:nth-child(8) {
-        width: auto;
-        min-width: 200px;
-      }
-
-      thead th:nth-child(9) {
-        width: 200px;
-      }
-
-      tbody td,
-      tbody th {
-        padding: 12px 10px;
-        border-bottom: 1px solid var(--line);
-        color: var(--fg);
-        vertical-align: top;
-        white-space: normal;
-        word-break: keep-all;
-        overflow-wrap: break-word;
-        border-right: 1px solid var(--line);
-        font-weight: normal;
-      }
-
-      tbody td:last-child {
-        border-right: none;
-      }
-
-      tbody td:nth-child(1),
-      tbody th:nth-child(2) {
-        text-align: center;
-      }
-
-      tbody td:nth-child(5),
-      tbody td:nth-child(3) {
-        word-break: break-all;
-      }
-
-      tbody td:nth-child(9) {
-        white-space: nowrap;
-      }
-
-      tbody tr:hover {
-        background: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.03));
-      }
-
-      tbody tr:last-child td,
-      tbody tr:last-child th {
-        border-bottom: none;
-      }
-
-      .tag-badge {
-        display: inline-block;
-        font-family: "Pretendard Mono", monospace;
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--fg);
-        background: transparent;
-        padding: 0;
-        white-space: normal;
-        word-break: break-all;
-        text-align: center;
-      }
-
-      .tags-cell {
-        padding-top: 10px;
-      }
-
-      a {
-        color: var(--accent);
-        text-decoration: none;
-        font-weight: 500;
-        white-space: nowrap;
-
-        &:hover {
-          color: var(--success);
-          text-decoration: underline;
-        }
-      }
-    }
-
-    @layer utilities {
-      .caps {
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--muted);
-      }
-
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
-    }
-  </style>
+    </style>
 </head>
 
 <body>
-  <header>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="42" height="42" fill="currentColor"
-      aria-hidden="true" style="flex-shrink: 0;">
-      <path
-        d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
-    </svg>
-    <div>
-      <h1>SRG 데이터 역지오코딩 도구</h1>
-      <p><strong>SRG의 random_data.txt에서</strong> 좌표를 추출해 Nominatim(OpenStreetMap) API를 호출하여 주소를 구합니다.</p>
-    </div>
-  </header>
-  <main>
-    <section class="card" aria-labelledby="controls-title">
-      <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
-      <search>
-        <form class="row">
-          <fieldset class="row">
-            <legend class="sr-only">파일 업로드 및 실행</legend>
-            <label for="file">random_data.txt</label>
-            <input type="file" id="file" accept=".txt">
-            <div class="row">
-              <button type="button" id="parse" enterkeyhint="done">좌표 추출</button>
-              <button type="button" id="start" enterkeyhint="go" disabled>조회 시작</button>
-              <button type="button" id="pause" disabled>일시정지</button>
-              <button type="button" id="resume" disabled>재개</button>
-              <button type="button" id="stop" disabled>중지</button>
-              <button type="button" id="export" disabled>CSV 내보내기</button>
-            </div>
-          </fieldset>
-        </form>
-      </search>
-      <div>
-        <label for="coords">
-          <span class="caps">추출된 좌표 (lat,lon)</span>
-        </label>
-        <textarea id="coords" readonly spellcheck="false" placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea>
-      </div>
-      <div class="row row-progress">
-        <div class="sp">
-          <div class="caps" id="prog-label">진행 상황 0%</div>
-          <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label" aria-valuemin="0"
-            aria-valuemax="100" aria-valuenow="0">
-          </div>
+    <header>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="42" height="42" fill="currentColor"
+            aria-hidden="true" style="flex-shrink: 0;">
+            <path
+                d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
+        </svg>
+        <div>
+            <h1>SRG 데이터 역지오코딩 도구</h1>
+            <p><strong>SRG의 random_data.txt에서</strong> 좌표를 추출해 Nominatim(OpenStreetMap) API를 호출하여 주소를 구합니다.</p>
         </div>
-        <output class="counts" id="counts">
-          총 <strong>0</strong>건 중
-          <strong>0</strong>건 완료,
-          <strong>0</strong>건 실패,
-          <strong>0</strong>건 미처리
-        </output>
-      </div>
-      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
-    </section>
-    <section class="card" aria-labelledby="results-title">
-      <div class="card-header">
-        <h2 id="results-title">결과 표</h2>
-        <p class="header-desc">각 좌표별로 분류, 주소, 행정구역, 지도 링크를 표시합니다.</p>
-      </div>
-      <div class="table-wrap" role="region" aria-label="역지오코딩 결과" tabindex="0" data-state="idle">
-        <table id="tbl">
-          <caption class="sr-only">역지오코딩 결과 표</caption>
-          <thead>
-            <tr>
-              <th scope="col">구분</th>
-              <th scope="col">순번</th>
-              <th scope="col">좌표 (위도,경도)</th>
-              <th scope="col">시·도</th>
-              <th scope="col">시·군·구</th>
-              <th scope="col">읍·면·동·리</th>
-              <th scope="col">지물 태그</th>
-              <th scope="col">전체주소</th>
-              <th scope="col">지도링크</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-  <footer>
-    <p>서비스 품질을 위해 너무 빠른 요청은 제한될 수 있습니다. 공용 API 사용 정책을 존중해 주세요. (<code>nominatim.openstreetmap.org</code> 1req/sec 권장) •
-      실패 시 자동으로 짧은 대기 후 재시도합니다.</p>
-  </footer>
-  <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
-  <script type="module">
-    const CONFIG = {
-      MAX_RETRY: 3,
-      REQUEST_TIMEOUT_MS: 10000,
-      RATE_LIMIT_DELAY_MS: 1000,
-      REVERSE_ZOOM: 14,
-      SPECIAL_CITIES: ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'],
-      MAP_TEMPLATES: {
-        Google: 'https://www.google.com/maps?q=${latStr},${lonStr}',
-        OSM: 'https://www.openstreetmap.org/search?query=${osmQuery}&zoom=${zoom}#map=${zoom}/${latStr}/${lonStr}',
-        Naver: 'https://map.naver.com/?lng=${lonStr}&lat=${latStr}&title=${title}',
-        Kakao: 'https://map.kakao.com/link/map/${title},${latStr},${lonStr}',
-      }
-    };
-    const nf = new Intl.NumberFormat('ko-KR');
-    const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
-    const els = {
-      file: document.getElementById('file'),
-      parse: document.getElementById('parse'),
-      start: document.getElementById('start'),
-      pause: document.getElementById('pause'),
-      resume: document.getElementById('resume'),
-      stop: document.getElementById('stop'),
-      exportBtn: document.getElementById('export'),
-      status: document.getElementById('status'),
-      counts: document.getElementById('counts'),
-      prog: document.getElementById('prog'),
-      progLabel: document.getElementById('prog-label'),
-      tbody: document.querySelector('#tbl tbody'),
-      coords: document.getElementById('coords'),
-      tableWrap: document.querySelector('.table-wrap'),
-    };
-    const BASE_COLUMNS = [
-      '구분', '순번', '좌표 (위도,경도)', '시·도', '시·군·구', '읍·면·동·리', '지물 태그', '전체주소',
-    ];
-    const MAP_PROVIDERS = [
-      { key: 'Google', header: '지도링크(Google)' },
-      { key: 'OSM', header: '지도링크(OSM)' },
-      { key: 'Naver', header: '지도링크(Naver)' },
-      { key: 'Kakao', header: '지도링크(Kakao)' },
-    ];
-    let records = [];
-    let results = [];
-    let stopFlag = false;
-    let paused = false;
-    let running = false;
-    let controller = null;
-    let currentIndex = 0;
-    let resumeHandler = null;
-    let inFlight = false;
-    let processedCount = 0;
-    let successCount = 0;
-    function setStatus(msg, type = 'info') {
-      const el = els.status;
-      el.textContent = msg;
-      el.classList.remove('err', 'warn');
-      if (type === 'error') el.classList.add('err');
-      else if (type === 'warn') el.classList.add('warn');
-    }
-    function setTableState(state) {
-      els.tableWrap.setAttribute('data-state', state);
-    }
-    function resetProcessingState(total) {
-      results = [];
-      currentIndex = 0;
-      paused = false;
-      processedCount = 0;
-      successCount = 0;
-      clearTable();
-      setProgress(0, total);
-      updateCounts();
-    }
-    function setControlsIdle(message, type = 'info') {
-      running = false;
-      stopFlag = false;
-      setStatus(message, type);
-      els.start.disabled = false;
-      els.pause.disabled = true;
-      els.resume.disabled = true;
-      els.stop.disabled = true;
-      setTableState('idle');
-    }
-    function updateCounts() {
-      const total = records.length;
-      const processed = processedCount;
-      const success = successCount;
-      const fail = Math.max(0, processed - success);
-      const remaining = Math.max(0, total - processed);
-      els.counts.innerHTML =
-        `총 <strong>${nf.format(total)}</strong>건 중 ` +
-        `<strong>${nf.format(success)}</strong>건 완료, ` +
-        `<strong>${nf.format(fail)}</strong>건 실패, ` +
-        `<strong>${nf.format(remaining)}</strong>건 미처리`;
-      els.exportBtn.disabled = processed === 0;
-    }
-    function setProgress(done, total) {
-      const pct = total ? Math.round((done / total) * 100) : 0;
-      els.prog.style.setProperty("--value", pct);
-      els.prog.setAttribute("aria-valuenow", String(pct));
-      els.progLabel.textContent = `진행 상황 ${pct}%`;
-    }
-    function clearTable() {
-      while (els.tbody.firstChild) els.tbody.removeChild(els.tbody.firstChild);
-    }
-    function isKR(lat, lon) {
-      return lat >= 32 && lat <= 39 && lon >= 124 && lon <= 132;
-    }
-    function mapLinks(lat, lon) {
-      const latStr = String(lat);
-      const lonStr = String(lon);
-      const zoom = 16;
-      const osmQuery = encodeURIComponent(`${latStr},${lonStr}`);
-      const title = encodeURIComponent(`${latStr} ${lonStr}`);
-      const replaceTemplate = (tmpl) => {
-        return tmpl
-          .replace(/\$\{latStr\}/g, latStr)
-          .replace(/\$\{lonStr\}/g, lonStr)
-          .replace(/\$\{zoom\}/g, zoom)
-          .replace(/\$\{osmQuery\}/g, osmQuery)
-          .replace(/\$\{title\}/g, title);
-      };
-      return MAP_PROVIDERS.map(p => ({
-        label: p.key,
-        url: replaceTemplate(CONFIG.MAP_TEMPLATES[p.key] || ''),
-      }));
-    }
-    function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-    async function yieldToMain() {
-      if ('scheduler' in window && 'yield' in window.scheduler) {
-        await window.scheduler.yield();
-      } else {
-        await new Promise(r => setTimeout(r, 0));
-      }
-    }
-    async function fetchReverseWithRetry(lat, lon, signal) {
-      const buildUrl = () => {
-        const url = new URL('https://nominatim.openstreetmap.org/reverse');
-        url.searchParams.set('format', 'jsonv2');
-        url.searchParams.set('lat', String(lat));
-        url.searchParams.set('lon', String(lon));
-        url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM));
-        url.searchParams.set('addressdetails', '1');
-        url.searchParams.set('accept-language', 'ko');
-        return url;
-      };
-      let attempt = 0;
-      while (attempt < CONFIG.MAX_RETRY) {
-        attempt++;
-        const timeoutSignal = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-        const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-        const res = await fetch(buildUrl(), {
-          headers: { 'Accept': 'application/json' },
-          signal: combinedSignal,
-        });
-        if (res.ok) return res.json();
-        if (res.status === 429 || res.status >= 500) {
-          await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt);
-          continue;
+    </header>
+    <main>
+        <section class="card" aria-labelledby="controls-title">
+            <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
+            <search>
+                <form class="row">
+                    <fieldset class="row">
+                        <legend class="sr-only">파일 업로드 및 실행</legend>
+                        <label for="file">random_data.txt</label>
+                        <input type="file" id="file" accept=".txt">
+                        <div class="row">
+                            <button type="button" id="parse" enterkeyhint="done">좌표 추출</button>
+                            <button type="button" id="start" enterkeyhint="go" disabled>조회 시작</button>
+                            <button type="button" id="pause" disabled>일시정지</button>
+                            <button type="button" id="resume" disabled>재개</button>
+                            <button type="button" id="stop" disabled>중지</button>
+                            <button type="button" id="export" disabled>CSV 내보내기</button>
+                        </div>
+                    </fieldset>
+                </form>
+            </search>
+            <div> <label for="coords"><span class="caps">추출된 좌표 (lat,lon)</span></label> <textarea id="coords" readonly
+                    spellcheck="false" placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea> </div>
+            <div class="row row-progress">
+                <div class="sp">
+                    <div class="caps" id="prog-label">진행 상황 0%</div>
+                    <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label"
+                        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+                </div>
+                <output id="counts">총 <strong id="cnt-total">0</strong>건 중 <strong id="cnt-success">0</strong>건 완료,
+                    <strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
+            </div>
+            <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
+        </section>
+        <section class="card" aria-labelledby="results-title">
+            <div class="card-header">
+                <h2 id="results-title">결과 표</h2>
+                <p class="header-desc">각 좌표별로 분류, 주소, 행정구역, 지도 링크를 표시합니다.</p>
+            </div>
+            <div class="table-wrap" role="region" aria-label="역지오코딩 결과" tabindex="0" data-state="idle">
+                <table id="tbl">
+                    <caption class="sr-only">역지오코딩 결과 표</caption>
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>서비스 품질을 위해 너무 빠른 요청은 제한될 수 있습니다. 공용 API 사용 정책을 존중해 주세요. (<code>nominatim.openstreetmap.org</code> 1req/sec
+            권장) • 실패 시 자동으로 짧은 대기 후 재시도합니다.</p>
+    </footer>
+    <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
+    <script type="module">
+        const COORD_REGEX = { KR: /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, PAIR: /([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g, HEADER: /\b(lat|latitude|위도|경도)\b/i, LAT_KEY: /^(lat|latitude|위도)$/i, LON_KEY: /^(lon|lng|longitude|경도)$/i, CLEAN: /["']/g, SPLIT: /,|\t|\s{2,}/ };
+        const RX_CSV = /[",\n]/;
+        const CONFIG = { MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'] };
+        const MAP_PROVIDERS = [
+            { key: 'Google', header: '지도링크(Google)', url: (lat, lon) => `https://www.google.com/maps?q=$${lat},${lon}` },
+            { key: 'OSM', header: '지도링크(OSM)', url: (lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}` },
+            { key: 'Naver', header: '지도링크(Naver)', url: (lat, lon) => `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}` },
+            { key: 'Kakao', header: '지도링크(Kakao)', url: (lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}` }
+        ];
+        const COL_DEFS = [
+            { key: 'kind', label: '구분', val: r => r.set },
+            { key: 'idx', label: '순번', val: r => r.idx },
+            { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}` },
+            { key: 'sido', label: '시·도', val: r => r.addr?.sido },
+            { key: 'sigungu', label: '시·군·구', val: r => r.addr?.sigungu },
+            { key: 'emd', label: '읍·면·동·리', val: r => r.addr?.eupmyeon },
+            { key: 'tag', label: '지물 태그', val: r => r.addr?.tag, render: (v, td) => { if (v) { const s = document.createElement('span'); s.className = 'tag-badge'; s.textContent = v; td.appendChild(s); } td.className = 'tags-cell'; } },
+            { key: 'fullAddr', label: '전체주소', val: r => r.fullAddr },
+            { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { const links = MAP_PROVIDERS.map(p => ({ label: p.key, url: p.url(r.lat, r.lon) })); links.forEach((l, i) => { const a = document.createElement('a'); a.href = l.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = l.label; td.appendChild(a); if (i < links.length - 1) td.appendChild(document.createTextNode(' · ')); }); } }
+        ];
+        const numberFormatter = new Intl.NumberFormat('ko-KR');
+        const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
+        const domElements = { file: document.getElementById('file'), parse: document.getElementById('parse'), start: document.getElementById('start'), pause: document.getElementById('pause'), resume: document.getElementById('resume'), stop: document.getElementById('stop'), exportBtn: document.getElementById('export'), status: document.getElementById('status'), counts: document.getElementById('counts'), cntTotal: document.getElementById('cnt-total'), cntSuccess: document.getElementById('cnt-success'), cntFail: document.getElementById('cnt-fail'), cntRemain: document.getElementById('cnt-remain'), prog: document.getElementById('prog'), progLabel: document.getElementById('prog-label'), thead: document.querySelector('#tbl thead'), tbody: document.querySelector('#tbl tbody'), coords: document.getElementById('coords'), tableWrap: document.querySelector('.table-wrap') };
+        const AddressFormatter = {
+            _getKoreanAdminArea(a) {
+                let sido = a.province || a.state || a.region || '';
+                let tmpCity = a.city || a.county || a.municipality || '';
+                let tmpGu = a.district || a.borough || a.suburb || '';
+                let sigungu;
+                const isSpecialCity = CONFIG.SPECIAL_CITIES.some(c => tmpCity.includes(c));
+                if (!sido && isSpecialCity) { sido = tmpCity; sigungu = tmpGu; }
+                else { sigungu = tmpCity; if (tmpCity && tmpGu && tmpCity !== tmpGu) { if (!sigungu.includes(tmpGu)) sigungu += ' ' + tmpGu; } else if (!sigungu) { sigungu = tmpGu; } }
+                const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
+                const ri = a.village || a.hamlet || '';
+                const eupmyeon = (emd && ri) ? `${emd} ${ri}` : (emd || ri || '');
+                return { sido, sigungu, eupmyeon };
+            },
+            _getTag(a, data) {
+                if (!data || typeof data !== 'object') return '';
+                const name = data.name || a.attraction || a.building;
+                const addType = data.addresstype;
+                const category = data.category;
+                const parts = [];
+                if (name) parts.push(name);
+                if (addType && addType !== name) parts.push(addType);
+                else if (category && category !== name) parts.push(category);
+                return parts.length > 0 ? listFormatter.format(parts) : '';
+            },
+            parse(data) {
+                const a = data?.address ?? {};
+                const countryCode = (a.country_code || '').toLowerCase();
+                const isKR = countryCode === 'kr' || a.country === '대한민국';
+                let result;
+                if (isKR) { result = this._getKoreanAdminArea(a); }
+                else { result = { sido: a.state || a.region || a.province || a.county || a.city || '', sigungu: a.city || a.town || a.county || a.district || a.municipality || a.region || '', eupmyeon: a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '' }; }
+                result.tag = this._getTag(a, data);
+                return result;
+            }
+        };
+        const AppState = {
+            records: [], results: [], droppedFile: null, status: 'idle', controller: null, resumeResolve: null, inFlight: false, renderReq: null,
+            get isRunning() { return this.status === 'running' || this.status === 'paused'; },
+            get isPaused() { return this.status === 'paused'; },
+            get isStopping() { return this.status === 'stopping'; },
+            reset() { this.results = []; this.status = 'idle'; this.controller = null; this.resumeResolve = null; this.inFlight = false; this.renderReq = null; },
+            setRecords(newRecords) { this.records = newRecords; this.reset(); updateUIState(); },
+            setFile(file) { this.droppedFile = file; updateUIState(); },
+            clearDroppedFile() { this.droppedFile = null; updateUIState(); },
+            setStatus(st) { this.status = st; updateUIState(); }
+        };
+        function updateUIState() {
+            const s = AppState.status;
+            const hasRecords = AppState.records.length > 0;
+            const hasResults = AppState.results.length > 0;
+            const { parse, start, pause, resume, stop, exportBtn, tableWrap } = domElements;
+            parse.disabled = s === 'running' || s === 'paused';
+            start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'stopping';
+            pause.disabled = s !== 'running';
+            resume.disabled = s !== 'paused';
+            stop.disabled = s === 'idle' || s === 'stopping';
+            exportBtn.disabled = !hasResults;
+            if (s === 'running') tableWrap.setAttribute('data-state', 'running');
+            else if (s === 'idle' && !hasResults) tableWrap.setAttribute('data-state', 'idle');
         }
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-      }
-      throw new Error('재시도 후 실패');
-    }
-    function getKoreanAdminArea(a) {
-      let sido = a.province || a.state || a.region || '';
-      let tmpCity = a.city || a.county || a.municipality || '';
-      let tmpGu = a.district || a.borough || a.suburb || '';
-      let sigungu = '';
-      const isSpecialCity = CONFIG.SPECIAL_CITIES.some(c => tmpCity.includes(c));
-      if (!sido && isSpecialCity) {
-        sido = tmpCity;
-        sigungu = tmpGu;
-      } else {
-        sigungu = tmpCity;
-        if (tmpCity && tmpGu && tmpCity !== tmpGu) {
-          if (!sigungu.includes(tmpGu)) {
-            sigungu += ' ' + tmpGu;
-          }
-        } else if (!sigungu) {
-          sigungu = tmpGu;
+        function setStatus(msg, type = 'info') {
+            const el = domElements.status; el.textContent = msg; el.classList.remove('err', 'warn');
+            if (type === 'error') el.classList.add('err'); else if (type === 'warn') el.classList.add('warn');
         }
-      }
-      const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
-      const ri = a.village || a.hamlet || '';
-      const eupmyeon = [emd, ri].filter(Boolean).join(' ');
-      return { sido, sigungu, eupmyeon };
-    }
-    function getFeatureTag(a, data) {
-      if (!data || typeof data !== 'object') return '';
-      const parts = [];
-      const name = data.name || a.attraction || a.building;
-      const addType = data.addresstype;
-      const category = data.category;
-      if (name) parts.push(name);
-      if (addType && addType !== name) parts.push(addType);
-      else if (category && category !== name) parts.push(category);
-      if (parts.length > 0) {
-        return listFormatter.format(parts);
-      }
-      return '';
-    }
-    function toKoreanAddressParts(a, data) {
-      const countryCode = (a.country_code || '').toLowerCase();
-      const isKR = countryCode === 'kr' || a.country === '대한민국';
-      let result = { sido: '', sigungu: '', eupmyeon: '', tag: '' };
-      if (isKR) {
-        const admin = getKoreanAdminArea(a);
-        result.sido = admin.sido;
-        result.sigungu = admin.sigungu;
-        result.eupmyeon = admin.eupmyeon;
-      } else {
-        result.sido = a.state || a.region || a.province || a.county || a.city || '';
-        result.sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || '';
-        result.eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '';
-      }
-      result.tag = getFeatureTag(a, data);
-      return result;
-    }
-    function extractCoordinates(text) {
-      const out = [];
-      const push = (lat, lon, setLabel) => {
-        if (
-          Number.isFinite(lat) && Number.isFinite(lon) &&
-          Math.abs(lat) <= 90 && Math.abs(lon) <= 180
-        ) {
-          out.push({ lat, lon, setLabel });
-        }
-      };
-      const krRe = /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
-      const worldRe = /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi;
-      const pairRe = /([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
-      for (const m of text.matchAll(krRe)) {
-        push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
-      }
-      for (const m of text.matchAll(worldRe)) {
-        push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
-      }
-      if (out.length) return out;
-      const lines = text.split(/\r?\n/);
-      const firstLine = lines.find(l => l.trim().length);
-      if (firstLine && /lat|longitude|위도|경도/i.test(firstLine)) {
-        const hdr = firstLine.split(/,|\t|\s{2,}/);
-        const idxLat = hdr.findIndex(h => /^(lat|latitude|위도)$/i.test(h.trim()));
-        const idxLon = hdr.findIndex(h => /^(lon|lng|longitude|경도)$/i.test(h.trim()));
-        if (idxLat >= 0 && idxLon >= 0) {
-          for (let i = 1; i < lines.length; i++) {
-            const line = lines[i];
-            if (!line.trim()) continue;
-            const cols = line.split(/,|\t|\s{2,}/);
-            const lat = parseFloat(cols[idxLat]);
-            const lon = parseFloat(cols[idxLon]);
-            push(lat, lon);
-          }
-          if (out.length) return out;
-        }
-      }
-      for (const m of text.matchAll(pairRe)) {
-        push(parseFloat(m[1]), parseFloat(m[2]));
-      }
-      return out;
-    }
-    function buildResultRow(kind, r, extra) {
-      const base = {
-        '구분': kind,
-        '순번': r.idx,
-        '좌표 (위도,경도)': `${r.lat}, ${r.lon}`,
-        '시·도': '',
-        '시·군·구': '',
-        '읍·면·동·리': '',
-        '지물 태그': '',
-        '전체주소': '',
-        '지도링크': [],
-      };
-      return { ...base, ...extra };
-    }
-    function appendRow(row) {
-      const tr = document.createElement('tr');
-      const keys = [...BASE_COLUMNS, '지도링크'];
-      for (const k of keys) {
-        const isRowHeader = (k === '순번');
-        const cellTag = (isRowHeader) ? 'th' : 'td';
-        const td = document.createElement(cellTag);
-
-        if (isRowHeader) td.setAttribute('scope', 'row');
-        if (k === '지도링크') {
-          const links = row[k];
-          if (Array.isArray(links)) {
-            links.forEach((it, idx) => {
-              const a = document.createElement('a');
-              a.href = it.url;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              a.textContent = it.label;
-              td.appendChild(a);
-              if (idx < links.length - 1) {
-                td.appendChild(document.createTextNode(' · '));
-              }
+        function scheduleRender() {
+            if (AppState.renderReq) return;
+            AppState.renderReq = requestAnimationFrame(() => {
+                const total = AppState.records.length;
+                const processed = AppState.results.length;
+                const success = AppState.results.filter(r => r.set !== '에러').length;
+                const fail = processed - success;
+                const remaining = Math.max(0, total - processed);
+                domElements.cntTotal.textContent = numberFormatter.format(total);
+                domElements.cntSuccess.textContent = numberFormatter.format(success);
+                domElements.cntFail.textContent = numberFormatter.format(fail);
+                domElements.cntRemain.textContent = numberFormatter.format(remaining);
+                const pct = total ? Math.round((processed / total) * 100) : 0;
+                domElements.prog.style.setProperty("--value", pct);
+                domElements.prog.setAttribute("aria-valuenow", String(pct));
+                domElements.progLabel.textContent = `진행 상황 ${pct}%`;
+                updateUIState();
+                AppState.renderReq = null;
             });
-          }
-        } else if (k === '지물 태그') {
-          if (row[k]) {
-            const span = document.createElement('span');
-            span.className = 'tag-badge';
-            span.textContent = row[k];
-            td.appendChild(span);
-          }
-          td.className = 'tags-cell';
-        } else {
-          td.textContent = row[k] ?? '';
         }
-        tr.appendChild(td);
-      }
-      els.tbody.appendChild(tr);
-    }
-    function toCSV(rows) {
-      if (!rows || !rows.length) return '';
-      const headers = [
-        ...BASE_COLUMNS,
-        ...MAP_PROVIDERS.map(p => p.header),
-      ];
-      const escape = (s) => {
-        if (s == null) return '';
-        s = String(s);
-        if (/[",\n]/.test(s)) {
-          return '"' + s.replaceAll('"', '""') + '"';
+        function clearTable() { while (domElements.tbody.firstChild) domElements.tbody.removeChild(domElements.tbody.firstChild); }
+        function initTableHeaders() {
+            const tr = document.createElement('tr');
+            COL_DEFS.forEach(col => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = col.label; tr.appendChild(th); });
+            domElements.thead.appendChild(tr);
         }
-        return s;
-      };
-      const lines = [headers.join(',')];
-      for (const r of rows) {
-        const links = (r['지도링크'] && Array.isArray(r['지도링크'])) ? r['지도링크'] : [];
-        const linkMap = Object.fromEntries(links.map(l => [l.label, l.url]));
-        const baseVals = BASE_COLUMNS.map(col => r[col]);
-        const linkVals = MAP_PROVIDERS.map(p => linkMap[p.key] || '');
-        const rowVals = [...baseVals, ...linkVals];
-        lines.push(rowVals.map(escape).join(','));
-      }
-      return lines.join('\n');
-    }
-    function exportCSV() {
-      try {
-        if (!results || results.length === 0) {
-          setStatus('내보낼 데이터가 없습니다. 먼저 조회 시작을 눌러주세요.', 'warn');
-          return;
+        function isKR(lat, lon) { return lat >= 32 && lat <= 39 && lon >= 124 && lon <= 132; }
+        function sleep(ms, signal) {
+            return new Promise((resolve, reject) => {
+                if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+                const onAbort = () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); };
+                const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+                signal?.addEventListener('abort', onAbort, { once: true });
+            });
         }
-        const csv = toCSV(results);
-        if (!csv) {
-          setStatus('CSV 데이터 생성에 실패했습니다.', 'error');
-          return;
+        async function yieldToMain() { if ('scheduler' in window && 'yield' in window.scheduler) await window.scheduler.yield(); else await new Promise(r => setTimeout(r, 0)); }
+        async function extractCoordinates(text) {
+            const out = [];
+            const push = (lat, lon, setLabel) => { if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); } };
+            const clean = (s) => s ? s.replace(COORD_REGEX.CLEAN, '').trim() : '';
+            for (const m of text.matchAll(COORD_REGEX.KR)) push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
+            for (const m of text.matchAll(COORD_REGEX.WORLD)) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
+            if (out.length) return out;
+            const lineBreakRegex = /\r?\n/g;
+            let match;
+            let lineCount = 0;
+            let firstLineEnd = -1;
+            while ((match = lineBreakRegex.exec(text)) !== null) {
+                if (text.substring(match.index - (match.index > 0 ? 1 : 0), match.index).trim().length > 0) { firstLineEnd = match.index; break; }
+                lineCount++;
+            }
+            if (firstLineEnd === -1) firstLineEnd = text.length;
+            const firstLine = text.substring(0, firstLineEnd).trim();
+            if (firstLine && COORD_REGEX.HEADER.test(clean(firstLine))) {
+                const hdr = firstLine.split(COORD_REGEX.SPLIT).map(clean);
+                const idxLat = hdr.findIndex(h => COORD_REGEX.LAT_KEY.test(h));
+                const idxLon = hdr.findIndex(h => COORD_REGEX.LON_KEY.test(h));
+                if (idxLat >= 0 && idxLon >= 0) {
+                    let prevIndex = lineBreakRegex.lastIndex;
+                    let loopCount = 0;
+                    while ((match = lineBreakRegex.exec(text)) !== null) {
+                        if (++loopCount % 5000 === 0) await yieldToMain();
+                        const line = text.substring(prevIndex, match.index).trim();
+                        prevIndex = match.index + match[0].length;
+                        if (!line) continue;
+                        const cols = line.split(COORD_REGEX.SPLIT);
+                        push(parseFloat(clean(cols[idxLat])), parseFloat(clean(cols[idxLon])));
+                    }
+                    const lastLine = text.substring(prevIndex).trim();
+                    if (lastLine) {
+                        const cols = lastLine.split(COORD_REGEX.SPLIT);
+                        push(parseFloat(clean(cols[idxLat])), parseFloat(clean(cols[idxLon])));
+                    }
+                    if (out.length) return out;
+                }
+            }
+            for (const m of text.matchAll(COORD_REGEX.PAIR)) push(parseFloat(m[1]), parseFloat(m[2]));
+            return out;
         }
-        const bom = '\uFEFF';
-        const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'reverse_geocode_results.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setStatus('CSV 파일을 다운로드했습니다.');
-      } catch (err) {
-        console.error('CSV Export Error:', err);
-        setStatus(`내보내기 중 오류가 발생했습니다: ${err.message}`, 'error');
-      }
-    }
-    function pushResultRow(row) {
-      results.push(row);
-      if (row['구분'] !== '에러') successCount++;
-      processedCount++;
-      appendRow(row);
-      currentIndex++;
-      setProgress(currentIndex, records.length);
-    }
-    async function runProcessingLoop() {
-      for (let i = currentIndex; i < records.length; i++) {
-        if (!running || stopFlag) break;
-        if (paused && resumeHandler) {
-          setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
-          await resumeHandler.promise;
+        async function fetchReverseWithRetry(lat, lon, userSignal) {
+            const buildUrl = () => {
+                const url = new URL('https://nominatim.openstreetmap.org/reverse');
+                url.searchParams.set('format', 'jsonv2'); url.searchParams.set('lat', String(lat)); url.searchParams.set('lon', String(lon)); url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM)); url.searchParams.set('addressdetails', '1'); url.searchParams.set('accept-language', 'ko');
+                return url;
+            };
+            let attempt = 0;
+            while (attempt < CONFIG.MAX_RETRY) {
+                if (userSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+                attempt++;
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), CONFIG.REQUEST_TIMEOUT_MS);
+                const onUserAbort = () => ctrl.abort();
+                if (userSignal) userSignal.addEventListener('abort', onUserAbort);
+                try {
+                    const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
+                    if (res.ok) return res.json();
+                    if (res.status === 429 || res.status >= 500) { await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); continue; }
+                    const text = await res.text(); throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+                } catch (e) {
+                    if (userSignal && userSignal.aborted) throw e;
+                    if (attempt >= CONFIG.MAX_RETRY) throw e;
+                    await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
+                } finally {
+                    clearTimeout(timer);
+                    if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
+                }
+            }
+            throw new Error('재시도 후 실패');
         }
-        if (!running || stopFlag) break;
-        currentIndex = i;
-        const r = records[i];
-        const { lat, lon } = r;
-        controller = new AbortController();
-        inFlight = true;
-        try {
-          await sleep(CONFIG.RATE_LIMIT_DELAY_MS);
-          if (!running || stopFlag) break;
-          if (!paused) {
-            setStatus(`처리 중… (${i + 1}/${records.length}) (단축키: S=일시정지, Esc=중지)`);
-          }
-          const data = await fetchReverseWithRetry(lat, lon, controller.signal);
-          const addr = data.address ?? {};
-          const { sido, sigungu, eupmyeon, tag } = toKoreanAddressParts(addr, data);
-          const linkset = mapLinks(lat, lon);
-          const row = buildResultRow(r.set, r, {
-            '시·도': sido,
-            '시·군·구': sigungu,
-            '읍·면·동·리': eupmyeon,
-            '지물 태그': tag,
-            '전체주소': data.display_name || '',
-            '지도링크': linkset,
-          });
-          pushResultRow(row);
-        } catch (err) {
-          const msg = err && (err.message || String(err));
-          const isAbort = err && (err.name === 'AbortError' || /aborted/i.test(msg));
-          if (stopFlag && isAbort) break;
-          console.error(err);
-          const row = buildResultRow('에러', r, { '전체주소': msg });
-          pushResultRow(row);
-          if (!stopFlag) {
-            setStatus(`에러 발생: (${i + 1}/${records.length}) ${msg}`, 'error');
-          }
-        } finally {
-          inFlight = false;
-          updateCounts();
+        function appendRow(row) {
+            const tr = document.createElement('tr');
+            COL_DEFS.forEach(col => {
+                const td = document.createElement(col.key === 'idx' ? 'th' : 'td');
+                if (col.key === 'idx') td.scope = 'row';
+                const val = col.val ? col.val(row) : '';
+                if (col.render) col.render(val, td, row); else td.textContent = val ?? '';
+                tr.appendChild(td);
+            });
+            domElements.tbody.appendChild(tr);
         }
-      }
-      if (stopFlag) {
-        setControlsIdle('중지되었습니다.', 'warn');
-      } else if (currentIndex >= records.length - 1) {
-        setControlsIdle('모든 처리가 완료되었습니다.');
-      }
-    }
-    function startProcessing() {
-      stopFlag = false;
-      running = true;
-      resetProcessingState(records.length);
-      setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
-      els.start.disabled = true;
-      els.pause.disabled = false;
-      els.resume.disabled = true;
-      els.stop.disabled = false;
-      setTableState('running');
-      runProcessingLoop();
-    }
-    els.parse.addEventListener('click', async () => {
-      try {
-        if (running) {
-          setStatus('현재 역지오코딩이 진행 중입니다. 중지 후 다시 좌표를 추출해 주세요.', 'warn');
-          return;
+        function pushResultRow(row) {
+            AppState.results.push(row);
+            appendRow(row);
+            scheduleRender();
         }
-        els.start.disabled = true;
-        els.exportBtn.disabled = true;
-        const file = els.file.files?.[0];
-        if (!file) {
-          setStatus('먼저 random_data.txt 파일을 선택해 주세요.', 'warn');
-          return;
+        async function runProcessingLoop() {
+            const startIndex = AppState.results.length;
+            for (let i = startIndex; i < AppState.records.length; i++) {
+                if (!AppState.isRunning || AppState.isStopping) break;
+                if (AppState.isPaused) {
+                    setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
+                    await new Promise(r => AppState.resumeResolve = r);
+                    domElements.resume.disabled = true; domElements.pause.disabled = false;
+                    setStatus('재개합니다… (단축키 Esc로 중지)');
+                }
+                if (!AppState.isRunning || AppState.isStopping) break;
+                const r = AppState.records[i];
+                AppState.controller = new AbortController();
+                AppState.inFlight = true;
+                try {
+                    if (i > startIndex) await sleep(CONFIG.RATE_LIMIT_DELAY_MS, AppState.controller.signal);
+                    if (!AppState.isRunning || AppState.isStopping) break;
+                    if (!AppState.isPaused) setStatus(`처리 중… (${i + 1}/${AppState.records.length}) (단축키: S=일시정지, Esc=중지)`);
+                    const data = await fetchReverseWithRetry(r.lat, r.lon, AppState.controller.signal);
+                    const parsedAddr = AddressFormatter.parse(data);
+                    r.addr = parsedAddr; r.fullAddr = data.display_name || '';
+                    pushResultRow(r);
+                } catch (err) {
+                    const msg = err && (err.message || String(err));
+                    const isAbort = err && (err.name === 'AbortError' || /aborted/i.test(msg));
+                    if (AppState.isStopping && isAbort) break;
+                    console.error(err);
+                    r.set = '에러'; r.fullAddr = msg;
+                    pushResultRow(r);
+                    if (!AppState.isStopping) setStatus(`에러 발생: (${i + 1}/${AppState.records.length}) ${msg}`, 'error');
+                } finally {
+                    AppState.inFlight = false; scheduleRender();
+                }
+            }
+            if (AppState.isStopping) { AppState.setStatus('idle'); setStatus('중지되었습니다.', 'warn'); }
+            else if (AppState.results.length >= AppState.records.length) { AppState.setStatus('idle'); setStatus('모든 처리가 완료되었습니다.', 'info'); }
         }
-        setStatus('파일 읽는 중…');
-        const text = await file.text();
-        setStatus('좌표 추출 중…');
-        await yieldToMain();
-        const parsed = extractCoordinates(text);
-        if (!parsed.length) {
-          records = [];
-          resetProcessingState(0);
-          els.coords.value = '';
-          els.start.disabled = true;
-          setStatus(
-            '좌표를 찾지 못했습니다. 라벨(대한민국/세계 위경도) 또는 "위도,경도" 형태를 확인해 주세요.',
-            'warn'
-          );
-          return;
+        function startProcessing() {
+            AppState.reset(); AppState.setStatus('running');
+            clearTable(); scheduleRender();
+            setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
+            runProcessingLoop();
         }
-        records = parsed.map((p, i) => ({
-          set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'),
-          idx: i + 1,
-          lat: p.lat,
-          lon: p.lon
-        }));
-        els.coords.value = records
-          .map(r => `${r.lat},${r.lon}`)
-          .join('\n');
-        resetProcessingState(records.length);
-        setControlsIdle(
-          `분석 완료: ${records.length}개 좌표 발견. "조회 시작(단축키 S)"을 누르세요.`
-        );
-      } catch (err) {
-        console.error(err);
-        setStatus(`오류 발생: ${err.message}`, 'error');
-        els.start.disabled = true;
-      }
-    });
-    els.start.addEventListener('click', () => {
-      if (!document.startViewTransition) {
-        startProcessing();
-      } else {
-        document.startViewTransition(() => {
-          startProcessing();
+        function toCSV(rows) {
+            if (!rows || !rows.length) return [];
+            const headerCols = COL_DEFS.filter(c => !c.noCsv);
+            const mapHeaders = MAP_PROVIDERS.map(p => p.header);
+            const escape = (s) => { if (s == null) return ''; s = String(s); return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
+            const lines = [[...headerCols.map(c => c.label), ...mapHeaders].join(',') + '\n'];
+            for (const r of rows) {
+                const baseVals = headerCols.map(c => c.val(r));
+                const mapVals = MAP_PROVIDERS.map(p => p.url(r.lat, r.lon));
+                lines.push([...baseVals, ...mapVals].map(escape).join(',') + '\n');
+            }
+            return lines;
+        }
+        domElements.exportBtn.addEventListener('click', () => {
+            try {
+                const blobData = toCSV(AppState.results);
+                if (!blobData.length) return setStatus('내보낼 데이터가 없습니다.', 'warn');
+                const url = URL.createObjectURL(new Blob(['\uFEFF', ...blobData], { type: 'text/csv;charset=utf-8' }));
+                const a = document.createElement('a'); a.href = url;
+                const now = new Date();
+                const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0];
+                a.download = `result_${timestamp}.csv`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setStatus('CSV 파일을 다운로드했습니다.');
+            } catch (err) { setStatus(`오류 발생: ${err.message}`, 'error'); }
         });
-      }
-    });
-    els.pause.addEventListener('click', () => {
-      if (!running) return;
-      paused = true;
-      if (!resumeHandler) {
-        resumeHandler = Promise.withResolvers();
-      }
-      if (inFlight) {
-        setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn');
-      } else {
-        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
-      }
-      els.pause.disabled = true;
-      els.resume.disabled = false;
-    });
-    els.resume.addEventListener('click', () => {
-      if (!running || !paused) return;
-      paused = false;
-      setStatus('재개합니다… (단축키 Esc로 중지)');
-      if (resumeHandler) {
-        resumeHandler.resolve();
-        resumeHandler = null;
-      }
-      els.pause.disabled = false;
-      els.resume.disabled = true;
-    });
-    els.stop.addEventListener('click', () => {
-      if (!running) return;
-      stopFlag = true;
-      if (paused && resumeHandler) {
-        resumeHandler.resolve();
-        resumeHandler = null;
-        paused = false;
-      }
-      if (inFlight && controller) {
-        controller.abort();
-        setStatus('중지 요청됨. 현재 요청을 취소하는 중입니다…', 'warn');
-      } else {
-        setControlsIdle('중지되었습니다.', 'warn');
-      }
-    });
-    els.exportBtn.addEventListener('click', exportCSV);
-    els.file.addEventListener('change', () => {
-      if (els.file.files.length > 0) {
-        const f = els.file.files[0];
-        if (f.type && !f.type.startsWith('text/')) {
-          setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
-          els.file.value = '';
-          return;
-        }
-        setStatus(`파일이 선택되었습니다: ${f.name} (단축키 P를 눌러 추출하세요)`);
-      }
-    });
-    const dropZone = document.body;
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.style.opacity = '0.8';
-    });
-    dropZone.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dropZone.style.opacity = '1';
-    });
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.style.opacity = '1';
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        const f = files[0];
-        if (f.type && !f.type.startsWith('text/')) {
-          setStatus('텍스트 파일(.txt)만 지원합니다.', 'warn');
-          els.file.value = '';
-          return;
-        }
-        els.file.files = files;
-        setStatus(`파일이 선택되었습니다: ${f.name} (단축키 P를 눌러 추출하세요)`);
-      }
-    });
-    window.addEventListener('keydown', (e) => {
-      const active = document.activeElement;
-      if (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && active.type === 'text')) {
-        return;
-      }
-      const key = e.key.toLowerCase();
-      if (key === 'p' && !els.parse.disabled) {
-        e.preventDefault();
-        els.parse.click();
-      }
-      if (e.key === 'Escape' && !els.stop.disabled) {
-        e.preventDefault();
-        els.stop.click();
-      }
-      if (key === 's') {
-        if (!els.resume.disabled) {
-          e.preventDefault();
-          els.resume.click();
-        } else if (!els.pause.disabled) {
-          e.preventDefault();
-          els.pause.click();
-        } else if (!els.start.disabled) {
-          e.preventDefault();
-          els.start.click();
-        }
-      }
-    });
-  </script>
+        domElements.parse.addEventListener('click', async () => {
+            try {
+                const file = AppState.droppedFile ?? domElements.file.files?.[0];
+                if (!file) return setStatus('파일을 선택해 주세요.', 'warn');
+                setStatus('파일 읽는 중…');
+                const text = await file.text();
+                setStatus('좌표 추출 중…');
+                await yieldToMain();
+                const parsed = await extractCoordinates(text);
+                if (!parsed.length) { AppState.setRecords([]); domElements.coords.value = ''; scheduleRender(); return setStatus('좌표를 찾지 못했습니다.', 'warn'); }
+                const records = parsed.map((p, i) => ({ set: p.setLabel ? (p.setLabel === 'KR' ? 'KR' : 'WORLD') : (isKR(p.lat, p.lon) ? 'KR' : 'WORLD'), idx: i + 1, lat: p.lat, lon: p.lon }));
+                AppState.setRecords(records);
+                domElements.coords.value = records.map(r => `${r.lat},${r.lon}`).join('\n');
+                clearTable(); scheduleRender();
+                setStatus(`분석 완료: ${records.length}개 좌표. 조회 시작을 누르세요(단축키 S)`);
+            } catch (err) { console.error(err); setStatus(`오류 발생: ${err.message}`, 'error'); }
+        });
+        domElements.start.addEventListener('click', () => { document.startViewTransition ? document.startViewTransition(startProcessing) : startProcessing(); });
+        domElements.pause.addEventListener('click', () => { if (!AppState.isRunning) return; AppState.setStatus('paused'); if (AppState.inFlight) setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn'); });
+        domElements.resume.addEventListener('click', () => { if (!AppState.isPaused) return; AppState.setStatus('running'); if (AppState.resumeResolve) { AppState.resumeResolve(); AppState.resumeResolve = null; } });
+        domElements.stop.addEventListener('click', () => {
+            if (!AppState.isRunning) return;
+            AppState.setStatus('stopping');
+            if (AppState.isPaused && AppState.resumeResolve) { AppState.resumeResolve(); AppState.resumeResolve = null; }
+            if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatus('중지 요청됨. 취소 중…', 'warn'); }
+            else { AppState.setStatus('idle'); setStatus('중지되었습니다.', 'warn'); }
+        });
+        function handleFile(files) { if (files.length) { AppState.setFile(files[0]); setStatus(`파일 선택됨: ${files[0].name} (추출 버튼을 누르세요(단축키 P))`); domElements.file.value = ''; } }
+        domElements.file.addEventListener('change', () => { AppState.clearDroppedFile(); handleFile(domElements.file.files); });
+        document.body.addEventListener('dragover', e => { e.preventDefault(); document.body.style.opacity = '0.8'; });
+        document.body.addEventListener('dragleave', e => { e.preventDefault(); document.body.style.opacity = '1'; });
+        document.body.addEventListener('drop', e => { e.preventDefault(); document.body.style.opacity = '1'; handleFile(e.dataTransfer.files); });
+        window.addEventListener('keydown', e => {
+            if (['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) return;
+            const key = e.key.toLowerCase();
+            if (key === 'p' && !domElements.parse.disabled) domElements.parse.click();
+            if (key === 'escape' && !domElements.stop.disabled) domElements.stop.click();
+            if (key === 's') { if (!domElements.resume.disabled) domElements.resume.click(); else if (!domElements.pause.disabled) domElements.pause.click(); else if (!domElements.start.disabled) domElements.start.click(); }
+        });
+        initTableHeaders();
+    </script>
 </body>
 
 </html>
