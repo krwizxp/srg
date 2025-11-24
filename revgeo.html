@@ -556,6 +556,12 @@
                 padding-top: 10px;
             }
 
+            .maps-cell {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+
             a {
                 color: var(--accent);
                 text-decoration: none;
@@ -658,16 +664,16 @@
     </footer>
     <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
     <script type="module">
-        const COORD_REGEX = { KR: /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, PAIR: /([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g, HEADER: /\b(lat|latitude|위도|경도)\b/i, LAT_KEY: /^(lat|latitude|위도)$/i, LON_KEY: /^(lon|lng|longitude|경도)$/i, CLEAN: /["']/g, SPLIT: /,|\t|\s{2,}/ };
-        const RX_CSV = /[",\n]/;
-        const CONFIG = { MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종'] };
-        const MAP_PROVIDERS = [
+        const COORD_REGEX = Object.freeze({ KR: /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, PAIR: /([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g, HEADER: /\b(lat|latitude|위도|경도)\b/i, LAT_KEY: /^(lat|latitude|위도)$/i, LON_KEY: /^(lon|lng|longitude|경도)$/i, CLEAN: /["']/g, SPLIT: /,|\t|\s{2,}/ });
+        const RX_CSV = /[",\n\r]/;
+        const CONFIG = Object.freeze({ MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/ });
+        const MAP_PROVIDERS = Object.freeze([
             { key: 'Google', header: '지도링크(Google)', url: (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}` },
             { key: 'OSM', header: '지도링크(OSM)', url: (lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}` },
             { key: 'Naver', header: '지도링크(Naver)', url: (lat, lon) => `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}` },
             { key: 'Kakao', header: '지도링크(Kakao)', url: (lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}` }
-        ];
-        const COL_DEFS = [
+        ]);
+        const COL_DEFS = Object.freeze([
             { key: 'kind', label: '구분', val: r => r.set },
             { key: 'idx', label: '순번', val: r => r.idx },
             { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}` },
@@ -676,24 +682,25 @@
             { key: 'emd', label: '읍·면·동·리', val: r => r.addr?.eupmyeon },
             { key: 'tag', label: '지물 태그', val: r => r.addr?.tag, render: (v, td) => { if (v) { const s = document.createElement('span'); s.className = 'tag-badge'; s.textContent = v; td.appendChild(s); } td.className = 'tags-cell'; } },
             { key: 'fullAddr', label: '전체주소', val: r => r.fullAddr },
-            { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { const links = MAP_PROVIDERS.map(p => ({ label: p.key, url: p.url(r.lat, r.lon) })); links.forEach((l, i) => { const a = document.createElement('a'); a.href = l.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = l.label; td.appendChild(a); if (i < links.length - 1) td.appendChild(document.createTextNode(' · ')); }); } }
-        ];
+            { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { td.className = 'maps-cell'; MAP_PROVIDERS.forEach((p) => { const a = document.createElement('a'); a.href = p.url(r.lat, r.lon); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = p.key; td.appendChild(a); }); } }
+        ]);
         const numberFormatter = new Intl.NumberFormat('ko-KR');
         const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
         const domElements = { file: document.getElementById('file'), parse: document.getElementById('parse'), start: document.getElementById('start'), pause: document.getElementById('pause'), resume: document.getElementById('resume'), stop: document.getElementById('stop'), exportBtn: document.getElementById('export'), status: document.getElementById('status'), counts: document.getElementById('counts'), cntTotal: document.getElementById('cnt-total'), cntSuccess: document.getElementById('cnt-success'), cntFail: document.getElementById('cnt-fail'), cntRemain: document.getElementById('cnt-remain'), prog: document.getElementById('prog'), progLabel: document.getElementById('prog-label'), thead: document.querySelector('#tbl thead'), tbody: document.querySelector('#tbl tbody'), coords: document.getElementById('coords'), tableWrap: document.querySelector('.table-wrap') };
+        const cleanStr = (s) => s ? s.replace(COORD_REGEX.CLEAN, '').trim() : '';
         const AddressFormatter = {
-            _getKoreanAdminArea(a) {
+            _getKoreanAdminArea(a, tag) {
                 let sido = a.province || a.state || a.region || '';
                 let tmpCity = a.city || a.county || a.municipality || '';
                 let tmpGu = a.district || a.borough || a.suburb || '';
                 let sigungu;
-                const isSpecialCity = CONFIG.SPECIAL_CITIES.some(c => tmpCity.includes(c));
+                const isSpecialCity = CONFIG.SPECIAL_CITIES.test(tmpCity);
                 if (!sido && isSpecialCity) { sido = tmpCity; sigungu = tmpGu; }
                 else { sigungu = tmpCity; if (tmpCity && tmpGu && tmpCity !== tmpGu) { if (!sigungu.includes(tmpGu)) sigungu += ' ' + tmpGu; } else if (!sigungu) { sigungu = tmpGu; } }
                 const emd = a.town || a.township || a.neighbourhood || a.city_district || '';
                 const ri = a.village || a.hamlet || '';
                 const eupmyeon = (emd && ri) ? `${emd} ${ri}` : (emd || ri || '');
-                return { sido, sigungu, eupmyeon };
+                return { sido, sigungu, eupmyeon, tag };
             },
             _getTag(a, data) {
                 if (!data || typeof data !== 'object') return '';
@@ -708,22 +715,19 @@
             },
             parse(data) {
                 const a = data?.address ?? {};
-                const countryCode = (a.country_code || '').toLowerCase();
-                const isKR = countryCode === 'kr' || a.country === '대한민국';
-                let result;
-                if (isKR) { result = this._getKoreanAdminArea(a); }
-                else { result = { sido: a.state || a.region || a.province || a.county || a.city || '', sigungu: a.city || a.town || a.county || a.district || a.municipality || a.region || '', eupmyeon: a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '' }; }
-                result.tag = this._getTag(a, data);
-                return result;
+                const isKR = (a.country_code || '').toLowerCase() === 'kr' || a.country === '대한민국';
+                const tag = this._getTag(a, data);
+                if (isKR) return this._getKoreanAdminArea(a, tag);
+                return { sido: a.state || a.region || a.province || a.county || a.city || '', sigungu: a.city || a.town || a.county || a.district || a.municipality || a.region || '', eupmyeon: a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '', tag };
             }
         };
         const AppState = {
-            records: [], results: [], droppedFile: null, status: 'idle', controller: null, resumeResolve: null, inFlight: false, renderReq: null,
+            records: [], results: [], droppedFile: null, status: 'idle', controller: null, resumeHandler: null, inFlight: false, renderReq: null,
             get isRunning() { return this.status === 'running' || this.status === 'paused' || this.status === 'pausing'; },
             get isPaused() { return this.status === 'paused'; },
             get isPausing() { return this.status === 'pausing'; },
             get isStopping() { return this.status === 'stopping'; },
-            reset() { this.results = []; this.status = 'idle'; this.controller = null; this.resumeResolve = null; this.inFlight = false; this.renderReq = null; },
+            reset() { this.results = []; this.status = 'idle'; this.controller = null; this.resumeHandler = null; this.inFlight = false; this.renderReq = null; },
             setRecords(newRecords) { this.records = newRecords; this.reset(); updateUIState(); },
             setFile(file) { this.droppedFile = file; updateUIState(); },
             clearDroppedFile() { this.droppedFile = null; updateUIState(); },
@@ -734,8 +738,8 @@
             const hasRecords = AppState.records.length > 0;
             const hasResults = AppState.results.length > 0;
             const { parse, start, pause, resume, stop, exportBtn, tableWrap } = domElements;
-            parse.disabled = s === 'running' || s === 'paused' || s === 'pausing';
-            start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'pausing' || s === 'stopping';
+            parse.disabled = s === 'running' || s === 'paused' || s === 'pausing' || s === 'parsing';
+            start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'pausing' || s === 'stopping' || s === 'parsing';
             pause.disabled = s !== 'running';
             resume.disabled = s !== 'paused';
             stop.disabled = s === 'idle' || s === 'stopping';
@@ -763,7 +767,6 @@
                 domElements.prog.style.setProperty("--value", pct);
                 domElements.prog.setAttribute("aria-valuenow", String(pct));
                 domElements.progLabel.textContent = `진행 상황 ${pct}%`;
-                if (AppState.isRunning && !AppState.isPaused) setStatus(`처리 중… (${processed}/${total}) (단축키: S=일시정지, Esc=중지)`);
                 updateUIState();
                 AppState.renderReq = null;
             });
@@ -787,11 +790,7 @@
         async function extractCoordinates(text) {
             const out = [];
             const push = (lat, lon, setLabel) => { if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); } };
-            const clean = (s) => s ? s.replace(COORD_REGEX.CLEAN, '').trim() : '';
-            for (const m of text.matchAll(COORD_REGEX.KR)) push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
-            for (const m of text.matchAll(COORD_REGEX.WORLD)) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
-            if (out.length) return out;
-            const lineBreakRegex = /\r?\n/g;
+            const lineBreakRegex = /\r\n|[\n\r]/g;
             let match;
             let firstLineEnd = -1;
             while ((match = lineBreakRegex.exec(text)) !== null) {
@@ -799,12 +798,13 @@
             }
             if (firstLineEnd === -1) firstLineEnd = text.length;
             const firstLine = text.substring(0, firstLineEnd).trim();
-            if (firstLine && COORD_REGEX.HEADER.test(clean(firstLine))) {
-                const hdr = firstLine.split(COORD_REGEX.SPLIT).map(clean);
+            if (firstLine && COORD_REGEX.HEADER.test(cleanStr(firstLine))) {
+                if (firstLineEnd === text.length) return out;
+                const hdr = firstLine.split(COORD_REGEX.SPLIT).map(cleanStr);
                 const idxLat = hdr.findIndex(h => COORD_REGEX.LAT_KEY.test(h));
                 const idxLon = hdr.findIndex(h => COORD_REGEX.LON_KEY.test(h));
                 if (idxLat >= 0 && idxLon >= 0) {
-                    let prevIndex = lineBreakRegex.lastIndex || firstLineEnd;
+                    let prevIndex = lineBreakRegex.lastIndex;
                     let loopCount = 0;
                     while ((match = lineBreakRegex.exec(text)) !== null) {
                         if (++loopCount % 5000 === 0) await yieldToMain();
@@ -812,18 +812,33 @@
                         prevIndex = match.index + match[0].length;
                         if (!line) continue;
                         const cols = line.split(COORD_REGEX.SPLIT);
-                        push(parseFloat(clean(cols[idxLat])), parseFloat(clean(cols[idxLon])));
+                        push(parseFloat(cleanStr(cols[idxLat])), parseFloat(cleanStr(cols[idxLon])));
                     }
                     const lastLine = text.substring(prevIndex).trim();
                     if (lastLine) {
                         const cols = lastLine.split(COORD_REGEX.SPLIT);
-                        push(parseFloat(clean(cols[idxLat])), parseFloat(clean(cols[idxLon])));
+                        push(parseFloat(cleanStr(cols[idxLat])), parseFloat(cleanStr(cols[idxLon])));
                     }
-                    if (out.length) return out;
+                    return out;
                 }
             }
+            for (const m of text.matchAll(COORD_REGEX.KR)) push(parseFloat(m[1]), parseFloat(m[2]), 'KR');
+            for (const m of text.matchAll(COORD_REGEX.WORLD)) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD');
+            if (out.length) return out;
             for (const m of text.matchAll(COORD_REGEX.PAIR)) push(parseFloat(m[1]), parseFloat(m[2]));
             return out;
+        }
+        async function performPauseCheck() {
+            if (AppState.isPausing) {
+                AppState.setStatus('paused');
+                setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
+                let resumeResolve;
+                const resumePromise = new Promise(r => resumeResolve = r);
+                AppState.resumeHandler = { resolve: resumeResolve, promise: resumePromise };
+                renderUI();
+                await resumePromise;
+                setStatus('재개합니다… (단축키 Esc로 중지)');
+            }
         }
         async function fetchReverseWithRetry(lat, lon, userSignal) {
             const buildUrl = () => {
@@ -875,13 +890,7 @@
             const startIndex = AppState.results.length;
             for (let i = startIndex; i < AppState.records.length; i++) {
                 if (!AppState.isRunning || AppState.isStopping) break;
-                if (AppState.isPausing) {
-                    AppState.setStatus('paused');
-                    setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
-                    await new Promise(r => AppState.resumeResolve = r);
-                    domElements.resume.disabled = true; domElements.pause.disabled = false;
-                    setStatus('재개합니다… (단축키 Esc로 중지)');
-                }
+                await performPauseCheck();
                 if (!AppState.isRunning || AppState.isStopping) break;
                 const r = AppState.records[i];
                 AppState.controller = new AbortController();
@@ -889,13 +898,7 @@
                 try {
                     if (i > startIndex) await sleep(CONFIG.RATE_LIMIT_DELAY_MS, AppState.controller.signal);
                     if (!AppState.isRunning || AppState.isStopping) break;
-                    if (AppState.isPausing) {
-                        AppState.setStatus('paused');
-                        setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
-                        await new Promise(r => AppState.resumeResolve = r);
-                        domElements.resume.disabled = true; domElements.pause.disabled = false;
-                        setStatus('재개합니다… (단축키 Esc로 중지)');
-                    }
+                    await performPauseCheck();
                     if (!AppState.isRunning || AppState.isStopping) break;
                     if (!AppState.isPaused) setStatus(`처리 중… (${i + 1}/${AppState.records.length}) (단축키: S=일시정지, Esc=중지)`);
                     const data = await fetchReverseWithRetry(r.lat, r.lon, AppState.controller.signal);
@@ -914,13 +917,28 @@
                     AppState.inFlight = false; scheduleRender();
                 }
             }
-            if (AppState.isStopping) { AppState.setStatus('idle'); setStatus('중지되었습니다.', 'warn'); }
-            else if (AppState.results.length >= AppState.records.length) { AppState.setStatus('idle'); setStatus('모든 처리가 완료되었습니다.', 'info'); }
+            if (AppState.isStopping) { setControlsIdle('중지되었습니다.', 'warn', 'done'); }
+            else if (AppState.results.length >= AppState.records.length) { setControlsIdle('모든 처리가 완료되었습니다.', 'info', 'done'); }
+        }
+        function setControlsIdle(message, type = 'info', tableState = 'idle') {
+            AppState.status = 'idle';
+            setStatus(message, type);
+            domElements.start.disabled = false;
+            domElements.pause.disabled = true;
+            domElements.resume.disabled = true;
+            domElements.stop.disabled = true;
+            if (tableState === 'done') domElements.tableWrap.setAttribute('data-state', 'idle');
+            renderUI();
         }
         function startProcessing() {
             AppState.reset(); AppState.setStatus('running');
-            clearTable(); scheduleRender();
+            clearTable(); renderUI();
             setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
+            domElements.start.disabled = true;
+            domElements.pause.disabled = false;
+            domElements.resume.disabled = true;
+            domElements.stop.disabled = false;
+            domElements.tableWrap.setAttribute('data-state', 'running');
             runProcessingLoop();
         }
         function toCSV(rows) {
@@ -929,18 +947,16 @@
             const mapHeaders = MAP_PROVIDERS.map(p => p.header);
             const lines = [[...headerCols.map(c => c.label), ...mapHeaders].join(',') + '\n'];
             for (const r of rows) {
-                let rowStr = '';
+                const rowArr = [];
                 for (let i = 0; i < headerCols.length; i++) {
-                    const s = headerCols[i].val(r);
-                    const str = String(s ?? '');
-                    rowStr += (RX_CSV.test(str) ? '"' + str.replaceAll('"', '""') + '"' : str) + ',';
+                    const s = String(headerCols[i].val(r) ?? '');
+                    rowArr.push(RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s);
                 }
                 for (let i = 0; i < MAP_PROVIDERS.length; i++) {
-                    const s = MAP_PROVIDERS[i].url(r.lat, r.lon);
-                    const str = String(s ?? '');
-                    rowStr += (RX_CSV.test(str) ? '"' + str.replaceAll('"', '""') + '"' : str) + (i < MAP_PROVIDERS.length - 1 ? ',' : '');
+                    const s = String(MAP_PROVIDERS[i].url(r.lat, r.lon) ?? '');
+                    rowArr.push(RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s);
                 }
-                lines.push(rowStr + '\n');
+                lines.push(rowArr.join(',') + '\n');
             }
             return lines;
         }
@@ -963,6 +979,7 @@
             try {
                 const file = AppState.droppedFile ?? domElements.file.files?.[0];
                 if (!file) return setStatus('파일을 선택해 주세요.', 'warn');
+                AppState.setStatus('parsing');
                 setStatus('파일 읽는 중…');
                 const text = await file.text();
                 setStatus('좌표 추출 중…');
@@ -978,13 +995,13 @@
         });
         domElements.start.addEventListener('click', () => { document.startViewTransition ? document.startViewTransition(startProcessing) : startProcessing(); });
         domElements.pause.addEventListener('click', () => { if (!AppState.isRunning) return; AppState.setStatus('pausing'); if (AppState.inFlight) setStatus('일시정지 요청됨. 현재 작업을 마치고 멈춥니다...', 'warn'); });
-        domElements.resume.addEventListener('click', () => { if (!AppState.isPaused) return; AppState.setStatus('running'); if (AppState.resumeResolve) { AppState.resumeResolve(); AppState.resumeResolve = null; } });
+        domElements.resume.addEventListener('click', () => { if (!AppState.isPaused) return; AppState.setStatus('running'); if (AppState.resumeHandler) { AppState.resumeHandler.resolve(); AppState.resumeHandler = null; } });
         domElements.stop.addEventListener('click', () => {
             if (!AppState.isRunning) return;
             AppState.setStatus('stopping');
-            if (AppState.isPaused && AppState.resumeResolve) { AppState.resumeResolve(); AppState.resumeResolve = null; }
+            if (AppState.isPaused && AppState.resumeHandler) { AppState.resumeHandler.resolve(); AppState.resumeHandler = null; }
             if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatus('중지 요청됨. 취소 중…', 'warn'); }
-            else { AppState.setStatus('idle'); setStatus('중지되었습니다.', 'warn'); }
+            else { setControlsIdle('중지되었습니다.', 'warn', 'done'); }
         });
         function handleFile(files) { if (files.length) { AppState.setFile(files[0]); setStatus(`파일 선택됨: ${files[0].name} (추출 버튼을 누르세요(단축키 P))`); domElements.file.value = ''; } }
         domElements.file.addEventListener('change', () => { AppState.clearDroppedFile(); handleFile(domElements.file.files); });
