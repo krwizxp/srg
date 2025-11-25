@@ -315,8 +315,6 @@ enum Activity {
 }
 struct NetworkContext {
     tcp_line_buffer: Vec<u8>,
-    tcp_headers_buffer: Vec<u8>,
-    curl_stdout_buf: String,
     curl_stderr_buf: String,
 }
 static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("curl"));
@@ -425,8 +423,6 @@ impl AppState {
         let mut message_buffer = String::with_capacity(256);
         let mut network_context = NetworkContext {
             tcp_line_buffer: Vec::with_capacity(256),
-            tcp_headers_buffer: Vec::with_capacity(1024),
-            curl_stdout_buf: String::with_capacity(4096),
             curl_stderr_buf: String::with_capacity(1024),
         };
         loop {
@@ -787,7 +783,6 @@ fn fetch_server_time_sample_curl(
     context: &str,
     net_ctx: &mut NetworkContext,
 ) -> Result<TimeSample> {
-    net_ctx.curl_stdout_buf.clear();
     net_ctx.curl_stderr_buf.clear();
     let time_before_curl_call_inst = Instant::now();
     let timeout_str = TCP_TIMEOUT_SECS.to_string();
@@ -821,9 +816,6 @@ fn fetch_server_time_sample_curl(
         }
         return Err(Error::Curl(mem::take(&mut net_ctx.curl_stderr_buf)));
     }
-    net_ctx
-        .curl_stdout_buf
-        .push_str(&String::from_utf8_lossy(&stdout_bytes));
     let mut end = stdout_bytes.len();
     while end > 0 && stdout_bytes[end - 1].is_ascii_whitespace() {
         end -= 1;
@@ -854,11 +846,7 @@ fn fetch_server_time_sample_curl(
         server_time,
     })
 }
-fn tcp_attempt(
-    line_buffer: &mut Vec<u8>,
-    full_headers: &mut Vec<u8>,
-    host: &str,
-) -> Result<TimeSample> {
+fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
     let request_start_inst = Instant::now();
     let tcp_host_uri = host.strip_prefix("http://").unwrap_or(host);
     let (tcp_host_no_port, _) = tcp_host_uri.split_once(':').unwrap_or((tcp_host_uri, ""));
@@ -879,7 +867,6 @@ fn tcp_attempt(
     stream.write_all(tcp_host_no_port.as_bytes())?;
     stream.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
     let mut stream_reader = BufReader::new(&stream);
-    full_headers.clear();
     loop {
         line_buffer.clear();
         let bytes_read = stream_reader.read_until(b'\n', line_buffer)?;
@@ -899,7 +886,6 @@ fn tcp_attempt(
         if line_buffer == b"\r\n" {
             break;
         }
-        full_headers.extend_from_slice(line_buffer);
     }
     Err(Error::HeaderNotFound("Date (TCP)".into()))
 }
@@ -935,12 +921,7 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
     if host.len() >= 8 && host[..8].eq_ignore_ascii_case("https://") {
         return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx);
     }
-    tcp_attempt(
-        &mut net_ctx.tcp_line_buffer,
-        &mut net_ctx.tcp_headers_buffer,
-        host,
-    )
-    .or_else(|_| {
+    tcp_attempt(&mut net_ctx.tcp_line_buffer, host).or_else(|_| {
         if !is_curl_available() {
             return Err(Error::SyncFailed(
                 "TCP 연결에 실패했고 curl을 사용할 수 없습니다.".into(),

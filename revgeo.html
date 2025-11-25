@@ -778,7 +778,6 @@
             COL_DEFS.forEach(col => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = col.label; tr.appendChild(th); });
             domElements.thead.appendChild(tr);
         }
-        function isKR(lat, lon) { return lat >= 32 && lat <= 39 && lon >= 124 && lon <= 132; }
         function sleep(ms, signal) {
             return new Promise((resolve, reject) => {
                 if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
