@@ -250,7 +250,7 @@
                 height: 100%;
                 flex: 1;
                 overflow-y: auto;
-                font-family: "Pretendard Mono", monospace;
+                font-family: inherit;
                 line-height: 1.5;
                 resize: none;
 
@@ -541,7 +541,6 @@
 
             .tag-badge {
                 display: inline-block;
-                font-family: "Pretendard Mono", monospace;
                 font-size: 11px;
                 font-weight: 500;
                 color: var(--fg);
@@ -554,12 +553,6 @@
 
             .tags-cell {
                 padding-top: 10px;
-            }
-
-            .maps-cell {
-                display: flex;
-                gap: 6px;
-                flex-wrap: wrap;
             }
 
             a {
@@ -676,13 +669,13 @@
         const COL_DEFS = Object.freeze([
             { key: 'kind', label: '구분', val: r => r.set },
             { key: 'idx', label: '순번', val: r => r.idx },
-            { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}` },
+            { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}`, className: 'coords-cell' },
             { key: 'sido', label: '시·도', val: r => r.addr?.sido },
             { key: 'sigungu', label: '시·군·구', val: r => r.addr?.sigungu },
             { key: 'emd', label: '읍·면·동·리', val: r => r.addr?.eupmyeon },
             { key: 'tag', label: '지물 태그', val: r => r.addr?.tag, render: (v, td) => { if (v) { const s = document.createElement('span'); s.className = 'tag-badge'; s.textContent = v; td.appendChild(s); } td.className = 'tags-cell'; } },
             { key: 'fullAddr', label: '전체주소', val: r => r.fullAddr },
-            { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { td.className = 'maps-cell'; MAP_PROVIDERS.forEach((p) => { const a = document.createElement('a'); a.href = p.url(r.lat, r.lon); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = p.key; td.appendChild(a); }); } }
+            { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { td.style.whiteSpace = 'nowrap'; MAP_PROVIDERS.forEach((p, i) => { const a = document.createElement('a'); a.href = p.url(r.lat, r.lon); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = p.key; td.appendChild(a); if (i < MAP_PROVIDERS.length - 1) td.appendChild(document.createTextNode(' · ')); }); } }
         ]);
         const numberFormatter = new Intl.NumberFormat('ko-KR');
         const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
@@ -745,6 +738,7 @@
             stop.disabled = s === 'idle' || s === 'stopping';
             exportBtn.disabled = !hasResults;
             if (s === 'running' || s === 'pausing') tableWrap.setAttribute('data-state', 'running');
+            else if (s === 'idle' && hasResults) tableWrap.removeAttribute('data-state');
             else if (s === 'idle' && !hasResults) tableWrap.setAttribute('data-state', 'idle');
         }
         function setStatus(msg, type = 'info') {
@@ -832,11 +826,9 @@
             if (AppState.isPausing) {
                 AppState.setStatus('paused');
                 setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
-                let resumeResolve;
-                const resumePromise = new Promise(r => resumeResolve = r);
-                AppState.resumeHandler = { resolve: resumeResolve, promise: resumePromise };
-                renderUI();
-                await resumePromise;
+                if (!AppState.resumeHandler) AppState.resumeHandler = Promise.withResolvers();
+                scheduleRender();
+                await AppState.resumeHandler.promise;
                 setStatus('재개합니다… (단축키 Esc로 중지)');
             }
         }
@@ -875,6 +867,7 @@
             COL_DEFS.forEach(col => {
                 const td = document.createElement(col.key === 'idx' ? 'th' : 'td');
                 if (col.key === 'idx') td.scope = 'row';
+                if (col.className) td.className = col.className;
                 const val = col.val ? col.val(row) : '';
                 if (col.render) col.render(val, td, row); else td.textContent = val ?? '';
                 tr.appendChild(td);
@@ -923,21 +916,13 @@
         function setControlsIdle(message, type = 'info', tableState = 'idle') {
             AppState.status = 'idle';
             setStatus(message, type);
-            domElements.start.disabled = false;
-            domElements.pause.disabled = true;
-            domElements.resume.disabled = true;
-            domElements.stop.disabled = true;
-            if (tableState === 'done') domElements.tableWrap.setAttribute('data-state', 'idle');
-            renderUI();
+            if (tableState === 'done') domElements.tableWrap.removeAttribute('data-state');
+            scheduleRender();
         }
         function startProcessing() {
             AppState.reset(); AppState.setStatus('running');
-            clearTable(); renderUI();
+            clearTable(); scheduleRender();
             setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)');
-            domElements.start.disabled = true;
-            domElements.pause.disabled = false;
-            domElements.resume.disabled = true;
-            domElements.stop.disabled = false;
             domElements.tableWrap.setAttribute('data-state', 'running');
             runProcessingLoop();
         }
@@ -945,16 +930,21 @@
             if (!rows || !rows.length) return [];
             const headerCols = COL_DEFS.filter(c => !c.noCsv);
             const mapHeaders = MAP_PROVIDERS.map(p => p.header);
-            const lines = [[...headerCols.map(c => c.label), ...mapHeaders].join(',') + '\n'];
+            const esc = (s) => {
+                s = String(s ?? '');
+                return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
+            };
+            const headerLine = [...headerCols.map(c => esc(c.label)), ...mapHeaders.map(esc)].join(',') + '\n';
+            const lines = [headerLine];
             for (const r of rows) {
                 const rowArr = [];
                 for (let i = 0; i < headerCols.length; i++) {
                     const s = String(headerCols[i].val(r) ?? '');
-                    rowArr.push(RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s);
+                    rowArr.push(esc(s));
                 }
                 for (let i = 0; i < MAP_PROVIDERS.length; i++) {
                     const s = String(MAP_PROVIDERS[i].url(r.lat, r.lon) ?? '');
-                    rowArr.push(RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s);
+                    rowArr.push(esc(s));
                 }
                 lines.push(rowArr.join(',') + '\n');
             }
