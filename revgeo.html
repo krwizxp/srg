@@ -484,12 +484,9 @@
 
                     &:nth-child(4),
                     &:nth-child(5),
-                    &:nth-child(6) {
-                        width: 72px;
-                    }
-
+                    &:nth-child(6),
                     &:nth-child(7) {
-                        width: 70px;
+                        width: 72px;
                     }
 
                     &:nth-child(8) {
@@ -546,7 +543,8 @@
                 padding: 0;
                 white-space: normal;
                 word-break: keep-all;
-                overflow-wrap: break-word;
+                overflow-wrap: anywhere;
+                max-width: 100%;
                 text-align: center;
             }
 
