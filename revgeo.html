@@ -802,7 +802,7 @@
                 if (!AppState.resumeHandler) AppState.resumeHandler = Promise.withResolvers();
                 scheduleRender();
                 await AppState.resumeHandler.promise;
-                setStatus('재개합니다… (단축키 Esc로 중지)');
+                if (!AppState.isStopping) setStatus('재개합니다… (단축키 Esc로 중지)');
             }
         }
         async function fetchReverseWithRetry(lat, lon, userSignal) {
@@ -956,9 +956,9 @@
         domElements.stop.addEventListener('click', () => {
             if (!AppState.isRunning) return;
             AppState.setStatus('stopping');
-            if (AppState.isPaused && AppState.resumeHandler) { AppState.resumeHandler.resolve(); AppState.resumeHandler = null; }
+            if (AppState.resumeHandler) { AppState.resumeHandler.resolve(); AppState.resumeHandler = null; }
             if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatus('중지 요청됨. 취소 중…', 'warn'); }
-            else { setControlsIdle('중지되었습니다.', 'warn', 'done'); }
+            else { setStatus('중지 요청됨. 정리 중…', 'warn'); }
         });
         function handleFile(files) { if (files.length) { AppState.setFile(files[0]); setStatus(`파일 선택됨: ${files[0].name} (추출 버튼을 누르세요(단축키 P))`); domElements.file.value = ''; } }
         domElements.file.addEventListener('change', () => { AppState.clearDroppedFile(); handleFile(domElements.file.files); });
