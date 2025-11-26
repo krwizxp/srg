@@ -622,8 +622,8 @@
                         <label for="file">random_data.txt</label>
                         <input type="file" id="file" accept=".txt">
                         <div class="row">
-                            <button type="button" id="parse" enterkeyhint="done">좌표 추출</button>
-                            <button type="button" id="start" enterkeyhint="go" disabled>조회 시작</button>
+                            <button type="button" id="parse">좌표 추출</button>
+                            <button type="button" id="start" disabled>조회 시작</button>
                             <button type="button" id="pause" disabled>일시정지</button>
                             <button type="button" id="resume" disabled>재개</button>
                             <button type="button" id="stop" disabled>중지</button>
@@ -772,18 +772,22 @@
                 AppState.renderReq = null;
             });
         }
-        function clearTable() { while (domElements.tbody.firstChild) domElements.tbody.removeChild(domElements.tbody.firstChild); }
+        function clearTable() { domElements.tbody.replaceChildren(); }
         function initTableHeaders() {
             const tr = document.createElement('tr');
             COL_DEFS.forEach(col => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = col.label; tr.appendChild(th); });
             domElements.thead.appendChild(tr);
         }
         function sleep(ms, signal) {
+            if (!signal) return new Promise(r => setTimeout(r, ms));
+            if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+            const timeoutSig = AbortSignal.timeout(ms);
+            const combined = AbortSignal.any([signal, timeoutSig]);
             return new Promise((resolve, reject) => {
-                if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
-                const onAbort = () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); };
-                const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
-                signal?.addEventListener('abort', onAbort, { once: true });
+                combined.addEventListener('abort', () => {
+                    if (signal.aborted && !timeoutSig.aborted) reject(new DOMException('Aborted', 'AbortError'));
+                    else resolve();
+                }, { once: true });
             });
         }
         async function yieldToMain() { if ('scheduler' in window && 'yield' in window.scheduler) await window.scheduler.yield(); else await new Promise(r => setTimeout(r, 0)); }
@@ -791,7 +795,8 @@
             const out = []; const push = (lat, lon, setLabel) => {
                 if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); }
             }; for (const m of text.matchAll(COORD_REGEX.KR)) push(parseFloat(m[1]), parseFloat(m[2]), 'KR'); for (const m of text.matchAll(COORD_REGEX.WORLD)) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD'); return out;
-        } async function performPauseCheck() {
+        }
+        async function performPauseCheck() {
             if (AppState.isPausing) {
                 AppState.setStatus('paused'); setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn');
                 if (!AppState.resumeHandler) AppState.resumeHandler = Promise.withResolvers();
@@ -799,7 +804,8 @@
                 await AppState.resumeHandler.promise;
                 setStatus('재개합니다… (단축키 Esc로 중지)');
             }
-        } async function fetchReverseWithRetry(lat, lon, userSignal) {
+        }
+        async function fetchReverseWithRetry(lat, lon, userSignal) {
             const buildUrl = () => {
                 const url = new URL('https://nominatim.openstreetmap.org/reverse');
                 url.searchParams.set('format', 'jsonv2'); url.searchParams.set('lat', String(lat)); url.searchParams.set('lon', String(lon)); url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM)); url.searchParams.set('addressdetails', '1'); url.searchParams.set('accept-language', 'ko');
@@ -809,22 +815,17 @@
             while (attempt < CONFIG.MAX_RETRY) {
                 if (userSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
                 attempt++;
-                const ctrl = new AbortController();
-                const timer = setTimeout(() => ctrl.abort(), CONFIG.REQUEST_TIMEOUT_MS);
-                const onUserAbort = () => ctrl.abort();
-                if (userSignal) userSignal.addEventListener('abort', onUserAbort);
                 try {
-                    const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
+                    const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
+                    const combinedSignal = userSignal ? AbortSignal.any([userSignal, timeoutSig]) : timeoutSig;
+                    const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: combinedSignal });
                     if (res.ok) return res.json();
                     if (res.status === 429 || res.status >= 500) { await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); continue; }
                     const text = await res.text(); throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
                 } catch (e) {
-                    if (userSignal && userSignal.aborted) throw e;
+                    if (userSignal?.aborted) throw e;
                     if (attempt >= CONFIG.MAX_RETRY) throw e;
                     await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
-                } finally {
-                    clearTimeout(timer);
-                    if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
                 }
             }
         }
@@ -893,44 +894,40 @@
             domElements.tableWrap.setAttribute('data-state', 'running');
             runProcessingLoop();
         }
-        function toCSV(rows) {
-            if (!rows || !rows.length) return [];
-            const headerCols = COL_DEFS.filter(c => !c.noCsv);
-            const mapHeaders = MAP_PROVIDERS.map(p => p.header);
-            const esc = (s) => {
-                s = String(s ?? '');
-                return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
-            };
-            const headerLine = [...headerCols.map(c => esc(c.label)), ...mapHeaders.map(esc)].join(',') + '\n';
-            const lines = [headerLine];
-            for (const r of rows) {
-                const rowArr = [];
-                for (let i = 0; i < headerCols.length; i++) {
-                    const s = String(headerCols[i].val(r) ?? '');
-                    rowArr.push(esc(s));
-                }
-                for (let i = 0; i < MAP_PROVIDERS.length; i++) {
-                    const s = String(MAP_PROVIDERS[i].url(r.lat, r.lon) ?? '');
-                    rowArr.push(esc(s));
-                }
-                lines.push(rowArr.join(',') + '\n');
-            }
-            return lines;
-        }
-        domElements.exportBtn.addEventListener('click', () => {
+        domElements.exportBtn.addEventListener('click', async () => {
             try {
-                const blobData = toCSV(AppState.results);
-                if (!blobData.length) return setStatus('내보낼 데이터가 없습니다.', 'warn');
-                blobData.unshift('\uFEFF');
-                const url = URL.createObjectURL(new Blob(blobData, { type: 'text/csv;charset=utf-8' }));
-                const a = document.createElement('a'); a.href = url;
-                const now = new Date();
-                const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0];
-                a.download = `result_${timestamp}.csv`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                setStatus('CSV 파일을 다운로드했습니다.');
-            } catch (err) { setStatus(`오류 발생: ${err.message}`, 'error'); }
+                const rows = AppState.results;
+                if (!rows.length) return setStatus('내보낼 데이터가 없습니다.', 'warn');
+                const headerCols = COL_DEFS.filter(c => !c.noCsv);
+                const mapHeaders = MAP_PROVIDERS.map(p => p.header);
+                const esc = (s) => { s = String(s ?? ''); return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
+                const makeRow = r => {
+                    const rowArr = [];
+                    for (let i = 0; i < headerCols.length; i++) rowArr.push(esc(headerCols[i].val(r)));
+                    for (let i = 0; i < MAP_PROVIDERS.length; i++) rowArr.push(esc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
+                    return rowArr.join(',') + '\n';
+                };
+                const headerStr = [...headerCols.map(c => esc(c.label)), ...mapHeaders.map(esc)].join(',') + '\n';
+                const fileName = `result_${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}.csv`;
+                if ('showSaveFilePicker' in window) {
+                    const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }] });
+                    const writable = await handle.createWritable();
+                    try {
+                        await writable.write('\uFEFF');
+                        await writable.write(headerStr);
+                        for (const r of rows) await writable.write(makeRow(r));
+                    } finally { await writable.close(); }
+                    setStatus('파일이 로컬에 저장되었습니다.');
+                } else {
+                    const lines = ['\uFEFF' + headerStr];
+                    for (const r of rows) lines.push(makeRow(r));
+                    const url = URL.createObjectURL(new Blob(lines, { type: 'text/csv;charset=utf-8' }));
+                    const a = document.createElement('a'); a.href = url; a.download = fileName;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    setStatus('CSV 파일을 다운로드했습니다.');
+                }
+            } catch (err) { if (err.name !== 'AbortError') setStatus(`저장 실패: ${err.message}`, 'error'); }
         });
         domElements.parse.addEventListener('click', async () => {
             try {
