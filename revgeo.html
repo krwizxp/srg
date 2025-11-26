@@ -370,7 +370,9 @@
                 background: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05));
                 border-left: 3px solid var(--muted);
                 animation: fadeIn 0.3s ease;
-                word-break: break-all;
+                word-break: keep-all;
+                overflow-wrap: break-word;
+                text-wrap: pretty;
 
                 &.err {
                     color: var(--err);
@@ -433,7 +435,7 @@
 
             table {
                 width: 100%;
-                min-width: 880px;
+                min-width: 800px;
                 table-layout: fixed;
                 border-collapse: separate;
                 border-spacing: 0;
@@ -470,40 +472,33 @@
                         border-top-right-radius: 16px;
                     }
 
-                    &:nth-child(1) {
-                        width: 40px;
-                        text-align: center;
-                    }
-
+                    &:nth-child(1),
                     &:nth-child(2) {
-                        width: 45px;
+                        width: 50px;
                         text-align: center;
                     }
 
                     &:nth-child(3) {
-                        width: 135px;
+                        width: 160px;
                     }
 
-                    &:nth-child(4) {
-                        width: 65px;
-                    }
-
+                    &:nth-child(4),
                     &:nth-child(5),
                     &:nth-child(6) {
-                        width: 75px;
+                        width: 72px;
                     }
 
                     &:nth-child(7) {
-                        width: 80px;
+                        width: 70px;
                     }
 
                     &:nth-child(8) {
                         width: auto;
-                        min-width: 200px;
+                        min-width: 150px;
                     }
 
                     &:nth-child(9) {
-                        width: 200px;
+                        width: 190px;
                     }
                 }
 
@@ -522,11 +517,6 @@
                     td:nth-child(1),
                     th:nth-child(2) {
                         text-align: center;
-                    }
-
-                    td:nth-child(3),
-                    td:nth-child(5) {
-                        word-break: break-all;
                     }
 
                     td:nth-child(9) {
@@ -555,7 +545,8 @@
                 background: transparent;
                 padding: 0;
                 white-space: normal;
-                word-break: break-all;
+                word-break: keep-all;
+                overflow-wrap: break-word;
                 text-align: center;
             }
 
@@ -665,7 +656,7 @@
     </footer>
     <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
     <script type="module">
-        const COORD_REGEX = Object.freeze({ KR: /대한민국\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/gi });
+        const COORD_REGEX = Object.freeze({ KR: /대한민국\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi, });
         const RX_CSV = /[",\n\r]/;
         const CONFIG = Object.freeze({ MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/ });
         const MAP_PROVIDERS = Object.freeze([
@@ -779,22 +770,12 @@
             domElements.thead.appendChild(tr);
         }
         function sleep(ms, signal) {
-            if (!signal) return new Promise(r => setTimeout(r, ms));
-            if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
-            const timeoutSig = AbortSignal.timeout(ms);
-            const combined = AbortSignal.any([signal, timeoutSig]);
-            return new Promise((resolve, reject) => {
-                combined.addEventListener('abort', () => {
-                    if (signal.aborted && !timeoutSig.aborted) reject(new DOMException('Aborted', 'AbortError'));
-                    else resolve();
-                }, { once: true });
-            });
+            if (!signal) { return new Promise(resolve => setTimeout(resolve, ms)); } signal.throwIfAborted(); const timeoutSig = AbortSignal.timeout(ms);
+            const combined = AbortSignal.any([signal, timeoutSig]); return new Promise((resolve, reject) => { combined.addEventListener('abort', () => { if (signal.aborted && !timeoutSig.aborted) { reject(signal.reason); } else { resolve(); } }, { once: true }); });
         }
         async function yieldToMain() { if ('scheduler' in window && 'yield' in window.scheduler) await window.scheduler.yield(); else await new Promise(r => setTimeout(r, 0)); }
         function extractCoordinates(text) {
-            const out = []; const push = (lat, lon, setLabel) => {
-                if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); }
-            }; for (const m of text.matchAll(COORD_REGEX.KR)) push(parseFloat(m[1]), parseFloat(m[2]), 'KR'); for (const m of text.matchAll(COORD_REGEX.WORLD)) push(parseFloat(m[1]), parseFloat(m[2]), 'WORLD'); return out;
+            const out = []; const push = (lat, lon, setLabel) => { if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); } }; for (const m of text.matchAll(COORD_REGEX.KR)) { const { lat, lon } = m.groups; push(parseFloat(lat), parseFloat(lon), 'KR'); } for (const m of text.matchAll(COORD_REGEX.WORLD)) { const { lat, lon } = m.groups; push(parseFloat(lat), parseFloat(lon), 'WORLD'); } return out;
         }
         async function performPauseCheck() {
             if (AppState.isPausing) {
@@ -807,26 +788,11 @@
         }
         async function fetchReverseWithRetry(lat, lon, userSignal) {
             const buildUrl = () => {
-                const url = new URL('https://nominatim.openstreetmap.org/reverse');
-                url.searchParams.set('format', 'jsonv2'); url.searchParams.set('lat', String(lat)); url.searchParams.set('lon', String(lon)); url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM)); url.searchParams.set('addressdetails', '1'); url.searchParams.set('accept-language', 'ko');
-                return url;
-            };
-            let attempt = 0;
-            while (attempt < CONFIG.MAX_RETRY) {
-                if (userSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-                attempt++;
-                try {
-                    const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-                    const combinedSignal = userSignal ? AbortSignal.any([userSignal, timeoutSig]) : timeoutSig;
-                    const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: combinedSignal });
-                    if (res.ok) return res.json();
-                    if (res.status === 429 || res.status >= 500) { await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); continue; }
-                    const text = await res.text(); throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-                } catch (e) {
-                    if (userSignal?.aborted) throw e;
-                    if (attempt >= CONFIG.MAX_RETRY) throw e;
-                    await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
-                }
+                const url = new URL('https://nominatim.openstreetmap.org/reverse'); url.searchParams.set('format', 'jsonv2'); url.searchParams.set('lat', String(lat)); url.searchParams.set('lon', String(lon)); url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM)); url.searchParams.set('addressdetails', '1'); url.searchParams.set('accept-language', 'ko'); return url;
+            }; let attempt = 0; while (attempt < CONFIG.MAX_RETRY) {
+                userSignal?.throwIfAborted(); attempt++; try {
+                    const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS); const combinedSignal = userSignal ? AbortSignal.any([userSignal, timeoutSig]) : timeoutSig; const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: combinedSignal }); if (res.ok) { return res.json(); } if (res.status === 429 || res.status >= 500) { await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); continue; } const text = await res.text(); throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+                } catch (e) { userSignal?.throwIfAborted(); if (attempt >= CONFIG.MAX_RETRY) { throw e; } await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); }
             }
         }
         function appendRow(row) {
