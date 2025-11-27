@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
     <title>SRG 데이터 역지오코딩 도구</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://nominatim.openstreetmap.org">
     <link rel="stylesheet" crossorigin
@@ -57,6 +56,7 @@
                 --success: light-dark(oklch(60% 0.18 150), oklch(70% 0.15 150));
                 --warn: light-dark(oklch(65% 0.18 50), oklch(75% 0.15 50));
                 --err: light-dark(oklch(55% 0.22 25), oklch(65% 0.2 25));
+                --spotlight: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.1));
                 --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.03);
                 --shadow-md: 0 20px 40px -10px rgba(0, 0, 0, 0.1), var(--inner-glow);
                 --glass: blur(12px) saturate(180%);
@@ -67,14 +67,14 @@
                 background-color: var(--bg-grad-start);
                 background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"), linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
                 color: var(--fg);
-                padding: 24px;
+                padding: 20px;
                 display: flex;
                 flex-direction: column;
-                gap: 20px;
                 align-items: center;
                 letter-spacing: -0.01em;
-                overflow-x: hidden;
+                overflow: hidden;
                 transition: opacity 0.2s ease;
+                font-variant-numeric: tabular-nums;
             }
 
             body.is-dragging {
@@ -83,76 +83,46 @@
 
             @media (max-width: 600px) {
                 body {
-                    padding: 16px;
-                    gap: 16px;
+                    padding: 12px;
+                    overflow-y: auto;
                 }
             }
         }
 
         @layer layout {
-
-            main,
-            header,
-            footer {
-                width: min(1400px, 100%);
-            }
-
-            header {
-                padding: 20px 24px;
-                border-radius: 20px;
-                background: var(--card-bg);
-                backdrop-filter: var(--glass);
-                border: 1px solid var(--card-border);
-                box-shadow: var(--shadow-sm);
-                display: flex;
-                align-items: center;
-                gap: 18px;
-
-                h1 {
-                    margin: 0;
-                    font-size: 20px;
-                    font-weight: 700;
-                    line-height: 1.2;
-                }
-
-                p {
-                    margin-top: 4px;
-                    font-size: 14px;
-                    color: var(--muted);
-                    word-break: keep-all;
-                }
-
-                svg {
-                    color: var(--accent);
-                    filter: drop-shadow(0 0 8px var(--accent-glow));
-                    flex-shrink: 0;
-                }
-            }
-
             main {
+                width: min(1600px, 100%);
                 display: grid;
-                grid-template-columns: 420px 1fr;
-                gap: 20px;
+                grid-template-columns: 400px 1fr;
+                gap: 16px;
                 align-items: stretch;
+                height: calc(100vh - 40px);
+                min-height: 500px;
 
                 >section {
                     min-width: 0;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
                 }
             }
 
             @media (max-width: 900px) {
                 main {
                     grid-template-columns: 1fr;
+                    height: auto;
+                    min-height: 0;
+                    gap: 20px;
                 }
             }
 
             footer {
                 text-align: center;
-                font-size: 12px;
+                font-size: 11px;
                 color: var(--muted);
-                opacity: 0.8;
-                word-break: keep-all;
-                line-height: 1.6;
+                opacity: 0.7;
+                margin-top: auto;
+                padding-top: 10px;
             }
         }
 
@@ -161,21 +131,21 @@
                 background: var(--card-bg);
                 backdrop-filter: var(--glass);
                 border: 1px solid var(--card-border);
-                border-radius: 20px;
+                border-radius: 24px;
                 padding: 24px;
                 box-shadow: var(--shadow-md);
                 display: flex;
                 flex-direction: column;
                 gap: 16px;
                 max-width: 100%;
-                height: 600px;
                 overflow: hidden;
+                position: relative;
 
                 >div:has(#coords) {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    min-height: 0;
+                    min-height: 100px;
                 }
 
                 .card-header {
@@ -183,6 +153,7 @@
                     align-items: baseline;
                     gap: 12px;
                     flex-wrap: wrap;
+                    flex-shrink: 0;
 
                     #results-title {
                         font-size: 20px;
@@ -198,10 +169,59 @@
                         font-weight: 400;
                     }
                 }
+
+                &::before {
+                    content: "";
+                    position: absolute;
+                    pointer-events: none;
+                    inset: 0;
+                    border-radius: inherit;
+                    background: radial-gradient(800px circle at var(--mouse-x, 0) var(--mouse-y, 0), var(--spotlight), transparent 40%);
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    z-index: 2;
+                }
+
+                &:hover::before {
+                    opacity: 1;
+                }
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 4px;
+
+                svg {
+                    color: var(--accent);
+                    filter: drop-shadow(0 0 8px var(--accent-glow));
+                    width: 32px;
+                    height: 32px;
+                }
+
+                div {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                h1 {
+                    margin: 0;
+                    font-size: 18px;
+                    font-weight: 700;
+                    line-height: 1.2;
+                }
+
+                p {
+                    margin: 0;
+                    font-size: 12px;
+                    color: var(--muted);
+                }
             }
 
             form.row {
                 width: 100%;
+                flex-shrink: 0;
             }
 
             fieldset.row {
@@ -222,7 +242,7 @@
                 position: relative;
                 border: 2px dashed var(--line);
                 border-radius: 16px;
-                padding: 20px;
+                padding: 12px;
                 text-align: center;
                 transition: all 0.2s ease;
                 background: light-dark(rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.1));
@@ -233,6 +253,8 @@
                 justify-content: center;
                 gap: 8px;
                 word-break: keep-all;
+                flex-shrink: 0;
+                overflow: hidden;
 
                 &:hover,
                 &:focus-within {
@@ -248,12 +270,13 @@
                     cursor: pointer;
                     width: 100%;
                     height: 100%;
+                    z-index: 10;
                 }
 
                 .drop-icon {
-                    width: 48px;
-                    height: 48px;
-                    margin-bottom: 12px;
+                    width: 32px;
+                    height: 32px;
+                    margin-bottom: 6px;
                     color: var(--muted);
                     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 }
@@ -266,7 +289,7 @@
                 }
 
                 .drop-text {
-                    font-size: 14px;
+                    font-size: 13px;
                     color: var(--muted);
                     font-weight: 500;
 
@@ -316,6 +339,22 @@
                 white-space: nowrap;
                 padding: 12px 4px;
                 background: light-dark(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.05));
+                position: relative;
+                overflow: hidden;
+
+                &::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    background: radial-gradient(circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(255, 255, 255, 0.2), transparent 50%);
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    pointer-events: none;
+                }
+
+                &:hover:not(:disabled)::after {
+                    opacity: 1;
+                }
 
                 &:hover:not(:disabled) {
                     background: light-dark(#fff, rgba(255, 255, 255, 0.1));
@@ -360,6 +399,7 @@
                 align-items: center;
                 gap: 10px;
                 margin-top: 12px;
+                flex-shrink: 0;
 
                 >.sp {
                     flex: 1;
@@ -396,6 +436,22 @@
                     transition: transform 0.3s ease;
                     will-change: transform;
                 }
+
+                &.active::after {
+                    animation: shimmer 2s linear infinite;
+                    background: linear-gradient(90deg, var(--accent), var(--success), var(--accent));
+                    background-size: 200% 100%;
+                }
+            }
+
+            @keyframes shimmer {
+                0% {
+                    background-position: 100% 0;
+                }
+
+                100% {
+                    background-position: -100% 0;
+                }
             }
 
             .status {
@@ -409,6 +465,7 @@
                 word-break: keep-all;
                 overflow-wrap: break-word;
                 text-wrap: pretty;
+                flex-shrink: 0;
 
                 &:empty {
                     display: none;
@@ -445,8 +502,6 @@
                 border-radius: 16px;
                 border: 1px solid var(--line);
                 background: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
-                height: 100%;
-                min-height: 0;
                 overflow: auto;
                 position: relative;
                 content-visibility: auto;
@@ -486,11 +541,7 @@
                 tbody th {
                     padding: 12px 10px;
                     border-bottom: 1px solid var(--line);
-                    border-right: 1px solid var(--line);
-
-                    &:last-child {
-                        border-right: none;
-                    }
+                    font-variant-numeric: tabular-nums;
                 }
 
                 thead th {
@@ -498,11 +549,12 @@
                     top: 0;
                     z-index: 10;
                     background: var(--card-bg);
-                    backdrop-filter: blur(8px);
+                    backdrop-filter: blur(12px);
                     text-align: left;
                     font-weight: 600;
                     color: var(--muted);
                     white-space: nowrap;
+                    box-shadow: 0 1px 0 var(--line);
 
                     &:first-child {
                         border-top-left-radius: 16px;
@@ -519,14 +571,14 @@
                     }
 
                     &:nth-child(3) {
-                        width: 160px;
+                        width: 180px;
                     }
 
                     &:nth-child(4),
                     &:nth-child(5),
                     &:nth-child(6),
                     &:nth-child(7) {
-                        width: 72px;
+                        width: 80px;
                     }
 
                     &:nth-child(8) {
@@ -535,7 +587,7 @@
                     }
 
                     &:nth-child(9) {
-                        width: 190px;
+                        width: 220px;
                     }
                 }
 
@@ -549,6 +601,7 @@
                         white-space: normal;
                         word-break: keep-all;
                         overflow-wrap: break-word;
+                        transition: background 0.1s;
                     }
 
                     td:nth-child(1),
@@ -556,12 +609,18 @@
                         text-align: center;
                     }
 
+                    td:nth-child(3) {
+                        color: var(--accent);
+                        letter-spacing: -0.02em;
+                    }
+
                     td:nth-child(9) {
                         white-space: nowrap;
                     }
 
                     tr:hover {
-                        background: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.03));
+                        background: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.08));
+                        z-index: 1;
                     }
 
                     tr:last-child {
@@ -574,13 +633,86 @@
                 }
             }
 
+            @media (max-width: 800px) {
+                table {
+                    display: block;
+                    min-width: 0;
+                }
+
+                thead {
+                    display: none;
+                }
+
+                tbody {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    padding: 12px;
+                }
+
+                tbody tr {
+                    display: flex;
+                    flex-direction: column;
+                    background: var(--card-bg);
+                    border: 1px solid var(--line);
+                    border-radius: 12px;
+                    padding: 12px;
+                    gap: 8px;
+                    box-shadow: var(--shadow-sm);
+                }
+
+                tbody td,
+                tbody th {
+                    border: none;
+                    padding: 4px 0;
+                    display: grid;
+                    grid-template-columns: 80px 1fr;
+                    gap: 12px;
+                    align-items: baseline;
+                    text-align: left !important;
+                    width: auto !important;
+                }
+
+                tbody td::before,
+                tbody th::before {
+                    content: attr(data-label);
+                    font-weight: 600;
+                    color: var(--muted);
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    text-align: left;
+                }
+
+                tbody tr:hover {
+                    transform: translateY(-2px);
+                    box-shadow: var(--shadow-md);
+                    transition: transform 0.2s;
+                }
+
+                .map-sep {
+                    display: none;
+                }
+            }
+
+            .skeleton-bar {
+                height: 12px;
+                width: 100%;
+                background: linear-gradient(90deg, transparent, light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.1)), transparent);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+                border-radius: 4px;
+            }
+
             .tag-badge {
                 display: inline-block;
                 font-size: 11px;
                 font-weight: 500;
                 color: var(--fg);
-                background: transparent;
-                padding: 0;
+                background: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.1));
+                padding: 2px 6px;
+                border-radius: 4px;
+                border: 1px solid var(--line);
                 white-space: normal;
                 word-break: keep-all;
                 overflow-wrap: anywhere;
@@ -630,20 +762,19 @@
 </head>
 
 <body>
-    <header>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="42" height="42" fill="currentColor"
-            aria-hidden="true">
-            <path
-                d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
-        </svg>
-        <div>
-            <h1>SRG 데이터 역지오코딩 도구</h1>
-            <p><strong>SRG의 random_data.txt에서</strong> 좌표를 추출해 Nominatim(OpenStreetMap) API를 호출하여 주소를 구합니다.</p>
-        </div>
-    </header>
     <main>
         <section class="card" aria-labelledby="controls-title">
             <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
+            <div class="brand">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+                    <path
+                        d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
+                </svg>
+                <div>
+                    <h1>SRG 역지오코딩</h1>
+                    <p>random_data.txt 좌표 변환</p>
+                </div>
+            </div>
             <search>
                 <form class="row">
                     <fieldset class="row">
@@ -654,7 +785,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                             </svg>
-                            <p class="drop-text">여기에 <strong>random_data.txt</strong> 파일을 끌어다 놓거나<br>클릭하여 업로드하세요.</p>
+                            <p class="drop-text"><strong>random_data.txt</strong> 드래그 앤 드롭</p>
                             <input type="file" id="file" accept=".txt" aria-label="파일 업로드">
                         </div>
                         <div class="row">
@@ -669,22 +800,25 @@
                 </form>
             </search>
             <div> <label for="coords"><span class="caps">추출된 좌표 (lat,lon)</span></label> <textarea id="coords" readonly
-                    spellcheck="false" placeholder="random_data.txt에서 추출된 좌표가 이곳에 표시됩니다."></textarea> </div>
+                    spellcheck="false" placeholder="좌표가 이곳에 표시됩니다."></textarea> </div>
             <div class="row row-progress">
                 <div class="sp">
                     <div class="caps" id="prog-label">진행 상황 0%</div>
                     <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label"
                         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                 </div>
-                <output id="counts">총 <strong id="cnt-total">0</strong>건 중 <strong id="cnt-success">0</strong>건 완료,
-                    <strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
+                <output id="counts">총 <strong id="cnt-total">0</strong>건 중 <strong id="cnt-success">0</strong>건
+                    완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
             </div>
             <output id="status" class="status" aria-live="polite" aria-atomic="true"></output>
+            <footer>
+                <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
+            </footer>
         </section>
         <section class="card" aria-labelledby="results-title">
             <div class="card-header">
                 <h2 id="results-title">결과 표</h2>
-                <p class="header-desc">각 좌표별로 분류, 주소, 지도 링크를 표시합니다.</p>
+                <p class="header-desc">좌표별 주소 및 지도 링크</p>
             </div>
             <div class="table-wrap" role="region" aria-label="역지오코딩 결과" tabindex="0" data-state="idle">
                 <table id="tbl">
@@ -695,22 +829,19 @@
             </div>
         </section>
     </main>
-    <footer>
-        <p>• 서비스 품질을 위해 요청 속도는 초당 1회로 제한되며, 요청 실패 시 잠시 대기 후 자동으로 다시 시도합니다.</p>
-    </footer>
     <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
     <script type="module">
         const COORD_REGEX = Object.freeze({ KR: /대한민국\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi, WORLD: /세계\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi, });
         const RX_CSV = /[",\n\r]/;
         const CONFIG = Object.freeze({ MAX_RETRY: 3, REQUEST_TIMEOUT_MS: 10000, RATE_LIMIT_DELAY_MS: 1000, REVERSE_ZOOM: 14, SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/ });
         const MAP_PROVIDERS = Object.freeze([{ key: 'Google', header: '지도링크(Google)', url: (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}` }, { key: 'OSM', header: '지도링크(OSM)', url: (lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}` }, { key: 'Naver', header: '지도링크(Naver)', url: (lat, lon) => `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}` }, { key: 'Kakao', header: '지도링크(Kakao)', url: (lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}` }]);
-        const COL_DEFS = Object.freeze([{ key: 'kind', label: '구분', val: r => r.set }, { key: 'idx', label: '순번', val: r => r.idx }, { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}` }, { key: 'sido', label: '시·도', val: r => r.addr?.sido }, { key: 'sigungu', label: '시·군·구', val: r => r.addr?.sigungu }, { key: 'emd', label: '읍·면·동·리', val: r => r.addr?.eupmyeon }, { key: 'tag', label: '지물 태그', val: r => r.addr?.tag, render: (v, td) => { if (v) { const s = document.createElement('span'); s.className = 'tag-badge'; s.textContent = v; td.appendChild(s); } td.className = 'tags-cell'; } }, { key: 'fullAddr', label: '전체주소', val: r => r.fullAddr }, { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { td.style.whiteSpace = 'nowrap'; MAP_PROVIDERS.forEach((p, i) => { const a = document.createElement('a'); a.href = p.url(r.lat, r.lon); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = p.key; td.appendChild(a); if (i < MAP_PROVIDERS.length - 1) td.appendChild(document.createTextNode(' · ')); }); } }]);
+        const COL_DEFS = Object.freeze([{ key: 'kind', label: '구분', val: r => r.set }, { key: 'idx', label: '순번', val: r => r.idx }, { key: 'coords', label: '좌표 (위도,경도)', val: r => `${r.lat}, ${r.lon}` }, { key: 'sido', label: '시·도', val: r => r.addr?.sido }, { key: 'sigungu', label: '시·군·구', val: r => r.addr?.sigungu }, { key: 'emd', label: '읍·면·동·리', val: r => r.addr?.eupmyeon }, { key: 'tag', label: '지물 태그', val: r => r.addr?.tag, render: (v, td) => { if (v) { const s = document.createElement('span'); s.className = 'tag-badge'; s.textContent = v; td.appendChild(s); } td.className = 'tags-cell'; } }, { key: 'fullAddr', label: '전체주소', val: r => r.fullAddr }, { key: 'maps', label: '지도링크', noCsv: true, render: (_, td, r) => { const wrap = document.createElement('div'); wrap.style.display = 'flex'; wrap.style.flexWrap = 'wrap'; wrap.style.gap = '6px'; wrap.style.alignItems = 'center'; MAP_PROVIDERS.forEach((p, i) => { const a = document.createElement('a'); a.href = p.url(r.lat, r.lon); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = p.key; wrap.appendChild(a); if (i < MAP_PROVIDERS.length - 1) { const sep = document.createElement('span'); sep.textContent = '·'; sep.className = 'map-sep'; sep.style.color = 'var(--muted)'; wrap.appendChild(sep); } }); td.appendChild(wrap); } }]);
         const numberFormatter = new Intl.NumberFormat('ko-KR');
         const listFormatter = new Intl.ListFormat('ko', { style: 'narrow', type: 'unit' });
         const domElements = { file: document.getElementById('file'), dropZoneText: document.querySelector('.drop-text'), parse: document.getElementById('parse'), start: document.getElementById('start'), pause: document.getElementById('pause'), resume: document.getElementById('resume'), stop: document.getElementById('stop'), exportBtn: document.getElementById('export'), status: document.getElementById('status'), cntTotal: document.getElementById('cnt-total'), cntSuccess: document.getElementById('cnt-success'), cntFail: document.getElementById('cnt-fail'), cntRemain: document.getElementById('cnt-remain'), prog: document.getElementById('prog'), progLabel: document.getElementById('prog-label'), thead: document.querySelector('#tbl thead'), tbody: document.querySelector('#tbl tbody'), coords: document.getElementById('coords'), tableWrap: document.querySelector('.table-wrap') };
         const AddressFormatter = { _getKoreanAdminArea(a, tag) { let sido = a.province || a.state || a.region || ''; let tmpCity = a.city || a.county || a.municipality || ''; let tmpGu = a.district || a.borough || a.suburb || ''; let sigungu; const isSpecialCity = CONFIG.SPECIAL_CITIES.test(tmpCity); if (!sido && isSpecialCity) { sido = tmpCity; sigungu = tmpGu; } else { sigungu = tmpCity; if (tmpCity && tmpGu && tmpCity !== tmpGu) { if (!sigungu.includes(tmpGu)) sigungu += ' ' + tmpGu; } else if (!sigungu) { sigungu = tmpGu; } } const emd = a.town || a.township || a.neighbourhood || a.city_district || ''; const ri = a.village || a.hamlet || ''; const eupmyeon = (emd && ri) ? `${emd} ${ri}` : (emd || ri || ''); return { sido, sigungu, eupmyeon, tag }; }, _getTag(a, data) { if (!data || typeof data !== 'object') return ''; const name = data.name || a.attraction || a.building; const addType = data.addresstype; const category = data.category; const parts = []; if (name) parts.push(name); if (addType && addType !== name) parts.push(addType); else if (category && category !== name) parts.push(category); return parts.length > 0 ? listFormatter.format(parts) : ''; }, parse(data) { const a = data?.address ?? {}; const isKR = (a.country_code || '').toLowerCase() === 'kr' || a.country === '대한민국'; const tag = this._getTag(a, data); if (isKR) return this._getKoreanAdminArea(a, tag); return { sido: a.state || a.region || a.province || a.county || a.city || '', sigungu: a.city || a.town || a.county || a.district || a.municipality || a.region || '', eupmyeon: a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || '', tag }; } };
         const AppState = { records: [], results: [], droppedFile: null, status: 'idle', controller: null, resumeHandler: null, inFlight: false, renderReq: null, cntSuccess: 0, cntFail: 0, get isRunning() { return this.status === 'running' || this.status === 'paused' || this.status === 'pausing'; }, get isPaused() { return this.status === 'paused'; }, get isPausing() { return this.status === 'pausing'; }, get isStopping() { return this.status === 'stopping'; }, reset() { this.results = []; this.cntSuccess = 0; this.cntFail = 0; this.status = 'idle'; this.controller = null; this.resumeHandler = null; this.inFlight = false; this.renderReq = null; }, setRecords(newRecords) { this.records = newRecords; this.reset(); updateUIState(); }, setFile(file) { this.droppedFile = file; updateUIState(); }, clearDroppedFile() { this.droppedFile = null; updateUIState(); }, setStatus(st) { this.status = st; updateUIState(); } };
-        function updateUIState() { const s = AppState.status; const hasRecords = AppState.records.length > 0; const hasResults = AppState.results.length > 0; const { parse, start, pause, resume, stop, exportBtn, tableWrap } = domElements; parse.disabled = s === 'running' || s === 'paused' || s === 'pausing' || s === 'parsing'; start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'pausing' || s === 'stopping' || s === 'parsing'; pause.disabled = s !== 'running'; resume.disabled = s !== 'paused'; stop.disabled = s === 'idle' || s === 'stopping'; exportBtn.disabled = !hasResults; if (s === 'running' || s === 'pausing') tableWrap.setAttribute('data-state', 'running'); else if (s === 'idle' && hasResults) tableWrap.removeAttribute('data-state'); else if (s === 'idle' && !hasResults) tableWrap.setAttribute('data-state', 'idle'); }
+        function updateUIState() { const s = AppState.status; const hasRecords = AppState.records.length > 0; const hasResults = AppState.results.length > 0; const { parse, start, pause, resume, stop, exportBtn, tableWrap, prog } = domElements; parse.disabled = s === 'running' || s === 'paused' || s === 'pausing' || s === 'parsing'; start.disabled = !hasRecords || s === 'running' || s === 'paused' || s === 'pausing' || s === 'stopping' || s === 'parsing'; pause.disabled = s !== 'running'; resume.disabled = s !== 'paused'; stop.disabled = s === 'idle' || s === 'stopping'; exportBtn.disabled = !hasResults; if (s === 'running' || s === 'pausing') { tableWrap.setAttribute('data-state', 'running'); prog.classList.add('active'); } else { if (s === 'idle' && hasResults) tableWrap.removeAttribute('data-state'); else if (s === 'idle' && !hasResults) tableWrap.setAttribute('data-state', 'idle'); prog.classList.remove('active'); } }
         function setStatus(msg, type = 'info') { const el = domElements.status; el.textContent = msg; el.classList.remove('err', 'warn'); if (type === 'error') el.classList.add('err'); else if (type === 'warn') el.classList.add('warn'); }
         function scheduleRender() { if (AppState.renderReq) return; AppState.renderReq = requestAnimationFrame(() => { const total = AppState.records.length; const processed = AppState.results.length; const success = AppState.cntSuccess; const fail = AppState.cntFail; const remaining = Math.max(0, total - processed); domElements.cntTotal.textContent = numberFormatter.format(total); domElements.cntSuccess.textContent = numberFormatter.format(success); domElements.cntFail.textContent = numberFormatter.format(fail); domElements.cntRemain.textContent = numberFormatter.format(remaining); const pct = total ? Math.round((processed / total) * 100) : 0; domElements.prog.style.setProperty("--value", pct); domElements.prog.setAttribute("aria-valuenow", String(pct)); domElements.progLabel.textContent = `진행 상황 ${pct}%`; updateUIState(); AppState.renderReq = null; }); }
         function clearTable() { domElements.tbody.replaceChildren(); }
@@ -720,9 +851,10 @@
         function extractCoordinates(text) { const out = []; const push = (lat, lon, setLabel) => { if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { out.push({ lat, lon, setLabel }); } }; for (const m of text.matchAll(COORD_REGEX.KR)) { const { lat, lon } = m.groups; push(parseFloat(lat), parseFloat(lon), 'KR'); } for (const m of text.matchAll(COORD_REGEX.WORLD)) { const { lat, lon } = m.groups; push(parseFloat(lat), parseFloat(lon), 'WORLD'); } return out; }
         async function performPauseCheck() { if (AppState.isPausing) { AppState.setStatus('paused'); setStatus('일시정지됨. "재개"를 누르면 이어서 진행합니다. (단축키 S로 재개)', 'warn'); if (!AppState.resumeHandler) AppState.resumeHandler = Promise.withResolvers(); scheduleRender(); await AppState.resumeHandler.promise; if (!AppState.isStopping) setStatus('재개합니다… (단축키 Esc로 중지)'); } }
         async function fetchReverseWithRetry(lat, lon, userSignal) { const buildUrl = () => { const url = new URL('https://nominatim.openstreetmap.org/reverse'); url.searchParams.set('format', 'jsonv2'); url.searchParams.set('lat', String(lat)); url.searchParams.set('lon', String(lon)); url.searchParams.set('zoom', String(CONFIG.REVERSE_ZOOM)); url.searchParams.set('addressdetails', '1'); url.searchParams.set('accept-language', 'ko'); return url; }; let attempt = 0; while (attempt < CONFIG.MAX_RETRY) { userSignal?.throwIfAborted(); attempt++; try { const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS); const combinedSignal = userSignal ? AbortSignal.any([userSignal, timeoutSig]) : timeoutSig; const res = await fetch(buildUrl(), { headers: { 'Accept': 'application/json' }, signal: combinedSignal }); if (res.ok) { return res.json(); } if (res.status === 429 || res.status >= 500) { await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); continue; } const text = await res.text(); throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`); } catch (e) { userSignal?.throwIfAborted(); if (attempt >= CONFIG.MAX_RETRY) { throw e; } await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal); } } }
-        function appendRow(row) { const tr = document.createElement('tr'); COL_DEFS.forEach(col => { const td = document.createElement(col.key === 'idx' ? 'th' : 'td'); if (col.key === 'idx') td.scope = 'row'; if (col.className) td.className = col.className; const val = col.val ? col.val(row) : ''; if (col.render) col.render(val, td, row); else td.textContent = val ?? ''; tr.appendChild(td); }); domElements.tbody.appendChild(tr); }
-        function pushResultRow(row) { AppState.results.push(row); if (row.set === '에러') AppState.cntFail++; else AppState.cntSuccess++; appendRow(row); scheduleRender(); }
-        async function runProcessingLoop() { const startIndex = AppState.results.length; for (let i = startIndex; i < AppState.records.length; i++) { if (!AppState.isRunning || AppState.isStopping) break; await performPauseCheck(); if (!AppState.isRunning || AppState.isStopping) break; const r = AppState.records[i]; AppState.controller = new AbortController(); AppState.inFlight = true; try { if (i > startIndex) await sleep(CONFIG.RATE_LIMIT_DELAY_MS, AppState.controller.signal); if (!AppState.isRunning || AppState.isStopping) break; await performPauseCheck(); if (!AppState.isRunning || AppState.isStopping) break; if (!AppState.isPaused) setStatus(`처리 중… (${i + 1}/${AppState.records.length}) (단축키: S=일시정지, Esc=중지)`); const data = await fetchReverseWithRetry(r.lat, r.lon, AppState.controller.signal); const parsedAddr = AddressFormatter.parse(data); r.addr = parsedAddr; r.fullAddr = data.display_name || ''; pushResultRow(r); } catch (err) { const msg = err && (err.message || String(err)); const isAbort = err && (err.name === 'AbortError' || /aborted/i.test(msg)); if (AppState.isStopping && isAbort) break; console.error(err); r.set = '에러'; r.fullAddr = msg; pushResultRow(r); if (!AppState.isStopping) setStatus(`에러 발생: (${i + 1}/${AppState.records.length}) ${msg}`, 'error'); } finally { AppState.inFlight = false; scheduleRender(); } } if (AppState.isStopping) { setControlsIdle('중지되었습니다.', 'warn', 'done'); } else if (AppState.results.length >= AppState.records.length) { setControlsIdle('모든 처리가 완료되었습니다.', 'info', 'done'); } }
+        function appendSkeletonRow(idx) { const tr = document.createElement('tr'); tr.className = 'skeleton-row'; COL_DEFS.forEach(col => { const td = document.createElement(col.key === 'idx' ? 'th' : 'td'); td.dataset.label = col.label; if (col.key === 'idx') { td.scope = 'row'; td.textContent = idx; } else { const bar = document.createElement('div'); bar.className = 'skeleton-bar'; td.appendChild(bar); } tr.appendChild(td); }); domElements.tbody.appendChild(tr); return tr; }
+        function fillRow(tr, row) { tr.classList.remove('skeleton-row'); tr.replaceChildren(); COL_DEFS.forEach(col => { const td = document.createElement(col.key === 'idx' ? 'th' : 'td'); if (col.key === 'idx') td.scope = 'row'; if (col.className) td.className = col.className; td.dataset.label = col.label; const val = col.val ? col.val(row) : ''; if (col.render) col.render(val, td, row); else td.textContent = val ?? ''; tr.appendChild(td); }); }
+        function pushResultRow(row) { AppState.results.push(row); if (row.set === '에러') AppState.cntFail++; else AppState.cntSuccess++; scheduleRender(); }
+        async function runProcessingLoop() { const startIndex = AppState.results.length; for (let i = startIndex; i < AppState.records.length; i++) { if (!AppState.isRunning || AppState.isStopping) break; await performPauseCheck(); if (!AppState.isRunning || AppState.isStopping) break; const r = AppState.records[i]; AppState.controller = new AbortController(); AppState.inFlight = true; const skeletonTr = appendSkeletonRow(r.idx); skeletonTr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); try { if (i > startIndex) await sleep(CONFIG.RATE_LIMIT_DELAY_MS, AppState.controller.signal); if (!AppState.isRunning || AppState.isStopping) { skeletonTr.remove(); break; } await performPauseCheck(); if (!AppState.isRunning || AppState.isStopping) { skeletonTr.remove(); break; } if (!AppState.isPaused) setStatus(`처리 중… (${i + 1}/${AppState.records.length}) (단축키: S=일시정지, Esc=중지)`); const data = await fetchReverseWithRetry(r.lat, r.lon, AppState.controller.signal); const parsedAddr = AddressFormatter.parse(data); r.addr = parsedAddr; r.fullAddr = data.display_name || ''; fillRow(skeletonTr, r); pushResultRow(r); } catch (err) { const msg = err && (err.message || String(err)); const isAbort = err && (err.name === 'AbortError' || /aborted/i.test(msg)); if (AppState.isStopping && isAbort) { skeletonTr.remove(); break; } console.error(err); r.set = '에러'; r.fullAddr = msg; fillRow(skeletonTr, r); pushResultRow(r); if (!AppState.isStopping) setStatus(`에러 발생: (${i + 1}/${AppState.records.length}) ${msg}`, 'error'); } finally { AppState.inFlight = false; scheduleRender(); } } if (AppState.isStopping) { setControlsIdle('중지되었습니다.', 'warn', 'done'); } else if (AppState.results.length >= AppState.records.length) { setControlsIdle('모든 처리가 완료되었습니다.', 'info', 'done'); } }
         function setControlsIdle(message, type = 'info', tableState = 'idle') { AppState.status = 'idle'; setStatus(message, type); if (tableState === 'done') domElements.tableWrap.removeAttribute('data-state'); scheduleRender(); }
         function startProcessing() { AppState.reset(); AppState.setStatus('running'); clearTable(); scheduleRender(); setStatus('조회 시작… (단축키: S=일시정지, Esc=중지)'); domElements.tableWrap.setAttribute('data-state', 'running'); runProcessingLoop(); }
         domElements.exportBtn.addEventListener('click', async () => { try { const rows = AppState.results; if (!rows.length) return setStatus('내보낼 데이터가 없습니다.', 'warn'); const headerCols = COL_DEFS.filter(c => !c.noCsv); const mapHeaders = MAP_PROVIDERS.map(p => p.header); const esc = (s) => { s = String(s ?? ''); return RX_CSV.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; }; const makeRow = r => { const rowArr = []; for (let i = 0; i < headerCols.length; i++) rowArr.push(esc(headerCols[i].val(r))); for (let i = 0; i < MAP_PROVIDERS.length; i++) rowArr.push(esc(MAP_PROVIDERS[i].url(r.lat, r.lon))); return rowArr.join(',') + '\n'; }; const headerStr = [...headerCols.map(c => esc(c.label)), ...mapHeaders.map(esc)].join(',') + '\n'; const fileName = `result_${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}.csv`; if ('showSaveFilePicker' in window) { const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }] }); const writable = await handle.createWritable(); try { await writable.write('\uFEFF'); await writable.write(headerStr); for (const r of rows) await writable.write(makeRow(r)); } finally { await writable.close(); } setStatus('파일이 로컬에 저장되었습니다.'); } else { const lines = ['\uFEFF' + headerStr]; for (const r of rows) lines.push(makeRow(r)); const url = URL.createObjectURL(new Blob(lines, { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); setStatus('CSV 파일을 다운로드했습니다.'); } } catch (err) { if (err.name !== 'AbortError') setStatus(`저장 실패: ${err.message}`, 'error'); } });
@@ -738,6 +870,7 @@
         document.body.addEventListener('dragleave', e => { e.preventDefault(); if (!e.relatedTarget) document.body.classList.remove('is-dragging'); });
         document.body.addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('is-dragging'); handleFile(e.dataTransfer.files); });
         window.addEventListener('keydown', e => { if (['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) return; const key = e.key.toLowerCase(); if (key === 'p' && !domElements.parse.disabled) domElements.parse.click(); if (key === 'escape' && !domElements.stop.disabled) domElements.stop.click(); if (key === 's') { if (!domElements.resume.disabled) domElements.resume.click(); else if (!domElements.pause.disabled) domElements.pause.click(); else if (!domElements.start.disabled) domElements.start.click(); } });
+        document.body.addEventListener('mousemove', e => { document.querySelectorAll('.card, button').forEach(el => { const rect = el.getBoundingClientRect(); el.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`); el.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`); }); });
         initTableHeaders();
     </script>
 </body>
