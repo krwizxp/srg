@@ -1,0 +1,18 @@
+{
+  "name": "SRG 데이터 역지오코딩 도구",
+  "short_name": "SRG 역지오코딩",
+  "lang": "ko-KR",
+
+  "start_url": "revgeo.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#3b82f6",
+
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
