@@ -11,7 +11,6 @@
     }
 
     .pin {
-      fill: #3b82f6;
       fill: light-dark(oklch(55% 0.22 270), oklch(65% 0.18 260));
     }
   </style>
