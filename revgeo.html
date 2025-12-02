@@ -272,16 +272,6 @@
           transform: scale(1.01);
         }
 
-        &:has(input:user-invalid) {
-          border-color: var(--warn);
-          border-style: solid;
-        }
-
-        &:has(input:user-valid) {
-          border-color: var(--success);
-          border-style: solid;
-        }
-
         input[type="file"] {
           position: absolute;
           inset: 0;
@@ -521,7 +511,7 @@
         display: flex;
         flex-direction: column;
 
-        &::after {
+        tbody:empty::before {
           content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
           display: flex;
           align-items: center;
@@ -534,11 +524,6 @@
           inset: 0;
           top: 50px;
           z-index: 0;
-        }
-
-        &:has(tbody > tr)::after {
-          content: none;
-          display: none;
         }
       }
 
