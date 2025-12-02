@@ -511,7 +511,7 @@
         display: flex;
         flex-direction: column;
 
-        tbody:empty::before {
+        &::after {
           content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
           display: flex;
           align-items: center;
@@ -524,6 +524,11 @@
           inset: 0;
           top: 50px;
           z-index: 0;
+        }
+
+        &:has(tbody > tr)::after {
+          content: none;
+          display: none;
         }
       }
 
