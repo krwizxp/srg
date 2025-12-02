@@ -116,7 +116,7 @@
           flex-direction: column;
         }
 
-        @media (max-width:900px) {
+        @media (max-width:800px) {
           & {
             grid-template-columns: 1fr;
             height: auto;
@@ -818,7 +818,7 @@
         <form class="row">
           <fieldset class="row">
             <legend class="sr-only">파일 업로드 및 실행</legend>
-            <div class="drop-zone" id="drop-zone-area">
+            <div class="drop-zone">
               <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
                 aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -843,7 +843,7 @@
         <label for="coords"><span class="caps">추출된 좌표 (lat,lon)</span></label>
         <textarea id="coords" readonly spellcheck="false" placeholder="좌표가 이곳에 표시됩니다."></textarea>
       </div>
-      <div class="row row-progress">
+      <div class="row-progress">
         <div class="sp">
           <div class="caps" id="prog-label">진행 상황 0%</div>
           <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label" aria-valuemin="0"
