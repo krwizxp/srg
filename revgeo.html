@@ -522,26 +522,26 @@
         contain-intrinsic-size: auto;
         display: flex;
         flex-direction: column;
+      }
 
-        &::after {
-          content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex: 1;
-          min-height: 200px;
-          color: var(--muted);
-          font-size: calc(var(--fs-base) * 1.05);
-          position: absolute;
-          inset: 0;
-          top: 50px;
-          z-index: 0;
-        }
+      .table-wrap::after {
+        content: "데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        min-height: 200px;
+        color: var(--muted);
+        font-size: calc(var(--fs-base) * 1.05);
+        position: absolute;
+        inset: 0;
+        top: 50px;
+        z-index: 0;
+      }
 
-        &:has(tbody > tr)::after {
-          content: none;
-          display: none;
-        }
+      .table-wrap:has(tbody > tr)::after {
+        content: none;
+        display: none;
       }
 
       table {
