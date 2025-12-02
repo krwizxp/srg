@@ -642,12 +642,22 @@
       }
 
       @container card (max-width:800px) {
+        .table-wrap:not(:has(tbody > tr)) {
+          min-height: 220px;
+          overflow: hidden;
+        }
+
+        .table-wrap:not(:has(tbody > tr))::after {
+          top: 0;
+        }
+
         table {
           display: block;
           min-width: 0;
 
           thead {
             display: none;
+
           }
 
           tbody {
