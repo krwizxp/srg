@@ -892,7 +892,19 @@
           <caption class="sr-only">
             역지오코딩 결과 표
           </caption>
-          <thead></thead>
+          <thead>
+            <tr>
+              <th scope="col" data-col-key="kind">구분</th>
+              <th scope="col" data-col-key="idx">순번</th>
+              <th scope="col" data-col-key="coords">좌표 (위도,경도)</th>
+              <th scope="col" data-col-key="sido">시·도</th>
+              <th scope="col" data-col-key="sigungu">시·군·구</th>
+              <th scope="col" data-col-key="emd">읍·면·동·리</th>
+              <th scope="col" data-col-key="tag">지물 태그</th>
+              <th scope="col" data-col-key="fullAddr">전체주소</th>
+              <th scope="col" data-col-key="maps">지도링크</th>
+            </tr>
+          </thead>
           <tbody></tbody>
         </table>
       </div>
@@ -938,20 +950,26 @@
           `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
       },
     ]);
-    const COL_DEFS = Object.freeze([
-      { key: "kind", label: "구분", val: (r) => r.set },
-      { key: "idx", label: "순번", val: (r) => r.idx },
-      {
-        key: "coords",
-        label: "좌표 (위도,경도)",
+    const BASE_COL_CONFIG = Object.freeze({
+      kind: {
+        val: (r) => r.set,
+      },
+      idx: {
+        val: (r) => r.idx,
+      },
+      coords: {
         val: (r) => `${r.lat}, ${r.lon}`,
       },
-      { key: "sido", label: "시·도", val: (r) => r.addr?.sido },
-      { key: "sigungu", label: "시·군·구", val: (r) => r.addr?.sigungu },
-      { key: "emd", label: "읍·면·동·리", val: (r) => r.addr?.eupmyeon },
-      {
-        key: "tag",
-        label: "지물 태그",
+      sido: {
+        val: (r) => r.addr?.sido,
+      },
+      sigungu: {
+        val: (r) => r.addr?.sigungu,
+      },
+      emd: {
+        val: (r) => r.addr?.eupmyeon,
+      },
+      tag: {
         val: (r) => r.addr?.tag,
         render: (v, td) => {
           if (v) {
@@ -963,10 +981,10 @@
           td.className = "tags-cell";
         },
       },
-      { key: "fullAddr", label: "전체주소", val: (r) => r.fullAddr },
-      {
-        key: "maps",
-        label: "지도링크",
+      fullAddr: {
+        val: (r) => r.fullAddr,
+      },
+      maps: {
         noCsv: true,
         render: (_, td, r) => {
           const wrap = document.createElement("div");
@@ -992,12 +1010,13 @@
           td.appendChild(wrap);
         },
       },
-    ]);
+    });
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const listFormatter = new Intl.ListFormat("ko", {
       style: "narrow",
       type: "unit",
     });
+    const thead = document.querySelector("#tbl thead");
     const domElements = {
       file: document.getElementById("file"),
       dropZoneText: document.querySelector(".drop-text"),
@@ -1014,10 +1033,18 @@
       cntRemain: document.getElementById("cnt-remain"),
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
-      thead: document.querySelector("#tbl thead"),
       tbody: document.querySelector("#tbl tbody"),
       coords: document.getElementById("coords"),
     };
+    const COL_DEFS = Array.from(thead.querySelectorAll("th")).map((th) => {
+      const key = th.dataset.colKey;
+      const base = BASE_COL_CONFIG[key] || {};
+      return {
+        key,
+        label: th.textContent.trim(),
+        ...base,
+      };
+    });
     const AddressFormatter = {
       _getKoreanAdminArea(a, tag) {
         let sido = a.province || a.state || a.region || "";
@@ -1196,16 +1223,6 @@
     function clearTable() {
       domElements.tbody.replaceChildren();
     }
-    function initTableHeaders() {
-      const tr = document.createElement("tr");
-      COL_DEFS.forEach((col) => {
-        const th = document.createElement("th");
-        th.scope = "col";
-        th.textContent = col.label;
-        tr.appendChild(th);
-      });
-      domElements.thead.appendChild(tr);
-    }
     function sleep(ms, signal) {
       if (!signal) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1333,7 +1350,6 @@
       COL_DEFS.forEach((col) => {
         const td = document.createElement(col.key === "idx" ? "th" : "td");
         if (col.key === "idx") td.scope = "row";
-        if (col.className) td.className = col.className;
         td.dataset.label = col.label;
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
@@ -1668,7 +1684,6 @@
         });
       });
     });
-    initTableHeaders();
   </script>
 </body>
 
