@@ -457,29 +457,41 @@
         }
       }
 
-      .progress-bar {
-        --value: 0;
+      .progress-shell {
+        --pct: 0;
         width: 100%;
-        height: 6px;
+        margin-top: 6px;
+        position: relative;
         border-radius: 999px;
         background: var(--line);
         overflow: hidden;
-        position: relative;
-        margin-top: 6px;
       }
 
-      .progress-bar::after {
-        content: "";
+      .progress-shell>progress {
+        width: 100%;
+        height: 6px;
+        border: none;
+        margin: 0;
+        padding: 0;
+        opacity: 0;
+      }
+
+      .progress-visual {
         position: absolute;
         inset: 0;
-        transform-origin: left;
-        transform: scaleX(calc(var(--value) / 100));
-        background: linear-gradient(90deg, var(--accent), var(--success));
-        transition: transform 0.25s ease-out;
-        will-change: transform;
+        border-radius: inherit;
+        pointer-events: none;
       }
 
-      .progress-bar.active::after {
+      .progress-fill {
+        height: 100%;
+        width: calc(var(--pct, 0) * 1%);
+        background: linear-gradient(90deg, var(--accent), var(--success));
+        transition: width 0.25s ease-out;
+        will-change: width;
+      }
+
+      .progress-shell.active .progress-fill {
         animation: shimmer 1.5s linear infinite;
         background: linear-gradient(90deg,
             var(--accent),
@@ -870,8 +882,12 @@
       <div class="row-progress">
         <div class="sp">
           <div class="caps" id="prog-label">진행 상황 0%</div>
-          <div id="prog" class="progress-bar" role="progressbar" aria-labelledby="prog-label" aria-valuemin="0"
-            aria-valuemax="100" aria-valuenow="0"></div>
+          <div id="prog-shell" class="progress-shell">
+            <progress id="prog" value="0" max="100" aria-labelledby="prog-label"></progress>
+            <div class="progress-visual" aria-hidden="true">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
         </div>
         <output id="counts">총 <strong id="cnt-total">0</strong>건 중
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
@@ -1031,6 +1047,7 @@
       cntSuccess: document.getElementById("cnt-success"),
       cntFail: document.getElementById("cnt-fail"),
       cntRemain: document.getElementById("cnt-remain"),
+      progShell: document.getElementById("prog-shell"),
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
       tbody: document.querySelector("#tbl tbody"),
@@ -1169,7 +1186,7 @@
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
-      const { parse, start, pause, resume, stop, exportBtn, prog } =
+      const { parse, start, pause, resume, stop, exportBtn, progShell } =
         domElements;
       parse.disabled =
         s === "running" ||
@@ -1188,9 +1205,9 @@
       stop.disabled = s === "idle" || s === "stopping";
       exportBtn.disabled = AppState.processedCount === 0;
       if (s === "running" || s === "pausing") {
-        prog.classList.add("active");
+        progShell.classList.add("active");
       } else {
-        prog.classList.remove("active");
+        progShell.classList.remove("active");
       }
     }
     function setStatus(msg, type = "info") {
@@ -1213,8 +1230,8 @@
         domElements.cntFail.textContent = numberFormatter.format(fail);
         domElements.cntRemain.textContent = numberFormatter.format(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
-        domElements.prog.style.setProperty("--value", String(pct));
-        domElements.prog.setAttribute("aria-valuenow", String(pct));
+        domElements.prog.value = pct;
+        domElements.progShell.style.setProperty("--pct", String(pct));
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
         updateUIState();
         AppState.renderReq = null;
