@@ -351,7 +351,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
     let upper_ratio = (upper_32_bits as f64) * U32_MAX_INV;
     let lower_ratio = ((num & 0xFFFF_FFFF) as f64) * U32_MAX_INV;
     data.kor_coords = (
-        32.122778 + 6.493889 * upper_ratio,
+        33.112500 + 5.504167 * upper_ratio,
         124.609722 + 7.263056 * lower_ratio,
     );
     data.world_coords = (-90.0 + 180.0 * upper_ratio, -180.0 + 360.0 * lower_ratio);
