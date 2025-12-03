@@ -862,14 +862,14 @@
                   <strong>random_data.txt</strong> 업로드</span>
                 <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
               </p>
-              <input type="file" id="file" accept=".txt" required aria-label="파일 업로드">
+              <input type="file" id="file" accept=".txt" aria-label="파일 업로드">
             </div>
             <div class="row">
-              <button type="button" id="parse">좌표 추출</button>
+              <button type="submit" id="parse" accesskey="p">좌표 추출</button>
               <button type="button" id="start" disabled>조회 시작</button>
               <button type="button" id="pause" disabled>일시정지</button>
               <button type="button" id="resume" disabled>재개</button>
-              <button type="button" id="stop" disabled>중지</button>
+              <button type="button" id="stop" disabled accesskey="e">중지</button>
               <button type="button" id="export" disabled>CSV 내보내기</button>
             </div>
           </fieldset>
@@ -1053,6 +1053,7 @@
       tbody: document.querySelector("#tbl tbody"),
       coords: document.getElementById("coords"),
     };
+    const form = document.querySelector("search form");
     const COL_DEFS = Array.from(thead.querySelectorAll("th")).map((th) => {
       const key = th.dataset.colKey;
       const base = BASE_COL_CONFIG[key] || {};
@@ -1172,10 +1173,6 @@
       },
       setFile(file) {
         this.droppedFile = file;
-        updateUIState();
-      },
-      clearDroppedFile() {
-        this.droppedFile = null;
         updateUIState();
       },
       setStatus(st) {
@@ -1559,11 +1556,11 @@
           setStatus(`저장 실패: ${err.message}`, "error");
       }
     });
-    domElements.parse.addEventListener("click", async () => {
+    async function handleParse() {
+      if (domElements.parse.disabled) return;
       try {
-        const file = AppState.droppedFile ?? domElements.file.files?.[0];
+        const file = AppState.droppedFile;
         if (!file) {
-          domElements.file.reportValidity();
           return setStatus("파일을 선택해 주세요.", "warn");
         }
         AppState.setStatus("parsing");
@@ -1605,6 +1602,11 @@
         console.error(err);
         setStatus(`오류 발생: ${err.message}`, "error");
       }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void handleParse();
     });
     domElements.start.addEventListener("click", () => {
       document.startViewTransition
@@ -1650,7 +1652,6 @@
       }
     }
     domElements.file.addEventListener("change", () => {
-      AppState.clearDroppedFile();
       handleFile(domElements.file.files);
     });
     document.body.addEventListener("dragenter", (e) => {
@@ -1668,13 +1669,26 @@
       handleFile(e.dataTransfer.files);
     });
     window.addEventListener("keydown", (e) => {
-      if (["TEXTAREA", "INPUT"].includes(document.activeElement.tagName))
-        return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.isComposing) return;
       const key = e.key.toLowerCase();
-      if (key === "p" && !domElements.parse.disabled)
-        domElements.parse.click();
-      if (key === "escape" && !domElements.stop.disabled)
-        domElements.stop.click();
+      if (key === "p") {
+        if (domElements.parse.disabled) return;
+        e.preventDefault();
+        if (typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        } else {
+          void handleParse();
+        }
+        return;
+      }
+      if (key === "escape") {
+        if (!domElements.stop.disabled) {
+          e.preventDefault();
+          domElements.stop.click();
+        }
+        return;
+      }
       if (key === "s") {
         if (!domElements.resume.disabled) domElements.resume.click();
         else if (!domElements.pause.disabled) domElements.pause.click();
