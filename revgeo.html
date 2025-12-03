@@ -1180,6 +1180,16 @@
         updateUIState();
       },
     };
+    const fileDateFmt = new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Seoul",
+    });
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
@@ -1519,10 +1529,8 @@
             ...headerCols.map((c) => esc(c.label)),
             ...mapHeaders.map(esc),
           ].join(",") + "\n";
-        const fileName = `result_${new Date()
-          .toISOString()
-          .replace(/[-:T.]/g, "")
-          .slice(0, 14)}.csv`;
+        const dateStr = fileDateFmt.format(new Date()).replace(/\D/g, "");
+        const fileName = `result_${dateStr}.csv`;
         const lines = ["\uFEFF" + headerStr];
         for (const r of rows) lines.push(makeRow(r));
 
