@@ -1495,8 +1495,9 @@
     domElements.exportBtn.addEventListener("click", async () => {
       try {
         const rows = AppState.records.slice(0, AppState.processedCount);
-        if (!rows.length)
+        if (!rows.length) {
           return setStatus("내보낼 데이터가 없습니다.", "warn");
+        }
         const headerCols = COL_DEFS.filter((c) => !c.noCsv);
         const mapHeaders = MAP_PROVIDERS.map((p) => p.header);
         const esc = (s) => {
@@ -1505,10 +1506,12 @@
         };
         const makeRow = (r) => {
           const rowArr = [];
-          for (let i = 0; i < headerCols.length; i++)
+          for (let i = 0; i < headerCols.length; i++) {
             rowArr.push(esc(headerCols[i].val(r)));
-          for (let i = 0; i < MAP_PROVIDERS.length; i++)
+          }
+          for (let i = 0; i < MAP_PROVIDERS.length; i++) {
             rowArr.push(esc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
+          }
           return rowArr.join(",") + "\n";
         };
         const headerStr =
@@ -1520,40 +1523,22 @@
           .toISOString()
           .replace(/[-:T.]/g, "")
           .slice(0, 14)}.csv`;
-        if ("showSaveFilePicker" in window) {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: fileName,
-            types: [
-              { description: "CSV File", accept: { "text/csv": [".csv"] } },
-            ],
-          });
-          const writable = await handle.createWritable();
-          try {
-            await writable.write("\uFEFF");
-            await writable.write(headerStr);
-            for (const r of rows) await writable.write(makeRow(r));
-          } finally {
-            await writable.close();
-          }
-          setStatus("파일이 로컬에 저장되었습니다.");
-        } else {
-          const lines = ["\uFEFF" + headerStr];
-          for (const r of rows) lines.push(makeRow(r));
-          const url = URL.createObjectURL(
-            new Blob(lines, { type: "text/csv;charset=utf-8" })
-          );
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          setStatus("CSV 파일을 다운로드했습니다.");
-        }
+        const lines = ["\uFEFF" + headerStr];
+        for (const r of rows) lines.push(makeRow(r));
+
+        const blob = new Blob(lines, { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus("CSV 파일을 다운로드했습니다.");
       } catch (err) {
-        if (err.name !== "AbortError")
-          setStatus(`저장 실패: ${err.message}`, "error");
+        console.error(err);
+        setStatus(`저장 실패: ${err.message}`, "error");
       }
     });
     async function handleParse() {
