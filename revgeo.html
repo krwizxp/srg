@@ -834,8 +834,7 @@
 <body>
   <main>
     <section class="card">
-      <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
-      <div class="brand">
+      <header class="brand">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
           <path
             d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
@@ -844,7 +843,8 @@
           <h1>SRG 역지오코딩</h1>
           <p>random_data.txt 좌표 변환</p>
         </div>
-      </div>
+        <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
+      </header>
       <form class="row">
         <fieldset class="row">
           <legend class="sr-only">파일 업로드 및 실행</legend>
@@ -888,16 +888,16 @@
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
             id="cnt-remain">0</strong>건 미처리</output>
       </div>
-      <output id="status" class="status"></output>
+      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
       <footer>
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
     </section>
     <section class="card">
-      <div class="card-header">
+      <header class="card-header">
         <h2 id="results-title">결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
-      </div>
+      </header>
       <div class="table-wrap">
         <p class="empty-hint">
           데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
@@ -1636,7 +1636,11 @@
         setStatus(
           `파일 선택됨: ${files[0].name} 추출 버튼을 누르세요(단축키 P)`
         );
-        domElements.dropZoneText.innerHTML = `선택된 파일: <strong>${files[0].name}</strong>`;
+        domElements.dropZoneText.textContent = "";
+        domElements.dropZoneText.append("선택된 파일: ");
+        const strongEl = document.createElement("strong");
+        strongEl.textContent = files[0].name;
+        domElements.dropZoneText.appendChild(strongEl);
         domElements.file.value = "";
       }
     }
