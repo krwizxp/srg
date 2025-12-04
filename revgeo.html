@@ -6,6 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>SRG 데이터 역지오코딩 도구</title>
+  <meta name="description" content="random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
+  <meta property="og:description" content="대량의 좌표 데이터를 주소로 빠르고 안전하게 변환하세요.">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml" sizes="any">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org">
@@ -834,7 +838,6 @@
 </head>
 
 <body>
-  <a href="#main-content" class="sr-only">본문으로 건너뛰기</a>
   <main id="main-content">
     <section class="card">
       <header class="brand">
@@ -850,7 +853,6 @@
       <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
       <form class="row">
         <fieldset class="row">
-          <legend class="sr-only">파일 업로드 및 실행</legend>
           <label class="drop-zone">
             <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
               aria-hidden="true">
@@ -887,11 +889,11 @@
             </div>
           </div>
         </div>
-        <output id="counts">총 <strong id="cnt-total">0</strong>건 중
+        <output id="counts" aria-live="polite">총 <strong id="cnt-total">0</strong>건 중
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
             id="cnt-remain">0</strong>건 미처리</output>
       </div>
-      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
+      <output id="status" class="status" role="status" aria-atomic="true"></output>
       <footer>
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
@@ -1354,14 +1356,9 @@
       const tr = document.createElement("tr");
       tr.className = "skeleton-row";
       COL_DEFS.forEach((col) => {
-        const td = document.createElement(col.key === "kind" ? "th" : "td");
+        const td = document.createElement("td");
         td.dataset.label = col.label;
-        if (col.key === "kind") {
-          td.scope = "row";
-          const bar = document.createElement("div");
-          bar.className = "skeleton-bar";
-          td.appendChild(bar);
-        } else if (col.key === "idx") {
+        if (col.key === "idx") {
           td.textContent = idx;
         } else {
           const bar = document.createElement("div");
@@ -1377,8 +1374,7 @@
       tr.classList.remove("skeleton-row");
       tr.replaceChildren();
       COL_DEFS.forEach((col) => {
-        const td = document.createElement(col.key === "kind" ? "th" : "td");
-        if (col.key === "kind") td.scope = "row";
+        const td = document.createElement("td");
         td.dataset.label = col.label;
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
