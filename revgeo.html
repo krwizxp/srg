@@ -20,8 +20,6 @@
   <link rel="stylesheet" crossorigin
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <style>
-    @layer reset, theme, layout, components, utilities;
-
     @layer reset {
 
       *,
@@ -40,12 +38,6 @@
         margin: 0;
         padding: 0;
         border: 0;
-      }
-
-      button,
-      input,
-      textarea {
-        font-family: inherit;
       }
 
       p {
@@ -345,11 +337,11 @@
 
       textarea,
       button {
+        font-family: inherit;
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.2));
         color: var(--fg);
-        padding: 10px 14px;
         transition: all 0.2s;
       }
 
@@ -358,7 +350,6 @@
         height: 100%;
         flex: 1;
         overflow-y: auto;
-        font-family: inherit;
         line-height: 1.5;
         resize: none;
         padding: 10px 8px;
@@ -381,8 +372,6 @@
         min-width: 0;
         white-space: nowrap;
         padding: 12px 4px;
-        background: light-dark(rgba(255, 255, 255, 0.8),
-            rgba(255, 255, 255, 0.05));
         position: relative;
         overflow: hidden;
 
@@ -832,7 +821,7 @@
         padding: 0;
         margin: -1px;
         overflow: hidden;
-        clip: rect(0, 0, 0, 0);
+        clip-path: inset(50%);
         white-space: nowrap;
         border: 0;
       }
