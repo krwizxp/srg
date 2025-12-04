@@ -12,7 +12,8 @@
   <meta property="og:description" content="대량의 좌표 데이터를 주소로 빠르고 안전하게 변환하세요.">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml" sizes="any">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
+  <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" crossorigin
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <style>
@@ -622,9 +623,7 @@
         }
 
         tbody {
-
-          td,
-          th {
+          td {
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
             font-variant-numeric: tabular-nums;
@@ -638,9 +637,7 @@
           }
 
           td:nth-child(1),
-          td:nth-child(2),
-          th:nth-child(1),
-          th:nth-child(2) {
+          td:nth-child(2) {
             text-align: center;
           }
 
@@ -660,9 +657,7 @@
           }
 
           tr:last-child {
-
-            td,
-            th {
+            td {
               border-bottom: none;
             }
           }
@@ -717,8 +712,7 @@
               }
             }
 
-            td,
-            th {
+            td {
               border: none;
               padding: 4px 0;
               display: grid;
@@ -853,6 +847,9 @@
       <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
       <form class="row">
         <fieldset class="row">
+          <legend class="sr-only">
+            random_data.txt 파일 업로드 및 조회 제어
+          </legend>
           <label class="drop-zone">
             <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
               aria-hidden="true">
@@ -866,11 +863,11 @@
             <input type="file" id="file" accept=".txt">
           </label>
           <div class="row">
-            <button type="submit" id="parse" accesskey="p">좌표 추출</button>
+            <button type="submit" id="parse">좌표 추출</button>
             <button type="button" id="start" disabled>조회 시작</button>
             <button type="button" id="pause" disabled>일시정지</button>
             <button type="button" id="resume" disabled>재개</button>
-            <button type="button" id="stop" disabled accesskey="e">중지</button>
+            <button type="button" id="stop" disabled>중지</button>
             <button type="button" id="export" disabled>CSV 내보내기</button>
           </div>
         </fieldset>
