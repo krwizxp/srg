@@ -96,6 +96,7 @@
         overflow-x: hidden;
         overflow-y: auto;
         transition: opacity 0.2s ease;
+        container-type: inline-size;
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
 
@@ -128,7 +129,7 @@
           flex-direction: column;
         }
 
-        @media (max-width: 800px) {
+        @container (max-width: 800px) {
           & {
             grid-template-columns: 1fr;
             height: auto;
