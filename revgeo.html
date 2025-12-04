@@ -526,14 +526,16 @@
 
         &.err {
           color: var(--err);
-          border-color: var(--err);
-          background: light-dark(oklch(95% 0.1 25), rgba(220, 38, 38, 0.1));
+          border-inline-start-color: var(--err);
+          background: light-dark(oklch(95% 0.1 25),
+              rgba(220, 38, 38, 0.1));
         }
 
         &.warn {
           color: var(--warn);
-          border-color: var(--warn);
-          background: light-dark(oklch(98% 0.1 50), rgba(245, 158, 11, 0.1));
+          border-inline-start-color: var(--warn);
+          background: light-dark(oklch(98% 0.1 50),
+              rgba(245, 158, 11, 0.1));
         }
       }
 
