@@ -634,6 +634,8 @@
           }
 
           td:nth-child(1),
+          td:nth-child(2),
+          th:nth-child(1),
           th:nth-child(2) {
             text-align: center;
           }
@@ -832,7 +834,8 @@
 </head>
 
 <body>
-  <main>
+  <a href="#main-content" class="sr-only">본문으로 건너뛰기</a>
+  <main id="main-content">
     <section class="card">
       <header class="brand">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
@@ -843,8 +846,8 @@
           <h1>SRG 역지오코딩</h1>
           <p>random_data.txt 좌표 변환</p>
         </div>
-        <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
       </header>
+      <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
       <form class="row">
         <fieldset class="row">
           <legend class="sr-only">파일 업로드 및 실행</legend>
@@ -1351,10 +1354,14 @@
       const tr = document.createElement("tr");
       tr.className = "skeleton-row";
       COL_DEFS.forEach((col) => {
-        const td = document.createElement(col.key === "idx" ? "th" : "td");
+        const td = document.createElement(col.key === "kind" ? "th" : "td");
         td.dataset.label = col.label;
-        if (col.key === "idx") {
+        if (col.key === "kind") {
           td.scope = "row";
+          const bar = document.createElement("div");
+          bar.className = "skeleton-bar";
+          td.appendChild(bar);
+        } else if (col.key === "idx") {
           td.textContent = idx;
         } else {
           const bar = document.createElement("div");
@@ -1370,8 +1377,8 @@
       tr.classList.remove("skeleton-row");
       tr.replaceChildren();
       COL_DEFS.forEach((col) => {
-        const td = document.createElement(col.key === "idx" ? "th" : "td");
-        if (col.key === "idx") td.scope = "row";
+        const td = document.createElement(col.key === "kind" ? "th" : "td");
+        if (col.key === "kind") td.scope = "row";
         td.dataset.label = col.label;
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
