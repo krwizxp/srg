@@ -507,12 +507,13 @@
       }
 
       .status {
-        margin-top: 10px;
-        padding: 10px 14px;
+        margin-block-start: 10px;
+        padding-block: 10px;
+        padding-inline: 14px;
         border-radius: 8px;
         background: light-dark(rgba(0, 0, 0, 0.03),
             rgba(255, 255, 255, 0.05));
-        border-left: 3px solid var(--muted);
+        border-inline-start: 3px solid var(--muted);
         animation: fadeIn 0.3s ease;
         word-break: keep-all;
         overflow-wrap: break-word;
@@ -851,7 +852,7 @@
           <legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
           </legend>
-          <label class="drop-zone">
+          <label class="drop-zone" data-has-file="false">
             <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
               aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round"
@@ -1632,18 +1633,31 @@
       }
     });
     function handleFile(files) {
-      if (files.length) {
-        AppState.setFile(files[0]);
-        setStatus(
-          `파일 선택됨: ${files[0].name} 추출 버튼을 누르세요(단축키 P)`
-        );
-        domElements.dropZoneText.textContent = "";
-        domElements.dropZoneText.append("선택된 파일: ");
-        const strongEl = document.createElement("strong");
-        strongEl.textContent = files[0].name;
-        domElements.dropZoneText.appendChild(strongEl);
-        domElements.file.value = "";
+      if (!files.length) return;
+      const file = files[0];
+      AppState.setFile(file);
+      setStatus(
+        `파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`
+      );
+      const label = domElements.file.closest(".drop-zone");
+      if (label) {
+        label.dataset.hasFile = "true";
       }
+      const desktopMsg = domElements.dropZoneText.querySelector(".desktop-msg");
+      const mobileMsg = domElements.dropZoneText.querySelector(".mobile-msg");
+      if (desktopMsg) {
+        desktopMsg.textContent = "선택된 파일: ";
+        const strong = document.createElement("strong");
+        strong.textContent = file.name;
+        desktopMsg.appendChild(strong);
+      }
+      if (mobileMsg) {
+        mobileMsg.textContent = "선택된 파일: ";
+        const strong = document.createElement("strong");
+        strong.textContent = file.name;
+        mobileMsg.appendChild(strong);
+      }
+      domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
       handleFile(domElements.file.files);
@@ -1662,52 +1676,41 @@
       document.body.classList.remove("is-dragging");
       handleFile(e.dataTransfer.files);
     });
-    window.addEventListener("keydown", (e) => {
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.isComposing) return;
-      const key = e.key.toLowerCase();
-      if (key === "p") {
+    const hotkeys = {
+      p: () => {
         if (domElements.parse.disabled) return;
-        e.preventDefault();
         if (typeof form.requestSubmit === "function") {
           form.requestSubmit();
         } else {
           void handleParse();
         }
-        return;
-      }
-      if (key === "escape") {
+      },
+      escape: () => {
         if (!domElements.stop.disabled) {
-          e.preventDefault();
           domElements.stop.click();
         }
-        return;
-      }
-      if (key === "s") {
+      },
+      s: () => {
         if (!domElements.resume.disabled) domElements.resume.click();
         else if (!domElements.pause.disabled) domElements.pause.click();
         else if (!domElements.start.disabled) domElements.start.click();
-      }
+      },
+    };
+    window.addEventListener("keydown", (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.isComposing) return;
+      const key = e.key.toLowerCase();
+      const handler = hotkeys[key];
+      if (!handler) return;
+      e.preventDefault();
+      handler();
     });
-    const hoverTargets = Array.from(
-      document.querySelectorAll(".card, button")
-    );
-    let lastMouseEvent = null;
-    let mouseMoveScheduled = false;
-    document.body.addEventListener("mousemove", (e) => {
-      lastMouseEvent = e;
-      if (mouseMoveScheduled) return;
-      mouseMoveScheduled = true;
-      requestAnimationFrame(() => {
-        mouseMoveScheduled = false;
-        if (!lastMouseEvent) return;
-        const { clientX, clientY } = lastMouseEvent;
-        hoverTargets.forEach((el) => {
-          const rect = el.getBoundingClientRect();
-          el.style.setProperty("--mouse-x", `${clientX - rect.left}px`);
-          el.style.setProperty("--mouse-y", `${clientY - rect.top}px`);
-        });
-      });
+    document.addEventListener("pointermove", (e) => {
+      const target = e.target.closest(".card, button");
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      target.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+      target.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
     });
   </script>
 </body>
