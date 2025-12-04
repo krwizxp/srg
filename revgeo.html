@@ -10,6 +10,9 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="대량의 좌표 데이터를 주소로 빠르고 안전하게 변환하세요.">
+  <meta property="og:locale" content="ko_KR">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fb">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#020617">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml" sizes="any">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
@@ -526,15 +529,13 @@
         &.err {
           color: var(--err);
           border-inline-start-color: var(--err);
-          background: light-dark(oklch(95% 0.1 25),
-              rgba(220, 38, 38, 0.1));
+          background: light-dark(oklch(95% 0.1 25), rgba(220, 38, 38, 0.1));
         }
 
         &.warn {
           color: var(--warn);
           border-inline-start-color: var(--warn);
-          background: light-dark(oklch(98% 0.1 50),
-              rgba(245, 158, 11, 0.1));
+          background: light-dark(oklch(98% 0.1 50), rgba(245, 158, 11, 0.1));
         }
       }
 
@@ -737,10 +738,6 @@
             }
           }
         }
-
-        .map-sep {
-          display: none;
-        }
       }
 
       .skeleton-bar {
@@ -773,6 +770,15 @@
 
       .tags-cell {
         padding-top: 10px;
+      }
+
+      .map-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
       }
 
       a {
@@ -835,7 +841,7 @@
 </head>
 
 <body>
-  <main id="main-content">
+  <main>
     <section class="card">
       <header class="brand">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
@@ -847,20 +853,21 @@
           <p>random_data.txt 좌표 변환</p>
         </div>
       </header>
-      <h2 id="controls-title" class="sr-only">파일 업로드 및 실행</h2>
+      <h2 class="sr-only">파일 업로드 및 실행</h2>
       <form class="row">
         <fieldset class="row">
           <legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
           </legend>
-          <label class="drop-zone" data-has-file="false">
+          <label class="drop-zone">
             <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
               aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
             <span class="drop-text">
-              <span class="desktop-msg">클릭 또는 드래그 앤 드롭하여 <strong>random_data.txt</strong> 업로드</span>
+              <span class="desktop-msg">클릭 또는 드래그 앤 드롭하여
+                <strong>random_data.txt</strong> 업로드</span>
               <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
             </span>
             <input type="file" id="file" accept=".txt">
@@ -889,11 +896,11 @@
             </div>
           </div>
         </div>
-        <output id="counts" aria-live="polite">총 <strong id="cnt-total">0</strong>건 중
+        <output id="counts">총 <strong id="cnt-total">0</strong>건 중
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
             id="cnt-remain">0</strong>건 미처리</output>
       </div>
-      <output id="status" class="status" role="status" aria-atomic="true"></output>
+      <output id="status" class="status"></output>
       <footer>
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
@@ -1006,27 +1013,19 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const wrap = document.createElement("div");
-          wrap.style.display = "flex";
-          wrap.style.flexWrap = "wrap";
-          wrap.style.gap = "6px";
-          wrap.style.alignItems = "center";
-          MAP_PROVIDERS.forEach((p, i) => {
+          const list = document.createElement("ul");
+          list.className = "map-links";
+          MAP_PROVIDERS.forEach((p) => {
+            const li = document.createElement("li");
             const a = document.createElement("a");
             a.href = p.url(r.lat, r.lon);
             a.target = "_blank";
             a.rel = "noopener noreferrer";
             a.textContent = p.key;
-            wrap.appendChild(a);
-            if (i < MAP_PROVIDERS.length - 1) {
-              const sep = document.createElement("span");
-              sep.textContent = "·";
-              sep.className = "map-sep";
-              sep.style.color = "var(--muted)";
-              wrap.appendChild(sep);
-            }
+            li.appendChild(a);
+            list.appendChild(li);
           });
-          td.appendChild(wrap);
+          td.appendChild(list);
         },
       },
     });
@@ -1354,7 +1353,6 @@
     }
     function appendSkeletonRow(idx) {
       const tr = document.createElement("tr");
-      tr.className = "skeleton-row";
       COL_DEFS.forEach((col) => {
         const td = document.createElement("td");
         td.dataset.label = col.label;
@@ -1371,7 +1369,6 @@
       return tr;
     }
     function fillRow(tr, row) {
-      tr.classList.remove("skeleton-row");
       tr.replaceChildren();
       COL_DEFS.forEach((col) => {
         const td = document.createElement("td");
@@ -1637,14 +1634,9 @@
       if (!files.length) return;
       const file = files[0];
       AppState.setFile(file);
-      setStatus(
-        `파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`
-      );
-      const label = domElements.file.closest(".drop-zone");
-      if (label) {
-        label.dataset.hasFile = "true";
-      }
-      const desktopMsg = domElements.dropZoneText.querySelector(".desktop-msg");
+      setStatus(`파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`);
+      const desktopMsg =
+        domElements.dropZoneText.querySelector(".desktop-msg");
       const mobileMsg = domElements.dropZoneText.querySelector(".mobile-msg");
       if (desktopMsg) {
         desktopMsg.textContent = "선택된 파일: ";
