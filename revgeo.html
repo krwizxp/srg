@@ -1326,9 +1326,9 @@
         attempt++;
         try {
           const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-          const combinedSignal = userSignal
-            ? AbortSignal.any([userSignal, timeoutSig])
-            : timeoutSig;
+          const combinedSignal = userSignal ?
+            AbortSignal.any([userSignal, timeoutSig]) :
+            timeoutSig;
           const res = await fetch(buildUrl(), {
             headers: { Accept: "application/json" },
             signal: combinedSignal,
@@ -1598,9 +1598,9 @@
       void handleParse();
     });
     domElements.start.addEventListener("click", () => {
-      document.startViewTransition
-        ? document.startViewTransition(startProcessing)
-        : startProcessing();
+      document.startViewTransition ?
+        document.startViewTransition(startProcessing) :
+        startProcessing();
     });
     domElements.pause.addEventListener("click", () => {
       if (!AppState.isRunning) return;
