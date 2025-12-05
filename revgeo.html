@@ -28,7 +28,6 @@
         box-sizing: border-box;
       }
 
-      html,
       body {
         margin: 0;
         min-height: 100dvh;
@@ -79,7 +78,6 @@
       }
 
       body {
-        background-color: var(--bg-grad-start);
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"),
           linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
         color: var(--fg);
@@ -88,8 +86,6 @@
         flex-direction: column;
         align-items: center;
         letter-spacing: -0.01em;
-        overflow-x: hidden;
-        overflow-y: auto;
         transition: opacity 0.2s ease;
         container-type: inline-size;
         font-variant-numeric: tabular-nums;
@@ -113,22 +109,16 @@
         display: grid;
         grid-template-columns: clamp(320px, 25vw, 420px) 1fr;
         gap: 16px;
-        align-items: stretch;
         height: clamp(650px, calc(100vh - 40px), 1000px);
 
         >section {
-          min-width: 0;
           height: 100%;
-          display: flex;
-          flex-direction: column;
         }
 
         @container (max-width: 800px) {
           & {
             grid-template-columns: 1fr;
             height: auto;
-            min-height: 0;
-            gap: 20px;
           }
         }
       }
@@ -157,13 +147,11 @@
         overflow: hidden;
         position: relative;
         container-type: inline-size;
-        container-name: card;
 
         &>div:has(#coords) {
           flex: 1;
           display: flex;
           flex-direction: column;
-          min-height: 100px;
         }
 
         .card-header {
@@ -171,18 +159,14 @@
           align-items: baseline;
           gap: 12px;
           flex-wrap: wrap;
-          flex-shrink: 0;
 
           #results-title {
             font-size: var(--fs-lg);
-            font-weight: 700;
             margin: 0;
-            color: var(--fg);
           }
 
           .header-desc {
             color: var(--muted);
-            font-weight: 400;
           }
         }
 
@@ -191,13 +175,11 @@
           position: absolute;
           pointer-events: none;
           inset: 0;
-          border-radius: inherit;
           background: radial-gradient(800px circle at var(--mouse-x, 0) var(--mouse-y, 0),
               var(--spotlight),
               transparent 40%);
           opacity: 0;
           transition: opacity 0.3s;
-          z-index: 2;
         }
 
         &:hover::before {
@@ -218,11 +200,6 @@
           height: 32px;
         }
 
-        div {
-          display: flex;
-          flex-direction: column;
-        }
-
         h1 {
           margin: 0;
           font-weight: 700;
@@ -236,22 +213,15 @@
         }
       }
 
-      form.row {
-        width: 100%;
-        flex-shrink: 0;
-      }
-
       fieldset.row {
         display: flex;
         flex-direction: column;
         gap: 12px;
-        width: 100%;
 
         .row {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 8px;
-          width: 100%;
         }
       }
 
@@ -263,15 +233,12 @@
         text-align: center;
         transition: all 0.2s ease;
         background: light-dark(rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.1));
-        cursor: pointer;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 8px;
         word-break: keep-all;
-        flex-shrink: 0;
-        overflow: hidden;
 
         &:hover,
         &:focus-within {
@@ -282,12 +249,10 @@
         }
 
         input[type="file"] {
+          cursor: pointer;
           position: absolute;
           inset: 0;
           opacity: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 10;
         }
 
         .drop-icon {
@@ -312,10 +277,6 @@
           strong {
             color: var(--fg);
           }
-        }
-
-        .desktop-msg {
-          display: inline;
         }
 
         .mobile-msg {
@@ -344,10 +305,7 @@
       }
 
       textarea {
-        width: 100%;
-        height: 100%;
         flex: 1;
-        overflow-y: auto;
         line-height: 1.5;
         resize: none;
         padding: 10px 8px;
@@ -366,7 +324,6 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 100%;
         min-width: 0;
         white-space: nowrap;
         padding: 12px 4px;
@@ -382,7 +339,6 @@
               transparent 50%);
           opacity: 0;
           transition: opacity 0.3s;
-          pointer-events: none;
         }
 
         &:hover:not(:disabled) {
@@ -433,13 +389,9 @@
         align-items: center;
         gap: 10px;
         margin-top: 12px;
-        flex-shrink: 0;
 
         >.sp {
           flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
         }
 
         #counts {
@@ -454,7 +406,6 @@
 
       .progress-shell {
         --pct: 0;
-        width: 100%;
         margin-top: 6px;
         position: relative;
         border-radius: 999px;
@@ -474,8 +425,6 @@
       .progress-visual {
         position: absolute;
         inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
       }
 
       .progress-fill {
@@ -483,7 +432,6 @@
         width: calc(var(--pct, 0) * 1%);
         background: linear-gradient(90deg, var(--accent), var(--success));
         transition: width 0.25s ease-out;
-        will-change: width;
       }
 
       .progress-shell.active .progress-fill {
@@ -528,7 +476,6 @@
 
       .table-wrap {
         flex: 1;
-        width: 100%;
         border-radius: 16px;
         border: 1px solid var(--line);
         background: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
@@ -558,14 +505,11 @@
       table {
         width: 100%;
         min-width: 800px;
-        table-layout: auto;
-        border-collapse: separate;
         border-spacing: 0;
 
         thead th {
           padding: 12px 10px;
           border-bottom: 1px solid var(--line);
-          font-variant-numeric: tabular-nums;
           position: sticky;
           top: 0;
           z-index: 10;
@@ -575,7 +519,6 @@
           font-weight: 600;
           color: var(--muted);
           white-space: nowrap;
-          box-shadow: 0 1px 0 var(--line);
 
           &:first-child {
             border-top-left-radius: 16px;
@@ -616,14 +559,9 @@
           td {
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
-            font-variant-numeric: tabular-nums;
-            color: var(--fg);
             vertical-align: top;
-            font-weight: 400;
-            white-space: normal;
             word-break: keep-all;
             overflow-wrap: break-word;
-            transition: background 0.1s;
           }
 
           td:nth-child(1),
@@ -643,7 +581,6 @@
           tr:hover {
             background: light-dark(rgba(0, 0, 0, 0.05),
                 rgba(255, 255, 255, 0.08));
-            z-index: 1;
           }
 
           tr:last-child {
@@ -654,14 +591,12 @@
         }
       }
 
-      @supports (content-visibility: auto) {
-        .table-wrap tbody tr {
-          content-visibility: auto;
-          contain-intrinsic-size: var(--row-size);
-        }
+      .table-wrap tbody tr {
+        content-visibility: auto;
+        contain-intrinsic-size: var(--row-size);
       }
 
-      @container card (max-width:800px) {
+      @container (max-width:800px) {
         .table-wrap:not(:has(tbody > tr)) {
           min-height: 100px;
           overflow: hidden;
@@ -710,7 +645,6 @@
               gap: 12px;
               align-items: baseline;
               text-align: left !important;
-              width: auto !important;
 
               &::before {
                 content: attr(data-label);
@@ -719,7 +653,6 @@
                 font-size: var(--fs-sm);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
-                text-align: left;
               }
             }
           }
@@ -742,7 +675,6 @@
         display: inline-block;
         font-size: var(--fs-sm);
         font-weight: 500;
-        color: var(--fg);
         background: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.1));
         padding: 2px 6px;
         border-radius: 4px;
@@ -771,7 +703,6 @@
         color: var(--accent);
         text-decoration: none;
         font-weight: 500;
-        white-space: nowrap;
 
         &:hover {
           color: var(--success);
@@ -816,11 +747,8 @@
         width: 1px;
         height: 1px;
         padding: 0;
-        margin: -1px;
         overflow: hidden;
         clip-path: inset(50%);
-        white-space: nowrap;
-        border: 0;
       }
     }
   </style>
@@ -924,20 +852,20 @@
   </main>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
-    const COORD_REGEX = Object.freeze({
+    const COORD_REGEX = {
       KR: /대한민국\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi,
       WORLD:
         /세계\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi,
-    });
+    };
     const RX_CSV = /[",\n\r]/;
-    const CONFIG = Object.freeze({
+    const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10000,
       RATE_LIMIT_DELAY_MS: 1000,
       REVERSE_ZOOM: 14,
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
-    });
-    const MAP_PROVIDERS = Object.freeze([
+    };
+    const MAP_PROVIDERS = [
       {
         key: "Google",
         header: "지도링크(Google)",
@@ -961,8 +889,8 @@
         url: (lat, lon) =>
           `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
       },
-    ]);
-    const BASE_COL_CONFIG = Object.freeze({
+    ];
+    const BASE_COL_CONFIG = {
       kind: {
         val: (r) => r.set,
       },
@@ -1014,12 +942,8 @@
           td.appendChild(list);
         },
       },
-    });
+    };
     const numberFormatter = new Intl.NumberFormat("ko-KR");
-    const listFormatter = new Intl.ListFormat("ko", {
-      style: "narrow",
-      type: "unit",
-    });
     const thead = document.querySelector("#tbl thead");
     const domElements = {
       file: document.getElementById("file"),
@@ -1084,7 +1008,7 @@
         if (name) parts.push(name);
         if (addType && addType !== name) parts.push(addType);
         else if (category && category !== name) parts.push(category);
-        return parts.length > 0 ? listFormatter.format(parts) : "";
+        return parts.join(", ");
       },
       parse(data) {
         const a = data?.address ?? {};
@@ -1226,7 +1150,7 @@
         domElements.cntRemain.textContent = numberFormatter.format(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
-        domElements.progShell.style.setProperty("--pct", String(pct));
+        domElements.progShell.style.setProperty("--pct", pct);
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
         updateUIState();
         AppState.renderReq = null;
@@ -1236,10 +1160,6 @@
       domElements.tbody.replaceChildren();
     }
     function sleep(ms, signal) {
-      if (!signal) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-      }
-      signal.throwIfAborted();
       const timeoutSig = AbortSignal.timeout(ms);
       const combined = AbortSignal.any([signal, timeoutSig]);
       return new Promise((resolve, reject) => {
@@ -1299,9 +1219,9 @@
       const buildUrl = () => {
         const url = new URL("https://nominatim.openstreetmap.org/reverse");
         url.searchParams.set("format", "jsonv2");
-        url.searchParams.set("lat", String(lat));
-        url.searchParams.set("lon", String(lon));
-        url.searchParams.set("zoom", String(CONFIG.REVERSE_ZOOM));
+        url.searchParams.set("lat", lat);
+        url.searchParams.set("lon", lon);
+        url.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
         url.searchParams.set("addressdetails", "1");
         url.searchParams.set("accept-language", "ko");
         return url;
@@ -1385,7 +1305,7 @@
         if (!row) continue;
         const rect = row.getBoundingClientRect();
         const h = rect.height;
-        if (!h || !Number.isFinite(h)) continue;
+        if (!h) continue;
         total += h;
         count++;
       }
@@ -1511,7 +1431,7 @@
         const headerStr =
           [
             ...headerCols.map((c) => esc(c.label)),
-            ...mapHeaders.map(esc),
+            ...mapHeaders,
           ].join(",") + "\n";
         const dateStr = fileDateFmt.format(new Date()).replace(/\D/g, "");
         const fileName = `result_${dateStr}.csv`;
@@ -1522,9 +1442,7 @@
         const a = document.createElement("a");
         a.href = url;
         a.download = fileName;
-        document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
         setStatus("CSV 파일을 다운로드했습니다.");
       } catch (err) {
@@ -1552,7 +1470,7 @@
           return setStatus("좌표를 찾지 못했습니다.", "warn");
         }
         const records = parsed.map((p, i) => ({
-          set: p.setLabel === "KR" ? "KR" : "WORLD",
+          set: p.setLabel,
           idx: i + 1,
           lat: p.lat,
           lon: p.lon,
@@ -1647,7 +1565,6 @@
     });
     document.body.addEventListener("dragover", (e) => e.preventDefault());
     document.body.addEventListener("dragleave", (e) => {
-      e.preventDefault();
       if (!e.relatedTarget) document.body.classList.remove("is-dragging");
     });
     document.body.addEventListener("drop", (e) => {
