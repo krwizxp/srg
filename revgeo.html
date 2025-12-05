@@ -946,7 +946,7 @@
       coords: document.getElementById("coords"),
     };
     const form = document.getElementById("controls");
-    const COL_DEFS = Array.from(thead.querySelectorAll("th")).map((th) => {
+    const COL_DEFS = [...thead.querySelectorAll("th")].map((th) => {
       const key = th.dataset.colKey;
       const base = BASE_COL_CONFIG[key] || {};
       return {
@@ -1394,6 +1394,7 @@
         if (!parsed.length) {
           AppState.setRecords([]);
           domElements.coords.value = "";
+          domElements.cntTotal.textContent = "0";
           scheduleRender();
           return setStatus("좌표를 찾지 못했습니다.", "warn");
         }
