@@ -1114,6 +1114,7 @@
         const success = AppState.cntSuccess;
         const fail = AppState.cntFail;
         const remaining = total - processed;
+        domElements.cntTotal.textContent = numberFormatter.format(total);
         domElements.cntSuccess.textContent = numberFormatter.format(success);
         domElements.cntFail.textContent = numberFormatter.format(fail);
         domElements.cntRemain.textContent = numberFormatter.format(remaining);
@@ -1394,7 +1395,6 @@
         if (!parsed.length) {
           AppState.setRecords([]);
           domElements.coords.value = "";
-          domElements.cntTotal.textContent = "0";
           scheduleRender();
           return setStatus("좌표를 찾지 못했습니다.", "warn");
         }
@@ -1405,7 +1405,6 @@
           lon: p.lon,
         }));
         AppState.setRecords(records);
-        domElements.cntTotal.textContent = numberFormatter.format(records.length);
         const MAX_DISP = 50000;
         const disp = records
           .slice(0, MAX_DISP)
