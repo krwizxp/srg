@@ -129,7 +129,6 @@
         text-align: center;
         font-size: var(--fs-sm);
         color: var(--muted);
-        opacity: 0.7;
         margin-top: 8px;
       }
     }
@@ -1114,7 +1113,7 @@
         const processed = AppState.processedCount;
         const success = AppState.cntSuccess;
         const fail = AppState.cntFail;
-        const remaining = Math.max(0, total - processed);
+        const remaining = total - processed;
         domElements.cntSuccess.textContent = numberFormatter.format(success);
         domElements.cntFail.textContent = numberFormatter.format(fail);
         domElements.cntRemain.textContent = numberFormatter.format(remaining);
@@ -1153,12 +1152,7 @@
     function extractCoordinates(text) {
       const out = [];
       const push = (lat, lon, setLabel) => {
-        if (
-          Number.isFinite(lat) &&
-          Number.isFinite(lon) &&
-          Math.abs(lat) <= 90 &&
-          Math.abs(lon) <= 180
-        ) {
+        if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
           out.push({ lat, lon, setLabel });
         }
       };
