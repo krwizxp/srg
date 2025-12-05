@@ -6,13 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>SRG 데이터 역지오코딩 도구</title>
-  <meta name="description" content="random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
+  <meta name="description" content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="대량의 좌표 데이터를 주소로 빠르고 안전하게 변환하세요.">
   <meta property="og:locale" content="ko_KR">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fb">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#020617">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(97% 0.01 240)">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(12% 0.02 240)">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml" sizes="any">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
@@ -28,7 +28,15 @@
         box-sizing: border-box;
       }
 
+      input,
+      button,
+      textarea,
+      select {
+        font-family: inherit;
+      }
+
       body {
+        word-break: keep-all;
         margin: 0;
         min-height: 100dvh;
       }
@@ -96,9 +104,7 @@
         }
 
         @media (max-width: 800px) {
-          & {
-            padding: 12px;
-          }
+          padding: 12px;
         }
       }
     }
@@ -110,10 +116,6 @@
         grid-template-columns: clamp(320px, 25vw, 420px) 1fr;
         gap: 16px;
         height: clamp(650px, calc(100vh - 40px), 1000px);
-
-        >section {
-          height: 100%;
-        }
 
         @container (max-width: 800px) {
           & {
@@ -202,7 +204,6 @@
 
         h1 {
           margin: 0;
-          font-weight: 700;
           line-height: 1.2;
           font-size: var(--fs-xl);
         }
@@ -238,7 +239,6 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        word-break: keep-all;
 
         &:hover,
         &:focus-within {
@@ -296,7 +296,6 @@
 
       textarea,
       button {
-        font-family: inherit;
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.2));
@@ -309,7 +308,6 @@
         line-height: 1.5;
         resize: none;
         padding: 10px 8px;
-        word-break: keep-all;
 
         &:focus {
           outline: none;
@@ -429,9 +427,11 @@
 
       .progress-fill {
         height: 100%;
-        width: calc(var(--pct, 0) * 1%);
+        width: 100%;
+        transform: scaleX(calc(var(--pct, 0) / 100));
+        transform-origin: left;
         background: linear-gradient(90deg, var(--accent), var(--success));
-        transition: width 0.25s ease-out;
+        transition: transform 0.25s ease-out;
       }
 
       .progress-shell.active .progress-fill {
@@ -452,8 +452,6 @@
             rgba(255, 255, 255, 0.05));
         border-inline-start: 3px solid var(--muted);
         animation: fadeIn 0.3s ease;
-        word-break: keep-all;
-        overflow-wrap: break-word;
         text-wrap: pretty;
         flex-shrink: 0;
 
@@ -481,8 +479,6 @@
         background: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
         overflow: auto;
         position: relative;
-        display: flex;
-        flex-direction: column;
 
         .empty-hint {
           display: flex;
@@ -514,7 +510,7 @@
           top: 0;
           z-index: 10;
           background: var(--card-bg);
-          backdrop-filter: blur(12px);
+          backdrop-filter: var(--glass);
           text-align: left;
           font-weight: 600;
           color: var(--muted);
@@ -560,8 +556,6 @@
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
             vertical-align: top;
-            word-break: keep-all;
-            overflow-wrap: break-word;
           }
 
           td:nth-child(1),
@@ -680,7 +674,6 @@
         border-radius: 4px;
         border: 1px solid var(--line);
         white-space: normal;
-        word-break: keep-all;
         overflow-wrap: anywhere;
         max-width: 100%;
         text-align: center;
@@ -768,7 +761,7 @@
         </div>
       </header>
       <h2 class="sr-only">파일 업로드 및 실행</h2>
-      <form class="row">
+      <form id="controls">
         <fieldset class="row">
           <legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
@@ -787,7 +780,7 @@
             <input type="file" id="file" accept=".txt">
           </label>
           <div class="row">
-            <button type="submit" id="parse">좌표 추출</button>
+            <button id="parse">좌표 추출</button>
             <button type="button" id="start" disabled>조회 시작</button>
             <button type="button" id="pause" disabled>일시정지</button>
             <button type="button" id="resume" disabled>재개</button>
@@ -798,7 +791,7 @@
       </form>
       <div>
         <label for="coords"><span class="caps">추출된 좌표 (lat,lon)</span></label>
-        <textarea id="coords" readonly spellcheck="false" placeholder="좌표가 이곳에 표시됩니다."></textarea>
+        <textarea id="coords" readonly placeholder="좌표가 이곳에 표시됩니다."></textarea>
       </div>
       <div class="row-progress">
         <div class="sp">
@@ -852,12 +845,12 @@
   </main>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
-    const COORD_REGEX = {
-      KR: /대한민국\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi,
-      WORLD:
-        /세계\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi,
-    };
+    const COORD_REGEX = /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
     const RX_CSV = /[",\n\r]/;
+    const csvEsc = (s) => {
+      s = String(s ?? "");
+      return RX_CSV.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+    };
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10000,
@@ -865,31 +858,34 @@
       REVERSE_ZOOM: 14,
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
     };
+    const FETCH_HEADERS = { Accept: "application/json" };
+    const BASE_URL = new URL("https://nominatim.openstreetmap.org/reverse");
+    BASE_URL.searchParams.set("format", "jsonv2");
+    BASE_URL.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
+    BASE_URL.searchParams.set("addressdetails", "1");
+    BASE_URL.searchParams.set("accept-language", "ko");
     const MAP_PROVIDERS = [
       {
         key: "Google",
-        header: "지도링크(Google)",
         url: (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`,
       },
       {
         key: "OSM",
-        header: "지도링크(OSM)",
         url: (lat, lon) =>
           `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}`,
       },
       {
         key: "Naver",
-        header: "지도링크(Naver)",
         url: (lat, lon) =>
           `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}`,
       },
       {
         key: "Kakao",
-        header: "지도링크(Kakao)",
         url: (lat, lon) =>
           `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
       },
     ];
+    const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
       kind: {
         val: (r) => r.set,
@@ -900,15 +896,9 @@
       coords: {
         val: (r) => `${r.lat}, ${r.lon}`,
       },
-      sido: {
-        val: (r) => r.addr?.sido,
-      },
-      sigungu: {
-        val: (r) => r.addr?.sigungu,
-      },
-      emd: {
-        val: (r) => r.addr?.eupmyeon,
-      },
+      sido: { val: addrVal("sido") },
+      sigungu: { val: addrVal("sigungu") },
+      emd: { val: addrVal("eupmyeon") },
       tag: {
         val: (r) => r.addr?.tag,
         render: (v, td) => {
@@ -927,19 +917,10 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const list = document.createElement("ul");
-          list.className = "map-links";
-          MAP_PROVIDERS.forEach((p) => {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = p.url(r.lat, r.lon);
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = p.key;
-            li.appendChild(a);
-            list.appendChild(li);
-          });
-          td.appendChild(list);
+          const links = MAP_PROVIDERS.map((p) =>
+            `<li><a href="${p.url(r.lat, r.lon)}" target="_blank" rel="noopener noreferrer">${p.key}</a></li>`
+          ).join("");
+          td.innerHTML = `<ul class="map-links">${links}</ul>`;
         },
       },
     };
@@ -965,7 +946,7 @@
       tbody: document.querySelector("#tbl tbody"),
       coords: document.getElementById("coords"),
     };
-    const form = document.querySelector("form.row");
+    const form = document.getElementById("controls");
     const COL_DEFS = Array.from(thead.querySelectorAll("th")).map((th) => {
       const key = th.dataset.colKey;
       const base = BASE_COL_CONFIG[key] || {};
@@ -975,6 +956,27 @@
         ...base,
       };
     });
+    const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
+    const SKELETON_TEMPLATE = (() => {
+      const tr = document.createElement("tr");
+      COL_DEFS.forEach((col) => {
+        const td = document.createElement("td");
+        td.dataset.label = col.label;
+        if (col.key !== "idx") {
+          const bar = document.createElement("div");
+          bar.className = "skeleton-bar";
+          td.appendChild(bar);
+        }
+        tr.appendChild(td);
+      });
+      return tr;
+    })();
+    const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
+    const CSV_HEADER_STR = (() => {
+      const cols = CSV_COLS.map((c) => csvEsc(c.label));
+      const maps = MAP_PROVIDERS.map((p) => csvEsc(`지도링크(${p.key})`));
+      return "\uFEFF" + [...cols, ...maps].join(",") + "\n";
+    })();
     const AddressFormatter = {
       _getKoreanAdminArea(a, tag) {
         let sido = a.province || a.state || a.region || "";
@@ -996,54 +998,36 @@
         const emd =
           a.town || a.township || a.neighbourhood || a.city_district || "";
         const ri = a.village || a.hamlet || "";
-        const eupmyeon = emd && ri ? `${emd} ${ri}` : emd || ri || "";
-        return { sido, sigungu, eupmyeon, tag };
+        const eupmyeon = [emd, ri].filter(Boolean).join(" ");
+        return { sido, sigungu, eupmyeon };
       },
-      _getTag(a, data) {
+      _getGlobalAdminArea(a) {
+        const sido = a.state || a.region || a.province || a.county || a.city || "";
+        let sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || "";
+        if (sido === sigungu) sigungu = "";
+        const eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || "";
+        return { sido, sigungu, eupmyeon };
+      },
+      _getTag(data) {
         if (!data || typeof data !== "object") return "";
+        const a = data.address ?? {};
         const name = data.name || a.attraction || a.building;
         const addType = data.addresstype;
         const category = data.category;
-        const parts = [];
-        if (name) parts.push(name);
-        if (addType && addType !== name) parts.push(addType);
-        else if (category && category !== name) parts.push(category);
-        return parts.join(", ");
+        const secondary = [data.addresstype, data.category].find(v => v && v !== name);
+        return [name, secondary].filter(Boolean).join(", ");
       },
       parse(data) {
         const a = data?.address ?? {};
-        const isKR =
-          (a.country_code || "").toLowerCase() === "kr" ||
-          a.country === "대한민국";
-        const tag = this._getTag(a, data);
-        if (isKR) return this._getKoreanAdminArea(a, tag);
-        return {
-          sido: a.state || a.region || a.province || a.county || a.city || "",
-          sigungu:
-            a.city ||
-            a.town ||
-            a.county ||
-            a.district ||
-            a.municipality ||
-            a.region ||
-            "",
-          eupmyeon:
-            a.village ||
-            a.suburb ||
-            a.neighbourhood ||
-            a.quarter ||
-            a.hamlet ||
-            a.city_district ||
-            a.township ||
-            a.residential ||
-            "",
-          tag,
-        };
+        const isKR = a.country_code?.toLowerCase() === "kr" || a.country === "대한민국";
+        const tag = this._getTag(data);
+        const addr = isKR ? this._getKoreanAdminArea(a) : this._getGlobalAdminArea(a);
+        addr.tag = tag;
+        return addr;
       },
     };
     const AppState = {
       records: [],
-      processedCount: 0,
       droppedFile: null,
       status: "idle",
       controller: null,
@@ -1068,8 +1052,10 @@
       get isStopping() {
         return this.status === "stopping";
       },
+      get processedCount() {
+        return this.cntSuccess + this.cntFail;
+      },
       reset() {
-        this.processedCount = 0;
         this.cntSuccess = 0;
         this.cntFail = 0;
         this.status = "idle";
@@ -1081,7 +1067,6 @@
       setRecords(newRecords) {
         this.records = newRecords;
         this.reset();
-        updateUIState();
       },
       setFile(file) {
         this.droppedFile = file;
@@ -1107,34 +1092,20 @@
       const hasRecords = AppState.records.length > 0;
       const { parse, start, pause, resume, stop, exportBtn, progShell } =
         domElements;
-      parse.disabled =
-        s === "running" ||
-        s === "paused" ||
-        s === "pausing" ||
-        s === "parsing";
-      start.disabled =
-        !hasRecords ||
-        s === "running" ||
-        s === "paused" ||
-        s === "pausing" ||
-        s === "stopping" ||
-        s === "parsing";
+      const isBusy = AppState.isRunning || s === "parsing";
+      parse.disabled = isBusy;
+      start.disabled = isBusy || !hasRecords || s === "stopping";
       pause.disabled = s !== "running";
       resume.disabled = s !== "paused";
       stop.disabled = s === "idle" || s === "stopping";
       exportBtn.disabled = AppState.processedCount === 0;
-      if (s === "running" || s === "pausing") {
-        progShell.classList.add("active");
-      } else {
-        progShell.classList.remove("active");
-      }
+      progShell.classList.toggle("active", s === "running" || s === "pausing");
     }
     function setStatus(msg, type = "info") {
       const el = domElements.status;
       el.textContent = msg;
-      el.classList.remove("err", "warn");
-      if (type === "error") el.classList.add("err");
-      else if (type === "warn") el.classList.add("warn");
+      el.classList.toggle("err", type === "error");
+      el.classList.toggle("warn", type === "warn");
     }
     function scheduleRender() {
       if (AppState.renderReq) return;
@@ -1144,7 +1115,6 @@
         const success = AppState.cntSuccess;
         const fail = AppState.cntFail;
         const remaining = Math.max(0, total - processed);
-        domElements.cntTotal.textContent = numberFormatter.format(total);
         domElements.cntSuccess.textContent = numberFormatter.format(success);
         domElements.cntFail.textContent = numberFormatter.format(fail);
         domElements.cntRemain.textContent = numberFormatter.format(remaining);
@@ -1166,7 +1136,7 @@
         combined.addEventListener(
           "abort",
           () => {
-            if (signal.aborted && !timeoutSig.aborted) {
+            if (signal.aborted) {
               reject(signal.reason);
             } else {
               resolve();
@@ -1176,11 +1146,10 @@
         );
       });
     }
-    async function yieldToMain() {
-      if ("scheduler" in window && "yield" in window.scheduler)
-        await window.scheduler.yield();
-      else await new Promise((r) => setTimeout(r, 0));
-    }
+    const yieldToMain =
+      "scheduler" in window && "yield" in window.scheduler
+        ? () => window.scheduler.yield()
+        : () => new Promise((r) => setTimeout(r, 0));
     function extractCoordinates(text) {
       const out = [];
       const push = (lat, lon, setLabel) => {
@@ -1193,13 +1162,10 @@
           out.push({ lat, lon, setLabel });
         }
       };
-      for (const m of text.matchAll(COORD_REGEX.KR)) {
-        const { lat, lon } = m.groups;
-        push(parseFloat(lat), parseFloat(lon), "KR");
-      }
-      for (const m of text.matchAll(COORD_REGEX.WORLD)) {
-        const { lat, lon } = m.groups;
-        push(parseFloat(lat), parseFloat(lon), "WORLD");
+      for (const m of text.matchAll(COORD_REGEX)) {
+        const { label, lat, lon } = m.groups;
+        const setLabel = label.startsWith("대한민국") ? "KR" : "WORLD";
+        push(parseFloat(lat), parseFloat(lon), setLabel);
       }
       return out;
     }
@@ -1216,16 +1182,6 @@
       }
     }
     async function fetchReverseWithRetry(lat, lon, userSignal) {
-      const buildUrl = () => {
-        const url = new URL("https://nominatim.openstreetmap.org/reverse");
-        url.searchParams.set("format", "jsonv2");
-        url.searchParams.set("lat", lat);
-        url.searchParams.set("lon", lon);
-        url.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
-        url.searchParams.set("addressdetails", "1");
-        url.searchParams.set("accept-language", "ko");
-        return url;
-      };
       let attempt = 0;
       while (attempt < CONFIG.MAX_RETRY) {
         userSignal?.throwIfAborted();
@@ -1235,8 +1191,11 @@
           const combinedSignal = userSignal ?
             AbortSignal.any([userSignal, timeoutSig]) :
             timeoutSig;
-          const res = await fetch(buildUrl(), {
-            headers: { Accept: "application/json" },
+          const url = new URL(BASE_URL);
+          url.searchParams.set("lat", lat);
+          url.searchParams.set("lon", lon);
+          const res = await fetch(url, {
+            headers: FETCH_HEADERS,
             signal: combinedSignal,
           });
           if (res.ok) {
@@ -1258,35 +1217,25 @@
       }
     }
     function appendSkeletonRow(idx) {
-      const tr = document.createElement("tr");
-      COL_DEFS.forEach((col) => {
-        const td = document.createElement("td");
-        td.dataset.label = col.label;
-        if (col.key === "idx") {
-          td.textContent = idx;
-        } else {
-          const bar = document.createElement("div");
-          bar.className = "skeleton-bar";
-          td.appendChild(bar);
-        }
-        tr.appendChild(td);
-      });
+      const tr = SKELETON_TEMPLATE.cloneNode(true);
+      if (IDX_COL_INDEX >= 0) {
+        tr.cells[IDX_COL_INDEX].textContent = idx;
+      }
       domElements.tbody.appendChild(tr);
       return tr;
     }
     function fillRow(tr, row) {
-      tr.replaceChildren();
-      COL_DEFS.forEach((col) => {
-        const td = document.createElement("td");
+      COL_DEFS.forEach((col, i) => {
+        const td = tr.cells[i];
+        td.textContent = "";
+        td.className = "";
         td.dataset.label = col.label;
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
         else td.textContent = val ?? "";
-        tr.appendChild(td);
       });
     }
     function pushResultRow(row) {
-      AppState.processedCount++;
       if (row.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
@@ -1325,9 +1274,8 @@
     async function runProcessingLoop() {
       const startIndex = AppState.processedCount;
       for (let i = startIndex; i < AppState.records.length; i++) {
-        if (!AppState.isRunning || AppState.isStopping) break;
         await performPauseCheck();
-        if (!AppState.isRunning || AppState.isStopping) break;
+        if (!AppState.isRunning) break;
         const r = AppState.records[i];
         AppState.controller = new AbortController();
         AppState.inFlight = true;
@@ -1338,12 +1286,8 @@
               CONFIG.RATE_LIMIT_DELAY_MS,
               AppState.controller.signal
             );
-          if (!AppState.isRunning || AppState.isStopping) {
-            skeletonTr.remove();
-            break;
-          }
           await performPauseCheck();
-          if (!AppState.isRunning || AppState.isStopping) {
+          if (!AppState.isRunning) {
             skeletonTr.remove();
             break;
           }
@@ -1412,31 +1356,21 @@
         if (!rows.length) {
           return setStatus("내보낼 데이터가 없습니다.", "warn");
         }
-        const headerCols = COL_DEFS.filter((c) => !c.noCsv);
-        const mapHeaders = MAP_PROVIDERS.map((p) => p.header);
-        const esc = (s) => {
-          s = String(s ?? "");
-          return RX_CSV.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-        };
+        const headerCols = CSV_COLS;
         const makeRow = (r) => {
           const rowArr = [];
           for (let i = 0; i < headerCols.length; i++) {
-            rowArr.push(esc(headerCols[i].val(r)));
+            rowArr.push(csvEsc(headerCols[i].val(r)));
           }
           for (let i = 0; i < MAP_PROVIDERS.length; i++) {
-            rowArr.push(esc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
+            rowArr.push(csvEsc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
           }
           return rowArr.join(",") + "\n";
         };
-        const headerStr =
-          [
-            ...headerCols.map((c) => esc(c.label)),
-            ...mapHeaders,
-          ].join(",") + "\n";
+        const lines = [CSV_HEADER_STR];
+        for (const r of rows) lines.push(makeRow(r));
         const dateStr = fileDateFmt.format(new Date()).replace(/\D/g, "");
         const fileName = `result_${dateStr}.csv`;
-        const lines = ["\uFEFF" + headerStr];
-        for (const r of rows) lines.push(makeRow(r));
         const blob = new Blob(lines, { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -1476,6 +1410,7 @@
           lon: p.lon,
         }));
         AppState.setRecords(records);
+        domElements.cntTotal.textContent = numberFormatter.format(records.length);
         const MAX_DISP = 50000;
         const disp = records
           .slice(0, MAX_DISP)
@@ -1542,18 +1477,13 @@
       const desktopMsg =
         domElements.dropZoneText.querySelector(".desktop-msg");
       const mobileMsg = domElements.dropZoneText.querySelector(".mobile-msg");
-      if (desktopMsg) {
-        desktopMsg.textContent = "선택된 파일: ";
+      [desktopMsg, mobileMsg].forEach((el) => {
+        if (!el) return;
+        el.textContent = "선택된 파일: ";
         const strong = document.createElement("strong");
         strong.textContent = file.name;
-        desktopMsg.appendChild(strong);
-      }
-      if (mobileMsg) {
-        mobileMsg.textContent = "선택된 파일: ";
-        const strong = document.createElement("strong");
-        strong.textContent = file.name;
-        mobileMsg.appendChild(strong);
-      }
+        el.appendChild(strong);
+      });
       domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
@@ -1601,12 +1531,21 @@
       e.preventDefault();
       handler();
     });
+    let moveReq = null;
+    let lastEvent = null;
     document.addEventListener("pointermove", (e) => {
-      const target = e.target.closest(".card, button");
-      if (!target) return;
-      const rect = target.getBoundingClientRect();
-      target.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
-      target.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+      lastEvent = e;
+      if (moveReq) return;
+      moveReq = requestAnimationFrame(() => {
+        moveReq = null;
+        const ev = lastEvent;
+        if (!ev) return;
+        const target = ev.target.closest(".card, button");
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
+        target.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
+      });
     });
   </script>
 </body>
