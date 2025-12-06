@@ -33,6 +33,7 @@
       textarea,
       select {
         font-family: inherit;
+        font-size: inherit;
       }
 
       body {
@@ -78,7 +79,7 @@
           0 1px 2px rgba(0, 0, 0, 0.03);
         --shadow-md: 0 20px 40px -10px rgba(0, 0, 0, 0.1), var(--inner-glow);
         --glass: blur(12px) saturate(180%);
-        --fs-base: clamp(15px, 1.5vw, 16px);
+        --fs-base: clamp(13px, 1.5vw, 14px);
         --fs-sm: clamp(13px, 0.9vw, 14px);
         --fs-lg: clamp(16px, 1.6vw, 20px);
         --fs-xl: clamp(18px, 2vw, 24px);
@@ -130,7 +131,6 @@
         text-align: center;
         font-size: var(--fs-sm);
         color: var(--muted);
-        margin-top: 8px;
       }
     }
 
@@ -383,7 +383,7 @@
 
       .row-progress {
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         gap: 10px;
         margin-top: 12px;
 
@@ -442,7 +442,6 @@
       }
 
       .status {
-        margin-block-start: 10px;
         padding-block: 10px;
         padding-inline: 14px;
         border-radius: 8px;
@@ -1104,25 +1103,26 @@
       el.classList.toggle("err", type === "error");
       el.classList.toggle("warn", type === "warn");
     }
+    const renderFrame = () => {
+      const total = AppState.records.length;
+      const processed = AppState.processedCount;
+      const success = AppState.cntSuccess;
+      const fail = AppState.cntFail;
+      const remaining = total - processed;
+      domElements.cntTotal.textContent = numberFormatter.format(total);
+      domElements.cntSuccess.textContent = numberFormatter.format(success);
+      domElements.cntFail.textContent = numberFormatter.format(fail);
+      domElements.cntRemain.textContent = numberFormatter.format(remaining);
+      const pct = total ? Math.round((processed / total) * 100) : 0;
+      domElements.prog.value = pct;
+      domElements.progShell.style.setProperty("--pct", pct);
+      domElements.progLabel.textContent = `진행 상황 ${pct}%`;
+      updateUIState();
+      AppState.renderReq = null;
+    };
     function scheduleRender() {
       if (AppState.renderReq) return;
-      AppState.renderReq = requestAnimationFrame(() => {
-        const total = AppState.records.length;
-        const processed = AppState.processedCount;
-        const success = AppState.cntSuccess;
-        const fail = AppState.cntFail;
-        const remaining = total - processed;
-        domElements.cntTotal.textContent = numberFormatter.format(total);
-        domElements.cntSuccess.textContent = numberFormatter.format(success);
-        domElements.cntFail.textContent = numberFormatter.format(fail);
-        domElements.cntRemain.textContent = numberFormatter.format(remaining);
-        const pct = total ? Math.round((processed / total) * 100) : 0;
-        domElements.prog.value = pct;
-        domElements.progShell.style.setProperty("--pct", pct);
-        domElements.progLabel.textContent = `진행 상황 ${pct}%`;
-        updateUIState();
-        AppState.renderReq = null;
-      });
+      AppState.renderReq = requestAnimationFrame(renderFrame);
     }
     function clearTable() {
       domElements.tbody.replaceChildren();
@@ -1481,18 +1481,30 @@
     domElements.file.addEventListener("change", () => {
       handleFile(domElements.file.files);
     });
-    document.body.addEventListener("dragenter", (e) => {
+    window.addEventListener("dragenter", (e) => e.preventDefault());
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("dragleave", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => {
       e.preventDefault();
-      document.body.classList.add("is-dragging");
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files);
+      }
     });
-    document.body.addEventListener("dragover", (e) => e.preventDefault());
-    document.body.addEventListener("dragleave", (e) => {
-      if (!e.relatedTarget) document.body.classList.remove("is-dragging");
-    });
-    document.body.addEventListener("drop", (e) => {
-      e.preventDefault();
-      document.body.classList.remove("is-dragging");
-      handleFile(e.dataTransfer.files);
+    let moveReq = null;
+    let lastEvent = null;
+    document.addEventListener("pointermove", (e) => {
+      lastEvent = e;
+      if (moveReq) return;
+      moveReq = requestAnimationFrame(() => {
+        moveReq = null;
+        const ev = lastEvent;
+        if (!ev) return;
+        const target = ev.target.closest(".card, button");
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
+        target.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
+      });
     });
     const hotkeys = {
       p: () => {
@@ -1522,22 +1534,6 @@
       if (!handler) return;
       e.preventDefault();
       handler();
-    });
-    let moveReq = null;
-    let lastEvent = null;
-    document.addEventListener("pointermove", (e) => {
-      lastEvent = e;
-      if (moveReq) return;
-      moveReq = requestAnimationFrame(() => {
-        moveReq = null;
-        const ev = lastEvent;
-        if (!ev) return;
-        const target = ev.target.closest(".card, button");
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
-        target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
-        target.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
-      });
     });
   </script>
 </body>
