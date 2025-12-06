@@ -307,6 +307,8 @@
         resize: none;
         padding: 10px 8px;
         min-height: 80px;
+        field-sizing: content;
+        max-height: 400px;
 
         &:focus {
           outline: none;
@@ -444,14 +446,20 @@
         padding-block: 10px;
         padding-inline: 14px;
         border-radius: 8px;
-        background: light-dark(rgba(0, 0, 0, 0.03),
-            rgba(255, 255, 255, 0.05));
+        background: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05));
         border-inline-start: 3px solid var(--muted);
-        animation: fadeIn 0.3s ease;
         flex-shrink: 0;
+        transition: opacity 0.3s, transform 0.3s, display 0.3s allow-discrete;
 
         &:empty {
           display: none;
+          opacity: 0;
+          transform: translateY(5px);
+        }
+
+        @starting-style {
+          opacity: 0;
+          transform: translateY(5px);
         }
 
         &.err {
@@ -705,18 +713,6 @@
 
         100% {
           background-position: -100% 0;
-        }
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(5px);
-        }
-
-        to {
-          opacity: 1;
-          transform: translateY(0);
         }
       }
     }
