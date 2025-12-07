@@ -1191,11 +1191,11 @@
           await yieldToMain();
         }
         for (const { groups: { label, lat, lon } } of line.matchAll(COORD_REGEX)) {
-          const fLat = parseFloat(lat);
-          const fLon = parseFloat(lon);
+          const fLat = +lat;
+          const fLon = +lon;
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
           if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
-          const setLabel = label.startsWith("대한민국") ? "KR" : "WORLD";
+          const setLabel = label === "대한민국" ? "KR" : "WORLD";
           out.push({ lat: fLat, lon: fLon, setLabel });
         }
       }
@@ -1400,7 +1400,7 @@
         };
         const lines = [CSV_HEADER_STR];
         for (const r of rows) lines.push(makeRow(r));
-        const dateStr = fileDateFmt.format(new Date()).replace(/\D/g, "");
+        const dateStr = fileDateFmt.format().replace(/\D/g, "");
         const fileName = `result_${dateStr}.csv`;
         const blob = new Blob(lines, { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
