@@ -826,31 +826,31 @@
           </thead>
           <tbody></tbody>
         </table>
-        <template id="tmpl-map-links">
-          <ul class="map-links">
-            <li>
-              <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}"
-                target="_blank" rel="noopener noreferrer">Google</a>
-            </li>
-            <li>
-              <a data-provider-key="OSM"
-                data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&amp;zoom=16#map=16/{lat}/{lon}"
-                target="_blank" rel="noopener noreferrer">OSM</a>
-            </li>
-            <li>
-              <a data-provider-key="Naver"
-                data-url-template="https://map.naver.com/?lng={lon}&amp;lat={lat}&amp;title={lat}%20{lon}"
-                target="_blank" rel="noopener noreferrer">Naver</a>
-            </li>
-            <li>
-              <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-                target="_blank" rel="noopener noreferrer">Kakao</a>
-            </li>
-          </ul>
-        </template>
       </div>
     </section>
   </main>
+  <template id="tmpl-map-links">
+    <ul class="map-links">
+      <li>
+        <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
+          rel="noopener noreferrer">Google</a>
+      </li>
+      <li>
+        <a data-provider-key="OSM"
+          data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&amp;zoom=16#map=16/{lat}/{lon}"
+          target="_blank" rel="noopener noreferrer">OSM</a>
+      </li>
+      <li>
+        <a data-provider-key="Naver"
+          data-url-template="https://map.naver.com/?lng={lon}&amp;lat={lat}&amp;title={lat}%20{lon}" target="_blank"
+          rel="noopener noreferrer">Naver</a>
+      </li>
+      <li>
+        <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
+          target="_blank" rel="noopener noreferrer">Kakao</a>
+      </li>
+    </ul>
+  </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
     const COORD_REGEX = /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
@@ -881,8 +881,8 @@
           const template = a.dataset.urlTemplate;
           const url = (lat, lon) =>
             template
-              .replace(/\{lat\}/g, lat)
-              .replace(/\{lon\}/g, lon);
+              .replaceAll('{lat}', lat)
+              .replaceAll('{lon}', lon);
           return { key, url };
         }
       )
