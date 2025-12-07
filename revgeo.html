@@ -43,6 +43,13 @@
         text-wrap: pretty;
       }
 
+      h1,
+      h2,
+      h3,
+      .card-header #results-title {
+        text-wrap: balance;
+      }
+
       fieldset {
         margin: 0;
         padding: 0;
@@ -837,13 +844,12 @@
       </li>
       <li>
         <a data-provider-key="OSM"
-          data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&amp;zoom=16#map=16/{lat}/{lon}"
+          data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
           target="_blank" rel="noopener noreferrer">OSM</a>
       </li>
       <li>
-        <a data-provider-key="Naver"
-          data-url-template="https://map.naver.com/?lng={lon}&amp;lat={lat}&amp;title={lat}%20{lon}" target="_blank"
-          rel="noopener noreferrer">Naver</a>
+        <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
+          target="_blank" rel="noopener noreferrer">Naver</a>
       </li>
       <li>
         <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
@@ -1184,10 +1190,7 @@
         if (++processedLines % 5000 === 0) {
           await yieldToMain();
         }
-        for (const m of line.matchAll(COORD_REGEX)) {
-          const groups = m.groups;
-          if (!groups) continue;
-          const { label, lat, lon } = groups;
+        for (const { groups: { label, lat, lon } } of line.matchAll(COORD_REGEX)) {
           const fLat = parseFloat(lat);
           const fLon = parseFloat(lon);
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
@@ -1385,11 +1388,10 @@
         if (!rows.length) {
           return setStatus("내보낼 데이터가 없습니다.", "warn");
         }
-        const headerCols = CSV_COLS;
         const makeRow = (r) => {
           const rowArr = [];
-          for (let i = 0; i < headerCols.length; i++) {
-            rowArr.push(csvEsc(headerCols[i].val(r)));
+          for (let i = 0; i < CSV_COLS.length; i++) {
+            rowArr.push(csvEsc(CSV_COLS[i].val(r)));
           }
           for (let i = 0; i < MAP_PROVIDERS.length; i++) {
             rowArr.push(csvEsc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
