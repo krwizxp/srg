@@ -101,10 +101,6 @@
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
 
-        &.is-dragging {
-          opacity: 0.8;
-        }
-
         @media (width <=800px) {
           padding: 12px;
         }
@@ -1473,15 +1469,6 @@
     }
     domElements.file.addEventListener("change", () => {
       handleFile(domElements.file.files);
-    });
-    window.addEventListener("dragenter", (e) => e.preventDefault());
-    window.addEventListener("dragover", (e) => e.preventDefault());
-    window.addEventListener("dragleave", (e) => e.preventDefault());
-    window.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        handleFile(e.dataTransfer.files);
-      }
     });
     let moveReq = null;
     let lastEvent = null;
