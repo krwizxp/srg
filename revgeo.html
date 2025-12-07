@@ -68,8 +68,7 @@
         --muted: light-dark(oklch(50% 0.05 260), oklch(65% 0.04 260));
         --line: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
         --accent: light-dark(oklch(55% 0.22 270), oklch(65% 0.18 260));
-        --accent-glow: light-dark(oklch(55% 0.22 270/0.4),
-            oklch(65% 0.18 260/0.4));
+        --accent-glow: oklch(from var(--accent) l c h / 0.4);
         --success: light-dark(oklch(60% 0.18 150), oklch(70% 0.15 150));
         --warn: light-dark(oklch(65% 0.18 50), oklch(75% 0.15 50));
         --err: light-dark(oklch(55% 0.22 25), oklch(65% 0.2 25));
@@ -827,6 +826,28 @@
           </thead>
           <tbody></tbody>
         </table>
+        <template id="tmpl-map-links">
+          <ul class="map-links">
+            <li>
+              <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}"
+                target="_blank" rel="noopener noreferrer">Google</a>
+            </li>
+            <li>
+              <a data-provider-key="OSM"
+                data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&amp;zoom=16#map=16/{lat}/{lon}"
+                target="_blank" rel="noopener noreferrer">OSM</a>
+            </li>
+            <li>
+              <a data-provider-key="Naver"
+                data-url-template="https://map.naver.com/?lng={lon}&amp;lat={lat}&amp;title={lat}%20{lon}"
+                target="_blank" rel="noopener noreferrer">Naver</a>
+            </li>
+            <li>
+              <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
+                target="_blank" rel="noopener noreferrer">Kakao</a>
+            </li>
+          </ul>
+        </template>
       </div>
     </section>
   </main>
@@ -851,27 +872,21 @@
     BASE_URL.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
     BASE_URL.searchParams.set("addressdetails", "1");
     BASE_URL.searchParams.set("accept-language", "ko");
-    const MAP_PROVIDERS = [
-      {
-        key: "Google",
-        url: (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`,
-      },
-      {
-        key: "OSM",
-        url: (lat, lon) =>
-          `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}`,
-      },
-      {
-        key: "Naver",
-        url: (lat, lon) =>
-          `https://map.naver.com/?lng=${lon}&lat=${lat}&title=${lat}%20${lon}`,
-      },
-      {
-        key: "Kakao",
-        url: (lat, lon) =>
-          `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
-      },
-    ];
+    const tmplMapLinks = document.getElementById("tmpl-map-links");
+    const MAP_PROVIDERS = tmplMapLinks
+      ? Array.from(
+        tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
+        (a) => {
+          const key = a.dataset.providerKey || a.textContent.trim();
+          const template = a.dataset.urlTemplate;
+          const url = (lat, lon) =>
+            template
+              .replace(/\{lat\}/g, lat)
+              .replace(/\{lon\}/g, lon);
+          return { key, url };
+        }
+      )
+      : [];
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
       kind: {
@@ -904,10 +919,19 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const links = MAP_PROVIDERS.map((p) =>
-            `<li><a href="${p.url(r.lat, r.lon)}" target="_blank" rel="noopener noreferrer">${p.key}</a></li>`
-          ).join("");
-          td.innerHTML = `<ul class="map-links">${links}</ul>`;
+          if (!tmplMapLinks || MAP_PROVIDERS.length === 0) {
+            td.textContent = "";
+            return;
+          }
+          const fragment = tmplMapLinks.content.cloneNode(true);
+          const anchors = fragment.querySelectorAll("a[data-url-template]");
+          let idx = 0;
+          for (const a of anchors) {
+            const provider = MAP_PROVIDERS[idx++];
+            if (!provider) break;
+            a.href = provider.url(r.lat, r.lon);
+          }
+          td.replaceChildren(fragment);
         },
       },
     };
@@ -1137,17 +1161,40 @@
       "scheduler" in window && "yield" in window.scheduler
         ? () => window.scheduler.yield()
         : () => new Promise((r) => setTimeout(r, 0));
-    function extractCoordinates(text) {
-      const out = [];
-      const push = (lat, lon, setLabel) => {
-        if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-          out.push({ lat, lon, setLabel });
+    async function* lineIterator(stream) {
+      const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+      let remnant = "";
+      while (true) {
+        const { value: chunk, done } = await reader.read();
+        if (done) break;
+        const lines = (remnant + chunk).split(/\r\n|\n|\r/);
+        remnant = lines.pop() ?? "";
+        for (const line of lines) {
+          yield line;
         }
-      };
-      for (const m of text.matchAll(COORD_REGEX)) {
-        const { label, lat, lon } = m.groups;
-        const setLabel = label.startsWith("대한민국") ? "KR" : "WORLD";
-        push(parseFloat(lat), parseFloat(lon), setLabel);
+      }
+      if (remnant) {
+        yield remnant;
+      }
+    }
+    async function extractCoordinatesFromStream(file) {
+      const out = [];
+      let processedLines = 0;
+      for await (const line of lineIterator(file.stream())) {
+        if (++processedLines % 5000 === 0) {
+          await yieldToMain();
+        }
+        for (const m of line.matchAll(COORD_REGEX)) {
+          const groups = m.groups;
+          if (!groups) continue;
+          const { label, lat, lon } = groups;
+          const fLat = parseFloat(lat);
+          const fLon = parseFloat(lon);
+          if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
+          if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
+          const setLabel = label.startsWith("대한민국") ? "KR" : "WORLD";
+          out.push({ lat: fLat, lon: fLon, setLabel });
+        }
       }
       return out;
     }
@@ -1374,11 +1421,8 @@
           return setStatus("파일을 선택해 주세요.", "warn");
         }
         AppState.setStatus("parsing");
-        setStatus("파일 읽는 중…");
-        const text = await file.text();
-        setStatus("좌표 추출 중…");
-        await yieldToMain();
-        const parsed = await extractCoordinates(text);
+        setStatus("파일 분석 중…");
+        const parsed = await extractCoordinatesFromStream(file);
         if (!parsed.length) {
           AppState.setRecords([]);
           domElements.coords.value = "";
