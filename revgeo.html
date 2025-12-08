@@ -492,6 +492,7 @@
         overflow: auto;
         scrollbar-gutter: stable;
         position: relative;
+        scrollbar-width: thin;
 
         .empty-hint {
           display: flex;
@@ -965,7 +966,6 @@
       progLabel: document.getElementById("prog-label"),
       tbody: document.querySelector("#tbl tbody"),
       coords: document.getElementById("coords"),
-      coordsBox: document.getElementById("coords")?.parentElement,
     };
     const form = document.getElementById("controls");
     const COL_DEFS = Array.from(thead.querySelectorAll("th"), (th) => {
@@ -1140,7 +1140,6 @@
         exportBtn,
         progShell,
         dropZone,
-        coordsBox,
       } = domElements;
       const isBusy = AppState.isRunning || s === "parsing";
       parse.disabled = isBusy;
@@ -1155,7 +1154,6 @@
       );
       const lockInput = isBusy || s === "stopping";
       dropZone?.toggleAttribute("inert", lockInput);
-      coordsBox?.toggleAttribute("inert", lockInput);
     }
     function setStatus(msg, type = "info") {
       const el = domElements.status;
