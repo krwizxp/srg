@@ -102,9 +102,7 @@
           linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
         color: var(--fg);
         padding: 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        align-content: center;
         letter-spacing: -0.01em;
         text-autospace: normal;
         transition: opacity 0.2s ease;
@@ -121,10 +119,12 @@
     @layer layout {
       main {
         width: min(1600px, 100%);
+        margin-inline: auto;
         display: grid;
         grid-template-columns: clamp(380px, 25vw, 420px) 1fr;
         gap: 16px;
         height: clamp(650px, calc(100vh - 40px), 1000px);
+        transition: grid-template-columns 0.25s ease, height 0.25s ease;
 
         @container (width <=800px) {
           & {
@@ -316,6 +316,7 @@
         padding: 10px 8px;
         min-height: 80px;
         field-sizing: content;
+        scrollbar-width: thin;
 
         &:focus {
           outline: none;
@@ -416,44 +417,45 @@
         border-radius: 999px;
         background: var(--line);
         overflow: hidden;
-      }
 
-      .progress-shell>progress {
-        width: 100%;
-        height: 6px;
-        border: none;
-        margin: 0;
-        padding: 0;
-        opacity: 0;
-      }
+        >progress {
+          width: 100%;
+          height: 6px;
+          border: none;
+          margin: 0;
+          padding: 0;
+          opacity: 0;
+        }
 
-      .progress-visual {
-        position: absolute;
-        inset: 0;
-      }
+        .progress-visual {
+          position: absolute;
+          inset: 0;
+        }
 
-      .progress-fill {
-        height: 100%;
-        transform: scaleX(calc(var(--pct, 0) / 100));
-        transform-origin: left;
-        background: linear-gradient(90deg, var(--accent), var(--success));
-        transition: transform 0.25s ease-out;
-      }
+        .progress-fill {
+          height: 100%;
+          transform: scaleX(calc(var(--pct, 0) / 100));
+          transform-origin: left;
+          background: linear-gradient(90deg, var(--accent), var(--success));
+          transition: transform 0.25s ease-out;
+        }
 
-      .progress-shell.active .progress-fill {
-        animation: shimmer 1.5s linear infinite;
-        background: linear-gradient(90deg,
-            var(--accent),
-            var(--success),
-            var(--accent));
-        background-size: 200% 100%;
+        &.active .progress-fill {
+          animation: shimmer 1.5s linear infinite;
+          background: linear-gradient(90deg,
+              var(--accent),
+              var(--success),
+              var(--accent));
+          background-size: 200% 100%;
+        }
       }
 
       .status {
         padding-block: 10px;
         padding-inline: 14px;
         border-radius: 8px;
-        background: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05));
+        background: light-dark(rgba(0, 0, 0, 0.03),
+            rgba(255, 255, 255, 0.05));
         border-inline-start: 3px solid var(--muted);
         flex-shrink: 0;
         transition: opacity 0.3s, transform 0.3s, display 0.3s allow-discrete;
@@ -506,6 +508,11 @@
 
         &:has(tbody > tr) .empty-hint {
           display: none;
+        }
+
+        tbody tr {
+          content-visibility: auto;
+          contain-intrinsic-size: var(--row-size);
         }
       }
 
@@ -594,11 +601,6 @@
             }
           }
         }
-      }
-
-      .table-wrap tbody tr {
-        content-visibility: auto;
-        contain-intrinsic-size: var(--row-size);
       }
 
       @container (width <=800px) {
@@ -864,7 +866,8 @@
   </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
-    const COORD_REGEX = /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
+    const COORD_REGEX =
+      /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
     const RX_CSV = /[",\n\r]/;
     const csvEsc = (s) => {
       s = String(s ?? "");
@@ -884,20 +887,18 @@
     BASE_URL.searchParams.set("addressdetails", "1");
     BASE_URL.searchParams.set("accept-language", "ko");
     const tmplMapLinks = document.getElementById("tmpl-map-links");
-    const MAP_PROVIDERS = tmplMapLinks
-      ? Array.from(
-        tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
-        (a) => {
-          const key = a.dataset.providerKey || a.textContent.trim();
-          const template = a.dataset.urlTemplate;
-          const url = (lat, lon) =>
-            template
-              .replaceAll('{lat}', lat)
-              .replaceAll('{lon}', lon);
-          return { key, url };
-        }
-      )
-      : [];
+    const MAP_PROVIDERS = Array.from(
+      tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
+      (a) => {
+        const key = a.dataset.providerKey || a.textContent.trim();
+        const template = a.dataset.urlTemplate;
+        const url = (lat, lon) =>
+          template
+            .replaceAll("{lat}", lat)
+            .replaceAll("{lon}", lon);
+        return { key, url };
+      }
+    );
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
       kind: {
@@ -930,10 +931,6 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          if (!tmplMapLinks || MAP_PROVIDERS.length === 0) {
-            td.textContent = "";
-            return;
-          }
           const fragment = tmplMapLinks.content.cloneNode(true);
           const anchors = fragment.querySelectorAll("a[data-url-template]");
           let idx = 0;
@@ -951,6 +948,7 @@
     const domElements = {
       file: document.getElementById("file"),
       dropZoneText: document.querySelector(".drop-text"),
+      dropZone: document.querySelector(".drop-zone"),
       parse: document.getElementById("parse"),
       start: document.getElementById("start"),
       pause: document.getElementById("pause"),
@@ -967,6 +965,7 @@
       progLabel: document.getElementById("prog-label"),
       tbody: document.querySelector("#tbl tbody"),
       coords: document.getElementById("coords"),
+      coordsBox: document.getElementById("coords")?.parentElement,
     };
     const form = document.getElementById("controls");
     const COL_DEFS = Array.from(thead.querySelectorAll("th"), (th) => {
@@ -1024,24 +1023,46 @@
         return { sido, sigungu, eupmyeon };
       },
       _getGlobalAdminArea(a) {
-        const sido = a.state || a.region || a.province || a.county || a.city || "";
-        let sigungu = a.city || a.town || a.county || a.district || a.municipality || a.region || "";
+        const sido =
+          a.state || a.region || a.province || a.county || a.city || "";
+        let sigungu =
+          a.city ||
+          a.town ||
+          a.county ||
+          a.district ||
+          a.municipality ||
+          a.region ||
+          "";
         if (sido === sigungu) sigungu = "";
-        const eupmyeon = a.village || a.suburb || a.neighbourhood || a.quarter || a.hamlet || a.city_district || a.township || a.residential || "";
+        const eupmyeon =
+          a.village ||
+          a.suburb ||
+          a.neighbourhood ||
+          a.quarter ||
+          a.hamlet ||
+          a.city_district ||
+          a.township ||
+          a.residential ||
+          "";
         return { sido, sigungu, eupmyeon };
       },
       _getTag(data) {
         if (!data || typeof data !== "object") return "";
         const a = data.address ?? {};
         const name = data.name || a.attraction || a.building;
-        const secondary = [data.addresstype, data.category].find(v => v && v !== name);
+        const secondary = [data.addresstype, data.category].find(
+          (v) => v && v !== name
+        );
         return [name, secondary].filter(Boolean).join(", ");
       },
       parse(data) {
         const a = data?.address ?? {};
-        const isKR = a.country_code?.toLowerCase() === "kr" || a.country === "대한민국";
+        const isKR =
+          a.country_code?.toLowerCase() === "kr" || a.country === "대한민국";
         const tag = this._getTag(data);
-        const addr = isKR ? this._getKoreanAdminArea(a) : this._getGlobalAdminArea(a);
+        const addr = isKR
+          ? this._getKoreanAdminArea(a)
+          : this._getGlobalAdminArea(a);
         addr.tag = tag;
         return addr;
       },
@@ -1110,8 +1131,17 @@
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
-      const { parse, start, pause, resume, stop, exportBtn, progShell } =
-        domElements;
+      const {
+        parse,
+        start,
+        pause,
+        resume,
+        stop,
+        exportBtn,
+        progShell,
+        dropZone,
+        coordsBox,
+      } = domElements;
       const isBusy = AppState.isRunning || s === "parsing";
       parse.disabled = isBusy;
       start.disabled = isBusy || !hasRecords || s === "stopping";
@@ -1119,7 +1149,13 @@
       resume.disabled = s !== "paused";
       stop.disabled = s === "idle" || s === "stopping";
       exportBtn.disabled = AppState.processedCount === 0;
-      progShell.classList.toggle("active", s === "running" || s === "pausing");
+      progShell.classList.toggle(
+        "active",
+        s === "running" || s === "pausing"
+      );
+      const lockInput = isBusy || s === "stopping";
+      dropZone?.toggleAttribute("inert", lockInput);
+      coordsBox?.toggleAttribute("inert", lockInput);
     }
     function setStatus(msg, type = "info") {
       const el = domElements.status;
@@ -1195,7 +1231,9 @@
         if (++processedLines % 5000 === 0) {
           await yieldToMain();
         }
-        for (const { groups: { label, lat, lon } } of line.matchAll(COORD_REGEX)) {
+        for (const {
+          groups: { label, lat, lon },
+        } of line.matchAll(COORD_REGEX)) {
           const fLat = +lat;
           const fLon = +lon;
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
