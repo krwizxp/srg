@@ -513,7 +513,7 @@
 
         tbody tr {
           content-visibility: auto;
-          contain-intrinsic-size: var(--row-size);
+          contain-intrinsic-size: auto 61px;
         }
       }
 
@@ -1313,37 +1313,6 @@
       else AppState.cntSuccess++;
       scheduleRender();
     }
-    function updateIntrinsicRowSize() {
-      const tbody = domElements.tbody;
-      const rows = tbody.rows;
-      const len = rows.length;
-      if (!len) return;
-      const sampleLimit = Math.min(len, 120);
-      const start = Math.max(0, len - sampleLimit);
-      let total = 0;
-      let count = 0;
-      for (let i = len - 1; i >= start; i -= 2) {
-        const row = rows[i];
-        if (!row) continue;
-        const rect = row.getBoundingClientRect();
-        const h = rect.height;
-        if (!h) continue;
-        total += h;
-        count++;
-      }
-      if (!count) return;
-      const avg = total / count;
-      if (!Number.isFinite(avg) || avg <= 0) return;
-      const clamped = Math.max(20, Math.min(avg, 240));
-      document.documentElement.style.setProperty(
-        "--row-size",
-        `${clamped}px`
-      );
-    }
-    function maybeUpdateIntrinsicRowSize() {
-      const n = AppState.processedCount;
-      if (n === 1 || n === 50 || n % 200 === 0) updateIntrinsicRowSize();
-    }
     async function runProcessingLoop() {
       const startIndex = AppState.processedCount;
       for (let i = startIndex; i < AppState.records.length; i++) {
@@ -1379,7 +1348,6 @@
           r.fullAddr = data.display_name || "";
           fillRow(skeletonTr, r);
           pushResultRow(r);
-          maybeUpdateIntrinsicRowSize();
         } catch (err) {
           const msg = err && (err.message || String(err));
           const isAbort =
@@ -1393,7 +1361,6 @@
           r.fullAddr = msg;
           fillRow(skeletonTr, r);
           pushResultRow(r);
-          maybeUpdateIntrinsicRowSize();
           if (!AppState.isStopping)
             setStatus(
               `에러 발생: (${i + 1}/${AppState.records.length}) ${msg}`,
