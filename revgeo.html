@@ -43,7 +43,7 @@
       body {
         word-break: keep-all;
         margin: 0;
-        min-height: 100dvh;
+        min-block-size: 100dvh;
         text-wrap: pretty;
       }
 
@@ -118,18 +118,18 @@
 
     @layer layout {
       main {
-        width: min(1600px, 100%);
+        inline-size: min(1600px, 100%);
         margin-inline: auto;
         display: grid;
         grid-template-columns: clamp(380px, 25vw, 420px) 1fr;
         gap: 16px;
-        height: clamp(650px, calc(100vh - 40px), 1000px);
-        transition: grid-template-columns 0.25s ease, height 0.25s ease;
+        block-size: clamp(650px, calc(100vh - 40px), 1000px);
+        transition: grid-template-columns 0.25s ease, block-size 0.25s ease;
 
         @container (width <=800px) {
           & {
             grid-template-columns: 1fr;
-            height: auto;
+            block-size: auto;
           }
         }
       }
@@ -152,7 +152,7 @@
         display: flex;
         flex-direction: column;
         gap: 16px;
-        max-width: 100%;
+        max-inline-size: 100%;
         overflow: hidden;
         position: relative;
         container-type: inline-size;
@@ -161,7 +161,7 @@
           flex: 1;
           display: flex;
           flex-direction: column;
-          min-height: 0;
+          min-block-size: 0;
         }
 
         .card-header {
@@ -201,13 +201,13 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        margin-bottom: 4px;
+        margin-block-end: 4px;
 
         svg {
           color: var(--accent);
           filter: drop-shadow(0 0 8px var(--accent-glow));
-          width: 32px;
-          height: 32px;
+          inline-size: 32px;
+          block-size: 32px;
         }
 
         h1 {
@@ -263,9 +263,9 @@
         }
 
         .drop-icon {
-          width: 32px;
-          height: 32px;
-          margin-bottom: 6px;
+          inline-size: 32px;
+          block-size: 32px;
+          margin-block-end: 6px;
           color: var(--muted);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -314,7 +314,7 @@
         flex: 1;
         resize: none;
         padding: 10px 8px;
-        min-height: 80px;
+        min-block-size: 80px;
         field-sizing: content;
         scrollbar-width: thin;
 
@@ -325,13 +325,20 @@
         }
       }
 
+      @container (width <=800px) {
+        #coords {
+          max-block-size: 40dvh;
+          overflow: auto;
+        }
+      }
+
       button {
         cursor: pointer;
         font-weight: 600;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 0;
+        min-inline-size: 0;
         white-space: nowrap;
         padding: 12px 4px;
         position: relative;
@@ -395,7 +402,7 @@
         display: flex;
         align-items: flex-end;
         gap: 10px;
-        margin-top: 12px;
+        margin-block-start: 12px;
 
         >.sp {
           flex: 1;
@@ -404,7 +411,7 @@
         #counts {
           flex: 0 0 auto;
           font-size: var(--fs-sm);
-          text-align: right;
+          text-align: end;
           white-space: nowrap;
           letter-spacing: -0.03em;
         }
@@ -412,15 +419,15 @@
 
       .progress-shell {
         --pct: 0;
-        margin-top: 6px;
+        margin-block-start: 6px;
         position: relative;
         border-radius: 999px;
         background: var(--line);
         overflow: hidden;
 
         >progress {
-          width: 100%;
-          height: 6px;
+          inline-size: 100%;
+          block-size: 6px;
           border: none;
           margin: 0;
           padding: 0;
@@ -433,7 +440,7 @@
         }
 
         .progress-fill {
-          height: 100%;
+          block-size: 100%;
           transform: scaleX(calc(var(--pct, 0) / 100));
           transform-origin: left;
           background: linear-gradient(90deg, var(--accent), var(--success));
@@ -500,7 +507,7 @@
           justify-content: center;
           position: absolute;
           inset: 0;
-          top: 50px;
+          inset-block-start: 50px;
           color: var(--muted);
           font-size: calc(var(--fs-base) * 1.05);
           z-index: 0;
@@ -513,67 +520,67 @@
 
         tbody tr {
           content-visibility: auto;
-          contain-intrinsic-size: auto 61px;
+          contain-intrinsic-block-size: auto 57px;
         }
       }
 
       table {
-        width: 100%;
-        min-width: 800px;
+        inline-size: 100%;
+        min-inline-size: 800px;
         border-spacing: 0;
 
         thead th {
           padding: 12px 10px;
-          border-bottom: 1px solid var(--line);
+          border-block-end: 1px solid var(--line);
           position: sticky;
-          top: 0;
+          inset-block-start: 0;
           z-index: 10;
           background: var(--card-bg);
           backdrop-filter: var(--glass);
-          text-align: left;
+          text-align: start;
           font-weight: 600;
           color: var(--muted);
           white-space: nowrap;
 
           &:first-child {
-            border-top-left-radius: 16px;
+            border-start-start-radius: 16px;
           }
 
           &:last-child {
-            border-top-right-radius: 16px;
+            border-start-end-radius: 16px;
           }
 
           &:nth-child(1),
           &:nth-child(2) {
-            width: 50px;
+            inline-size: 50px;
             text-align: center;
           }
 
           &:nth-child(3) {
-            width: 180px;
+            inline-size: 180px;
           }
 
           &:nth-child(4),
           &:nth-child(5),
           &:nth-child(6),
           &:nth-child(7) {
-            width: 80px;
+            inline-size: 80px;
           }
 
           &:nth-child(8) {
-            min-width: 160px;
+            min-inline-size: 160px;
           }
 
           &:nth-child(9) {
-            min-width: 75px;
-            width: 240px;
+            min-inline-size: 75px;
+            inline-size: 240px;
           }
         }
 
         tbody {
           td {
             padding: 12px 10px;
-            border-bottom: 1px solid var(--line);
+            border-block-end: 1px solid var(--line);
             vertical-align: top;
           }
 
@@ -598,7 +605,7 @@
 
           tr:last-child {
             td {
-              border-bottom: none;
+              border-block-end: none;
             }
           }
         }
@@ -606,17 +613,17 @@
 
       @container (width <=800px) {
         .table-wrap:not(:has(tbody > tr)) {
-          min-height: 80px;
+          min-block-size: 80px;
           overflow: hidden;
         }
 
         .table-wrap:not(:has(tbody > tr)) .empty-hint {
-          top: 0;
+          inset-block-start: 0;
         }
 
         table {
           display: block;
-          min-width: 0;
+          min-inline-size: 0;
 
           thead {
             display: none;
@@ -629,6 +636,7 @@
             padding: 12px;
 
             tr {
+              contain-intrinsic-block-size: auto 318px;
               display: flex;
               flex-direction: column;
               background: var(--card-bg);
@@ -652,7 +660,7 @@
               grid-template-columns: 80px 1fr;
               gap: 12px;
               align-items: baseline;
-              text-align: left !important;
+              text-align: start !important;
 
               &::before {
                 content: attr(data-label);
@@ -668,7 +676,7 @@
       }
 
       .skeleton-bar {
-        height: 12px;
+        block-size: 12px;
         background: linear-gradient(90deg,
             transparent,
             light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.1)),
@@ -688,12 +696,12 @@
         border: 1px solid var(--line);
         white-space: normal;
         overflow-wrap: anywhere;
-        max-width: 100%;
+        max-inline-size: 100%;
         text-align: center;
       }
 
       .tags-cell {
-        padding-top: 10px;
+        padding-block-start: 10px;
       }
 
       .map-links {
@@ -738,8 +746,8 @@
 
       .sr-only {
         position: absolute;
-        width: 1px;
-        height: 1px;
+        inline-size: 1px;
+        block-size: 1px;
         padding: 0;
         overflow: hidden;
         clip-path: inset(50%);
