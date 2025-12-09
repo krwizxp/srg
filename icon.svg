@@ -8,13 +8,16 @@
   <style>
     :root {
       color-scheme: light dark;
-      --accent: light-dark(oklch(54% 0.29 270), oklch(66% 0.27 265));
-      --accent-glow: light-dark(oklch(54% 0.29 270 / 0.4), oklch(66% 0.27 265 / 0.4));
+      --accent: light-dark(
+        oklch(56% 0.38 274),
+        oklch(68% 0.36 270)
+      );
+      --accent-glow: oklch(from var(--accent) l c h / 0.45);
     }
 
     .pin {
       fill: var(--accent);
-      filter: drop-shadow(0 0 16px var(--accent-glow));
+      filter: drop-shadow(0 0 8px var(--accent-glow));
     }
   </style>
 
