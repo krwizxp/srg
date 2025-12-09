@@ -45,6 +45,8 @@
         margin: 0;
         min-block-size: 100dvh;
         text-wrap: pretty;
+        container-type: inline-size;
+        container-name: page;
       }
 
       h1,
@@ -106,7 +108,6 @@
         letter-spacing: -0.01em;
         text-autospace: normal;
         transition: opacity 0.2s ease;
-        container-type: inline-size;
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
 
@@ -325,7 +326,7 @@
         }
       }
 
-      @container (width <=800px) {
+      @container page (width <=800px) {
         #coords {
           max-block-size: 40dvh;
           overflow: auto;
