@@ -9,7 +9,7 @@
   <meta name="description" content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
-  <meta property="og:description" content="대량의 좌표 데이터를 주소로 빠르고 안전하게 변환하세요.">
+  <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(97% 0.01 240)">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(12% 0.02 240)">
@@ -899,9 +899,8 @@
     };
     const FETCH_HEADERS = { Accept: "application/json" };
     const BASE_URL = new URL("https://nominatim.openstreetmap.org/reverse");
-    BASE_URL.searchParams.set("format", "jsonv2");
+    BASE_URL.searchParams.set("format", "geocodejson");
     BASE_URL.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
-    BASE_URL.searchParams.set("addressdetails", "1");
     BASE_URL.searchParams.set("accept-language", "ko");
     const tmplMapLinks = document.getElementById("tmpl-map-links");
     const MAP_PROVIDERS = Array.from(
@@ -1014,73 +1013,132 @@
       const maps = MAP_PROVIDERS.map((p) => csvEsc(`지도링크(${p.key})`));
       return "\uFEFF" + [...cols, ...maps].join(",") + "\n";
     })();
+    function getGeocodejsonFeature(data) {
+      if (!data || typeof data !== "object") return null;
+      const { features } = data;
+      if (!features) return null;
+      if (Array.isArray(features)) return features[0] || null;
+      if (typeof features === "object") return features;
+      return null;
+    }
     const AddressFormatter = {
-      _getKoreanAdminArea(a) {
-        let sido = a.province || a.state || a.region || "";
-        let tmpCity = a.city || a.county || a.municipality || "";
-        let tmpGu = a.district || a.borough || a.suburb || "";
-        let sigungu;
-        const isSpecialCity = CONFIG.SPECIAL_CITIES.test(tmpCity);
-        if (!sido && isSpecialCity) {
-          sido = tmpCity;
-          sigungu = tmpGu;
-        } else {
-          sigungu = tmpCity;
-          if (tmpCity && tmpGu && tmpCity !== tmpGu) {
-            if (!sigungu.includes(tmpGu)) sigungu += " " + tmpGu;
-          } else {
-            sigungu ||= tmpGu;
-          }
-        }
-        const emd =
-          a.town || a.township || a.neighbourhood || a.city_district || "";
-        const ri = a.village || a.hamlet || "";
-        const eupmyeon = [emd, ri].filter(Boolean).join(" ");
-        return { sido, sigungu, eupmyeon };
-      },
-      _getGlobalAdminArea(a) {
-        const sido =
-          a.state || a.region || a.province || a.county || a.city || "";
-        let sigungu =
-          a.city ||
-          a.town ||
-          a.county ||
-          a.district ||
-          a.municipality ||
-          a.region ||
-          "";
-        if (sido === sigungu) sigungu = "";
-        const eupmyeon =
-          a.village ||
-          a.suburb ||
-          a.neighbourhood ||
-          a.quarter ||
-          a.hamlet ||
-          a.city_district ||
-          a.township ||
-          a.residential ||
-          "";
-        return { sido, sigungu, eupmyeon };
-      },
-      _getTag(data) {
-        if (!data || typeof data !== "object") return "";
-        const a = data.address ?? {};
-        const name = data.name || a.attraction || a.building;
-        const secondary = [data.addresstype, data.category].find(
-          (v) => v && v !== name
+      _getAdminFromGeocoding(gc) {
+        const admin = gc?.admin || {};
+        const entries = Object.entries(admin)
+          .map(([key, name]) => {
+            const m = /^level(\d+)$/.exec(key);
+            return m ? { level: Number(m[1]), name } : null;
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.level - b.level);
+        const byLevel = Object.fromEntries(
+          entries.map((e) => [e.level, e.name])
         );
-        return [name, secondary].filter(Boolean).join(", ");
+        const country = gc.country || byLevel[2] || "";
+        const countryLower = String(country).toLowerCase();
+        const isKR =
+          country === "대한민국" ||
+          countryLower.includes("south korea") ||
+          countryLower.includes("korea, republic");
+        let sido = "";
+        let sigungu = "";
+        let eupmyeon = "";
+        if (isKR) {
+          const level4 = byLevel[4] || "";
+          const level6 = byLevel[6] || byLevel[7] || "";
+          const level8 = byLevel[8] || byLevel[9] || "";
+          const cityCandidate =
+            gc.city ||
+            level4 ||
+            "";
+          const guCandidate =
+            gc.city_district ||
+            gc.district ||
+            gc.suburb ||
+            level6 ||
+            "";
+          sido = level4 || gc.state || "";
+          sigungu =
+            level6 ||
+            gc.city ||
+            gc.county ||
+            "";
+          eupmyeon =
+            level8 ||
+            gc.city_district ||
+            gc.district ||
+            gc.town ||
+            gc.village ||
+            "";
+          if (!sido && cityCandidate && CONFIG.SPECIAL_CITIES.test(cityCandidate)) {
+            sido = cityCandidate;
+            if (!sigungu || sigungu === cityCandidate) {
+              sigungu = guCandidate;
+            }
+          }
+        } else {
+          sido =
+            byLevel[4] ||
+            gc.state ||
+            gc.region ||
+            gc.province ||
+            gc.county ||
+            gc.city ||
+            "";
+          sigungu =
+            byLevel[6] ||
+            byLevel[8] ||
+            gc.city ||
+            gc.town ||
+            gc.county ||
+            gc.district ||
+            gc.municipality ||
+            "";
+          if (sido === sigungu) sigungu = "";
+          eupmyeon =
+            byLevel[8] ||
+            byLevel[10] ||
+            gc.village ||
+            gc.suburb ||
+            gc.neighbourhood ||
+            gc.quarter ||
+            gc.hamlet ||
+            gc.city_district ||
+            gc.township ||
+            gc.residential ||
+            "";
+        }
+        return { sido, sigungu, eupmyeon };
+      },
+      _getTagFromGeocoding(gc) {
+        if (!gc || typeof gc !== "object") return "";
+        const label = gc.label || "";
+        const firstPart = label.split(",")[0].trim();
+        const primary =
+          gc.name ||
+          firstPart ||
+          gc.street ||
+          gc.city ||
+          "";
+        const secondary = gc.type || "";
+        return [primary, secondary].filter(Boolean).join(", ");
       },
       parse(data) {
-        const a = data?.address ?? {};
-        const isKR =
-          a.country_code?.toLowerCase() === "kr" || a.country === "대한민국";
-        const tag = this._getTag(data);
-        const addr = isKR
-          ? this._getKoreanAdminArea(a)
-          : this._getGlobalAdminArea(a);
-        addr.tag = tag;
-        return addr;
+        const feature = getGeocodejsonFeature(data);
+        const gc =
+          feature?.properties?.geocoding ||
+          null;
+        if (!gc) {
+          return {
+            sido: "",
+            sigungu: "",
+            eupmyeon: "",
+            tag: "",
+          };
+        }
+        const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(gc);
+        const tag = this._getTagFromGeocoding(gc);
+        return { sido, sigungu, eupmyeon, tag };
       },
     };
     const AppState = {
@@ -1361,7 +1419,9 @@
           );
           const parsedAddr = AddressFormatter.parse(data);
           r.addr = parsedAddr;
-          r.fullAddr = data.display_name || "";
+          const feature = getGeocodejsonFeature(data);
+          const gc = feature?.properties?.geocoding || null;
+          r.fullAddr = (gc && gc.label) || "";
           fillRow(skeletonTr, r);
           pushResultRow(r);
         } catch (err) {
