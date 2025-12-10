@@ -9,8 +9,8 @@
     :root {
       color-scheme: light dark;
       --accent: light-dark(
-        oklch(56% 0.38 274),
-        oklch(68% 0.36 270)
+        oklch(52% 0.28 275),
+        oklch(68% 0.24 270)
       );
       --accent-glow: oklch(from var(--accent) l c h / 0.45);
     }
