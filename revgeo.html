@@ -45,7 +45,8 @@
 
       body {
         word-break: keep-all;
-        margin: 0;
+        margin-block: 0;
+        margin-inline: 0;
         min-block-size: 100dvh;
         text-wrap: pretty;
         container-type: inline-size;
@@ -60,13 +61,16 @@
       }
 
       fieldset {
-        margin: 0;
-        padding: 0;
+        margin-block: 0;
+        margin-inline: 0;
+        padding-block: 0;
+        padding-inline: 0;
         border: 0;
       }
 
       p {
-        margin: 0;
+        margin-block: 0;
+        margin-inline: 0;
       }
     }
 
@@ -123,7 +127,8 @@
           url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"),
           linear-gradient(in oklch 135deg, var(--bg-grad-start), var(--bg-grad-end));
         color: var(--fg);
-        padding: 20px;
+        padding-block: 20px;
+        padding-inline: 20px;
         align-content: center;
         letter-spacing: -0.01em;
         text-autospace: normal;
@@ -134,7 +139,8 @@
 
       @container (width <=800px) {
         body {
-          padding: 12px;
+          padding-block: 12px;
+          padding-inline: 12px;
         }
       }
     }
@@ -168,7 +174,8 @@
         backdrop-filter: var(--glass);
         border: 1px solid var(--card-border);
         border-radius: clamp(16px, 2vw, 24px);
-        padding: clamp(16px, 2.4vw, 24px);
+        padding-block: clamp(16px, 2.4vw, 24px);
+        padding-inline: clamp(16px, 2.4vw, 24px);
         box-shadow: var(--shadow-md);
         display: flex;
         flex-direction: column;
@@ -193,7 +200,8 @@
 
           #results-title {
             font-size: var(--fs-lg);
-            margin: 0;
+            margin-block: 0;
+            margin-inline: 0;
           }
 
           .header-desc {
@@ -232,7 +240,8 @@
         }
 
         h1 {
-          margin: 0;
+          margin-block: 0;
+          margin-inline: 0;
           font-size: var(--fs-xl);
         }
 
@@ -258,7 +267,8 @@
         position: relative;
         border: 2px dashed var(--line);
         border-radius: 16px;
-        padding: 12px;
+        padding-block: 12px;
+        padding-inline: 12px;
         text-align: center;
         transition: all 0.2s ease;
         background: light-dark(oklch(98% 0.07 270 / 0.55),
@@ -339,7 +349,8 @@
       textarea {
         flex: 1;
         resize: none;
-        padding: 10px 8px;
+        padding-block: 10px;
+        padding-inline: 8px;
         min-block-size: 80px;
         field-sizing: content;
         scrollbar-width: thin;
@@ -366,7 +377,8 @@
         justify-content: center;
         min-inline-size: 0;
         white-space: nowrap;
-        padding: 12px 4px;
+        padding-block: 12px;
+        padding-inline: 4px;
         position: relative;
         overflow: hidden;
 
@@ -456,8 +468,10 @@
           inline-size: 100%;
           block-size: 6px;
           border: none;
-          margin: 0;
-          padding: 0;
+          margin-block: 0;
+          margin-inline: 0;
+          padding-block: 0;
+          padding-inline: 0;
           opacity: 0;
         }
 
@@ -560,7 +574,8 @@
         border-spacing: 0;
 
         thead th {
-          padding: 12px 10px;
+          padding-block: 12px;
+          padding-inline: 10px;
           border-block-end: 1px solid var(--line);
           position: sticky;
           inset-block-start: 0;
@@ -609,7 +624,8 @@
 
         tbody {
           td {
-            padding: 12px 10px;
+            padding-block: 12px;
+            padding-inline: 10px;
             border-block-end: 1px solid var(--line);
             vertical-align: top;
           }
@@ -628,7 +644,7 @@
             white-space: nowrap;
           }
 
-          tbody tr:hover {
+          tr:hover {
             background: light-dark(oklch(96% 0.09 274),
                 oklch(34% 0.10 274));
           }
@@ -663,7 +679,8 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            padding: 12px;
+            padding-block: 12px;
+            padding-inline: 12px;
 
             tr {
               contain-intrinsic-block-size: auto 318px;
@@ -672,7 +689,8 @@
               background: var(--card-bg);
               border: 1px solid var(--line);
               border-radius: 12px;
-              padding: 12px;
+              padding-block: 12px;
+              padding-inline: 12px;
               gap: 8px;
               box-shadow: var(--shadow-sm);
 
@@ -685,7 +703,8 @@
 
             td {
               border: none;
-              padding: 4px 0;
+              padding-block: 4px;
+              padding-inline: 0;
               display: grid;
               grid-template-columns: 80px 1fr;
               gap: 12px;
@@ -724,8 +743,10 @@
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      padding: 0;
-      margin: 0;
+      padding-block: 0;
+      padding-inline: 0;
+      margin-block: 0;
+      margin-inline: 0;
       list-style: none;
     }
 
@@ -763,7 +784,8 @@
         position: absolute;
         inline-size: 1px;
         block-size: 1px;
-        padding: 0;
+        padding-block: 0;
+        padding-inline: 0;
         overflow: hidden;
         clip-path: inset(50%);
       }
@@ -785,7 +807,7 @@
         </div>
       </header>
       <h2 class="sr-only">파일 업로드 및 실행</h2>
-      <form id="controls">
+      <form>
         <fieldset class="row">
           <legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
@@ -804,7 +826,7 @@
             <input type="file" id="file" accept=".txt">
           </label>
           <div class="row">
-            <button id="parse">좌표 추출</button>
+            <button type="button" id="parse">좌표 추출</button>
             <button type="button" id="start" disabled>조회 시작</button>
             <button type="button" id="pause" disabled>일시정지</button>
             <button type="button" id="resume" disabled>재개</button>
@@ -867,24 +889,53 @@
       </div>
     </section>
   </main>
+  <template id="tmpl-row-skeleton">
+    <tr>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td></td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+      <td>
+        <div class="skeleton-bar"></div>
+      </td>
+    </tr>
+  </template>
   <template id="tmpl-map-links">
     <ul class="map-links">
       <li>
         <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
-          rel="noopener noreferrer">Google</a>
+          rel="noopener noreferrer"></a>
       </li>
       <li>
         <a data-provider-key="OSM"
           data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
-          target="_blank" rel="noopener noreferrer">OSM</a>
+          target="_blank" rel="noopener noreferrer"></a>
       </li>
       <li>
         <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
-          target="_blank" rel="noopener noreferrer">Naver</a>
+          target="_blank" rel="noopener noreferrer"></a>
       </li>
       <li>
         <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-          target="_blank" rel="noopener noreferrer">Kakao</a>
+          target="_blank" rel="noopener noreferrer"></a>
       </li>
     </ul>
   </template>
@@ -909,11 +960,13 @@
     BASE_URL.searchParams.set("format", "geocodejson");
     BASE_URL.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
     BASE_URL.searchParams.set("accept-language", "ko");
-    const tmplMapLinks = document.getElementById("tmpl-map-links");
+    const tmplMapLinks = document.querySelector("#tmpl-map-links");
+    const tmplSkeleton = document.querySelector("#tmpl-row-skeleton");
     const MAP_PROVIDERS = Array.from(
       tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
       (a) => {
         const key = a.dataset.providerKey || a.textContent.trim();
+        a.textContent = key;
         const template = a.dataset.urlTemplate;
         const url = (lat, lon) =>
           template
@@ -956,53 +1009,49 @@
       },
     };
     const numberFormatter = new Intl.NumberFormat("ko-KR");
-    const thead = document.querySelector("#tbl thead");
     const domElements = {
-      file: document.getElementById("file"),
+      file: document.querySelector("#file"),
       dropZoneText: document.querySelector(".drop-text"),
       dropZone: document.querySelector(".drop-zone"),
-      parse: document.getElementById("parse"),
-      start: document.getElementById("start"),
-      pause: document.getElementById("pause"),
-      resume: document.getElementById("resume"),
-      stop: document.getElementById("stop"),
-      exportBtn: document.getElementById("export"),
-      status: document.getElementById("status"),
-      cntTotal: document.getElementById("cnt-total"),
-      cntSuccess: document.getElementById("cnt-success"),
-      cntFail: document.getElementById("cnt-fail"),
-      cntRemain: document.getElementById("cnt-remain"),
-      progShell: document.getElementById("prog-shell"),
-      prog: document.getElementById("prog"),
-      progLabel: document.getElementById("prog-label"),
+      parse: document.querySelector("#parse"),
+      start: document.querySelector("#start"),
+      pause: document.querySelector("#pause"),
+      resume: document.querySelector("#resume"),
+      stop: document.querySelector("#stop"),
+      exportBtn: document.querySelector("#export"),
+      status: document.querySelector("#status"),
+      cntTotal: document.querySelector("#cnt-total"),
+      cntSuccess: document.querySelector("#cnt-success"),
+      cntFail: document.querySelector("#cnt-fail"),
+      cntRemain: document.querySelector("#cnt-remain"),
+      progShell: document.querySelector("#prog-shell"),
+      prog: document.querySelector("#prog"),
+      progLabel: document.querySelector("#prog-label"),
       tbody: document.querySelector("#tbl tbody"),
-      coords: document.getElementById("coords"),
+      coords: document.querySelector("#coords"),
     };
-    const form = document.getElementById("controls");
-    const COL_DEFS = Array.from(thead.querySelectorAll("th"), (th) => {
-      const key = th.dataset.colKey;
-      const base = BASE_COL_CONFIG[key] || {};
-      return {
-        key,
-        label: th.textContent.trim(),
-        ...base,
-      };
-    });
+    const COL_DEFS = Array.from(
+      document.querySelector("#tbl thead").querySelectorAll("th"),
+      (th) => {
+        const key = th.dataset.colKey;
+        const base = BASE_COL_CONFIG[key] || {};
+        return {
+          key,
+          label: th.textContent.trim(),
+          ...base,
+        };
+      }
+    );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
-    const SKELETON_TEMPLATE = (() => {
-      const tr = document.createElement("tr");
-      COL_DEFS.forEach((col) => {
-        const td = document.createElement("td");
+    const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
+    if (SKELETON_TEMPLATE) {
+      const skeletonCells = SKELETON_TEMPLATE.querySelectorAll("td");
+      COL_DEFS.forEach((col, i) => {
+        const td = skeletonCells[i];
+        if (!td) return;
         td.dataset.label = col.label;
-        if (col.key !== "idx") {
-          const bar = document.createElement("div");
-          bar.className = "skeleton-bar";
-          td.append(bar);
-        }
-        tr.append(td);
       });
-      return tr;
-    })();
+    }
     const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
     const CSV_HEADER_STR = (() => {
       const cols = CSV_COLS.map((c) => csvEsc(c.label));
@@ -1121,20 +1170,20 @@
       },
       parse(data) {
         const feature = getGeocodejsonFeature(data);
-        const gc =
-          feature?.properties?.geocoding ||
-          null;
+        const gc = feature?.properties?.geocoding || null;
         if (!gc) {
           return {
             sido: "",
             sigungu: "",
             eupmyeon: "",
             tag: "",
+            fullAddr: "",
           };
         }
         const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(gc);
         const tag = this._getTagFromGeocoding(gc);
-        return { sido, sigungu, eupmyeon, tag };
+        const fullAddr = gc.label || "";
+        return { sido, sigungu, eupmyeon, tag, fullAddr };
       },
     };
     const AppState = {
@@ -1231,7 +1280,7 @@
       el.classList.toggle("err", type === "error");
       el.classList.toggle("warn", type === "warn");
     }
-    const renderFrame = () => {
+    function renderFrame() {
       const total = AppState.records.length;
       const processed = AppState.processedCount;
       const success = AppState.cntSuccess;
@@ -1247,7 +1296,7 @@
       domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       updateUIState();
       AppState.renderReq = null;
-    };
+    }
     function scheduleRender() {
       if (AppState.renderReq) return;
       AppState.renderReq = requestAnimationFrame(renderFrame);
@@ -1257,25 +1306,30 @@
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
-      const combined = AbortSignal.any([signal, timeoutSig]);
-      return new Promise((resolve, reject) => {
-        combined.addEventListener(
-          "abort",
-          () => {
-            if (signal.aborted) {
-              reject(signal.reason);
-            } else {
-              resolve();
-            }
-          },
-          { once: true }
-        );
-      });
+      const combined =
+        signal ? AbortSignal.any([signal, timeoutSig]) : timeoutSig;
+      const { promise, resolve, reject } = Promise.withResolvers();
+      combined.addEventListener(
+        "abort",
+        () => {
+          if (signal?.aborted) {
+            reject(signal.reason);
+          } else {
+            resolve();
+          }
+        },
+        { once: true }
+      );
+      return promise;
     }
     const yieldToMain =
       "scheduler" in window && "yield" in window.scheduler
         ? () => window.scheduler.yield()
-        : () => new Promise((r) => setTimeout(r, 0));
+        : () => {
+          const { promise, resolve } = Promise.withResolvers();
+          setTimeout(resolve, 0);
+          return promise;
+        };
     async function* lineIterator(stream) {
       const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
       let remnant = "";
@@ -1326,14 +1380,15 @@
     }
     async function fetchReverseWithRetry(lat, lon, userSignal) {
       let attempt = 0;
+      let lastError;
       while (attempt < CONFIG.MAX_RETRY) {
         userSignal?.throwIfAborted();
         attempt++;
         try {
           const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-          const combinedSignal = userSignal ?
-            AbortSignal.any([userSignal, timeoutSig]) :
-            timeoutSig;
+          const combinedSignal = userSignal
+            ? AbortSignal.any([userSignal, timeoutSig])
+            : timeoutSig;
           const url = new URL(BASE_URL);
           url.searchParams.set("lat", lat);
           url.searchParams.set("lon", lon);
@@ -1341,23 +1396,31 @@
             headers: FETCH_HEADERS,
             signal: combinedSignal,
           });
+
           if (res.ok) {
             return res.json();
           }
           if (res.status === 429 || res.status >= 500) {
+            lastError = new Error(`HTTP ${res.status}: rate limited or server error`);
+            if (attempt >= CONFIG.MAX_RETRY) {
+              throw lastError;
+            }
             await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
             continue;
           }
           const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+          lastError = new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+          throw lastError;
         } catch (e) {
           userSignal?.throwIfAborted();
+          lastError = e;
           if (attempt >= CONFIG.MAX_RETRY) {
             throw e;
           }
           await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
         }
       }
+      throw lastError ?? new Error("최대 재시도 횟수를 초과했습니다.");
     }
     function appendSkeletonRow(idx) {
       const tr = SKELETON_TEMPLATE.cloneNode(true);
@@ -1413,11 +1476,9 @@
             r.lon,
             AppState.controller.signal
           );
-          const parsedAddr = AddressFormatter.parse(data);
-          r.addr = parsedAddr;
-          const feature = getGeocodejsonFeature(data);
-          const gc = feature?.properties?.geocoding || null;
-          r.fullAddr = (gc && gc.label) || "";
+          const parsed = AddressFormatter.parse(data);
+          r.addr = parsed;
+          r.fullAddr = parsed.fullAddr;
           fillRow(skeletonTr, r);
           pushResultRow(r);
         } catch (err) {
@@ -1536,11 +1597,11 @@
         );
       } catch (err) {
         console.error(err);
+        AppState.setStatus("idle");
         setStatus(`오류 발생: ${err.message}`, "error");
       }
     }
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
+    domElements.parse.addEventListener("click", () => {
       void handleParse();
     });
     domElements.start.addEventListener("click", () => {
@@ -1578,7 +1639,16 @@
     });
     function handleFile(files) {
       if (!files.length) return;
+      if (AppState.isRunning || AppState.status === "parsing" || AppState.status === "stopping") {
+        setStatus("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
+        domElements.file.value = "";
+        return;
+      }
       const file = files[0];
+      AppState.setRecords([]);
+      domElements.coords.value = "";
+      clearTable();
+      scheduleRender();
       AppState.setFile(file);
       setStatus(`파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`);
       const desktopMsg =
@@ -1615,7 +1685,7 @@
     const hotkeys = {
       p: () => {
         if (domElements.parse.disabled) return;
-        form.requestSubmit();
+        void handleParse();
       },
       escape: () => {
         if (!domElements.stop.disabled) {
