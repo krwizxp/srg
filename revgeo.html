@@ -707,13 +707,17 @@
     }
 
     .skeleton-bar {
+      display: block;
+      inline-size: 100%;
+      block-size: 1.1em;
+      margin-block: 4px;
+      border-radius: 999px;
       background: linear-gradient(in oklch 90deg,
-          transparent,
-          oklch(from var(--accent) 0.9l 0.18c h / 0.35),
-          transparent);
+          oklch(from var(--accent) l calc(c * 0.25) h / 0.12),
+          oklch(from var(--accent) l calc(c * 0.95) h / 0.55),
+          oklch(from var(--accent) l calc(c * 0.40) h / 0.16));
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
-      border-radius: 4px;
     }
 
     .map-links {
