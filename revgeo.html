@@ -1655,7 +1655,7 @@
     });
     let moveReq = null;
     let lastEvent = null;
-    const hoverPointerQuery = window.matchMedia?.("(any-hover: hover)") ?? null;
+    const hoverPointerQuery = window.matchMedia("(any-hover: hover)");
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
       lastEvent = e;
@@ -1672,10 +1672,6 @@
       });
     }
     function updatePointerListener() {
-      if (!("PointerEvent" in window) || !hoverPointerQuery) {
-        document.removeEventListener("pointermove", handlePointerMove);
-        return;
-      }
       if (hoverPointerQuery.matches) {
         document.addEventListener("pointermove", handlePointerMove);
       } else {
@@ -1683,7 +1679,7 @@
       }
     }
     updatePointerListener();
-    hoverPointerQuery?.addEventListener?.("change", updatePointerListener);
+    hoverPointerQuery.addEventListener("change", updatePointerListener);
     const hotkeys = {
       p: () => {
         if (domElements.parse.disabled) return;
