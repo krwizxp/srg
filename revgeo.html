@@ -1063,105 +1063,100 @@
           })
           .filter(Boolean)
           .sort((a, b) => a.level - b.level);
-        const byLevel = Object.fromEntries(
-          entries.map((e) => [e.level, e.name])
-        );
-        const country = gc.country || byLevel[2] || "";
-        const countryLower = String(country).toLowerCase();
-        const isKR =
-          country === "대한민국" ||
-          countryLower.includes("south korea") ||
-          countryLower.includes("korea, republic");
+        const byLevel = Object.fromEntries(entries.map((e) => [e.level, e.name]));
+        const adminCountry = byLevel[2] || "";
+        const countryName = gc.country || adminCountry || "";
+        const countryCode = String(gc.country_code || "").toLowerCase();
+        const lower = (s) => String(s || "").toLowerCase();
+        const isKoreanPeninsula =
+          countryCode === "kr" ||
+          countryCode === "kp" ||
+          countryName === "대한민국" ||
+          countryName === "조선민주주의인민공화국" ||
+          lower(countryName).includes("korea") ||
+          lower(adminCountry).includes("korea");
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
-        if (isKR) {
+        if (isKoreanPeninsula) {
           const level4 = byLevel[4] || "";
           const level6 = byLevel[6] || byLevel[7] || "";
           const level8 = byLevel[8] || byLevel[9] || "";
           const level10 = byLevel[10] || "";
-          const cityCandidate = gc.city || level4 || "";
-          const guCandidate =
+          const city = gc.city || "";
+          const county = gc.county || "";
+          const cityDistrict =
             gc.city_district ||
             gc.district ||
             gc.suburb ||
-            level6 ||
             "";
           sido = level4 || gc.state || "";
-          sigungu =
-            level6 ||
-            gc.city ||
-            gc.county ||
-            "";
-          let eupCandidate =
-            level8 ||
-            gc.city_district ||
-            gc.district ||
-            gc.town ||
-            "";
-          let riCandidate =
-            level10 ||
-            gc.village ||
-            gc.hamlet ||
-            "";
+          if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
+            sido = city;
+          }
+          const looksEmd = (name = "") => /[읍면동리]$/.test(name);
+          const looksSigungu = (name = "") => /[시군구]$/.test(name);
+          let baseCity = "";
+          if (looksSigungu(county)) {
+            baseCity = county;
+          } else if (looksSigungu(city) && !looksEmd(city)) {
+            baseCity = city;
+          } else if (looksSigungu(level6)) {
+            baseCity = level6;
+          }
+          if (!baseCity && CONFIG.SPECIAL_CITIES.test(sido)) {
+            baseCity = sido;
+          }
+          let sigunguCombined = "";
+          if (cityDistrict) {
+            if (
+              baseCity &&
+              (cityDistrict === baseCity ||
+                cityDistrict.startsWith(baseCity))
+            ) {
+              sigunguCombined = cityDistrict;
+            }
+            else if (baseCity) {
+              sigunguCombined = `${baseCity} ${cityDistrict}`;
+            }
+            else {
+              sigunguCombined = cityDistrict;
+            }
+          } else {
+            sigunguCombined = baseCity;
+          }
+          if (!sigunguCombined) {
+            sigunguCombined =
+              level6 ||
+              county ||
+              (!CONFIG.SPECIAL_CITIES.test(city) ? city : "") ||
+              "";
+          }
+          sigungu = sigunguCombined || "";
           const label = String(gc.label || "");
           const labelParts = label
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean);
-          const labelFirst = labelParts[0] || "";
-          const labelSecond = labelParts[1] || "";
-          const nameCandidate = gc.name || labelFirst;
-          if (!riCandidate) {
-            if (
-              /리$/.test(nameCandidate) &&
-              nameCandidate !== eupCandidate &&
-              nameCandidate !== sigungu &&
-              nameCandidate !== sido
-            ) {
-              riCandidate = nameCandidate;
-            } else if (
-              /리$/.test(labelFirst) &&
-              labelFirst !== eupCandidate &&
-              labelFirst !== sigungu &&
-              labelFirst !== sido
-            ) {
-              riCandidate = labelFirst;
-            }
-          }
-          if (!eupCandidate) {
-            if (
-              /[읍면동]$/.test(labelSecond) &&
-              labelSecond !== sigungu &&
-              labelSecond !== sido
-            ) {
-              eupCandidate = labelSecond;
-            } else if (
-              /[읍면동]$/.test(nameCandidate) &&
-              nameCandidate !== sigungu &&
-              nameCandidate !== sido
-            ) {
-              eupCandidate = nameCandidate;
-            }
-          }
-          if (eupCandidate && riCandidate) {
-            if (
-              !riCandidate.startsWith(eupCandidate) &&
-              !eupCandidate.endsWith(riCandidate)
-            ) {
-              eupmyeon = `${eupCandidate} ${riCandidate}`;
-            } else {
-              eupmyeon = eupCandidate || riCandidate;
-            }
-          } else {
-            eupmyeon = eupCandidate || riCandidate || "";
-          }
-          if (!sido && cityCandidate && CONFIG.SPECIAL_CITIES.test(cityCandidate)) {
-            sido = cityCandidate;
-            if (!sigungu || sigungu === cityCandidate) {
-              sigungu = guCandidate;
-            }
-          }
+          const primaryName = gc.name || labelParts[0] || "";
+          const emdCandidates = [
+            level8,
+            gc.locality,
+            gc.town,
+            gc.village,
+            gc.suburb,
+            level10,
+            primaryName,
+            labelParts[0],
+            labelParts[1],
+          ].filter(Boolean);
+          eupmyeon =
+            emdCandidates.find(
+              (n) =>
+                looksEmd(n) &&
+                n !== sido &&
+                n !== sigungu
+            ) || "";
         } else {
           sido =
             byLevel[4] ||
@@ -1180,18 +1175,29 @@
             gc.district ||
             gc.municipality ||
             "";
-          if (sido === sigungu) sigungu = "";
+          if (sido && sigungu && sido === sigungu) sigungu = "";
+          const label = String(gc.label || "");
+          const labelParts = label
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
           eupmyeon =
+            gc.locality ||
             byLevel[8] ||
             byLevel[10] ||
+            gc.town ||
             gc.village ||
             gc.suburb ||
             gc.neighbourhood ||
             gc.quarter ||
             gc.hamlet ||
             gc.city_district ||
+            gc.district ||
             gc.township ||
             gc.residential ||
+            gc.name ||
+            labelParts[0] ||
+            labelParts[1] ||
             "";
         }
         if (sido && sigungu && sido === sigungu) {
