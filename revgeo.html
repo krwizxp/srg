@@ -1139,6 +1139,27 @@
             .map((s) => s.trim())
             .filter(Boolean);
           const primaryName = gc.name || labelParts[0] || "";
+          if (!sigungu || sigungu === sido) {
+            const sigunguCandidates = [
+              county,
+              level6,
+              gc.city_district,
+              gc.district,
+              primaryName,
+              labelParts[0],
+            ].filter(Boolean);
+            const looksSigungu = (name = "") => /[시군구]$/.test(name);
+            const fallback = sigunguCandidates.find(
+              (n) => looksSigungu(n) && n !== sido
+            );
+            if (fallback) {
+              if (CONFIG.SPECIAL_CITIES.test(sido) && !fallback.startsWith(sido)) {
+                sigungu = `${sido} ${fallback}`;
+              } else {
+                sigungu = fallback;
+              }
+            }
+          }
           const emdCandidates = [
             level8,
             gc.locality,
