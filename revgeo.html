@@ -148,6 +148,16 @@
     }
 
     @layer components {
+      @keyframes shimmer {
+        0% {
+          background-position: 150% 0;
+        }
+
+        100% {
+          background-position: -50% 0;
+        }
+      }
+
       .card {
         background: var(--card-bg);
         backdrop-filter: var(--glass);
@@ -747,16 +757,6 @@
             }
           }
         }
-
-        @keyframes shimmer {
-          0% {
-            background-position: 150% 0;
-          }
-
-          100% {
-            background-position: -50% 0;
-          }
-        }
       }
     }
 
@@ -1079,10 +1079,8 @@
           const level4 = byLevel[4] || "";
           const level6 = byLevel[6] || byLevel[7] || "";
           const level8 = byLevel[8] || byLevel[9] || "";
-          const cityCandidate =
-            gc.city ||
-            level4 ||
-            "";
+          const level10 = byLevel[10] || "";
+          const cityCandidate = gc.city || level4 || "";
           const guCandidate =
             gc.city_district ||
             gc.district ||
@@ -1095,13 +1093,69 @@
             gc.city ||
             gc.county ||
             "";
-          eupmyeon =
+          let eupCandidate =
             level8 ||
             gc.city_district ||
             gc.district ||
             gc.town ||
-            gc.village ||
             "";
+          let riCandidate =
+            level10 ||
+            gc.village ||
+            gc.hamlet ||
+            "";
+          const label = String(gc.label || "");
+          const labelParts = label
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const labelFirst = labelParts[0] || "";
+          const labelSecond = labelParts[1] || "";
+          const nameCandidate = gc.name || labelFirst;
+          if (!riCandidate) {
+            if (
+              /리$/.test(nameCandidate) &&
+              nameCandidate !== eupCandidate &&
+              nameCandidate !== sigungu &&
+              nameCandidate !== sido
+            ) {
+              riCandidate = nameCandidate;
+            } else if (
+              /리$/.test(labelFirst) &&
+              labelFirst !== eupCandidate &&
+              labelFirst !== sigungu &&
+              labelFirst !== sido
+            ) {
+              riCandidate = labelFirst;
+            }
+          }
+          if (!eupCandidate) {
+            if (
+              /[읍면동]$/.test(labelSecond) &&
+              labelSecond !== sigungu &&
+              labelSecond !== sido
+            ) {
+              eupCandidate = labelSecond;
+            } else if (
+              /[읍면동]$/.test(nameCandidate) &&
+              nameCandidate !== sigungu &&
+              nameCandidate !== sido
+            ) {
+              eupCandidate = nameCandidate;
+            }
+          }
+          if (eupCandidate && riCandidate) {
+            if (
+              !riCandidate.startsWith(eupCandidate) &&
+              !eupCandidate.endsWith(riCandidate)
+            ) {
+              eupmyeon = `${eupCandidate} ${riCandidate}`;
+            } else {
+              eupmyeon = eupCandidate || riCandidate;
+            }
+          } else {
+            eupmyeon = eupCandidate || riCandidate || "";
+          }
           if (!sido && cityCandidate && CONFIG.SPECIAL_CITIES.test(cityCandidate)) {
             sido = cityCandidate;
             if (!sigungu || sigungu === cityCandidate) {
@@ -1139,6 +1193,9 @@
             gc.township ||
             gc.residential ||
             "";
+        }
+        if (sido && sigungu && sido === sigungu) {
+          sigungu = "";
         }
         return { sido, sigungu, eupmyeon };
       },
