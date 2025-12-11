@@ -13,7 +13,7 @@
   <meta property="og:locale" content="ko_KR">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(97% 0.04 275)">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(12% 0.08 275)">
-  <link rel="icon" href="icon.svg?v=3" type="image/svg+xml" sizes="any">
+  <link rel="icon" href="icon.svg?v=4">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -33,14 +33,6 @@
       *::before,
       *::after {
         box-sizing: border-box;
-      }
-
-      input,
-      button,
-      textarea,
-      select {
-        font-family: inherit;
-        font-size: inherit;
       }
 
       body {
@@ -108,7 +100,7 @@
           var(--inner-glow);
         --glass: blur(20px) saturate(180%);
         --fs-base: clamp(14px, 1.5vw, 15px);
-        --fs-sm: clamp(12px, 0.9vw, 13px);
+        --fs-sm: clamp(13px, 0.9vw, 14px);
         --fs-lg: clamp(18px, 1.6vw, 22px);
         --fs-xl: clamp(22px, 2vw, 28px);
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -131,10 +123,8 @@
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
         line-height: 1.6;
-      }
 
-      @container (inline-size <=800px) {
-        body {
+        @container (inline-size <=800px) {
           padding-block: 12px;
           padding-inline: 12px;
         }
@@ -161,7 +151,8 @@
         text-align: center;
         font-size: var(--fs-sm);
         color: var(--muted);
-        margin-block-start: 8px;
+        margin-block: 0;
+        line-height: 1.3;
       }
     }
 
@@ -176,7 +167,7 @@
         box-shadow: var(--shadow-md);
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: 10px;
         max-inline-size: 100%;
         overflow: hidden;
         position: relative;
@@ -229,7 +220,6 @@
         display: flex;
         align-items: center;
         gap: 14px;
-        margin-block-end: 8px;
 
         svg {
           color: var(--accent);
@@ -243,8 +233,8 @@
           font-size: var(--fs-xl);
           font-weight: 800;
           line-height: 1.1;
-          background: linear-gradient(120deg, var(--fg), var(--accent));
-          background-clip: text;
+          color: var(--accent);
+          filter: drop-shadow(0 2px 8px oklch(from var(--accent) l c h / 0.25));
         }
 
         p {
@@ -270,7 +260,7 @@
         position: relative;
         border: 2px dashed var(--line);
         border-radius: 18px;
-        padding-block: 24px;
+        padding-block: 12px;
         padding-inline: 16px;
         text-align: center;
         transition: all 0.2s ease;
@@ -323,11 +313,9 @@
         .mobile-msg {
           display: none;
         }
-      }
 
-      @media (pointer: coarse) {
-        @container page (inline-size <=800px) {
-          .drop-zone {
+        @media (pointer: coarse) {
+          @container page (inline-size <=800px) {
             padding-block: 16px;
 
             .desktop-msg {
@@ -346,7 +334,6 @@
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
-        color: var(--fg);
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
@@ -358,6 +345,7 @@
         min-block-size: 100px;
         field-sizing: content;
         scrollbar-width: thin;
+        font-family: inherit;
         font-size: 0.9em;
         line-height: 1.5;
 
@@ -368,8 +356,8 @@
         }
       }
 
-      @container page (inline-size <=800px) {
-        #coords {
+      #coords {
+        @container page (inline-size <=800px) {
           max-block-size: 30dvh;
           overflow: auto;
         }
@@ -468,7 +456,6 @@
 
           strong {
             color: var(--fg);
-            font-variant-numeric: tabular-nums;
           }
         }
       }
@@ -483,13 +470,7 @@
         block-size: 8px;
 
         >progress {
-          inline-size: 100%;
-          block-size: 8px;
           border: none;
-          margin-block: 0;
-          margin-inline: 0;
-          padding-block: 0;
-          padding-inline: 0;
           opacity: 0;
         }
 
@@ -583,6 +564,17 @@
           content-visibility: auto;
           contain-intrinsic-block-size: auto 57px;
         }
+
+        @container (inline-size <=900px) {
+          &:not(:has(tbody > tr)) {
+            min-block-size: 100px;
+            overflow: hidden;
+
+            .empty-hint {
+              inset-block-start: 0;
+            }
+          }
+        }
       }
 
       table {
@@ -598,33 +590,15 @@
           inset-block-start: 0;
           z-index: 10;
           background: var(--card-bg);
-          backdrop-filter: blur(8px);
           text-align: start;
           font-weight: 600;
           font-size: var(--fs-sm);
           color: var(--muted);
           white-space: nowrap;
 
-          &:first-child {
-            border-start-start-radius: 16px;
-          }
-
-          &:last-child {
-            border-start-end-radius: 16px;
-          }
-
           &:nth-child(1),
           &:nth-child(2) {
-            inline-size: 60px;
             text-align: center;
-          }
-
-          &:nth-child(3) {
-            inline-size: 190px;
-          }
-
-          &:nth-child(9) {
-            min-inline-size: 180px;
           }
         }
 
@@ -663,19 +637,8 @@
             }
           }
         }
-      }
 
-      @container (inline-size <=900px) {
-        .table-wrap:not(:has(tbody > tr)) {
-          min-block-size: 100px;
-          overflow: hidden;
-
-          .empty-hint {
-            inset-block-start: 0;
-          }
-        }
-
-        table {
+        @container (inline-size <=900px) {
           display: block;
           min-inline-size: 0;
 
@@ -735,7 +698,6 @@
     }
 
     .skeleton-bar {
-      inline-size: 100%;
       block-size: 1.1em;
       margin-block: 4px;
       border-radius: 999px;
@@ -784,7 +746,7 @@
       .caps {
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        font-size: 0.8em;
+        font-size: var(--fs-sm);
         font-weight: 700;
         color: var(--muted);
       }
@@ -880,15 +842,15 @@
           </caption>
           <thead>
             <tr>
-              <th scope="col" data-col-key="kind">구분</th>
-              <th scope="col" data-col-key="idx">순번</th>
-              <th scope="col" data-col-key="coords">좌표 (위도,경도)</th>
-              <th scope="col" data-col-key="sido">시·도</th>
-              <th scope="col" data-col-key="sigungu">시·군·구</th>
-              <th scope="col" data-col-key="emd">읍·면·동·리</th>
-              <th scope="col" data-col-key="tag">지물 태그</th>
-              <th scope="col" data-col-key="fullAddr">전체주소</th>
-              <th scope="col" data-col-key="maps">지도링크</th>
+              <th data-col-key="kind">구분</th>
+              <th data-col-key="idx">순번</th>
+              <th data-col-key="coords">좌표 (위도,경도)</th>
+              <th data-col-key="sido">시·도</th>
+              <th data-col-key="sigungu">시·군·구</th>
+              <th data-col-key="emd">읍·면·동·리</th>
+              <th data-col-key="tag">지물 태그</th>
+              <th data-col-key="fullAddr">전체주소</th>
+              <th data-col-key="maps">지도링크</th>
             </tr>
           </thead>
           <tbody></tbody>
