@@ -210,7 +210,7 @@
           z-index: 1;
         }
 
-        @media (hover: hover) and (pointer: fine) {
+        @media (any-hover: hover) {
           &:hover::before {
             opacity: 1;
           }
@@ -393,7 +393,7 @@
 
         &:not(:disabled) {
           &:hover {
-            @media (hover: hover) and (pointer: fine) {
+            @media (any-hover: hover) {
               &::after {
                 opacity: 1;
               }
@@ -640,8 +640,10 @@
             content-visibility: auto;
             contain-intrinsic-block-size: auto 57px;
 
-            &:hover {
-              background: light-dark(oklch(97% 0.02 270), oklch(22% 0.04 270));
+            @media (any-hover: hover) {
+              &:hover {
+                background: light-dark(oklch(97% 0.02 270), oklch(22% 0.04 270));
+              }
             }
 
             &:last-child {
@@ -679,11 +681,13 @@
               gap: 10px;
               box-shadow: var(--shadow-sm);
 
-              &:hover {
-                transform: translateY(-2px);
-                box-shadow: var(--shadow-md);
-                transition: transform 0.2s;
-                border-color: var(--accent);
+              @media (any-hover: hover) {
+                &:hover {
+                  transform: translateY(-2px);
+                  box-shadow: var(--shadow-md);
+                  transition: transform 0.2s;
+                  border-color: var(--accent);
+                }
               }
             }
 
@@ -1651,7 +1655,8 @@
     });
     let moveReq = null;
     let lastEvent = null;
-    document.addEventListener("pointermove", (e) => {
+    const hoverPointerQuery = window.matchMedia?.("(any-hover: hover)") ?? null;
+    function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
       lastEvent = e;
       if (moveReq) return;
@@ -1665,7 +1670,20 @@
         target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
         target.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
       });
-    });
+    }
+    function updatePointerListener() {
+      if (!("PointerEvent" in window) || !hoverPointerQuery) {
+        document.removeEventListener("pointermove", handlePointerMove);
+        return;
+      }
+      if (hoverPointerQuery.matches) {
+        document.addEventListener("pointermove", handlePointerMove);
+      } else {
+        document.removeEventListener("pointermove", handlePointerMove);
+      }
+    }
+    updatePointerListener();
+    hoverPointerQuery?.addEventListener?.("change", updatePointerListener);
     const hotkeys = {
       p: () => {
         if (domElements.parse.disabled) return;
