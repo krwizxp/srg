@@ -1536,7 +1536,10 @@
         this.controller = null;
         this.resumeHandler = null;
         this.inFlight = false;
-        this.renderReq = null;
+        if (this.renderReq !== null) {
+          cancelAnimationFrame(this.renderReq);
+          this.renderReq = null;
+        }
         updateUIState();
         scheduleRender();
       },
@@ -1602,6 +1605,7 @@
       el.classList.toggle("stopped", type === "stopped");
     }
     function renderFrame() {
+      AppState.renderReq = null;
       const total = AppState.records.length;
       const processed = AppState.processedCount;
       const success = AppState.cntSuccess;
@@ -1616,10 +1620,9 @@
       domElements.progShell.style.setProperty("--pct", pct);
       domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       domElements.exportBtn.disabled = processed === 0;
-      AppState.renderReq = null;
     }
     function scheduleRender() {
-      if (AppState.renderReq) return;
+      if (AppState.renderReq !== null) return;
       AppState.renderReq = requestAnimationFrame(renderFrame);
     }
     function clearTable() {
