@@ -1446,6 +1446,21 @@
           ) {
             eupmyeon = "";
           }
+          if (!eupmyeon && districtLike && districtLike !== sido) {
+            eupmyeon = districtLike;
+            if (sigungu) {
+              const esc = (s) =>
+                String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const re = new RegExp(
+                `(?:^|\\s+)${esc(districtLike)}(?:\\s+|$)`,
+                "g"
+              );
+              sigungu = String(sigungu)
+                .replace(re, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+            }
+          }
         }
         if (!isKoreanPeninsula) {
           if (isCountryLike(sido)) sido = "";
