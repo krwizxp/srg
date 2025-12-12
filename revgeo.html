@@ -1068,20 +1068,30 @@
         const countryName = gc.country || adminCountry || "";
         const countryCode = String(gc.country_code || "").toLowerCase();
         const lower = (s) => String(s || "").toLowerCase();
+        const lowerCountryName = lower(countryName);
+        const lowerAdminCountry = lower(adminCountry);
         const isKoreanPeninsula =
           countryCode === "kr" ||
           countryCode === "kp" ||
           countryName === "대한민국" ||
           countryName === "조선민주주의인민공화국" ||
-          lower(countryName).includes("korea") ||
-          lower(adminCountry).includes("korea");
+          lowerCountryName.includes("korea") ||
+          lowerAdminCountry.includes("korea");
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
+        const label = String(gc.label || "");
+        const labelParts = label
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const primaryName = gc.name || labelParts[0] || "";
+        const type = gc.type || "";
         if (isKoreanPeninsula) {
           const level4 = byLevel[4] || "";
           const level6 = byLevel[6] || byLevel[7] || "";
-          const level8 = byLevel[8] || byLevel[9] || "";
+          const level8 = byLevel[8] || "";
+          const level9 = byLevel[9] || "";
           const level10 = byLevel[10] || "";
           const city = gc.city || "";
           const county = gc.county || "";
@@ -1094,91 +1104,94 @@
           if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
             sido = city;
           }
-          const looksEmd = (name = "") => /[읍면동리]$/.test(name);
-          const looksSigungu = (name = "") => /[시군구]$/.test(name);
-          let baseCity = "";
-          if (looksSigungu(county)) {
-            baseCity = county;
-          } else if (looksSigungu(city) && !looksEmd(city)) {
-            baseCity = city;
-          } else if (looksSigungu(level6)) {
-            baseCity = level6;
-          }
-          if (!baseCity && CONFIG.SPECIAL_CITIES.test(sido)) {
-            baseCity = sido;
-          }
-          let sigunguCombined = "";
-          if (cityDistrict) {
-            if (
-              baseCity &&
-              (cityDistrict === baseCity ||
-                cityDistrict.startsWith(baseCity))
-            ) {
-              sigunguCombined = cityDistrict;
-            }
-            else if (baseCity) {
-              sigunguCombined = `${baseCity} ${cityDistrict}`;
-            }
-            else {
-              sigunguCombined = cityDistrict;
-            }
-          } else {
-            sigunguCombined = baseCity;
-          }
-          if (!sigunguCombined) {
-            sigunguCombined =
-              level6 ||
-              county ||
-              (!CONFIG.SPECIAL_CITIES.test(city) ? city : "") ||
-              "";
-          }
-          sigungu = sigunguCombined || "";
-          const label = String(gc.label || "");
-          const labelParts = label
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          const primaryName = gc.name || labelParts[0] || "";
-          if (!sigungu || sigungu === sido) {
-            const sigunguCandidates = [
-              county,
+          const looksSiGun = (name = "") => /[시군]$/.test(name);
+          const looksGuGun = (name = "") => /[구군]$/.test(name);
+          const isSpecialSido = CONFIG.SPECIAL_CITIES.test(sido);
+          if (isSpecialSido) {
+            const sgCandidates = [
+              cityDistrict,
               level6,
-              gc.city_district,
-              gc.district,
+              county,
               primaryName,
               labelParts[0],
+              labelParts[1],
             ].filter(Boolean);
-            const looksSigungu = (name = "") => /[시군구]$/.test(name);
-            const fallback = sigunguCandidates.find(
-              (n) => looksSigungu(n) && n !== sido
-            );
-            if (fallback) {
-              if (CONFIG.SPECIAL_CITIES.test(sido) && !fallback.startsWith(sido)) {
-                sigungu = `${sido} ${fallback}`;
-              } else {
-                sigungu = fallback;
-              }
+            let picked =
+              sgCandidates.find((n) => looksGuGun(n) && n !== sido) ||
+              sgCandidates.find(
+                (n) =>
+                  /시$/.test(n) &&
+                  n !== sido &&
+                  !CONFIG.SPECIAL_CITIES.test(n)
+              ) ||
+              "";
+            sigungu = picked || "";
+          } else {
+            const cityLikeCandidates = [
+              city,
+              county,
+              level6,
+              primaryName,
+              labelParts[1],
+              labelParts[0],
+            ].filter(Boolean);
+            const cityLike =
+              cityLikeCandidates.find(
+                (n) => looksSiGun(n) && n !== sido
+              ) || "";
+            const districtCandidates = [
+              cityDistrict,
+              level8,
+              level9,
+              gc.town,
+              gc.locality,
+              gc.village,
+            ].filter(Boolean);
+            const districtLike =
+              districtCandidates.find(
+                (n) => /구$/.test(n) && n !== cityLike && n !== sido
+              ) || "";
+            if (cityLike && districtLike && districtLike !== cityLike) {
+              sigungu = `${cityLike} ${districtLike}`;
+            } else {
+              sigungu = cityLike || districtLike || "";
+            }
+            if (!sigungu) {
+              const allCandidates = [
+                county,
+                level6,
+                cityDistrict,
+                primaryName,
+                labelParts[0],
+                labelParts[1],
+              ].filter(Boolean);
+              const fallback =
+                allCandidates.find(
+                  (n) => (looksSiGun(n) || looksGuGun(n)) && n !== sido
+                ) || "";
+              if (fallback) sigungu = fallback;
             }
           }
-          const emdCandidates = [
-            level8,
-            gc.locality,
-            gc.town,
-            gc.village,
-            gc.suburb,
-            level10,
-            primaryName,
-            labelParts[0],
-            labelParts[1],
-          ].filter(Boolean);
-          eupmyeon =
-            emdCandidates.find(
-              (n) =>
-                looksEmd(n) &&
-                n !== sido &&
-                n !== sigungu
-            ) || "";
+          const emdSet = new Set();
+          const addEmd = (name) => {
+            if (!name) return;
+            if (!/^[\s\S]*[읍면동리]$/.test(name)) return;
+            if (name === sido || name === sigungu) return;
+            emdSet.add(name);
+          };
+          addEmd(level8);
+          addEmd(level9);
+          addEmd(level10);
+          addEmd(gc.town);
+          addEmd(gc.village);
+          addEmd(gc.locality);
+          addEmd(gc.suburb);
+          addEmd(primaryName);
+          addEmd(labelParts[0]);
+          addEmd(labelParts[1]);
+          eupmyeon = Array.from(emdSet).join(" ");
         } else {
+          const isCityOrCounty = type === "city" || type === "county";
           sido =
             byLevel[4] ||
             gc.state ||
@@ -1197,11 +1210,9 @@
             gc.municipality ||
             "";
           if (sido && sigungu && sido === sigungu) sigungu = "";
-          const label = String(gc.label || "");
-          const labelParts = label
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+          if (!sigungu && isCityOrCounty) {
+            sigungu = primaryName || gc.city || gc.county || "";
+          }
           eupmyeon =
             gc.locality ||
             byLevel[8] ||
@@ -1220,6 +1231,17 @@
             labelParts[0] ||
             labelParts[1] ||
             "";
+          if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
+            eupmyeon = "";
+          }
+          if (
+            eupmyeon &&
+            isCityOrCounty &&
+            eupmyeon === primaryName &&
+            eupmyeon === sigungu
+          ) {
+            eupmyeon = "";
+          }
         }
         if (sido && sigungu && sido === sigungu) {
           sigungu = "";
@@ -1229,7 +1251,8 @@
       _getTagFromGeocoding(gc) {
         if (!gc || typeof gc !== "object") return "";
         const label = gc.label || "";
-        const firstPart = label.split(",")[0].trim();
+        const [firstPartRaw = ""] = label.split(",");
+        const firstPart = firstPartRaw.trim();
         const primary =
           gc.name ||
           firstPart ||
@@ -1249,12 +1272,20 @@
             eupmyeon: "",
             tag: "",
             fullAddr: "",
+            kind: undefined,
           };
         }
+        const countryCode = String(gc.country_code || "").toLowerCase();
         const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(gc);
         const tag = this._getTagFromGeocoding(gc);
         const fullAddr = gc.label || "";
-        return { sido, sigungu, eupmyeon, tag, fullAddr };
+        let kind = undefined;
+        if (countryCode === "kp") {
+          kind = "KP";
+        } else if (countryCode === "jp") {
+          kind = "WORLD";
+        }
+        return { sido, sigungu, eupmyeon, tag, fullAddr, kind };
       },
     };
     const AppState = {
@@ -1548,6 +1579,9 @@
             AppState.controller.signal
           );
           const parsed = AddressFormatter.parse(data);
+          if (parsed.kind) {
+            r.set = parsed.kind;
+          }
           r.addr = parsed;
           r.fullAddr = parsed.fullAddr;
           fillRow(skeletonTr, r);
