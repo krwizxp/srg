@@ -225,6 +225,10 @@
             opacity: 1;
           }
         }
+
+        &.tap-highlight::before {
+          opacity: 1;
+        }
       }
 
       .brand {
@@ -336,6 +340,22 @@
 
             .mobile-msg {
               display: inline;
+            }
+          }
+        }
+
+        &[inert] {
+          opacity: 0.5;
+          cursor: not-allowed;
+
+          .drop-icon {
+            filter: none;
+            transform: none;
+          }
+
+          .drop-text {
+            strong {
+              color: var(--muted);
             }
           }
         }
@@ -454,6 +474,10 @@
             }
           }
         }
+
+        &.tap-highlight::after {
+          opacity: 1;
+        }
       }
 
       .row-progress {
@@ -551,6 +575,13 @@
           color: oklch(from var(--warn) l c h);
           border-inline-start-color: var(--warn);
           background: light-dark(oklch(97% 0.08 65), oklch(25% 0.10 65 / 0.3));
+        }
+
+        &.stopped {
+          color: var(--muted);
+          border-inline-start-color: var(--muted);
+          background: light-dark(oklch(94% 0.01 270),
+              oklch(20% 0.02 270 / 0.4));
         }
       }
 
@@ -756,6 +787,135 @@
               text-underline-offset: 3px;
             }
           }
+        }
+      }
+    }
+
+    @layer transitions {
+      main {
+        view-transition-name: app-root;
+      }
+
+      .card:first-of-type {
+        view-transition-name: controls-card;
+      }
+
+      .card:nth-of-type(2) {
+        view-transition-name: results-card;
+      }
+
+      .row-progress {
+        view-transition-name: progress-bar;
+      }
+
+      .status {
+        view-transition-name: status-bar;
+      }
+
+      .table-wrap {
+        view-transition-name: results-table;
+      }
+
+      ::view-transition-old(app-root),
+      ::view-transition-new(app-root) {
+        animation-duration: 260ms;
+        animation-timing-function: cubic-bezier(0.22, 0.7, 0.3, 1);
+      }
+
+      ::view-transition-old(app-root) {
+        animation-name: vt-fade-out;
+      }
+
+      ::view-transition-new(app-root) {
+        animation-name: vt-fade-in;
+      }
+
+      ::view-transition-old(results-card),
+      ::view-transition-new(results-card),
+      ::view-transition-old(results-table),
+      ::view-transition-new(results-table),
+      ::view-transition-old(progress-bar),
+      ::view-transition-new(progress-bar),
+      ::view-transition-old(status-bar),
+      ::view-transition-new(status-bar) {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.25, 0.9, 0.35, 1);
+      }
+
+      ::view-transition-old(results-card),
+      ::view-transition-old(results-table),
+      ::view-transition-old(progress-bar),
+      ::view-transition-old(status-bar) {
+        animation-name: vt-slide-fade-up;
+      }
+
+      ::view-transition-new(results-card),
+      ::view-transition-new(results-table) {
+        animation-name: vt-slide-fade-in-strong;
+      }
+
+      ::view-transition-new(progress-bar),
+      ::view-transition-new(status-bar) {
+        animation-name: vt-slide-fade-in;
+      }
+
+      @keyframes vt-fade-in {
+        from {
+          opacity: 0;
+          transform: scale(0.98);
+        }
+
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes vt-fade-out {
+        from {
+          opacity: 1;
+          transform: scale(1);
+        }
+
+        to {
+          opacity: 0;
+          transform: scale(0.98);
+        }
+      }
+
+      @keyframes vt-slide-fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes vt-slide-fade-in-strong {
+        from {
+          opacity: 0;
+          transform: translateY(16px) scale(0.97);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes vt-slide-fade-up {
+        from {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        to {
+          opacity: 0;
+          transform: translateY(-4px);
         }
       }
     }
@@ -1349,6 +1509,13 @@
       hour12: false,
       timeZone: "Asia/Seoul",
     });
+    function withViewTransition(fn) {
+      if (document.startViewTransition) {
+        document.startViewTransition(fn);
+      } else {
+        fn();
+      }
+    }
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
@@ -1381,6 +1548,7 @@
       el.textContent = msg;
       el.classList.toggle("err", type === "error");
       el.classList.toggle("warn", type === "warn");
+      el.classList.toggle("stopped", type === "stopped");
     }
     function renderFrame() {
       const total = AppState.records.length;
@@ -1610,15 +1778,17 @@
         }
       }
       if (AppState.isStopping) {
-        setControlsIdle("중지되었습니다.", "warn");
+        setControlsIdle("중지되었습니다.", "stopped");
       } else if (AppState.processedCount >= AppState.records.length) {
         setControlsIdle("모든 처리가 완료되었습니다.", "info");
       }
     }
     function setControlsIdle(message, type = "info") {
-      AppState.setStatus("idle");
-      setStatus(message, type);
-      scheduleRender();
+      withViewTransition(() => {
+        AppState.setStatus("idle");
+        setStatus(message, type);
+        scheduleRender();
+      });
     }
     function startProcessing() {
       AppState.reset();
@@ -1695,7 +1865,6 @@
             )}건 생략됨`
           );
         domElements.coords.value = disp.join("\n");
-        clearTable();
         scheduleRender();
         setStatus(
           `분석 완료: ${records.length}개 좌표. 조회 시작을 누르세요(단축키 S)`
@@ -1710,37 +1879,42 @@
       void handleParse();
     });
     domElements.start.addEventListener("click", () => {
-      document.startViewTransition ?
-        document.startViewTransition(startProcessing) :
-        startProcessing();
+      withViewTransition(startProcessing);
     });
     domElements.pause.addEventListener("click", () => {
       if (!AppState.isRunning) return;
-      AppState.setStatus("pausing");
-      if (AppState.inFlight)
-        setStatus("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
+      withViewTransition(() => {
+        AppState.setStatus("pausing");
+        if (AppState.inFlight) {
+          setStatus("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
+        }
+      });
     });
     domElements.resume.addEventListener("click", () => {
       if (!AppState.isPaused) return;
-      AppState.setStatus("running");
-      if (AppState.resumeHandler) {
-        AppState.resumeHandler.resolve();
-        AppState.resumeHandler = null;
-      }
+      withViewTransition(() => {
+        AppState.setStatus("running");
+        if (AppState.resumeHandler) {
+          AppState.resumeHandler.resolve();
+          AppState.resumeHandler = null;
+        }
+      });
     });
     domElements.stop.addEventListener("click", () => {
       if (!AppState.isRunning) return;
-      AppState.setStatus("stopping");
-      if (AppState.resumeHandler) {
-        AppState.resumeHandler.resolve();
-        AppState.resumeHandler = null;
-      }
-      if (AppState.inFlight && AppState.controller) {
-        AppState.controller.abort();
-        setStatus("중지 요청됨. 취소 중…", "warn");
-      } else {
-        setStatus("중지 요청됨. 정리 중…", "warn");
-      }
+      withViewTransition(() => {
+        AppState.setStatus("stopping");
+        if (AppState.resumeHandler) {
+          AppState.resumeHandler.resolve();
+          AppState.resumeHandler = null;
+        }
+        if (AppState.inFlight && AppState.controller) {
+          AppState.controller.abort();
+          setStatus("중지 요청됨. 취소 중…", "warn");
+        } else {
+          setStatus("중지 요청됨. 정리 중…", "warn");
+        }
+      });
     });
     function handleFile(files) {
       if (!files.length) return;
@@ -1769,7 +1943,8 @@
       domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
-      handleFile(domElements.file.files);
+      const files = domElements.file.files;
+      withViewTransition(() => handleFile(files));
     });
     let moveReq = null;
     let lastEvent = null;
@@ -1798,6 +1973,18 @@
     }
     updatePointerListener();
     hoverPointerQuery.addEventListener("change", updatePointerListener);
+    document.addEventListener("pointerdown", (e) => {
+      if (e.pointerType && e.pointerType !== "touch") return;
+      const target = e.target.closest(".card, button");
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      target.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+      target.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+      target.classList.add("tap-highlight");
+      setTimeout(() => {
+        target.classList.remove("tap-highlight");
+      }, 250);
+    });
     const hotkeys = {
       p: () => {
         if (domElements.parse.disabled) return;
