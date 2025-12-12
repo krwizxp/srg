@@ -737,8 +737,8 @@
               padding-block: 2px;
               padding-inline: 0;
               display: grid;
-              grid-template-columns: 90px 1fr;
-              gap: 12px;
+              grid-template-columns: 80px 1fr;
+              gap: 10px;
               align-items: baseline;
               text-align: start !important;
 
@@ -1178,7 +1178,7 @@
       coords: document.querySelector("#coords"),
     };
     const COL_DEFS = Array.from(
-      document.querySelector("#tbl thead").querySelectorAll("th"),
+      document.querySelectorAll("#tbl thead th"),
       (th) => {
         const key = th.dataset.colKey;
         const base = BASE_COL_CONFIG[key] || {};
@@ -1206,16 +1206,25 @@
       return "\uFEFF" + [...cols, ...maps].join(",") + "\n";
     })();
     function getGeocodejsonFeature(data) {
-      if (!data || typeof data !== "object") return null;
-      const { features } = data;
-      if (!features) return null;
-      if (Array.isArray(features)) return features[0] || null;
-      if (typeof features === "object") return features;
-      return null;
+      if (
+        !data ||
+        typeof data !== "object" ||
+        !Array.isArray(data.features)
+      ) {
+        return null;
+      }
+      return data.features[0] || null;
+    }
+    function getLabelParts(gc) {
+      const label = String(gc.label || "");
+      const rawParts = label.split(",");
+      const trimmedParts = rawParts.map((s) => s.trim());
+      const nonEmptyParts = trimmedParts.filter(Boolean);
+      return { label, trimmedParts, nonEmptyParts };
     }
     const AddressFormatter = {
-      _getAdminFromGeocoding(gc) {
-        const admin = gc?.admin || {};
+      _getAdminFromGeocoding(gc, countryCode, nonEmptyLabelParts) {
+        const admin = gc.admin || {};
         const entries = Object.entries(admin)
           .map(([key, name]) => {
             const m = /^level(\d+)$/.exec(key);
@@ -1226,10 +1235,14 @@
         const byLevel = Object.fromEntries(entries.map((e) => [e.level, e.name]));
         const adminCountry = byLevel[2] || "";
         const countryName = gc.country || adminCountry || "";
-        const countryCode = String(gc.country_code || "").toLowerCase();
         const lower = (s) => String(s || "").toLowerCase();
         const lowerCountryName = lower(countryName);
         const lowerAdminCountry = lower(adminCountry);
+        const isCountryLike = (name) => {
+          const l = lower(name);
+          if (!l) return false;
+          return l === lowerCountryName || l === lowerAdminCountry;
+        };
         const isKoreanPeninsula =
           countryCode === "kr" ||
           countryCode === "kp" ||
@@ -1240,26 +1253,22 @@
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
-        const label = String(gc.label || "");
-        const labelParts = label
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const primaryName = gc.name || labelParts[0] || "";
-        const type = gc.type || "";
+        const primaryName = gc.name || nonEmptyLabelParts[0] || "";
+        const cityDistrict =
+          gc.city_district ||
+          gc.district ||
+          gc.suburb ||
+          "";
+        const level4 = byLevel[4] || "";
+        const level6 = byLevel[6] || "";
+        const level7 = byLevel[7] || "";
+        const level8 = byLevel[8] || "";
+        const level9 = byLevel[9] || "";
+        const level10 = byLevel[10] || "";
+        const city = gc.city || "";
+        const county = gc.county || "";
         if (isKoreanPeninsula) {
-          const level4 = byLevel[4] || "";
-          const level6 = byLevel[6] || byLevel[7] || "";
-          const level8 = byLevel[8] || "";
-          const level9 = byLevel[9] || "";
-          const level10 = byLevel[10] || "";
-          const city = gc.city || "";
-          const county = gc.county || "";
-          const cityDistrict =
-            gc.city_district ||
-            gc.district ||
-            gc.suburb ||
-            "";
+          const level6Kr = level6 || level7;
           sido = level4 || gc.state || "";
           if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
             sido = city;
@@ -1270,11 +1279,11 @@
           if (isSpecialSido) {
             const sgCandidates = [
               cityDistrict,
-              level6,
+              level6Kr,
               county,
               primaryName,
-              labelParts[0],
-              labelParts[1],
+              nonEmptyLabelParts[0],
+              nonEmptyLabelParts[1],
             ].filter(Boolean);
             let picked =
               sgCandidates.find((n) => looksGuGun(n) && n !== sido) ||
@@ -1290,10 +1299,10 @@
             const cityLikeCandidates = [
               city,
               county,
-              level6,
+              level6Kr,
               primaryName,
-              labelParts[1],
-              labelParts[0],
+              nonEmptyLabelParts[1],
+              nonEmptyLabelParts[0],
             ].filter(Boolean);
             const cityLike =
               cityLikeCandidates.find(
@@ -1319,11 +1328,11 @@
             if (!sigungu) {
               const allCandidates = [
                 county,
-                level6,
+                level6Kr,
                 cityDistrict,
                 primaryName,
-                labelParts[0],
-                labelParts[1],
+                nonEmptyLabelParts[0],
+                nonEmptyLabelParts[1],
               ].filter(Boolean);
               const fallback =
                 allCandidates.find(
@@ -1347,50 +1356,85 @@
           addEmd(gc.locality);
           addEmd(gc.suburb);
           addEmd(primaryName);
-          addEmd(labelParts[0]);
-          addEmd(labelParts[1]);
+          addEmd(nonEmptyLabelParts[0]);
+          addEmd(nonEmptyLabelParts[1]);
           eupmyeon = Array.from(emdSet).join(" ");
         } else {
+          const type = gc.type || "";
           const isCityOrCounty = type === "city" || type === "county";
           sido =
-            byLevel[4] ||
+            level4 ||
             gc.state ||
             gc.region ||
             gc.province ||
             gc.county ||
             gc.city ||
             "";
-          sigungu =
-            byLevel[6] ||
-            byLevel[8] ||
-            gc.city ||
-            gc.town ||
-            gc.county ||
-            gc.district ||
-            gc.municipality ||
-            "";
-          if (sido && sigungu && sido === sigungu) sigungu = "";
-          if (!sigungu && isCityOrCounty) {
+          const cityLikeCandidates = [
+            city,
+            county,
+            level6,
+            level7,
+            primaryName,
+            nonEmptyLabelParts[1],
+            nonEmptyLabelParts[0],
+          ].filter(Boolean);
+          const cityLike =
+            cityLikeCandidates.find((n) => n !== sido) || "";
+          const districtCandidates = [
+            cityDistrict,
+            level8,
+            level9,
+            gc.town,
+            gc.locality,
+            gc.village,
+            gc.suburb,
+            gc.neighbourhood,
+          ].filter(Boolean);
+          const districtLike =
+            districtCandidates.find(
+              (n) => n !== cityLike && n !== sido
+            ) || "";
+          if (cityLike && districtLike && cityLike !== districtLike) {
+            sigungu = `${cityLike} ${districtLike}`;
+          } else {
+            sigungu =
+              cityLike ||
+              districtLike ||
+              byLevel[6] ||
+              byLevel[8] ||
+              gc.city ||
+              gc.town ||
+              gc.county ||
+              gc.district ||
+              gc.municipality ||
+              "";
+          }
+          if ((!sigungu || sigungu === sido) && isCityOrCounty) {
             sigungu = primaryName || gc.city || gc.county || "";
           }
-          eupmyeon =
-            gc.locality ||
-            byLevel[8] ||
-            byLevel[10] ||
-            gc.town ||
-            gc.village ||
-            gc.suburb ||
-            gc.neighbourhood ||
-            gc.quarter ||
-            gc.hamlet ||
-            gc.city_district ||
-            gc.district ||
-            gc.township ||
-            gc.residential ||
-            gc.name ||
-            labelParts[0] ||
-            labelParts[1] ||
-            "";
+          const emdCandidates = [
+            gc.locality,
+            byLevel[10],
+            gc.town,
+            gc.village,
+            gc.suburb,
+            gc.neighbourhood,
+            gc.quarter,
+            gc.hamlet,
+            gc.township,
+            gc.residential,
+            gc.name,
+            nonEmptyLabelParts[0],
+            nonEmptyLabelParts[1],
+          ].filter((name) => {
+            if (!name) return false;
+            if (name === sido) return false;
+            if (name === cityLike) return false;
+            if (name === districtLike) return false;
+            return true;
+          });
+          eupmyeon = emdCandidates[0] || "";
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
@@ -1403,16 +1447,18 @@
             eupmyeon = "";
           }
         }
+        if (!isKoreanPeninsula) {
+          if (isCountryLike(sido)) sido = "";
+          if (isCountryLike(sigungu)) sigungu = "";
+          if (isCountryLike(eupmyeon)) eupmyeon = "";
+        }
         if (sido && sigungu && sido === sigungu) {
           sigungu = "";
         }
         return { sido, sigungu, eupmyeon };
       },
-      _getTagFromGeocoding(gc) {
-        if (!gc || typeof gc !== "object") return "";
-        const label = gc.label || "";
-        const [firstPartRaw = ""] = label.split(",");
-        const firstPart = firstPartRaw.trim();
+      _getTagFromGeocoding(gc, trimmedParts) {
+        const firstPart = trimmedParts[0] || "";
         const primary =
           gc.name ||
           firstPart ||
@@ -1427,26 +1473,29 @@
         const gc = feature?.properties?.geocoding || null;
         if (!gc) {
           return {
-            sido: "",
-            sigungu: "",
-            eupmyeon: "",
-            tag: "",
-            fullAddr: "",
+            addr: {
+              sido: "",
+              sigungu: "",
+              eupmyeon: "",
+              tag: "",
+              fullAddr: "",
+            },
             kind: undefined,
           };
         }
+        const { label, trimmedParts, nonEmptyParts } = getLabelParts(gc);
         const countryCode = String(gc.country_code || "").toLowerCase();
-        const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(gc);
-        const tag = this._getTagFromGeocoding(gc);
-        const fullAddr = gc.label || "";
-        let kind = undefined;
-        if (countryCode === "kp") {
-          kind = "KP";
-        } else if (countryCode === "jp") {
-          kind = "WORLD";
-        }
-        return { sido, sigungu, eupmyeon, tag, fullAddr, kind };
-      },
+        const { sido, sigungu, eupmyeon } =
+          this._getAdminFromGeocoding(gc, countryCode, nonEmptyParts);
+        const tag = this._getTagFromGeocoding(gc, trimmedParts);
+        const fullAddr = label;
+        const addr = { sido, sigungu, eupmyeon, tag, fullAddr };
+        let kind;
+        if (countryCode === "kr") kind = "KR";
+        else if (countryCode === "kp") kind = "KP";
+        else if (countryCode) kind = "WORLD";
+        return { addr, kind };
+      }
     };
     const AppState = {
       records: [],
@@ -1465,6 +1514,9 @@
           this.status === "pausing"
         );
       },
+      get isBusy() {
+        return this.isRunning || this.status === "parsing";
+      },
       get isPaused() {
         return this.status === "paused";
       },
@@ -1477,14 +1529,16 @@
       get processedCount() {
         return this.cntSuccess + this.cntFail;
       },
-      reset() {
+      reset(status = "idle") {
         this.cntSuccess = 0;
         this.cntFail = 0;
-        this.status = "idle";
+        this.status = status;
         this.controller = null;
         this.resumeHandler = null;
         this.inFlight = false;
         this.renderReq = null;
+        updateUIState();
+        scheduleRender();
       },
       setRecords(newRecords) {
         this.records = newRecords;
@@ -1492,7 +1546,6 @@
       },
       setFile(file) {
         this.droppedFile = file;
-        updateUIState();
       },
       setStatus(st) {
         this.status = st;
@@ -1525,17 +1578,15 @@
         pause,
         resume,
         stop,
-        exportBtn,
         progShell,
         dropZone,
       } = domElements;
-      const isBusy = AppState.isRunning || s === "parsing";
+      const isBusy = AppState.isBusy;
       parse.disabled = isBusy;
       start.disabled = isBusy || !hasRecords || s === "stopping";
       pause.disabled = s !== "running";
       resume.disabled = s !== "paused";
       stop.disabled = s === "idle" || s === "stopping";
-      exportBtn.disabled = AppState.processedCount === 0;
       progShell.classList.toggle(
         "active",
         s === "running" || s === "pausing"
@@ -1564,7 +1615,7 @@
       domElements.prog.value = pct;
       domElements.progShell.style.setProperty("--pct", pct);
       domElements.progLabel.textContent = `진행 상황 ${pct}%`;
-      updateUIState();
+      domElements.exportBtn.disabled = processed === 0;
       AppState.renderReq = null;
     }
     function scheduleRender() {
@@ -1650,7 +1701,6 @@
     }
     async function fetchReverseWithRetry(lat, lon, userSignal) {
       let attempt = 0;
-      let lastError;
       while (attempt < CONFIG.MAX_RETRY) {
         userSignal?.throwIfAborted();
         attempt++;
@@ -1671,26 +1721,22 @@
             return res.json();
           }
           if (res.status === 429 || res.status >= 500) {
-            lastError = new Error(`HTTP ${res.status}: rate limited or server error`);
             if (attempt >= CONFIG.MAX_RETRY) {
-              throw lastError;
+              throw new Error(`HTTP ${res.status}: rate limited or server error`);
             }
             await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
             continue;
           }
           const text = await res.text();
-          lastError = new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-          throw lastError;
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
         } catch (e) {
           userSignal?.throwIfAborted();
-          lastError = e;
           if (attempt >= CONFIG.MAX_RETRY) {
             throw e;
           }
           await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
         }
       }
-      throw lastError ?? new Error("최대 재시도 횟수를 초과했습니다.");
     }
     function appendSkeletonRow(idx) {
       const tr = SKELETON_TEMPLATE.cloneNode(true);
@@ -1746,18 +1792,17 @@
             r.lon,
             AppState.controller.signal
           );
-          const parsed = AddressFormatter.parse(data);
-          if (parsed.kind) {
-            r.set = parsed.kind;
+          const { addr, kind } = AddressFormatter.parse(data);
+          if (kind) {
+            r.set = kind;
           }
-          r.addr = parsed;
-          r.fullAddr = parsed.fullAddr;
+          r.addr = addr;
+          r.fullAddr = addr.fullAddr;
           fillRow(skeletonTr, r);
           pushResultRow(r);
         } catch (err) {
           const msg = err && (err.message || String(err));
-          const isAbort =
-            err && (err.name === "AbortError" || /aborted/i.test(msg));
+          const isAbort = err && err.name === "AbortError";
           if (AppState.isStopping && isAbort) {
             skeletonTr.remove();
             break;
@@ -1774,7 +1819,6 @@
             );
         } finally {
           AppState.inFlight = false;
-          scheduleRender();
         }
       }
       if (AppState.isStopping) {
@@ -1787,14 +1831,11 @@
       withViewTransition(() => {
         AppState.setStatus("idle");
         setStatus(message, type);
-        scheduleRender();
       });
     }
     function startProcessing() {
-      AppState.reset();
-      AppState.setStatus("running");
+      AppState.reset("running");
       clearTable();
-      scheduleRender();
       setStatus("조회 시작… (단축키: S=일시정지, Esc=중지)");
       runProcessingLoop();
     }
@@ -1832,7 +1873,6 @@
       }
     });
     async function handleParse() {
-      if (domElements.parse.disabled) return;
       try {
         const file = AppState.droppedFile;
         if (!file) {
@@ -1844,7 +1884,6 @@
         if (!parsed.length) {
           AppState.setRecords([]);
           domElements.coords.value = "";
-          scheduleRender();
           return setStatus("좌표를 찾지 못했습니다.", "warn");
         }
         const records = parsed.map((p, i) => ({
@@ -1865,7 +1904,6 @@
             )}건 생략됨`
           );
         domElements.coords.value = disp.join("\n");
-        scheduleRender();
         setStatus(
           `분석 완료: ${records.length}개 좌표. 조회 시작을 누르세요(단축키 S)`
         );
@@ -1918,28 +1956,25 @@
     });
     function handleFile(files) {
       if (!files.length) return;
-      if (AppState.isRunning || AppState.status === "parsing" || AppState.status === "stopping") {
+      if (AppState.isBusy || AppState.isStopping) {
         setStatus("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
         domElements.file.value = "";
         return;
       }
       const file = files[0];
-      AppState.setRecords([]);
       domElements.coords.value = "";
       clearTable();
-      scheduleRender();
+      AppState.setRecords([]);
       AppState.setFile(file);
       setStatus(`파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`);
-      const desktopMsg =
-        domElements.dropZoneText.querySelector(".desktop-msg");
-      const mobileMsg = domElements.dropZoneText.querySelector(".mobile-msg");
-      [desktopMsg, mobileMsg].forEach((el) => {
-        if (!el) return;
-        el.textContent = "선택된 파일: ";
-        const strong = document.createElement("strong");
-        strong.textContent = file.name;
-        el.append(strong);
-      });
+      domElements.dropZoneText
+        .querySelectorAll(".desktop-msg, .mobile-msg")
+        .forEach((el) => {
+          el.textContent = "선택된 파일: ";
+          const strong = document.createElement("strong");
+          strong.textContent = file.name;
+          el.append(strong);
+        });
       domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
