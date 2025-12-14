@@ -4,7 +4,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
   <title>SRG 데이터 역지오코딩 도구</title>
   <meta name="description" content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
   <meta property="og:type" content="website">
@@ -625,6 +624,9 @@
         }
 
         @container (inline-size <=900px) {
+          max-block-size: 70dvh;
+          overscroll-behavior: contain;
+
           &:not(:has(tbody > tr)) {
             min-block-size: 100px;
             overflow: hidden;
