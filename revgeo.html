@@ -45,9 +45,7 @@
         container-name: page;
       }
 
-      h1,
-      h2,
-      h3 {
+      :is(h1, h2, h3) {
         text-wrap: balance;
       }
 
@@ -155,6 +153,16 @@
 
         100% {
           background-position: -50% 0;
+        }
+      }
+
+      @keyframes row-fade-in {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
         }
       }
 
@@ -314,8 +322,7 @@
           }
         }
 
-        &:hover,
-        &:focus-within {
+        &:is(:hover, :focus-within) {
           border-color: var(--accent);
           background: light-dark(oklch(99% 0.02 275 / 0.8), oklch(12% 0.08 275 / 0.4));
 
@@ -361,8 +368,7 @@
         }
       }
 
-      textarea,
-      button {
+      :is(textarea, button) {
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
@@ -446,8 +452,7 @@
           filter: grayscale(0.8);
         }
 
-        &#parse,
-        &#start {
+        &:is(#parse, #start) {
           background: var(--accent);
           color: oklch(99% 0.02 270);
           border-color: transparent;
@@ -596,6 +601,12 @@
         scrollbar-width: thin;
         box-shadow: inset 0 2px 4px oklch(0% 0 0 / 0.03);
 
+        &.scrolling {
+          box-shadow:
+            inset 0 2px 4px oklch(0% 0 0 / 0.03),
+            0 10px 30px -20px oklch(0% 0 0 / 0.35);
+        }
+
         .empty-hint {
           display: flex;
           align-items: center;
@@ -645,8 +656,7 @@
             color: var(--muted);
             white-space: nowrap;
 
-            &:nth-child(1),
-            &:nth-child(2) {
+            &:nth-child(-n + 2) {
               text-align: center;
             }
           }
@@ -660,8 +670,7 @@
             vertical-align: top;
             font-size: var(--fs-sm);
 
-            &:nth-child(1),
-            &:nth-child(2) {
+            &:nth-child(-n + 2) {
               text-align: center;
               color: var(--muted);
             }
@@ -714,13 +723,16 @@
               contain-intrinsic-block-size: auto 378.77px;
               display: flex;
               flex-direction: column;
+              gap: 10px;
+              padding-block: 16px;
+              padding-inline: 16px;
               background: light-dark(oklch(100% 0 0 / 0.4), oklch(20% 0.04 270 / 0.4));
               border: 1px solid var(--line);
               border-radius: 16px;
-              padding-block: 16px;
-              padding-inline: 16px;
-              gap: 10px;
               box-shadow: var(--shadow-sm);
+              animation: row-fade-in 1s both;
+              animation-timeline: view();
+              animation-range: entry 0% cover 25%;
 
               @media (any-hover: hover) {
                 &:hover {
@@ -730,25 +742,25 @@
                   border-color: var(--accent);
                 }
               }
-            }
 
-            td {
-              border: none;
-              padding-block: 2px;
-              padding-inline: 0;
-              display: grid;
-              grid-template-columns: 80px 1fr;
-              gap: 10px;
-              align-items: baseline;
-              text-align: start !important;
+              td {
+                display: grid;
+                grid-template-columns: 80px 1fr;
+                gap: 10px;
+                align-items: baseline;
+                text-align: start !important;
+                border: none;
+                padding-block: 2px;
+                padding-inline: 0;
 
-              &::before {
-                content: attr(data-label);
-                font-weight: 600;
-                color: var(--muted);
-                font-size: var(--fs-sm);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
+                &::before {
+                  content: attr(data-label);
+                  font-weight: 600;
+                  color: var(--muted);
+                  font-size: var(--fs-sm);
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                }
               }
             }
           }
@@ -792,107 +804,27 @@
     }
 
     @layer transitions {
-      main {
-        view-transition-name: app-root;
-      }
-
-      .card:first-of-type {
-        view-transition-name: controls-card;
-      }
-
       .card:nth-of-type(2) {
         view-transition-name: results-card;
       }
 
-      .row-progress {
-        view-transition-name: progress-bar;
-      }
-
-      .status {
-        view-transition-name: status-bar;
-      }
-
-      .table-wrap {
-        view-transition-name: results-table;
-      }
-
-      ::view-transition-old(app-root),
-      ::view-transition-new(app-root) {
-        animation-duration: 260ms;
-        animation-timing-function: cubic-bezier(0.22, 0.7, 0.3, 1);
-      }
-
-      ::view-transition-old(app-root) {
-        animation-name: vt-fade-out;
-      }
-
-      ::view-transition-new(app-root) {
-        animation-name: vt-fade-in;
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation: none;
       }
 
       ::view-transition-old(results-card),
-      ::view-transition-new(results-card),
-      ::view-transition-old(results-table),
-      ::view-transition-new(results-table),
-      ::view-transition-old(progress-bar),
-      ::view-transition-new(progress-bar),
-      ::view-transition-old(status-bar),
-      ::view-transition-new(status-bar) {
+      ::view-transition-new(results-card) {
         animation-duration: 300ms;
         animation-timing-function: cubic-bezier(0.25, 0.9, 0.35, 1);
       }
 
-      ::view-transition-old(results-card),
-      ::view-transition-old(results-table),
-      ::view-transition-old(progress-bar),
-      ::view-transition-old(status-bar) {
+      ::view-transition-old(results-card) {
         animation-name: vt-slide-fade-up;
       }
 
-      ::view-transition-new(results-card),
-      ::view-transition-new(results-table) {
+      ::view-transition-new(results-card) {
         animation-name: vt-slide-fade-in-strong;
-      }
-
-      ::view-transition-new(progress-bar),
-      ::view-transition-new(status-bar) {
-        animation-name: vt-slide-fade-in;
-      }
-
-      @keyframes vt-fade-in {
-        from {
-          opacity: 0;
-          transform: scale(0.98);
-        }
-
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
-
-      @keyframes vt-fade-out {
-        from {
-          opacity: 1;
-          transform: scale(1);
-        }
-
-        to {
-          opacity: 0;
-          transform: scale(0.98);
-        }
-      }
-
-      @keyframes vt-slide-fade-in {
-        from {
-          opacity: 0;
-          transform: translateY(8px);
-        }
-
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
       }
 
       @keyframes vt-slide-fade-in-strong {
@@ -1007,7 +939,7 @@
     </section>
     <section class="card">
       <header class="card-header">
-        <h2 id="results-title">결과 표</h2>
+        <h2>결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
       </header>
       <div class="table-wrap">
@@ -1174,6 +1106,7 @@
       progShell: document.querySelector("#prog-shell"),
       prog: document.querySelector("#prog"),
       progLabel: document.querySelector("#prog-label"),
+      tableWrap: document.querySelector(".table-wrap"),
       tbody: document.querySelector("#tbl tbody"),
       coords: document.querySelector("#coords"),
     };
@@ -1581,11 +1514,12 @@
       timeZone: "Asia/Seoul",
     });
     function withViewTransition(fn) {
-      if (document.startViewTransition) {
-        document.startViewTransition(fn);
-      } else {
+      const active = document.activeViewTransition;
+      if (active) {
         fn();
+        return active;
       }
+      return document.startViewTransition(fn);
     }
     function updateUIState() {
       const s = AppState.status;
@@ -1846,10 +1780,8 @@
       }
     }
     function setControlsIdle(message, type = "info") {
-      withViewTransition(() => {
-        AppState.setStatus("idle");
-        setStatusMessage(message, type);
-      });
+      AppState.setStatus("idle");
+      setStatusMessage(message, type);
     }
     function startProcessing() {
       AppState.reset("running");
@@ -1935,42 +1867,38 @@
       void handleParse();
     });
     domElements.start.addEventListener("click", () => {
-      withViewTransition(startProcessing);
+      const rowCount = domElements.tbody.childElementCount;
+      if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
+      else startProcessing();
     });
     domElements.pause.addEventListener("click", () => {
       if (!AppState.isRunning) return;
-      withViewTransition(() => {
-        AppState.setStatus("pausing");
-        if (AppState.inFlight) {
-          setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
-        }
-      });
+      AppState.setStatus("pausing");
+      if (AppState.inFlight) {
+        setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
+      }
     });
     domElements.resume.addEventListener("click", () => {
       if (!AppState.isPaused) return;
-      withViewTransition(() => {
-        AppState.setStatus("running");
-        if (AppState.resumeHandler) {
-          AppState.resumeHandler.resolve();
-          AppState.resumeHandler = null;
-        }
-      });
+      AppState.setStatus("running");
+      if (AppState.resumeHandler) {
+        AppState.resumeHandler.resolve();
+        AppState.resumeHandler = null;
+      }
     });
     domElements.stop.addEventListener("click", () => {
       if (!AppState.isRunning) return;
-      withViewTransition(() => {
-        AppState.setStatus("stopping");
-        if (AppState.resumeHandler) {
-          AppState.resumeHandler.resolve();
-          AppState.resumeHandler = null;
-        }
-        if (AppState.inFlight && AppState.controller) {
-          AppState.controller.abort();
-          setStatusMessage("중지 요청됨. 취소 중…", "warn");
-        } else {
-          setStatusMessage("중지 요청됨. 정리 중…", "warn");
-        }
-      });
+      AppState.setStatus("stopping");
+      if (AppState.resumeHandler) {
+        AppState.resumeHandler.resolve();
+        AppState.resumeHandler = null;
+      }
+      if (AppState.inFlight && AppState.controller) {
+        AppState.controller.abort();
+        setStatusMessage("중지 요청됨. 취소 중…", "warn");
+      } else {
+        setStatusMessage("중지 요청됨. 정리 중…", "warn");
+      }
     });
     function handleFile(files) {
       if (!files.length) return;
@@ -1997,7 +1925,9 @@
     }
     domElements.file.addEventListener("change", () => {
       const files = domElements.file.files;
-      withViewTransition(() => handleFile(files));
+      const rowCount = domElements.tbody.childElementCount;
+      if (rowCount > 0 && rowCount <= 200) withViewTransition(() => handleFile(files));
+      else handleFile(files);
     });
     let moveReq = null;
     let lastEvent = null;
@@ -2063,6 +1993,17 @@
       e.preventDefault();
       handler();
     });
+    {
+      const wrap = domElements.tableWrap;
+      if (wrap) {
+        wrap.addEventListener("scroll", () => {
+          wrap.classList.add("scrolling");
+        }, { passive: true });
+        wrap.addEventListener("scrollend", () => {
+          wrap.classList.remove("scrolling");
+        }, { passive: true });
+      }
+    }
   </script>
 </body>
 
