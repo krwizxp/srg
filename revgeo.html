@@ -144,6 +144,25 @@
     }
 
     @layer components {
+      @keyframes find-reveal-flash {
+        0% {
+          background: light-dark(oklch(from var(--accent) l c h / 0.22),
+              oklch(from var(--accent) l c h / 0.16));
+          box-shadow: 0 0 0 2px oklch(from var(--accent) l c h / 0.22) inset;
+        }
+
+        60% {
+          background: light-dark(oklch(from var(--accent) l c h / 0.12),
+              oklch(from var(--accent) l c h / 0.08));
+          box-shadow: 0 0 0 2px oklch(from var(--accent) l c h / 0.14) inset;
+        }
+
+        100% {
+          background: transparent;
+          box-shadow: none;
+        }
+      }
+
       @keyframes shimmer {
         0% {
           background-position: 150% 0;
@@ -749,6 +768,10 @@
             content-visibility: auto;
             contain-intrinsic-block-size: auto 136.56px;
 
+            &.find-reveal {
+              animation: find-reveal-flash 900ms ease-out;
+            }
+
             @media (any-hover: hover) {
               &:hover {
                 background: light-dark(oklch(97% 0.02 270), oklch(22% 0.04 270));
@@ -1250,21 +1273,45 @@
       }
       return true;
     }
+    const setRowHiddenUntilFound = (tr, hide) => {
+      if (!tr) return;
+      if (hide) tr.setAttribute("hidden", "until-found");
+      else tr.removeAttribute("hidden");
+    };
     function applyFilterAll() {
       const f = currentFilter();
       const active = hasActiveFilter(f);
       for (const tr of domElements.tbody.rows) {
-        tr.hidden = active ? !rowMatchesFilter(tr, f) : false;
+        const hide = active ? !rowMatchesFilter(tr, f) : false;
+        setRowHiddenUntilFound(tr, hide);
       }
     }
     function applyFilterToRow(tr) {
       const f = currentFilter();
       if (!hasActiveFilter(f)) {
-        tr.hidden = false;
+        setRowHiddenUntilFound(tr, false);
         return;
       }
-      tr.hidden = !rowMatchesFilter(tr, f);
+      setRowHiddenUntilFound(tr, !rowMatchesFilter(tr, f));
     }
+    const TEMP_REVEAL_MS = 1200;
+    const tempRevealTimers = new WeakMap();
+    domElements.tbody.addEventListener("beforematch", (e) => {
+      const tr = e.target?.closest?.("tr");
+      if (!tr) return;
+      tr.removeAttribute("hidden");
+      tr.classList.remove("find-reveal");
+      void tr.offsetWidth;
+      tr.classList.add("find-reveal");
+      const prev = tempRevealTimers.get(tr);
+      if (prev) clearTimeout(prev);
+      const id = setTimeout(() => {
+        tr.classList.remove("find-reveal");
+        applyFilterToRow(tr);
+        tempRevealTimers.delete(tr);
+      }, TEMP_REVEAL_MS);
+      tempRevealTimers.set(tr, id);
+    });
     const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
     if (SKELETON_TEMPLATE) {
       const skeletonCells = SKELETON_TEMPLATE.querySelectorAll("td");
@@ -2019,8 +2066,8 @@
       domElements.filterFullAddr,
     ]) {
       el?.addEventListener("input", applyFilterAll);
-      domElements.filterKind?.addEventListener("change", applyFilterAll);
     }
+    domElements.filterKind?.addEventListener("change", applyFilterAll);
     domElements.app.addEventListener("command", async (e) => {
       switch (e.command) {
         case "--parse":
