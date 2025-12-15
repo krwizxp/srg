@@ -110,7 +110,6 @@
         padding-block: 20px;
         padding-inline: 20px;
         letter-spacing: -.015em;
-        transition: opacity .2s ease;
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
         line-height: 1.6;
@@ -933,7 +932,7 @@
 </head>
 
 <body>
-  <main>
+  <main id="app">
     <section class="card">
       <header class="brand">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
@@ -965,12 +964,12 @@
             <input type="file" id="file" accept=".txt">
           </label>
           <div class="row">
-            <button type="button" id="parse">좌표 추출</button>
-            <button type="button" id="start" disabled>조회 시작</button>
-            <button type="button" id="pause" disabled>일시정지</button>
-            <button type="button" id="resume" disabled>재개</button>
-            <button type="button" id="stop" disabled>중지</button>
-            <button type="button" id="export" disabled>CSV 내보내기</button>
+            <button type="button" id="parse" commandfor="app" command="--parse">좌표 추출</button>
+            <button type="button" id="start" commandfor="app" command="--start" disabled>조회 시작</button>
+            <button type="button" id="pause" commandfor="app" command="--pause" disabled>일시정지</button>
+            <button type="button" id="resume" commandfor="app" command="--resume" disabled>재개</button>
+            <button type="button" id="stop" commandfor="app" command="--stop" disabled>중지</button>
+            <button type="button" id="export" commandfor="app" command="--export" disabled>CSV 내보내기</button>
           </div>
         </fieldset>
       </form>
@@ -1002,7 +1001,7 @@
         <h2>결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
       </header>
-      <div class="filters" id="filters">
+      <div class="filters">
         <input id="filter-q" type="search" placeholder="전체검색" />
         <select id="filter-kind">
           <option value="">구분(전체)</option>
@@ -1016,7 +1015,7 @@
         <input id="filter-emd" type="search" placeholder="읍·면·동·리" />
         <input id="filter-tag" type="search" placeholder="지물 태그" />
         <input id="filter-fulladdr" type="search" placeholder="전체주소" />
-        <button type="button" id="filter-clear">필터 초기화</button>
+        <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
       </div>
       <div class="table-wrap">
         <p class="empty-hint">
@@ -1119,7 +1118,7 @@
     const MAP_PROVIDERS = Array.from(
       tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
       (a) => {
-        const key = a.dataset.providerKey || a.textContent.trim();
+        const key = a.dataset.providerKey || "";
         a.textContent = key;
         const template = a.dataset.urlTemplate;
         const url = (lat, lon) =>
@@ -1129,6 +1128,8 @@
         return { key, url };
       }
     );
+    const numberFormatter = new Intl.NumberFormat("ko-KR");
+    const fmt = (n) => numberFormatter.format(n);
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
       kind: {
@@ -1136,6 +1137,9 @@
       },
       idx: {
         val: (r) => r.idx,
+        render: (val, td) => {
+          td.textContent = fmt(val);
+        },
       },
       coords: {
         val: (r) => `${r.lat}, ${r.lon}`,
@@ -1162,11 +1166,11 @@
         },
       },
     };
-    const numberFormatter = new Intl.NumberFormat("ko-KR");
     const domElements = {
       file: document.querySelector("#file"),
       dropZoneText: document.querySelector(".drop-text"),
       dropZone: document.querySelector(".drop-zone"),
+      app: document.querySelector("#app"),
       parse: document.querySelector("#parse"),
       start: document.querySelector("#start"),
       pause: document.querySelector("#pause"),
@@ -1191,7 +1195,6 @@
       filterEmd: document.querySelector("#filter-emd"),
       filterTag: document.querySelector("#filter-tag"),
       filterFullAddr: document.querySelector("#filter-fulladdr"),
-      filterClear: document.querySelector("#filter-clear"),
     };
     const COL_DEFS = Array.from(
       document.querySelectorAll("#tbl thead th"),
@@ -1275,7 +1278,7 @@
     const CSV_HEADER_STR = (() => {
       const cols = CSV_COLS.map((c) => csvEsc(c.label));
       const maps = MAP_PROVIDERS.map((p) => csvEsc(`지도링크(${p.key})`));
-      return "\uFEFF" + [...cols, ...maps].join(",") + "\n";
+      return "\uFEFF" + [...cols, ...maps].join(",");
     })();
     function getGeocodejsonFeature(data) {
       if (
@@ -1642,16 +1645,6 @@
         updateUIState();
       },
     };
-    const fileDateFmt = new Intl.DateTimeFormat("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Seoul",
-    });
     function withViewTransition(fn) {
       const active = document.activeViewTransition;
       if (active) {
@@ -1699,10 +1692,10 @@
       const success = AppState.cntSuccess;
       const fail = AppState.cntFail;
       const remaining = total - processed;
-      domElements.cntTotal.textContent = numberFormatter.format(total);
-      domElements.cntSuccess.textContent = numberFormatter.format(success);
-      domElements.cntFail.textContent = numberFormatter.format(fail);
-      domElements.cntRemain.textContent = numberFormatter.format(remaining);
+      domElements.cntTotal.textContent = fmt(total);
+      domElements.cntSuccess.textContent = fmt(success);
+      domElements.cntFail.textContent = fmt(fail);
+      domElements.cntRemain.textContent = fmt(remaining);
       const pct = total ? Math.round((processed / total) * 100) : 0;
       domElements.prog.value = pct;
       domElements.progShell.style.setProperty("--pct", pct);
@@ -1787,13 +1780,13 @@
     async function performPauseCheck() {
       if (AppState.isPausing) {
         AppState.setStatus("paused");
-        setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행(단축키 S)', "warn");
+        setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
         if (!AppState.resumeHandler)
           AppState.resumeHandler = Promise.withResolvers();
         scheduleRender();
         await AppState.resumeHandler.promise;
         if (!AppState.isStopping)
-          setStatusMessage("재개합니다… (단축키 Esc로 중지)");
+          setStatusMessage("재개합니다…");
       }
     }
     async function fetchReverseWithRetry(lat, lon, userSignal) {
@@ -1838,7 +1831,7 @@
     function appendSkeletonRow(idx) {
       const tr = SKELETON_TEMPLATE.cloneNode(true);
       if (IDX_COL_INDEX >= 0) {
-        tr.cells[IDX_COL_INDEX].textContent = idx;
+        tr.cells[IDX_COL_INDEX].textContent = fmt(idx);
       }
       domElements.tbody.append(tr);
       return tr;
@@ -1861,10 +1854,13 @@
     }
     async function runProcessingLoop() {
       const startIndex = AppState.processedCount;
-      for (let i = startIndex; i < AppState.records.length; i++) {
+      const total = AppState.records.length;
+      const totalDisp = fmt(total);
+      for (let i = startIndex; i < total; i++) {
         await performPauseCheck();
         if (!AppState.isRunning) break;
         const r = AppState.records[i];
+        const curDisp = fmt(i + 1);
         AppState.controller = new AbortController();
         AppState.inFlight = true;
         const skeletonTr = appendSkeletonRow(r.idx);
@@ -1881,8 +1877,7 @@
           }
           if (!AppState.isPaused)
             setStatusMessage(
-              `처리 중… (${i + 1}/${AppState.records.length
-              }) (단축키: S=일시정지, Esc=중지)`
+              `처리 중… (${curDisp}/${totalDisp})`
             );
           const data = await fetchReverseWithRetry(
             r.lat,
@@ -1913,7 +1908,7 @@
           pushResultRow(r);
           if (!AppState.isStopping)
             setStatusMessage(
-              `에러 발생: (${i + 1}/${AppState.records.length}) ${msg}`,
+              `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
               "error"
             );
         } finally {
@@ -1923,7 +1918,7 @@
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
       } else if (AppState.processedCount >= AppState.records.length) {
-        setControlsIdle("모든 처리가 완료되었습니다.", "info");
+        setControlsIdle("모든 처리가 완료되었습니다.");
       }
     }
     function setControlsIdle(message, type = "info") {
@@ -1933,10 +1928,10 @@
     function startProcessing() {
       AppState.reset("running");
       clearTable();
-      setStatusMessage("조회 시작… (단축키: S=일시정지, Esc=중지)");
+      setStatusMessage("조회 시작…");
       runProcessingLoop();
     }
-    domElements.exportBtn.addEventListener("click", async () => {
+    async function handleExport() {
       try {
         const rows = AppState.records.slice(0, AppState.processedCount);
         if (!rows.length) {
@@ -1950,25 +1945,30 @@
           for (let i = 0; i < MAP_PROVIDERS.length; i++) {
             rowArr.push(csvEsc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
           }
-          return rowArr.join(",") + "\n";
+          return rowArr.join(",");
         };
-        const lines = [CSV_HEADER_STR];
-        for (const r of rows) lines.push(makeRow(r));
-        const dateStr = fileDateFmt.format().replace(/\D/g, "");
-        const fileName = `result_${dateStr}.csv`;
-        const blob = new Blob(lines, { type: "text/csv;charset=utf-8" });
+        let csv = CSV_HEADER_STR;
+        for (let i = 0; i < rows.length; i++) {
+          csv += `\n${makeRow(rows[i])}`;
+        }
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const base = (AppState.droppedFile?.name || "revgeo").replace(/\.[^.]+$/, "");
+        const filename = `${base}_${stamp}.csv`;
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = fileName;
+        a.download = filename;
+        document.body.appendChild(a);
         a.click();
+        a.remove();
         URL.revokeObjectURL(url);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
         console.error(err);
         setStatusMessage(`저장 실패: ${err.message}`, "error");
       }
-    });
+    }
     async function handleParse() {
       try {
         const file = AppState.droppedFile;
@@ -1996,13 +1996,13 @@
           .map((r) => `${r.lat},${r.lon}`);
         if (records.length > MAX_DISP)
           disp.push(
-            `... 외 ${numberFormatter.format(
+            `... 외 ${fmt(
               records.length - MAX_DISP
             )}건 생략됨`
           );
         domElements.coords.value = disp.join("\n");
         setStatusMessage(
-          `분석 완료: ${records.length}개 좌표. 조회 시작을 누르세요(단축키 S)`
+          `분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`
         );
       } catch (err) {
         console.error(err);
@@ -2010,10 +2010,8 @@
         setStatusMessage(`오류 발생: ${err.message}`, "error");
       }
     }
-    domElements.parse.addEventListener("click", handleParse);
     for (const el of [
       domElements.filterQ,
-      domElements.filterKind,
       domElements.filterSido,
       domElements.filterSigungu,
       domElements.filterEmd,
@@ -2021,50 +2019,61 @@
       domElements.filterFullAddr,
     ]) {
       el?.addEventListener("input", applyFilterAll);
-      el?.addEventListener("change", applyFilterAll);
+      domElements.filterKind?.addEventListener("change", applyFilterAll);
     }
-    domElements.filterClear?.addEventListener("click", () => {
-      domElements.filterQ.value = "";
-      domElements.filterKind.value = "";
-      domElements.filterSido.value = "";
-      domElements.filterSigungu.value = "";
-      domElements.filterEmd.value = "";
-      domElements.filterTag.value = "";
-      domElements.filterFullAddr.value = "";
-      applyFilterAll();
-    });
-    domElements.start.addEventListener("click", () => {
-      const rowCount = domElements.tbody.childElementCount;
-      if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
-      else startProcessing();
-    });
-    domElements.pause.addEventListener("click", () => {
-      if (!AppState.isRunning) return;
-      AppState.setStatus("pausing");
-      if (AppState.inFlight) {
-        setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
-      }
-    });
-    domElements.resume.addEventListener("click", () => {
-      if (!AppState.isPaused) return;
-      AppState.setStatus("running");
-      if (AppState.resumeHandler) {
-        AppState.resumeHandler.resolve();
-        AppState.resumeHandler = null;
-      }
-    });
-    domElements.stop.addEventListener("click", () => {
-      if (!AppState.isRunning) return;
-      AppState.setStatus("stopping");
-      if (AppState.resumeHandler) {
-        AppState.resumeHandler.resolve();
-        AppState.resumeHandler = null;
-      }
-      if (AppState.inFlight && AppState.controller) {
-        AppState.controller.abort();
-        setStatusMessage("중지 요청됨. 취소 중…", "warn");
-      } else {
-        setStatusMessage("중지 요청됨. 정리 중…", "warn");
+    domElements.app.addEventListener("command", async (e) => {
+      switch (e.command) {
+        case "--parse":
+          await handleParse();
+          break;
+        case "--start": {
+          const rowCount = domElements.tbody.childElementCount;
+          if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
+          else startProcessing();
+          break;
+        }
+        case "--pause":
+          if (!AppState.isRunning) return;
+          AppState.setStatus("pausing");
+          if (AppState.inFlight) {
+            setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
+          }
+          break;
+        case "--resume":
+          if (!AppState.isPaused) return;
+          AppState.setStatus("running");
+          if (AppState.resumeHandler) {
+            AppState.resumeHandler.resolve();
+            AppState.resumeHandler = null;
+          }
+          break;
+        case "--stop":
+          if (!AppState.isRunning) return;
+          AppState.setStatus("stopping");
+          if (AppState.resumeHandler) {
+            AppState.resumeHandler.resolve();
+            AppState.resumeHandler = null;
+          }
+          if (AppState.inFlight && AppState.controller) {
+            AppState.controller.abort();
+            setStatusMessage("중지 요청됨. 취소 중…", "warn");
+          } else {
+            setStatusMessage("중지 요청됨. 정리 중…", "warn");
+          }
+          break;
+        case "--filter-clear":
+          domElements.filterQ.value = "";
+          domElements.filterKind.value = "";
+          domElements.filterSido.value = "";
+          domElements.filterSigungu.value = "";
+          domElements.filterEmd.value = "";
+          domElements.filterTag.value = "";
+          domElements.filterFullAddr.value = "";
+          applyFilterAll();
+          break;
+        case "--export":
+          await handleExport();
+          break;
       }
     });
     function handleFile(files) {
@@ -2079,7 +2088,7 @@
       clearTable();
       AppState.setRecords([]);
       AppState.setFile(file);
-      setStatusMessage(`파일 선택됨: ${file.name} 추출 버튼을 누르세요(단축키 P)`);
+      setStatusMessage(`파일 선택됨: ${file.name} 추출 버튼을 누르세요`);
       domElements.dropZoneText
         .querySelectorAll(".desktop-msg, .mobile-msg")
         .forEach((el) => {
@@ -2148,31 +2157,6 @@
         tapHighlightAbort.delete(target);
       }
     }
-    const hotkeys = {
-      p: () => {
-        if (domElements.parse.disabled) return;
-        void handleParse();
-      },
-      escape: () => {
-        if (!domElements.stop.disabled) {
-          domElements.stop.click();
-        }
-      },
-      s: () => {
-        if (!domElements.resume.disabled) domElements.resume.click();
-        else if (!domElements.pause.disabled) domElements.pause.click();
-        else if (!domElements.start.disabled) domElements.start.click();
-      },
-    };
-    window.addEventListener("keydown", (e) => {
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.isComposing) return;
-      const key = e.key.toLowerCase();
-      const handler = hotkeys[key];
-      if (!handler) return;
-      e.preventDefault();
-      handler();
-    });
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
