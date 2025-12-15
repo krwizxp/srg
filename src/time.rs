@@ -90,6 +90,26 @@ mod windows_input {
         r#type: u32,
         union: InputUnion,
     }
+    impl Input {
+        #[inline(always)]
+        fn mouse(mi: MouseInput) -> Self {
+            Self {
+                r#type: INPUT_MOUSE,
+                union: InputUnion { mi },
+            }
+        }
+        #[inline(always)]
+        fn keyboard(ki: KeybdInput) -> Self {
+            Self {
+                r#type: INPUT_KEYBOARD,
+                union: InputUnion { ki },
+            }
+        }
+    }
+    #[cfg(target_pointer_width = "64")]
+    const _: [(); 40] = [(); std::mem::size_of::<Input>()];
+    #[cfg(target_pointer_width = "32")]
+    const _: [(); 28] = [(); std::mem::size_of::<Input>()];
     #[link(name = "user32")]
     unsafe extern "system" {
         fn SendInput(cInputs: u32, pInputs: *const Input, cbSize: i32) -> u32;
@@ -105,48 +125,28 @@ mod windows_input {
     }
     pub fn send_mouse_click() {
         let inputs = [
-            Input {
-                r#type: INPUT_MOUSE,
-                union: InputUnion {
-                    mi: MouseInput {
-                        dw_flags: MOUSEEVENTF_LEFTDOWN,
-                        ..Default::default()
-                    },
-                },
-            },
-            Input {
-                r#type: INPUT_MOUSE,
-                union: InputUnion {
-                    mi: MouseInput {
-                        dw_flags: MOUSEEVENTF_LEFTUP,
-                        ..Default::default()
-                    },
-                },
-            },
+            Input::mouse(MouseInput {
+                dw_flags: MOUSEEVENTF_LEFTDOWN,
+                ..Default::default()
+            }),
+            Input::mouse(MouseInput {
+                dw_flags: MOUSEEVENTF_LEFTUP,
+                ..Default::default()
+            }),
         ];
         send_input_events(&inputs)
     }
     pub fn send_f5_press() {
         let inputs = [
-            Input {
-                r#type: INPUT_KEYBOARD,
-                union: InputUnion {
-                    ki: KeybdInput {
-                        w_vk: VK_F5,
-                        ..Default::default()
-                    },
-                },
-            },
-            Input {
-                r#type: INPUT_KEYBOARD,
-                union: InputUnion {
-                    ki: KeybdInput {
-                        w_vk: VK_F5,
-                        dw_flags: KEYEVENTF_KEYUP,
-                        ..Default::default()
-                    },
-                },
-            },
+            Input::keyboard(KeybdInput {
+                w_vk: VK_F5,
+                ..Default::default()
+            }),
+            Input::keyboard(KeybdInput {
+                w_vk: VK_F5,
+                dw_flags: KEYEVENTF_KEYUP,
+                ..Default::default()
+            }),
         ];
         send_input_events(&inputs)
     }
