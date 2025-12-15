@@ -1115,19 +1115,16 @@
     );
     const tmplMapLinks = document.querySelector("#tmpl-map-links");
     const tmplSkeleton = document.querySelector("#tmpl-row-skeleton");
-    const MAP_PROVIDERS = Array.from(
-      tmplMapLinks.content.querySelectorAll("a[data-url-template]"),
-      (a) => {
-        const key = a.dataset.providerKey || "";
-        a.textContent = key;
-        const template = a.dataset.urlTemplate;
-        const url = (lat, lon) =>
-          template
-            .replaceAll("{lat}", lat)
-            .replaceAll("{lon}", lon);
-        return { key, url };
-      }
-    );
+    const mapAnchors = tmplMapLinks.content.querySelectorAll("a[data-url-template]");
+    const MAP_LINKS = Array.from(mapAnchors, (a) => ({
+      key: a.dataset.providerKey || "",
+      template: a.dataset.urlTemplate || "",
+    }));
+    const MAP_PROVIDER_COUNT = MAP_LINKS.length;
+    const fillLatLon = (tpl, lat, lon) =>
+      tpl
+        .replaceAll("{lat}", lat)
+        .replaceAll("{lon}", lon);
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
     const addrVal = (key) => (r) => r.addr?.[key];
@@ -1155,12 +1152,15 @@
         noCsv: true,
         render: (_, td, r) => {
           const fragment = tmplMapLinks.content.cloneNode(true);
-          const anchors = fragment.querySelectorAll("a[data-url-template]");
-          let idx = 0;
-          for (const a of anchors) {
-            const provider = MAP_PROVIDERS[idx++];
-            if (!provider) break;
-            a.href = provider.url(r.lat, r.lon);
+          const anchors = fragment.querySelectorAll("a");
+          const lat = String(r.lat);
+          const lon = String(r.lon);
+          const n = Math.min(anchors?.length ?? 0, MAP_PROVIDER_COUNT);
+          for (let i = 0; i < n; i++) {
+            const { key, template } = MAP_LINKS[i];
+            const a = anchors[i];
+            if (!a.textContent) a.textContent = key;
+            a.href = fillLatLon(template, lat, lon);
           }
           td.replaceChildren(fragment);
         },
@@ -1196,6 +1196,15 @@
       filterTag: document.querySelector("#filter-tag"),
       filterFullAddr: document.querySelector("#filter-fulladdr"),
     };
+    const FILTER_INPUTS = [
+      domElements.filterQ,
+      domElements.filterKind,
+      domElements.filterSido,
+      domElements.filterSigungu,
+      domElements.filterEmd,
+      domElements.filterTag,
+      domElements.filterFullAddr,
+    ];
     const COL_DEFS = Array.from(
       document.querySelectorAll("#tbl thead th"),
       (th) => {
@@ -1248,7 +1257,7 @@
         ].join(" ");
         if (!hay.includes(f.q)) return false;
       }
-return true;
+      return true;
     }
     function applyFilterAll() {
       const f = currentFilter();
@@ -1277,7 +1286,10 @@ return true;
     const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
     const CSV_HEADER_STR = (() => {
       const cols = CSV_COLS.map((c) => csvEsc(c.label));
-      const maps = MAP_PROVIDERS.map((p) => csvEsc(`지도링크(${p.key})`));
+      const maps = Array.from(
+        { length: MAP_PROVIDER_COUNT },
+        (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`)
+      );
       return "\uFEFF" + [...cols, ...maps].join(",");
     })();
     function getGeocodejsonFeature(data) {
@@ -1857,60 +1869,70 @@ return true;
       const total = AppState.records.length;
       const totalDisp = fmt(total);
       for (let i = startIndex; i < total; i++) {
-        await performPauseCheck();
-        if (!AppState.isRunning) break;
-        const r = AppState.records[i];
         const curDisp = fmt(i + 1);
-        AppState.controller = new AbortController();
-        AppState.inFlight = true;
-        const skeletonTr = appendSkeletonRow(r.idx);
+        let skeletonTr = null;
         try {
-          if (i > startIndex)
-            await sleep(
-              CONFIG.RATE_LIMIT_DELAY_MS,
+          await performPauseCheck();
+          if (!AppState.isRunning) break;
+          const r = AppState.records[i];
+          AppState.controller = new AbortController();
+          AppState.inFlight = true;
+          skeletonTr = appendSkeletonRow(r.idx);
+          try {
+            if (i > startIndex)
+              await sleep(
+                CONFIG.RATE_LIMIT_DELAY_MS,
+                AppState.controller.signal
+              );
+            await performPauseCheck();
+            if (!AppState.isRunning) {
+              skeletonTr.remove();
+              break;
+            }
+            if (!AppState.isPaused)
+              setStatusMessage(
+                `처리 중… (${curDisp}/${totalDisp})`
+              );
+            const data = await fetchReverseWithRetry(
+              r.lat,
+              r.lon,
               AppState.controller.signal
             );
-          await performPauseCheck();
-          if (!AppState.isRunning) {
-            skeletonTr.remove();
-            break;
+            const { addr, kind } = AddressFormatter.parse(data);
+            if (kind) {
+              r.set = kind;
+            }
+            r.addr = addr;
+            r.fullAddr = addr.fullAddr;
+            fillRow(skeletonTr, r);
+            applyFilterToRow(skeletonTr);
+            pushResultRow(r);
+          } catch (err) {
+            const msg = err && (err.message || String(err));
+            const isAbort = err && err.name === "AbortError";
+            if (AppState.isStopping && isAbort) {
+              skeletonTr.remove();
+              break;
+            }
+            console.error(err);
+            r.set = "에러";
+            r.fullAddr = msg;
+            fillRow(skeletonTr, r);
+            applyFilterToRow(skeletonTr);
+            pushResultRow(r);
+            if (!AppState.isStopping)
+              setStatusMessage(
+                `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
+                "error"
+              );
           }
-          if (!AppState.isPaused)
-            setStatusMessage(
-              `처리 중… (${curDisp}/${totalDisp})`
-            );
-          const data = await fetchReverseWithRetry(
-            r.lat,
-            r.lon,
-            AppState.controller.signal
-          );
-          const { addr, kind } = AddressFormatter.parse(data);
-          if (kind) {
-            r.set = kind;
-          }
-          r.addr = addr;
-          r.fullAddr = addr.fullAddr;
-          fillRow(skeletonTr, r);
-          applyFilterToRow(skeletonTr);
-          pushResultRow(r);
         } catch (err) {
-          const msg = err && (err.message || String(err));
-          const isAbort = err && err.name === "AbortError";
-          if (AppState.isStopping && isAbort) {
-            skeletonTr.remove();
-            break;
-          }
           console.error(err);
-          r.set = "에러";
-          r.fullAddr = msg;
-          fillRow(skeletonTr, r);
-          applyFilterToRow(skeletonTr);
-          pushResultRow(r);
-          if (!AppState.isStopping)
-            setStatusMessage(
-              `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
-              "error"
-            );
+          const msg = err?.message || String(err);
+          AppState.controller = null;
+          AppState.resumeHandler = null;
+          setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${msg}`, "error");
+          break;
         } finally {
           AppState.inFlight = false;
         }
@@ -1929,7 +1951,13 @@ return true;
       AppState.reset("running");
       clearTable();
       setStatusMessage("조회 시작…");
-      runProcessingLoop();
+      void runProcessingLoop().catch((err) => {
+        console.error(err);
+        AppState.inFlight = false;
+        AppState.controller = null;
+        AppState.resumeHandler = null;
+        setControlsIdle(`오류로 중단됨: ${err?.message || String(err)}`, "error");
+      });
     }
     async function handleExport() {
       try {
@@ -1942,19 +1970,41 @@ return true;
           for (let i = 0; i < CSV_COLS.length; i++) {
             rowArr.push(csvEsc(CSV_COLS[i].val(r)));
           }
-          for (let i = 0; i < MAP_PROVIDERS.length; i++) {
-            rowArr.push(csvEsc(MAP_PROVIDERS[i].url(r.lat, r.lon)));
+          const lat = String(r.lat);
+          const lon = String(r.lon);
+          for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+            rowArr.push(csvEsc(fillLatLon(MAP_LINKS[i].template, lat, lon)));
           }
           return rowArr.join(",");
         };
-        let csv = CSV_HEADER_STR;
+        setStatusMessage("CSV 생성 중…");
+        await yieldToMain();
+        const encoder = new TextEncoder();
+        const parts = [encoder.encode(CSV_HEADER_STR)];
+        const CHUNK_CHAR_LIMIT = 1_000_000;
+        let chunkLines = [];
+        let chunkChars = 0;
+        const flushChunk = () => {
+          if (!chunkLines.length) return;
+          parts.push(encoder.encode("\n" + chunkLines.join("\n")));
+          chunkLines = [];
+          chunkChars = 0;
+        };
         for (let i = 0; i < rows.length; i++) {
-          csv += `\n${makeRow(rows[i])}`;
+          const line = makeRow(rows[i]);
+          chunkLines.push(line);
+          chunkChars += line.length + 1;
+          if (chunkChars >= CHUNK_CHAR_LIMIT) {
+            flushChunk();
+            setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${fmt(rows.length)})`);
+            await yieldToMain();
+          }
         }
+        flushChunk();
         const stamp = new Date().toISOString().replace(/[:.]/g, "-");
         const base = (AppState.droppedFile?.name || "revgeo").replace(/\.[^.]+$/, "");
         const filename = `${base}_${stamp}.csv`;
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const blob = new Blob(parts, { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1962,7 +2012,7 @@ return true;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
         console.error(err);
@@ -2013,61 +2063,20 @@ return true;
     const filtersEl = document.querySelector(".filters");
     filtersEl?.addEventListener("input", applyFilterAll);
     filtersEl?.addEventListener("change", applyFilterAll);
-    domElements.app.addEventListener("command", async (e) => {
-      switch (e.command) {
-        case "--parse":
-          await handleParse();
-          break;
-        case "--start": {
-          const rowCount = domElements.tbody.childElementCount;
-          if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
-          else startProcessing();
-          break;
-        }
-        case "--pause":
-          if (!AppState.isRunning) return;
-          AppState.setStatus("pausing");
-          if (AppState.inFlight) {
-            setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn");
-          }
-          break;
-        case "--resume":
-          if (!AppState.isPaused) return;
-          AppState.setStatus("running");
-          if (AppState.resumeHandler) {
-            AppState.resumeHandler.resolve();
-            AppState.resumeHandler = null;
-          }
-          break;
-        case "--stop":
-          if (!AppState.isRunning) return;
-          AppState.setStatus("stopping");
-          if (AppState.resumeHandler) {
-            AppState.resumeHandler.resolve();
-            AppState.resumeHandler = null;
-          }
-          if (AppState.inFlight && AppState.controller) {
-            AppState.controller.abort();
-            setStatusMessage("중지 요청됨. 취소 중…", "warn");
-          } else {
-            setStatusMessage("중지 요청됨. 정리 중…", "warn");
-          }
-          break;
-        case "--filter-clear":
-          domElements.filterQ.value = "";
-          domElements.filterKind.value = "";
-          domElements.filterSido.value = "";
-          domElements.filterSigungu.value = "";
-          domElements.filterEmd.value = "";
-          domElements.filterTag.value = "";
-          domElements.filterFullAddr.value = "";
-          applyFilterAll();
-          break;
-        case "--export":
-          await handleExport();
-          break;
-      }
-    });
+    const maybeVT = (fn) => {
+      const n = domElements.tbody.childElementCount;
+      return (n > 0 && n <= 200) ? withViewTransition(fn) : fn();
+    };
+    const COMMANDS = {
+      "--parse": handleParse,
+      "--start": () => maybeVT(startProcessing),
+      "--pause": () => { if (!AppState.isRunning) return; AppState.setStatus("pausing"); if (AppState.inFlight) setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn"); },
+      "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
+      "--stop": () => { if (!AppState.isRunning) return; AppState.setStatus("stopping"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatusMessage("중지 요청됨. 취소 중…", "warn"); } else setStatusMessage("중지 요청됨. 정리 중…", "warn"); },
+      "--filter-clear": () => { for (const el of FILTER_INPUTS) el.value = ""; applyFilterAll(); },
+      "--export": handleExport,
+    };
+    domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
     function handleFile(files) {
       if (!files.length) return;
       if (AppState.isBusy || AppState.isStopping) {
@@ -2093,9 +2102,7 @@ return true;
     }
     domElements.file.addEventListener("change", () => {
       const files = domElements.file.files;
-      const rowCount = domElements.tbody.childElementCount;
-      if (rowCount > 0 && rowCount <= 200) withViewTransition(() => handleFile(files));
-      else handleFile(files);
+      maybeVT(() => handleFile(files));
     });
     let moveReq = null;
     let lastEvent = null;
