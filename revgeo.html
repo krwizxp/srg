@@ -109,8 +109,8 @@
         color: var(--fg);
         padding-block: 20px;
         padding-inline: 20px;
-        letter-spacing: -0.015em;
-        transition: opacity 0.2s ease;
+        letter-spacing: -.015em;
+        transition: opacity .2s ease;
         font-variant-numeric: tabular-nums;
         font-size: var(--fs-base);
         line-height: 1.6;
@@ -210,7 +210,6 @@
           text-align: center;
           font-size: var(--fs-sm);
           color: var(--muted);
-          margin-block: 0;
           line-height: 1.3;
         }
 
@@ -223,7 +222,7 @@
               var(--spotlight),
               transparent 40%);
           opacity: 0;
-          transition: opacity 0.3s;
+          transition: opacity .3s;
           z-index: 1;
         }
 
@@ -240,7 +239,7 @@
 
       .brand {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 14px;
 
         svg {
@@ -248,9 +247,16 @@
           filter: drop-shadow(0 0 12px var(--accent-glow));
           inline-size: 36px;
           block-size: 36px;
+          flex: 0 0 auto;
+          display: block;
+          margin-block-start: 2px;
         }
 
         >div {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+
           h1 {
             margin-block: 0;
             font-size: var(--fs-xl);
@@ -264,6 +270,7 @@
             color: var(--muted);
             font-size: var(--fs-sm);
             font-weight: 500;
+            line-height: 1.25;
           }
         }
       }
@@ -287,7 +294,7 @@
         padding-block: 12px;
         padding-inline: 16px;
         text-align: center;
-        transition: all 0.2s ease;
+        transition: .2s ease;
         background: light-dark(oklch(98% 0.02 270 / 0.4), oklch(15% 0.03 270 / 0.4));
         display: flex;
         flex-direction: column;
@@ -296,10 +303,10 @@
         gap: 10px;
 
         input[type="file"] {
-          cursor: pointer;
           position: absolute;
           inset: 0;
           opacity: 0;
+          cursor: pointer;
         }
 
         .drop-icon {
@@ -307,7 +314,7 @@
           block-size: 36px;
           margin-block-end: 4px;
           color: var(--muted);
-          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: .3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .drop-text {
@@ -371,7 +378,7 @@
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
       textarea {
@@ -423,7 +430,7 @@
               oklch(100% 0 0 / 0.2),
               transparent 70%);
           opacity: 0;
-          transition: opacity 0.3s;
+          transition: opacity .3s;
         }
 
         &:not(:disabled) {
@@ -492,6 +499,14 @@
 
         >.sp {
           flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-inline-size: 0;
+        }
+
+        #prog-label {
+          line-height: 1.15;
         }
 
         #counts {
@@ -499,7 +514,7 @@
           font-size: var(--fs-sm);
           text-align: end;
           white-space: nowrap;
-          line-height: 1.4;
+          line-height: 1.15;
           color: var(--muted);
 
           strong {
@@ -510,7 +525,6 @@
 
       .progress-shell {
         --pct: 0;
-        margin-block-start: 8px;
         position: relative;
         border-radius: 999px;
         background: var(--line);
@@ -518,7 +532,6 @@
         block-size: 8px;
 
         >progress {
-          border: none;
           opacity: 0;
         }
 
@@ -556,7 +569,7 @@
         flex-shrink: 0;
         font-weight: 500;
         font-size: var(--fs-sm);
-        transition: opacity 0.3s, transform 0.3s, display 0.3s allow-discrete;
+        transition: opacity .3s, transform .3s, display .3s allow-discrete;
 
         &:empty {
           display: none;
@@ -1037,10 +1050,9 @@
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
     };
     const FETCH_HEADERS = { Accept: "application/json" };
-    const BASE_URL = new URL("https://nominatim.openstreetmap.org/reverse");
-    BASE_URL.searchParams.set("format", "geocodejson");
-    BASE_URL.searchParams.set("zoom", CONFIG.REVERSE_ZOOM);
-    BASE_URL.searchParams.set("accept-language", "ko");
+    const BASE_URL = new URL(
+      `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
+    );
     const tmplMapLinks = document.querySelector("#tmpl-map-links");
     const tmplSkeleton = document.querySelector("#tmpl-row-skeleton");
     const MAP_PROVIDERS = Array.from(
@@ -1597,14 +1609,20 @@
       );
       return promise;
     }
-    const yieldToMain =
-      "scheduler" in window && "yield" in window.scheduler
-        ? () => window.scheduler.yield()
-        : () => {
-          const { promise, resolve } = Promise.withResolvers();
-          setTimeout(resolve, 0);
-          return promise;
-        };
+    const yieldToMain = (() => {
+      if ("scheduler" in window && "yield" in window.scheduler) {
+        return () => window.scheduler.yield();
+      }
+      const ch = new MessageChannel();
+      const q = [];
+      ch.port1.onmessage = () => q.shift()?.resolve();
+      return () => {
+        const { promise, resolve } = Promise.withResolvers();
+        q.push({ resolve });
+        ch.port2.postMessage(0);
+        return promise;
+      };
+    })();
     async function* lineIterator(stream) {
       const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
       let remnant = "";
@@ -1865,9 +1883,7 @@
         setStatusMessage(`오류 발생: ${err.message}`, "error");
       }
     }
-    domElements.parse.addEventListener("click", () => {
-      void handleParse();
-    });
+    domElements.parse.addEventListener("click", handleParse);
     domElements.start.addEventListener("click", () => {
       const rowCount = domElements.tbody.childElementCount;
       if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
