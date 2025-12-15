@@ -176,7 +176,6 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        max-inline-size: 100%;
         overflow: hidden;
         position: relative;
         container-type: inline-size;
@@ -374,7 +373,10 @@
         }
       }
 
-      :is(textarea, button) {
+      :where(textarea,
+        button,
+        .filters input[type="search"],
+        .filters select) {
         border-radius: 12px;
         border: 1px solid var(--line);
         background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
@@ -543,7 +545,7 @@
         .progress-fill {
           block-size: 100%;
           transform: scaleX(calc(var(--pct, 0) / 100));
-          transform-origin: left;
+          transform-origin: 0% 50%;
           background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
           transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
         }
@@ -647,6 +649,49 @@
             .empty-hint {
               inset-block-start: 0;
             }
+          }
+        }
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-block: 10px 12px;
+
+        :is(input[type="search"], select) {
+          padding-block: 10px;
+          padding-inline: 12px;
+          font: inherit;
+          font-size: var(--fs-sm);
+        }
+
+        input[type="search"] {
+          min-inline-size: 220px;
+          flex: 1 1 220px;
+        }
+
+        select {
+          flex: 0 0 auto;
+        }
+
+        #filter-clear {
+          flex: 0 0 auto;
+          min-inline-size: max-content;
+          padding-inline: 12px;
+        }
+      }
+
+      @container page (inline-size >=1550px) {
+        .filters {
+          flex-wrap: nowrap;
+          align-items: center;
+          overflow-inline: auto;
+          max-inline-size: 100%;
+
+          input[type="search"] {
+            min-inline-size: 120px;
+            flex: 0 1 140px;
           }
         }
       }
@@ -957,6 +1002,22 @@
         <h2>결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
       </header>
+      <div class="filters" id="filters">
+        <input id="filter-q" type="search" placeholder="전체검색" />
+        <select id="filter-kind">
+          <option value="">구분(전체)</option>
+          <option value="kr">KR</option>
+          <option value="kp">KP</option>
+          <option value="world">WORLD</option>
+          <option value="에러">에러</option>
+        </select>
+        <input id="filter-sido" type="search" placeholder="시·도" />
+        <input id="filter-sigungu" type="search" placeholder="시·군·구" />
+        <input id="filter-emd" type="search" placeholder="읍·면·동·리" />
+        <input id="filter-tag" type="search" placeholder="지물 태그" />
+        <input id="filter-fulladdr" type="search" placeholder="전체주소" />
+        <button type="button" id="filter-clear">필터 초기화</button>
+      </div>
       <div class="table-wrap">
         <p class="empty-hint">
           데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
@@ -1123,6 +1184,14 @@
       tableWrap: document.querySelector(".table-wrap"),
       tbody: document.querySelector("#tbl tbody"),
       coords: document.querySelector("#coords"),
+      filterQ: document.querySelector("#filter-q"),
+      filterKind: document.querySelector("#filter-kind"),
+      filterSido: document.querySelector("#filter-sido"),
+      filterSigungu: document.querySelector("#filter-sigungu"),
+      filterEmd: document.querySelector("#filter-emd"),
+      filterTag: document.querySelector("#filter-tag"),
+      filterFullAddr: document.querySelector("#filter-fulladdr"),
+      filterClear: document.querySelector("#filter-clear"),
     };
     const COL_DEFS = Array.from(
       document.querySelectorAll("#tbl thead th"),
@@ -1137,6 +1206,62 @@
       }
     );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
+    const COL_INDEX = Object.fromEntries(COL_DEFS.map((c, i) => [c.key, i]));
+    const norm = (s) => String(s ?? "").trim().toLowerCase();
+    function currentFilter() {
+      return {
+        q: norm(domElements.filterQ?.value),
+        kind: norm(domElements.filterKind?.value),
+        sido: norm(domElements.filterSido?.value),
+        sigungu: norm(domElements.filterSigungu?.value),
+        emd: norm(domElements.filterEmd?.value),
+        tag: norm(domElements.filterTag?.value),
+        fullAddr: norm(domElements.filterFullAddr?.value),
+      };
+    }
+    function hasActiveFilter(f) {
+      return !!(f.q || f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
+    }
+    function rowMatchesFilter(tr, f) {
+      const cellText = (key) => {
+        const i = COL_INDEX[key];
+        const td = i >= 0 ? tr.cells[i] : null;
+        return norm(td?.textContent);
+      };
+      if (f.kind && cellText("kind") !== f.kind) return false;
+      if (f.sido && !cellText("sido").includes(f.sido)) return false;
+      if (f.sigungu && !cellText("sigungu").includes(f.sigungu)) return false;
+      if (f.emd && !cellText("emd").includes(f.emd)) return false;
+      if (f.tag && !cellText("tag").includes(f.tag)) return false;
+      if (f.fullAddr && !cellText("fullAddr").includes(f.fullAddr)) return false;
+      if (f.q) {
+        const hay = [
+          cellText("coords"),
+          cellText("sido"),
+          cellText("sigungu"),
+          cellText("emd"),
+          cellText("tag"),
+          cellText("fullAddr"),
+        ].join(" ");
+        if (!hay.includes(f.q)) return false;
+      }
+      return true;
+    }
+    function applyFilterAll() {
+      const f = currentFilter();
+      const active = hasActiveFilter(f);
+      for (const tr of domElements.tbody.rows) {
+        tr.hidden = active ? !rowMatchesFilter(tr, f) : false;
+      }
+    }
+    function applyFilterToRow(tr) {
+      const f = currentFilter();
+      if (!hasActiveFilter(f)) {
+        tr.hidden = false;
+        return;
+      }
+      tr.hidden = !rowMatchesFilter(tr, f);
+    }
     const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
     if (SKELETON_TEMPLATE) {
       const skeletonCells = SKELETON_TEMPLATE.querySelectorAll("td");
@@ -1552,7 +1677,7 @@
       start.disabled = isBusy || !hasRecords || s === "stopping";
       pause.disabled = s !== "running";
       resume.disabled = s !== "paused";
-      stop.disabled = s === "idle" || s === "stopping";
+      stop.disabled = !AppState.isRunning || s === "stopping";
       progShell.classList.toggle(
         "active",
         s === "running" || s === "pausing"
@@ -1771,6 +1896,7 @@
           r.addr = addr;
           r.fullAddr = addr.fullAddr;
           fillRow(skeletonTr, r);
+          applyFilterToRow(skeletonTr);
           pushResultRow(r);
         } catch (err) {
           const msg = err && (err.message || String(err));
@@ -1783,6 +1909,7 @@
           r.set = "에러";
           r.fullAddr = msg;
           fillRow(skeletonTr, r);
+          applyFilterToRow(skeletonTr);
           pushResultRow(r);
           if (!AppState.isStopping)
             setStatusMessage(
@@ -1884,6 +2011,28 @@
       }
     }
     domElements.parse.addEventListener("click", handleParse);
+    for (const el of [
+      domElements.filterQ,
+      domElements.filterKind,
+      domElements.filterSido,
+      domElements.filterSigungu,
+      domElements.filterEmd,
+      domElements.filterTag,
+      domElements.filterFullAddr,
+    ]) {
+      el?.addEventListener("input", applyFilterAll);
+      el?.addEventListener("change", applyFilterAll);
+    }
+    domElements.filterClear?.addEventListener("click", () => {
+      domElements.filterQ.value = "";
+      domElements.filterKind.value = "";
+      domElements.filterSido.value = "";
+      domElements.filterSigungu.value = "";
+      domElements.filterEmd.value = "";
+      domElements.filterTag.value = "";
+      domElements.filterFullAddr.value = "";
+      applyFilterAll();
+    });
     domElements.start.addEventListener("click", () => {
       const rowCount = domElements.tbody.childElementCount;
       if (rowCount > 0 && rowCount <= 200) withViewTransition(startProcessing);
