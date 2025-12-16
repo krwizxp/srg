@@ -1076,20 +1076,20 @@
     <ul class="map-links">
       <li>
         <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
-          rel="noopener noreferrer"></a>
+          rel="noopener noreferrer">Google</a>
       </li>
       <li>
         <a data-provider-key="OSM"
           data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
-          target="_blank" rel="noopener noreferrer"></a>
+          target="_blank" rel="noopener noreferrer">OSM</a>
       </li>
       <li>
         <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
-          target="_blank" rel="noopener noreferrer"></a>
+          target="_blank" rel="noopener noreferrer">Naver</a>
       </li>
       <li>
         <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-          target="_blank" rel="noopener noreferrer"></a>
+          target="_blank" rel="noopener noreferrer">Kakao</a>
       </li>
     </ul>
   </template>
@@ -1116,15 +1116,50 @@
     const tmplMapLinks = document.querySelector("#tmpl-map-links");
     const tmplSkeleton = document.querySelector("#tmpl-row-skeleton");
     const mapAnchors = tmplMapLinks.content.querySelectorAll("a[data-url-template]");
-    const MAP_LINKS = Array.from(mapAnchors, (a) => ({
-      key: a.dataset.providerKey || "",
-      template: a.dataset.urlTemplate || "",
-    }));
+    const LATLON_TOKEN_RE = /{lat}|{lon}/g;
+    function compileLatLonTemplate(tpl) {
+      const parts = [];
+      let last = 0;
+      LATLON_TOKEN_RE.lastIndex = 0;
+      for (let m; (m = LATLON_TOKEN_RE.exec(tpl));) {
+        const idx = m.index;
+        if (idx > last) parts.push(tpl.slice(last, idx));
+        parts.push(m[0] === "{lat}" ? 0 : 1);
+        last = idx + m[0].length;
+      }
+      if (last < tpl.length) parts.push(tpl.slice(last));
+      return parts.length ? parts : [tpl];
+    }
+    const MAP_LINKS = Array.from(mapAnchors, (a) => {
+      const template = a.dataset.urlTemplate || "";
+      return {
+        key: a.dataset.providerKey || a.textContent.trim() || "",
+        template,
+        parts: compileLatLonTemplate(template),
+      };
+    });
     const MAP_PROVIDER_COUNT = MAP_LINKS.length;
-    const fillLatLon = (tpl, lat, lon) =>
-      tpl
-        .replaceAll("{lat}", lat)
-        .replaceAll("{lon}", lon);
+    const MAP_LINK_LI_PROTOS = (() => {
+      const protos = new Array(MAP_PROVIDER_COUNT);
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = MAP_LINKS[i].key || "";
+        li.append(a);
+        protos[i] = li;
+      }
+      return protos;
+    })();
+    function fillLatLon(parts, lat, lon) {
+      let out = "";
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        out += (p === 0) ? lat : (p === 1) ? lon : p;
+      }
+      return out;
+    }
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
     const addrVal = (key) => (r) => r.addr?.[key];
@@ -1139,7 +1174,7 @@
         },
       },
       coords: {
-        val: (r) => `${r.lat}, ${r.lon}`,
+        val: (r) => `${r.latStr}, ${r.lonStr}`,
       },
       sido: { val: addrVal("sido") },
       sigungu: { val: addrVal("sigungu") },
@@ -1151,18 +1186,16 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const fragment = tmplMapLinks.content.cloneNode(true);
-          const anchors = fragment.querySelectorAll("a");
-          const lat = String(r.lat);
-          const lon = String(r.lon);
-          const n = Math.min(anchors?.length ?? 0, MAP_PROVIDER_COUNT);
-          for (let i = 0; i < n; i++) {
-            const { key, template } = MAP_LINKS[i];
-            const a = anchors[i];
-            if (!a.textContent) a.textContent = key;
-            a.href = fillLatLon(template, lat, lon);
+          const { latStr: lat, lonStr: lon } = r;
+          const ul = document.createElement("ul");
+          ul.className = "map-links";
+          for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+            const li = MAP_LINK_LI_PROTOS[i].cloneNode(true);
+            const a = li.firstElementChild;
+            if (a) a.href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
+            ul.append(li);
           }
-          td.replaceChildren(fragment);
+          td.replaceChildren(ul);
         },
       },
     };
@@ -1219,9 +1252,12 @@
     );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
     const COL_INDEX = Object.fromEntries(COL_DEFS.map((c, i) => [c.key, i]));
-    const norm = (s) => String(s ?? "").trim().toLowerCase();
-    function currentFilter() {
-      return {
+    const RX_COMMA_WS = /\s*,\s*/g;
+    const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
+    const FILTER_DEBOUNCE_MS = 120;
+    const ROW_FILTER_CACHE = new WeakMap();
+    function buildFilterSnapshot() {
+      const f = {
         q: norm(domElements.filterQ?.value),
         kind: norm(domElements.filterKind?.value),
         sido: norm(domElements.filterSido?.value),
@@ -1230,49 +1266,97 @@
         tag: norm(domElements.filterTag?.value),
         fullAddr: norm(domElements.filterFullAddr?.value),
       };
+      f.active = !!(f.q || f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
+      return f;
     }
-    function hasActiveFilter(f) {
-      return !!(f.q || f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
+    let FILTER_SNAP = buildFilterSnapshot();
+    let filterDirty = false;
+    function markFilterDirty() {
+      filterDirty = true;
     }
-    function rowMatchesFilter(tr, f) {
-      const cellText = (key) => {
-        const i = COL_INDEX[key];
-        const td = i >= 0 ? tr.cells[i] : null;
-        return norm(td?.textContent);
-      };
-      if (f.kind && cellText("kind") !== f.kind) return false;
-      if (f.sido && !cellText("sido").includes(f.sido)) return false;
-      if (f.sigungu && !cellText("sigungu").includes(f.sigungu)) return false;
-      if (f.emd && !cellText("emd").includes(f.emd)) return false;
-      if (f.tag && !cellText("tag").includes(f.tag)) return false;
-      if (f.fullAddr && !cellText("fullAddr").includes(f.fullAddr)) return false;
-      if (f.q) {
-        const hay = [
-          cellText("coords"),
-          cellText("sido"),
-          cellText("sigungu"),
-          cellText("emd"),
-          cellText("tag"),
-          cellText("fullAddr"),
-        ].join(" ");
-        if (!hay.includes(f.q)) return false;
+    function getLiveFilterSnapshot() {
+      if (filterDirty) {
+        FILTER_SNAP = buildFilterSnapshot();
+        filterDirty = false;
       }
+      return FILTER_SNAP;
+    }
+    function getCellNorm(tr, key) {
+      const i = COL_INDEX[key];
+      const td = i >= 0 ? tr.cells[i] : null;
+      return norm(td?.textContent);
+    }
+    function buildRowFilterCache(tr) {
+      const kind = getCellNorm(tr, "kind");
+      const coords = getCellNorm(tr, "coords");
+      const sido = getCellNorm(tr, "sido");
+      const sigungu = getCellNorm(tr, "sigungu");
+      const emd = getCellNorm(tr, "emd");
+      const tag = getCellNorm(tr, "tag");
+      const fullAddr = getCellNorm(tr, "fullAddr");
+      const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fullAddr}`.trim();
+      return { kind, sido, sigungu, emd, tag, fullAddr, q };
+    }
+    function ensureRowFilterCache(tr) {
+      let cache = ROW_FILTER_CACHE.get(tr);
+      if (!cache) {
+        cache = buildRowFilterCache(tr);
+        ROW_FILTER_CACHE.set(tr, cache);
+      }
+      return cache;
+    }
+    function updateRowFilterCache(tr) {
+      ROW_FILTER_CACHE.set(tr, buildRowFilterCache(tr));
+    }
+    function rowMatchesFilterCached(cache, f) {
+      if (f.kind && cache.kind !== f.kind) return false;
+      if (f.sido && !cache.sido.includes(f.sido)) return false;
+      if (f.sigungu && !cache.sigungu.includes(f.sigungu)) return false;
+      if (f.emd && !cache.emd.includes(f.emd)) return false;
+      if (f.tag && !cache.tag.includes(f.tag)) return false;
+      if (f.fullAddr && !cache.fullAddr.includes(f.fullAddr)) return false;
+      if (f.q && !cache.q.includes(f.q)) return false;
       return true;
     }
-    function applyFilterAll() {
-      const f = currentFilter();
-      const active = hasActiveFilter(f);
-      for (const tr of domElements.tbody.rows) {
-        tr.hidden = active ? !rowMatchesFilter(tr, f) : false;
-      }
+    function setRowHiddenByFilter(tr, f) {
+      const hide = f.active ? !rowMatchesFilterCached(ensureRowFilterCache(tr), f) : false;
+      if (tr.hidden !== hide) tr.hidden = hide;
     }
-    function applyFilterToRow(tr) {
-      const f = currentFilter();
-      if (!hasActiveFilter(f)) {
-        tr.hidden = false;
+    function applyFilterAll(f = getLiveFilterSnapshot()) {
+      const rows = domElements.tbody.rows;
+      if (!rows?.length) return;
+      if (!f.active) {
+        for (const tr of rows) {
+          if (tr.hidden) tr.hidden = false;
+        }
         return;
       }
-      tr.hidden = !rowMatchesFilter(tr, f);
+      for (const tr of rows) {
+        setRowHiddenByFilter(tr, f);
+      }
+    }
+    function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
+      if (!tr) return;
+      setRowHiddenByFilter(tr, f);
+    }
+    let filterTimer = null;
+    let filterRaf = null;
+    function scheduleApplyFilterAll() {
+      markFilterDirty();
+      if (filterTimer) clearTimeout(filterTimer);
+      filterTimer = setTimeout(() => {
+        filterTimer = null;
+        if (filterRaf) cancelAnimationFrame(filterRaf);
+        filterRaf = requestAnimationFrame(() => {
+          filterRaf = null;
+          applyFilterAll(getLiveFilterSnapshot());
+        });
+      }, FILTER_DEBOUNCE_MS);
+    }
+    function clearAllFilters() {
+      for (const el of FILTER_INPUTS) el.value = "";
+      markFilterDirty();
+      applyFilterAll(getLiveFilterSnapshot());
     }
     const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
     if (SKELETON_TEMPLATE) {
@@ -1858,6 +1942,7 @@
         if (col.render) col.render(val, td, row);
         else td.textContent = val ?? "";
       });
+      updateRowFilterCache(tr);
     }
     function pushResultRow(row) {
       if (row.set === "에러") AppState.cntFail++;
@@ -1905,7 +1990,7 @@
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
             fillRow(skeletonTr, r);
-            applyFilterToRow(skeletonTr);
+            applyFilterToRow(skeletonTr, getLiveFilterSnapshot());
             pushResultRow(r);
           } catch (err) {
             const msg = err && (err.message || String(err));
@@ -1918,7 +2003,7 @@
             r.set = "에러";
             r.fullAddr = msg;
             fillRow(skeletonTr, r);
-            applyFilterToRow(skeletonTr);
+            applyFilterToRow(skeletonTr, getLiveFilterSnapshot());
             pushResultRow(r);
             if (!AppState.isStopping)
               setStatusMessage(
@@ -1970,10 +2055,9 @@
           for (let i = 0; i < CSV_COLS.length; i++) {
             rowArr.push(csvEsc(CSV_COLS[i].val(r)));
           }
-          const lat = String(r.lat);
-          const lon = String(r.lon);
+          const { latStr: lat, lonStr: lon } = r;
           for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            rowArr.push(csvEsc(fillLatLon(MAP_LINKS[i].template, lat, lon)));
+            rowArr.push(csvEsc(fillLatLon(MAP_LINKS[i].parts, lat, lon)));
           }
           return rowArr.join(",");
         };
@@ -2038,12 +2122,14 @@
           idx: i + 1,
           lat: p.lat,
           lon: p.lon,
+          latStr: String(p.lat),
+          lonStr: String(p.lon),
         }));
         AppState.setRecords(records);
         const MAX_DISP = 50_000;
         const disp = records
           .slice(0, MAX_DISP)
-          .map((r) => `${r.lat},${r.lon}`);
+          .map((r) => `${r.latStr}, ${r.lonStr}`);
         if (records.length > MAX_DISP)
           disp.push(
             `... 외 ${fmt(
@@ -2061,8 +2147,9 @@
       }
     }
     const filtersEl = document.querySelector(".filters");
-    filtersEl?.addEventListener("input", applyFilterAll);
-    filtersEl?.addEventListener("change", applyFilterAll);
+    const onFilterEvent = () => scheduleApplyFilterAll();
+    filtersEl?.addEventListener("input", onFilterEvent, { passive: true });
+    filtersEl?.addEventListener("change", onFilterEvent, { passive: true });
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
       return (n > 0 && n <= 200) ? withViewTransition(fn) : fn();
@@ -2073,7 +2160,7 @@
       "--pause": () => { if (!AppState.isRunning) return; AppState.setStatus("pausing"); if (AppState.inFlight) setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn"); },
       "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
       "--stop": () => { if (!AppState.isRunning) return; AppState.setStatus("stopping"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatusMessage("중지 요청됨. 취소 중…", "warn"); } else setStatusMessage("중지 요청됨. 정리 중…", "warn"); },
-      "--filter-clear": () => { for (const el of FILTER_INPUTS) el.value = ""; applyFilterAll(); },
+      "--filter-clear": () => clearAllFilters(),
       "--export": handleExport,
     };
     domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
