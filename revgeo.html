@@ -59,6 +59,10 @@
       p {
         margin-block: 0;
       }
+
+      :where([hidden]):not([hidden="until-found" i]) {
+        display: none;
+      }
     }
 
     @layer theme {
@@ -144,6 +148,10 @@
     }
 
     @layer components {
+      #tbl tbody tr[hidden] {
+        contain-intrinsic-size: 0px 0px;
+      }
+
       @keyframes shimmer {
         0% {
           background-position: 150% 0;
@@ -679,10 +687,8 @@
           min-inline-size: max-content;
           padding-inline: 12px;
         }
-      }
 
-      @container page (inline-size >=1550px) {
-        .filters {
+        @container page (inline-size >=1550px) {
           flex-wrap: nowrap;
           align-items: center;
           overflow-inline: auto;
@@ -746,8 +752,10 @@
           }
 
           tr {
-            content-visibility: auto;
-            contain-intrinsic-block-size: auto 136.56px;
+            &:not([hidden]) {
+              content-visibility: auto;
+              contain-intrinsic-block-size: auto 136.56px;
+            }
 
             @media (any-hover: hover) {
               &:hover {
@@ -774,11 +782,24 @@
           tbody {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 0;
             padding-block: 16px;
             padding-inline: 16px;
 
-            tr {
+            tr:not([hidden])+tr:not([hidden]) {
+              margin-block-start: 16px;
+            }
+
+            tr[hidden] {
+              block-size: 0 !important;
+              min-block-size: 0 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              border: 0 !important;
+              overflow: hidden !important;
+            }
+
+            tr:not([hidden]) {
               contain-intrinsic-block-size: auto 357.97px;
               display: flex;
               flex-direction: column;
@@ -927,6 +948,20 @@
         overflow: hidden;
         clip-path: inset(50%);
       }
+
+      #find-proxy-root {
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        inline-size: 1px;
+        block-size: 1px;
+        overflow: hidden;
+        pointer-events: none;
+
+        .find-proxy {
+          white-space: pre;
+        }
+      }
     }
   </style>
 </head>
@@ -1043,6 +1078,7 @@
       </div>
     </section>
   </main>
+  <div id="find-proxy-root" aria-hidden="true"></div>
   <template id="tmpl-row-skeleton">
     <tr>
       <td>
@@ -1134,7 +1170,6 @@
       const template = a.dataset.urlTemplate || "";
       return {
         key: a.dataset.providerKey || a.textContent.trim() || "",
-        template,
         parts: compileLatLonTemplate(template),
       };
     });
@@ -1228,6 +1263,7 @@
       filterEmd: document.querySelector("#filter-emd"),
       filterTag: document.querySelector("#filter-tag"),
       filterFullAddr: document.querySelector("#filter-fulladdr"),
+      findProxyRoot: document.querySelector("#find-proxy-root"),
     };
     const FILTER_INPUTS = [
       domElements.filterQ,
@@ -1255,7 +1291,50 @@
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
     const FILTER_DEBOUNCE_MS = 120;
-    const ROW_FILTER_CACHE = new WeakMap();
+    let ROW_FILTER_CACHE = new WeakMap();
+    let ROW_ID_SEQ = 0;
+    let ROW_TO_FIND_PROXY = new WeakMap();
+    function ensureRowId(tr) {
+      let id = tr.dataset.rowId;
+      if (!id) tr.dataset.rowId = id = String(++ROW_ID_SEQ);
+      return id;
+    }
+    function setFindProxyText(tr, text) {
+      const root = domElements.findProxyRoot;
+      if (!root) return;
+      let proxy = ROW_TO_FIND_PROXY.get(tr);
+      if (!proxy) {
+        proxy = document.createElement("div");
+        proxy.className = "find-proxy";
+        proxy.setAttribute("hidden", "until-found");
+        proxy.dataset.rowId = ensureRowId(tr);
+        root.append(proxy);
+        ROW_TO_FIND_PROXY.set(tr, proxy);
+      } else {
+        proxy.dataset.rowId = ensureRowId(tr);
+        proxy.setAttribute("hidden", "until-found");
+      }
+      proxy.textContent = text;
+    }
+    const FIND_REHIDE_DELAY_MS = 8000;
+    let FIND_REHIDE_TIMERS = new WeakMap();
+    function cancelFindRehide(tr) {
+      const t = FIND_REHIDE_TIMERS.get(tr);
+      if (t) {
+        clearTimeout(t);
+        FIND_REHIDE_TIMERS.delete(tr);
+      }
+    }
+    function scheduleFindRehide(tr) {
+      cancelFindRehide(tr);
+      tr.dataset.revealedByFind = "1";
+      const timer = setTimeout(() => {
+        if (!tr.isConnected) return;
+        delete tr.dataset.revealedByFind;
+        setRowHiddenByFilter(tr, getLiveFilterSnapshot());
+      }, FIND_REHIDE_DELAY_MS);
+      FIND_REHIDE_TIMERS.set(tr, timer);
+    }
     function buildFilterSnapshot() {
       const f = {
         q: norm(domElements.filterQ?.value),
@@ -1318,31 +1397,58 @@
       if (f.q && !cache.q.includes(f.q)) return false;
       return true;
     }
-    function setRowHiddenByFilter(tr, f) {
-      const hide = f.active ? !rowMatchesFilterCached(ensureRowFilterCache(tr), f) : false;
-      if (tr.hidden !== hide) tr.hidden = hide;
+    function showRow(tr) {
+      tr.removeAttribute("hidden");
+      const p = ROW_TO_FIND_PROXY.get(tr);
+      if (p) {
+        p.remove();
+        ROW_TO_FIND_PROXY.delete(tr);
+      }
     }
-    function applyFilterAll(f = getLiveFilterSnapshot()) {
-      const rows = domElements.tbody.rows;
-      if (!rows?.length) return;
-      if (!f.active) {
-        for (const tr of rows) {
-          if (tr.hidden) tr.hidden = false;
-        }
+    function hideRow(tr) {
+      tr.hidden = true;
+      const cache = ensureRowFilterCache(tr);
+      const text = `${cache.kind} ${cache.q}`.trim();
+      if (text) setFindProxyText(tr, text);
+    }
+    function setRowHiddenByFilter(tr, f) {
+      if (tr?.dataset?.skeleton === "1") {
+        showRow(tr);
         return;
       }
-      for (const tr of rows) {
-        setRowHiddenByFilter(tr, f);
+      const hide = f.active ? !rowMatchesFilterCached(ensureRowFilterCache(tr), f) : false;
+      if (!hide || tr.dataset.revealedByFind === "1") {
+        showRow(tr);
+        return;
+      }
+      hideRow(tr);
+    }
+    function getAllRows() {
+      const tb = domElements.tbody;
+      return tb ? tb.querySelectorAll("tr") : [];
+    }
+    function applyFilterAll(f = getLiveFilterSnapshot()) {
+      const rows = getAllRows();
+      for (let i = 0; i < rows.length; i++) {
+        setRowHiddenByFilter(rows[i], f);
       }
     }
     function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
       if (!tr) return;
       setRowHiddenByFilter(tr, f);
     }
+    function clearFindReveals() {
+      const rows = getAllRows();
+      for (const tr of rows) {
+        cancelFindRehide(tr);
+        delete tr.dataset.revealedByFind;
+      }
+    }
     let filterTimer = null;
     let filterRaf = null;
     function scheduleApplyFilterAll() {
       markFilterDirty();
+      clearFindReveals();
       if (filterTimer) clearTimeout(filterTimer);
       filterTimer = setTimeout(() => {
         filterTimer = null;
@@ -1354,8 +1460,11 @@
       }, FILTER_DEBOUNCE_MS);
     }
     function clearAllFilters() {
-      for (const el of FILTER_INPUTS) el.value = "";
+      for (const el of FILTER_INPUTS) {
+        if (el) el.value = "";
+      }
       markFilterDirty();
+      clearFindReveals();
       applyFilterAll(getLiveFilterSnapshot());
     }
     const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
@@ -1701,7 +1810,7 @@
         );
       },
       get isBusy() {
-        return this.isRunning || this.status === "parsing";
+        return this.isRunning || this.status === "parsing" || this.status === "stopping";
       },
       get isPaused() {
         return this.status === "paused";
@@ -1729,9 +1838,9 @@
         updateUIState();
         scheduleRender();
       },
-      setRecords(newRecords) {
+      setRecords(newRecords, status = "idle") {
         this.records = newRecords;
-        this.reset();
+        this.reset(status);
       },
       setFile(file) {
         this.droppedFile = file;
@@ -1763,7 +1872,7 @@
       } = domElements;
       const isBusy = AppState.isBusy;
       parse.disabled = isBusy;
-      start.disabled = isBusy || !hasRecords || s === "stopping";
+      start.disabled = isBusy || !hasRecords;
       pause.disabled = s !== "running";
       resume.disabled = s !== "paused";
       stop.disabled = !AppState.isRunning || s === "stopping";
@@ -1771,15 +1880,16 @@
         "active",
         s === "running" || s === "pausing"
       );
-      const lockInput = isBusy || s === "stopping";
+      const lockInput = isBusy;
       dropZone?.toggleAttribute("inert", lockInput);
     }
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
       el.textContent = msg;
-      el.classList.toggle("err", type === "error");
-      el.classList.toggle("warn", type === "warn");
-      el.classList.toggle("stopped", type === "stopped");
+      el.classList.remove("err", "warn", "stopped");
+      if (type === "error") el.classList.add("err");
+      else if (type === "warn") el.classList.add("warn");
+      else if (type === "stopped") el.classList.add("stopped");
     }
     function renderFrame() {
       AppState.renderReq = null;
@@ -1803,24 +1913,40 @@
       AppState.renderReq = requestAnimationFrame(renderFrame);
     }
     function clearTable() {
+      if (filterTimer) {
+        clearTimeout(filterTimer);
+        filterTimer = null;
+      }
+      if (filterRaf) {
+        cancelAnimationFrame(filterRaf);
+        filterRaf = null;
+      }
+      domElements.tableWrap?.classList.remove("scrolling");
+      domElements.findProxyRoot?.replaceChildren();
+      ROW_ID_SEQ = 0;
+      for (const tr of domElements.tbody.querySelectorAll("tr")) {
+        cancelFindRehide(tr);
+        delete tr.dataset.revealedByFind;
+      }
       domElements.tbody.replaceChildren();
+      ROW_FILTER_CACHE = new WeakMap();
+      ROW_TO_FIND_PROXY = new WeakMap();
+      FIND_REHIDE_TIMERS = new WeakMap();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
       const combined =
         signal ? AbortSignal.any([signal, timeoutSig]) : timeoutSig;
       const { promise, resolve, reject } = Promise.withResolvers();
-      combined.addEventListener(
-        "abort",
-        () => {
-          if (signal?.aborted) {
-            reject(signal.reason);
-          } else {
-            resolve();
-          }
-        },
-        { once: true }
-      );
+      const onAbort = () => {
+        if (signal?.aborted) reject(signal.reason);
+        else resolve();
+      };
+      if (combined.aborted) {
+        onAbort();
+        return promise;
+      }
+      combined.addEventListener("abort", onAbort, { once: true });
       return promise;
     }
     const yieldToMain = (() => {
@@ -1860,15 +1986,15 @@
         if (++processedLines % 5000 === 0) {
           await yieldToMain();
         }
-        for (const {
-          groups: { label, lat, lon },
-        } of line.matchAll(COORD_REGEX)) {
+        COORD_REGEX.lastIndex = 0;
+        for (const m of line.matchAll(COORD_REGEX)) {
+          const { label, lat, lon } = m.groups;
           const fLat = +lat;
           const fLon = +lon;
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
           if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
           const setLabel = label === "대한민국" ? "KR" : "WORLD";
-          out.push({ lat: fLat, lon: fLon, setLabel });
+          out.push({ lat: fLat, lon: fLon, latStr: lat, lonStr: lon, setLabel });
         }
       }
       return out;
@@ -1926,6 +2052,7 @@
     }
     function appendSkeletonRow(idx) {
       const tr = SKELETON_TEMPLATE.cloneNode(true);
+      tr.dataset.skeleton = "1";
       if (IDX_COL_INDEX >= 0) {
         tr.cells[IDX_COL_INDEX].textContent = fmt(idx);
       }
@@ -1933,6 +2060,7 @@
       return tr;
     }
     function fillRow(tr, row) {
+      delete tr.dataset.skeleton;
       COL_DEFS.forEach((col, i) => {
         const td = tr.cells[i];
         td.textContent = "";
@@ -1960,6 +2088,8 @@
           await performPauseCheck();
           if (!AppState.isRunning) break;
           const r = AppState.records[i];
+          r.addr = null;
+          r.fullAddr = "";
           AppState.controller = new AbortController();
           AppState.inFlight = true;
           skeletonTr = appendSkeletonRow(r.idx);
@@ -1989,11 +2119,9 @@
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
-            fillRow(skeletonTr, r);
-            applyFilterToRow(skeletonTr, getLiveFilterSnapshot());
-            pushResultRow(r);
+            commitResultRow(skeletonTr, r);
           } catch (err) {
-            const msg = err && (err.message || String(err));
+            const msg = getErrorMessage(err);
             const isAbort = err && err.name === "AbortError";
             if (AppState.isStopping && isAbort) {
               skeletonTr.remove();
@@ -2001,10 +2129,9 @@
             }
             console.error(err);
             r.set = "에러";
+            r.addr = null;
             r.fullAddr = msg;
-            fillRow(skeletonTr, r);
-            applyFilterToRow(skeletonTr, getLiveFilterSnapshot());
-            pushResultRow(r);
+            commitResultRow(skeletonTr, r);
             if (!AppState.isStopping)
               setStatusMessage(
                 `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
@@ -2013,13 +2140,17 @@
           }
         } catch (err) {
           console.error(err);
-          const msg = err?.message || String(err);
+          const msg = getErrorMessage(err);
+          if (skeletonTr && skeletonTr.isConnected) {
+            skeletonTr.remove();
+          }
           AppState.controller = null;
           AppState.resumeHandler = null;
           setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${msg}`, "error");
           break;
         } finally {
           AppState.inFlight = false;
+          AppState.controller = null;
         }
       }
       if (AppState.isStopping) {
@@ -2032,6 +2163,20 @@
       AppState.setStatus("idle");
       setStatusMessage(message, type);
     }
+    function getErrorMessage(err) {
+      try {
+        const msg = err && typeof err === "object" ? err.message : null;
+        return msg ? String(msg) : String(err);
+      } catch {
+        return "Unknown error";
+      }
+    }
+    function commitResultRow(tr, r) {
+      if (!tr || !tr.isConnected) return;
+      fillRow(tr, r);
+      applyFilterToRow(tr);
+      pushResultRow(r);
+    }
     function startProcessing() {
       AppState.reset("running");
       clearTable();
@@ -2041,7 +2186,7 @@
         AppState.inFlight = false;
         AppState.controller = null;
         AppState.resumeHandler = null;
-        setControlsIdle(`오류로 중단됨: ${err?.message || String(err)}`, "error");
+        setControlsIdle(`오류로 중단됨: ${getErrorMessage(err)}`, "error");
       });
     }
     async function handleExport() {
@@ -2096,25 +2241,24 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 0);
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
         console.error(err);
-        setStatusMessage(`저장 실패: ${err.message}`, "error");
+        setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
       }
     }
     async function handleParse() {
+      const file = AppState.droppedFile;
+      if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
+      domElements.coords.value = "";
+      clearTable();
+      AppState.setRecords([], "parsing");
+      setStatusMessage("파일 분석 중…");
       try {
-        const file = AppState.droppedFile;
-        if (!file) {
-          return setStatusMessage("파일을 선택해 주세요.", "warn");
-        }
-        AppState.setStatus("parsing");
-        setStatusMessage("파일 분석 중…");
         const parsed = await extractCoordinatesFromStream(file);
         if (!parsed.length) {
           AppState.setRecords([]);
-          domElements.coords.value = "";
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         const records = parsed.map((p, i) => ({
@@ -2122,34 +2266,48 @@
           idx: i + 1,
           lat: p.lat,
           lon: p.lon,
-          latStr: String(p.lat),
-          lonStr: String(p.lon),
+          latStr: p.latStr ?? String(p.lat),
+          lonStr: p.lonStr ?? String(p.lon),
         }));
         AppState.setRecords(records);
         const MAX_DISP = 50_000;
         const disp = records
           .slice(0, MAX_DISP)
           .map((r) => `${r.latStr}, ${r.lonStr}`);
-        if (records.length > MAX_DISP)
-          disp.push(
-            `... 외 ${fmt(
-              records.length - MAX_DISP
-            )}건 생략됨`
-          );
+        if (records.length > MAX_DISP) {
+          disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
+        }
         domElements.coords.value = disp.join("\n");
-        setStatusMessage(
-          `분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`
-        );
+        setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`);
       } catch (err) {
         console.error(err);
-        AppState.setStatus("idle");
-        setStatusMessage(`오류 발생: ${err.message}`, "error");
+        setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
       }
     }
-    const filtersEl = document.querySelector(".filters");
     const onFilterEvent = () => scheduleApplyFilterAll();
-    filtersEl?.addEventListener("input", onFilterEvent, { passive: true });
-    filtersEl?.addEventListener("change", onFilterEvent, { passive: true });
+    for (const el of FILTER_INPUTS.filter(Boolean)) {
+      if (el.tagName === "SELECT") {
+        el.addEventListener("change", onFilterEvent);
+      } else {
+        el.addEventListener("input", onFilterEvent);
+      }
+    }
+    if (domElements.findProxyRoot) {
+      domElements.findProxyRoot.addEventListener(
+        "beforematch",
+        (e) => {
+          const el = e.target instanceof Element ? e.target.closest(".find-proxy") : null;
+          const id = el?.dataset.rowId;
+          if (!id) return;
+          const tr = domElements.tbody.querySelector(`tr[data-row-id="${id}"]`);
+          if (!tr) return;
+          showRow(tr);
+          requestAnimationFrame(() => tr.scrollIntoView({ block: "center", inline: "nearest" }));
+          scheduleFindRehide(tr);
+        },
+        true
+      );
+    }
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
       return (n > 0 && n <= 200) ? withViewTransition(fn) : fn();
@@ -2164,14 +2322,13 @@
       "--export": handleExport,
     };
     domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
-    function handleFile(files) {
-      if (!files.length) return;
-      if (AppState.isBusy || AppState.isStopping) {
+    function handleFile(file) {
+      if (!file) return;
+      if (AppState.isBusy) {
         setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
         domElements.file.value = "";
         return;
       }
-      const file = files[0];
       domElements.coords.value = "";
       clearTable();
       AppState.setRecords([]);
@@ -2188,12 +2345,16 @@
       domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
-      const files = domElements.file.files;
-      maybeVT(() => handleFile(files));
+      const file = domElements.file.files?.[0] || null;
+      maybeVT(() => handleFile(file));
     });
     let moveReq = null;
     let lastEvent = null;
     const hoverPointerQuery = window.matchMedia("(any-hover: hover)");
+    const closestFromEvent = (e, selector) => {
+      const t = (e && typeof e.composedPath === "function" ? e.composedPath()[0] : e?.target) ?? null;
+      return (t instanceof Element) ? t.closest(selector) : null;
+    };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
       lastEvent = e;
@@ -2202,7 +2363,7 @@
         moveReq = null;
         const ev = lastEvent;
         if (!ev) return;
-        const target = ev.target.closest(".card, button");
+        const target = closestFromEvent(ev, ".card, button");
         if (!target) return;
         const rect = target.getBoundingClientRect();
         target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
@@ -2214,13 +2375,16 @@
         document.addEventListener("pointermove", handlePointerMove);
       } else {
         document.removeEventListener("pointermove", handlePointerMove);
+        if (moveReq) cancelAnimationFrame(moveReq);
+        moveReq = null;
+        lastEvent = null;
       }
     }
     updatePointerListener();
     hoverPointerQuery.addEventListener("change", updatePointerListener);
     document.addEventListener("pointerdown", (e) => {
       if (e.pointerType && e.pointerType !== "touch") return;
-      const target = e.target.closest(".card, button");
+      const target = closestFromEvent(e, ".card, button");
       if (!target) return;
       const rect = target.getBoundingClientRect();
       target.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
