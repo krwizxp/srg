@@ -763,6 +763,19 @@
                 border-block-end: none;
               }
             }
+
+            &[hidden="until-found"] {
+              display: block;
+              content-visibility: hidden;
+              border: 0;
+              margin-block: 0;
+              margin-inline: 0;
+              padding-block: 0;
+              padding-inline: 0;
+              block-size: 0;
+              min-block-size: 0;
+              overflow: hidden;
+            }
           }
         }
 
@@ -933,20 +946,6 @@
         overflow: hidden;
         clip-path: inset(50%);
       }
-
-      #find-proxy-root {
-        position: fixed;
-        left: -9999px;
-        top: 0;
-        inline-size: 1px;
-        block-size: 1px;
-        overflow: hidden;
-        pointer-events: none;
-
-        .find-proxy {
-          white-space: pre;
-        }
-      }
     }
   </style>
 </head>
@@ -1063,7 +1062,6 @@
       </div>
     </section>
   </main>
-  <div id="find-proxy-root" aria-hidden="true"></div>
   <template id="tmpl-row-skeleton">
     <tr>
       <td>
@@ -1254,7 +1252,6 @@
       filterEmd: document.querySelector("#filter-emd"),
       filterTag: document.querySelector("#filter-tag"),
       filterFullAddr: document.querySelector("#filter-fulladdr"),
-      findProxyRoot: document.querySelector("#find-proxy-root"),
     };
     const FILTER_INPUTS = [
       domElements.filterQ,
@@ -1284,32 +1281,12 @@
     const FILTER_DEBOUNCE_MS = 120;
     let ROW_FILTER_CACHE = new WeakMap();
     let ROW_ID_SEQ = 0;
-    let ROW_TO_FIND_PROXY = new WeakMap();
     const HIDDEN_UNTIL_FOUND = "until-found";
     const REVEALED_BY_FIND_IDS = new Set();
     function ensureRowId(tr) {
       let id = tr.dataset.rowId;
       if (!id) tr.dataset.rowId = id = String(++ROW_ID_SEQ);
       return id;
-    }
-    function ensureFindProxy(tr) {
-      const root = domElements.findProxyRoot;
-      if (!root) return null;
-      let proxy = ROW_TO_FIND_PROXY.get(tr);
-      if (!proxy) {
-        proxy = document.createElement("div");
-        proxy.className = "find-proxy";
-        root.append(proxy);
-        ROW_TO_FIND_PROXY.set(tr, proxy);
-      }
-      proxy.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-      const rowId = ensureRowId(tr);
-      if (proxy.dataset.rowId !== rowId) proxy.dataset.rowId = rowId;
-      return proxy;
-    }
-    function setFindProxyText(tr, text) {
-      const proxy = ensureFindProxy(tr);
-      if (proxy) proxy.textContent = text;
     }
     const FIND_REHIDE_DELAY_MS = 8000;
     let FIND_REHIDE_TIMERS = new WeakMap();
@@ -1403,11 +1380,6 @@
     }
     function showRow(tr) {
       tr.removeAttribute("hidden");
-      const p = ROW_TO_FIND_PROXY.get(tr);
-      if (p) {
-        p.remove();
-        ROW_TO_FIND_PROXY.delete(tr);
-      }
     }
     function shouldHideRowByFilter(tr, f) {
       if (tr?.dataset?.skeleton === "1") return { hide: !!f.active, cache: null };
@@ -1422,10 +1394,7 @@
         if (tr.hidden) showRow(tr);
         return;
       }
-      if (!tr.hidden) tr.hidden = true;
-      const c = cache ?? ensureRowFilterCache(tr);
-      const text = `${c.kind} ${c.q}`.trim();
-      if (text) setFindProxyText(tr, text);
+      if (!tr.hidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
     }
     function getAllRows() {
       const tb = domElements.tbody;
@@ -1929,14 +1898,12 @@
         filterRaf = null;
       }
       domElements.tableWrap?.classList.remove("scrolling");
-      domElements.findProxyRoot?.replaceChildren();
       for (const tr of domElements.tbody.querySelectorAll("tr")) {
         cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
       }
       domElements.tbody.replaceChildren();
       ROW_FILTER_CACHE = new WeakMap();
-      ROW_TO_FIND_PROXY = new WeakMap();
       FIND_REHIDE_TIMERS = new WeakMap();
       REVEALED_BY_FIND_IDS.clear();
     }
@@ -2305,22 +2272,15 @@
         el.addEventListener("input", onFilterEvent);
       }
     }
-    if (domElements.findProxyRoot) {
-      domElements.findProxyRoot.addEventListener(
-        "beforematch",
-        (e) => {
-          const el = e.target instanceof Element ? e.target.closest(".find-proxy") : null;
-          const id = el?.dataset.rowId;
-          if (!id) return;
-          const tr = domElements.tbody.querySelector(`tr[data-row-id="${id}"]`);
-          if (!tr) return;
-          showRow(tr);
-          requestAnimationFrame(() => tr.scrollIntoView({ block: "center", inline: "nearest" }));
-          scheduleFindRehide(tr);
-        },
-        true
-      );
-    }
+    domElements.tbody.addEventListener(
+      "beforematch",
+      (e) => {
+        const tr = e.target instanceof Element ? e.target.closest("tr") : null;
+        if (!tr) return;
+        showRow(tr);
+        scheduleFindRehide(tr);
+      }
+    );
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
       return (n > 0 && n <= 200) ? withViewTransition(fn) : fn();
