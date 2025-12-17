@@ -24,9 +24,6 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <style>
     @layer reset {
-      html {
-        container-type: inline-size;
-      }
 
       *,
       *::before,
@@ -34,10 +31,13 @@
         box-sizing: border-box;
       }
 
-      body {
-        word-break: keep-all;
+      :is(body, fieldset) {
         margin-block: 0;
         margin-inline: 0;
+      }
+
+      body {
+        word-break: keep-all;
         min-block-size: 100dvh;
         text-wrap: pretty;
         container-type: inline-size;
@@ -49,8 +49,6 @@
       }
 
       fieldset {
-        margin-block: 0;
-        margin-inline: 0;
         padding-block: 0;
         padding-inline: 0;
         border: 0;
@@ -148,10 +146,6 @@
     }
 
     @layer components {
-      #tbl tbody tr[hidden] {
-        contain-intrinsic-size: 0px 0px;
-      }
-
       @keyframes shimmer {
         0% {
           background-position: 150% 0;
@@ -637,7 +631,6 @@
           inset-block-start: 50px;
           color: var(--muted);
           font-size: var(--fs-base);
-          z-index: 0;
           pointer-events: none;
         }
 
@@ -752,10 +745,8 @@
           }
 
           tr {
-            &:not([hidden]) {
-              content-visibility: auto;
-              contain-intrinsic-block-size: auto 136.56px;
-            }
+            content-visibility: auto;
+            contain-intrinsic-block-size: auto 136.56px;
 
             @media (any-hover: hover) {
               &:hover {
@@ -782,7 +773,6 @@
           tbody {
             display: flex;
             flex-direction: column;
-            gap: 0;
             padding-block: 16px;
             padding-inline: 16px;
 
@@ -790,16 +780,7 @@
               margin-block-start: 16px;
             }
 
-            tr[hidden] {
-              block-size: 0 !important;
-              min-block-size: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border: 0 !important;
-              overflow: hidden !important;
-            }
-
-            tr:not([hidden]) {
+            tr {
               contain-intrinsic-block-size: auto 357.97px;
               display: flex;
               flex-direction: column;
@@ -1134,6 +1115,12 @@
     const COORD_REGEX =
       /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
     const RX_CSV = /[",\n\r]/;
+    const RX_SI_GUN = /[시군]$/;
+    const RX_GU_GUN = /[구군]$/;
+    const RX_RE_ESCAPE = /[.*+?^${}()|[\]\\]/g;
+    const looksSiGun = (name = "") => RX_SI_GUN.test(name);
+    const looksGuGun = (name = "") => RX_GU_GUN.test(name);
+    const escapeForRegExp = (s) => String(s).replace(RX_RE_ESCAPE, "\\$&");
     const csvEsc = (s) => {
       s = String(s ?? "");
       return RX_CSV.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
@@ -1294,27 +1281,31 @@
     let ROW_FILTER_CACHE = new WeakMap();
     let ROW_ID_SEQ = 0;
     let ROW_TO_FIND_PROXY = new WeakMap();
+    const HIDDEN_UNTIL_FOUND = "until-found";
+    const REVEALED_BY_FIND_IDS = new Set();
     function ensureRowId(tr) {
       let id = tr.dataset.rowId;
       if (!id) tr.dataset.rowId = id = String(++ROW_ID_SEQ);
       return id;
     }
-    function setFindProxyText(tr, text) {
+    function ensureFindProxy(tr) {
       const root = domElements.findProxyRoot;
-      if (!root) return;
+      if (!root) return null;
       let proxy = ROW_TO_FIND_PROXY.get(tr);
       if (!proxy) {
         proxy = document.createElement("div");
         proxy.className = "find-proxy";
-        proxy.setAttribute("hidden", "until-found");
-        proxy.dataset.rowId = ensureRowId(tr);
         root.append(proxy);
         ROW_TO_FIND_PROXY.set(tr, proxy);
-      } else {
-        proxy.dataset.rowId = ensureRowId(tr);
-        proxy.setAttribute("hidden", "until-found");
       }
-      proxy.textContent = text;
+      proxy.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
+      const rowId = ensureRowId(tr);
+      if (proxy.dataset.rowId !== rowId) proxy.dataset.rowId = rowId;
+      return proxy;
+    }
+    function setFindProxyText(tr, text) {
+      const proxy = ensureFindProxy(tr);
+      if (proxy) proxy.textContent = text;
     }
     const FIND_REHIDE_DELAY_MS = 8000;
     let FIND_REHIDE_TIMERS = new WeakMap();
@@ -1324,14 +1315,23 @@
         clearTimeout(t);
         FIND_REHIDE_TIMERS.delete(tr);
       }
+      const id = tr?.dataset?.rowId;
+      if (id) REVEALED_BY_FIND_IDS.delete(id);
     }
     function scheduleFindRehide(tr) {
       cancelFindRehide(tr);
+      const rowId = ensureRowId(tr);
       tr.dataset.revealedByFind = "1";
+      REVEALED_BY_FIND_IDS.add(rowId);
       const timer = setTimeout(() => {
-        if (!tr.isConnected) return;
-        delete tr.dataset.revealedByFind;
-        setRowHiddenByFilter(tr, getLiveFilterSnapshot());
+        REVEALED_BY_FIND_IDS.delete(rowId);
+        const tb = domElements.tbody;
+        if (!tb) return;
+        const curTr = tb.querySelector(`tr[data-row-id="${rowId}"]`);
+        if (!curTr) return;
+        delete curTr.dataset.revealedByFind;
+        setRowHiddenByFilter(curTr, getLiveFilterSnapshot());
+        FIND_REHIDE_TIMERS.delete(curTr);
       }, FIND_REHIDE_DELAY_MS);
       FIND_REHIDE_TIMERS.set(tr, timer);
     }
@@ -1405,27 +1405,27 @@
         ROW_TO_FIND_PROXY.delete(tr);
       }
     }
-    function hideRow(tr) {
-      tr.hidden = true;
+    function shouldHideRowByFilter(tr, f) {
+      if (tr?.dataset?.skeleton === "1") return { hide: !!f.active, cache: null };
+      if (tr.dataset.revealedByFind === "1") return { hide: false, cache: null };
+      if (!f.active) return { hide: false, cache: null };
       const cache = ensureRowFilterCache(tr);
-      const text = `${cache.kind} ${cache.q}`.trim();
-      if (text) setFindProxyText(tr, text);
+      return { hide: !rowMatchesFilterCached(cache, f), cache };
     }
     function setRowHiddenByFilter(tr, f) {
-      if (tr?.dataset?.skeleton === "1") {
-        showRow(tr);
+      const { hide, cache } = shouldHideRowByFilter(tr, f);
+      if (!hide) {
+        if (tr.hidden) showRow(tr);
         return;
       }
-      const hide = f.active ? !rowMatchesFilterCached(ensureRowFilterCache(tr), f) : false;
-      if (!hide || tr.dataset.revealedByFind === "1") {
-        showRow(tr);
-        return;
-      }
-      hideRow(tr);
+      if (!tr.hidden) tr.hidden = true;
+      const c = cache ?? ensureRowFilterCache(tr);
+      const text = `${c.kind} ${c.q}`.trim();
+      if (text) setFindProxyText(tr, text);
     }
     function getAllRows() {
       const tb = domElements.tbody;
-      return tb ? tb.querySelectorAll("tr") : [];
+      return tb ? tb.rows : [];
     }
     function applyFilterAll(f = getLiveFilterSnapshot()) {
       const rows = getAllRows();
@@ -1438,8 +1438,15 @@
       setRowHiddenByFilter(tr, f);
     }
     function clearFindReveals() {
-      const rows = getAllRows();
-      for (const tr of rows) {
+      if (!REVEALED_BY_FIND_IDS.size) return;
+      const ids = Array.from(REVEALED_BY_FIND_IDS);
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const tr = domElements.tbody.querySelector(`tr[data-row-id="${id}"]`);
+        if (!tr) {
+          REVEALED_BY_FIND_IDS.delete(id);
+          continue;
+        }
         cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
       }
@@ -1448,13 +1455,13 @@
     let filterRaf = null;
     function scheduleApplyFilterAll() {
       markFilterDirty();
-      clearFindReveals();
       if (filterTimer) clearTimeout(filterTimer);
       filterTimer = setTimeout(() => {
         filterTimer = null;
         if (filterRaf) cancelAnimationFrame(filterRaf);
         filterRaf = requestAnimationFrame(() => {
           filterRaf = null;
+          clearFindReveals();
           applyFilterAll(getLiveFilterSnapshot());
         });
       }, FILTER_DEBOUNCE_MS);
@@ -1553,8 +1560,6 @@
           if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
             sido = city;
           }
-          const looksSiGun = (name = "") => /[시군]$/.test(name);
-          const looksGuGun = (name = "") => /[구군]$/.test(name);
           const isSpecialSido = CONFIG.SPECIAL_CITIES.test(sido);
           if (isSpecialSido) {
             const sgCandidates = [
@@ -1729,10 +1734,8 @@
           if (!eupmyeon && districtLike && districtLike !== sido) {
             eupmyeon = districtLike;
             if (sigungu) {
-              const esc = (s) =>
-                String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
               const re = new RegExp(
-                `(?:^|\\s+)${esc(districtLike)}(?:\\s+|$)`,
+                `(?:^|\\s+)${escapeForRegExp(districtLike)}(?:\\s+|$)`,
                 "g"
               );
               sigungu = String(sigungu)
@@ -1923,7 +1926,6 @@
       }
       domElements.tableWrap?.classList.remove("scrolling");
       domElements.findProxyRoot?.replaceChildren();
-      ROW_ID_SEQ = 0;
       for (const tr of domElements.tbody.querySelectorAll("tr")) {
         cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
@@ -1932,6 +1934,7 @@
       ROW_FILTER_CACHE = new WeakMap();
       ROW_TO_FIND_PROXY = new WeakMap();
       FIND_REHIDE_TIMERS = new WeakMap();
+      REVEALED_BY_FIND_IDS.clear();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -1939,7 +1942,7 @@
         signal ? AbortSignal.any([signal, timeoutSig]) : timeoutSig;
       const { promise, resolve, reject } = Promise.withResolvers();
       const onAbort = () => {
-        if (signal?.aborted) reject(signal.reason);
+        if (signal?.aborted) reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
         else resolve();
       };
       if (combined.aborted) {
@@ -2011,6 +2014,8 @@
           setStatusMessage("재개합니다…");
       }
     }
+    const sleepBackoff = (attempt, signal) =>
+      sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, signal);
     async function fetchReverseWithRetry(lat, lon, userSignal) {
       let attempt = 0;
       while (attempt < CONFIG.MAX_RETRY) {
@@ -2036,7 +2041,7 @@
             if (attempt >= CONFIG.MAX_RETRY) {
               throw new Error(`HTTP ${res.status}: rate limited or server error`);
             }
-            await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
+            await sleepBackoff(attempt, userSignal);
             continue;
           }
           const text = await res.text();
@@ -2046,7 +2051,7 @@
           if (attempt >= CONFIG.MAX_RETRY) {
             throw e;
           }
-          await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
+          await sleepBackoff(attempt, userSignal);
         }
       }
     }
@@ -2055,6 +2060,10 @@
       tr.dataset.skeleton = "1";
       if (IDX_COL_INDEX >= 0) {
         tr.cells[IDX_COL_INDEX].textContent = fmt(idx);
+      }
+      const f = getLiveFilterSnapshot();
+      if (f.active) {
+        tr.hidden = true;
       }
       domElements.tbody.append(tr);
       return tr;
@@ -2065,7 +2074,7 @@
         const td = tr.cells[i];
         td.textContent = "";
         td.className = "";
-        td.dataset.label = col.label;
+        if (!td.dataset.label) td.dataset.label = col.label;
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
         else td.textContent = val ?? "";
