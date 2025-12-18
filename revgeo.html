@@ -2345,9 +2345,17 @@
     });
     let moveReq = null;
     let lastEvent = null;
-    const hoverPointerQuery = window.matchMedia("(any-hover: hover)");
+    const CARDS = Array.from(document.querySelectorAll(".card"));
+    const setXY = (el, ev) => {
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
+      el.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
+    };
     const closestFromEvent = (e, selector) => {
-      const t = (e && typeof e.composedPath === "function" ? e.composedPath()[0] : e?.target) ?? null;
+      const first = (e && typeof e.composedPath === "function" ? e.composedPath()[0] : e?.target) ?? null;
+      const t = (first && first.nodeType === Node.TEXT_NODE)
+        ? (first.parentElement ?? first.parentNode)
+        : first;
       return (t instanceof Element) ? t.closest(selector) : null;
     };
     function handlePointerMove(e) {
@@ -2358,33 +2366,26 @@
         moveReq = null;
         const ev = lastEvent;
         if (!ev) return;
-        const target = closestFromEvent(ev, ".card, button");
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
-        target.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
-        target.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
+        for (let i = 0; i < CARDS.length; i++) {
+          setXY(CARDS[i], ev);
+        }
+        const btn = closestFromEvent(ev, "button");
+        if (btn) setXY(btn, ev);
       });
     }
-    function updatePointerListener() {
-      if (hoverPointerQuery.matches) {
-        document.addEventListener("pointermove", handlePointerMove);
-      } else {
-        document.removeEventListener("pointermove", handlePointerMove);
-        if (moveReq) cancelAnimationFrame(moveReq);
-        moveReq = null;
-        lastEvent = null;
-      }
-    }
-    updatePointerListener();
-    hoverPointerQuery.addEventListener("change", updatePointerListener);
+    document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerdown", (e) => {
       if (e.pointerType && e.pointerType !== "touch") return;
-      const target = closestFromEvent(e, ".card, button");
-      if (!target) return;
-      const rect = target.getBoundingClientRect();
-      target.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
-      target.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
-      void flashTapHighlight(target);
+      const card = closestFromEvent(e, ".card");
+      if (card) {
+        setXY(card, e);
+        void flashTapHighlight(card);
+      }
+      const btn = closestFromEvent(e, "button");
+      if (btn) {
+        setXY(btn, e);
+        void flashTapHighlight(btn);
+      }
     });
     const tapHighlightAbort = new WeakMap();
     async function flashTapHighlight(target) {
