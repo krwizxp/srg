@@ -769,9 +769,7 @@
               content-visibility: hidden;
               border: 0;
               margin-block: 0;
-              margin-inline: 0;
               padding-block: 0;
-              padding-inline: 0;
               block-size: 0;
               min-block-size: 0;
               overflow: hidden;
@@ -1282,7 +1280,6 @@
     let ROW_FILTER_CACHE = new WeakMap();
     let ROW_ID_SEQ = 0;
     const HIDDEN_UNTIL_FOUND = "until-found";
-    const REVEALED_BY_FIND_IDS = new Set();
     function ensureRowId(tr) {
       let id = tr.dataset.rowId;
       if (!id) tr.dataset.rowId = id = String(++ROW_ID_SEQ);
@@ -1296,16 +1293,12 @@
         clearTimeout(t);
         FIND_REHIDE_TIMERS.delete(tr);
       }
-      const id = tr?.dataset?.rowId;
-      if (id) REVEALED_BY_FIND_IDS.delete(id);
     }
     function scheduleFindRehide(tr) {
       cancelFindRehide(tr);
       const rowId = ensureRowId(tr);
       tr.dataset.revealedByFind = "1";
-      REVEALED_BY_FIND_IDS.add(rowId);
       const timer = setTimeout(() => {
-        REVEALED_BY_FIND_IDS.delete(rowId);
         const tb = domElements.tbody;
         if (!tb) return;
         const curTr = tb.querySelector(`tr[data-row-id="${rowId}"]`);
@@ -1365,9 +1358,6 @@
       }
       return cache;
     }
-    function updateRowFilterCache(tr) {
-      ROW_FILTER_CACHE.set(tr, buildRowFilterCache(tr));
-    }
     function rowMatchesFilterCached(cache, f) {
       if (f.kind && cache.kind !== f.kind) return false;
       if (f.sido && !cache.sido.includes(f.sido)) return false;
@@ -1378,9 +1368,6 @@
       if (f.q && !cache.q.includes(f.q)) return false;
       return true;
     }
-    function showRow(tr) {
-      tr.removeAttribute("hidden");
-    }
     function shouldHideRowByFilter(tr, f) {
       if (tr?.dataset?.skeleton === "1") return { hide: !!f.active, cache: null };
       if (tr.dataset.revealedByFind === "1") return { hide: false, cache: null };
@@ -1389,54 +1376,90 @@
       return { hide: !rowMatchesFilterCached(cache, f), cache };
     }
     function setRowHiddenByFilter(tr, f) {
-      const { hide, cache } = shouldHideRowByFilter(tr, f);
+      const { hide } = shouldHideRowByFilter(tr, f);
       if (!hide) {
-        if (tr.hidden) showRow(tr);
+        if (tr.hidden) tr.removeAttribute("hidden");
         return;
       }
-      if (!tr.hidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
+      if (tr.getAttribute("hidden") !== HIDDEN_UNTIL_FOUND) {
+        tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
+      }
     }
     function getAllRows() {
       const tb = domElements.tbody;
       return tb ? tb.rows : [];
-    }
-    function applyFilterAll(f = getLiveFilterSnapshot()) {
-      const rows = getAllRows();
-      for (let i = 0; i < rows.length; i++) {
-        setRowHiddenByFilter(rows[i], f);
-      }
     }
     function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
       if (!tr) return;
       setRowHiddenByFilter(tr, f);
     }
     function clearFindReveals() {
-      if (!REVEALED_BY_FIND_IDS.size) return;
-      const ids = Array.from(REVEALED_BY_FIND_IDS);
-      for (let i = 0; i < ids.length; i++) {
-        const id = ids[i];
-        const tr = domElements.tbody.querySelector(`tr[data-row-id="${id}"]`);
-        if (!tr) {
-          REVEALED_BY_FIND_IDS.delete(id);
-          continue;
-        }
+      const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
+      if (!revealed.length) return;
+      for (const tr of revealed) {
         cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
       }
     }
     let filterTimer = null;
-    let filterRaf = null;
+    let FILTER_APPLY_JOB = null;
+    let FILTER_APPLY_SEQ = 0;
+    const FILTER_FRAME_BUDGET_MS = 8;
+    const FILTER_MAX_ROWS_PER_FRAME = 1500;
+    function cancelActiveFilterApply() {
+      const job = FILTER_APPLY_JOB;
+      if (!job) return;
+      if (job.raf) cancelAnimationFrame(job.raf);
+      FILTER_APPLY_JOB = null;
+    }
+    function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
+      cancelActiveFilterApply();
+      const rows = Array.from(getAllRows());
+      const len = rows.length;
+      if (len <= 2000) {
+        for (let i = 0; i < len; i++) {
+          setRowHiddenByFilter(rows[i], f);
+        }
+        return;
+      }
+      const job = {
+        id: ++FILTER_APPLY_SEQ,
+        raf: 0,
+        i: 0,
+        rows,
+        len,
+        f,
+      };
+      FILTER_APPLY_JOB = job;
+      const step = () => {
+        if (FILTER_APPLY_JOB !== job) return;
+        const start = performance.now();
+        let processed = 0;
+        while (job.i < job.len) {
+          if (FILTER_APPLY_JOB !== job) return;
+          setRowHiddenByFilter(job.rows[job.i], job.f);
+          job.i++;
+          processed++;
+          if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
+          if (performance.now() - start >= FILTER_FRAME_BUDGET_MS) break;
+        }
+        if (FILTER_APPLY_JOB !== job) return;
+        if (job.i < job.len) {
+          job.raf = requestAnimationFrame(step);
+        } else {
+          FILTER_APPLY_JOB = null;
+        }
+      };
+      job.raf = requestAnimationFrame(step);
+    }
     function scheduleApplyFilterAll() {
       markFilterDirty();
+      cancelActiveFilterApply();
       if (filterTimer) clearTimeout(filterTimer);
       filterTimer = setTimeout(() => {
         filterTimer = null;
-        if (filterRaf) cancelAnimationFrame(filterRaf);
-        filterRaf = requestAnimationFrame(() => {
-          filterRaf = null;
-          clearFindReveals();
-          applyFilterAll(getLiveFilterSnapshot());
-        });
+        clearFindReveals();
+        startChunkedFilterApply(getLiveFilterSnapshot());
       }, FILTER_DEBOUNCE_MS);
     }
     function clearAllFilters() {
@@ -1444,8 +1467,9 @@
         if (el) el.value = "";
       }
       markFilterDirty();
+      cancelActiveFilterApply();
       clearFindReveals();
-      applyFilterAll(getLiveFilterSnapshot());
+      startChunkedFilterApply(getLiveFilterSnapshot());
     }
     const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
     if (SKELETON_TEMPLATE) {
@@ -1889,13 +1913,10 @@
       AppState.renderReq = requestAnimationFrame(renderFrame);
     }
     function clearTable() {
+      cancelActiveFilterApply();
       if (filterTimer) {
         clearTimeout(filterTimer);
         filterTimer = null;
-      }
-      if (filterRaf) {
-        cancelAnimationFrame(filterRaf);
-        filterRaf = null;
       }
       domElements.tableWrap?.classList.remove("scrolling");
       for (const tr of domElements.tbody.querySelectorAll("tr")) {
@@ -1905,7 +1926,6 @@
       domElements.tbody.replaceChildren();
       ROW_FILTER_CACHE = new WeakMap();
       FIND_REHIDE_TIMERS = new WeakMap();
-      REVEALED_BY_FIND_IDS.clear();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2050,7 +2070,6 @@
         if (col.render) col.render(val, td, row);
         else td.textContent = val ?? "";
       });
-      updateRowFilterCache(tr);
     }
     function pushResultRow(row) {
       if (row.set === "에러") AppState.cntFail++;
@@ -2277,7 +2296,6 @@
       (e) => {
         const tr = e.target instanceof Element ? e.target.closest("tr") : null;
         if (!tr) return;
-        showRow(tr);
         scheduleFindRehide(tr);
       }
     );
