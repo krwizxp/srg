@@ -2425,6 +2425,12 @@
           isScrolling = false;
         }, { passive: true });
       }
+      if (domElements.coords) {
+        domElements.coords.addEventListener("scroll", handleScrollState, { passive: true });
+        domElements.coords.addEventListener("scrollend", () => {
+          isScrolling = false;
+        }, { passive: true });
+      }
     }
   </script>
 </body>
