@@ -2343,6 +2343,14 @@
       const file = domElements.file.files?.[0] || null;
       maybeVT(() => handleFile(file));
     });
+    let isScrolling = false;
+    let scrollTimeout = null;
+    const handleScrollState = () => {
+      isScrolling = true;
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => { isScrolling = false; }, 150);
+    };
+    window.addEventListener("scroll", handleScrollState, { passive: true });
     let moveReq = null;
     let lastEvent = null;
     const CARDS = Array.from(document.querySelectorAll(".card"));
@@ -2360,10 +2368,12 @@
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
+      if (isScrolling) return;
       lastEvent = e;
       if (moveReq) return;
       moveReq = requestAnimationFrame(() => {
         moveReq = null;
+        if (isScrolling) return;
         const ev = lastEvent;
         if (!ev) return;
         for (let i = 0; i < CARDS.length; i++) {
@@ -2408,9 +2418,11 @@
       if (wrap) {
         wrap.addEventListener("scroll", () => {
           wrap.classList.add("scrolling");
+          handleScrollState();
         }, { passive: true });
         wrap.addEventListener("scrollend", () => {
           wrap.classList.remove("scrolling");
+          isScrolling = false;
         }, { passive: true });
       }
     }
