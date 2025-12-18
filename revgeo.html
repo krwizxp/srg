@@ -824,7 +824,13 @@
                 grid-template-columns: 80px 1fr;
                 gap: 10px;
                 align-items: baseline;
-                text-align: start !important;
+                text-align: start;
+
+                &,
+                &:nth-child(n) {
+                  text-align: start;
+                }
+
                 border: none;
                 padding-block: 2px;
                 padding-inline: 0;
