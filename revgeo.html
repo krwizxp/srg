@@ -2406,6 +2406,11 @@
       });
     }
     document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerdown", (e) => {
+      const target = e.target;
+      const el = (target instanceof Element) ? target.closest(".card, button") : null;
+      if (el) setXY(el, e);
+    });
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
