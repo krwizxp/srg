@@ -47,9 +47,21 @@
       }
 
       @media (pointer: coarse) {
-        :is(input, select):not([readonly]) {
+        :is(input, select) {
           font-size: 16px !important;
           letter-spacing: -0.03em;
+        }
+
+        textarea {
+          font-size: 16px !important;
+          transform: scale(0.8);
+          transform-origin: top left;
+          inline-size: 125% !important;
+          block-size: 125% !important;
+          margin-inline-end: -25% !important;
+          margin-block-end: -25% !important;
+          white-space: pre !important;
+          overflow-x: hidden !important;
         }
       }
 
