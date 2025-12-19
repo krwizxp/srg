@@ -696,8 +696,6 @@
           flex-wrap: wrap;
           gap: 10px;
           margin-block: 10px 12px;
-          margin-inline: 0;
-          padding-inline: 0;
           inline-size: 100%;
           box-sizing: border-box;
 
@@ -738,7 +736,6 @@
 
         table {
           inline-size: 100%;
-          min-inline-size: 900px;
           border-spacing: 0;
 
           thead {
@@ -759,6 +756,10 @@
               &:nth-child(-n + 2) {
                 text-align: center;
               }
+
+              &:nth-child(8) {
+                width: 100%;
+              }
             }
           }
 
@@ -769,6 +770,7 @@
               border-block-end: 1px solid var(--line);
               vertical-align: top;
               font-size: var(--fs-sm);
+              word-break: keep-all;
 
               &:nth-child(-n + 2) {
                 text-align: center;
@@ -779,6 +781,7 @@
                 color: var(--accent);
                 font-weight: 500;
                 letter-spacing: -0.03em;
+                word-break: normal;
               }
 
               &:nth-child(9) {
@@ -900,7 +903,7 @@
 
           .map-links {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 6px;
             padding-block: 0;
             padding-inline: 0;
