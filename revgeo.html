@@ -47,21 +47,9 @@
       }
 
       @media (pointer: coarse) {
-        :is(input, textarea, select) {
+        :is(input, select):not([readonly]) {
           font-size: 16px !important;
-          transform: scale(0.875);
-          transform-origin: 0 0;
-          inline-size: 114.29% !important;
-          padding-block: 11.5px !important;
-          padding-inline: 10px !important;
-          margin-inline-end: -14.29% !important;
-          margin-block-end: -14.29% !important;
-        }
-
-        textarea {
-          min-block-size: 114.29px !important;
-          white-space: pre !important;
-          overflow-x: auto !important;
+          letter-spacing: -0.03em;
         }
       }
 
@@ -2310,10 +2298,10 @@
       setTimeout(scheduleApplyFilterAll, 0);
     });
     function handleFile(file) {
+      if (!file) return;
       if (!file.name.endsWith('.txt') && file.type !== 'text/plain') {
         return setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
       }
-      if (!file) return;
       if (AppState.isBusy) {
         setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
         domElements.file.value = "";
