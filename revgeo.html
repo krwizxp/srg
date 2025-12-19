@@ -49,6 +49,9 @@
       @media (pointer: coarse) {
         :is(input, textarea, select) {
           font-size: 16px !important;
+          transform: scale(0.875);
+          transform-origin: 0 0;
+          inline-size: 114.29% !important;
         }
       }
 
@@ -555,7 +558,7 @@
           .progress-fill {
             block-size: 100%;
             transform: scaleX(calc(var(--pct, 0) / 100));
-            transform-origin: inline-start 50%;
+            transform-origin: 0% 50%;
             background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
             transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
           }
