@@ -12,6 +12,7 @@
   <meta property="og:locale" content="ko_KR">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(97% 0.04 275)">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(12% 0.08 275)">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" href="icon.svg?v=4">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
@@ -31,9 +32,32 @@
         box-sizing: border-box;
       }
 
-      :is(body, fieldset) {
+      :is(body, fieldset, h1, h2, ul, p) {
         margin-block: 0;
         margin-inline: 0;
+      }
+
+      :is(fieldset, ul) {
+        padding-block: 0;
+        padding-inline: 0;
+      }
+
+      :is(input, button, textarea, select) {
+        font: inherit;
+      }
+
+      @media (pointer: coarse) {
+        :is(input, textarea, select) {
+          font-size: 16px !important;
+        }
+      }
+
+      ul {
+        list-style: none;
+      }
+
+      fieldset {
+        border: 0;
       }
 
       body {
@@ -44,18 +68,8 @@
         container-name: page;
       }
 
-      :is(h1, h2, h3) {
+      :is(h1, h2) {
         text-wrap: balance;
-      }
-
-      fieldset {
-        padding-block: 0;
-        padding-inline: 0;
-        border: 0;
-      }
-
-      p {
-        margin-block: 0;
       }
 
       :where([hidden]):not([hidden="until-found" i]) {
@@ -140,7 +154,6 @@
         grid-template-columns: clamp(380px, 28vw, 440px) 1fr;
         gap: 20px;
         block-size: clamp(700px, calc(100dvh - 40px), 1100px);
-        transition: grid-template-columns 0.25s ease, block-size 0.25s ease;
 
         @container (inline-size <=900px) {
           grid-template-columns: 1fr;
@@ -150,6 +163,22 @@
     }
 
     @layer components {
+      :is(textarea, .table-wrap) {
+        flex: 1;
+        scrollbar-width: thin;
+
+        @supports (animation-timeline: scroll()) {
+          background-image:
+            linear-gradient(to bottom, oklch(0% 0 0 / 0.15), transparent),
+            linear-gradient(to top, oklch(0% 0 0 / 0.15), transparent);
+          background-repeat: no-repeat;
+          background-position: top center, bottom center;
+          background-size: 100% 0, 100% 0;
+          animation-timeline: scroll(self);
+          animation-name: scroll-shadows;
+        }
+      }
+
       @keyframes shimmer {
         0% {
           background-position: 150% 0;
@@ -163,10 +192,6 @@
       @keyframes row-fade-in {
         from {
           opacity: 0;
-        }
-
-        to {
-          opacity: 1;
         }
       }
 
@@ -203,8 +228,6 @@
 
           h2 {
             font-size: var(--fs-lg);
-            font-weight: 700;
-            margin-block: 0;
           }
 
           .header-desc {
@@ -263,7 +286,6 @@
             inline-size: 36px;
             block-size: 36px;
             flex: 0 0 auto;
-            display: block;
             margin-block-start: 2px;
           }
 
@@ -273,7 +295,6 @@
             gap: 2px;
 
             h1 {
-              margin-block: 0;
               font-size: var(--fs-xl);
               font-weight: 800;
               line-height: 1.1;
@@ -308,14 +329,13 @@
           border-radius: 18px;
           padding-block: 12px;
           padding-inline: 16px;
-          text-align: center;
           transition: .2s ease;
           background: light-dark(oklch(98% 0.02 270 / 0.4), oklch(15% 0.03 270 / 0.4));
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
           gap: 10px;
+          color: var(--muted);
 
           input[type="file"] {
             position: absolute;
@@ -327,19 +347,15 @@
           .drop-icon {
             inline-size: 36px;
             block-size: 36px;
-            margin-block-end: 4px;
-            color: var(--muted);
             transition: .3s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
 
           .drop-text {
-            color: var(--muted);
             font-weight: 500;
             font-size: var(--fs-sm);
 
             strong {
               color: var(--accent);
-              font-weight: 700;
             }
           }
 
@@ -350,7 +366,6 @@
             .drop-icon {
               color: var(--accent);
               transform: translateY(-6px) scale(1.1);
-              filter: drop-shadow(0 6px 8px var(--accent-glow));
             }
           }
 
@@ -374,18 +389,6 @@
 
           &[inert] {
             opacity: 0.5;
-            cursor: not-allowed;
-
-            .drop-icon {
-              filter: none;
-              transform: none;
-            }
-
-            .drop-text {
-              strong {
-                color: var(--muted);
-              }
-            }
           }
         }
 
@@ -395,35 +398,17 @@
           .filters select) {
           border-radius: 12px;
           border: 1px solid var(--line);
-          background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
-          font-family: inherit;
+          background-color: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         textarea {
-          flex: 1;
           resize: none;
           padding-block: 12px;
           padding-inline: 12px;
           min-block-size: 100px;
-          field-sizing: content;
-          font-family: inherit;
           font-size: 0.9em;
           line-height: 1.5;
-          scrollbar-width: thin;
-          scrollbar-color: var(--sb-thumb) var(--sb-track);
-
-          @supports (animation-timeline: scroll()) {
-            background-image:
-              linear-gradient(to bottom, oklch(0% 0 0 / 0.15), transparent),
-              linear-gradient(to top, oklch(0% 0 0 / 0.15), transparent);
-            background-repeat: no-repeat;
-            background-attachment: scroll;
-            background-position: top center, bottom center;
-            background-size: 100% 0, 100% 0;
-            animation-timeline: scroll(self);
-            animation-name: scroll-shadows;
-          }
 
           &:focus {
             outline: none;
@@ -434,7 +419,6 @@
           &#coords {
             @container page (inline-size <=800px) {
               max-block-size: 30dvh;
-              overflow: auto;
             }
           }
         }
@@ -442,7 +426,6 @@
         button {
           cursor: pointer;
           font-weight: 600;
-          font-size: var(--fs-sm);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -452,7 +435,6 @@
           padding-inline: 8px;
           position: relative;
           overflow: hidden;
-          z-index: 2;
 
           &::after {
             content: "";
@@ -530,6 +512,7 @@
           align-items: flex-end;
           gap: 12px;
           margin-block-start: 8px;
+          line-height: 1.15;
 
           >.sp {
             flex: 1;
@@ -539,16 +522,11 @@
             min-inline-size: 0;
           }
 
-          #prog-label {
-            line-height: 1.15;
-          }
-
           #counts {
             flex: 0 0 auto;
             font-size: var(--fs-sm);
             text-align: end;
             white-space: nowrap;
-            line-height: 1.15;
             color: var(--muted);
 
             strong {
@@ -577,7 +555,7 @@
           .progress-fill {
             block-size: 100%;
             transform: scaleX(calc(var(--pct, 0) / 100));
-            transform-origin: 0% 50%;
+            transform-origin: inline-start 50%;
             background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
             transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
           }
@@ -637,33 +615,17 @@
         }
 
         .table-wrap {
-          flex: 1;
           border-radius: 20px;
           border: 1px solid var(--line);
-          background: light-dark(oklch(100% 0 0 / 0.4), oklch(0% 0 0 / 0.2));
+          background-color: light-dark(oklch(100% 0 0 / 0.4), oklch(0% 0 0 / 0.2));
           overflow: auto;
           scrollbar-gutter: stable;
           position: relative;
           box-shadow: inset 0 2px 4px oklch(0% 0 0 / 0.03);
-          scrollbar-width: thin;
-          scrollbar-color: var(--sb-thumb) var(--sb-track);
-
-          @supports (animation-timeline: scroll()) {
-            background-image:
-              linear-gradient(to bottom, oklch(0% 0 0 / 0.15), transparent),
-              linear-gradient(to top, oklch(0% 0 0 / 0.15), transparent);
-            background-repeat: no-repeat;
-            background-attachment: scroll;
-            background-position: top center, bottom center;
-            background-size: 100% 0, 100% 0;
-            animation-timeline: scroll(self);
-            animation-name: scroll-shadows;
-          }
 
           .empty-hint {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: grid;
+            place-items: center;
             position: absolute;
             inset: 0;
             inset-block-start: 50px;
@@ -696,14 +658,10 @@
           flex-wrap: wrap;
           gap: 10px;
           margin-block: 10px 12px;
-          inline-size: 100%;
-          box-sizing: border-box;
 
           :is(input[type="search"], select) {
             padding-block: 10px;
             padding-inline: 12px;
-            font: inherit;
-            font-size: var(--fs-sm);
           }
 
           input[type="search"] {
@@ -758,7 +716,7 @@
               }
 
               &:nth-child(8) {
-                width: 100%;
+                inline-size: 100%;
               }
             }
           }
@@ -770,7 +728,6 @@
               border-block-end: 1px solid var(--line);
               vertical-align: top;
               font-size: var(--fs-sm);
-              word-break: keep-all;
 
               &:nth-child(-n + 2) {
                 text-align: center;
@@ -781,17 +738,12 @@
                 color: var(--accent);
                 font-weight: 500;
                 letter-spacing: -0.03em;
-                word-break: normal;
-              }
-
-              &:nth-child(9) {
-                white-space: nowrap;
               }
             }
 
             tr {
               content-visibility: auto;
-              contain-intrinsic-block-size: auto 136.56px;
+              contain-intrinsic-block-size: auto 76.09px;
 
               @media (any-hover: hover) {
                 &:hover {
@@ -865,9 +817,7 @@
                   grid-template-columns: 80px 1fr;
                   gap: 10px;
                   align-items: baseline;
-                  text-align: start;
 
-                  &,
                   &:nth-child(n) {
                     text-align: start;
                   }
@@ -903,18 +853,16 @@
 
           .map-links {
             display: flex;
-            flex-wrap: nowrap;
-            gap: 6px;
-            padding-block: 0;
-            padding-inline: 0;
-            margin-block: 0;
-            list-style: none;
+            flex-wrap: wrap;
+            gap: 4px 8px;
+            min-inline-size: 85px;
 
             a {
               color: var(--accent);
               text-decoration: none;
               font-weight: 600;
               transition: color 0.2s;
+              white-space: nowrap;
 
               &:hover {
                 color: var(--success);
@@ -1022,8 +970,7 @@
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
             <span class="drop-text">
-              <span class="desktop-msg">클릭(드래그 앤 드롭)하여
-                <strong>random_data.txt</strong> 업로드</span>
+              <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong> 업로드</span>
               <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
             </span>
             <input type="file" id="file" accept=".txt">
@@ -2350,6 +2297,9 @@
       setTimeout(scheduleApplyFilterAll, 0);
     });
     function handleFile(file) {
+      if (!file.name.endsWith('.txt') && file.type !== 'text/plain') {
+        return setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
+      }
       if (!file) return;
       if (AppState.isBusy) {
         setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
