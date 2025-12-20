@@ -2340,13 +2340,26 @@
       maybeVT(() => handleFile(file));
     });
     let isScrolling = false;
-    let scrollTimeout = null;
-    const handleScrollState = () => {
+    const ACTIVE_SCROLL = new Set();
+    const handleScrollStart = (e) => {
+      ACTIVE_SCROLL.add(e.currentTarget);
       isScrolling = true;
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => { isScrolling = false; }, 150);
     };
-    window.addEventListener("scroll", handleScrollState, { passive: true });
+    const handleScrollEnd = (e) => {
+      ACTIVE_SCROLL.delete(e.currentTarget);
+      isScrolling = ACTIVE_SCROLL.size > 0;
+    };
+    const clearScrollState = () => {
+      ACTIVE_SCROLL.clear();
+      isScrolling = false;
+    };
+    window.addEventListener("pagehide", clearScrollState, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") clearScrollState();
+    }, { passive: true });
+    window.addEventListener("blur", clearScrollState, { passive: true });
+    document.addEventListener("scroll", handleScrollStart, { passive: true });
+    document.addEventListener("scrollend", handleScrollEnd, { passive: true });
     let moveReq = null;
     let lastEvent = null;
     const CARDS = Array.from(document.querySelectorAll(".card"));
@@ -2381,18 +2394,12 @@
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
-        wrap.addEventListener("scroll", () => {
-          handleScrollState();
-        }, { passive: true });
-        wrap.addEventListener("scrollend", () => {
-          isScrolling = false;
-        }, { passive: true });
+        wrap.addEventListener("scroll", handleScrollStart, { passive: true });
+        wrap.addEventListener("scrollend", handleScrollEnd, { passive: true });
       }
       if (domElements.coords) {
-        domElements.coords.addEventListener("scroll", handleScrollState, { passive: true });
-        domElements.coords.addEventListener("scrollend", () => {
-          isScrolling = false;
-        }, { passive: true });
+        domElements.coords.addEventListener("scroll", handleScrollStart, { passive: true });
+        domElements.coords.addEventListener("scrollend", handleScrollEnd, { passive: true });
       }
     }
   </script>
