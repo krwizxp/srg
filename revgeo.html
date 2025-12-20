@@ -938,6 +938,23 @@
       }
     }
 
+    @media (any-hover: hover) {
+      html.scrolling .card:hover::before {
+        opacity: 0 !important;
+      }
+
+      html.scrolling button:hover {
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      html.scrolling .table-wrap table tbody tr:hover {
+        background: transparent !important;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+    }
+
     @layer utilities {
       .caps {
         text-transform: uppercase;
@@ -1041,7 +1058,7 @@
         <input id="filter-emd" type="search" placeholder="읍·면·동·리">
         <input id="filter-tag" type="search" placeholder="지물 태그">
         <input id="filter-fulladdr" type="search" placeholder="전체주소">
-        <button type="reset" id="filter-clear">필터 초기화</button>
+        <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
       </form>
       <div class="table-wrap">
         <p class="empty-hint">
@@ -1262,6 +1279,7 @@
       filterEmd: document.querySelector("#filter-emd"),
       filterTag: document.querySelector("#filter-tag"),
       filterFullAddr: document.querySelector("#filter-fulladdr"),
+      filtersForm: document.querySelector(".filters"),
     };
     const FILTER_INPUTS = [
       domElements.filterQ,
@@ -2305,11 +2323,16 @@
       "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
       "--stop": () => { if (!AppState.isRunning) return; AppState.setStatus("stopping"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatusMessage("중지 요청됨. 취소 중…", "warn"); } else setStatusMessage("중지 요청됨. 정리 중…", "warn"); },
       "--export": handleExport,
+      "--filter-clear": () => {
+        domElements.filtersForm?.reset();
+        markFilterDirty();
+        cancelActiveFilterApply();
+        if (filterTimer) { clearTimeout(filterTimer); filterTimer = null; }
+        clearFindReveals();
+        startChunkedFilterApply(getLiveFilterSnapshot());
+      },
     };
     domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
-    document.querySelector(".filters")?.addEventListener("reset", () => {
-      setTimeout(scheduleApplyFilterAll, 0);
-    });
     function handleFile(file) {
       if (!file) return;
       if (!file.name.endsWith('.txt') && file.type !== 'text/plain') {
@@ -2341,15 +2364,32 @@
     });
     let isScrolling = false;
     const ACTIVE_SCROLL = new Set();
+    const SCROLLING_CLASS = "scrolling";
+    const setGlobalScrolling = (on) => {
+      document.documentElement.classList.toggle(SCROLLING_CLASS, on);
+    };
+    const markTargetOn = (t) => { if (t instanceof Element) t.classList.add(SCROLLING_CLASS); };
+    const markTargetOff = (t) => { if (t instanceof Element) t.classList.remove(SCROLLING_CLASS); };
     const handleScrollStart = (e) => {
-      ACTIVE_SCROLL.add(e.currentTarget);
-      isScrolling = true;
+      const t = e.currentTarget;
+      if (ACTIVE_SCROLL.size === 0) {
+        isScrolling = true;
+        setGlobalScrolling(true);
+      }
+      ACTIVE_SCROLL.add(t);
+      markTargetOn(t);
     };
     const handleScrollEnd = (e) => {
-      ACTIVE_SCROLL.delete(e.currentTarget);
+      const t = e.currentTarget;
+      ACTIVE_SCROLL.delete(t);
+      markTargetOff(t);
       isScrolling = ACTIVE_SCROLL.size > 0;
+      if (!isScrolling) setGlobalScrolling(false);
     };
     const clearScrollState = () => {
+      setGlobalScrolling(false);
+      domElements.tableWrap?.classList.remove(SCROLLING_CLASS);
+      domElements.coords?.classList.remove(SCROLLING_CLASS);
       ACTIVE_SCROLL.clear();
       isScrolling = false;
     };
