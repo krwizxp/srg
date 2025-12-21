@@ -1044,7 +1044,7 @@
         <h2>결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
       </header>
-      <form class="filters" onsubmit="return false">
+      <form class="filters">
         <input id="filter-q" type="search" placeholder="전체검색">
         <select id="filter-kind">
           <option value="">구분(전체)</option>
@@ -1971,14 +1971,8 @@
       if ("scheduler" in window && "yield" in window.scheduler) {
         return () => window.scheduler.yield();
       }
-      const ch = new MessageChannel();
-      const q = [];
-      ch.port1.onmessage = () => q.shift()?.resolve();
       return () => {
-        const { promise, resolve } = Promise.withResolvers();
-        q.push({ resolve });
-        ch.port2.postMessage(0);
-        return promise;
+        return new Promise(resolve => setTimeout(resolve, 0));
       };
     })();
     async function* lineIterator(stream) {
@@ -2257,9 +2251,7 @@
         const a = document.createElement("a");
         a.href = url;
         a.download = filename;
-        document.body.appendChild(a);
         a.click();
-        a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
@@ -2342,6 +2334,7 @@
       },
     };
     domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
+    domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
       if (!file) return;
       if (!file.name.endsWith('.txt') && file.type !== 'text/plain') {
