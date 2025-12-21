@@ -1281,6 +1281,15 @@
       filterFullAddr: document.querySelector("#filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
     };
+    const ACTIVE_SCROLL = new Set();
+    const SCROLLING_CLASS = "scrolling";
+    const setGlobalScrolling = (on) => {
+      document.documentElement.classList.toggle(SCROLLING_CLASS, on);
+    };
+    const resetScrollState = () => {
+      setGlobalScrolling(false);
+      ACTIVE_SCROLL.clear();
+    };
     const FILTER_INPUTS = [
       domElements.filterQ,
       domElements.filterKind,
@@ -1933,7 +1942,7 @@
         clearTimeout(filterTimer);
         filterTimer = null;
       }
-      domElements.tableWrap?.classList.remove("scrolling");
+      resetScrollState();
       for (const tr of domElements.tbody.querySelectorAll("tr")) {
         cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
@@ -2362,42 +2371,24 @@
       const file = domElements.file.files?.[0] || null;
       maybeVT(() => handleFile(file));
     });
-    let isScrolling = false;
-    const ACTIVE_SCROLL = new Set();
-    const SCROLLING_CLASS = "scrolling";
-    const setGlobalScrolling = (on) => {
-      document.documentElement.classList.toggle(SCROLLING_CLASS, on);
-    };
-    const markTargetOn = (t) => { if (t instanceof Element) t.classList.add(SCROLLING_CLASS); };
-    const markTargetOff = (t) => { if (t instanceof Element) t.classList.remove(SCROLLING_CLASS); };
+
     const handleScrollStart = (e) => {
       const t = e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
-        isScrolling = true;
         setGlobalScrolling(true);
       }
       ACTIVE_SCROLL.add(t);
-      markTargetOn(t);
     };
     const handleScrollEnd = (e) => {
       const t = e.currentTarget;
       ACTIVE_SCROLL.delete(t);
-      markTargetOff(t);
-      isScrolling = ACTIVE_SCROLL.size > 0;
-      if (!isScrolling) setGlobalScrolling(false);
+      if (ACTIVE_SCROLL.size === 0) setGlobalScrolling(false);
     };
-    const clearScrollState = () => {
-      setGlobalScrolling(false);
-      domElements.tableWrap?.classList.remove(SCROLLING_CLASS);
-      domElements.coords?.classList.remove(SCROLLING_CLASS);
-      ACTIVE_SCROLL.clear();
-      isScrolling = false;
-    };
-    window.addEventListener("pagehide", clearScrollState, { passive: true });
+    window.addEventListener("pagehide", resetScrollState, { passive: true });
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") clearScrollState();
+      if (document.visibilityState === "hidden") resetScrollState();
     }, { passive: true });
-    window.addEventListener("blur", clearScrollState, { passive: true });
+    window.addEventListener("blur", resetScrollState, { passive: true });
     document.addEventListener("scroll", handleScrollStart, { passive: true });
     document.addEventListener("scrollend", handleScrollEnd, { passive: true });
     let moveReq = null;
@@ -2410,12 +2401,12 @@
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
-      if (isScrolling) return;
+      if (ACTIVE_SCROLL.size > 0) return;
       lastEvent = e;
       if (moveReq) return;
       moveReq = requestAnimationFrame(() => {
         moveReq = null;
-        if (isScrolling || !lastEvent) return;
+        if (ACTIVE_SCROLL.size > 0 || !lastEvent) return;
         const ev = lastEvent;
         for (let i = 0; i < CARDS.length; i++) {
           setXY(CARDS[i], ev);
