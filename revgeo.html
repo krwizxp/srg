@@ -12,7 +12,6 @@
   <meta property="og:locale" content="ko_KR">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(97% 0.04 275)">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(12% 0.08 275)">
-  <meta name="color-scheme" content="light dark">
   <link rel="icon" href="icon.svg?v=4">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
@@ -191,13 +190,13 @@
         }
       }
 
-      @keyframes shimmer {
-        0% {
-          background-position: 150% 0;
+      @keyframes skeleton-shimmer-x {
+        from {
+          transform: translateX(-120%);
         }
 
-        100% {
-          background-position: -50% 0;
+        to {
+          transform: translateX(120%);
         }
       }
 
@@ -572,16 +571,23 @@
             transform-origin: 0% 50%;
             background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
             transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            position: relative;
+            overflow: hidden;
           }
 
           &.active {
-            .progress-fill {
-              animation: shimmer 1.5s linear infinite;
+            .progress-fill::after {
+              content: "";
+              position: absolute;
+              inset: 0;
+              transform: translateX(-120%);
               background: linear-gradient(in oklch 90deg,
-                  var(--accent),
-                  oklch(from var(--success) l c h / 0.8),
-                  var(--accent));
-              background-size: 200% 100%;
+                  transparent,
+                  oklch(from var(--success) l c h / 0.55),
+                  transparent);
+              animation: skeleton-shimmer-x 1.5s linear infinite;
+              will-change: transform;
+              pointer-events: none;
             }
           }
         }
@@ -857,12 +863,22 @@
             block-size: 1.1em;
             margin-block: 4px;
             border-radius: 999px;
+            background: var(--line);
+            position: relative;
+            overflow: hidden;
+          }
+
+          .skeleton-bar::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-120%);
             background: linear-gradient(in oklch 90deg,
-                oklch(from var(--accent) l calc(c * 0.25) h / 0.08),
+                transparent,
                 oklch(from var(--accent) l calc(c * 0.95) h / 0.3),
-                oklch(from var(--accent) l calc(c * 0.40) h / 0.1));
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+                transparent);
+            animation: skeleton-shimmer-x 1.5s linear infinite;
+            will-change: transform;
           }
 
           .map-links {
@@ -1116,25 +1132,15 @@
     </tr>
   </template>
   <template id="tmpl-map-links">
-    <ul class="map-links">
-      <li>
-        <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
-          rel="noopener noreferrer">Google</a>
-      </li>
-      <li>
-        <a data-provider-key="OSM"
-          data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
-          target="_blank" rel="noopener noreferrer">OSM</a>
-      </li>
-      <li>
-        <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
-          target="_blank" rel="noopener noreferrer">Naver</a>
-      </li>
-      <li>
-        <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-          target="_blank" rel="noopener noreferrer">Kakao</a>
-      </li>
-    </ul>
+    <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}"
+      target="_blank">Google</a>
+    <a data-provider-key="OSM"
+      data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
+      target="_blank">OSM</a>
+    <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
+      target="_blank">Naver</a>
+    <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
+      target="_blank">Kakao</a>
   </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
@@ -1165,9 +1171,7 @@
     const BASE_URL = new URL(
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
     );
-    const tmplMapLinks = document.querySelector("#tmpl-map-links");
-    const tmplSkeleton = document.querySelector("#tmpl-row-skeleton");
-    const mapAnchors = tmplMapLinks.content.querySelectorAll("a[data-url-template]");
+    const mapAnchors = document.querySelector("#tmpl-map-links").content.querySelectorAll("a[data-url-template]");
     const LATLON_TOKEN_RE = /{lat}|{lon}/g;
     function compileLatLonTemplate(tpl) {
       const parts = [];
@@ -1190,16 +1194,14 @@
       };
     });
     const MAP_PROVIDER_COUNT = MAP_LINKS.length;
-    const MAP_LINK_LI_PROTOS = (() => {
+    const MAP_LINK_PROTOS = (() => {
       const protos = new Array(MAP_PROVIDER_COUNT);
+      const tmplContent = document.querySelector("#tmpl-map-links").content;
+      const links = tmplContent.querySelectorAll("a[data-url-template]");
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const li = document.createElement("li");
-        const a = document.createElement("a");
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent = MAP_LINKS[i].key || "";
-        li.append(a);
-        protos[i] = li;
+        const a = links[i].cloneNode(true);
+        a.textContent = MAP_LINKS[i].key || a.textContent;
+        protos[i] = a;
       }
       return protos;
     })();
@@ -1237,16 +1239,16 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const { latStr: lat, lonStr: lon } = r;
-          const ul = document.createElement("ul");
-          ul.className = "map-links";
+          const lat = String(r.lat);
+          const lon = String(r.lon);
+          const div = document.createElement("div");
+          div.className = "map-links";
           for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            const li = MAP_LINK_LI_PROTOS[i].cloneNode(true);
-            const a = li.firstElementChild;
+            const a = MAP_LINK_PROTOS[i].cloneNode(true);
             if (a) a.href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
-            ul.append(li);
+            div.append(a);
           }
-          td.replaceChildren(ul);
+          td.replaceChildren(div);
         },
       },
     };
@@ -1501,7 +1503,7 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FILTER_DEBOUNCE_MS);
     }
-    const SKELETON_TEMPLATE = tmplSkeleton.content.querySelector("tr");
+    const SKELETON_TEMPLATE = document.querySelector("#tmpl-row-skeleton").content.querySelector("tr");
     if (SKELETON_TEMPLATE) {
       const skeletonCells = SKELETON_TEMPLATE.querySelectorAll("td");
       COL_DEFS.forEach((col, i) => {
@@ -2353,10 +2355,9 @@
       domElements.dropZoneText
         .querySelectorAll(".desktop-msg, .mobile-msg")
         .forEach((el) => {
-          el.textContent = "선택된 파일: ";
           const strong = document.createElement("strong");
           strong.textContent = file.name;
-          el.append(strong);
+          el.replaceChildren("선택된 파일: ", strong);
         });
       domElements.file.value = "";
     }
@@ -2364,7 +2365,6 @@
       const file = domElements.file.files?.[0] || null;
       maybeVT(() => handleFile(file));
     });
-
     const handleScrollStart = (e) => {
       const t = e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
@@ -2387,11 +2387,23 @@
     let moveReq = null;
     let lastEvent = null;
     const CARDS = Array.from(document.querySelectorAll(".card"));
+    let hoveredCard = null;
     const setXY = (el, ev) => {
       const rect = el.getBoundingClientRect();
       el.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
       el.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
     };
+    for (let i = 0; i < CARDS.length; i++) {
+      const card = CARDS[i];
+      card.addEventListener("pointerenter", (e) => {
+        if (e.pointerType && e.pointerType !== "mouse") return;
+        hoveredCard = card;
+      }, { passive: true });
+      card.addEventListener("pointerleave", (e) => {
+        if (e.pointerType && e.pointerType !== "mouse") return;
+        if (hoveredCard === card) hoveredCard = null;
+      }, { passive: true });
+    }
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
       if (ACTIVE_SCROLL.size > 0) return;
@@ -2401,20 +2413,22 @@
         moveReq = null;
         if (ACTIVE_SCROLL.size > 0 || !lastEvent) return;
         const ev = lastEvent;
-        for (let i = 0; i < CARDS.length; i++) {
-          setXY(CARDS[i], ev);
+        if (hoveredCard && hoveredCard.isConnected) {
+          setXY(hoveredCard, ev);
+        } else {
+          hoveredCard = null;
         }
         const target = ev.target;
         const btn = (target instanceof Element) ? target.closest("button") : null;
         if (btn) setXY(btn, ev);
       });
     }
-    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointermove", handlePointerMove, { passive: true });
     document.addEventListener("pointerdown", (e) => {
       const target = e.target;
       const el = (target instanceof Element) ? target.closest(".card, button") : null;
       if (el) setXY(el, e);
-    });
+    }, { passive: true });
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
