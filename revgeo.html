@@ -1136,6 +1136,7 @@
     const COORD_REGEX =
       /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
     const RX_CSV = /[",\n\r]/;
+    const RX_CSV_FORMULA = /^[=+\-@]/;
     const RX_LEVEL = /^level(\d+)$/;
     const RX_RE_ESCAPE = /[.*+?^${}()|[\]\\]/g;
     const RX_SIGUN = /[시군]$/;
@@ -1146,6 +1147,9 @@
     const escapeForRegExp = (s) => String(s).replace(RX_RE_ESCAPE, "\\$&");
     const csvEsc = (s) => {
       s = String(s ?? "");
+      if (RX_CSV_FORMULA.test(s) || s.startsWith("\t")) {
+        s = "'" + s;
+      }
       return RX_CSV.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
     };
     const lower = (s) => String(s || "").toLowerCase();
@@ -1890,7 +1894,7 @@
       start.disabled = isBusy || !hasRecords;
       pause.disabled = s !== "running";
       resume.disabled = s !== "paused";
-      stop.disabled = !AppState.isRunning || s === "stopping";
+      stop.disabled = !(AppState.isRunning || s === "parsing") || s === "stopping";
       progShell.classList.toggle(
         "active",
         s === "running" || s === "pausing"
@@ -1966,26 +1970,56 @@
         return new Promise(resolve => setTimeout(resolve, 0));
       };
     })();
-    async function* lineIterator(stream) {
+    async function* lineIterator(stream, signal) {
       const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
       let remnant = "";
-      while (true) {
-        const { value: chunk, done } = await reader.read();
-        if (done) break;
-        const lines = (remnant + chunk).split(/\r\n|\n|\r/);
-        remnant = lines.pop() ?? "";
-        for (const line of lines) {
-          yield line;
+      let onAbort = null;
+      const makeAbortError = () => {
+        const reason = signal?.reason;
+        if (reason instanceof DOMException && reason.name === "AbortError") return reason;
+        const msg =
+          typeof reason === "string" ? reason :
+            (reason && typeof reason === "object" && "message" in reason) ? String(reason.message) :
+              "Aborted";
+        return new DOMException(msg, "AbortError");
+      };
+      const abortPromise = signal
+        ? new Promise((_, reject) => {
+          if (signal.aborted) {
+            reject(makeAbortError());
+            return;
+          }
+          onAbort = () => {
+            try { void reader.cancel(signal.reason); } catch { }
+            reject(makeAbortError());
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+        })
+        : null;
+      try {
+        while (true) {
+          const { value: chunk, done } = abortPromise
+            ? await Promise.race([reader.read(), abortPromise])
+            : await reader.read();
+          if (done) break;
+          const lines = (remnant + chunk).split(/\r\n|\n|\r/);
+          remnant = lines.pop() ?? "";
+          for (const line of lines) yield line;
         }
-      }
-      if (remnant) {
-        yield remnant;
+        if (remnant) yield remnant;
+      } finally {
+        if (signal && onAbort) {
+          try { signal.removeEventListener("abort", onAbort); } catch { }
+        }
+        try { await reader.cancel(signal?.reason); } catch { }
+        try { reader.releaseLock(); } catch { }
       }
     }
-    async function extractCoordinatesFromStream(file) {
+    async function extractCoordinatesFromStream(file, signal) {
       const out = [];
       let processedLines = 0;
-      for await (const line of lineIterator(file.stream())) {
+      for await (const line of lineIterator(file.stream(), signal)) {
+        signal?.throwIfAborted?.();
         if (++processedLines % 5000 === 0) {
           await yieldToMain();
         }
@@ -2257,8 +2291,10 @@
       clearTable();
       AppState.setRecords([], "parsing");
       setStatusMessage("파일 분석 중…");
+      AppState.controller = new AbortController();
+      AppState.inFlight = true;
       try {
-        const parsed = await extractCoordinatesFromStream(file);
+        const parsed = await extractCoordinatesFromStream(file, AppState.controller.signal);
         if (!parsed.length) {
           AppState.setRecords([]);
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
@@ -2284,8 +2320,15 @@
         domElements.coords.textContent = disp.join("\n");
         setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`);
       } catch (err) {
+        if (err && err.name === "AbortError") {
+          setControlsIdle("중지되었습니다.", "stopped");
+          return;
+        }
         console.error(err);
         setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
+      } finally {
+        AppState.inFlight = false;
+        AppState.controller = null;
       }
     }
     const onFilterEvent = () => scheduleApplyFilterAll();
@@ -2313,7 +2356,18 @@
       "--start": () => maybeVT(startProcessing),
       "--pause": () => { if (!AppState.isRunning) return; AppState.setStatus("pausing"); if (AppState.inFlight) setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn"); },
       "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
-      "--stop": () => { if (!AppState.isRunning) return; AppState.setStatus("stopping"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; if (AppState.inFlight && AppState.controller) { AppState.controller.abort(); setStatusMessage("중지 요청됨. 취소 중…", "warn"); } else setStatusMessage("중지 요청됨. 정리 중…", "warn"); },
+      "--stop": () => {
+        if (!(AppState.isRunning || AppState.status === "parsing")) return;
+        AppState.setStatus("stopping");
+        AppState.resumeHandler?.resolve();
+        AppState.resumeHandler = null;
+        if (AppState.controller) {
+          AppState.controller.abort();
+          setStatusMessage("중지 요청됨. 취소 중…", "warn");
+        } else {
+          setStatusMessage("중지 요청됨. 정리 중…", "warn");
+        }
+      },
       "--export": handleExport,
       "--filter-clear": () => {
         domElements.filtersForm?.reset();
