@@ -1049,22 +1049,24 @@
         <h2>결과 표</h2>
         <p class="header-desc">좌표별 주소 및 지도 링크</p>
       </header>
-      <form class="filters">
-        <input id="filter-q" type="search" placeholder="전체검색">
-        <select id="filter-kind">
-          <option value="">구분(전체)</option>
-          <option value="kr">KR</option>
-          <option value="kp">KP</option>
-          <option value="world">WORLD</option>
-          <option value="에러">에러</option>
-        </select>
-        <input id="filter-sido" type="search" placeholder="시·도">
-        <input id="filter-sigungu" type="search" placeholder="시·군·구">
-        <input id="filter-emd" type="search" placeholder="읍·면·동·리">
-        <input id="filter-tag" type="search" placeholder="지물 태그">
-        <input id="filter-fulladdr" type="search" placeholder="전체주소">
-        <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
-      </form>
+      <search>
+        <form class="filters">
+          <input id="filter-q" type="search" placeholder="전체검색">
+          <select id="filter-kind">
+            <option value="">구분(전체)</option>
+            <option value="kr">KR</option>
+            <option value="kp">KP</option>
+            <option value="world">WORLD</option>
+            <option value="에러">에러</option>
+          </select>
+          <input id="filter-sido" type="search" placeholder="시·도">
+          <input id="filter-sigungu" type="search" placeholder="시·군·구">
+          <input id="filter-emd" type="search" placeholder="읍·면·동·리">
+          <input id="filter-tag" type="search" placeholder="지물 태그">
+          <input id="filter-fulladdr" type="search" placeholder="전체주소">
+          <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
+        </form>
+      </search>
       <div class="table-wrap">
         <p class="empty-hint">
           데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
@@ -1138,13 +1140,11 @@
     const RX_CSV = /[",\n\r]/;
     const RX_CSV_FORMULA = /^[=+\-@]/;
     const RX_LEVEL = /^level(\d+)$/;
-    const RX_RE_ESCAPE = /[.*+?^${}()|[\]\\]/g;
     const RX_SIGUN = /[시군]$/;
     const RX_GUGUN = /[구군]$/;
     const RX_SI = /시$/;
     const RX_GU = /구$/;
     const RX_EMD = /[읍면동리]$/;
-    const escapeForRegExp = (s) => String(s).replace(RX_RE_ESCAPE, "\\$&");
     const csvEsc = (s) => {
       s = String(s ?? "");
       if (RX_CSV_FORMULA.test(s) || s.startsWith("\t")) {
@@ -1642,24 +1642,13 @@
               }
             }
           }
-          const emdSet = new Set();
-          const addEmd = (name) => {
-            if (!name) return;
-            if (!RX_EMD.test(name)) return;
-            if (name === sido || name === sigungu) return;
-            emdSet.add(name);
-          };
-          addEmd(level8);
-          addEmd(level9);
-          addEmd(level10);
-          addEmd(gc.town);
-          addEmd(gc.village);
-          addEmd(gc.locality);
-          addEmd(gc.suburb);
-          addEmd(primaryName);
-          addEmd(nonEmptyLabelParts[0]);
-          addEmd(nonEmptyLabelParts[1]);
-          eupmyeon = Array.from(emdSet).join(" ");
+          const candidates = new Set([
+            level8, level9, level10, gc.town, gc.village,
+            gc.locality, gc.suburb, primaryName,
+            nonEmptyLabelParts[0], nonEmptyLabelParts[1],
+          ].filter((n) => n && RX_EMD.test(n)));
+          const exclusions = new Set([sido, sigungu]);
+          eupmyeon = Array.from(candidates.difference(exclusions)).join(" ");
         } else {
           const type = gc.type || "";
           const isCityOrCounty = type === "city" || type === "county";
@@ -1751,7 +1740,7 @@
             eupmyeon = districtLike;
             if (sigungu) {
               const re = new RegExp(
-                `(?:^|\\s+)${escapeForRegExp(districtLike)}(?:\\s+|$)`,
+                `(?:^|\\s+)${RegExp.escape(districtLike)}(?:\\s+|$)`,
                 "g"
               );
               sigungu = String(sigungu)
@@ -2378,7 +2367,15 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       },
     };
-    domElements.app.addEventListener("command", (e) => void COMMANDS[e.command]?.());
+    domElements.app.addEventListener("command", (e) => {
+      Promise.try(() => COMMANDS[e.command]?.())
+        .catch((err) => {
+          if (err?.name === "AbortError") return;
+          console.error(err);
+          const msg = getErrorMessage(err);
+          setStatusMessage(`명령 실행 중 오류: ${msg}`, "error");
+        });
+    });
     domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
       if (!file) return;
