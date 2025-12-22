@@ -16,10 +16,6 @@
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="dns-prefetch" href="https://www.google.com">
-  <link rel="dns-prefetch" href="https://www.openstreetmap.org">
-  <link rel="dns-prefetch" href="https://map.naver.com">
-  <link rel="dns-prefetch" href="https://map.kakao.com">
   <link rel="stylesheet" crossorigin
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <style>
@@ -49,17 +45,6 @@
         :is(input, select) {
           font-size: 16px !important;
           letter-spacing: -0.03em;
-        }
-
-        textarea {
-          font-size: 16px !important;
-          transform: scale(0.8);
-          transform-origin: top left;
-          inline-size: 125% !important;
-          margin-inline-end: -25% !important;
-          margin-block-end: -15px !important;
-          white-space: pre !important;
-          overflow-x: hidden !important;
         }
       }
 
@@ -174,7 +159,7 @@
     }
 
     @layer components {
-      :is(textarea, .table-wrap) {
+      :is(.coords-view, .table-wrap) {
         flex: 1;
         scrollbar-width: thin;
 
@@ -403,7 +388,7 @@
           }
         }
 
-        :where(textarea,
+        :where(.coords-view,
           button,
           .filters input[type="search"],
           .filters select) {
@@ -414,16 +399,27 @@
           color: var(--fg);
         }
 
-        textarea {
-          resize: none;
+        .coords-view {
+          display: block;
+          font: inherit;
           padding-block: 12px;
           padding-inline: 12px;
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(11px, 3.5cqi, 14px);
           white-space: pre;
+          overflow: auto;
+          margin-block: 0;
+          margin-inline: 0;
+          cursor: text;
+          user-select: text;
 
-          &:focus {
+          &:empty::before {
+            content: attr(data-placeholder);
+            color: var(--muted);
+          }
+
+          &:focus-visible {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
@@ -1033,8 +1029,9 @@
         </fieldset>
       </form>
       <div>
-        <label for="coords"><span class="caps">추출된 좌표 (lat,lon)</span></label>
-        <textarea id="coords" readonly placeholder="좌표가 이곳에 표시됩니다."></textarea>
+        <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
+        <pre id="coords" class="coords-view" tabindex="0" aria-labelledby="coords-label"
+          data-placeholder="좌표가 이곳에 표시됩니다."></pre>
       </div>
       <div class="row-progress">
         <div class="sp">
@@ -2264,7 +2261,7 @@
     async function handleParse() {
       const file = AppState.droppedFile;
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
-      domElements.coords.value = "";
+      domElements.coords.textContent = "";
       clearTable();
       AppState.setRecords([], "parsing");
       setStatusMessage("파일 분석 중…");
@@ -2292,7 +2289,7 @@
         if (records.length > MAX_DISP) {
           disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
-        domElements.coords.value = disp.join("\n");
+        domElements.coords.textContent = disp.join("\n");
         setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`);
       } catch (err) {
         console.error(err);
@@ -2347,7 +2344,7 @@
         domElements.file.value = "";
         return;
       }
-      domElements.coords.value = "";
+      domElements.coords.textContent = "";
       clearTable();
       AppState.setRecords([]);
       AppState.setFile(file);
