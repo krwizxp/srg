@@ -48,10 +48,6 @@
         }
       }
 
-      ul {
-        list-style: none;
-      }
-
       fieldset {
         border: 0;
       }
@@ -400,19 +396,15 @@
         }
 
         .coords-view {
-          display: block;
           font: inherit;
           padding-block: 12px;
           padding-inline: 12px;
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
-          white-space: pre;
           overflow: auto;
           margin-block: 0;
           margin-inline: 0;
-          cursor: text;
-          user-select: text;
 
           &:empty::before {
             content: attr(data-placeholder);
@@ -1407,14 +1399,14 @@
       return true;
     }
     function shouldHideRowByFilter(tr, f) {
-      if (tr?.dataset?.skeleton === "1") return { hide: !!f.active, cache: null };
-      if (tr.dataset.revealedByFind === "1") return { hide: false, cache: null };
-      if (!f.active) return { hide: false, cache: null };
+      if (tr?.dataset?.skeleton === "1") return !!f.active;
+      if (tr.dataset.revealedByFind === "1") return false;
+      if (!f.active) return false;
       const cache = ensureRowFilterCache(tr);
-      return { hide: !rowMatchesFilterCached(cache, f), cache };
+      return !rowMatchesFilterCached(cache, f);
     }
     function setRowHiddenByFilter(tr, f) {
-      const { hide } = shouldHideRowByFilter(tr, f);
+      const hide = shouldHideRowByFilter(tr, f);
       if (!hide) {
         if (tr.hidden) tr.removeAttribute("hidden");
         return;
