@@ -1006,6 +1006,64 @@
         overflow: hidden;
         clip-path: inset(50%);
       }
+
+      .map-btn {
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
+        color: var(--accent);
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+
+        @media (any-hover: hover) {
+          &:hover {
+            background: light-dark(oklch(99% 0 0), oklch(22% 0.04 270));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px -2px oklch(0% 0 0 / 0.15);
+            border-color: transparent;
+          }
+        }
+
+        &:active {
+          transform: translateY(0);
+        }
+      }
+
+      .map-popover {
+        position: fixed;
+        inset: auto;
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card-bg);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: var(--glass);
+        max-inline-size: min(360px, 92vw);
+
+        .map-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px 8px;
+
+          a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 700;
+            white-space: nowrap;
+
+            @media (any-hover: hover) {
+              &:hover {
+                color: var(--success);
+                text-decoration: underline;
+                text-underline-offset: 3px;
+              }
+            }
+          }
+        }
+      }
     }
   </style>
 </head>
@@ -1124,6 +1182,9 @@
       </div>
     </section>
   </main>
+  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크">
+    <div class="map-links" id="map-popover-links"></div>
+  </div>
   <template id="tmpl-row-skeleton">
     <tr>
       <td>
@@ -1220,10 +1281,8 @@
     const MAP_PROVIDER_COUNT = MAP_LINKS.length;
     const MAP_LINK_PROTOS = (() => {
       const protos = new Array(MAP_PROVIDER_COUNT);
-      const tmplContent = document.querySelector("#tmpl-map-links").content;
-      const links = tmplContent.querySelectorAll("a[data-url-template]");
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const a = links[i].cloneNode(true);
+        const a = mapAnchors[i].cloneNode(true);
         a.textContent = MAP_LINKS[i].key || a.textContent;
         protos[i] = a;
       }
@@ -1236,6 +1295,58 @@
         out += (p === 0) ? lat : (p === 1) ? lon : p;
       }
       return out;
+    }
+    const mapPopover = document.querySelector("#map-popover");
+    const mapPopoverLinksHost = document.querySelector("#map-popover-links");
+    const HAS_POPOVER =
+      !!(mapPopover &&
+        mapPopoverLinksHost &&
+        typeof mapPopover.showPopover === "function" &&
+        typeof mapPopover.hidePopover === "function");
+    const POPOVER_LINKS = (() => {
+      if (!HAS_POPOVER) return [];
+      const arr = new Array(MAP_PROVIDER_COUNT);
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        const a = MAP_LINK_PROTOS[i].cloneNode(true);
+        a.rel = "noopener noreferrer";
+        arr[i] = a;
+      }
+      mapPopoverLinksHost.replaceChildren(...arr);
+      return arr;
+    })();
+    function closeMapPopover() {
+      if (!HAS_POPOVER) return;
+      try {
+        if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
+      } catch { }
+    }
+    function positionMapPopover(anchorEl) {
+      if (!HAS_POPOVER) return;
+      const margin = 8;
+      const ar = anchorEl.getBoundingClientRect();
+      const pr = mapPopover.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = ar.left;
+      if (left + pr.width > vw - margin) left = vw - pr.width - margin;
+      if (left < margin) left = margin;
+      let top = ar.bottom + margin;
+      if (top + pr.height > vh - margin) top = ar.top - pr.height - margin;
+      if (top < margin) top = margin;
+      mapPopover.style.left = `${Math.round(left)}px`;
+      mapPopover.style.top = `${Math.round(top)}px`;
+    }
+    function openMapPopover(anchorEl, lat, lon) {
+      if (!HAS_POPOVER) {
+        const url = fillLatLon(MAP_LINKS[0].parts, lat, lon);
+        window.open(url, "_blank", "noopener");
+        return;
+      }
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        POPOVER_LINKS[i].href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
+      }
+      mapPopover.showPopover();
+      positionMapPopover(anchorEl);
     }
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
@@ -1263,16 +1374,14 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const lat = String(r.lat);
-          const lon = String(r.lon);
-          const div = document.createElement("div");
-          div.className = "map-links";
-          for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            const a = MAP_LINK_PROTOS[i].cloneNode(true);
-            if (a) a.href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
-            div.append(a);
-          }
-          td.replaceChildren(div);
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "map-btn";
+          btn.textContent = "지도";
+          btn.dataset.lat = String(r.lat);
+          btn.dataset.lon = String(r.lon);
+          btn.setAttribute("aria-haspopup", "dialog");
+          td.replaceChildren(btn);
         },
       },
     };
@@ -2359,6 +2468,14 @@
         el.addEventListener("input", onFilterEvent);
       }
     }
+    domElements.tbody.addEventListener("click", (e) => {
+      const btn = (e.target instanceof Element) ? e.target.closest("button.map-btn") : null;
+      if (!btn) return;
+      const lat = btn.dataset.lat;
+      const lon = btn.dataset.lon;
+      if (!lat || !lon) return;
+      openMapPopover(btn, lat, lon);
+    });
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
@@ -2437,6 +2554,7 @@
       maybeVT(() => handleFile(file));
     });
     const handleScrollStart = (e) => {
+      closeMapPopover();
       const t = e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
         setGlobalScrolling(true);
