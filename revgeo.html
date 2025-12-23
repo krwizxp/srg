@@ -1279,15 +1279,6 @@
       };
     });
     const MAP_PROVIDER_COUNT = MAP_LINKS.length;
-    const MAP_LINK_PROTOS = (() => {
-      const protos = new Array(MAP_PROVIDER_COUNT);
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const a = mapAnchors[i].cloneNode(true);
-        a.textContent = MAP_LINKS[i].key || a.textContent;
-        protos[i] = a;
-      }
-      return protos;
-    })();
     function fillLatLon(parts, lat, lon) {
       let out = "";
       for (let i = 0; i < parts.length; i++) {
@@ -1301,7 +1292,8 @@
     const POPOVER_LINKS = (() => {
       const arr = new Array(MAP_PROVIDER_COUNT);
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const a = MAP_LINK_PROTOS[i].cloneNode(true);
+        const a = mapAnchors[i].cloneNode(true);
+        a.textContent = MAP_LINKS[i].key || a.textContent;
         a.rel = "noopener noreferrer";
         arr[i] = a;
       }
@@ -2312,7 +2304,6 @@
           if (skeletonTr && skeletonTr.isConnected) {
             skeletonTr.remove();
           }
-          AppState.controller = null;
           AppState.resumeHandler = null;
           setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${msg}`, "error");
           break;
