@@ -1298,13 +1298,7 @@
     }
     const mapPopover = document.querySelector("#map-popover");
     const mapPopoverLinksHost = document.querySelector("#map-popover-links");
-    const HAS_POPOVER =
-      !!(mapPopover &&
-        mapPopoverLinksHost &&
-        typeof mapPopover.showPopover === "function" &&
-        typeof mapPopover.hidePopover === "function");
     const POPOVER_LINKS = (() => {
-      if (!HAS_POPOVER) return [];
       const arr = new Array(MAP_PROVIDER_COUNT);
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         const a = MAP_LINK_PROTOS[i].cloneNode(true);
@@ -1315,13 +1309,9 @@
       return arr;
     })();
     function closeMapPopover() {
-      if (!HAS_POPOVER) return;
-      try {
-        if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
-      } catch { }
+      if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
     }
     function positionMapPopover(anchorEl) {
-      if (!HAS_POPOVER) return;
       const margin = 8;
       const ar = anchorEl.getBoundingClientRect();
       const pr = mapPopover.getBoundingClientRect();
@@ -1337,11 +1327,6 @@
       mapPopover.style.top = `${Math.round(top)}px`;
     }
     function openMapPopover(anchorEl, lat, lon) {
-      if (!HAS_POPOVER) {
-        const url = fillLatLon(MAP_LINKS[0].parts, lat, lon);
-        window.open(url, "_blank", "noopener");
-        return;
-      }
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         POPOVER_LINKS[i].href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
       }
@@ -1559,9 +1544,9 @@
         tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
       }
     }
-    function getAllRows() {
+    function getAllRowsLive() {
       const tb = domElements.tbody;
-      return tb ? tb.rows : [];
+      return tb ? tb.rows : null;
     }
     function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
       if (!tr) return;
@@ -1577,7 +1562,6 @@
     }
     let filterTimer = null;
     let FILTER_APPLY_JOB = null;
-    let FILTER_APPLY_SEQ = 0;
     const FILTER_FRAME_BUDGET_MS = 8;
     const FILTER_MAX_ROWS_PER_FRAME = 1500;
     function cancelActiveFilterApply() {
@@ -1587,31 +1571,46 @@
       FILTER_APPLY_JOB = null;
     }
     function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
-      cancelActiveFilterApply();
-      const rows = Array.from(getAllRows());
-      const len = rows.length;
+      const rows = getAllRowsLive();
+      const len = rows ? rows.length : 0;
+      if (!rows || len === 0) {
+        cancelActiveFilterApply();
+        return;
+      }
       if (len <= 2000) {
+        cancelActiveFilterApply();
         for (let i = 0; i < len; i++) {
-          setRowHiddenByFilter(rows[i], f);
+          const tr = rows[i];
+          if (tr) setRowHiddenByFilter(tr, f);
         }
         return;
       }
+      const existing = FILTER_APPLY_JOB;
+      if (existing && existing.rows === rows) {
+        existing.f = f;
+        existing.i = 0;
+        existing.len = len;
+        if (!existing.raf) existing.raf = requestAnimationFrame(existing.step);
+        return;
+      }
+      cancelActiveFilterApply();
       const job = {
-        id: ++FILTER_APPLY_SEQ,
         raf: 0,
         i: 0,
         rows,
         len,
         f,
+        step: null,
       };
-      FILTER_APPLY_JOB = job;
-      const step = () => {
+      job.step = () => {
         if (FILTER_APPLY_JOB !== job) return;
+        job.raf = 0;
         const start = performance.now();
         let processed = 0;
         while (job.i < job.len) {
           if (FILTER_APPLY_JOB !== job) return;
-          setRowHiddenByFilter(job.rows[job.i], job.f);
+          const tr = job.rows[job.i];
+          if (tr) setRowHiddenByFilter(tr, job.f);
           job.i++;
           processed++;
           if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
@@ -1619,16 +1618,18 @@
         }
         if (FILTER_APPLY_JOB !== job) return;
         if (job.i < job.len) {
-          job.raf = requestAnimationFrame(step);
+          job.raf = requestAnimationFrame(job.step);
         } else {
           FILTER_APPLY_JOB = null;
         }
       };
-      job.raf = requestAnimationFrame(step);
+      FILTER_APPLY_JOB = job;
+      job.raf = requestAnimationFrame(job.step);
     }
     function scheduleApplyFilterAll() {
       markFilterDirty();
-      cancelActiveFilterApply();
+      const job = FILTER_APPLY_JOB;
+      if (job) job.i = job.len;
       if (filterTimer) clearTimeout(filterTimer);
       filterTimer = setTimeout(() => {
         filterTimer = null;
