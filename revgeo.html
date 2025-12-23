@@ -2550,17 +2550,9 @@
         });
       domElements.file.value = "";
     }
-    const IS_COARSE_POINTER =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(pointer: coarse)").matches;
     domElements.file.addEventListener("change", () => {
       const file = domElements.file.files?.[0] || null;
-      if (IS_COARSE_POINTER) {
-        handleFile(file);
-      } else {
-        maybeVT(() => handleFile(file));
-      }
+      maybeVT(() => handleFile(file));
     });
     const handleScrollStart = (e) => {
       closeMapPopover();
