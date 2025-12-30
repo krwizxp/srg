@@ -45,17 +45,18 @@
         box-sizing: border-box;
       }
 
-      :is(body, fieldset, h1, h2, ul, p) {
+      :is(body, fieldset, h1, h2, p) {
         margin-block: 0;
         margin-inline: 0;
       }
 
-      :is(fieldset, ul) {
+      fieldset {
         padding-block: 0;
         padding-inline: 0;
+        border: 0;
       }
 
-      :is(input, button, textarea, select) {
+      :is(input, button, select) {
         font: inherit;
       }
 
@@ -64,10 +65,6 @@
           font-size: 16px !important;
           letter-spacing: -0.03em;
         }
-      }
-
-      fieldset {
-        border: 0;
       }
 
       body {
@@ -900,27 +897,6 @@
           animation: skeleton-shimmer-x 1.5s linear infinite;
           will-change: transform;
         }
-
-        .map-links {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px 4px;
-          min-inline-size: 85px;
-
-          a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-            white-space: nowrap;
-
-            &:hover {
-              color: var(--success);
-              text-decoration: underline;
-              text-underline-offset: 3px;
-            }
-          }
-        }
       }
     }
 
@@ -1010,24 +986,13 @@
       .map-btn {
         padding: 8px 10px;
         border-radius: 10px;
-        border: 1px solid var(--line);
-        background: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
         color: var(--accent);
         font-weight: 700;
-        cursor: pointer;
-        white-space: nowrap;
 
         @media (any-hover: hover) {
           &:hover {
-            background: light-dark(oklch(99% 0 0), oklch(22% 0.04 270));
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px -2px oklch(0% 0 0 / 0.15);
-            border-color: transparent;
           }
-        }
-
-        &:active {
-          transform: translateY(0);
         }
       }
 
@@ -1053,12 +1018,14 @@
           display: flex;
           flex-wrap: wrap;
           gap: 6px 8px;
+          min-inline-size: 85px;
 
           a {
             color: var(--accent);
             text-decoration: none;
             font-weight: 700;
             white-space: nowrap;
+            transition: color 0.2s;
 
             @media (any-hover: hover) {
               &:hover {
@@ -1338,16 +1305,14 @@
         POPOVER_SIZE_CACHE.w = pr.width;
         POPOVER_SIZE_CACHE.h = pr.height;
       }
-      return pr;
     }
     function closeMapPopover() {
       if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
     }
     function positionMapPopover(anchorEl, popoverSize = null) {
-      if (SUPPORTS_ANCHOR_POSITIONING) return;
       const margin = 8;
       const ar = anchorEl.getBoundingClientRect();
-      const pr = popoverSize
+      const pr = (popoverSize && popoverSize.w > 0 && popoverSize.h > 0)
         ? { width: popoverSize.w, height: popoverSize.h }
         : mapPopover.getBoundingClientRect();
       const vw = window.innerWidth;
@@ -1366,22 +1331,18 @@
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
           ((document.activeElement instanceof Element)
-            ? document.activeElement.closest?.("button.map-btn")
+            ? document.activeElement.closest("button.map-btn")
             : null);
       if (!invoker) return;
-      const lat = invoker.dataset.lat;
-      const lon = invoker.dataset.lon;
+      LAST_MAP_INVOKER = invoker;
+      const { lat, lon } = invoker.dataset;
       if (lat && lon) updateMapPopoverLinks(lat, lon);
-      if (SUPPORTS_ANCHOR_POSITIONING) {
-        mapPopover.style.left = "";
-        mapPopover.style.top = "";
-        return;
-      }
+      if (SUPPORTS_ANCHOR_POSITIONING) return;
       requestAnimationFrame(() => {
         cachePopoverSizeFromLiveRect();
-        positionMapPopover(invoker);
+        positionMapPopover(invoker, POPOVER_SIZE_CACHE);
       });
-    }, { passive: true });
+    });
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
     const COORD_DECIMALS = 6;
@@ -1493,7 +1454,7 @@
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
     const COL_INDEX = Object.fromEntries(COL_DEFS.map((c, i) => [c.key, i]));
     const SKELETON_TEMPLATE =
-      document.querySelector("#tmpl-row-skeleton")?.content?.querySelector("tr");
+      document.querySelector("#tmpl-row-skeleton").content.querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
     const FILTER_DEBOUNCE_MS = 120;
@@ -2082,7 +2043,7 @@
         s === "running" || s === "pausing"
       );
       const lockInput = isBusy;
-      dropZone?.toggleAttribute("inert", lockInput);
+      dropZone.toggleAttribute("inert", lockInput);
     }
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
@@ -2130,19 +2091,13 @@
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
-      const combined =
-        signal ? AbortSignal.any([signal, timeoutSig]) : timeoutSig;
-      const { promise, resolve, reject } = Promise.withResolvers();
-      const onAbort = () => {
-        if (signal?.aborted) reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
-        else resolve();
-      };
-      if (combined.aborted) {
-        onAbort();
-        return promise;
-      }
-      combined.addEventListener("abort", onAbort, { once: true });
-      return promise;
+      const combined = AbortSignal.any([signal, timeoutSig]);
+      const { promise, resolve } = Promise.withResolvers();
+      if (combined.aborted) resolve();
+      else combined.addEventListener("abort", resolve, { once: true });
+      return promise.then(() => {
+        signal.throwIfAborted();
+      });
     }
     const yieldToMain = (() => {
       if ("scheduler" in window && "yield" in window.scheduler) {
@@ -2153,47 +2108,23 @@
       };
     })();
     async function* lineIterator(stream, signal) {
-      const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
+      const reader = decoded.getReader();
       let remnant = "";
-      let onAbort = null;
-      const makeAbortError = () => {
-        const reason = signal?.reason;
-        if (reason instanceof DOMException && reason.name === "AbortError") return reason;
-        const msg =
-          typeof reason === "string" ? reason :
-            (reason && typeof reason === "object" && "message" in reason) ? String(reason.message) :
-              "Aborted";
-        return new DOMException(msg, "AbortError");
-      };
-      const abortPromise = signal
-        ? new Promise((_, reject) => {
-          if (signal.aborted) {
-            reject(makeAbortError());
-            return;
-          }
-          onAbort = () => {
-            try { void reader.cancel(signal.reason); } catch { }
-            reject(makeAbortError());
-          };
-          signal.addEventListener("abort", onAbort, { once: true });
-        })
-        : null;
       try {
         while (true) {
-          const { value: chunk, done } = abortPromise
-            ? await Promise.race([reader.read(), abortPromise])
-            : await reader.read();
-          if (done) break;
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            signal.throwIfAborted();
+            break;
+          }
           const lines = (remnant + chunk).split(/\r\n|\n|\r/);
           remnant = lines.pop() ?? "";
           for (const line of lines) yield line;
         }
         if (remnant) yield remnant;
       } finally {
-        if (signal && onAbort) {
-          try { signal.removeEventListener("abort", onAbort); } catch { }
-        }
-        try { await reader.cancel(signal?.reason); } catch { }
+        try { await reader.cancel(signal.reason); } catch { }
         try { reader.releaseLock(); } catch { }
       }
     }
@@ -2201,7 +2132,7 @@
       const out = [];
       let processedLines = 0;
       for await (const line of lineIterator(file.stream(), signal)) {
-        signal?.throwIfAborted?.();
+        signal.throwIfAborted();
         if (++processedLines % 5000 === 0) {
           await yieldToMain();
         }
@@ -2234,13 +2165,11 @@
     async function fetchReverseWithRetry(lat, lon, userSignal) {
       let attempt = 0;
       while (attempt < CONFIG.MAX_RETRY) {
-        userSignal?.throwIfAborted();
+        userSignal.throwIfAborted();
         attempt++;
         try {
           const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-          const combinedSignal = userSignal
-            ? AbortSignal.any([userSignal, timeoutSig])
-            : timeoutSig;
+          const combinedSignal = AbortSignal.any([userSignal, timeoutSig]);
           const url = new URL(BASE_URL);
           url.searchParams.set("lat", lat);
           url.searchParams.set("lon", lon);
@@ -2262,7 +2191,7 @@
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
         } catch (e) {
-          userSignal?.throwIfAborted();
+          userSignal.throwIfAborted();
           if (attempt >= CONFIG.MAX_RETRY) {
             throw e;
           }
@@ -2523,22 +2452,18 @@
         el.addEventListener("input", onFilterEvent);
       }
     }
+    const closestMapButton = (target) => {
+      return (target instanceof Element) ? target.closest("button.map-btn") : null;
+    };
     domElements.tbody.addEventListener("click", (e) => {
-      const btn = (e.target instanceof Element) ? e.target.closest("button.map-btn") : null;
+      const btn = closestMapButton(e.target);
       if (!btn) return;
-      const lat = btn.dataset.lat;
-      const lon = btn.dataset.lon;
+      const prev = (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       LAST_MAP_INVOKER = btn;
-      if (!lat || !lon) {
-        try { e.preventDefault(); } catch { }
-        closeMapPopover();
-        return;
+      if (mapPopover.matches(":popover-open") && prev !== btn) {
+        mapPopover.hidePopover();
       }
-      updateMapPopoverLinks(lat, lon);
-      if (!SUPPORTS_ANCHOR_POSITIONING && POPOVER_SIZE_CACHE.w > 0 && POPOVER_SIZE_CACHE.h > 0) {
-        positionMapPopover(btn, POPOVER_SIZE_CACHE);
-      }
-    });
+    }, { capture: true });
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
@@ -2570,7 +2495,7 @@
       },
       "--export": handleExport,
       "--filter-clear": () => {
-        domElements.filtersForm?.reset();
+        domElements.filtersForm.reset();
         markFilterDirty();
         cancelActiveFilterApply();
         if (filterTimer) { clearTimeout(filterTimer); filterTimer = null; }
