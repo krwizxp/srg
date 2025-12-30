@@ -1070,6 +1070,25 @@
           }
         }
       }
+
+      @supports (position-area: bottom) {
+        .map-popover {
+          position-anchor: auto;
+          position-area: bottom span-left;
+        }
+      }
+
+      @supports (position-area: bottom) and (position-try-fallbacks: flip-block) {
+        .map-popover {
+          position-try-fallbacks:
+            bottom span-right,
+            top span-left,
+            top span-right,
+            flip-block,
+            flip-inline,
+            flip-block flip-inline;
+        }
+      }
     }
   </style>
 </head>
@@ -1301,6 +1320,8 @@
       }
       return out;
     }
+    const SUPPORTS_ANCHOR_POSITIONING =
+      !!(window.CSS?.supports && CSS.supports("position-area: bottom"));
     let LAST_MAP_INVOKER = null;
     let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
     function updateMapPopoverLinks(lat, lon) {
@@ -1323,6 +1344,7 @@
       if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
     }
     function positionMapPopover(anchorEl, popoverSize = null) {
+      if (SUPPORTS_ANCHOR_POSITIONING) return;
       const margin = 8;
       const ar = anchorEl.getBoundingClientRect();
       const pr = popoverSize
@@ -1338,7 +1360,8 @@
       if (top < margin) top = margin;
       mapPopover.style.left = `${Math.round(left)}px`;
       mapPopover.style.top = `${Math.round(top)}px`;
-    } mapPopover.addEventListener("toggle", () => {
+    }
+    mapPopover.addEventListener("toggle", () => {
       if (!mapPopover.matches(":popover-open")) return;
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
@@ -1349,6 +1372,11 @@
       const lat = invoker.dataset.lat;
       const lon = invoker.dataset.lon;
       if (lat && lon) updateMapPopoverLinks(lat, lon);
+      if (SUPPORTS_ANCHOR_POSITIONING) {
+        mapPopover.style.left = "";
+        mapPopover.style.top = "";
+        return;
+      }
       requestAnimationFrame(() => {
         cachePopoverSizeFromLiveRect();
         positionMapPopover(invoker);
@@ -1395,8 +1423,8 @@
           btn.dataset.lat = r.latStr;
           btn.dataset.lon = r.lonStr;
           btn.setAttribute("aria-haspopup", "dialog");
-          btn.setAttribute("popovertarget", "map-popover");
-          btn.setAttribute("popovertargetaction", "show");
+          btn.setAttribute("commandfor", "map-popover");
+          btn.setAttribute("command", "show-popover");
           td.replaceChildren(btn);
         },
       },
@@ -2507,7 +2535,7 @@
         return;
       }
       updateMapPopoverLinks(lat, lon);
-      if (POPOVER_SIZE_CACHE.w > 0 && POPOVER_SIZE_CACHE.h > 0) {
+      if (!SUPPORTS_ANCHOR_POSITIONING && POPOVER_SIZE_CACHE.w > 0 && POPOVER_SIZE_CACHE.h > 0) {
         positionMapPopover(btn, POPOVER_SIZE_CACHE);
       }
     });
