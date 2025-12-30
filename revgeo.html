@@ -1183,47 +1183,46 @@
     </section>
   </main>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크">
-    <div class="map-links" id="map-popover-links"></div>
+    <div class="map-links" id="map-popover-links">
+      <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
+        rel="noopener noreferrer">Google</a>
+      <a data-provider-key="OSM"
+        data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
+        target="_blank" rel="noopener noreferrer">OSM</a>
+      <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%2C%20{lon}"
+        target="_blank" rel="noopener noreferrer">Naver</a>
+      <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
+        target="_blank" rel="noopener noreferrer">Kakao</a>
+    </div>
   </div>
   <template id="tmpl-row-skeleton">
     <tr>
-      <td>
+      <td data-label="구분">
         <div class="skeleton-bar"></div>
       </td>
-      <td></td>
-      <td>
+      <td data-label="순번"></td>
+      <td data-label="좌표 (위도,경도)">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="시·도">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="시·군·구">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="읍·면·동·리">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="지물 태그">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="전체주소">
         <div class="skeleton-bar"></div>
       </td>
-      <td>
+      <td data-label="지도링크">
         <div class="skeleton-bar"></div>
       </td>
     </tr>
-  </template>
-  <template id="tmpl-map-links">
-    <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}"
-      target="_blank">Google</a>
-    <a data-provider-key="OSM"
-      data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
-      target="_blank">OSM</a>
-    <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%20{lon}"
-      target="_blank">Naver</a>
-    <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-      target="_blank">Kakao</a>
   </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
@@ -1256,7 +1255,6 @@
     const BASE_URL = new URL(
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
     );
-    const mapAnchors = document.querySelector("#tmpl-map-links").content.querySelectorAll("a[data-url-template]");
     const LATLON_TOKEN_RE = /{lat}|{lon}/g;
     function compileLatLonTemplate(tpl) {
       const parts = [];
@@ -1271,14 +1269,24 @@
       if (last < tpl.length) parts.push(tpl.slice(last));
       return parts.length ? parts : [tpl];
     }
-    const MAP_LINKS = Array.from(mapAnchors, (a) => {
+    const mapPopover = document.querySelector("#map-popover");
+    const mapPopoverLinksHost = document.querySelector("#map-popover-links");
+    const mapAnchors =
+      mapPopoverLinksHost.querySelectorAll("a[data-url-template]");
+    const MAP_PROVIDER_COUNT = mapAnchors.length;
+    const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
+    const POPOVER_LINKS = new Array(MAP_PROVIDER_COUNT);
+    for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+      const a = mapAnchors[i];
+      POPOVER_LINKS[i] = a;
+      const key = a.dataset.providerKey || "";
       const template = a.dataset.urlTemplate || "";
-      return {
-        key: a.dataset.providerKey || a.textContent.trim() || "",
+      MAP_LINKS[i] = {
+        key,
         parts: compileLatLonTemplate(template),
+        round6: key === "Naver",
       };
-    });
-    const MAP_PROVIDER_COUNT = MAP_LINKS.length;
+    }
     function fillLatLon(parts, lat, lon) {
       let out = "";
       for (let i = 0; i < parts.length; i++) {
@@ -1287,19 +1295,6 @@
       }
       return out;
     }
-    const mapPopover = document.querySelector("#map-popover");
-    const mapPopoverLinksHost = document.querySelector("#map-popover-links");
-    const POPOVER_LINKS = (() => {
-      const arr = new Array(MAP_PROVIDER_COUNT);
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const a = mapAnchors[i].cloneNode(true);
-        a.textContent = MAP_LINKS[i].key || a.textContent;
-        a.rel = "noopener noreferrer";
-        arr[i] = a;
-      }
-      mapPopoverLinksHost.replaceChildren(...arr);
-      return arr;
-    })();
     function closeMapPopover() {
       if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
     }
@@ -1320,13 +1315,24 @@
     }
     function openMapPopover(anchorEl, lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        POPOVER_LINKS[i].href = fillLatLon(MAP_LINKS[i].parts, lat, lon);
+        const link = MAP_LINKS[i];
+        const latUse = link.round6 ? fmtCoord6(lat) : lat;
+        const lonUse = link.round6 ? fmtCoord6(lon) : lon;
+        POPOVER_LINKS[i].href = fillLatLon(link.parts, latUse, lonUse);
       }
-      mapPopover.showPopover();
+      if (!mapPopover.matches(":popover-open")) mapPopover.showPopover();
       positionMapPopover(anchorEl);
     }
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
+    const COORD_DECIMALS = 6;
+    const fmtCoord6 = (v) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return String(v ?? "");
+      const p = 10 ** COORD_DECIMALS;
+      const rounded = Math.round(n * p) / p;
+      return rounded.toFixed(COORD_DECIMALS).replace(/\.?0+$/, "");
+    };
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
       kind: {
@@ -1355,8 +1361,8 @@
           btn.type = "button";
           btn.className = "map-btn";
           btn.textContent = "지도";
-          btn.dataset.lat = String(r.lat);
-          btn.dataset.lon = String(r.lon);
+          btn.dataset.lat = r.latStr;
+          btn.dataset.lon = r.lonStr;
           btn.setAttribute("aria-haspopup", "dialog");
           td.replaceChildren(btn);
         },
@@ -1425,6 +1431,8 @@
     );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
     const COL_INDEX = Object.fromEntries(COL_DEFS.map((c, i) => [c.key, i]));
+    const SKELETON_TEMPLATE =
+      document.querySelector("#tmpl-row-skeleton")?.content?.querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
     const FILTER_DEBOUNCE_MS = 120;
@@ -1628,15 +1636,6 @@
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FILTER_DEBOUNCE_MS);
-    }
-    const SKELETON_TEMPLATE = document.querySelector("#tmpl-row-skeleton").content.querySelector("tr");
-    if (SKELETON_TEMPLATE) {
-      const skeletonCells = SKELETON_TEMPLATE.querySelectorAll("td");
-      COL_DEFS.forEach((col, i) => {
-        const td = skeletonCells[i];
-        if (!td) return;
-        td.dataset.label = col.label;
-      });
     }
     const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
     const CSV_HEADER_STR = (() => {
@@ -2361,7 +2360,10 @@
           }
           const { latStr: lat, lonStr: lon } = r;
           for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            rowArr.push(csvEsc(fillLatLon(MAP_LINKS[i].parts, lat, lon)));
+            const link = MAP_LINKS[i];
+            const latUse = link.round6 ? fmtCoord6(lat) : lat;
+            const lonUse = link.round6 ? fmtCoord6(lon) : lon;
+            rowArr.push(csvEsc(fillLatLon(link.parts, latUse, lonUse)));
           }
           return rowArr.join(",");
         };
