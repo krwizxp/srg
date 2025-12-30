@@ -1042,6 +1042,12 @@
         box-shadow: var(--shadow-md);
         backdrop-filter: var(--glass);
         max-inline-size: min(360px, 92vw);
+        opacity: 1;
+        transition: opacity 0s linear 16ms;
+
+        @starting-style {
+          opacity: 0;
+        }
 
         .map-links {
           display: flex;
@@ -1295,13 +1301,33 @@
       }
       return out;
     }
+    let LAST_MAP_INVOKER = null;
+    let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
+    function updateMapPopoverLinks(lat, lon) {
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        const link = MAP_LINKS[i];
+        const latUse = link.round6 ? fmtCoord6(lat) : lat;
+        const lonUse = link.round6 ? fmtCoord6(lon) : lon;
+        POPOVER_LINKS[i].href = fillLatLon(link.parts, latUse, lonUse);
+      }
+    }
+    function cachePopoverSizeFromLiveRect() {
+      const pr = mapPopover.getBoundingClientRect();
+      if (pr.width > 0 && pr.height > 0) {
+        POPOVER_SIZE_CACHE.w = pr.width;
+        POPOVER_SIZE_CACHE.h = pr.height;
+      }
+      return pr;
+    }
     function closeMapPopover() {
       if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
     }
-    function positionMapPopover(anchorEl) {
+    function positionMapPopover(anchorEl, popoverSize = null) {
       const margin = 8;
       const ar = anchorEl.getBoundingClientRect();
-      const pr = mapPopover.getBoundingClientRect();
+      const pr = popoverSize
+        ? { width: popoverSize.w, height: popoverSize.h }
+        : mapPopover.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       let left = ar.left;
@@ -1312,17 +1338,22 @@
       if (top < margin) top = margin;
       mapPopover.style.left = `${Math.round(left)}px`;
       mapPopover.style.top = `${Math.round(top)}px`;
-    }
-    function openMapPopover(anchorEl, lat, lon) {
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const link = MAP_LINKS[i];
-        const latUse = link.round6 ? fmtCoord6(lat) : lat;
-        const lonUse = link.round6 ? fmtCoord6(lon) : lon;
-        POPOVER_LINKS[i].href = fillLatLon(link.parts, latUse, lonUse);
-      }
-      if (!mapPopover.matches(":popover-open")) mapPopover.showPopover();
-      positionMapPopover(anchorEl);
-    }
+    } mapPopover.addEventListener("toggle", () => {
+      if (!mapPopover.matches(":popover-open")) return;
+      const invoker =
+        (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
+          ((document.activeElement instanceof Element)
+            ? document.activeElement.closest?.("button.map-btn")
+            : null);
+      if (!invoker) return;
+      const lat = invoker.dataset.lat;
+      const lon = invoker.dataset.lon;
+      if (lat && lon) updateMapPopoverLinks(lat, lon);
+      requestAnimationFrame(() => {
+        cachePopoverSizeFromLiveRect();
+        positionMapPopover(invoker);
+      });
+    }, { passive: true });
     const numberFormatter = new Intl.NumberFormat("ko-KR");
     const fmt = (n) => numberFormatter.format(n);
     const COORD_DECIMALS = 6;
@@ -1364,6 +1395,8 @@
           btn.dataset.lat = r.latStr;
           btn.dataset.lon = r.lonStr;
           btn.setAttribute("aria-haspopup", "dialog");
+          btn.setAttribute("popovertarget", "map-popover");
+          btn.setAttribute("popovertargetaction", "show");
           td.replaceChildren(btn);
         },
       },
@@ -2467,8 +2500,16 @@
       if (!btn) return;
       const lat = btn.dataset.lat;
       const lon = btn.dataset.lon;
-      if (!lat || !lon) return;
-      openMapPopover(btn, lat, lon);
+      LAST_MAP_INVOKER = btn;
+      if (!lat || !lon) {
+        try { e.preventDefault(); } catch { }
+        closeMapPopover();
+        return;
+      }
+      updateMapPopoverLinks(lat, lon);
+      if (POPOVER_SIZE_CACHE.w > 0 && POPOVER_SIZE_CACHE.h > 0) {
+        positionMapPopover(btn, POPOVER_SIZE_CACHE);
+      }
     });
     domElements.tbody.addEventListener(
       "beforematch",
