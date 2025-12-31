@@ -176,10 +176,10 @@
 
         @supports (animation-timeline: scroll()) {
           background-image:
-            linear-gradient(to bottom, oklch(0% 0 0 / 0.15), transparent),
-            linear-gradient(to top, oklch(0% 0 0 / 0.15), transparent);
+            linear-gradient(180deg, oklch(0% 0 0 / 0.15), transparent),
+            linear-gradient(0deg, oklch(0% 0 0 / 0.15), transparent);
           background-repeat: no-repeat;
-          background-position: top center, bottom center;
+          background-position: 50% 0%, 50% 100%;
           background-size: 100% 0, 100% 0;
           animation-timeline: scroll(self);
           animation-name: scroll-shadows;
@@ -261,7 +261,8 @@
           content: "";
           position: absolute;
           pointer-events: none;
-          inset: 0;
+          inset-block: 0;
+          inset-inline: 0;
           background: radial-gradient(in oklch 800px circle at var(--mouse-x) var(--mouse-y),
               var(--spotlight),
               transparent 40%);
@@ -352,7 +353,8 @@
 
           input[type="file"] {
             position: absolute;
-            inset: 0;
+            inset-block: 0;
+            inset-inline: 0;
             opacity: 0;
             cursor: pointer;
           }
@@ -425,7 +427,6 @@
           font-size: clamp(12px, 3.5cqi, 14px);
           overflow: auto;
           margin-block: 0;
-          margin-inline: 0;
 
           &:empty::before {
             content: attr(data-placeholder);
@@ -461,7 +462,8 @@
           &::after {
             content: "";
             position: absolute;
-            inset: 0;
+            inset-block: 0;
+            inset-inline: 0;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
                 oklch(100% 0 0 / 0.2),
                 transparent 70%);
@@ -576,7 +578,8 @@
 
         .progress-visual {
           position: absolute;
-          inset: 0;
+          inset-block: 0;
+          inset-inline: 0;
         }
 
         .progress-fill {
@@ -592,7 +595,8 @@
           .progress-fill::after {
             content: "";
             position: absolute;
-            inset: 0;
+            inset-block: 0;
+            inset-inline: 0;
             transform: translateX(-120%);
             background: linear-gradient(in oklch 90deg,
                 transparent,
@@ -660,7 +664,8 @@
           display: grid;
           place-items: center;
           position: absolute;
-          inset: 0;
+          inset-block: 0;
+          inset-inline: 0;
           inset-block-start: 50px;
           color: var(--muted);
           pointer-events: none;
@@ -881,7 +886,8 @@
         .skeleton-bar::after {
           content: "";
           position: absolute;
-          inset: 0;
+          inset-block: 0;
+          inset-inline: 0;
           transform: translateX(-120%);
           background: linear-gradient(in oklch 90deg,
               transparent,
@@ -977,7 +983,8 @@
       }
 
       .map-btn {
-        padding: 8px 10px;
+        padding-block: 8px;
+        padding-inline: 10px;
         border-radius: 10px;
         color: var(--accent);
         font-weight: 700;
@@ -991,9 +998,12 @@
 
       .map-popover {
         position: fixed;
-        inset: auto;
-        margin: 0;
-        padding: 10px 12px;
+        inset-block: auto;
+        inset-inline: auto;
+        margin-block: 0;
+        margin-inline: 0;
+        padding-block: 10px;
+        padding-inline: 12px;
         border: 1px solid var(--line);
         border-radius: 14px;
         background: var(--card-bg);
@@ -1030,19 +1040,19 @@
         }
       }
 
-      @supports (position-area: bottom) {
+      @supports (position-area: block-end span-inline-start) {
         .map-popover {
           position-anchor: auto;
-          position-area: bottom span-left;
+          position-area: block-end span-inline-start;
         }
       }
 
-      @supports (position-area: bottom) and (position-try-fallbacks: flip-block) {
+      @supports (position-area: block-end span-inline-start) and (position-try-fallbacks: flip-block) {
         .map-popover {
           position-try-fallbacks:
-            bottom span-right,
-            top span-left,
-            top span-right,
+            block-end span-inline-end,
+            block-start span-inline-start,
+            block-start span-inline-end,
             flip-block,
             flip-inline,
             flip-block flip-inline;
@@ -1279,7 +1289,7 @@
       }
       return out;
     }
-    const SUPPORTS_ANCHOR_POSITIONING = CSS.supports("position-area: bottom");
+    const SUPPORTS_ANCHOR_POSITIONING = CSS.supports("position-area: block-end span-inline-start");
     let LAST_MAP_INVOKER = null;
     let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
     function updateMapPopoverLinks(lat, lon) {
@@ -1308,14 +1318,14 @@
         : mapPopover.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      let left = ar.left;
-      if (left + pr.width > vw - margin) left = vw - pr.width - margin;
-      if (left < margin) left = margin;
-      let top = ar.bottom + margin;
-      if (top + pr.height > vh - margin) top = ar.top - pr.height - margin;
-      if (top < margin) top = margin;
-      mapPopover.style.left = `${Math.round(left)}px`;
-      mapPopover.style.top = `${Math.round(top)}px`;
+      let inlineStart = ar.x;
+      if (inlineStart + pr.width > vw - margin) inlineStart = vw - pr.width - margin;
+      if (inlineStart < margin) inlineStart = margin;
+      let blockStart = ar.y + ar.height + margin;
+      if (blockStart + pr.height > vh - margin) blockStart = ar.y - pr.height - margin;
+      if (blockStart < margin) blockStart = margin;
+      mapPopover.style.insetInlineStart = `${Math.round(inlineStart)}px`;
+      mapPopover.style.insetBlockStart = `${Math.round(blockStart)}px`;
     }
     mapPopover.addEventListener("toggle", () => {
       if (!mapPopover.matches(":popover-open")) return;
@@ -2564,8 +2574,8 @@
     let hoveredCard = null;
     const setXY = (el, ev) => {
       const rect = el.getBoundingClientRect();
-      el.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
-      el.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
+      el.style.setProperty("--mouse-x", `${ev.clientX - rect.x}px`);
+      el.style.setProperty("--mouse-y", `${ev.clientY - rect.y}px`);
     };
     for (let i = 0; i < CARDS.length; i++) {
       const card = CARDS[i];
