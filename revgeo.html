@@ -213,8 +213,6 @@
       }
 
       .card {
-        --mouse-x: 0px;
-        --mouse-y: 0px;
         background: var(--card-bg);
         backdrop-filter: var(--glass);
         border: 1px solid var(--card-border);
@@ -565,7 +563,6 @@
       }
 
       .progress-shell {
-        --pct: 0;
         position: relative;
         border-radius: 999px;
         background: var(--line);
@@ -587,7 +584,6 @@
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: 0% 50%;
           background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
-          transition: none;
           position: relative;
           overflow: hidden;
         }
@@ -667,7 +663,6 @@
           inset: 0;
           inset-block-start: 50px;
           color: var(--muted);
-          font-size: var(--fs-base);
           pointer-events: none;
         }
 
@@ -712,7 +707,6 @@
 
         #filter-clear {
           flex: 0 0 auto;
-          min-inline-size: max-content;
           padding-inline: 12px;
         }
 
@@ -767,7 +761,6 @@
             font-size: var(--fs-sm);
 
             &:nth-child(-n + 2) {
-              text-align: center;
               color: var(--muted);
             }
 
@@ -804,6 +797,12 @@
               min-block-size: 0;
               overflow: hidden;
             }
+          }
+        }
+
+        @container (inline-size >900px) {
+          tbody td:nth-child(-n + 2) {
+            text-align: center;
           }
         }
 
@@ -854,11 +853,6 @@
                 grid-template-columns: 64px 1fr;
                 gap: 10px;
                 align-items: baseline;
-
-                &:nth-child(n) {
-                  text-align: start;
-                }
-
                 border: none;
                 padding-block: 2px;
                 padding-inline: 0;
@@ -867,7 +861,6 @@
                   content: attr(data-label);
                   font-weight: 600;
                   color: var(--muted);
-                  font-size: var(--fs-sm);
                   text-transform: uppercase;
                   letter-spacing: 0.05em;
                 }
@@ -1007,7 +1000,6 @@
         box-shadow: var(--shadow-md);
         backdrop-filter: var(--glass);
         max-inline-size: min(360px, 92vw);
-        opacity: 1;
         transition: opacity 0s linear 16ms;
 
         @starting-style {
@@ -1287,8 +1279,7 @@
       }
       return out;
     }
-    const SUPPORTS_ANCHOR_POSITIONING =
-      !!(window.CSS?.supports && CSS.supports("position-area: bottom"));
+    const SUPPORTS_ANCHOR_POSITIONING = CSS.supports("position-area: bottom");
     let LAST_MAP_INVOKER = null;
     let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
     function updateMapPopoverLinks(lat, lon) {
@@ -1459,36 +1450,38 @@
     const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
     const FILTER_DEBOUNCE_MS = 120;
     let ROW_FILTER_CACHE = new WeakMap();
-    let ROW_ID_SEQ = 0;
     const HIDDEN_UNTIL_FOUND = "until-found";
-    function ensureRowId(tr) {
-      let id = tr.dataset.rowId;
-      if (!id) tr.dataset.rowId = id = String(++ROW_ID_SEQ);
-      return id;
-    }
     const FIND_REHIDE_DELAY_MS = 8000;
-    let FIND_REHIDE_TIMERS = new WeakMap();
-    function cancelFindRehide(tr) {
-      const t = FIND_REHIDE_TIMERS.get(tr);
-      if (t) {
-        clearTimeout(t);
-        FIND_REHIDE_TIMERS.delete(tr);
+    let FIND_REHIDE_TIMER = null;
+    let FIND_REVEAL_ACTIVE = false;
+    function bumpFindRehideTimer() {
+      if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
+      FIND_REHIDE_TIMER = setTimeout(() => {
+        FIND_REHIDE_TIMER = null;
+        FIND_REVEAL_ACTIVE = false;
+        clearFindReveals();
+        startChunkedFilterApply(getLiveFilterSnapshot());
+      }, FIND_REHIDE_DELAY_MS);
+    }
+    function revealAllHiddenRowsForFind() {
+      const tb = domElements.tbody;
+      if (!tb) return;
+      const rows = tb.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`);
+      if (!rows.length) return;
+      for (const row of rows) {
+        if (row.dataset.skeleton === "1") continue;
+        row.dataset.revealedByFind = "1";
+        row.removeAttribute("hidden");
       }
     }
     function scheduleFindRehide(tr) {
-      cancelFindRehide(tr);
-      const rowId = ensureRowId(tr);
-      tr.dataset.revealedByFind = "1";
-      const timer = setTimeout(() => {
-        const tb = domElements.tbody;
-        if (!tb) return;
-        const curTr = tb.querySelector(`tr[data-row-id="${rowId}"]`);
-        if (!curTr) return;
-        delete curTr.dataset.revealedByFind;
-        setRowHiddenByFilter(curTr, getLiveFilterSnapshot());
-        FIND_REHIDE_TIMERS.delete(curTr);
-      }, FIND_REHIDE_DELAY_MS);
-      FIND_REHIDE_TIMERS.set(tr, timer);
+      FIND_REVEAL_ACTIVE = true;
+      revealAllHiddenRowsForFind();
+      if (tr) {
+        tr.dataset.revealedByFind = "1";
+        if (tr.hidden) tr.removeAttribute("hidden");
+      }
+      bumpFindRehideTimer();
     }
     function buildFilterSnapshot() {
       const f = {
@@ -1575,10 +1568,14 @@
       setRowHiddenByFilter(tr, f);
     }
     function clearFindReveals() {
+      FIND_REVEAL_ACTIVE = false;
+      if (FIND_REHIDE_TIMER) {
+        clearTimeout(FIND_REHIDE_TIMER);
+        FIND_REHIDE_TIMER = null;
+      }
       const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
       if (!revealed.length) return;
       for (const tr of revealed) {
-        cancelFindRehide(tr);
         delete tr.dataset.revealedByFind;
       }
     }
@@ -2080,14 +2077,10 @@
         clearTimeout(filterTimer);
         filterTimer = null;
       }
+      clearFindReveals();
       resetScrollState();
-      for (const tr of domElements.tbody.querySelectorAll("tr")) {
-        cancelFindRehide(tr);
-        delete tr.dataset.revealedByFind;
-      }
       domElements.tbody.replaceChildren();
       ROW_FILTER_CACHE = new WeakMap();
-      FIND_REHIDE_TIMERS = new WeakMap();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2545,6 +2538,7 @@
       closeMapPopover();
       const t = e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
+        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
       }
       ACTIVE_SCROLL.add(t);
@@ -2552,7 +2546,10 @@
     const handleScrollEnd = (e) => {
       const t = e.currentTarget;
       ACTIVE_SCROLL.delete(t);
-      if (ACTIVE_SCROLL.size === 0) setGlobalScrolling(false);
+      if (ACTIVE_SCROLL.size === 0) {
+        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
+        setGlobalScrolling(false);
+      }
     };
     window.addEventListener("pagehide", resetScrollState, { passive: true });
     document.addEventListener("visibilitychange", () => {
