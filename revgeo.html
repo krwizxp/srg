@@ -21,13 +21,13 @@
   <style>
     @property --mouse-x {
       syntax: "<length>";
-      inherits: true;
+      inherits: false;
       initial-value: 0px;
     }
 
     @property --mouse-y {
       syntax: "<length>";
-      inherits: true;
+      inherits: false;
       initial-value: 0px;
     }
 
@@ -73,10 +73,6 @@
         text-wrap: pretty;
         container-type: inline-size;
         container-name: page;
-      }
-
-      :is(h1, h2) {
-        text-wrap: balance;
       }
 
       :where([hidden]):not([hidden="until-found" i]) {
@@ -263,6 +259,8 @@
           pointer-events: none;
           inset-block: 0;
           inset-inline: 0;
+          --mouse-x: inherit;
+          --mouse-y: inherit;
           background: radial-gradient(in oklch 800px circle at var(--mouse-x) var(--mouse-y),
               var(--spotlight),
               transparent 40%);
@@ -464,6 +462,8 @@
             position: absolute;
             inset-block: 0;
             inset-inline: 0;
+            --mouse-x: inherit;
+            --mouse-y: inherit;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
                 oklch(100% 0 0 / 0.2),
                 transparent 70%);
@@ -671,7 +671,7 @@
           pointer-events: none;
         }
 
-        &:has(tbody > tr) .empty-hint {
+        &.has-rows .empty-hint {
           display: none;
         }
 
@@ -679,7 +679,7 @@
           max-block-size: 70dvh;
           overscroll-behavior: contain;
 
-          &:not(:has(tbody > tr)) {
+          &:not(.has-rows) {
             min-block-size: 100px;
             overflow: hidden;
 
@@ -803,6 +803,18 @@
               overflow: hidden;
             }
           }
+        }
+
+        tbody[data-perf-mode="1"] tr {
+          animation: none !important;
+          transition: none !important;
+        }
+
+        tbody[data-perf-mode="1"] tr:hover {
+          transform: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          border-color: var(--line) !important;
         }
 
         @container (inline-size >900px) {
@@ -1221,7 +1233,7 @@
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
     const COORD_REGEX =
-      /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/gi;
+      /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/g;
     const RX_CSV = /[",\n\r]/;
     const RX_CSV_FORMULA = /^[=+\-@]/;
     const RX_LEVEL = /^level(\d+)$/;
@@ -1235,15 +1247,26 @@
       if (RX_CSV_FORMULA.test(s) || s.startsWith("\t")) {
         s = "'" + s;
       }
-      return RX_CSV.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+      if (!RX_CSV.test(s)) return s;
+      if (s.includes('"')) s = s.replaceAll('"', '""');
+      return `"${s}"`;
     };
     const lower = (s) => String(s || "").toLowerCase();
+    const STRING_POOL = new Map();
+    function intern(s) {
+      if (!s) return "";
+      const existing = STRING_POOL.get(s);
+      if (existing !== undefined) return existing;
+      STRING_POOL.set(s, s);
+      return s;
+    }
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
       RATE_LIMIT_DELAY_MS: 1_000,
       REVERSE_ZOOM: 14,
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
+      BIG_MODE_THRESHOLD: 1000,
     };
     const FETCH_HEADERS = { Accept: "application/json" };
     const BASE_URL = new URL(
@@ -1262,6 +1285,11 @@
       }
       if (last < tpl.length) parts.push(tpl.slice(last));
       return parts.length ? parts : [tpl];
+    }
+    function isCountryLike(name, lowerCountryName, lowerAdminCountry) {
+      const l = lower(name);
+      if (!l) return false;
+      return l === lowerCountryName || l === lowerAdminCountry;
     }
     const mapPopover = document.querySelector("#map-popover");
     const mapPopoverLinksHost = document.querySelector("#map-popover-links");
@@ -1344,14 +1372,13 @@
         positionMapPopover(invoker, POPOVER_SIZE_CACHE);
       });
     });
-    const numberFormatter = new Intl.NumberFormat("ko-KR");
-    const fmt = (n) => numberFormatter.format(n);
+    const fmt = (n) => String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const COORD_DECIMALS = 6;
+    const COORD_POW = 10 ** COORD_DECIMALS;
     const fmtCoord6 = (v) => {
       const n = Number(v);
       if (!Number.isFinite(n)) return String(v ?? "");
-      const p = 10 ** COORD_DECIMALS;
-      const rounded = Math.round(n * p) / p;
+      const rounded = Math.round(n * COORD_POW) / COORD_POW;
       return rounded.toFixed(COORD_DECIMALS).replace(/\.?0+$/, "");
     };
     const addrVal = (key) => (r) => r.addr?.[key];
@@ -1430,6 +1457,8 @@
     const resetScrollState = () => {
       setGlobalScrolling(false);
       ACTIVE_SCROLL.clear();
+      activePointerTarget = null;
+      activePointerRect = null;
     };
     const FILTER_INPUTS = [
       domElements.filterQ,
@@ -1453,13 +1482,14 @@
       }
     );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
-    const COL_INDEX = Object.fromEntries(COL_DEFS.map((c, i) => [c.key, i]));
     const SKELETON_TEMPLATE =
       document.querySelector("#tmpl-row-skeleton").content.querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
-    const norm = (s) => String(s ?? "").trim().toLowerCase().replace(RX_COMMA_WS, ",");
+    const norm = (s) => {
+      s = String(s ?? "").trim().toLowerCase();
+      return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
+    };
     const FILTER_DEBOUNCE_MS = 120;
-    let ROW_FILTER_CACHE = new WeakMap();
     const HIDDEN_UNTIL_FOUND = "until-found";
     const FIND_REHIDE_DELAY_MS = 8000;
     let FIND_REHIDE_TIMER = null;
@@ -1473,20 +1503,8 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FIND_REHIDE_DELAY_MS);
     }
-    function revealAllHiddenRowsForFind() {
-      const tb = domElements.tbody;
-      if (!tb) return;
-      const rows = tb.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`);
-      if (!rows.length) return;
-      for (const row of rows) {
-        if (row.dataset.skeleton === "1") continue;
-        row.dataset.revealedByFind = "1";
-        row.removeAttribute("hidden");
-      }
-    }
     function scheduleFindRehide(tr) {
       FIND_REVEAL_ACTIVE = true;
-      revealAllHiddenRowsForFind();
       if (tr) {
         tr.dataset.revealedByFind = "1";
         if (tr.hidden) tr.removeAttribute("hidden");
@@ -1518,46 +1536,24 @@
       }
       return FILTER_SNAP;
     }
-    function getCellNorm(tr, key) {
-      const i = COL_INDEX[key];
-      const td = i >= 0 ? tr.cells[i] : null;
-      return norm(td?.textContent);
-    }
-    function buildRowFilterCache(tr) {
-      const kind = getCellNorm(tr, "kind");
-      const coords = getCellNorm(tr, "coords");
-      const sido = getCellNorm(tr, "sido");
-      const sigungu = getCellNorm(tr, "sigungu");
-      const emd = getCellNorm(tr, "emd");
-      const tag = getCellNorm(tr, "tag");
-      const fullAddr = getCellNorm(tr, "fullAddr");
-      const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fullAddr}`.trim();
-      return { kind, sido, sigungu, emd, tag, fullAddr, q };
-    }
-    function ensureRowFilterCache(tr) {
-      let cache = ROW_FILTER_CACHE.get(tr);
-      if (!cache) {
-        cache = buildRowFilterCache(tr);
-        ROW_FILTER_CACHE.set(tr, cache);
-      }
-      return cache;
-    }
-    function rowMatchesFilterCached(cache, f) {
-      if (f.kind && cache.kind !== f.kind) return false;
-      if (f.sido && !cache.sido.includes(f.sido)) return false;
-      if (f.sigungu && !cache.sigungu.includes(f.sigungu)) return false;
-      if (f.emd && !cache.emd.includes(f.emd)) return false;
-      if (f.tag && !cache.tag.includes(f.tag)) return false;
-      if (f.fullAddr && !cache.fullAddr.includes(f.fullAddr)) return false;
-      if (f.q && !cache.q.includes(f.q)) return false;
+    function rowMatchesFilterCached(r, f) {
+      if (f.kind && r._f_kind !== f.kind) return false;
+      if (f.sido && !r._f_sido.includes(f.sido)) return false;
+      if (f.sigungu && !r._f_sigungu.includes(f.sigungu)) return false;
+      if (f.emd && !r._f_emd.includes(f.emd)) return false;
+      if (f.tag && !r._f_tag.includes(f.tag)) return false;
+      if (f.fullAddr && !r._f_fullAddr.includes(f.fullAddr)) return false;
+      if (f.q && !r._f_q.includes(f.q)) return false;
       return true;
     }
     function shouldHideRowByFilter(tr, f) {
-      if (tr?.dataset?.skeleton === "1") return !!f.active;
+      if (!tr.hasAttribute("data-idx")) return !!f.active;
       if (tr.dataset.revealedByFind === "1") return false;
       if (!f.active) return false;
-      const cache = ensureRowFilterCache(tr);
-      return !rowMatchesFilterCached(cache, f);
+      const dataIdx = +tr.dataset.idx;
+      const r = AppState.records[dataIdx];
+      if (!r || r._f_kind === undefined) return true;
+      return !rowMatchesFilterCached(r, f);
     }
     function setRowHiddenByFilter(tr, f) {
       const hide = shouldHideRowByFilter(tr, f);
@@ -1579,25 +1575,47 @@
     }
     function clearFindReveals() {
       FIND_REVEAL_ACTIVE = false;
-      if (FIND_REHIDE_TIMER) {
-        clearTimeout(FIND_REHIDE_TIMER);
-        FIND_REHIDE_TIMER = null;
-      }
+      if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
+      FIND_REHIDE_TIMER = null;
       const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
       if (!revealed.length) return;
       for (const tr of revealed) {
         delete tr.dataset.revealedByFind;
       }
     }
-    let filterTimer = null;
-    let FILTER_APPLY_JOB = null;
+    const FILTER_CTX = {
+      timer: null,
+      job: null,
+    };
+    function cancelPendingFilterDebounce() {
+      if (FILTER_CTX.timer) {
+        clearTimeout(FILTER_CTX.timer);
+        FILTER_CTX.timer = null;
+      }
+    }
     const FILTER_FRAME_BUDGET_MS = 8;
     const FILTER_MAX_ROWS_PER_FRAME = 1500;
     function cancelActiveFilterApply() {
-      const job = FILTER_APPLY_JOB;
+      const job = FILTER_CTX.job;
       if (!job) return;
-      if (job.raf) cancelAnimationFrame(job.raf);
-      FILTER_APPLY_JOB = null;
+      if (job.raf) {
+        cancelAnimationFrame(job.raf);
+        job.raf = 0;
+      }
+      FILTER_CTX.job = null;
+    }
+    function cancelActiveFilterTask() {
+      cancelPendingFilterDebounce();
+      cancelActiveFilterApply();
+    }
+    function softStopActiveFilterApply() {
+      const job = FILTER_CTX.job;
+      if (!job) return;
+      job.i = job.len;
+      if (job.raf) {
+        cancelAnimationFrame(job.raf);
+        job.raf = 0;
+      }
     }
     function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
       const rows = getAllRowsLive();
@@ -1614,7 +1632,7 @@
         }
         return;
       }
-      const existing = FILTER_APPLY_JOB;
+      const existing = FILTER_CTX.job;
       if (existing && existing.rows === rows) {
         existing.f = f;
         existing.i = 0;
@@ -1632,36 +1650,36 @@
         step: null,
       };
       job.step = () => {
-        if (FILTER_APPLY_JOB !== job) return;
+        if (FILTER_CTX.job !== job) return;
         job.raf = 0;
         const start = performance.now();
+        const deadline = start + FILTER_FRAME_BUDGET_MS;
         let processed = 0;
         while (job.i < job.len) {
-          if (FILTER_APPLY_JOB !== job) return;
+          if (FILTER_CTX.job !== job) return;
           const tr = job.rows[job.i];
           if (tr) setRowHiddenByFilter(tr, job.f);
           job.i++;
           processed++;
           if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
-          if (performance.now() - start >= FILTER_FRAME_BUDGET_MS) break;
+          if ((processed & 7) === 0 && performance.now() >= deadline) break;
         }
-        if (FILTER_APPLY_JOB !== job) return;
+        if (FILTER_CTX.job !== job) return;
         if (job.i < job.len) {
           job.raf = requestAnimationFrame(job.step);
         } else {
-          FILTER_APPLY_JOB = null;
+          FILTER_CTX.job = null;
         }
       };
-      FILTER_APPLY_JOB = job;
+      FILTER_CTX.job = job;
       job.raf = requestAnimationFrame(job.step);
     }
     function scheduleApplyFilterAll() {
       markFilterDirty();
-      const job = FILTER_APPLY_JOB;
-      if (job) job.i = job.len;
-      if (filterTimer) clearTimeout(filterTimer);
-      filterTimer = setTimeout(() => {
-        filterTimer = null;
+      softStopActiveFilterApply();
+      cancelPendingFilterDebounce();
+      FILTER_CTX.timer = setTimeout(() => {
+        FILTER_CTX.timer = null;
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FILTER_DEBOUNCE_MS);
@@ -1704,11 +1722,6 @@
         const countryName = gc.country || adminCountry || "";
         const lowerCountryName = lower(countryName);
         const lowerAdminCountry = lower(adminCountry);
-        const isCountryLike = (name) => {
-          const l = lower(name);
-          if (!l) return false;
-          return l === lowerCountryName || l === lowerAdminCountry;
-        };
         const isKoreanPeninsula =
           countryCode === "kr" ||
           countryCode === "kp" ||
@@ -1912,9 +1925,9 @@
           }
         }
         if (!isKoreanPeninsula) {
-          if (isCountryLike(sido)) sido = "";
-          if (isCountryLike(sigungu)) sigungu = "";
-          if (isCountryLike(eupmyeon)) eupmyeon = "";
+          if (isCountryLike(sido, lowerCountryName, lowerAdminCountry)) sido = "";
+          if (isCountryLike(sigungu, lowerCountryName, lowerAdminCountry)) sigungu = "";
+          if (isCountryLike(eupmyeon, lowerCountryName, lowerAdminCountry)) eupmyeon = "";
         }
         if (sido && sigungu && sido === sigungu) {
           sigungu = "";
@@ -1955,9 +1968,9 @@
         const fullAddr = label;
         const addr = { sido, sigungu, eupmyeon, tag, fullAddr };
         let kind;
-        if (countryCode === "kr") kind = "KR";
-        else if (countryCode === "kp") kind = "KP";
-        else if (countryCode) kind = "WORLD";
+        if (countryCode === "kr") kind = intern("KR");
+        else if (countryCode === "kp") kind = intern("KP");
+        else if (countryCode) kind = intern("WORLD");
         return { addr, kind };
       }
     };
@@ -2076,21 +2089,22 @@
       domElements.progShell.style.setProperty("--pct", pct);
       domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       domElements.exportBtn.disabled = processed === 0;
+      domElements.tableWrap.classList.toggle("has-rows", total > 0);
+      if (total > CONFIG.BIG_MODE_THRESHOLD) {
+        domElements.tbody.setAttribute("data-perf-mode", "1");
+      } else {
+        domElements.tbody.removeAttribute("data-perf-mode");
+      }
     }
     function scheduleRender() {
       if (AppState.renderReq !== null) return;
       AppState.renderReq = requestAnimationFrame(renderFrame);
     }
     function clearTable() {
-      cancelActiveFilterApply();
-      if (filterTimer) {
-        clearTimeout(filterTimer);
-        filterTimer = null;
-      }
+      cancelActiveFilterTask();
       clearFindReveals();
       resetScrollState();
       domElements.tbody.replaceChildren();
-      ROW_FILTER_CACHE = new WeakMap();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2113,40 +2127,102 @@
     async function* lineIterator(stream, signal) {
       const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
       const reader = decoded.getReader();
-      let remnant = "";
+      let buffer = "";
+      let pendingCR = false;
+      let hasCR = false;
       try {
         while (true) {
           const { value: chunk, done } = await reader.read();
           if (done) {
             signal.throwIfAborted();
+            if (buffer) yield buffer;
             break;
           }
-          const lines = (remnant + chunk).split(/\r\n|\n|\r/);
-          remnant = lines.pop() ?? "";
-          for (const line of lines) yield line;
+          if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
+          if (pendingCR) {
+            if (chunk && chunk[0] === "\n") {
+              buffer += chunk.slice(1);
+            } else {
+              buffer += chunk;
+            }
+            pendingCR = false;
+          } else {
+            buffer += chunk;
+          }
+          let start = 0;
+          if (!hasCR) {
+            while (true) {
+              const nl = buffer.indexOf("\n", start);
+              if (nl === -1) break;
+              yield buffer.substring(start, nl);
+              start = nl + 1;
+            }
+            buffer = buffer.substring(start);
+            continue;
+          }
+          while (start < buffer.length) {
+            const nl = buffer.indexOf("\n", start);
+            const cr = buffer.indexOf("\r", start);
+            let pos;
+            if (nl === -1) pos = cr;
+            else if (cr === -1) pos = nl;
+            else pos = nl < cr ? nl : cr;
+            if (pos === -1) break;
+            const ch = buffer[pos];
+            yield buffer.substring(start, pos);
+            if (ch === "\r") {
+              if (pos + 1 === buffer.length) {
+                pendingCR = true;
+                hasCR = true;
+                start = pos + 1;
+                break;
+              }
+              start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
+            } else {
+              start = pos + 1;
+            }
+          }
+          buffer = buffer.substring(start);
         }
-        if (remnant) yield remnant;
       } finally {
         try { await reader.cancel(signal.reason); } catch { }
         try { reader.releaseLock(); } catch { }
       }
     }
-    async function extractCoordinatesFromStream(file, signal) {
+    async function parseFileToRecords(file, signal) {
       const out = [];
-      let processedLines = 0;
+      const KIND_KR = intern("kr");
+      const KIND_WORLD = intern("world");
+      let lastYield = performance.now();
+      const YIELD_INTERVAL_MS = 8;
+      let linesSinceYield = 0;
       for await (const line of lineIterator(file.stream(), signal)) {
         signal.throwIfAborted();
-        if (++processedLines % 5000 === 0) {
-          await yieldToMain();
+        if (++linesSinceYield >= 1000) {
+          if (performance.now() - lastYield >= YIELD_INTERVAL_MS) {
+            await yieldToMain();
+            lastYield = performance.now();
+          }
+          linesSinceYield = 0;
         }
-        for (const m of line.matchAll(COORD_REGEX)) {
+        COORD_REGEX.lastIndex = 0;
+        for (let m; (m = COORD_REGEX.exec(line));) {
           const { label, lat, lon } = m.groups;
           const fLat = +lat;
           const fLon = +lon;
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
           if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
-          const setLabel = label === "대한민국" ? "KR" : "WORLD";
-          out.push({ lat: fLat, lon: fLon, latStr: lat, lonStr: lon, setLabel });
+          const isKR = label === "대한민국";
+          out.push({
+            set: isKR ? "KR" : "WORLD",
+            idx: out.length + 1,
+            lat: fLat, lon: fLon,
+            latStr: lat, lonStr: lon,
+            addr: null, fullAddr: "",
+            _f_kind: isKR ? KIND_KR : KIND_WORLD,
+            _f_sido: "", _f_sigungu: "", _f_emd: "", _f_tag: "", _f_fullAddr: "",
+            _f_q: `${lat},${lon}`
+          });
         }
       }
       return out;
@@ -2180,7 +2256,6 @@
             headers: FETCH_HEADERS,
             signal: combinedSignal,
           });
-
           if (res.ok) {
             return res.json();
           }
@@ -2204,7 +2279,6 @@
     }
     function appendSkeletonRow(idx) {
       const tr = SKELETON_TEMPLATE.cloneNode(true);
-      tr.dataset.skeleton = "1";
       if (IDX_COL_INDEX >= 0) {
         tr.cells[IDX_COL_INDEX].textContent = fmt(idx);
       }
@@ -2216,13 +2290,14 @@
       return tr;
     }
     function fillRow(tr, row) {
-      delete tr.dataset.skeleton;
-      COL_DEFS.forEach((col, i) => {
+      tr.dataset.idx = row.idx - 1;
+      for (let i = 0; i < COL_DEFS.length; i++) {
+        const col = COL_DEFS[i];
         const td = tr.cells[i];
         const val = col.val ? col.val(row) : "";
         if (col.render) col.render(val, td, row);
         else td.textContent = val ?? "";
-      });
+      }
     }
     function pushResultRow(row) {
       if (row.set === "에러") AppState.cntFail++;
@@ -2271,6 +2346,21 @@
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
+            const coords = `${r.latStr},${r.lonStr}`;
+            const a = addr || {};
+            const sido = norm(a.sido);
+            const sigungu = norm(a.sigungu);
+            const emd = norm(a.eupmyeon);
+            const tag = norm(a.tag);
+            const fAddr = norm(r.fullAddr);
+            const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
+            r._f_kind = intern(norm(r.set));
+            r._f_sido = intern(sido);
+            r._f_sigungu = intern(sigungu);
+            r._f_emd = intern(emd);
+            r._f_tag = intern(tag);
+            r._f_fullAddr = fAddr;
+            r._f_q = q;
             commitResultRow(skeletonTr, r);
           } catch (err) {
             const msg = getErrorMessage(err);
@@ -2283,6 +2373,13 @@
             r.set = "에러";
             r.addr = null;
             r.fullAddr = msg;
+            r._f_kind = "에러";
+            r._f_sido = "";
+            r._f_sigungu = "";
+            r._f_emd = "";
+            r._f_tag = "";
+            r._f_fullAddr = norm(msg);
+            r._f_q = norm(msg);
             commitResultRow(skeletonTr, r);
             if (!AppState.isStopping)
               setStatusMessage(
@@ -2405,28 +2502,19 @@
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
       domElements.coords.textContent = "";
       clearTable();
+      STRING_POOL.clear();
       AppState.setRecords([], "parsing");
       setStatusMessage("파일 분석 중…");
       AppState.controller = new AbortController();
       AppState.inFlight = true;
       try {
-        const parsed = await extractCoordinatesFromStream(file, AppState.controller.signal);
-        if (!parsed.length) {
+        const records = await parseFileToRecords(file, AppState.controller.signal);
+        if (!records.length) {
           AppState.setRecords([]);
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
-        const records = parsed.map((p, i) => ({
-          set: p.setLabel,
-          idx: i + 1,
-          lat: p.lat,
-          lon: p.lon,
-          latStr: p.latStr ?? String(p.lat),
-          lonStr: p.lonStr ?? String(p.lon),
-          addr: null,
-          fullAddr: "",
-        }));
         AppState.setRecords(records);
-        const MAX_DISP = 50_000;
+        const MAX_DISP = 1_000;
         const disp = records
           .slice(0, MAX_DISP)
           .map((r) => `${r.latStr}, ${r.lonStr}`);
@@ -2500,8 +2588,7 @@
       "--filter-clear": () => {
         domElements.filtersForm.reset();
         markFilterDirty();
-        cancelActiveFilterApply();
-        if (filterTimer) { clearTimeout(filterTimer); filterTimer = null; }
+        cancelActiveFilterTask();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       },
@@ -2552,6 +2639,8 @@
         setGlobalScrolling(true);
       }
       ACTIVE_SCROLL.add(t);
+      activePointerTarget = null;
+      activePointerRect = null;
     };
     const handleScrollEnd = (e) => {
       const t = e.currentTarget;
@@ -2570,32 +2659,36 @@
     document.addEventListener("scrollend", handleScrollEnd, { passive: true });
     let pointerRaf = null;
     let pointerEv = null;
-    const CARDS = Array.from(document.querySelectorAll(".card"));
-    let hoveredCard = null;
-    const setXY = (el, ev) => {
-      const rect = el.getBoundingClientRect();
-      el.style.setProperty("--mouse-x", `${ev.clientX - rect.x}px`);
-      el.style.setProperty("--mouse-y", `${ev.clientY - rect.y}px`);
+    let activePointerTarget = null;
+    let activePointerRect = null;
+    const handlePointerEnter = (e) => {
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const t = e.target instanceof Element ? e.target.closest(".card, button") : null;
+      if (t) {
+        activePointerTarget = t;
+        activePointerRect = t.getBoundingClientRect();
+      }
     };
-    for (let i = 0; i < CARDS.length; i++) {
-      const card = CARDS[i];
-      card.addEventListener("pointerenter", (e) => {
-        if (e.pointerType && e.pointerType !== "mouse") return;
-        hoveredCard = card;
-      }, { passive: true });
-      card.addEventListener("pointerleave", (e) => {
-        if (e.pointerType && e.pointerType !== "mouse") return;
-        if (hoveredCard === card) hoveredCard = null;
-      }, { passive: true });
-    }
+    const handlePointerLeave = (e) => {
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const t = e.target instanceof Element ? e.target.closest(".card, button") : null;
+      if (t === activePointerTarget) {
+        activePointerTarget = null;
+        activePointerRect = null;
+      }
+    };
+    document.body.addEventListener("pointerenter", handlePointerEnter, { capture: true, passive: true });
+    document.body.addEventListener("pointerleave", handlePointerLeave, { capture: true, passive: true });
+    window.addEventListener("resize", () => { activePointerRect = null; }, { passive: true });
     const flushPointer = () => {
       pointerRaf = null;
       const ev = pointerEv;
-      if (!ev || ACTIVE_SCROLL.size > 0) return;
-      if (hoveredCard && hoveredCard.isConnected) setXY(hoveredCard, ev);
-      else hoveredCard = null;
-      const btn = (ev.target instanceof Element) ? ev.target.closest("button") : null;
-      if (btn) setXY(btn, ev);
+      if (!ev || ACTIVE_SCROLL.size > 0 || !activePointerTarget) return;
+      if (!activePointerRect) {
+        activePointerRect = activePointerTarget.getBoundingClientRect();
+      }
+      activePointerTarget.style.setProperty("--mouse-x", `${ev.clientX - activePointerRect.x}px`);
+      activePointerTarget.style.setProperty("--mouse-y", `${ev.clientY - activePointerRect.y}px`);
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
@@ -2605,11 +2698,6 @@
       pointerRaf = requestAnimationFrame(flushPointer);
     }
     document.addEventListener("pointermove", handlePointerMove, { passive: true });
-    document.addEventListener("pointerdown", (e) => {
-      const target = e.target;
-      const el = (target instanceof Element) ? target.closest(".card, button") : null;
-      if (el) setXY(el, e);
-    }, { passive: true });
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
