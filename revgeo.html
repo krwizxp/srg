@@ -21,13 +21,13 @@
   <style>
     @property --mouse-x {
       syntax: "<length>";
-      inherits: false;
+      inherits: true;
       initial-value: 0px;
     }
 
     @property --mouse-y {
       syntax: "<length>";
-      inherits: false;
+      inherits: true;
       initial-value: 0px;
     }
 
@@ -259,8 +259,6 @@
           pointer-events: none;
           inset-block: 0;
           inset-inline: 0;
-          --mouse-x: inherit;
-          --mouse-y: inherit;
           background: radial-gradient(in oklch 800px circle at var(--mouse-x) var(--mouse-y),
               var(--spotlight),
               transparent 40%);
@@ -462,8 +460,6 @@
             position: absolute;
             inset-block: 0;
             inset-inline: 0;
-            --mouse-x: inherit;
-            --mouse-y: inherit;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
                 oklch(100% 0 0 / 0.2),
                 transparent 70%);
