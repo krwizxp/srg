@@ -1190,15 +1190,17 @@
   </main>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크">
     <div class="map-links" id="map-popover-links">
-      <a data-provider-key="Google" data-url-template="https://www.google.com/maps?q={lat},{lon}" target="_blank"
-        rel="noopener noreferrer">Google</a>
-      <a data-provider-key="OSM"
+      <a data-provider-key="Google" href="about:blank" data-url-template="https://www.google.com/maps?q={lat},{lon}"
+        target="_blank" rel="noopener noreferrer">Google</a>
+      <a data-provider-key="OSM" href="about:blank"
         data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
         target="_blank" rel="noopener noreferrer">OSM</a>
-      <a data-provider-key="Naver" data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%2C%20{lon}"
-        target="_blank" rel="noopener noreferrer">Naver</a>
-      <a data-provider-key="Kakao" data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}"
-        target="_blank" rel="noopener noreferrer">Kakao</a>
+      <a data-provider-key="Naver" href="about:blank"
+        data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%2C%20{lon}" target="_blank"
+        rel="noopener noreferrer">Naver</a>
+      <a data-provider-key="Kakao" href="about:blank"
+        data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}" target="_blank"
+        rel="noopener noreferrer">Kakao</a>
     </div>
   </div>
   <template id="tmpl-row-skeleton">
@@ -1457,8 +1459,6 @@
     const resetScrollState = () => {
       setGlobalScrolling(false);
       ACTIVE_SCROLL.clear();
-      activePointerTarget = null;
-      activePointerRect = null;
     };
     const FILTER_INPUTS = [
       domElements.filterQ,
@@ -2185,8 +2185,8 @@
           buffer = buffer.substring(start);
         }
       } finally {
-        try { await reader.cancel(signal.reason); } catch { }
-        try { reader.releaseLock(); } catch { }
+        try { await reader.cancel(signal.reason); } catch { /* ignore */ }
+        try { reader.releaseLock(); } catch { /* ignore */ }
       }
     }
     async function parseFileToRecords(file, signal) {
@@ -2631,6 +2631,12 @@
       const file = domElements.file.files?.[0] || null;
       maybeVT(() => handleFile(file));
     });
+    domElements.dropZone.addEventListener("dragover", (e) => e.preventDefault());
+    domElements.dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files?.[0] || null;
+      maybeVT(() => handleFile(file));
+    });
     const handleScrollStart = (e) => {
       closeMapPopover();
       const t = e.currentTarget;
@@ -2639,8 +2645,6 @@
         setGlobalScrolling(true);
       }
       ACTIVE_SCROLL.add(t);
-      activePointerTarget = null;
-      activePointerRect = null;
     };
     const handleScrollEnd = (e) => {
       const t = e.currentTarget;
@@ -2659,36 +2663,20 @@
     document.addEventListener("scrollend", handleScrollEnd, { passive: true });
     let pointerRaf = null;
     let pointerEv = null;
-    let activePointerTarget = null;
-    let activePointerRect = null;
-    const handlePointerEnter = (e) => {
-      if (e.pointerType && e.pointerType !== "mouse") return;
-      const t = e.target instanceof Element ? e.target.closest(".card, button") : null;
-      if (t) {
-        activePointerTarget = t;
-        activePointerRect = t.getBoundingClientRect();
-      }
-    };
-    const handlePointerLeave = (e) => {
-      if (e.pointerType && e.pointerType !== "mouse") return;
-      const t = e.target instanceof Element ? e.target.closest(".card, button") : null;
-      if (t === activePointerTarget) {
-        activePointerTarget = null;
-        activePointerRect = null;
-      }
-    };
-    document.body.addEventListener("pointerenter", handlePointerEnter, { capture: true, passive: true });
-    document.body.addEventListener("pointerleave", handlePointerLeave, { capture: true, passive: true });
-    window.addEventListener("resize", () => { activePointerRect = null; }, { passive: true });
     const flushPointer = () => {
       pointerRaf = null;
       const ev = pointerEv;
-      if (!ev || ACTIVE_SCROLL.size > 0 || !activePointerTarget) return;
-      if (!activePointerRect) {
-        activePointerRect = activePointerTarget.getBoundingClientRect();
+      if (!ev || ACTIVE_SCROLL.size > 0) return;
+      let current = ev.target;
+      if (!(current instanceof Element)) current = current.parentElement;
+      while (current && current !== document.body) {
+        if (current.matches && current.matches(".card, button")) {
+          const rect = current.getBoundingClientRect();
+          current.style.setProperty("--mouse-x", `${ev.clientX - rect.x}px`);
+          current.style.setProperty("--mouse-y", `${ev.clientY - rect.y}px`);
+        }
+        current = current.parentElement;
       }
-      activePointerTarget.style.setProperty("--mouse-x", `${ev.clientX - activePointerRect.x}px`);
-      activePointerTarget.style.setProperty("--mouse-y", `${ev.clientY - activePointerRect.y}px`);
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
