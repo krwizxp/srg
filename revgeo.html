@@ -805,18 +805,6 @@
           }
         }
 
-        tbody[data-perf-mode="1"] tr {
-          animation: none !important;
-          transition: none !important;
-        }
-
-        tbody[data-perf-mode="1"] tr:hover {
-          transform: none !important;
-          box-shadow: none !important;
-          background: transparent !important;
-          border-color: var(--line) !important;
-        }
-
         @container (inline-size >900px) {
           tbody td:nth-child(-n + 2) {
             text-align: center;
@@ -883,6 +871,18 @@
                 }
               }
             }
+
+            &[data-perf-mode="1"] tr {
+              animation: none !important;
+              transition: none !important;
+
+              &:hover {
+                transform: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                border-color: var(--line) !important;
+              }
+            }
           }
         }
 
@@ -893,20 +893,20 @@
           background: var(--line);
           position: relative;
           overflow: hidden;
-        }
 
-        .skeleton-bar::after {
-          content: "";
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          transform: translateX(-120%);
-          background: linear-gradient(in oklch 90deg,
-              transparent,
-              oklch(from var(--accent) l calc(c * 0.95) h / 0.3),
-              transparent);
-          animation: skeleton-shimmer-x 1.5s linear infinite;
-          will-change: transform;
+          &::after {
+            content: "";
+            position: absolute;
+            inset-block: 0;
+            inset-inline: 0;
+            transform: translateX(-120%);
+            background: linear-gradient(in oklch 90deg,
+                transparent,
+                oklch(from var(--accent) l calc(c * 0.95) h / 0.3),
+                transparent);
+            animation: skeleton-shimmer-x 1.5s linear infinite;
+            will-change: transform;
+          }
         }
       }
     }
@@ -961,19 +961,21 @@
     }
 
     @media (any-hover: hover) {
-      html.scrolling .card:hover::before {
-        opacity: 0 !important;
-      }
+      html.scrolling {
+        .card:hover::before {
+          opacity: 0 !important;
+        }
 
-      html.scrolling button:hover {
-        transform: none !important;
-        box-shadow: none !important;
-      }
+        button:hover {
+          transform: none !important;
+          box-shadow: none !important;
+        }
 
-      html.scrolling .table-wrap table tbody tr:hover {
-        background: transparent !important;
-        transform: none !important;
-        box-shadow: none !important;
+        .table-wrap table tbody tr:hover {
+          background: transparent !important;
+          transform: none !important;
+          box-shadow: none !important;
+        }
       }
     }
 
@@ -1005,6 +1007,16 @@
           &:hover {
             transform: translateY(-1px);
           }
+        }
+      }
+
+      td[data-label="지도링크"] {
+        .map-btn:disabled {
+          display: none;
+        }
+
+        &:has(.map-btn:not(:disabled)) .skeleton-bar {
+          display: none;
         }
       }
 
@@ -1050,24 +1062,20 @@
             }
           }
         }
-      }
 
-      @supports (position-area: block-end span-inline-start) {
-        .map-popover {
+        @supports (position-area: block-end span-inline-start) {
           position-anchor: auto;
           position-area: block-end span-inline-start;
-        }
-      }
 
-      @supports (position-area: block-end span-inline-start) and (position-try-fallbacks: flip-block) {
-        .map-popover {
-          position-try-fallbacks:
-            block-end span-inline-end,
-            block-start span-inline-start,
-            block-start span-inline-end,
-            flip-block,
-            flip-inline,
-            flip-block flip-inline;
+          @supports (position-try-fallbacks: flip-block) {
+            position-try-fallbacks:
+              block-end span-inline-end,
+              block-start span-inline-start,
+              block-start span-inline-end,
+              flip-block,
+              flip-inline,
+              flip-block flip-inline;
+          }
         }
       }
     }
@@ -1229,6 +1237,8 @@
       </td>
       <td data-label="지도링크">
         <div class="skeleton-bar"></div>
+        <button type="button" class="map-btn" aria-haspopup="dialog" commandfor="map-popover" command="show-popover"
+          disabled>지도</button>
       </td>
     </tr>
   </template>
@@ -1407,16 +1417,11 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "map-btn";
-          btn.textContent = "지도";
+          const btn = td.querySelector("button.map-btn");
+          if (!btn) return;
           btn.dataset.lat = r.latStr;
           btn.dataset.lon = r.lonStr;
-          btn.setAttribute("aria-haspopup", "dialog");
-          btn.setAttribute("commandfor", "map-popover");
-          btn.setAttribute("command", "show-popover");
-          td.replaceChildren(btn);
+          btn.disabled = false;
         },
       },
     };
@@ -1558,7 +1563,7 @@
     function setRowHiddenByFilter(tr, f) {
       const hide = shouldHideRowByFilter(tr, f);
       if (!hide) {
-        if (tr.hidden) tr.removeAttribute("hidden");
+        if (tr.hasAttribute("hidden")) tr.removeAttribute("hidden");
         return;
       }
       if (tr.getAttribute("hidden") !== HIDDEN_UNTIL_FOUND) {
@@ -2205,6 +2210,7 @@
           }
           linesSinceYield = 0;
         }
+        if (line.indexOf("위경도") === -1) continue;
         COORD_REGEX.lastIndex = 0;
         for (let m; (m = COORD_REGEX.exec(line));) {
           const { label, lat, lon } = m.groups;
@@ -2242,6 +2248,9 @@
     const sleepBackoff = (attempt, signal) =>
       sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, signal);
     async function fetchReverseWithRetry(lat, lon, userSignal) {
+      const url = new URL(BASE_URL);
+      url.searchParams.set("lat", lat);
+      url.searchParams.set("lon", lon);
       let attempt = 0;
       while (attempt < CONFIG.MAX_RETRY) {
         userSignal.throwIfAborted();
@@ -2249,9 +2258,6 @@
         try {
           const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
           const combinedSignal = AbortSignal.any([userSignal, timeoutSig]);
-          const url = new URL(BASE_URL);
-          url.searchParams.set("lat", lat);
-          url.searchParams.set("lon", lon);
           const res = await fetch(url, {
             headers: FETCH_HEADERS,
             signal: combinedSignal,
@@ -2661,6 +2667,10 @@
     window.addEventListener("blur", resetScrollState, { passive: true });
     document.addEventListener("scroll", handleScrollStart, { passive: true });
     document.addEventListener("scrollend", handleScrollEnd, { passive: true });
+    const rectCache = new Map();
+    const invalidateRectCache = () => rectCache.clear();
+    window.addEventListener("scroll", invalidateRectCache, { capture: true, passive: true });
+    window.addEventListener("resize", invalidateRectCache, { passive: true });
     let pointerRaf = null;
     let pointerEv = null;
     const flushPointer = () => {
@@ -2671,9 +2681,13 @@
       if (!(current instanceof Element)) current = current.parentElement;
       while (current && current !== document.body) {
         if (current.matches && current.matches(".card, button")) {
-          const rect = current.getBoundingClientRect();
-          current.style.setProperty("--mouse-x", `${ev.clientX - rect.x}px`);
-          current.style.setProperty("--mouse-y", `${ev.clientY - rect.y}px`);
+          let rect = rectCache.get(current);
+          if (!rect) {
+            rect = current.getBoundingClientRect();
+            rectCache.set(current, rect);
+          }
+          current.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
+          current.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
         }
         current = current.parentElement;
       }
@@ -2686,6 +2700,30 @@
       pointerRaf = requestAnimationFrame(flushPointer);
     }
     document.addEventListener("pointermove", handlePointerMove, { passive: true });
+    function setSpotlightVars(el, clientX, clientY) {
+      let rect = rectCache.get(el);
+      if (!rect) {
+        rect = el.getBoundingClientRect();
+        rectCache.set(el, rect);
+      }
+      el.style.setProperty("--mouse-x", `${clientX - rect.left}px`);
+      el.style.setProperty("--mouse-y", `${clientY - rect.top}px`);
+    }
+    function handlePointerDownSpotlight(e) {
+      if (ACTIVE_SCROLL.size > 0) return;
+      const t = (e.target instanceof Element) ? e.target : null;
+      if (!t) return;
+      const x = e.clientX;
+      const y = e.clientY;
+      const btn = t.closest("button");
+      if (btn) setSpotlightVars(btn, x, y);
+      const card = t.closest(".card");
+      if (card) setSpotlightVars(card, x, y);
+    }
+    document.addEventListener("pointerdown", handlePointerDownSpotlight, {
+      passive: true,
+      capture: true
+    });
     {
       const wrap = domElements.tableWrap;
       if (wrap) {
