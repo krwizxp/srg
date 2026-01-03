@@ -71,6 +71,7 @@
         text-wrap: pretty;
         container-type: inline-size;
         container-name: page;
+        overscroll-behavior: none;
       }
 
       :where([hidden]):not([hidden="until-found" i]) {
@@ -128,7 +129,7 @@
           url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E"),
           linear-gradient(in oklch 150deg, var(--bg-grad-start), var(--bg-grad-end));
         background-color: var(--bg-grad-start);
-        background-attachment: fixed;
+        min-block-size: 100%;
       }
 
       body {
