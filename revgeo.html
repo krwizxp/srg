@@ -529,6 +529,10 @@
             }
           }
 
+          &:is(#parse, #start, #pause, #resume, #stop, #export, #filter-clear)::after {
+            will-change: opacity;
+          }
+
           &:not(:disabled):active::after {
             opacity: 1;
             transition: none;
@@ -778,7 +782,7 @@
 
           tr {
             content-visibility: auto;
-            contain-intrinsic-block-size: auto 76.09px;
+            contain-intrinsic-block-size: auto 73px;
 
             @media (any-hover: hover) {
               &:hover {
@@ -830,7 +834,7 @@
             }
 
             tr {
-              contain-intrinsic-block-size: auto 357.97px;
+              contain-intrinsic-block-size: auto 375px;
               display: flex;
               flex-direction: column;
               gap: 10px;
