@@ -916,7 +916,7 @@
     }
 
     @layer transitions {
-      .card:nth-of-type(2) {
+      .card:nth-of-type(2) .table-wrap {
         view-transition-name: results-card;
       }
 
@@ -2592,7 +2592,7 @@
     );
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
-      return (n > 0 && n <= 200) ? withViewTransition(fn) : fn();
+      return (n > 0 && n <= 1000) ? withViewTransition(fn) : fn();
     };
     const COMMANDS = {
       "--parse": handleParse,
