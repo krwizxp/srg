@@ -1387,7 +1387,7 @@
         positionMapPopover(invoker, POPOVER_SIZE_CACHE);
       });
     });
-    const fmt = (n) => String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
     const fmtCoord6 = (v) => {
@@ -1428,35 +1428,38 @@
         },
       },
     };
+    const tbl = document.getElementById("tbl");
     const domElements = {
-      file: document.querySelector("#file"),
+      file: document.getElementById("file"),
       dropZoneText: document.querySelector(".drop-text"),
       dropZone: document.querySelector(".drop-zone"),
-      app: document.querySelector("#app"),
-      parse: document.querySelector("#parse"),
-      start: document.querySelector("#start"),
-      pause: document.querySelector("#pause"),
-      resume: document.querySelector("#resume"),
-      stop: document.querySelector("#stop"),
-      exportBtn: document.querySelector("#export"),
-      status: document.querySelector("#status"),
-      cntTotal: document.querySelector("#cnt-total"),
-      cntSuccess: document.querySelector("#cnt-success"),
-      cntFail: document.querySelector("#cnt-fail"),
-      cntRemain: document.querySelector("#cnt-remain"),
-      progShell: document.querySelector("#prog-shell"),
+      app: document.getElementById("app"),
+      parse: document.getElementById("parse"),
+      start: document.getElementById("start"),
+      pause: document.getElementById("pause"),
+      resume: document.getElementById("resume"),
+      stop: document.getElementById("stop"),
+      exportBtn: document.getElementById("export"),
+      status: document.getElementById("status"),
+      cntTotal: document.getElementById("cnt-total"),
+      cntSuccess: document.getElementById("cnt-success"),
+      cntFail: document.getElementById("cnt-fail"),
+      cntRemain: document.getElementById("cnt-remain"),
+      progShell: document.getElementById("prog-shell"),
+      prog: document.getElementById("prog"),
+      progLabel: document.getElementById("prog-label"),
       prog: document.querySelector("#prog"),
       progLabel: document.querySelector("#prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
-      tbody: document.querySelector("#tbl tbody"),
-      coords: document.querySelector("#coords"),
-      filterQ: document.querySelector("#filter-q"),
-      filterKind: document.querySelector("#filter-kind"),
-      filterSido: document.querySelector("#filter-sido"),
-      filterSigungu: document.querySelector("#filter-sigungu"),
-      filterEmd: document.querySelector("#filter-emd"),
-      filterTag: document.querySelector("#filter-tag"),
-      filterFullAddr: document.querySelector("#filter-fulladdr"),
+      tbody: tbl?.tBodies?.[0] ?? null,
+      coords: document.getElementById("coords"),
+      filterQ: document.getElementById("filter-q"),
+      filterKind: document.getElementById("filter-kind"),
+      filterSido: document.getElementById("filter-sido"),
+      filterSigungu: document.getElementById("filter-sigungu"),
+      filterEmd: document.getElementById("filter-emd"),
+      filterTag: document.getElementById("filter-tag"),
+      filterFullAddr: document.getElementById("filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
     };
     const ACTIVE_SCROLL = new Set();
@@ -2125,12 +2128,29 @@
       });
     }
     const yieldToMain = (() => {
-      if ("scheduler" in window && "yield" in window.scheduler) {
-        return () => window.scheduler.yield();
+      const y = window.scheduler?.yield;
+      if (typeof y === "function") {
+        return () => y.call(window.scheduler);
       }
-      return () => {
-        return new Promise(resolve => setTimeout(resolve, 0));
+      if (typeof MessageChannel !== "function") {
+        throw new Error("scheduler.yield is unavailable, and MessageChannel is not supported in this environment.");
+      }
+      const channel = new MessageChannel();
+      const queue = [];
+      let head = 0;
+      channel.port1.onmessage = () => {
+        if (head >= queue.length) return;
+        queue[head++]();
+        if (head > 1024 && head * 2 > queue.length) {
+          queue.splice(0, head);
+          head = 0;
+        }
       };
+      return () =>
+        new Promise((resolve) => {
+          queue.push(resolve);
+          channel.port2.postMessage(0);
+        });
     })();
     async function* lineIterator(stream, signal) {
       const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
