@@ -2592,10 +2592,11 @@
     );
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
-      return (n > 0 && n <= 1000) ? withViewTransition(fn) : fn();
+      const perfMode = domElements.tbody.getAttribute("data-perf-mode") === "1";
+      return (n > 0 && !perfMode) ? withViewTransition(fn) : fn();
     };
     const COMMANDS = {
-      "--parse": handleParse,
+      "--parse": () => maybeVT(handleParse),
       "--start": () => maybeVT(startProcessing),
       "--pause": () => { if (!AppState.isRunning) return; AppState.setStatus("pausing"); if (AppState.inFlight) setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn"); },
       "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
