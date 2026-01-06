@@ -810,8 +810,10 @@
         }
 
         @container (inline-size >900px) {
-          tbody td:nth-child(-n + 2) {
-            text-align: center;
+          tbody {
+            td:nth-child(-n + 2) {
+              text-align: center;
+            }
           }
         }
 
@@ -916,8 +918,12 @@
     }
 
     @layer transitions {
-      .card:nth-of-type(2) .table-wrap {
-        view-transition-name: results-card;
+      .card {
+        &:has(#tbl) {
+          .table-wrap {
+            view-transition-name: results-card;
+          }
+        }
       }
 
       ::view-transition-old(root),
@@ -985,19 +991,31 @@
 
     html.scrolling {
       @media (any-hover: hover) {
-        .card:hover::before {
-          opacity: 0 !important;
+        .card {
+          &:hover::before {
+            opacity: 0 !important;
+          }
         }
 
-        button:hover {
-          transform: none !important;
-          box-shadow: none !important;
+        button {
+          &:hover {
+            transform: none !important;
+            box-shadow: none !important;
+          }
         }
 
-        .table-wrap table tbody tr:hover {
-          background: transparent !important;
-          transform: none !important;
-          box-shadow: none !important;
+        .table-wrap {
+          table {
+            tbody {
+              tr {
+                &:hover {
+                  background: transparent !important;
+                  transform: none !important;
+                  box-shadow: none !important;
+                }
+              }
+            }
+          }
         }
       }
     }
