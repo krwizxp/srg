@@ -1037,10 +1037,6 @@
         .map-btn:disabled {
           display: none;
         }
-
-        &:has(.map-btn:not(:disabled)) .skeleton-bar {
-          display: none;
-        }
       }
 
       .map-popover {
@@ -1392,8 +1388,8 @@
       mapPopover.style.insetInlineStart = `${Math.round(inlineStart)}px`;
       mapPopover.style.insetBlockStart = `${Math.round(blockStart)}px`;
     }
-    mapPopover.addEventListener("toggle", () => {
-      MAP_POPOVER_OPEN = mapPopover.matches(":popover-open");
+    mapPopover.addEventListener("toggle", (e) => {
+      MAP_POPOVER_OPEN = e.newState === "open";
       if (!MAP_POPOVER_OPEN) return;
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
@@ -1443,11 +1439,15 @@
       maps: {
         noCsv: true,
         render: (_, td, r) => {
-          const btn = td.querySelector("button.map-btn");
-          if (!btn) return;
+          const btn = td.lastElementChild;
+          if (!(btn instanceof HTMLButtonElement) || !btn.classList.contains("map-btn")) return;
           btn.dataset.lat = r.latStr;
           btn.dataset.lon = r.lonStr;
           btn.disabled = false;
+          const skeleton = td.firstElementChild;
+          if (skeleton && skeleton.classList.contains("skeleton-bar")) {
+            skeleton.remove();
+          }
         },
       },
     };
@@ -1528,6 +1528,7 @@
     const FIND_REHIDE_DELAY_MS = 8000;
     let FIND_REHIDE_TIMER = null;
     let FIND_REVEAL_ACTIVE = false;
+    const FIND_REVEALED_ROWS = new Set();
     function bumpFindRehideTimer() {
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = setTimeout(() => {
@@ -1538,7 +1539,8 @@
     function scheduleFindRehide(tr) {
       FIND_REVEAL_ACTIVE = true;
       if (tr) {
-        tr.dataset.revealedByFind = "1";
+        if (tr.dataset.revealedByFind !== "1") tr.dataset.revealedByFind = "1";
+        FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
       }
       bumpFindRehideTimer();
@@ -1578,17 +1580,14 @@
       if (f.q && !r._f_q.includes(f.q)) return false;
       return true;
     }
-    function shouldHideRowByFilter(tr, f) {
-      if (!tr.hasAttribute("data-idx")) return !!f.active;
-      if (tr.dataset.revealedByFind === "1") return false;
+    function shouldHideRowByFilter(tr, f, r) {
+      if (FIND_REVEAL_ACTIVE && tr.dataset.revealedByFind === "1") return false;
       if (!f.active) return false;
-      const dataIdx = +tr.dataset.idx;
-      const r = AppState.records[dataIdx];
       if (!r || r._f_kind === undefined) return true;
       return !rowMatchesFilterCached(r, f);
     }
-    function setRowHiddenByFilter(tr, f) {
-      const hide = shouldHideRowByFilter(tr, f);
+    function setRowHiddenByFilter(tr, f, r) {
+      const hide = shouldHideRowByFilter(tr, f, r);
       if (!hide) {
         if (tr.hasAttribute("hidden")) tr.removeAttribute("hidden");
         return;
@@ -1600,9 +1599,9 @@
     function getAllRowsLive() {
       return domElements.tbody.rows;
     }
-    function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
+    function applyFilterToRow(tr, f = getLiveFilterSnapshot(), r = null) {
       if (!tr) return;
-      setRowHiddenByFilter(tr, f);
+      setRowHiddenByFilter(tr, f, r);
     }
     function clearFindReveals() {
       if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
@@ -1610,12 +1609,20 @@
       FIND_REVEAL_ACTIVE = false;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
-      if (!shouldScan) return;
+      if (!shouldScan) {
+        FIND_REVEALED_ROWS.clear();
+        return;
+      }
+      if (FIND_REVEALED_ROWS.size) {
+        for (const tr of FIND_REVEALED_ROWS) {
+          delete tr.dataset.revealedByFind;
+        }
+        FIND_REVEALED_ROWS.clear();
+        return;
+      }
       const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
       if (!revealed.length) return;
-      for (const tr of revealed) {
-        delete tr.dataset.revealedByFind;
-      }
+      for (const tr of revealed) delete tr.dataset.revealedByFind;
     }
     const FILTER_CTX = {
       timer: null,
@@ -1658,11 +1665,12 @@
         cancelActiveFilterApply();
         return;
       }
+      const records = AppState.records;
       if (len <= 2000) {
         cancelActiveFilterApply();
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
-          if (tr) setRowHiddenByFilter(tr, f);
+          if (tr) setRowHiddenByFilter(tr, f, records[i]);
         }
         return;
       }
@@ -1671,6 +1679,7 @@
         existing.f = f;
         existing.i = 0;
         existing.len = len;
+        existing.records = records;
         if (!existing.raf) existing.raf = requestAnimationFrame(existing.step);
         return;
       }
@@ -1681,6 +1690,7 @@
         rows,
         len,
         f,
+        records,
         step: null,
       };
       job.step = () => {
@@ -1691,8 +1701,9 @@
         let processed = 0;
         while (job.i < job.len) {
           if (FILTER_CTX.job !== job) return;
-          const tr = job.rows[job.i];
-          if (tr) setRowHiddenByFilter(tr, job.f);
+          const idx = job.i;
+          const tr = job.rows[idx];
+          if (tr) setRowHiddenByFilter(tr, job.f, job.records[idx]);
           job.i++;
           processed++;
           if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
@@ -1727,6 +1738,8 @@
       );
       return "\uFEFF" + [...cols, ...maps].join(",");
     })();
+    const CSV_ENCODER = new TextEncoder();
+    const CSV_HEADER_BYTES = CSV_ENCODER.encode(CSV_HEADER_STR);
     function getGeocodejsonFeature(data) {
       if (
         !data ||
@@ -2074,6 +2087,15 @@
       }
       return document.startViewTransition(fn);
     }
+    const UI_CACHE = {
+      parseDisabled: null,
+      startDisabled: null,
+      pauseDisabled: null,
+      resumeDisabled: null,
+      stopDisabled: null,
+      progActive: null,
+      dropZoneInert: null,
+    };
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
@@ -2087,25 +2109,56 @@
         dropZone,
       } = domElements;
       const isBusy = AppState.isBusy;
-      parse.disabled = isBusy;
-      start.disabled = isBusy || !hasRecords;
-      pause.disabled = s !== "running";
-      resume.disabled = s !== "paused";
-      stop.disabled = !(AppState.isRunning || s === "parsing") || s === "stopping";
-      progShell.classList.toggle(
-        "active",
-        s === "running" || s === "pausing"
-      );
-      const lockInput = isBusy;
-      dropZone.toggleAttribute("inert", lockInput);
+      const parseDisabled = isBusy;
+      if (UI_CACHE.parseDisabled !== parseDisabled) {
+        UI_CACHE.parseDisabled = parseDisabled;
+        parse.disabled = parseDisabled;
+      }
+      const startDisabled = isBusy || !hasRecords;
+      if (UI_CACHE.startDisabled !== startDisabled) {
+        UI_CACHE.startDisabled = startDisabled;
+        start.disabled = startDisabled;
+      }
+      const pauseDisabled = s !== "running";
+      if (UI_CACHE.pauseDisabled !== pauseDisabled) {
+        UI_CACHE.pauseDisabled = pauseDisabled;
+        pause.disabled = pauseDisabled;
+      }
+      const resumeDisabled = s !== "paused";
+      if (UI_CACHE.resumeDisabled !== resumeDisabled) {
+        UI_CACHE.resumeDisabled = resumeDisabled;
+        resume.disabled = resumeDisabled;
+      }
+      const stopDisabled = !(AppState.isRunning || s === "parsing") || s === "stopping";
+      if (UI_CACHE.stopDisabled !== stopDisabled) {
+        UI_CACHE.stopDisabled = stopDisabled;
+        stop.disabled = stopDisabled;
+      }
+      const progActive = s === "running" || s === "pausing";
+      if (UI_CACHE.progActive !== progActive) {
+        UI_CACHE.progActive = progActive;
+        progShell.classList.toggle("active", progActive);
+      }
+      const dropZoneInert = isBusy;
+      if (UI_CACHE.dropZoneInert !== dropZoneInert) {
+        UI_CACHE.dropZoneInert = dropZoneInert;
+        dropZone.toggleAttribute("inert", dropZoneInert);
+      }
     }
+    const STATUS_CACHE = { msg: null, type: null };
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
-      el.textContent = msg;
-      el.classList.remove("err", "warn", "stopped");
-      if (type === "error") el.classList.add("err");
-      else if (type === "warn") el.classList.add("warn");
-      else if (type === "stopped") el.classList.add("stopped");
+      const nextMsg = String(msg ?? "");
+      if (STATUS_CACHE.msg !== nextMsg) {
+        STATUS_CACHE.msg = nextMsg;
+        el.textContent = nextMsg;
+      }
+      if (STATUS_CACHE.type !== type) {
+        STATUS_CACHE.type = type;
+        el.classList.toggle("err", type === "error");
+        el.classList.toggle("warn", type === "warn");
+        el.classList.toggle("stopped", type === "stopped");
+      }
     }
     const RENDER_CACHE = {
       total: -1,
@@ -2176,6 +2229,7 @@
       clearFindReveals();
       resetScrollState();
       domElements.tbody.replaceChildren();
+      if (rectCache.size) rectCache.clear();
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2374,7 +2428,6 @@
       return tr;
     }
     function fillRow(tr, row) {
-      tr.dataset.idx = row.idx - 1;
       for (let i = 0; i < COL_DEFS.length; i++) {
         const col = COL_DEFS[i];
         const td = tr.cells[i];
@@ -2512,7 +2565,7 @@
     function commitResultRow(tr, r) {
       if (!tr || !tr.isConnected) return;
       fillRow(tr, r);
-      applyFilterToRow(tr);
+      applyFilterToRow(tr, getLiveFilterSnapshot(), r);
       pushResultRow(r);
     }
     function startProcessing() {
@@ -2529,8 +2582,9 @@
     }
     async function handleExport() {
       try {
-        const rows = AppState.records.slice(0, AppState.processedCount);
-        if (!rows.length) {
+        const records = AppState.records;
+        const totalRows = Math.min(records.length, AppState.processedCount);
+        if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
         const makeRow = (r) => {
@@ -2549,24 +2603,24 @@
         };
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
-        const encoder = new TextEncoder();
-        const parts = [encoder.encode(CSV_HEADER_STR)];
+        const parts = [CSV_HEADER_BYTES];
         const CHUNK_CHAR_LIMIT = 1_000_000;
+        const totalDisp = fmt(totalRows);
         let chunkLines = [];
         let chunkChars = 0;
         const flushChunk = () => {
           if (!chunkLines.length) return;
-          parts.push(encoder.encode("\n" + chunkLines.join("\n")));
+          parts.push(CSV_ENCODER.encode("\n" + chunkLines.join("\n")));
           chunkLines = [];
           chunkChars = 0;
         };
-        for (let i = 0; i < rows.length; i++) {
-          const line = makeRow(rows[i]);
+        for (let i = 0; i < totalRows; i++) {
+          const line = makeRow(records[i]);
           chunkLines.push(line);
           chunkChars += line.length + 1;
           if (chunkChars >= CHUNK_CHAR_LIMIT) {
             flushChunk();
-            setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${fmt(rows.length)})`);
+            setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${totalDisp})`);
             await yieldToMain();
           }
         }
@@ -2605,9 +2659,12 @@
         }
         AppState.setRecords(records);
         const MAX_DISP = 1_000;
-        const disp = records
-          .slice(0, MAX_DISP)
-          .map((r) => `${r.latStr}, ${r.lonStr}`);
+        const disp = [];
+        const dispLen = Math.min(records.length, MAX_DISP);
+        for (let i = 0; i < dispLen; i++) {
+          const r = records[i];
+          disp.push(`${r.latStr}, ${r.lonStr}`);
+        }
         if (records.length > MAX_DISP) {
           disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
@@ -2763,21 +2820,14 @@
     const flushPointer = () => {
       pointerRaf = null;
       const ev = pointerEv;
+      pointerEv = null;
       if (!ev || ACTIVE_SCROLL.size > 0) return;
-      let current = ev.target;
-      if (!(current instanceof Element)) current = current.parentElement;
-      while (current && current !== document.body) {
-        if (current.matches && current.matches(".card, button")) {
-          let rect = rectCache.get(current);
-          if (!rect) {
-            rect = current.getBoundingClientRect();
-            rectCache.set(current, rect);
-          }
-          current.style.setProperty("--mouse-x", `${ev.clientX - rect.left}px`);
-          current.style.setProperty("--mouse-y", `${ev.clientY - rect.top}px`);
-        }
-        current = current.parentElement;
-      }
+      const x = ev.clientX;
+      const y = ev.clientY;
+      let target = ev.target;
+      if (!(target instanceof Element)) target = target?.parentElement;
+      if (!target) return;
+      updateSpotlightsFromTarget(target, x, y);
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
@@ -2796,16 +2846,24 @@
       el.style.setProperty("--mouse-x", `${clientX - rect.left}px`);
       el.style.setProperty("--mouse-y", `${clientY - rect.top}px`);
     }
+    function updateSpotlightsFromTarget(target, x, y) {
+      let btn = null;
+      let card = null;
+      let current = target;
+      while (current && current !== document.body) {
+        if (!btn && current.tagName === "BUTTON") btn = current;
+        if (!card && current.classList.contains("card")) card = current;
+        if (btn && card) break;
+        current = current.parentElement;
+      }
+      if (btn) setSpotlightVars(btn, x, y);
+      if (card) setSpotlightVars(card, x, y);
+    }
     function handlePointerDownSpotlight(e) {
       if (ACTIVE_SCROLL.size > 0) return;
       const t = (e.target instanceof Element) ? e.target : null;
       if (!t) return;
-      const x = e.clientX;
-      const y = e.clientY;
-      const btn = t.closest("button");
-      if (btn) setSpotlightVars(btn, x, y);
-      const card = t.closest(".card");
-      if (card) setSpotlightVars(card, x, y);
+      updateSpotlightsFromTarget(t, e.clientX, e.clientY);
     }
     document.addEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
     {
