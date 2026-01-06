@@ -1539,7 +1539,6 @@
     function scheduleFindRehide(tr) {
       FIND_REVEAL_ACTIVE = true;
       if (tr) {
-        if (tr.dataset.revealedByFind !== "1") tr.dataset.revealedByFind = "1";
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
       }
@@ -1581,7 +1580,7 @@
       return true;
     }
     function shouldHideRowByFilter(tr, f, r) {
-      if (FIND_REVEAL_ACTIVE && tr.dataset.revealedByFind === "1") return false;
+      if (FIND_REVEAL_ACTIVE && FIND_REVEALED_ROWS.has(tr)) return false;
       if (!f.active) return false;
       if (!r || r._f_kind === undefined) return true;
       return !rowMatchesFilterCached(r, f);
@@ -1605,24 +1604,10 @@
     }
     function clearFindReveals() {
       if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
-      const shouldScan = FIND_REVEAL_ACTIVE;
       FIND_REVEAL_ACTIVE = false;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
-      if (!shouldScan) {
-        FIND_REVEALED_ROWS.clear();
-        return;
-      }
-      if (FIND_REVEALED_ROWS.size) {
-        for (const tr of FIND_REVEALED_ROWS) {
-          delete tr.dataset.revealedByFind;
-        }
-        FIND_REVEALED_ROWS.clear();
-        return;
-      }
-      const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
-      if (!revealed.length) return;
-      for (const tr of revealed) delete tr.dataset.revealedByFind;
+      FIND_REVEALED_ROWS.clear();
     }
     const FILTER_CTX = {
       timer: null,
@@ -1869,7 +1854,13 @@
             nonEmptyLabelParts[0], nonEmptyLabelParts[1],
           ].filter((n) => n && RX_EMD.test(n)));
           const exclusions = new Set([sido, sigungu]);
-          eupmyeon = Array.from(candidates.difference(exclusions)).join(" ");
+          let emdOut = "";
+          for (const n of candidates) {
+            if (exclusions.has(n)) continue;
+            if (emdOut) emdOut += " " + n;
+            else emdOut = String(n);
+          }
+          eupmyeon = emdOut;
         } else {
           const type = gc.type || "";
           const isCityOrCounty = type === "city" || type === "county";
@@ -2587,19 +2578,21 @@
         if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
+        const csvColLen = CSV_COLS.length;
+        const outRow = new Array(csvColLen + MAP_PROVIDER_COUNT);
         const makeRow = (r) => {
-          const rowArr = [];
-          for (let i = 0; i < CSV_COLS.length; i++) {
-            rowArr.push(csvEsc(CSV_COLS[i].val(r)));
+          let j = 0;
+          for (let i = 0; i < csvColLen; i++) {
+            outRow[j++] = csvEsc(CSV_COLS[i].val(r));
           }
           const { latStr: lat, lonStr: lon } = r;
           for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
             const link = MAP_LINKS[i];
             const latUse = link.round6 ? fmtCoord6(lat) : lat;
             const lonUse = link.round6 ? fmtCoord6(lon) : lon;
-            rowArr.push(csvEsc(fillLatLon(link.parts, latUse, lonUse)));
+            outRow[j++] = csvEsc(fillLatLon(link.parts, latUse, lonUse));
           }
-          return rowArr.join(",");
+          return outRow.join(",");
         };
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
@@ -2609,10 +2602,12 @@
         let chunkLines = [];
         let chunkChars = 0;
         const flushChunk = () => {
-          if (!chunkLines.length) return;
+          const n = chunkLines.length;
+          if (n === 0) return;
           parts.push(CSV_ENCODER.encode("\n" + chunkLines.join("\n")));
-          chunkLines = [];
           chunkChars = 0;
+          if (n > 20_000) chunkLines = [];
+          else chunkLines.length = 0;
         };
         for (let i = 0; i < totalRows; i++) {
           const line = makeRow(records[i]);
@@ -2742,14 +2737,23 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       },
     };
+    function handleCommandError(err) {
+      if (err?.name === "AbortError") return;
+      console.error(err);
+      const msg = getErrorMessage(err);
+      setStatusMessage(`명령 실행 중 오류: ${msg}`, "error");
+    }
     domElements.app.addEventListener("command", (e) => {
-      Promise.try(() => COMMANDS[e.command]?.())
-        .catch((err) => {
-          if (err?.name === "AbortError") return;
-          console.error(err);
-          const msg = getErrorMessage(err);
-          setStatusMessage(`명령 실행 중 오류: ${msg}`, "error");
-        });
+      const cmd = COMMANDS[e.command];
+      if (!cmd) return;
+      try {
+        const out = cmd();
+        if (out && typeof out.then === "function") {
+          out.catch(handleCommandError);
+        }
+      } catch (err) {
+        handleCommandError(err);
+      }
     });
     domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
@@ -2816,23 +2820,24 @@
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
     window.addEventListener("resize", invalidateRectCache);
     let pointerRaf = null;
-    let pointerEv = null;
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerTarget = null;
     const flushPointer = () => {
       pointerRaf = null;
-      const ev = pointerEv;
-      pointerEv = null;
-      if (!ev || ACTIVE_SCROLL.size > 0) return;
-      const x = ev.clientX;
-      const y = ev.clientY;
-      let target = ev.target;
-      if (!(target instanceof Element)) target = target?.parentElement;
-      if (!target) return;
-      updateSpotlightsFromTarget(target, x, y);
+      const target = pointerTarget;
+      pointerTarget = null;
+      if (!target || ACTIVE_SCROLL.size > 0) return;
+      updateSpotlightsFromTarget(target, pointerX, pointerY);
     };
     function handlePointerMove(e) {
       if (e.pointerType && e.pointerType !== "mouse") return;
       if (ACTIVE_SCROLL.size > 0) return;
-      pointerEv = e;
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      let target = e.target;
+      if (!(target instanceof Element)) target = target?.parentElement;
+      pointerTarget = target;
       if (pointerRaf !== null) return;
       pointerRaf = requestAnimationFrame(flushPointer);
     }
