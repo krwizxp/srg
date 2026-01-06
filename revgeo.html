@@ -1468,7 +1468,7 @@
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
-      tbody: tbl?.tBodies?.[0] ?? null,
+      tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       filterQ: document.getElementById("filter-q"),
       filterKind: document.getElementById("filter-kind"),
@@ -1541,13 +1541,13 @@
     }
     function buildFilterSnapshot() {
       const f = {
-        q: norm(domElements.filterQ?.value),
-        kind: norm(domElements.filterKind?.value),
-        sido: norm(domElements.filterSido?.value),
-        sigungu: norm(domElements.filterSigungu?.value),
-        emd: norm(domElements.filterEmd?.value),
-        tag: norm(domElements.filterTag?.value),
-        fullAddr: norm(domElements.filterFullAddr?.value),
+        q: norm(domElements.filterQ.value),
+        kind: norm(domElements.filterKind.value),
+        sido: norm(domElements.filterSido.value),
+        sigungu: norm(domElements.filterSigungu.value),
+        emd: norm(domElements.filterEmd.value),
+        tag: norm(domElements.filterTag.value),
+        fullAddr: norm(domElements.filterFullAddr.value),
       };
       f.active = !!(f.q || f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
       return f;
@@ -2236,8 +2236,6 @@
     }
     async function parseFileToRecords(file, signal) {
       const out = [];
-      const KIND_KR = intern("kr");
-      const KIND_WORLD = intern("world");
       let lastYield = performance.now();
       const YIELD_INTERVAL_MS = 8;
       let linesSinceYield = 0;
@@ -2265,9 +2263,6 @@
             lat: fLat, lon: fLon,
             latStr: lat, lonStr: lon,
             addr: null, fullAddr: "",
-            _f_kind: isKR ? KIND_KR : KIND_WORLD,
-            _f_sido: "", _f_sigungu: "", _f_emd: "", _f_tag: "", _f_fullAddr: "",
-            _f_q: `${lat},${lon}`
           });
         }
       }
@@ -2350,6 +2345,35 @@
       else AppState.cntSuccess++;
       scheduleRender();
     }
+    function updateFilterCacheFromAddr(r, addr) {
+      const coords = `${r.latStr},${r.lonStr}`;
+      const sido = norm(addr.sido);
+      const sigungu = norm(addr.sigungu);
+      const emd = norm(addr.eupmyeon);
+      const tag = norm(addr.tag);
+      const fAddr = norm(r.fullAddr);
+      const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
+      r._f_kind = intern(norm(r.set));
+      r._f_sido = intern(sido);
+      r._f_sigungu = intern(sigungu);
+      r._f_emd = intern(emd);
+      r._f_tag = intern(tag);
+      r._f_fullAddr = fAddr;
+      r._f_q = q;
+    }
+    function applyErrorToRecord(r, msg) {
+      r.set = "에러";
+      r.addr = null;
+      r.fullAddr = msg;
+      r._f_kind = "에러";
+      r._f_sido = "";
+      r._f_sigungu = "";
+      r._f_emd = "";
+      r._f_tag = "";
+      const normMsg = norm(msg);
+      r._f_fullAddr = normMsg;
+      r._f_q = normMsg;
+    }
     async function runProcessingLoop() {
       const startIndex = AppState.processedCount;
       const total = AppState.records.length;
@@ -2392,21 +2416,7 @@
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
-            const coords = `${r.latStr},${r.lonStr}`;
-            const a = addr || {};
-            const sido = norm(a.sido);
-            const sigungu = norm(a.sigungu);
-            const emd = norm(a.eupmyeon);
-            const tag = norm(a.tag);
-            const fAddr = norm(r.fullAddr);
-            const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
-            r._f_kind = intern(norm(r.set));
-            r._f_sido = intern(sido);
-            r._f_sigungu = intern(sigungu);
-            r._f_emd = intern(emd);
-            r._f_tag = intern(tag);
-            r._f_fullAddr = fAddr;
-            r._f_q = q;
+            updateFilterCacheFromAddr(r, addr);
             commitResultRow(skeletonTr, r);
           } catch (err) {
             const msg = getErrorMessage(err);
@@ -2416,16 +2426,7 @@
               break;
             }
             console.error(err);
-            r.set = "에러";
-            r.addr = null;
-            r.fullAddr = msg;
-            r._f_kind = "에러";
-            r._f_sido = "";
-            r._f_sigungu = "";
-            r._f_emd = "";
-            r._f_tag = "";
-            r._f_fullAddr = norm(msg);
-            r._f_q = norm(msg);
+            applyErrorToRecord(r, msg);
             commitResultRow(skeletonTr, r);
             if (!AppState.isStopping)
               setStatusMessage(
@@ -2582,7 +2583,7 @@
       }
     }
     const onFilterEvent = () => scheduleApplyFilterAll();
-    for (const el of FILTER_INPUTS.filter(Boolean)) {
+    for (const el of FILTER_INPUTS) {
       if (el.tagName === "SELECT") {
         el.addEventListener("change", onFilterEvent);
       } else {
@@ -2701,17 +2702,17 @@
         setGlobalScrolling(false);
       }
     };
-    window.addEventListener("pagehide", resetScrollState, { passive: true });
+    window.addEventListener("pagehide", resetScrollState);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") resetScrollState();
-    }, { passive: true });
-    window.addEventListener("blur", resetScrollState, { passive: true });
-    document.addEventListener("scroll", handleScrollStart, { passive: true });
-    document.addEventListener("scrollend", handleScrollEnd, { passive: true });
+    });
+    window.addEventListener("blur", resetScrollState);
+    document.addEventListener("scroll", handleScrollStart);
+    document.addEventListener("scrollend", handleScrollEnd);
     const rectCache = new Map();
     const invalidateRectCache = () => rectCache.clear();
-    window.addEventListener("scroll", invalidateRectCache, { capture: true, passive: true });
-    window.addEventListener("resize", invalidateRectCache, { passive: true });
+    window.addEventListener("scroll", invalidateRectCache, { capture: true });
+    window.addEventListener("resize", invalidateRectCache);
     let pointerRaf = null;
     let pointerEv = null;
     const flushPointer = () => {
@@ -2740,7 +2741,7 @@
       if (pointerRaf !== null) return;
       pointerRaf = requestAnimationFrame(flushPointer);
     }
-    document.addEventListener("pointermove", handlePointerMove, { passive: true });
+    document.addEventListener("pointermove", handlePointerMove);
     function setSpotlightVars(el, clientX, clientY) {
       let rect = rectCache.get(el);
       if (!rect) {
@@ -2761,20 +2762,13 @@
       const card = t.closest(".card");
       if (card) setSpotlightVars(card, x, y);
     }
-    document.addEventListener("pointerdown", handlePointerDownSpotlight, {
-      passive: true,
-      capture: true
-    });
+    document.addEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
     {
       const wrap = domElements.tableWrap;
-      if (wrap) {
-        wrap.addEventListener("scroll", handleScrollStart, { passive: true });
-        wrap.addEventListener("scrollend", handleScrollEnd, { passive: true });
-      }
-      if (domElements.coords) {
-        domElements.coords.addEventListener("scroll", handleScrollStart, { passive: true });
-        domElements.coords.addEventListener("scrollend", handleScrollEnd, { passive: true });
-      }
+      wrap.addEventListener("scroll", handleScrollStart);
+      wrap.addEventListener("scrollend", handleScrollEnd);
+      domElements.coords.addEventListener("scroll", handleScrollStart);
+      domElements.coords.addEventListener("scrollend", handleScrollEnd);
     }
   </script>
 </body>
