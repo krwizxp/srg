@@ -1354,6 +1354,7 @@
     const SUPPORTS_ANCHOR_POSITIONING = CSS.supports("position-area: block-end span-inline-start");
     let LAST_MAP_INVOKER = null;
     let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
+    let MAP_POPOVER_OPEN = false;
     function updateMapPopoverLinks(lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         const link = MAP_LINKS[i];
@@ -1370,7 +1371,9 @@
       }
     }
     function closeMapPopover() {
-      if (mapPopover.matches(":popover-open")) mapPopover.hidePopover();
+      if (!MAP_POPOVER_OPEN) return;
+      MAP_POPOVER_OPEN = false;
+      mapPopover.hidePopover();
     }
     function positionMapPopover(anchorEl, popoverSize = null) {
       const margin = 8;
@@ -1390,7 +1393,8 @@
       mapPopover.style.insetBlockStart = `${Math.round(blockStart)}px`;
     }
     mapPopover.addEventListener("toggle", () => {
-      if (!mapPopover.matches(":popover-open")) return;
+      MAP_POPOVER_OPEN = mapPopover.matches(":popover-open");
+      if (!MAP_POPOVER_OPEN) return;
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
           ((document.activeElement instanceof Element)
@@ -1479,6 +1483,8 @@
       filterFullAddr: document.getElementById("filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
     };
+    const DROP_ZONE_FILE_LABELS =
+      domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
     const ACTIVE_SCROLL = new Set();
     const SCROLLING_CLASS = "scrolling";
     const setGlobalScrolling = (on) => {
@@ -1525,8 +1531,6 @@
     function bumpFindRehideTimer() {
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = setTimeout(() => {
-        FIND_REHIDE_TIMER = null;
-        FIND_REVEAL_ACTIVE = false;
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FIND_REHIDE_DELAY_MS);
@@ -1594,17 +1598,19 @@
       }
     }
     function getAllRowsLive() {
-      const tb = domElements.tbody;
-      return tb ? tb.rows : null;
+      return domElements.tbody.rows;
     }
     function applyFilterToRow(tr, f = getLiveFilterSnapshot()) {
       if (!tr) return;
       setRowHiddenByFilter(tr, f);
     }
     function clearFindReveals() {
+      if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
+      const shouldScan = FIND_REVEAL_ACTIVE;
       FIND_REVEAL_ACTIVE = false;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
+      if (!shouldScan) return;
       const revealed = domElements.tbody.querySelectorAll('tr[data-revealed-by-find="1"]');
       if (!revealed.length) return;
       for (const tr of revealed) {
@@ -1647,8 +1653,8 @@
     }
     function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
       const rows = getAllRowsLive();
-      const len = rows ? rows.length : 0;
-      if (!rows || len === 0) {
+      const len = rows.length;
+      if (len === 0) {
         cancelActiveFilterApply();
         return;
       }
@@ -2101,6 +2107,16 @@
       else if (type === "warn") el.classList.add("warn");
       else if (type === "stopped") el.classList.add("stopped");
     }
+    const RENDER_CACHE = {
+      total: -1,
+      success: -1,
+      fail: -1,
+      remaining: -1,
+      pct: -1,
+      exportDisabled: null,
+      hasRows: null,
+      perfMode: null,
+    };
     function renderFrame() {
       AppState.renderReq = null;
       const total = AppState.records.length;
@@ -2108,20 +2124,47 @@
       const success = AppState.cntSuccess;
       const fail = AppState.cntFail;
       const remaining = total - processed;
-      domElements.cntTotal.textContent = fmt(total);
-      domElements.cntSuccess.textContent = fmt(success);
-      domElements.cntFail.textContent = fmt(fail);
-      domElements.cntRemain.textContent = fmt(remaining);
+      if (RENDER_CACHE.total !== total) {
+        RENDER_CACHE.total = total;
+        domElements.cntTotal.textContent = fmt(total);
+      }
+      if (RENDER_CACHE.success !== success) {
+        RENDER_CACHE.success = success;
+        domElements.cntSuccess.textContent = fmt(success);
+      }
+      if (RENDER_CACHE.fail !== fail) {
+        RENDER_CACHE.fail = fail;
+        domElements.cntFail.textContent = fmt(fail);
+      }
+      if (RENDER_CACHE.remaining !== remaining) {
+        RENDER_CACHE.remaining = remaining;
+        domElements.cntRemain.textContent = fmt(remaining);
+      }
       const pct = total ? Math.round((processed / total) * 100) : 0;
-      domElements.prog.value = pct;
-      domElements.progShell.style.setProperty("--pct", pct);
-      domElements.progLabel.textContent = `진행 상황 ${pct}%`;
-      domElements.exportBtn.disabled = processed === 0;
-      domElements.tableWrap.classList.toggle("has-rows", total > 0);
-      if (total > CONFIG.BIG_MODE_THRESHOLD) {
-        domElements.tbody.setAttribute("data-perf-mode", "1");
-      } else {
-        domElements.tbody.removeAttribute("data-perf-mode");
+      if (RENDER_CACHE.pct !== pct) {
+        RENDER_CACHE.pct = pct;
+        domElements.prog.value = pct;
+        domElements.progShell.style.setProperty("--pct", pct);
+        domElements.progLabel.textContent = `진행 상황 ${pct}%`;
+      }
+      const exportDisabled = processed === 0;
+      if (RENDER_CACHE.exportDisabled !== exportDisabled) {
+        RENDER_CACHE.exportDisabled = exportDisabled;
+        domElements.exportBtn.disabled = exportDisabled;
+      }
+      const hasRows = total > 0;
+      if (RENDER_CACHE.hasRows !== hasRows) {
+        RENDER_CACHE.hasRows = hasRows;
+        domElements.tableWrap.classList.toggle("has-rows", hasRows);
+      }
+      const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
+      if (RENDER_CACHE.perfMode !== perfMode) {
+        RENDER_CACHE.perfMode = perfMode;
+        if (perfMode) {
+          domElements.tbody.setAttribute("data-perf-mode", "1");
+        } else {
+          domElements.tbody.removeAttribute("data-perf-mode");
+        }
       }
     }
     function scheduleRender() {
@@ -2598,7 +2641,8 @@
       if (!btn) return;
       const prev = (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       LAST_MAP_INVOKER = btn;
-      if (mapPopover.matches(":popover-open") && prev !== btn) {
+      if (MAP_POPOVER_OPEN && prev !== btn) {
+        MAP_POPOVER_OPEN = false;
         mapPopover.hidePopover();
       }
     }, { capture: true });
@@ -2666,13 +2710,11 @@
       AppState.setRecords([]);
       AppState.setFile(file);
       setStatusMessage(`파일 선택됨: ${file.name} 추출 버튼을 누르세요`);
-      domElements.dropZoneText
-        .querySelectorAll(".desktop-msg, .mobile-msg")
-        .forEach((el) => {
-          const strong = document.createElement("strong");
-          strong.textContent = file.name;
-          el.replaceChildren("선택된 파일: ", strong);
-        });
+      for (const el of DROP_ZONE_FILE_LABELS) {
+        const strong = document.createElement("strong");
+        strong.textContent = file.name;
+        el.replaceChildren("선택된 파일: ", strong);
+      }
       domElements.file.value = "";
     }
     domElements.file.addEventListener("change", () => {
@@ -2710,7 +2752,10 @@
     document.addEventListener("scroll", handleScrollStart);
     document.addEventListener("scrollend", handleScrollEnd);
     const rectCache = new Map();
-    const invalidateRectCache = () => rectCache.clear();
+    const invalidateRectCache = () => {
+      if (rectCache.size === 0) return;
+      rectCache.clear();
+    };
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
     window.addEventListener("resize", invalidateRectCache);
     let pointerRaf = null;
