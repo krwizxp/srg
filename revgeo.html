@@ -2788,7 +2788,9 @@
       if (!file) return;
       const isTxtName = file.name.toLowerCase().endsWith(".txt");
       if (!isTxtName && file.type !== "text/plain") {
-        return setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
+        setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
+        domElements.file.value = "";
+        return;
       }
       if (AppState.isBusy) {
         setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
@@ -2843,14 +2845,32 @@
     document.addEventListener("scrollend", handleScrollEnd);
     const rectCache = new Map();
     let rectCacheDirty = false;
+    let pointerRaf = null;
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerTarget = null;
+    let lastPointerTarget = null;
+    let hasPointer = false;
     const invalidateRectCache = () => {
       rectCacheDirty = true;
       if (rectCache.size === 0) return;
       rectCache.clear();
     };
+    const resolvePointerTarget = () => {
+      let target = lastPointerTarget;
+      if (target && !target.isConnected) target = null;
+      if (!target && hasPointer && typeof document.elementFromPoint === "function") {
+        const el = document.elementFromPoint(pointerX, pointerY);
+        target = el instanceof Element ? el : el?.parentElement;
+      }
+      return target;
+    };
     const requestRectCacheRefresh = () => {
       if (pointerRaf !== null) return;
-      if (!pointerTarget || ACTIVE_SCROLL.size > 0) return;
+      if (!hasPointer || ACTIVE_SCROLL.size > 0) return;
+      const target = resolvePointerTarget();
+      if (!target) return;
+      pointerTarget = target;
       pointerRaf = requestAnimationFrame(flushPointer);
     };
     const RESIZE_SCROLL_RESET_DELAY_MS = 150;
@@ -2877,15 +2897,12 @@
         rectCacheObserver.observe(card);
       }
     }
-    let pointerRaf = null;
-    let pointerX = 0;
-    let pointerY = 0;
-    let pointerTarget = null;
     const flushPointer = () => {
       pointerRaf = null;
       const target = pointerTarget;
       pointerTarget = null;
       if (!target || ACTIVE_SCROLL.size > 0) return;
+      lastPointerTarget = target;
       updateSpotlightsFromTarget(target, pointerX, pointerY);
     };
     function handlePointerMove(e) {
@@ -2896,6 +2913,8 @@
       let target = e.target;
       if (!(target instanceof Element)) target = target?.parentElement;
       pointerTarget = target;
+      lastPointerTarget = target;
+      hasPointer = true;
       if (pointerRaf !== null) return;
       pointerRaf = requestAnimationFrame(flushPointer);
     }
@@ -2930,6 +2949,10 @@
       if (ACTIVE_SCROLL.size > 0) return;
       const t = (e.target instanceof Element) ? e.target : null;
       if (!t) return;
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      lastPointerTarget = t;
+      hasPointer = true;
       updateSpotlightsFromTarget(t, e.clientX, e.clientY);
     }
     document.addEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
