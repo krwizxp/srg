@@ -1756,6 +1756,7 @@
       cancelPendingFilterDebounce();
       FILTER_CTX.timer = setTimeout(() => {
         FILTER_CTX.timer = null;
+        closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, FILTER_DEBOUNCE_MS);
@@ -2910,6 +2911,17 @@
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
         resetScrollState();
+        if (!MAP_POPOVER_OPEN || SUPPORTS_ANCHOR_POSITIONING) return;
+        const invoker =
+          (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
+        if (!invoker) {
+          closeMapPopover();
+          return;
+        }
+        requestAnimationFrame(() => {
+          cachePopoverSizeFromLiveRect();
+          positionMapPopover(invoker, POPOVER_SIZE_CACHE);
+        });
       }, RESIZE_SCROLL_RESET_DELAY_MS);
     };
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
