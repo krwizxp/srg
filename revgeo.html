@@ -1551,7 +1551,17 @@
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = setTimeout(() => {
         clearFindReveals();
-        startChunkedFilterApply(getLiveFilterSnapshot());
+        const f = getLiveFilterSnapshot();
+        if (f.active) {
+          startChunkedFilterApply(f);
+          return;
+        }
+        const hiddenRows =
+          domElements.tbody.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`);
+        if (!hiddenRows.length) return;
+        for (const tr of hiddenRows) {
+          tr.removeAttribute("hidden");
+        }
       }, FIND_REHIDE_DELAY_MS);
     }
     function scheduleFindRehide(tr) {
@@ -2776,7 +2786,8 @@
     domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
       if (!file) return;
-      if (!file.name.endsWith('.txt') && file.type !== 'text/plain') {
+      const isTxtName = file.name.toLowerCase().endsWith(".txt");
+      if (!isTxtName && file.type !== "text/plain") {
         return setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
       }
       if (AppState.isBusy) {
@@ -2831,12 +2842,41 @@
     document.addEventListener("scroll", handleScrollStart);
     document.addEventListener("scrollend", handleScrollEnd);
     const rectCache = new Map();
+    let rectCacheDirty = false;
     const invalidateRectCache = () => {
+      rectCacheDirty = true;
       if (rectCache.size === 0) return;
       rectCache.clear();
     };
+    const requestRectCacheRefresh = () => {
+      if (pointerRaf !== null) return;
+      if (!pointerTarget || ACTIVE_SCROLL.size > 0) return;
+      pointerRaf = requestAnimationFrame(flushPointer);
+    };
+    const RESIZE_SCROLL_RESET_DELAY_MS = 150;
+    let resizeScrollResetTimer = null;
+    const scheduleResizeScrollReset = () => {
+      if (resizeScrollResetTimer) clearTimeout(resizeScrollResetTimer);
+      resizeScrollResetTimer = setTimeout(() => {
+        resizeScrollResetTimer = null;
+        resetScrollState();
+      }, RESIZE_SCROLL_RESET_DELAY_MS);
+    };
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
-    window.addEventListener("resize", invalidateRectCache);
+    window.addEventListener("resize", () => {
+      invalidateRectCache();
+      scheduleResizeScrollReset();
+      requestRectCacheRefresh();
+    });
+    if (typeof ResizeObserver === "function") {
+      const rectCacheObserver = new ResizeObserver(() => {
+        invalidateRectCache();
+        requestRectCacheRefresh();
+      });
+      for (const card of document.querySelectorAll(".card")) {
+        rectCacheObserver.observe(card);
+      }
+    }
     let pointerRaf = null;
     let pointerX = 0;
     let pointerY = 0;
@@ -2861,6 +2901,10 @@
     }
     document.addEventListener("pointermove", handlePointerMove);
     function setSpotlightVars(el, clientX, clientY) {
+      if (rectCacheDirty) {
+        rectCacheDirty = false;
+        rectCache.clear();
+      }
       let rect = rectCache.get(el);
       if (!rect) {
         rect = el.getBoundingClientRect();
