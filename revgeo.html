@@ -1375,7 +1375,17 @@
       if (!(source instanceof Element)) return;
       const btn = source.closest("button.map-btn");
       if (!btn) return;
+      const prev = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
+      if (!MAP_POPOVER_OPEN || prev === btn) return;
+      const { lat, lon } = btn.dataset;
+      if (lat == null || lon == null || lat === "" || lon === "") return;
+      updateMapPopoverLinks(lat, lon);
+      if (SUPPORTS_ANCHOR_POSITIONING) return;
+      requestAnimationFrame(() => {
+        cachePopoverSizeFromLiveRect();
+        positionMapPopover(btn, POPOVER_SIZE_CACHE);
+      });
     }, { capture: true });
     function updateMapPopoverLinks(lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
@@ -1424,7 +1434,8 @@
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       if (!invoker) return;
       const { lat, lon } = invoker.dataset;
-      if (lat && lon) updateMapPopoverLinks(lat, lon);
+      if (lat == null || lon == null || lat === "" || lon === "") return;
+      updateMapPopoverLinks(lat, lon);
       if (SUPPORTS_ANCHOR_POSITIONING) return;
       requestAnimationFrame(() => {
         cachePopoverSizeFromLiveRect();
@@ -2253,6 +2264,7 @@
     function clearTable() {
       cancelActiveFilterTask();
       clearFindReveals();
+      closeMapPopover();
       resetScrollState();
       domElements.tbody.replaceChildren();
       if (rectCache.size) rectCache.clear();
@@ -2717,6 +2729,15 @@
         el.addEventListener("input", onFilterEvent);
       }
     }
+    domElements.tbody.addEventListener("click", (e) => {
+      if (!MAP_POPOVER_OPEN) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      const btn = target.closest("button.map-btn");
+      if (!btn) return;
+      if (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected && LAST_MAP_INVOKER === btn) return;
+      mapPopover.hidePopover();
+    }, { capture: true });
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
