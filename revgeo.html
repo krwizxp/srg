@@ -1369,6 +1369,14 @@
     let LAST_MAP_INVOKER = null;
     let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
     let MAP_POPOVER_OPEN = false;
+    document.addEventListener("command", (e) => {
+      if (e.command !== "show-popover") return;
+      const source = e.source;
+      if (!(source instanceof Element)) return;
+      const btn = source.closest("button.map-btn");
+      if (!btn) return;
+      LAST_MAP_INVOKER = btn;
+    }, { capture: true });
     function updateMapPopoverLinks(lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         const link = MAP_LINKS[i];
@@ -1408,14 +1416,13 @@
     }
     mapPopover.addEventListener("toggle", (e) => {
       MAP_POPOVER_OPEN = e.newState === "open";
-      if (!MAP_POPOVER_OPEN) return;
+      if (!MAP_POPOVER_OPEN) {
+        LAST_MAP_INVOKER = null;
+        return;
+      }
       const invoker =
-        (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER :
-          ((document.activeElement instanceof Element)
-            ? document.activeElement.closest("button.map-btn")
-            : null);
+        (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       if (!invoker) return;
-      LAST_MAP_INVOKER = invoker;
       const { lat, lon } = invoker.dataset;
       if (lat && lon) updateMapPopoverLinks(lat, lon);
       if (SUPPORTS_ANCHOR_POSITIONING) return;
@@ -2265,9 +2272,6 @@
       if (typeof y === "function") {
         return () => y.call(window.scheduler);
       }
-      if (typeof MessageChannel !== "function") {
-        throw new Error("scheduler.yield is unavailable, and MessageChannel is not supported in this environment.");
-      }
       const channel = new MessageChannel();
       const queue = [];
       let head = 0;
@@ -2713,19 +2717,6 @@
         el.addEventListener("input", onFilterEvent);
       }
     }
-    const closestMapButton = (target) => {
-      return (target instanceof Element) ? target.closest("button.map-btn") : null;
-    };
-    domElements.tbody.addEventListener("click", (e) => {
-      const btn = closestMapButton(e.target);
-      if (!btn) return;
-      const prev = (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
-      LAST_MAP_INVOKER = btn;
-      if (MAP_POPOVER_OPEN && prev !== btn) {
-        MAP_POPOVER_OPEN = false;
-        mapPopover.hidePopover();
-      }
-    }, { capture: true });
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
@@ -2851,6 +2842,15 @@
     let pointerTarget = null;
     let lastPointerTarget = null;
     let hasPointer = false;
+    const clearPointerState = () => {
+      hasPointer = false;
+      lastPointerTarget = null;
+      pointerTarget = null;
+      if (pointerRaf !== null) {
+        cancelAnimationFrame(pointerRaf);
+        pointerRaf = null;
+      }
+    };
     const invalidateRectCache = () => {
       rectCacheDirty = true;
       if (rectCache.size === 0) return;
@@ -2859,7 +2859,7 @@
     const resolvePointerTarget = () => {
       let target = lastPointerTarget;
       if (target && !target.isConnected) target = null;
-      if (!target && hasPointer && typeof document.elementFromPoint === "function") {
+      if (!target && hasPointer) {
         const el = document.elementFromPoint(pointerX, pointerY);
         target = el instanceof Element ? el : el?.parentElement;
       }
@@ -2873,6 +2873,15 @@
       pointerTarget = target;
       pointerRaf = requestAnimationFrame(flushPointer);
     };
+    document.addEventListener("pointerout", (e) => {
+      if (e.relatedTarget == null) clearPointerState();
+    }, { capture: true });
+    document.addEventListener("pointercancel", clearPointerState);
+    window.addEventListener("blur", clearPointerState);
+    window.addEventListener("pagehide", clearPointerState);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") clearPointerState();
+    });
     const RESIZE_SCROLL_RESET_DELAY_MS = 150;
     let resizeScrollResetTimer = null;
     const scheduleResizeScrollReset = () => {
@@ -2888,14 +2897,12 @@
       scheduleResizeScrollReset();
       requestRectCacheRefresh();
     });
-    if (typeof ResizeObserver === "function") {
-      const rectCacheObserver = new ResizeObserver(() => {
-        invalidateRectCache();
-        requestRectCacheRefresh();
-      });
-      for (const card of document.querySelectorAll(".card")) {
-        rectCacheObserver.observe(card);
-      }
+    const rectCacheObserver = new ResizeObserver(() => {
+      invalidateRectCache();
+      requestRectCacheRefresh();
+    });
+    for (const card of document.querySelectorAll(".card")) {
+      rectCacheObserver.observe(card);
     }
     const flushPointer = () => {
       pointerRaf = null;
