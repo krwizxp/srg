@@ -87,25 +87,25 @@
         --bg-grad-end: light-dark(oklch(92% 0.07 285),
             oklch(6% 0.10 270));
         --card-bg: light-dark(oklch(98% 0.03 275 / 0.70),
-            oklch(16% 0.06 275 / 0.60));
+            oklch(16% 0.101 275 / 0.60));
         --card-border: light-dark(oklch(92% 0.04 275 / 0.5),
             oklch(100% 0.04 275 / 0.12));
-        --inner-glow: inset 0 0 0 1px light-dark(oklch(100% 0 0 / 0.2),
+        --inner-glow: inset 0 0 0 1px light-dark(oklch(100% 0.008 270 / 0.2),
             oklch(100% 0.04 275 / 0.1));
-        --fg: light-dark(oklch(18% 0.08 275),
+        --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
-        --muted: light-dark(oklch(50% 0.08 275),
-            oklch(75% 0.06 275));
-        --line: light-dark(oklch(10% 0.06 275 / 0.10),
-            oklch(90% 0.04 275 / 0.15));
+        --muted: light-dark(oklch(50% 0.284 275),
+            oklch(75% 0.13 275));
+        --line: light-dark(oklch(10% 0.078 275 / 0.10),
+            oklch(90% 0.052 275 / 0.15));
         --accent: light-dark(oklch(52% 0.28 275),
             oklch(68% 0.24 270));
         --accent-glow: oklch(from var(--accent) l c h / 0.45);
         --success: light-dark(oklch(58% 0.25 150), oklch(70% 0.22 150));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --spotlight: light-dark(oklch(40% 0.15 275 / 0.08),
-            oklch(80% 0.10 275 / 0.12));
+        --spotlight: light-dark(oklch(40% 0.252 275 / 0.08),
+            oklch(80% 0.13 275 / 0.12));
         --shadow-sm:
           0 2px 4px oklch(10% 0.10 275 / 0.05),
           0 1px 2px oklch(10% 0.10 275 / 0.1);
@@ -143,7 +143,7 @@
 
         &::selection {
           background: var(--accent);
-          color: oklch(100% 0 0);
+          color: oklch(100% 0.008 270);
         }
 
         @container (inline-size <=800px) {
@@ -176,8 +176,8 @@
 
         @supports (animation-timeline: scroll()) {
           background-image:
-            linear-gradient(180deg, oklch(0% 0 0 / 0.15), transparent),
-            linear-gradient(0deg, oklch(0% 0 0 / 0.15), transparent);
+            linear-gradient(180deg, oklch(0% 0.008 64 / 0.15), transparent),
+            linear-gradient(0deg, oklch(0% 0.008 64 / 0.15), transparent);
           background-repeat: no-repeat;
           background-position: 50% 0%, 50% 100%;
           background-size: 100% 0, 100% 0;
@@ -344,7 +344,7 @@
           padding-block: 12px;
           padding-inline: 16px;
           transition: .2s ease;
-          background: light-dark(oklch(98% 0.02 270 / 0.4), oklch(15% 0.03 270 / 0.4));
+          background: light-dark(oklch(98% 0.02 270 / 0.4), oklch(15% 0.10 270 / 0.4));
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -413,7 +413,7 @@
           .filters select) {
           border-radius: 12px;
           border: 1px solid var(--line);
-          background-color: light-dark(oklch(100% 0 0 / 0.5), oklch(15% 0.04 270 / 0.4));
+          background-color: light-dark(oklch(100% 0.008 270 / 0.5), oklch(15% 0.10 270 / 0.4));
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
           color: var(--fg);
         }
@@ -465,7 +465,7 @@
             inset-block: 0;
             inset-inline: 0;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
-                oklch(100% 0 0 / 0.2),
+                oklch(100% 0.008 270 / 0.2),
                 transparent 70%);
             opacity: 0;
             transition:
@@ -484,9 +484,9 @@
                   --mouse-y 90ms linear;
               }
 
-              background: light-dark(oklch(99% 0 0), oklch(22% 0.04 270));
+              background: light-dark(oklch(99% 0.008 270), oklch(22% 0.145 270));
               transform: translateY(-2px);
-              box-shadow: 0 4px 12px -2px oklch(0% 0 0 / 0.15);
+              box-shadow: 0 4px 12px -2px oklch(0% 0.008 64 / 0.15);
               border-color: transparent;
             }
           }
@@ -617,7 +617,7 @@
         padding-block: 12px;
         padding-inline: 16px;
         border-radius: 12px;
-        background: light-dark(oklch(15% 0.02 270 / 0.05), oklch(96% 0.02 270 / 0.08));
+        background: light-dark(oklch(15% 0.10 270 / 0.05), oklch(96% 0.02 270 / 0.08));
         border-inline-start: 4px solid var(--muted);
         flex-shrink: 0;
         font-weight: 500;
@@ -638,7 +638,7 @@
         &.err {
           color: var(--err);
           border-inline-start-color: var(--err);
-          background: light-dark(oklch(96% 0.05 28), oklch(25% 0.10 28 / 0.3));
+          background: light-dark(oklch(96% 0.05 28), oklch(25% 0.13 28 / 0.3));
         }
 
         &.warn {
@@ -650,19 +650,19 @@
         &.stopped {
           color: var(--muted);
           border-inline-start-color: var(--muted);
-          background: light-dark(oklch(94% 0.01 270),
-              oklch(20% 0.02 270 / 0.4));
+          background: light-dark(oklch(94% 0.03 270),
+              oklch(20% 0.132 270 / 0.4));
         }
       }
 
       .table-wrap {
         border-radius: 20px;
         border: 1px solid var(--line);
-        background-color: light-dark(oklch(100% 0 0 / 0.4), oklch(0% 0 0 / 0.2));
+        background-color: light-dark(oklch(100% 0.008 270 / 0.4), oklch(0% 0.008 64 / 0.2));
         overflow: auto;
         scrollbar-gutter: stable;
         position: relative;
-        box-shadow: inset 0 2px 4px oklch(0% 0 0 / 0.03);
+        box-shadow: inset 0 2px 4px oklch(0% 0.008 64 / 0.03);
 
         .empty-hint {
           display: grid;
@@ -786,7 +786,7 @@
 
             @media (any-hover: hover) {
               &:hover {
-                background: light-dark(oklch(97% 0.02 270), oklch(22% 0.04 270));
+                background: light-dark(oklch(97% 0.02 270), oklch(22% 0.145 270));
               }
             }
 
@@ -842,7 +842,7 @@
               gap: 10px;
               padding-block: 16px;
               padding-inline: 16px;
-              background: light-dark(oklch(100% 0 0 / 0.4), oklch(20% 0.04 270 / 0.4));
+              background: light-dark(oklch(100% 0.008 270 / 0.4), oklch(20% 0.132 270 / 0.4));
               border: 1px solid var(--line);
               border-radius: 16px;
               box-shadow: var(--shadow-sm);
