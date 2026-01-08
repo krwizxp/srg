@@ -1641,13 +1641,6 @@
         tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
       }
     }
-    function getAllRowsLive() {
-      return domElements.tbody.rows;
-    }
-    function applyFilterToRow(tr, f = getLiveFilterSnapshot(), r = null) {
-      if (!tr) return;
-      setRowHiddenByFilter(tr, f, r);
-    }
     function clearFindReveals() {
       if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
       FIND_REVEAL_ACTIVE = false;
@@ -1690,7 +1683,7 @@
       }
     }
     function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
-      const rows = getAllRowsLive();
+      const rows = domElements.tbody.rows;
       const len = rows.length;
       if (len === 0) {
         cancelActiveFilterApply();
@@ -2601,7 +2594,7 @@
     function commitResultRow(tr, r) {
       if (!tr || !tr.isConnected) return;
       fillRow(tr, r);
-      applyFilterToRow(tr, getLiveFilterSnapshot(), r);
+      setRowHiddenByFilter(tr, getLiveFilterSnapshot(), r);
       pushResultRow(r);
     }
     function startProcessing() {
@@ -2722,12 +2715,11 @@
         AppState.controller = null;
       }
     }
-    const onFilterEvent = () => scheduleApplyFilterAll();
     for (const el of FILTER_INPUTS) {
       if (el.tagName === "SELECT") {
-        el.addEventListener("change", onFilterEvent);
+        el.addEventListener("change", scheduleApplyFilterAll);
       } else {
-        el.addEventListener("input", onFilterEvent);
+        el.addEventListener("input", scheduleApplyFilterAll);
       }
     }
     domElements.tbody.addEventListener("click", (e) => {
