@@ -1339,8 +1339,8 @@
       if (!l) return false;
       return l === lowerCountryName || l === lowerAdminCountry;
     }
-    const mapPopover = document.querySelector("#map-popover");
-    const mapPopoverLinksHost = document.querySelector("#map-popover-links");
+    const mapPopover = document.getElementById("map-popover");
+    const mapPopoverLinksHost = document.getElementById("map-popover-links");
     const mapAnchors =
       mapPopoverLinksHost.querySelectorAll("a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
@@ -1553,7 +1553,7 @@
     );
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
     const SKELETON_TEMPLATE =
-      document.querySelector("#tmpl-row-skeleton").content.querySelector("tr");
+      document.getElementById("tmpl-row-skeleton").content.querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => {
       s = String(s ?? "").trim().toLowerCase();
