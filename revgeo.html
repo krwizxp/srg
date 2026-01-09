@@ -633,6 +633,10 @@
         overflow: hidden;
         border-radius: clamp(20px, 2vw, 28px);
 
+        @media (max-width: 900px) {
+          block-size: auto;
+        }
+
         .card-stack-frame {
           position: absolute;
           inset-block: 0;
