@@ -170,11 +170,15 @@
     }
 
     @layer components {
-      :is(.coords-view, .table-wrap) {
+
+      .coords-view,
+      .table-wrap {
         flex: 1;
         scrollbar-width: thin;
+      }
 
-        @supports (animation-timeline: scroll()) {
+      @supports (animation-timeline: scroll()) {
+        .coords-view {
           background-image:
             linear-gradient(180deg, oklch(0% 0.008 64 / 0.15), transparent),
             linear-gradient(0deg, oklch(0% 0.008 64 / 0.15), transparent);
@@ -183,6 +187,34 @@
           background-size: 100% 0, 100% 0;
           animation-timeline: scroll(self);
           animation-name: scroll-shadows;
+        }
+
+        .table-wrap::before,
+        .table-wrap::after {
+          content: "";
+          display: block;
+          position: sticky;
+          inset-inline: 0;
+          block-size: 14px;
+          pointer-events: none;
+          z-index: 5;
+          opacity: 0;
+        }
+
+        .table-wrap::before {
+          inset-block-start: var(--table-head-offset);
+          margin-block-start: -14px;
+          background: linear-gradient(180deg, oklch(0% 0.008 64 / 0.15), transparent);
+          animation: scroll-shadow-top 1s both;
+          animation-timeline: scroll(nearest);
+        }
+
+        .table-wrap::after {
+          inset-block-end: 0;
+          margin-block-end: -14px;
+          background: linear-gradient(0deg, oklch(0% 0.008 64 / 0.15), transparent);
+          animation: scroll-shadow-bottom 1s both;
+          animation-timeline: scroll(nearest);
         }
       }
 
@@ -209,6 +241,26 @@
 
         100% {
           background-size: 100% 14px, 100% 0;
+        }
+      }
+
+      @keyframes scroll-shadow-top {
+        0% {
+          opacity: 0;
+        }
+
+        100% {
+          opacity: 1;
+        }
+      }
+
+      @keyframes scroll-shadow-bottom {
+        0% {
+          opacity: 1;
+        }
+
+        100% {
+          opacity: 0;
         }
       }
 
@@ -783,6 +835,7 @@
       }
 
       .table-wrap {
+        --table-head-offset: 0px;
         border-radius: 20px;
         border: 1px solid var(--line);
         background-color: light-dark(oklch(100% 0.008 270 / 0.4), oklch(0% 0.008 64 / 0.2));
@@ -1656,6 +1709,17 @@
     };
     const DROP_ZONE_FILE_LABELS =
       domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
+    const updateTableHeadOffset = (() => {
+      let lastHeight = -1;
+      return () => {
+        if (!domElements.tableWrap || !tbl.tHead) return;
+        const height = tbl.tHead.offsetHeight;
+        if (height === lastHeight) return;
+        lastHeight = height;
+        domElements.tableWrap.style.setProperty("--table-head-offset", `${height}px`);
+      };
+    })();
+    updateTableHeadOffset();
     const ACTIVE_SCROLL = new Set();
     const SCROLLING_CLASS = "scrolling";
     const setGlobalScrolling = (on) => {
@@ -3075,16 +3139,19 @@
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
     window.addEventListener("resize", () => {
       invalidateRectCache();
+      updateTableHeadOffset();
       scheduleResizeScrollReset();
       requestRectCacheRefresh();
     });
     const rectCacheObserver = new ResizeObserver(() => {
       invalidateRectCache();
       requestRectCacheRefresh();
+      updateTableHeadOffset();
     });
     for (const card of document.querySelectorAll(".card, .card-stack-spotlight")) {
       rectCacheObserver.observe(card);
     }
+    if (tbl.tHead) rectCacheObserver.observe(tbl.tHead);
     const flushPointer = () => {
       pointerRaf = null;
       const target = pointerTarget;
