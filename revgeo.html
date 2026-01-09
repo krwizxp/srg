@@ -281,7 +281,7 @@
         }
 
         @media (any-hover: hover) {
-          &:hover::before {
+          &:hover:not(.spotlight-paused)::before {
             opacity: 1;
             will-change: transform;
             transition:
@@ -291,9 +291,13 @@
           }
         }
 
-        &:active::before {
+        &:active:not(.spotlight-paused)::before {
           opacity: 1;
           transition: none;
+        }
+
+        &.spotlight-paused::before {
+          opacity: 0;
         }
 
         .brand {
@@ -447,7 +451,7 @@
           }
 
           &#coords {
-            @container page (inline-size <=800px) {
+            @container page (inline-size <=900px) {
               max-block-size: 30dvh;
             }
           }
@@ -2863,10 +2867,16 @@
     let pointerTarget = null;
     let lastPointerTarget = null;
     let hasPointer = false;
+    const tableCard = domElements.tableWrap.closest(".card");
+    let tableSpotlightPaused = false;
     const clearPointerState = () => {
       hasPointer = false;
       lastPointerTarget = null;
       pointerTarget = null;
+      if (tableSpotlightPaused) {
+        tableSpotlightPaused = false;
+        if (tableCard) tableCard.classList.remove("spotlight-paused");
+      }
       if (pointerRaf !== null) {
         cancelAnimationFrame(pointerRaf);
         pointerRaf = null;
@@ -2894,10 +2904,20 @@
       pointerTarget = target;
       pointerRaf = requestAnimationFrame(flushPointer);
     };
+    const setTableSpotlightPaused = (paused) => {
+      if (!tableCard) return;
+      if (tableSpotlightPaused === paused) return;
+      tableSpotlightPaused = paused;
+      tableCard.classList.toggle("spotlight-paused", paused);
+      if (!paused) requestRectCacheRefresh();
+    };
     document.addEventListener("pointerout", (e) => {
       if (e.relatedTarget == null) clearPointerState();
     }, { capture: true });
     document.addEventListener("pointercancel", clearPointerState);
+    domElements.tableWrap.addEventListener("pointerenter", () => setTableSpotlightPaused(true));
+    domElements.tableWrap.addEventListener("pointerleave", () => setTableSpotlightPaused(false));
+    domElements.tableWrap.addEventListener("pointercancel", () => setTableSpotlightPaused(false));
     window.addEventListener("blur", clearPointerState);
     window.addEventListener("pagehide", clearPointerState);
     document.addEventListener("visibilitychange", () => {
@@ -2982,7 +3002,9 @@
         current = current.parentElement;
       }
       if (btn) setSpotlightVars(btn, x, y);
-      if (card) setSpotlightVars(card, x, y);
+      if (card && !(tableSpotlightPaused && card === tableCard)) {
+        setSpotlightVars(card, x, y);
+      }
     }
     function handlePointerDownSpotlight(e) {
       if (ACTIVE_SCROLL.size > 0) return;
