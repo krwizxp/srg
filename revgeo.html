@@ -226,6 +226,7 @@
         overflow: hidden;
         position: relative;
         container-type: inline-size;
+        --spotlight-radius: 800px;
 
         .card-header {
           display: flex;
@@ -261,11 +262,16 @@
           content: "";
           position: absolute;
           pointer-events: none;
-          inset-block: 0;
-          inset-inline: 0;
-          background: radial-gradient(in oklch 800px circle at var(--mouse-x) var(--mouse-y),
+          inset-block-start: 0;
+          inset-inline-start: 0;
+          inline-size: calc(var(--spotlight-radius) * 2);
+          block-size: calc(var(--spotlight-radius) * 2);
+          background: radial-gradient(in oklch circle,
               var(--spotlight),
               transparent 40%);
+          transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
+              calc(var(--mouse-y) - var(--spotlight-radius)),
+              0);
           opacity: 0;
           transition:
             opacity .5s ease-out,
@@ -277,6 +283,7 @@
         @media (any-hover: hover) {
           &:hover::before {
             opacity: 1;
+            will-change: transform;
             transition:
               opacity .2s ease-out,
               --mouse-x 90ms linear,
