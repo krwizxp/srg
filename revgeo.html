@@ -281,7 +281,7 @@
         }
 
         @media (any-hover: hover) {
-          &:hover:not(.spotlight-paused)::before {
+          &:hover:not(.no-spotlight)::before {
             opacity: 1;
             will-change: transform;
             transition:
@@ -291,12 +291,12 @@
           }
         }
 
-        &:active:not(.spotlight-paused)::before {
+        &:active:not(.no-spotlight)::before {
           opacity: 1;
           transition: none;
         }
 
-        &.spotlight-paused::before {
+        &.no-spotlight::before {
           opacity: 0;
         }
 
@@ -620,6 +620,118 @@
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
             pointer-events: none;
+          }
+        }
+      }
+
+      .card-stack {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        block-size: 100%;
+        min-block-size: 0;
+        overflow: hidden;
+        border-radius: clamp(20px, 2vw, 28px);
+
+        .card-stack-frame {
+          position: absolute;
+          inset-block: 0;
+          inset-inline: 0;
+          background: var(--card-bg);
+          backdrop-filter: var(--glass);
+          border: 1px solid var(--card-border);
+          border-radius: inherit;
+          box-shadow: var(--shadow-md);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .card-stack-spotlight {
+          position: absolute;
+          inset-block: 0;
+          inset-inline: 0;
+          border-radius: inherit;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 2;
+          --spotlight-radius: 800px;
+
+          &::before {
+            content: "";
+            position: absolute;
+            inset-block-start: 0;
+            inset-inline-start: 0;
+            inline-size: calc(var(--spotlight-radius) * 2);
+            block-size: calc(var(--spotlight-radius) * 2);
+            background: radial-gradient(in oklch circle,
+                var(--spotlight),
+                transparent 40%);
+            transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
+                calc(var(--mouse-y) - var(--spotlight-radius)),
+                0);
+            opacity: 0;
+            transition:
+              opacity .5s ease-out,
+              --mouse-x 90ms linear,
+              --mouse-y 90ms linear;
+          }
+
+          &.suppressed::before {
+            opacity: 0;
+          }
+        }
+
+        @media (any-hover: hover) {
+          &:hover .card-stack-spotlight::before {
+            opacity: 1;
+            will-change: transform;
+            transition:
+              opacity .2s ease-out,
+              --mouse-x 90ms linear,
+              --mouse-y 90ms linear;
+          }
+
+          &:hover .card-stack-spotlight.suppressed::before {
+            opacity: 0;
+          }
+        }
+
+        &:active .card-stack-spotlight::before {
+          opacity: 1;
+          transition: none;
+        }
+
+        .card-stack-content {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-block-size: 0;
+          position: relative;
+          z-index: 1;
+
+          >.card {
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            border-radius: 0;
+            backdrop-filter: none;
+          }
+        }
+
+        .card-stack-top {
+          padding-block-end: 0;
+        }
+
+        .card-stack-bottom {
+          padding-block-start: 10px;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-block-size: 0;
+
+          .table-wrap {
+            flex: 1;
+            min-block-size: 0;
           }
         }
       }
@@ -1194,54 +1306,62 @@
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
     </section>
-    <section class="card">
-      <header class="card-header">
-        <h2>결과 표</h2>
-        <p class="header-desc">좌표별 주소 및 지도 링크</p>
-      </header>
-      <search>
-        <form class="filters">
-          <input id="filter-q" type="search" placeholder="전체검색">
-          <select id="filter-kind">
-            <option value="">구분(전체)</option>
-            <option value="kr">KR</option>
-            <option value="kp">KP</option>
-            <option value="world">WORLD</option>
-            <option value="에러">에러</option>
-          </select>
-          <input id="filter-sido" type="search" placeholder="시·도">
-          <input id="filter-sigungu" type="search" placeholder="시·군·구">
-          <input id="filter-emd" type="search" placeholder="읍·면·동·리">
-          <input id="filter-tag" type="search" placeholder="지물 태그">
-          <input id="filter-fulladdr" type="search" placeholder="전체주소">
-          <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
-        </form>
-      </search>
-      <div class="table-wrap">
-        <p class="empty-hint">
-          데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
-        </p>
-        <table id="tbl">
-          <caption class="sr-only">
-            역지오코딩 결과 표
-          </caption>
-          <thead>
-            <tr>
-              <th data-col-key="kind">구분</th>
-              <th data-col-key="idx">순번</th>
-              <th data-col-key="coords">좌표 (위도,경도)</th>
-              <th data-col-key="sido">시·도</th>
-              <th data-col-key="sigungu">시·군·구</th>
-              <th data-col-key="emd">읍·면·동·리</th>
-              <th data-col-key="tag">지물 태그</th>
-              <th data-col-key="fullAddr">전체주소</th>
-              <th data-col-key="maps">지도링크</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+    <div class="card-stack">
+      <div class="card-stack-frame"></div>
+      <div class="card-stack-spotlight"></div>
+      <div class="card-stack-content">
+        <section class="card card-stack-top no-spotlight">
+          <header class="card-header">
+            <h2>결과 표</h2>
+            <p class="header-desc">좌표별 주소 및 지도 링크</p>
+          </header>
+          <search>
+            <form class="filters">
+              <input id="filter-q" type="search" placeholder="전체검색">
+              <select id="filter-kind">
+                <option value="">구분(전체)</option>
+                <option value="kr">KR</option>
+                <option value="kp">KP</option>
+                <option value="world">WORLD</option>
+                <option value="에러">에러</option>
+              </select>
+              <input id="filter-sido" type="search" placeholder="시·도">
+              <input id="filter-sigungu" type="search" placeholder="시·군·구">
+              <input id="filter-emd" type="search" placeholder="읍·면·동·리">
+              <input id="filter-tag" type="search" placeholder="지물 태그">
+              <input id="filter-fulladdr" type="search" placeholder="전체주소">
+              <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
+            </form>
+          </search>
+        </section>
+        <section class="card card-stack-bottom no-spotlight">
+          <div class="table-wrap">
+            <p class="empty-hint">
+              데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
+            </p>
+            <table id="tbl">
+              <caption class="sr-only">
+                역지오코딩 결과 표
+              </caption>
+              <thead>
+                <tr>
+                  <th data-col-key="kind">구분</th>
+                  <th data-col-key="idx">순번</th>
+                  <th data-col-key="coords">좌표 (위도,경도)</th>
+                  <th data-col-key="sido">시·도</th>
+                  <th data-col-key="sigungu">시·군·구</th>
+                  <th data-col-key="emd">읍·면·동·리</th>
+                  <th data-col-key="tag">지물 태그</th>
+                  <th data-col-key="fullAddr">전체주소</th>
+                  <th data-col-key="maps">지도링크</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </main>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크">
     <div class="map-links" id="map-popover-links">
@@ -2867,15 +2987,16 @@
     let pointerTarget = null;
     let lastPointerTarget = null;
     let hasPointer = false;
-    const tableCard = domElements.tableWrap.closest(".card");
-    let tableSpotlightPaused = false;
+    const tableCardStack = domElements.tableWrap.closest(".card-stack");
+    const tableCardStackSpotlight = tableCardStack?.querySelector(".card-stack-spotlight");
+    let stackSpotlightSuppressed = false;
     const clearPointerState = () => {
       hasPointer = false;
       lastPointerTarget = null;
       pointerTarget = null;
-      if (tableSpotlightPaused) {
-        tableSpotlightPaused = false;
-        if (tableCard) tableCard.classList.remove("spotlight-paused");
+      if (stackSpotlightSuppressed) {
+        stackSpotlightSuppressed = false;
+        tableCardStackSpotlight?.classList.remove("suppressed");
       }
       if (pointerRaf !== null) {
         cancelAnimationFrame(pointerRaf);
@@ -2904,20 +3025,24 @@
       pointerTarget = target;
       pointerRaf = requestAnimationFrame(flushPointer);
     };
-    const setTableSpotlightPaused = (paused) => {
-      if (!tableCard) return;
-      if (tableSpotlightPaused === paused) return;
-      tableSpotlightPaused = paused;
-      tableCard.classList.toggle("spotlight-paused", paused);
-      if (!paused) requestRectCacheRefresh();
+    const setStackSpotlightSuppressed = (suppressed) => {
+      if (!tableCardStackSpotlight) return;
+      if (stackSpotlightSuppressed === suppressed) return;
+      stackSpotlightSuppressed = suppressed;
+      tableCardStackSpotlight.classList.toggle("suppressed", suppressed);
+      if (!suppressed) {
+        lastPointerTarget = null;
+        pointerTarget = null;
+        requestRectCacheRefresh();
+      }
     };
     document.addEventListener("pointerout", (e) => {
       if (e.relatedTarget == null) clearPointerState();
     }, { capture: true });
     document.addEventListener("pointercancel", clearPointerState);
-    domElements.tableWrap.addEventListener("pointerenter", () => setTableSpotlightPaused(true));
-    domElements.tableWrap.addEventListener("pointerleave", () => setTableSpotlightPaused(false));
-    domElements.tableWrap.addEventListener("pointercancel", () => setTableSpotlightPaused(false));
+    domElements.tableWrap.addEventListener("pointerenter", () => setStackSpotlightSuppressed(true));
+    domElements.tableWrap.addEventListener("pointerleave", () => setStackSpotlightSuppressed(false));
+    domElements.tableWrap.addEventListener("pointercancel", () => setStackSpotlightSuppressed(false));
     window.addEventListener("blur", clearPointerState);
     window.addEventListener("pagehide", clearPointerState);
     document.addEventListener("visibilitychange", () => {
@@ -2953,7 +3078,7 @@
       invalidateRectCache();
       requestRectCacheRefresh();
     });
-    for (const card of document.querySelectorAll(".card")) {
+    for (const card of document.querySelectorAll(".card, .card-stack-spotlight")) {
       rectCacheObserver.observe(card);
     }
     const flushPointer = () => {
@@ -2992,17 +3117,28 @@
       el.style.setProperty("--mouse-y", `${clientY - rect.top}px`);
     }
     function updateSpotlightsFromTarget(target, x, y) {
+      const isTableTarget =
+        target instanceof Element && domElements.tableWrap.contains(target);
+      if (isTableTarget !== stackSpotlightSuppressed) {
+        setStackSpotlightSuppressed(isTableTarget);
+      }
       let btn = null;
       let card = null;
       let current = target;
       while (current && current !== document.body) {
         if (!btn && current.tagName === "BUTTON") btn = current;
         if (!card && current.classList.contains("card")) card = current;
-        if (btn && card) break;
         current = current.parentElement;
       }
       if (btn) setSpotlightVars(btn, x, y);
-      if (card && !(tableSpotlightPaused && card === tableCard)) {
+      const inTableStack =
+        tableCardStack && target instanceof Element && tableCardStack.contains(target);
+      if (inTableStack) {
+        if (stackSpotlightSuppressed || !tableCardStackSpotlight) return;
+        setSpotlightVars(tableCardStackSpotlight, x, y);
+        return;
+      }
+      if (card && !card.classList.contains("no-spotlight")) {
         setSpotlightVars(card, x, y);
       }
     }
