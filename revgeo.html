@@ -684,6 +684,7 @@
         min-block-size: 0;
         overflow: hidden;
         border-radius: clamp(20px, 2vw, 28px);
+        box-shadow: var(--shadow-md);
 
         @container page (inline-size <=900px) {
           block-size: auto;
@@ -697,7 +698,6 @@
           backdrop-filter: var(--glass);
           border: 1px solid var(--card-border);
           border-radius: inherit;
-          box-shadow: var(--shadow-md);
           pointer-events: none;
           z-index: 0;
         }
@@ -752,9 +752,15 @@
           }
         }
 
-        &:active .card-stack-spotlight::before {
-          opacity: 1;
-          transition: none;
+        &:active {
+          .card-stack-spotlight::before {
+            opacity: 1;
+            transition: none;
+          }
+
+          .card-stack-spotlight.suppressed::before {
+            opacity: 0;
+          }
         }
 
         .card-stack-content {
