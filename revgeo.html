@@ -106,6 +106,10 @@
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
         --spotlight: light-dark(oklch(40% 0.252 275 / 0.08),
             oklch(80% 0.13 275 / 0.12));
+        --surface-base: light-dark(oklch(100% 0.008 270 / 0.5),
+            oklch(15% 0.10 270 / 0.4));
+        --surface-hover: color-mix(in oklch, var(--accent) 10%, var(--surface-base));
+        --surface-hover-strong: color-mix(in oklch, var(--accent) 18%, var(--surface-base));
         --shadow-sm:
           0 2px 4px oklch(10% 0.10 275 / 0.05),
           0 1px 2px oklch(10% 0.10 275 / 0.1);
@@ -439,7 +443,7 @@
 
           &:is(:hover, :focus-within) {
             border-color: var(--accent);
-            background: light-dark(oklch(99% 0.02 275 / 0.8), oklch(12% 0.08 275 / 0.4));
+            background: var(--surface-hover-strong);
 
             .drop-icon {
               color: var(--accent);
@@ -476,7 +480,7 @@
           .filters select) {
           border-radius: 12px;
           border: 1px solid var(--line);
-          background-color: light-dark(oklch(100% 0.008 270 / 0.5), oklch(15% 0.10 270 / 0.4));
+          background-color: var(--surface-base);
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
           color: var(--fg);
         }
@@ -547,7 +551,7 @@
                   --mouse-y 90ms linear;
               }
 
-              background: light-dark(oklch(99% 0.008 270), oklch(22% 0.145 270));
+              background: var(--surface-hover);
               transform: translateY(-2px);
               box-shadow: 0 4px 12px -2px oklch(0% 0.008 64 / 0.15);
               border-color: transparent;
@@ -1386,7 +1390,7 @@
           </header>
           <search>
             <form class="filters">
-              <input id="filter-q" type="search" placeholder="전체검색">
+              <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색">
               <select id="filter-kind">
                 <option value="">구분(전체)</option>
                 <option value="kr">KR</option>
@@ -1394,11 +1398,11 @@
                 <option value="world">WORLD</option>
                 <option value="에러">에러</option>
               </select>
-              <input id="filter-sido" type="search" placeholder="시·도">
-              <input id="filter-sigungu" type="search" placeholder="시·군·구">
-              <input id="filter-emd" type="search" placeholder="읍·면·동·리">
-              <input id="filter-tag" type="search" placeholder="지물 태그">
-              <input id="filter-fulladdr" type="search" placeholder="전체주소">
+              <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도">
+              <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구">
+              <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리">
+              <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그">
+              <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소">
               <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
             </form>
           </search>
