@@ -763,6 +763,12 @@
           }
         }
 
+        &:has(.table-wrap:active) {
+          .card-stack-spotlight::before {
+            opacity: 0;
+          }
+        }
+
         .card-stack-content {
           display: flex;
           flex-direction: column;
