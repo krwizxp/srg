@@ -82,8 +82,8 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 98%, var(--accent)),
-            color-mix(in oklch, oklch(14% 0.07 275) 98%, var(--accent)));
+        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 99%, var(--accent)),
+            color-mix(in oklch, oklch(14% 0.07 275) 99%, var(--accent)));
         --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 96%, var(--accent)),
             color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 96%, var(--accent)));
         --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
@@ -99,11 +99,11 @@
             oklch(64% 0.16 270));
         --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
         --accent-border: color-mix(in oklch, var(--accent) 35%, var(--line-soft));
-        --accent-wash: color-mix(in oklch, var(--accent) 6%, var(--surface-panel));
+        --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --spotlight: light-dark(color-mix(in oklch, var(--accent) 5%, transparent),
-            color-mix(in oklch, var(--accent) 7%, transparent));
+        --spotlight: light-dark(color-mix(in oklch, var(--accent) 4%, transparent),
+            color-mix(in oklch, var(--accent) 6%, transparent));
         --surface-base: light-dark(oklch(100% 0.008 270 / 0.5),
             oklch(18% 0.08 270 / 0.45));
         --surface-panel: light-dark(color-mix(in oklch, var(--surface-base) 86%, var(--card-bg)),
@@ -115,11 +115,6 @@
       }
 
       html {
-        background-image:
-          url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E"),
-          linear-gradient(in oklch 180deg, var(--bg-grad-start),
-            light-dark(color-mix(in oklch, var(--surface-panel) 96%, var(--accent)),
-              color-mix(in oklch, var(--surface-panel) 94%, var(--accent))));
         background-color: var(--bg-grad-start);
         min-block-size: 100%;
       }
@@ -261,9 +256,9 @@
         backdrop-filter: blur(18px) saturate(140%);
         border: 1px solid var(--line-soft);
         box-shadow:
-          0 12px 24px -12px color-mix(in oklch, var(--fg) 12%, transparent),
-          inset 0 0 0 1px light-dark(color-mix(in oklch, var(--tone-base) 16%, transparent),
-            color-mix(in oklch, var(--fg) 8%, transparent));
+          0 12px 24px -12px color-mix(in oklch, var(--fg) 10%, transparent),
+          inset 0 0 0 1px light-dark(color-mix(in oklch, var(--tone-base) 14%, transparent),
+            color-mix(in oklch, var(--fg) 7%, transparent));
       }
 
       :is(.card, .card-stack) {
@@ -321,7 +316,7 @@
           block-size: calc(var(--spotlight-radius) * 2);
           background: radial-gradient(in oklch circle,
               var(--spotlight),
-              transparent 30%);
+              transparent 25%);
           transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
               calc(var(--mouse-y) - var(--spotlight-radius)),
               0);
@@ -528,7 +523,7 @@
             inset-block: 0;
             inset-inline: 0;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
-                color-mix(in oklch, var(--accent) 6%, transparent),
+                color-mix(in oklch, var(--accent) 4%, transparent),
                 transparent 70%);
             opacity: 0;
             transition:
@@ -559,13 +554,13 @@
           }
 
           &:is(#parse, #start) {
-            background: color-mix(in oklch, var(--accent) 80%, var(--surface-panel));
+            background: color-mix(in oklch, var(--accent) 75%, var(--surface-panel));
             color: color-mix(in oklch, white 92%, var(--fg));
             border-color: var(--accent-border);
 
             &:not(:disabled) {
               &:hover {
-                background: color-mix(in oklch, var(--accent) 85%, var(--surface-panel));
+                background: color-mix(in oklch, var(--accent) 80%, var(--surface-panel));
               }
             }
           }
@@ -708,7 +703,7 @@
             block-size: calc(var(--spotlight-radius) * 2);
             background: radial-gradient(in oklch circle,
                 var(--spotlight),
-                transparent 30%);
+                transparent 25%);
             transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
                 calc(var(--mouse-y) - var(--spotlight-radius)),
                 0);
@@ -927,7 +922,7 @@
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: color-mix(in oklch, var(--surface-panel) 94%, var(--card-surface));
+            background: color-mix(in oklch, var(--surface-panel) 40%, var(--tone-base));
             text-align: start;
             font-weight: 600;
             font-size: var(--fs-sm);
