@@ -94,10 +94,12 @@
             oklch(100% 0.04 275 / 0.1));
         --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
-        --muted: light-dark(oklch(50% 0.284 275),
-            oklch(75% 0.13 275));
-        --line: light-dark(oklch(10% 0.078 275 / 0.10),
-            oklch(90% 0.052 275 / 0.15));
+        --tone-base: light-dark(oklch(98% 0.008 270), oklch(14% 0.04 270));
+        --line-glass: color-mix(in oklch, var(--fg) 12%, transparent);
+        --line-glass-strong: color-mix(in oklch, var(--fg) 16%, transparent);
+        --muted: light-dark(color-mix(in oklch, var(--fg) 68%, var(--tone-base)),
+            color-mix(in oklch, var(--fg) 72%, var(--tone-base)));
+        --line: color-mix(in oklch, var(--fg) 12%, var(--tone-base));
         --accent: light-dark(oklch(52% 0.28 275),
             oklch(68% 0.24 270));
         --accent-glow: oklch(from var(--accent) l c h / 0.45);
@@ -110,6 +112,8 @@
             oklch(15% 0.10 270 / 0.4));
         --surface-hover: color-mix(in oklch, var(--accent) 10%, var(--surface-base));
         --surface-hover-strong: color-mix(in oklch, var(--accent) 18%, var(--surface-base));
+        --bg-warn: color-mix(in oklch, var(--warn) 14%, var(--surface-base));
+        --bg-err: color-mix(in oklch, var(--err) 14%, var(--surface-base));
         --shadow-sm:
           0 2px 4px oklch(10% 0.10 275 / 0.05),
           0 1px 2px oklch(10% 0.10 275 / 0.1);
@@ -486,6 +490,7 @@
         }
 
         .coords-view {
+          --line: var(--line-glass);
           font: inherit;
           padding-block: 12px;
           padding-inline: 12px;
@@ -833,13 +838,13 @@
         &.err {
           color: var(--err);
           border-inline-start-color: var(--err);
-          background: light-dark(oklch(96% 0.05 28), oklch(25% 0.13 28 / 0.3));
+          background: var(--bg-err);
         }
 
         &.warn {
           color: oklch(from var(--warn) l c h);
           border-inline-start-color: var(--warn);
-          background: light-dark(oklch(97% 0.08 65), oklch(25% 0.10 65 / 0.3));
+          background: var(--bg-warn);
         }
 
         &.stopped {
@@ -852,6 +857,7 @@
 
       .table-wrap {
         --table-head-offset: 0px;
+        --line: var(--line-glass-strong);
         border-radius: 20px;
         border: 1px solid var(--line);
         background-color: light-dark(oklch(100% 0.008 270 / 0.4), oklch(0% 0.008 64 / 0.2));
@@ -904,6 +910,11 @@
         input[type="search"] {
           min-inline-size: 220px;
           flex: 1 1 220px;
+        }
+
+        input[type="search"]::placeholder {
+          color: color-mix(in oklch, var(--fg) 70%, var(--tone-base));
+          opacity: 1;
         }
 
         select {
