@@ -82,8 +82,7 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 99%, var(--accent)),
-            color-mix(in oklch, oklch(14% 0.07 275) 99%, var(--accent)));
+        --bg-grad-start: light-dark(oklch(97% 0.04 275), oklch(14% 0.07 275));
         --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 96%, var(--accent)),
             color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 96%, var(--accent)));
         --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
