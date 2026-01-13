@@ -10,7 +10,7 @@
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
-  <link rel="icon" href="icon.svg?v=4">
+  <link rel="icon" href="icon.svg">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -82,60 +82,44 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --bg-grad-start: light-dark(oklch(97% 0.04 275),
-            oklch(12% 0.08 275));
-        --bg-grad-end: light-dark(oklch(92% 0.07 285),
-            oklch(6% 0.10 270));
-        --card-bg: light-dark(oklch(98% 0.03 275 / 0.70),
-            oklch(16% 0.101 275 / 0.60));
-        --card-border: light-dark(oklch(92% 0.04 275 / 0.5),
-            oklch(100% 0.04 275 / 0.12));
-        --inner-glow: inset 0 0 0 1px light-dark(oklch(100% 0.008 270 / 0.2),
-            oklch(100% 0.04 275 / 0.1));
+        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 98%, var(--accent)),
+            color-mix(in oklch, oklch(14% 0.07 275) 98%, var(--accent)));
+        --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 96%, var(--accent)),
+            color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 96%, var(--accent)));
+        --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
         --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
-        --tone-base: light-dark(oklch(98% 0.008 270), oklch(14% 0.04 270));
-        --line-glass: color-mix(in oklch, var(--fg) 12%, transparent);
-        --line-glass-strong: color-mix(in oklch, var(--fg) 16%, transparent);
+        --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
         --muted: light-dark(color-mix(in oklch, var(--fg) 68%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 72%, var(--tone-base)));
-        --line: color-mix(in oklch, var(--fg) 12%, var(--tone-base));
-        --accent: light-dark(oklch(52% 0.28 275),
-            oklch(68% 0.24 270));
-        --accent-glow: oklch(from var(--accent) l c h / 0.45);
-        --success: light-dark(oklch(58% 0.25 150), oklch(70% 0.22 150));
+            color-mix(in oklch, var(--fg) 78%, var(--tone-base)));
+        --line-soft: light-dark(color-mix(in oklch, color-mix(in oklch, var(--fg) 10%, transparent) 80%,
+              var(--surface-panel)),
+            color-mix(in oklch, color-mix(in oklch, var(--fg) 20%, transparent) 80%, var(--surface-panel)));
+        --accent: light-dark(oklch(50% 0.18 275),
+            oklch(64% 0.16 270));
+        --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
+        --accent-border: color-mix(in oklch, var(--accent) 35%, var(--line-soft));
+        --accent-wash: color-mix(in oklch, var(--accent) 6%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --spotlight: light-dark(oklch(40% 0.252 275 / 0.08),
-            oklch(80% 0.13 275 / 0.12));
+        --spotlight: light-dark(color-mix(in oklch, var(--accent) 5%, transparent),
+            color-mix(in oklch, var(--accent) 7%, transparent));
         --surface-base: light-dark(oklch(100% 0.008 270 / 0.5),
-            oklch(15% 0.10 270 / 0.4));
-        --surface-hover: color-mix(in oklch, var(--accent) 10%, var(--surface-base));
-        --surface-hover-strong: color-mix(in oklch, var(--accent) 18%, var(--surface-base));
-        --bg-warn: color-mix(in oklch, var(--warn) 14%, var(--surface-base));
-        --bg-err: color-mix(in oklch, var(--err) 14%, var(--surface-base));
-        --shadow-sm:
-          0 2px 4px oklch(10% 0.10 275 / 0.05),
-          0 1px 2px oklch(10% 0.10 275 / 0.1);
-        --shadow-md:
-          0 20px 40px -10px oklch(5% 0.15 275 / 0.2),
-          var(--inner-glow);
-        --glass: blur(20px) saturate(180%);
-        --fs-base: clamp(14px, 1.5vw, 15px);
+            oklch(18% 0.08 270 / 0.45));
+        --surface-panel: light-dark(color-mix(in oklch, var(--surface-base) 86%, var(--card-bg)),
+            color-mix(in oklch, var(--surface-base) 76%, var(--card-bg)));
         --fs-sm: clamp(13px, 0.9vw, 14px);
-        --fs-lg: clamp(18px, 1.6vw, 22px);
-        --fs-xl: clamp(22px, 2vw, 28px);
-        --sb-thumb: oklch(from var(--accent) l c h / 0.5);
-        --sb-track: transparent;
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
-        scrollbar-color: var(--sb-thumb) var(--sb-track);
+        scrollbar-color: color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) transparent;
       }
 
       html {
         background-image:
-          url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E"),
-          linear-gradient(in oklch 180deg, var(--bg-grad-start), var(--bg-grad-end));
+          url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E"),
+          linear-gradient(in oklch 180deg, var(--bg-grad-start),
+            light-dark(color-mix(in oklch, var(--surface-panel) 96%, var(--accent)),
+              color-mix(in oklch, var(--surface-panel) 94%, var(--accent))));
         background-color: var(--bg-grad-start);
         min-block-size: 100%;
       }
@@ -146,12 +130,12 @@
         padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
         letter-spacing: -.015em;
         font-variant-numeric: tabular-nums;
-        font-size: var(--fs-base);
+        font-size: clamp(14px, 1.5vw, 15px);
         line-height: 1.6;
 
         &::selection {
-          background: var(--accent);
-          color: oklch(100% 0.008 270);
+          background: color-mix(in oklch, var(--accent) 25%, var(--card-surface));
+          color: var(--fg);
         }
 
         @container (inline-size <=800px) {
@@ -188,8 +172,8 @@
       @supports (animation-timeline: scroll()) {
         .coords-view {
           background-image:
-            linear-gradient(180deg, oklch(0% 0.008 64 / 0.15), transparent),
-            linear-gradient(0deg, oklch(0% 0.008 64 / 0.15), transparent);
+            linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent),
+            linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
           background-repeat: no-repeat;
           background-position: 50% 0%, 50% 100%;
           background-size: 100% 0, 100% 0;
@@ -212,7 +196,7 @@
         .table-wrap::before {
           inset-block-start: var(--table-head-offset);
           margin-block-start: -14px;
-          background: linear-gradient(180deg, oklch(0% 0.008 64 / 0.15), transparent);
+          background: linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
           animation: scroll-shadow-top 1s both;
           animation-timeline: scroll(nearest);
         }
@@ -220,7 +204,7 @@
         .table-wrap::after {
           inset-block-end: 0;
           margin-block-end: -14px;
-          background: linear-gradient(0deg, oklch(0% 0.008 64 / 0.15), transparent);
+          background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
           animation: scroll-shadow-bottom 1s both;
           animation-timeline: scroll(nearest);
         }
@@ -272,18 +256,27 @@
         }
       }
 
-      .card {
-        background: var(--card-bg);
-        backdrop-filter: var(--glass);
-        border: 1px solid var(--card-border);
+      :is(.card, .card-stack, .map-popover) {
+        background: var(--card-surface);
+        backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--line-soft);
+        box-shadow:
+          0 12px 24px -12px color-mix(in oklch, var(--fg) 12%, transparent),
+          inset 0 0 0 1px light-dark(color-mix(in oklch, var(--tone-base) 16%, transparent),
+            color-mix(in oklch, var(--fg) 8%, transparent));
+      }
+
+      :is(.card, .card-stack) {
         border-radius: clamp(20px, 2vw, 28px);
+        overflow: hidden;
+      }
+
+      .card {
         padding-block: clamp(20px, 2.5vw, 32px);
         padding-inline: clamp(20px, 2.5vw, 32px);
-        box-shadow: var(--shadow-md);
         display: flex;
         flex-direction: column;
         gap: 10px;
-        overflow: hidden;
         position: relative;
         container-type: inline-size;
         --spotlight-radius: 800px;
@@ -295,7 +288,7 @@
           flex-wrap: wrap;
 
           h2 {
-            font-size: var(--fs-lg);
+            font-size: clamp(18px, 1.6vw, 22px);
           }
 
           .header-desc {
@@ -328,7 +321,7 @@
           block-size: calc(var(--spotlight-radius) * 2);
           background: radial-gradient(in oklch circle,
               var(--spotlight),
-              transparent 40%);
+              transparent 30%);
           transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
               calc(var(--mouse-y) - var(--spotlight-radius)),
               0);
@@ -366,8 +359,7 @@
           gap: 14px;
 
           svg {
-            color: var(--accent);
-            filter: drop-shadow(0 0 12px var(--accent-glow));
+            color: var(--accent-ink);
             inline-size: 36px;
             block-size: 36px;
             flex: 0 0 auto;
@@ -380,11 +372,10 @@
             gap: 2px;
 
             h1 {
-              font-size: var(--fs-xl);
+              font-size: clamp(22px, 2vw, 28px);
               font-weight: 800;
               line-height: 1.1;
-              color: var(--accent);
-              filter: drop-shadow(0 2px 8px oklch(from var(--accent) l c h / 0.25));
+              color: var(--accent-ink);
             }
 
             p {
@@ -410,12 +401,12 @@
 
         .drop-zone {
           position: relative;
-          border: 2px dashed var(--line);
+          border: 1px dashed color-mix(in oklch, var(--line-soft) 70%, transparent);
           border-radius: 18px;
           padding-block: 12px;
           padding-inline: 16px;
           transition: .2s ease;
-          background: light-dark(oklch(98% 0.02 270 / 0.4), oklch(15% 0.10 270 / 0.4));
+          background: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -433,7 +424,7 @@
           .drop-icon {
             inline-size: 36px;
             block-size: 36px;
-            transition: .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: .2s ease;
           }
 
           .drop-text {
@@ -441,17 +432,16 @@
             font-size: var(--fs-sm);
 
             strong {
-              color: var(--accent);
+              color: var(--accent-ink);
             }
           }
 
           &:is(:hover, :focus-within) {
-            border-color: var(--accent);
-            background: var(--surface-hover-strong);
+            border-color: var(--accent-border);
+            background: var(--accent-wash);
 
             .drop-icon {
-              color: var(--accent);
-              transform: translateY(-6px) scale(1.1);
+              color: var(--accent-ink);
             }
           }
 
@@ -483,14 +473,13 @@
           .filters input[type="search"],
           .filters select) {
           border-radius: 12px;
-          border: 1px solid var(--line);
-          background-color: var(--surface-base);
+          border: 1px solid var(--line-soft);
+          background-color: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
           color: var(--fg);
         }
 
         .coords-view {
-          --line: var(--line-glass);
           font: inherit;
           padding-block: 12px;
           padding-inline: 12px;
@@ -505,17 +494,19 @@
             color: var(--muted);
           }
 
-          &:focus-visible {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-          }
-
           &#coords {
             @container page (inline-size <=900px) {
               max-block-size: 30dvh;
             }
           }
+        }
+
+        :where(button,
+          .filters input[type="search"],
+          .filters select):focus-visible {
+          outline: none;
+          box-shadow: inset 0 0 0 2px var(--accent-border);
+          border-color: var(--accent-border);
         }
 
         button {
@@ -537,7 +528,7 @@
             inset-block: 0;
             inset-inline: 0;
             background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
-                oklch(100% 0.008 270 / 0.2),
+                color-mix(in oklch, var(--accent) 6%, transparent),
                 transparent 70%);
             opacity: 0;
             transition:
@@ -549,22 +540,16 @@
           @media (any-hover: hover) {
             &:hover {
               &::after {
-                opacity: 1;
+                opacity: 0.6;
                 transition:
                   opacity .2s ease-out,
                   --mouse-x 90ms linear,
                   --mouse-y 90ms linear;
               }
 
-              background: var(--surface-hover);
-              transform: translateY(-2px);
-              box-shadow: 0 4px 12px -2px oklch(0% 0.008 64 / 0.15);
-              border-color: transparent;
+              background: var(--accent-wash);
+              border-color: var(--accent-border);
             }
-          }
-
-          &:active {
-            transform: translateY(0);
           }
 
           &:disabled {
@@ -574,29 +559,32 @@
           }
 
           &:is(#parse, #start) {
-            background: var(--accent);
-            color: oklch(99% 0.02 270);
-            border-color: transparent;
-            box-shadow: 0 4px 12px var(--accent-glow);
+            background: color-mix(in oklch, var(--accent) 80%, var(--surface-panel));
+            color: color-mix(in oklch, white 92%, var(--fg));
+            border-color: var(--accent-border);
 
             &:not(:disabled) {
               &:hover {
-                filter: brightness(1.1);
-                box-shadow: 0 8px 16px var(--accent-glow);
+                background: color-mix(in oklch, var(--accent) 85%, var(--surface-panel));
               }
             }
           }
 
+          &:is(#parse, #start):focus-visible {
+            box-shadow:
+              inset 0 0 0 2px var(--accent-border),
+              0 0 0 3px color-mix(in oklch, var(--accent) 30%, transparent);
+          }
+
           &#stop {
-            color: var(--err);
-            border-color: oklch(from var(--err) l c h / 0.3);
+            color: color-mix(in oklch, var(--err) 80%, var(--fg));
+            border-color: color-mix(in oklch, var(--err) 45%, var(--line-soft));
 
             &:not(:disabled) {
               &:hover {
-                background: var(--err);
-                color: white;
-                border-color: transparent;
-                box-shadow: 0 4px 12px oklch(from var(--err) l c h / 0.4);
+                background: color-mix(in oklch, var(--err) 12%, var(--surface-panel));
+                color: color-mix(in oklch, var(--err) 85%, var(--fg));
+                border-color: color-mix(in oklch, var(--err) 50%, var(--line-soft));
               }
             }
           }
@@ -606,10 +594,15 @@
           }
 
           &:not(:disabled):active::after {
-            opacity: 1;
+            opacity: 0.6;
             transition: none;
           }
         }
+      }
+
+      :is(.progress-shell, .skeleton-bar) {
+        background: color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel));
+        border-radius: 999px;
       }
 
       .row-progress {
@@ -642,8 +635,6 @@
 
       .progress-shell {
         position: relative;
-        border-radius: 999px;
-        background: var(--line);
         overflow: hidden;
         block-size: 8px;
         transition: --pct 0.3s cubic-bezier(0.25, 1, 0.5, 1);
@@ -662,7 +653,9 @@
           block-size: 100%;
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: 0% 50%;
-          background: linear-gradient(in oklch 90deg, var(--accent), var(--success));
+          background: linear-gradient(in oklch 90deg,
+              color-mix(in oklch, var(--accent) 75%, var(--surface-panel)),
+              color-mix(in oklch, var(--accent) 65%, var(--surface-panel)));
           position: relative;
           overflow: hidden;
         }
@@ -676,7 +669,7 @@
             transform: translateX(-120%);
             background: linear-gradient(in oklch 90deg,
                 transparent,
-                oklch(from var(--success) l c h / 0.55),
+                color-mix(in oklch, var(--accent) 30%, transparent),
                 transparent);
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
@@ -691,24 +684,9 @@
         flex-direction: column;
         block-size: 100%;
         min-block-size: 0;
-        overflow: hidden;
-        border-radius: clamp(20px, 2vw, 28px);
-        box-shadow: var(--shadow-md);
 
         @container page (inline-size <=900px) {
           block-size: auto;
-        }
-
-        .card-stack-frame {
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          background: var(--card-bg);
-          backdrop-filter: var(--glass);
-          border: 1px solid var(--card-border);
-          border-radius: inherit;
-          pointer-events: none;
-          z-index: 0;
         }
 
         .card-stack-spotlight {
@@ -730,7 +708,7 @@
             block-size: calc(var(--spotlight-radius) * 2);
             background: radial-gradient(in oklch circle,
                 var(--spotlight),
-                transparent 40%);
+                transparent 30%);
             transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
                 calc(var(--mouse-y) - var(--spotlight-radius)),
                 0);
@@ -817,8 +795,9 @@
         padding-block: 12px;
         padding-inline: 16px;
         border-radius: 12px;
-        background: light-dark(oklch(15% 0.10 270 / 0.05), oklch(96% 0.02 270 / 0.08));
-        border-inline-start: 4px solid var(--muted);
+        background: light-dark(color-mix(in oklch, var(--muted) 8%, var(--surface-panel)),
+            color-mix(in oklch, var(--muted) 12%, var(--surface-panel)));
+        border-inline-start: 2px solid color-mix(in oklch, var(--muted) 70%, var(--line-soft));
         flex-shrink: 0;
         font-weight: 500;
         font-size: var(--fs-sm);
@@ -836,35 +815,32 @@
         }
 
         &.err {
-          color: var(--err);
-          border-inline-start-color: var(--err);
-          background: var(--bg-err);
+          color: color-mix(in oklch, var(--err) 75%, var(--fg));
+          border-inline-start-color: color-mix(in oklch, var(--err) 70%, var(--line-soft));
+          background: color-mix(in oklch, var(--err) 14%, var(--surface-panel));
         }
 
         &.warn {
-          color: oklch(from var(--warn) l c h);
-          border-inline-start-color: var(--warn);
-          background: var(--bg-warn);
+          color: color-mix(in oklch, var(--warn) 75%, var(--fg));
+          border-inline-start-color: color-mix(in oklch, var(--warn) 70%, var(--line-soft));
+          background: color-mix(in oklch, var(--warn) 14%, var(--surface-panel));
         }
 
         &.stopped {
           color: var(--muted);
-          border-inline-start-color: var(--muted);
-          background: light-dark(oklch(94% 0.03 270),
-              oklch(20% 0.132 270 / 0.4));
+          background: light-dark(color-mix(in oklch, var(--muted) 12%, var(--surface-panel)),
+              color-mix(in oklch, var(--muted) 16%, var(--surface-panel)));
         }
       }
 
       .table-wrap {
         --table-head-offset: 0px;
-        --line: var(--line-glass-strong);
         border-radius: 20px;
-        border: 1px solid var(--line);
-        background-color: light-dark(oklch(100% 0.008 270 / 0.4), oklch(0% 0.008 64 / 0.2));
+        border: 1px solid var(--line-soft);
+        background-color: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
         overflow: auto;
         scrollbar-gutter: stable;
         position: relative;
-        box-shadow: inset 0 2px 4px oklch(0% 0.008 64 / 0.03);
 
         .empty-hint {
           display: grid;
@@ -913,7 +889,7 @@
         }
 
         input[type="search"]::placeholder {
-          color: color-mix(in oklch, var(--fg) 70%, var(--tone-base));
+          color: var(--muted);
           opacity: 1;
         }
 
@@ -947,11 +923,11 @@
           th {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 1px solid var(--line);
+            border-block-end: 1px solid var(--line-soft);
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: var(--card-bg);
+            background: color-mix(in oklch, var(--surface-panel) 94%, var(--card-surface));
             text-align: start;
             font-weight: 600;
             font-size: var(--fs-sm);
@@ -972,7 +948,7 @@
           td {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 1px solid var(--line);
+            border-block-end: 1px solid var(--line-soft);
             vertical-align: top;
             font-size: var(--fs-sm);
 
@@ -981,7 +957,7 @@
             }
 
             &:nth-child(3) {
-              color: var(--accent);
+              color: var(--accent-ink);
               font-weight: 500;
               letter-spacing: -0.03em;
             }
@@ -993,7 +969,7 @@
 
             @media (any-hover: hover) {
               &:hover {
-                background: light-dark(oklch(97% 0.02 270), oklch(22% 0.145 270));
+                background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
               }
             }
 
@@ -1049,20 +1025,18 @@
               gap: 10px;
               padding-block: 16px;
               padding-inline: 16px;
-              background: light-dark(oklch(100% 0.008 270 / 0.4), oklch(20% 0.132 270 / 0.4));
-              border: 1px solid var(--line);
+              background: color-mix(in oklch, var(--surface-panel) 90%, var(--card-surface));
+              border: 1px solid var(--line-soft);
               border-radius: 16px;
-              box-shadow: var(--shadow-sm);
+              box-shadow: 0 1px 2px color-mix(in oklch, var(--fg) 12%, transparent),
+                0 1px 1px color-mix(in oklch, var(--fg) 8%, transparent);
               animation: row-fade-in 1s both;
               animation-timeline: view();
               animation-range: entry 0% cover 25%;
 
               @media (any-hover: hover) {
                 &:hover {
-                  transform: translateY(-2px);
-                  box-shadow: var(--shadow-md);
-                  transition: transform 0.2s;
-                  border-color: var(--accent);
+                  border-color: var(--accent-border);
                 }
               }
 
@@ -1093,7 +1067,7 @@
                 transform: none !important;
                 box-shadow: none !important;
                 background: transparent !important;
-                border-color: var(--line) !important;
+                border-color: var(--line-soft) !important;
               }
             }
           }
@@ -1102,8 +1076,6 @@
         .skeleton-bar {
           block-size: 1.1em;
           margin-block: 4px;
-          border-radius: 999px;
-          background: var(--line);
           position: relative;
           overflow: hidden;
 
@@ -1115,7 +1087,7 @@
             transform: translateX(-120%);
             background: linear-gradient(in oklch 90deg,
                 transparent,
-                oklch(from var(--accent) l calc(c * 0.95) h / 0.3),
+                color-mix(in oklch, var(--accent) 18%, var(--surface-panel)),
                 transparent);
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
@@ -1248,14 +1220,8 @@
         padding-block: 8px;
         padding-inline: 10px;
         border-radius: 10px;
-        color: var(--accent);
+        color: var(--accent-ink);
         font-weight: 700;
-
-        @media (any-hover: hover) {
-          &:hover {
-            transform: translateY(-1px);
-          }
-        }
       }
 
       td[data-label="지도링크"] {
@@ -1271,11 +1237,7 @@
         margin-inline: 0;
         padding-block: 10px;
         padding-inline: 12px;
-        border: 1px solid var(--line);
         border-radius: 14px;
-        background: var(--card-bg);
-        box-shadow: var(--shadow-md);
-        backdrop-filter: var(--glass);
         max-inline-size: min(360px, 92vw);
         transition: opacity 0s linear 16ms;
 
@@ -1290,7 +1252,7 @@
           min-inline-size: 85px;
 
           a {
-            color: var(--accent);
+            color: var(--accent-ink);
             text-decoration: none;
             font-weight: 700;
             white-space: nowrap;
@@ -1298,7 +1260,7 @@
 
             @media (any-hover: hover) {
               &:hover {
-                color: var(--success);
+                color: color-mix(in oklch, var(--accent) 55%, var(--fg));
                 text-decoration: underline;
                 text-underline-offset: 3px;
               }
@@ -1368,7 +1330,7 @@
       </form>
       <div>
         <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-        <pre id="coords" class="coords-view" tabindex="0" role="region" aria-labelledby="coords-label"
+        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label"
           data-placeholder="좌표가 이곳에 표시됩니다."></pre>
       </div>
       <div class="row-progress">
@@ -1391,7 +1353,6 @@
       </footer>
     </section>
     <div class="card-stack">
-      <div class="card-stack-frame"></div>
       <div class="card-stack-spotlight"></div>
       <div class="card-stack-content">
         <section class="card card-stack-top no-spotlight">

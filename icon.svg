@@ -3,10 +3,10 @@
     :root {
       color-scheme: light dark;
       --accent: light-dark(
-        oklch(52% 0.28 275),
-        oklch(68% 0.24 270)
+        oklch(50% 0.18 275),
+        oklch(64% 0.16 270)
       );
-      --accent-glow: oklch(from var(--accent) l c h / 0.45);
+      --accent-glow: oklch(from var(--accent) l c h / 0.25);
     }
 
     .pin {
