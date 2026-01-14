@@ -557,13 +557,16 @@
           }
 
           &:is(#parse, #start) {
-            background: color-mix(in oklch, var(--accent) 80%, var(--surface-panel));
-            color: color-mix(in oklch, white 92%, var(--fg));
+            background: light-dark(color-mix(in oklch, var(--accent) 85%, var(--fg)),
+                color-mix(in oklch, var(--accent) 42%, var(--surface-panel)));
+            color: light-dark(color-mix(in oklch, var(--tone-base) 99%, var(--fg)),
+                color-mix(in oklch, var(--fg) 98%, var(--tone-base)));
             border-color: var(--accent-border);
 
             &:not(:disabled) {
               &:hover {
-                background: color-mix(in oklch, var(--accent) 85%, var(--surface-panel));
+                background: light-dark(color-mix(in oklch, var(--accent) 82%, var(--fg)),
+                    color-mix(in oklch, var(--accent) 38%, var(--surface-panel)));
               }
             }
           }
@@ -575,13 +578,13 @@
           }
 
           &#stop {
-            color: color-mix(in oklch, var(--err) 80%, var(--fg));
+            color: light-dark(color-mix(in oklch, var(--err) 60%, var(--fg)),
+                color-mix(in oklch, var(--err) 80%, var(--fg)));
             border-color: color-mix(in oklch, var(--err) 45%, var(--line-soft));
 
             &:not(:disabled) {
               &:hover {
-                background: color-mix(in oklch, var(--err) 12%, var(--surface-panel));
-                color: color-mix(in oklch, var(--err) 85%, var(--fg));
+                background: color-mix(in oklch, var(--err) 4%, var(--surface-panel));
                 border-color: color-mix(in oklch, var(--err) 50%, var(--line-soft));
               }
             }
@@ -836,19 +839,19 @@
         }
 
         &.err {
-          color: color-mix(in oklch, var(--err) 75%, var(--fg));
+          color: color-mix(in oklch, var(--err) 45%, var(--fg));
           border-inline-start-color: color-mix(in oklch, var(--err) 70%, var(--line-soft));
-          background: color-mix(in oklch, var(--err) 14%, var(--surface-panel));
+          background: color-mix(in oklch, var(--err) 10%, var(--surface-panel));
         }
 
         &.warn {
-          color: color-mix(in oklch, var(--warn) 75%, var(--fg));
+          color: color-mix(in oklch, var(--warn) 35%, var(--fg));
           border-inline-start-color: color-mix(in oklch, var(--warn) 70%, var(--line-soft));
-          background: color-mix(in oklch, var(--warn) 14%, var(--surface-panel));
+          background: color-mix(in oklch, var(--warn) 10%, var(--surface-panel));
         }
 
         &.stopped {
-          color: var(--muted);
+          color: var(--muted-strong);
           background: light-dark(color-mix(in oklch, var(--muted) 12%, var(--surface-panel)),
               color-mix(in oklch, var(--muted) 16%, var(--surface-panel)));
         }
