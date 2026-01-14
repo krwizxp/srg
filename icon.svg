@@ -2,16 +2,19 @@
   <style>
     :root {
       color-scheme: light dark;
+      --fg: light-dark(
+        oklch(18% 0.114 275),
+        oklch(95% 0.04 275)
+      );
       --accent: light-dark(
         oklch(50% 0.18 275),
         oklch(64% 0.16 270)
       );
-      --accent-glow: oklch(from var(--accent) l c h / 0.25);
+      --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
     }
 
     .pin {
-      fill: var(--accent);
-      filter: drop-shadow(0 0 12px var(--accent-glow));
+      fill: var(--accent-ink);
     }
   </style>
 

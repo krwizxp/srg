@@ -82,18 +82,18 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 98%, var(--accent)),
-            color-mix(in oklch, oklch(14% 0.07 275) 98%, var(--accent)));
-        --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 96%, var(--accent)),
-            color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 96%, var(--accent)));
+        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 99.7%, var(--accent)),
+            color-mix(in oklch, oklch(14% 0.07 275) 99.7%, var(--accent)));
+        --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 97%, var(--accent)),
+            color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 97%, var(--accent)));
         --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
         --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
         --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
         --muted: light-dark(color-mix(in oklch, var(--fg) 68%, var(--tone-base)),
             color-mix(in oklch, var(--fg) 78%, var(--tone-base)));
-        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 72%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 82%, var(--tone-base)));
+        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 77%, var(--tone-base)),
+            color-mix(in oklch, var(--fg) 87%, var(--tone-base)));
         --line-soft: light-dark(color-mix(in oklch, color-mix(in oklch, var(--fg) 10%, transparent) 80%,
               var(--surface-panel)),
             color-mix(in oklch, color-mix(in oklch, var(--fg) 20%, transparent) 80%, var(--surface-panel)));
@@ -101,7 +101,7 @@
             oklch(64% 0.16 270));
         --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
         --accent-border: color-mix(in oklch, var(--accent) 35%, var(--line-soft));
-        --accent-wash: color-mix(in oklch, var(--accent) 6%, var(--surface-panel));
+        --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
         --spotlight: light-dark(color-mix(in oklch, var(--accent) 5%, transparent),
@@ -116,11 +116,19 @@
         scrollbar-color: color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) transparent;
       }
 
+      :root[data-theme="light"] {
+        color-scheme: light;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+      }
+
       html {
         background-image:
           linear-gradient(in oklch 180deg, var(--bg-grad-start),
-            light-dark(color-mix(in oklch, var(--surface-panel) 96%, var(--accent)),
-              color-mix(in oklch, var(--surface-panel) 94%, var(--accent))));
+            light-dark(color-mix(in oklch, var(--surface-panel) 98%, var(--accent)),
+              color-mix(in oklch, var(--surface-panel) 97%, var(--accent))));
         background-color: var(--bg-grad-start);
         min-block-size: 100%;
       }
@@ -170,45 +178,43 @@
         scrollbar-width: thin;
       }
 
-      @supports (animation-timeline: scroll()) {
-        .coords-view {
-          background-image:
-            linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent),
-            linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-          background-repeat: no-repeat;
-          background-position: 50% 0%, 50% 100%;
-          background-size: 100% 0, 100% 0;
-          animation-timeline: scroll(self);
-          animation-name: scroll-shadows;
-        }
+      .coords-view {
+        background-image:
+          linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent),
+          linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
+        background-repeat: no-repeat;
+        background-position: 50% 0%, 50% 100%;
+        background-size: 100% 0, 100% 0;
+        animation-timeline: scroll(self);
+        animation-name: scroll-shadows;
+      }
 
-        .table-wrap::before,
-        .table-wrap::after {
-          content: "";
-          display: block;
-          position: sticky;
-          inset-inline: 0;
-          block-size: 14px;
-          pointer-events: none;
-          z-index: 5;
-          opacity: 0;
-        }
+      .table-wrap::before,
+      .table-wrap::after {
+        content: "";
+        display: block;
+        position: sticky;
+        inset-inline: 0;
+        block-size: 14px;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0;
+      }
 
-        .table-wrap::before {
-          inset-block-start: var(--table-head-offset);
-          margin-block-start: -14px;
-          background: linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-          animation: scroll-shadow-top 1s both;
-          animation-timeline: scroll(nearest);
-        }
+      .table-wrap::before {
+        inset-block-start: var(--table-head-offset);
+        margin-block-start: -14px;
+        background: linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
+        animation: scroll-shadow-top 1s both;
+        animation-timeline: scroll(nearest);
+      }
 
-        .table-wrap::after {
-          inset-block-end: 0;
-          margin-block-end: -14px;
-          background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-          animation: scroll-shadow-bottom 1s both;
-          animation-timeline: scroll(nearest);
-        }
+      .table-wrap::after {
+        inset-block-end: 0;
+        margin-block-end: -14px;
+        background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
+        animation: scroll-shadow-bottom 1s both;
+        animation-timeline: scroll(nearest);
       }
 
       @keyframes skeleton-shimmer-x {
@@ -259,12 +265,8 @@
 
       :is(.card, .card-stack, .map-popover) {
         background: var(--card-surface);
-        backdrop-filter: blur(18px) saturate(140%);
-        border: 1px solid var(--line-soft);
-        box-shadow:
-          0 12px 24px -12px color-mix(in oklch, var(--fg) 12%, transparent),
-          inset 0 0 0 1px light-dark(color-mix(in oklch, var(--tone-base) 16%, transparent),
-            color-mix(in oklch, var(--fg) 8%, transparent));
+        border: 1px solid color-mix(in oklch, var(--line-soft) 65%, transparent);
+        box-shadow: 0 10px 18px -12px color-mix(in oklch, var(--fg) 12%, transparent);
       }
 
       :is(.card, .card-stack) {
@@ -334,19 +336,8 @@
           z-index: 1;
         }
 
-        @media (any-hover: hover) {
-          &:hover:not(.no-spotlight)::before {
-            opacity: 1;
-            will-change: transform;
-            transition:
-              opacity .2s ease-out,
-              --mouse-x 90ms linear,
-              --mouse-y 90ms linear;
-          }
-        }
-
         &:active:not(.no-spotlight)::before {
-          opacity: 1;
+          opacity: 0.6;
           transition: none;
         }
 
@@ -358,6 +349,20 @@
           display: flex;
           align-items: flex-start;
           gap: 14px;
+
+          .theme-toggle {
+            margin-inline-start: auto;
+            align-self: flex-start;
+          }
+
+          @container page (inline-size <=600px) {
+            flex-wrap: wrap;
+
+            .theme-toggle {
+              margin-inline-start: auto;
+              margin-block-start: 6px;
+            }
+          }
 
           svg {
             color: var(--accent-ink);
@@ -540,14 +545,6 @@
 
           @media (any-hover: hover) {
             &:hover {
-              &::after {
-                opacity: 0.6;
-                transition:
-                  opacity .2s ease-out,
-                  --mouse-x 90ms linear,
-                  --mouse-y 90ms linear;
-              }
-
               background: var(--accent-wash);
               border-color: var(--accent-border);
             }
@@ -595,9 +592,47 @@
           }
 
           &:not(:disabled):active::after {
-            opacity: 0.6;
+            opacity: 0.4;
             transition: none;
           }
+
+          &.theme-toggle {
+            border-radius: 999px;
+            font-size: var(--fs-sm);
+            font-weight: 600;
+            color: var(--muted-strong);
+            inline-size: 36px;
+            block-size: 36px;
+            padding: 0;
+
+            &::after {
+              display: none;
+            }
+
+            svg {
+              display: block;
+              inline-size: 18px;
+              block-size: 18px;
+            }
+
+            .icon-sun {
+              display: none;
+            }
+
+            .icon-moon {
+              display: block;
+            }
+          }
+        }
+      }
+
+      :root[data-theme="dark"] .theme-toggle {
+        .icon-sun {
+          display: block;
+        }
+
+        .icon-moon {
+          display: none;
         }
       }
 
@@ -725,24 +760,9 @@
           }
         }
 
-        @media (any-hover: hover) {
-          &:hover .card-stack-spotlight::before {
-            opacity: 1;
-            will-change: transform;
-            transition:
-              opacity .2s ease-out,
-              --mouse-x 90ms linear,
-              --mouse-y 90ms linear;
-          }
-
-          &:hover .card-stack-spotlight.suppressed::before {
-            opacity: 0;
-          }
-        }
-
         &:active {
           .card-stack-spotlight::before {
-            opacity: 1;
+            opacity: 0.6;
             transition: none;
           }
 
@@ -928,7 +948,7 @@
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: color-mix(in oklch, var(--surface-panel) 94%, var(--card-surface));
+            background: color-mix(in oklch, var(--surface-panel) 82%, var(--tone-base));
             text-align: start;
             font-weight: 600;
             font-size: var(--fs-sm);
@@ -1200,6 +1220,16 @@
       }
     }
 
+    html.perf-mode {
+
+      .card::before,
+      .card-stack-spotlight::before,
+      button::after {
+        opacity: 0 !important;
+        transition: none !important;
+      }
+    }
+
     @layer utilities {
       .caps {
         text-transform: uppercase;
@@ -1232,10 +1262,6 @@
       }
 
       .map-popover {
-        inset-block: auto;
-        inset-inline: auto;
-        margin-block: 0;
-        margin-inline: 0;
         padding-block: 10px;
         padding-inline: 12px;
         border-radius: 14px;
@@ -1269,20 +1295,14 @@
           }
         }
 
-        @supports (position-area: block-end span-inline-start) {
-          position-anchor: auto;
-          position-area: block-end span-inline-start;
-
-          @supports (position-try-fallbacks: flip-block) {
-            position-try-fallbacks:
-              block-end span-inline-end,
-              block-start span-inline-start,
-              block-start span-inline-end,
-              flip-block,
-              flip-inline,
-              flip-block flip-inline;
-          }
-        }
+        position-anchor: auto;
+        position-area: block-end span-inline-start;
+        position-try-fallbacks: block-end span-inline-end,
+        block-start span-inline-start,
+        block-start span-inline-end,
+        flip-block,
+        flip-inline,
+        flip-block flip-inline;
       }
     }
   </style>
@@ -1300,6 +1320,20 @@
           <h1>SRG 역지오코딩</h1>
           <p>random_data.txt 좌표 변환</p>
         </div>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41">
+            </path>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+          </svg>
+          <span class="sr-only" id="theme-toggle-label">다크 모드</span>
+        </button>
       </header>
       <h2 class="sr-only">파일 업로드 및 실행</h2>
       <form>
@@ -1542,9 +1576,7 @@
       }
       return out;
     }
-    const SUPPORTS_ANCHOR_POSITIONING = CSS.supports("position-area: block-end span-inline-start");
     let LAST_MAP_INVOKER = null;
-    let POPOVER_SIZE_CACHE = { w: 0, h: 0 };
     let MAP_POPOVER_OPEN = false;
     document.addEventListener("command", (e) => {
       if (e.command !== "show-popover") return;
@@ -1558,11 +1590,6 @@
       const { lat, lon } = btn.dataset;
       if (lat == null || lon == null || lat === "" || lon === "") return;
       updateMapPopoverLinks(lat, lon);
-      if (SUPPORTS_ANCHOR_POSITIONING) return;
-      requestAnimationFrame(() => {
-        cachePopoverSizeFromLiveRect();
-        positionMapPopover(btn, POPOVER_SIZE_CACHE);
-      });
     }, { capture: true });
     function updateMapPopoverLinks(lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
@@ -1572,34 +1599,10 @@
         POPOVER_LINKS[i].href = fillLatLon(link.parts, latUse, lonUse);
       }
     }
-    function cachePopoverSizeFromLiveRect() {
-      const pr = mapPopover.getBoundingClientRect();
-      if (pr.width > 0 && pr.height > 0) {
-        POPOVER_SIZE_CACHE.w = pr.width;
-        POPOVER_SIZE_CACHE.h = pr.height;
-      }
-    }
     function closeMapPopover() {
       if (!MAP_POPOVER_OPEN) return;
       MAP_POPOVER_OPEN = false;
       mapPopover.hidePopover();
-    }
-    function positionMapPopover(anchorEl, popoverSize = null) {
-      const margin = 8;
-      const ar = anchorEl.getBoundingClientRect();
-      const pr = (popoverSize && popoverSize.w > 0 && popoverSize.h > 0)
-        ? { width: popoverSize.w, height: popoverSize.h }
-        : mapPopover.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      let inlineStart = ar.x;
-      if (inlineStart + pr.width > vw - margin) inlineStart = vw - pr.width - margin;
-      if (inlineStart < margin) inlineStart = margin;
-      let blockStart = ar.y + ar.height + margin;
-      if (blockStart + pr.height > vh - margin) blockStart = ar.y - pr.height - margin;
-      if (blockStart < margin) blockStart = margin;
-      mapPopover.style.insetInlineStart = `${Math.round(inlineStart)}px`;
-      mapPopover.style.insetBlockStart = `${Math.round(blockStart)}px`;
     }
     mapPopover.addEventListener("toggle", (e) => {
       MAP_POPOVER_OPEN = e.newState === "open";
@@ -1613,11 +1616,6 @@
       const { lat, lon } = invoker.dataset;
       if (lat == null || lon == null || lat === "" || lon === "") return;
       updateMapPopoverLinks(lat, lon);
-      if (SUPPORTS_ANCHOR_POSITIONING) return;
-      requestAnimationFrame(() => {
-        cachePopoverSizeFromLiveRect();
-        positionMapPopover(invoker, POPOVER_SIZE_CACHE);
-      });
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -1669,6 +1667,8 @@
       file: document.getElementById("file"),
       dropZoneText: document.querySelector(".drop-text"),
       dropZone: document.querySelector(".drop-zone"),
+      themeToggle: document.getElementById("theme-toggle"),
+      themeToggleLabel: document.getElementById("theme-toggle-label"),
       app: document.getElementById("app"),
       parse: document.getElementById("parse"),
       start: document.getElementById("start"),
@@ -1698,6 +1698,53 @@
     };
     const DROP_ZONE_FILE_LABELS =
       domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
+    const THEME_STORAGE_KEY = "srg-theme";
+    const themeToggle = domElements.themeToggle;
+    const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const getStoredTheme = () => {
+      try {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        return stored === "light" || stored === "dark" ? stored : null;
+      } catch {
+        return null;
+      }
+    };
+    const applyTheme = (theme) => {
+      document.documentElement.dataset.theme = theme;
+      const isDark = theme === "dark";
+      if (themeToggle) {
+        const label = isDark ? "라이트 모드" : "다크 모드";
+        const labelEl = domElements.themeToggleLabel;
+        if (labelEl) labelEl.textContent = label;
+        themeToggle.setAttribute("aria-label", `${label}로 전환`);
+        themeToggle.setAttribute("title", `${label}로 전환`);
+        themeToggle.setAttribute("aria-pressed", String(isDark));
+      }
+    };
+    const syncThemeFromPreference = () => {
+      const stored = getStoredTheme();
+      if (stored) {
+        applyTheme(stored);
+        return;
+      }
+      applyTheme(themeMedia.matches ? "dark" : "light");
+    };
+    syncThemeFromPreference();
+    themeMedia.addEventListener("change", () => {
+      if (getStoredTheme()) return;
+      applyTheme(themeMedia.matches ? "dark" : "light");
+    });
+    if (themeToggle) {
+      themeToggle.addEventListener("click", () => {
+        const current = document.documentElement.dataset.theme;
+        const next = current === "dark" ? "light" : "dark";
+        try {
+          localStorage.setItem(THEME_STORAGE_KEY, next);
+        } catch {
+        }
+        applyTheme(next);
+      });
+    }
     const updateTableHeadOffset = (() => {
       let lastHeight = -1;
       return () => {
@@ -2432,6 +2479,7 @@
       const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
       if (RENDER_CACHE.perfMode !== perfMode) {
         RENDER_CACHE.perfMode = perfMode;
+        document.documentElement.classList.toggle("perf-mode", perfMode);
         if (perfMode) {
           domElements.tbody.setAttribute("data-perf-mode", "1");
         } else {
@@ -3112,17 +3160,6 @@
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
         resetScrollState();
-        if (!MAP_POPOVER_OPEN || SUPPORTS_ANCHOR_POSITIONING) return;
-        const invoker =
-          (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
-        if (!invoker) {
-          closeMapPopover();
-          return;
-        }
-        requestAnimationFrame(() => {
-          cachePopoverSizeFromLiveRect();
-          positionMapPopover(invoker, POPOVER_SIZE_CACHE);
-        });
       }, RESIZE_SCROLL_RESET_DELAY_MS);
     };
     window.addEventListener("scroll", invalidateRectCache, { capture: true });
