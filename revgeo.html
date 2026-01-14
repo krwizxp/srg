@@ -92,6 +92,8 @@
         --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
         --muted: light-dark(color-mix(in oklch, var(--fg) 68%, var(--tone-base)),
             color-mix(in oklch, var(--fg) 78%, var(--tone-base)));
+        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 72%, var(--tone-base)),
+            color-mix(in oklch, var(--fg) 82%, var(--tone-base)));
         --line-soft: light-dark(color-mix(in oklch, color-mix(in oklch, var(--fg) 10%, transparent) 80%,
               var(--surface-panel)),
             color-mix(in oklch, color-mix(in oklch, var(--fg) 20%, transparent) 80%, var(--surface-panel)));
@@ -116,7 +118,6 @@
 
       html {
         background-image:
-          url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E"),
           linear-gradient(in oklch 180deg, var(--bg-grad-start),
             light-dark(color-mix(in oklch, var(--surface-panel) 96%, var(--accent)),
               color-mix(in oklch, var(--surface-panel) 94%, var(--accent))));
@@ -292,7 +293,7 @@
           }
 
           .header-desc {
-            color: var(--muted);
+            color: var(--muted-strong);
           }
         }
 
@@ -379,7 +380,7 @@
             }
 
             p {
-              color: var(--muted);
+              color: var(--muted-strong);
               font-size: var(--fs-sm);
               font-weight: 500;
               line-height: 1.25;
@@ -491,7 +492,7 @@
 
           &:empty::before {
             content: attr(data-placeholder);
-            color: var(--muted);
+            color: var(--muted-strong);
           }
 
           &#coords {
@@ -889,7 +890,7 @@
         }
 
         input[type="search"]::placeholder {
-          color: var(--muted);
+          color: var(--muted-strong);
           opacity: 1;
         }
 
@@ -931,7 +932,7 @@
             text-align: start;
             font-weight: 600;
             font-size: var(--fs-sm);
-            color: var(--muted);
+            color: var(--muted-strong);
             white-space: nowrap;
 
             &:nth-child(-n + 2) {
