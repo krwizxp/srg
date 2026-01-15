@@ -94,9 +94,8 @@
             color-mix(in oklch, var(--fg) 78%, var(--tone-base)));
         --muted-strong: light-dark(color-mix(in oklch, var(--fg) 77%, var(--tone-base)),
             color-mix(in oklch, var(--fg) 87%, var(--tone-base)));
-        --line-soft: light-dark(color-mix(in oklch, color-mix(in oklch, var(--fg) 10%, transparent) 80%,
-              var(--surface-panel)),
-            color-mix(in oklch, color-mix(in oklch, var(--fg) 20%, transparent) 80%, var(--surface-panel)));
+        --line-soft: light-dark(color-mix(in oklch, var(--fg) 30%, var(--surface-panel)),
+            color-mix(in oklch, var(--fg) 26.5%, var(--surface-panel)));
         --accent: light-dark(oklch(50% 0.18 275),
             oklch(64% 0.16 270));
         --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
@@ -265,7 +264,7 @@
 
       :is(.card, .card-stack, .map-popover) {
         background: var(--card-surface);
-        border: 1px solid color-mix(in oklch, var(--line-soft) 65%, transparent);
+        border: 1px solid var(--line-soft);
         box-shadow: 0 10px 18px -12px color-mix(in oklch, var(--fg) 12%, transparent);
       }
 
@@ -407,7 +406,7 @@
 
         .drop-zone {
           position: relative;
-          border: 1px dashed color-mix(in oklch, var(--line-soft) 70%, transparent);
+          border: 1px dashed var(--line-soft);
           border-radius: 18px;
           padding-block: 12px;
           padding-inline: 16px;
@@ -574,7 +573,7 @@
           &:is(#parse, #start):focus-visible {
             box-shadow:
               inset 0 0 0 2px var(--accent-border),
-              0 0 0 3px color-mix(in oklch, var(--accent) 30%, transparent);
+              0 0 0 3px var(--accent-border);
           }
 
           &#stop {
@@ -640,7 +639,8 @@
       }
 
       :is(.progress-shell, .skeleton-bar) {
-        background: color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel));
+        background: light-dark(color-mix(in oklch, var(--fg) 34%, var(--surface-panel)),
+            color-mix(in oklch, var(--fg) 32%, var(--surface-panel)));
         border-radius: 999px;
       }
 
@@ -693,8 +693,8 @@
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: 0% 50%;
           background: linear-gradient(in oklch 90deg,
-              color-mix(in oklch, var(--accent) 75%, var(--surface-panel)),
-              color-mix(in oklch, var(--accent) 65%, var(--surface-panel)));
+              color-mix(in oklch, var(--accent) 10%, var(--surface-panel)),
+              color-mix(in oklch, var(--accent) 6%, var(--surface-panel)));
           position: relative;
           overflow: hidden;
         }
@@ -846,7 +846,7 @@
 
         &.warn {
           color: color-mix(in oklch, var(--warn) 35%, var(--fg));
-          border-inline-start-color: color-mix(in oklch, var(--warn) 70%, var(--line-soft));
+          border-inline-start-color: color-mix(in oklch, var(--warn) 50%, var(--fg));
           background: color-mix(in oklch, var(--warn) 10%, var(--surface-panel));
         }
 
@@ -1701,6 +1701,7 @@
     };
     const DROP_ZONE_FILE_LABELS =
       domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
+    domElements.coords.addEventListener("focus", (e) => e.target.blur());
     const THEME_STORAGE_KEY = "srg-theme";
     const themeToggle = domElements.themeToggle;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
