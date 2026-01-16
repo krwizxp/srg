@@ -83,10 +83,9 @@
       :root {
         color-scheme: light dark;
         --page-bg: light-dark(oklch(100% 0 0), oklch(12% 0.02 265));
-        --bg-grad-start: var(--page-bg);
-        --card-bg: light-dark(oklch(94.5% 0.014 265 / 0.96),
-            oklch(17% 0.03 265 / 0.82));
-        --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
+        --card-surface: color-mix(in oklch,
+            light-dark(oklch(94.5% 0.014 265 / 0.96), oklch(17% 0.03 265 / 0.82)) 90%,
+            var(--surface-panel));
         --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
         --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
@@ -105,16 +104,19 @@
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
         --spotlight: light-dark(color-mix(in oklch, var(--accent) 5%, transparent),
             color-mix(in oklch, var(--accent) 7%, transparent));
-        --surface-base: light-dark(oklch(100% 0.008 270 / 0.5),
-            oklch(18% 0.08 270 / 0.45));
-        --surface-panel: light-dark(color-mix(in oklch, var(--surface-base) 88%, var(--card-bg)),
-            color-mix(in oklch, var(--surface-base) 78%, var(--card-bg)));
+        --surface-panel: light-dark(color-mix(in oklch,
+              oklch(100% 0.008 270 / 0.5) 88%,
+              oklch(94.5% 0.014 265 / 0.96)),
+            color-mix(in oklch,
+              oklch(18% 0.08 270 / 0.45) 78%,
+              oklch(17% 0.03 265 / 0.82)));
         --panel-shadow: light-dark(0 6px 16px -14px color-mix(in oklch, var(--fg) 18%, transparent),
             0 10px 18px -16px color-mix(in oklch, var(--fg) 40%, transparent));
         --fs-sm: clamp(13px, 0.9vw, 14px);
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
-        scrollbar-color: color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) transparent;
+        scrollbar-color: color-mix(in oklch,
+            color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) transparent;
       }
 
       :root[data-theme="light"] {
@@ -676,6 +678,7 @@
       .progress-shell {
         position: relative;
         overflow: hidden;
+        background: color-mix(in oklch, var(--fg) 12%, var(--surface-panel));
         block-size: 8px;
         transition: --pct 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 
@@ -694,8 +697,8 @@
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: 0% 50%;
           background: linear-gradient(in oklch 90deg,
-              color-mix(in oklch, var(--accent) 10%, var(--surface-panel)),
-              color-mix(in oklch, var(--accent) 6%, var(--surface-panel)));
+              color-mix(in oklch, var(--accent) 85%, var(--fg)),
+              color-mix(in oklch, var(--accent) 78%, var(--fg)));
           position: relative;
           overflow: hidden;
         }
@@ -708,9 +711,10 @@
             inset-inline: 0;
             transform: translateX(-120%);
             background: linear-gradient(in oklch 90deg,
-                transparent,
-                color-mix(in oklch, var(--accent) 30%, transparent),
-                transparent);
+                transparent 0%,
+                color-mix(in oklch, var(--page-bg) 75%, transparent) 45%,
+                transparent 100%);
+            opacity: light-dark(.78, .55);
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
             pointer-events: none;
@@ -1280,6 +1284,7 @@
         padding-block: 10px;
         padding-inline: 12px;
         border-radius: 14px;
+        border: 0;
         max-inline-size: min(360px, 92vw);
         transition: opacity 0s linear 16ms;
 
