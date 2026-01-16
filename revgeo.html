@@ -82,24 +82,24 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --bg-grad-start: light-dark(color-mix(in oklch, oklch(97% 0.04 275) 99.7%, var(--accent)),
-            color-mix(in oklch, oklch(14% 0.07 275) 99.7%, var(--accent)));
-        --card-bg: light-dark(color-mix(in oklch, oklch(98% 0.03 275 / 0.70) 97%, var(--accent)),
-            color-mix(in oklch, oklch(18% 0.08 275 / 0.65) 97%, var(--accent)));
+        --page-bg: light-dark(oklch(100% 0 0), oklch(12% 0.02 265));
+        --bg-grad-start: var(--page-bg);
+        --card-bg: light-dark(oklch(94.5% 0.014 265 / 0.96),
+            oklch(17% 0.03 265 / 0.82));
         --card-surface: color-mix(in oklch, var(--card-bg) 90%, var(--surface-panel));
         --fg: light-dark(oklch(18% 0.114 275),
             oklch(95% 0.04 275));
         --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
-        --muted: light-dark(color-mix(in oklch, var(--fg) 68%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 78%, var(--tone-base)));
-        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 77%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 87%, var(--tone-base)));
-        --line-soft: light-dark(color-mix(in oklch, var(--fg) 30%, var(--surface-panel)),
-            color-mix(in oklch, var(--fg) 26.5%, var(--surface-panel)));
+        --muted: light-dark(color-mix(in oklch, var(--fg) 72%, var(--tone-base)),
+            color-mix(in oklch, var(--fg) 82%, var(--tone-base)));
+        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 82%, var(--tone-base)),
+            color-mix(in oklch, var(--fg) 90%, var(--tone-base)));
+        --line-soft: light-dark(color-mix(in oklch, var(--fg) 58%, var(--surface-panel)),
+            color-mix(in oklch, var(--fg) 48%, var(--surface-panel)));
         --accent: light-dark(oklch(50% 0.18 275),
             oklch(64% 0.16 270));
         --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
-        --accent-border: color-mix(in oklch, var(--accent) 35%, var(--line-soft));
+        --accent-border: color-mix(in oklch, var(--accent) 40%, var(--line-soft));
         --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
@@ -107,8 +107,10 @@
             color-mix(in oklch, var(--accent) 7%, transparent));
         --surface-base: light-dark(oklch(100% 0.008 270 / 0.5),
             oklch(18% 0.08 270 / 0.45));
-        --surface-panel: light-dark(color-mix(in oklch, var(--surface-base) 86%, var(--card-bg)),
-            color-mix(in oklch, var(--surface-base) 76%, var(--card-bg)));
+        --surface-panel: light-dark(color-mix(in oklch, var(--surface-base) 88%, var(--card-bg)),
+            color-mix(in oklch, var(--surface-base) 78%, var(--card-bg)));
+        --panel-shadow: light-dark(0 6px 16px -14px color-mix(in oklch, var(--fg) 18%, transparent),
+            0 10px 18px -16px color-mix(in oklch, var(--fg) 40%, transparent));
         --fs-sm: clamp(13px, 0.9vw, 14px);
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
@@ -124,11 +126,8 @@
       }
 
       html {
-        background-image:
-          linear-gradient(in oklch 180deg, var(--bg-grad-start),
-            light-dark(color-mix(in oklch, var(--surface-panel) 98%, var(--accent)),
-              color-mix(in oklch, var(--surface-panel) 97%, var(--accent))));
-        background-color: var(--bg-grad-start);
+        background-color: var(--page-bg);
+        background-image: none;
         min-block-size: 100%;
       }
 
@@ -264,8 +263,7 @@
 
       :is(.card, .card-stack, .map-popover) {
         background: var(--card-surface);
-        border: 1px solid var(--line-soft);
-        box-shadow: 0 10px 18px -12px color-mix(in oklch, var(--fg) 12%, transparent);
+        box-shadow: 0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent);
       }
 
       :is(.card, .card-stack) {
@@ -411,12 +409,13 @@
           padding-block: 12px;
           padding-inline: 16px;
           transition: .2s ease;
-          background: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
+          background: color-mix(in oklch, var(--surface-panel) 88%, var(--card-surface));
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 10px;
           color: var(--muted);
+          box-shadow: var(--panel-shadow);
 
           input[type="file"] {
             position: absolute;
@@ -478,10 +477,16 @@
           .filters input[type="search"],
           .filters select) {
           border-radius: 12px;
-          border: 1px solid var(--line-soft);
-          background-color: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
+          border: 0;
+          background-color: color-mix(in oklch, var(--surface-panel) 88%, var(--card-surface));
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
           color: var(--fg);
+        }
+
+        :where(.coords-view,
+          .filters input[type="search"],
+          .filters select) {
+          box-shadow: var(--panel-shadow);
         }
 
         .coords-view {
@@ -511,7 +516,6 @@
           .filters select):focus-visible {
           outline: none;
           box-shadow: inset 0 0 0 2px var(--accent-border);
-          border-color: var(--accent-border);
         }
 
         button {
@@ -560,7 +564,6 @@
                 color-mix(in oklch, var(--accent) 42%, var(--surface-panel)));
             color: light-dark(color-mix(in oklch, var(--tone-base) 99%, var(--fg)),
                 color-mix(in oklch, var(--fg) 98%, var(--tone-base)));
-            border-color: var(--accent-border);
 
             &:not(:disabled) {
               &:hover {
@@ -579,12 +582,10 @@
           &#stop {
             color: light-dark(color-mix(in oklch, var(--err) 60%, var(--fg)),
                 color-mix(in oklch, var(--err) 80%, var(--fg)));
-            border-color: color-mix(in oklch, var(--err) 45%, var(--line-soft));
 
             &:not(:disabled) {
               &:hover {
                 background: color-mix(in oklch, var(--err) 4%, var(--surface-panel));
-                border-color: color-mix(in oklch, var(--err) 50%, var(--line-soft));
               }
             }
           }
@@ -603,8 +604,8 @@
             font-size: var(--fs-sm);
             font-weight: 600;
             color: var(--muted-strong);
-            inline-size: 36px;
-            block-size: 36px;
+            inline-size: 44px;
+            block-size: 44px;
             padding: 0;
 
             &::after {
@@ -639,8 +640,8 @@
       }
 
       :is(.progress-shell, .skeleton-bar) {
-        background: light-dark(color-mix(in oklch, var(--fg) 34%, var(--surface-panel)),
-            color-mix(in oklch, var(--fg) 32%, var(--surface-panel)));
+        background: light-dark(color-mix(in oklch, var(--fg) 62%, var(--surface-panel)),
+            color-mix(in oklch, var(--fg) 55%, var(--surface-panel)));
         border-radius: 999px;
       }
 
@@ -790,7 +791,6 @@
 
           >.card {
             background: transparent;
-            border: 0;
             box-shadow: none;
             border-radius: 0;
             backdrop-filter: none;
@@ -860,11 +860,11 @@
       .table-wrap {
         --table-head-offset: 0px;
         border-radius: 20px;
-        border: 1px solid var(--line-soft);
-        background-color: color-mix(in oklch, var(--surface-panel) 92%, var(--card-surface));
+        background-color: color-mix(in oklch, var(--surface-panel) 88%, var(--card-surface));
         overflow: auto;
         scrollbar-gutter: stable;
         position: relative;
+        box-shadow: var(--panel-shadow);
 
         .empty-hint {
           display: grid;
@@ -947,11 +947,11 @@
           th {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 1px solid var(--line-soft);
+            border-block-end: 0;
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: color-mix(in oklch, var(--surface-panel) 82%, var(--tone-base));
+            background: color-mix(in oklch, var(--surface-panel) 78%, var(--tone-base));
             text-align: start;
             font-weight: 600;
             font-size: var(--fs-sm);
@@ -972,7 +972,7 @@
           td {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 1px solid var(--line-soft);
+            border-block-end: 0;
             vertical-align: top;
             font-size: var(--fs-sm);
 
@@ -1006,7 +1006,6 @@
             &[hidden="until-found"] {
               display: block;
               content-visibility: hidden;
-              border: 0;
               margin-block: 0;
               padding-block: 0;
               block-size: 0;
@@ -1049,8 +1048,7 @@
               gap: 10px;
               padding-block: 16px;
               padding-inline: 16px;
-              background: color-mix(in oklch, var(--surface-panel) 90%, var(--card-surface));
-              border: 1px solid var(--line-soft);
+              background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
               border-radius: 16px;
               box-shadow: 0 1px 2px color-mix(in oklch, var(--fg) 12%, transparent),
                 0 1px 1px color-mix(in oklch, var(--fg) 8%, transparent);
@@ -1192,6 +1190,20 @@
       }
     }
 
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+
+      html {
+        scroll-behavior: auto !important;
+      }
+    }
+
     html.scrolling {
       @media (any-hover: hover) {
         .card {
@@ -1271,6 +1283,13 @@
         max-inline-size: min(360px, 92vw);
         transition: opacity 0s linear 16ms;
 
+        &:focus-visible {
+          outline: none;
+          box-shadow:
+            0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent),
+            0 0 0 2px var(--accent-border);
+        }
+
         @starting-style {
           opacity: 0;
         }
@@ -1287,6 +1306,12 @@
             font-weight: 700;
             white-space: nowrap;
             transition: color 0.2s;
+
+            &:focus-visible {
+              outline: none;
+              box-shadow: 0 0 0 2px var(--accent-border);
+              border-radius: 8px;
+            }
 
             @media (any-hover: hover) {
               &:hover {
@@ -1368,7 +1393,7 @@
       </form>
       <div>
         <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label"
+        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"
           data-placeholder="좌표가 이곳에 표시됩니다."></pre>
       </div>
       <div class="row-progress">
@@ -1385,7 +1410,7 @@
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
             id="cnt-remain">0</strong>건 미처리</output>
       </div>
-      <output id="status" class="status"></output>
+      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
       <footer>
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
@@ -1400,19 +1425,25 @@
           </header>
           <search>
             <form class="filters">
-              <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색">
-              <select id="filter-kind">
+              <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
+                aria-label="전체검색">
+              <select id="filter-kind" aria-label="구분">
                 <option value="">구분(전체)</option>
                 <option value="kr">KR</option>
                 <option value="kp">KP</option>
                 <option value="world">WORLD</option>
                 <option value="에러">에러</option>
               </select>
-              <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도">
-              <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구">
-              <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리">
-              <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그">
-              <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소">
+              <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도"
+                aria-label="시·도">
+              <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구"
+                aria-label="시·군·구">
+              <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리"
+                aria-label="읍·면·동·리">
+              <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그"
+                aria-label="지물 태그">
+              <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
+                aria-label="전체주소">
               <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
             </form>
           </search>
@@ -1446,7 +1477,8 @@
       </div>
     </div>
   </main>
-  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크">
+  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" aria-modal="false"
+    tabindex="-1">
     <div class="map-links" id="map-popover-links">
       <a data-provider-key="Google" href="about:blank" data-url-template="https://www.google.com/maps?q={lat},{lon}"
         target="_blank" rel="noopener noreferrer">Google</a>
@@ -1581,6 +1613,17 @@
     }
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_OPEN = false;
+    let MAP_POPOVER_PREV_FOCUS = null;
+    const focusFirstPopoverLink = () => {
+      const first = mapPopoverLinksHost.querySelector("a[href]");
+      if (first) first.focus();
+      else mapPopover.focus();
+    };
+    const shouldRestorePopoverFocus = () => {
+      const active = document.activeElement;
+      if (active === document.body || active === mapPopover) return true;
+      return active instanceof Element && mapPopover.contains(active);
+    };
     document.addEventListener("command", (e) => {
       if (e.command !== "show-popover") return;
       const source = e.source;
@@ -1590,9 +1633,11 @@
       const prev = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
       if (!MAP_POPOVER_OPEN || prev === btn) return;
+      MAP_POPOVER_PREV_FOCUS = btn;
       const { lat, lon } = btn.dataset;
       if (lat == null || lon == null || lat === "" || lon === "") return;
       updateMapPopoverLinks(lat, lon);
+      requestAnimationFrame(focusFirstPopoverLink);
     }, { capture: true });
     function updateMapPopoverLinks(lat, lon) {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
@@ -1610,15 +1655,22 @@
     mapPopover.addEventListener("toggle", (e) => {
       MAP_POPOVER_OPEN = e.newState === "open";
       if (!MAP_POPOVER_OPEN) {
+        if (MAP_POPOVER_PREV_FOCUS && shouldRestorePopoverFocus()) {
+          MAP_POPOVER_PREV_FOCUS.focus();
+        }
+        MAP_POPOVER_PREV_FOCUS = null;
         LAST_MAP_INVOKER = null;
         return;
       }
+      MAP_POPOVER_PREV_FOCUS =
+        document.activeElement instanceof HTMLElement ? document.activeElement : LAST_MAP_INVOKER;
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       if (!invoker) return;
       const { lat, lon } = invoker.dataset;
       if (lat == null || lon == null || lat === "" || lon === "") return;
       updateMapPopoverLinks(lat, lon);
+      requestAnimationFrame(focusFirstPopoverLink);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
