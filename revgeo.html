@@ -102,8 +102,8 @@
         --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --spotlight: light-dark(color-mix(in oklch, var(--accent) 5%, transparent),
-            color-mix(in oklch, var(--accent) 7%, transparent));
+        --spotlight: light-dark(color-mix(in oklch, var(--accent) 7%, transparent),
+            color-mix(in oklch, var(--accent) 14%, transparent));
         --surface-panel: light-dark(color-mix(in oklch,
               oklch(100% 0.008 270 / 0.5) 88%,
               oklch(94.5% 0.014 265 / 0.96)),
@@ -1013,7 +1013,6 @@
                 background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
               }
             }
-
 
             &[hidden="until-found"] {
               display: block;
