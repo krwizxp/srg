@@ -280,6 +280,31 @@
         overflow: hidden;
       }
 
+      :is(.card, .card-stack-spotlight) {
+        --spotlight-radius: 800px;
+      }
+
+      :is(.card, .card-stack-spotlight)::before {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+        inset-block-start: 0;
+        inset-inline-start: 0;
+        inline-size: calc(var(--spotlight-radius) * 2);
+        block-size: calc(var(--spotlight-radius) * 2);
+        background: radial-gradient(in oklch circle,
+            var(--spotlight),
+            transparent 30%);
+        transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
+            calc(var(--mouse-y) - var(--spotlight-radius)),
+            0);
+        opacity: 0;
+        transition:
+          opacity .5s ease-out,
+          --mouse-x 90ms linear,
+          --mouse-y 90ms linear;
+      }
+
       .card {
         padding-block: clamp(20px, 2.5vw, 32px);
         padding-inline: clamp(20px, 2.5vw, 32px);
@@ -288,7 +313,6 @@
         gap: 10px;
         position: relative;
         container-type: inline-size;
-        --spotlight-radius: 800px;
 
         .card-header {
           display: flex;
@@ -321,24 +345,6 @@
         }
 
         &::before {
-          content: "";
-          position: absolute;
-          pointer-events: none;
-          inset-block-start: 0;
-          inset-inline-start: 0;
-          inline-size: calc(var(--spotlight-radius) * 2);
-          block-size: calc(var(--spotlight-radius) * 2);
-          background: radial-gradient(in oklch circle,
-              var(--spotlight),
-              transparent 30%);
-          transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
-              calc(var(--mouse-y) - var(--spotlight-radius)),
-              0);
-          opacity: 0;
-          transition:
-            opacity .5s ease-out,
-            --mouse-x 90ms linear,
-            --mouse-y 90ms linear;
           z-index: 1;
         }
 
@@ -753,27 +759,6 @@
           overflow: hidden;
           pointer-events: none;
           z-index: 2;
-          --spotlight-radius: 800px;
-
-          &::before {
-            content: "";
-            position: absolute;
-            inset-block-start: 0;
-            inset-inline-start: 0;
-            inline-size: calc(var(--spotlight-radius) * 2);
-            block-size: calc(var(--spotlight-radius) * 2);
-            background: radial-gradient(in oklch circle,
-                var(--spotlight),
-                transparent 30%);
-            transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
-                calc(var(--mouse-y) - var(--spotlight-radius)),
-                0);
-            opacity: 0;
-            transition:
-              opacity .5s ease-out,
-              --mouse-x 90ms linear,
-              --mouse-y 90ms linear;
-          }
 
           &.suppressed::before {
             opacity: 0;
@@ -891,8 +876,7 @@
         position: relative;
         box-shadow: var(--panel-shadow);
 
-        .empty-hint {
-          display: grid;
+        .table-hint {
           place-items: center;
           position: absolute;
           inset-block: 0;
@@ -902,15 +886,12 @@
           pointer-events: none;
         }
 
+        .empty-hint {
+          display: grid;
+        }
+
         .filter-empty-hint {
           display: none;
-          place-items: center;
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          inset-block-start: 50px;
-          color: var(--muted);
-          pointer-events: none;
         }
 
         &.has-results .empty-hint {
@@ -928,8 +909,7 @@
           flex: 0 0 var(--results-pane-mobile-height);
           overscroll-behavior: contain;
 
-          .empty-hint,
-          .filter-empty-hint {
+          .table-hint {
             inset-block-start: 0;
           }
         }
@@ -1034,6 +1014,7 @@
               }
             }
 
+
             &[hidden="until-found"] {
               display: block;
               content-visibility: hidden;
@@ -1112,7 +1093,7 @@
               }
             }
 
-            &[data-perf-mode="1"] tr {
+            :root[data-perf-mode="1"] & tr {
               animation: none !important;
               transition: none !important;
 
@@ -1266,7 +1247,7 @@
       }
     }
 
-    html.perf-mode {
+    html[data-perf-mode="1"] {
 
       .card::before,
       .card-stack-spotlight::before,
@@ -1481,10 +1462,10 @@
         </section>
         <section class="card card-stack-bottom no-spotlight">
           <div class="table-wrap">
-            <p class="empty-hint" aria-live="polite" aria-atomic="true">
+            <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
               random_data.txt 파일을 업로드해 주세요.
             </p>
-            <p class="filter-empty-hint" aria-live="polite" aria-atomic="true">
+            <p class="table-hint filter-empty-hint" aria-live="polite" aria-atomic="true">
               필터 결과가 없습니다.
             </p>
             <table id="tbl">
@@ -1637,6 +1618,7 @@
         round6: key === "Naver",
       };
     }
+    const MAP_HAS_ROUND6 = MAP_LINKS.some((l) => l.round6);
     function fillLatLon(parts, lat, lon) {
       let out = "";
       for (let i = 0; i < parts.length; i++) {
@@ -1644,6 +1626,18 @@
         out += (p === 0) ? lat : (p === 1) ? lon : p;
       }
       return out;
+    }
+    function readLatLonDataset(el) {
+      if (!(el instanceof Element)) return null;
+      const lat = el.dataset?.lat;
+      const lon = el.dataset?.lon;
+      if (lat == null || lon == null || lat === "" || lon === "") return null;
+      return { lat, lon };
+    }
+    function buildMapHref(link, lat, lon, lat6 = null, lon6 = null) {
+      const useLat = link.round6 ? (lat6 ?? fmtCoord6(lat)) : lat;
+      const useLon = link.round6 ? (lon6 ?? fmtCoord6(lon)) : lon;
+      return fillLatLon(link.parts, useLat, useLon);
     }
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_OPEN = false;
@@ -1668,17 +1662,16 @@
       LAST_MAP_INVOKER = btn;
       if (!MAP_POPOVER_OPEN || prev === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
-      const { lat, lon } = btn.dataset;
-      if (lat == null || lon == null || lat === "" || lon === "") return;
-      updateMapPopoverLinks(lat, lon);
+      const coords = readLatLonDataset(btn);
+      if (!coords) return;
+      updateMapPopoverLinks(coords.lat, coords.lon);
       requestAnimationFrame(focusFirstPopoverLink);
     }, { capture: true });
     function updateMapPopoverLinks(lat, lon) {
+      const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
+      const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const link = MAP_LINKS[i];
-        const latUse = link.round6 ? fmtCoord6(lat) : lat;
-        const lonUse = link.round6 ? fmtCoord6(lon) : lon;
-        POPOVER_LINKS[i].href = fillLatLon(link.parts, latUse, lonUse);
+        POPOVER_LINKS[i].href = buildMapHref(MAP_LINKS[i], lat, lon, lat6, lon6);
       }
     }
     function closeMapPopover() {
@@ -1701,9 +1694,9 @@
       const invoker =
         (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
       if (!invoker) return;
-      const { lat, lon } = invoker.dataset;
-      if (lat == null || lon == null || lat === "" || lon === "") return;
-      updateMapPopoverLinks(lat, lon);
+      const coords = readLatLonDataset(invoker);
+      if (!coords) return;
+      updateMapPopoverLinks(coords.lat, coords.lon);
       requestAnimationFrame(focusFirstPopoverLink);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
@@ -1812,18 +1805,13 @@
         themeToggle.setAttribute("aria-pressed", String(isDark));
       }
     };
-    const syncThemeFromPreference = () => {
-      const stored = getStoredTheme();
-      if (stored) {
-        applyTheme(stored);
-        return;
-      }
-      applyTheme(themeMedia.matches ? "dark" : "light");
-    };
-    syncThemeFromPreference();
+    const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
+    const resolveTheme = () => getStoredTheme() ?? getSystemTheme();
+    const syncTheme = () => applyTheme(resolveTheme());
+    syncTheme();
     themeMedia.addEventListener("change", () => {
       if (getStoredTheme()) return;
-      applyTheme(themeMedia.matches ? "dark" : "light");
+      syncTheme();
     });
     if (themeToggle) {
       themeToggle.addEventListener("click", () => {
@@ -2015,7 +2003,7 @@
       const len = rows.length;
       if (len === 0) {
         cancelActiveFilterApply();
-        updateFilterEmptyUI(f.active, 0, 0);
+        syncFilterEmptyUI({ active: f.active, visibleCount: 0, totalRows: 0 });
         return;
       }
       const records = AppState.records;
@@ -2029,7 +2017,7 @@
             if (!hidden) visible++;
           }
         }
-        updateFilterEmptyUI(f.active, visible, len);
+        syncFilterEmptyUI({ active: f.active, visibleCount: visible, totalRows: len });
         return;
       }
       const existing = FILTER_CTX.job;
@@ -2076,7 +2064,7 @@
         if (job.i < job.len) {
           job.raf = requestAnimationFrame(job.step);
         } else {
-          updateFilterEmptyUI(job.f.active, job.visible, job.len);
+          syncFilterEmptyUI({ active: job.f.active, visibleCount: job.visible, totalRows: job.len });
           FILTER_CTX.job = null;
         }
       };
@@ -2543,19 +2531,18 @@
       el.textContent = EMPTY_HINT_TEXT[kind] || EMPTY_HINT_TEXT.init;
     }
     setEmptyHint("init");
-    function updateFilterEmptyUI(isActive, visibleCount, totalRows) {
-      const wrap = domElements.tableWrap;
-      if (!wrap) return;
-      const on = !!(isActive && totalRows > 0 && visibleCount === 0);
-      wrap.classList.toggle("filter-empty", on);
-    }
-    function refreshFilterEmptyUI(f = getLiveFilterSnapshot()) {
+    function syncFilterEmptyUI({ active = false, totalRows = null, visibleCount = null } = {}) {
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
       if (!wrap || !tbody) return;
-      const totalRows = tbody.rows.length;
-      if (!f.active || totalRows === 0) {
+      const rows = typeof totalRows === "number" ? totalRows : tbody.rows.length;
+      const isActive = !!active;
+      if (!isActive || rows === 0) {
         wrap.classList.remove("filter-empty");
+        return;
+      }
+      if (typeof visibleCount === "number") {
+        wrap.classList.toggle("filter-empty", visibleCount === 0);
         return;
       }
       const anyVisible = tbody.querySelector("tr:not([hidden])");
@@ -2614,12 +2601,9 @@
       const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
       if (RENDER_CACHE.perfMode !== perfMode) {
         RENDER_CACHE.perfMode = perfMode;
-        document.documentElement.classList.toggle("perf-mode", perfMode);
-        if (perfMode) {
-          domElements.tbody.setAttribute("data-perf-mode", "1");
-        } else {
-          domElements.tbody.removeAttribute("data-perf-mode");
-        }
+        const root = document.documentElement;
+        if (perfMode) root.setAttribute("data-perf-mode", "1");
+        else root.removeAttribute("data-perf-mode");
       }
     }
     function scheduleRender() {
@@ -2828,7 +2812,7 @@
       domElements.tbody.append(tr);
       domElements.tableWrap.classList.add("has-results");
       scheduleRender();
-      if (f.active) refreshFilterEmptyUI(f);
+      if (f.active) syncFilterEmptyUI({ active: f.active });
       return tr;
     }
     function fillRow(tr, row) {
@@ -2971,7 +2955,7 @@
       fillRow(tr, r);
       const f = getLiveFilterSnapshot();
       setRowHiddenByFilter(tr, f, r);
-      if (f.active) refreshFilterEmptyUI(f);
+      if (f.active) syncFilterEmptyUI({ active: f.active });
       pushResultRow(r);
     }
     function startProcessing() {
@@ -3001,11 +2985,10 @@
             outRow[j++] = csvEsc(CSV_COLS[i].val(r));
           }
           const { latStr: lat, lonStr: lon } = r;
+          const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
+          const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
           for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            const link = MAP_LINKS[i];
-            const latUse = link.round6 ? fmtCoord6(lat) : lat;
-            const lonUse = link.round6 ? fmtCoord6(lon) : lon;
-            outRow[j++] = csvEsc(fillLatLon(link.parts, latUse, lonUse));
+            outRow[j++] = csvEsc(buildMapHref(MAP_LINKS[i], lat, lon, lat6, lon6));
           }
           return outRow.join(",");
         };
@@ -3120,7 +3103,7 @@
     );
     const maybeVT = (fn) => {
       const n = domElements.tbody.childElementCount;
-      const perfMode = domElements.tbody.getAttribute("data-perf-mode") === "1";
+      const perfMode = document.documentElement.getAttribute("data-perf-mode") === "1";
       return (n > 0 && !perfMode) ? withViewTransition(fn) : fn();
     };
     const COMMANDS = {
@@ -3221,11 +3204,6 @@
         setGlobalScrolling(false);
       }
     };
-    window.addEventListener("pagehide", resetScrollState);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") resetScrollState();
-    });
-    window.addEventListener("blur", resetScrollState);
     document.addEventListener("scroll", handleScrollStart);
     document.addEventListener("scrollend", handleScrollEnd);
     const rectCache = new Map();
@@ -3252,6 +3230,37 @@
         pointerRaf = null;
       }
     };
+    const deferMicrotask =
+      typeof queueMicrotask === "function"
+        ? queueMicrotask
+        : (cb) => Promise.resolve().then(cb);
+    let DEACTIVATE_QUEUED = false;
+    let NEED_CLOSE_POPOVER = false;
+    function requestDeactivate({ closePopover = false } = {}) {
+      if (closePopover) NEED_CLOSE_POPOVER = true;
+      if (DEACTIVATE_QUEUED) return;
+      DEACTIVATE_QUEUED = true;
+      deferMicrotask(() => {
+        DEACTIVATE_QUEUED = false;
+        resetScrollState();
+        clearPointerState();
+        if (NEED_CLOSE_POPOVER) {
+          NEED_CLOSE_POPOVER = false;
+          closeMapPopover();
+        }
+      });
+    }
+    window.addEventListener("blur", () => requestDeactivate());
+    window.addEventListener("pagehide", () => {
+      resetScrollState();
+      clearPointerState();
+      closeMapPopover();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        requestDeactivate({ closePopover: true });
+      }
+    });
     const invalidateRectCache = () => {
       rectCacheDirty = true;
       if (rectCache.size === 0) return;
@@ -3292,11 +3301,6 @@
     domElements.tableWrap.addEventListener("pointerenter", () => setStackSpotlightSuppressed(true));
     domElements.tableWrap.addEventListener("pointerleave", () => setStackSpotlightSuppressed(false));
     domElements.tableWrap.addEventListener("pointercancel", () => setStackSpotlightSuppressed(false));
-    window.addEventListener("blur", clearPointerState);
-    window.addEventListener("pagehide", clearPointerState);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") clearPointerState();
-    });
     const RESIZE_SCROLL_RESET_DELAY_MS = 150;
     let resizeScrollResetTimer = null;
     const scheduleResizeScrollReset = () => {
