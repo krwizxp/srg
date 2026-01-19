@@ -2603,6 +2603,7 @@
         const root = document.documentElement;
         if (perfMode) root.setAttribute("data-perf-mode", "1");
         else root.removeAttribute("data-perf-mode");
+        syncSpotlightPerfMode(perfMode);
       }
     }
     function scheduleRender() {
@@ -2612,10 +2613,9 @@
     function clearTable() {
       cancelActiveFilterTask();
       clearFindReveals();
-      closeMapPopover();
-      resetScrollState();
+      resetInteractionState({ closePopover: true });
       domElements.tbody.replaceChildren();
-      if (rectCache.size) rectCache.clear();
+      invalidateRectCache();
       domElements.tableWrap?.classList.remove("filter-empty", "has-results");
     }
     function sleep(ms, signal) {
@@ -3188,7 +3188,7 @@
     });
     const handleScrollStart = (e) => {
       closeMapPopover();
-      const t = e.currentTarget;
+      const t = (e.target instanceof Element) ? e.target : e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
@@ -3196,15 +3196,22 @@
       ACTIVE_SCROLL.add(t);
     };
     const handleScrollEnd = (e) => {
-      const t = e.currentTarget;
+      const t = (e.target instanceof Element) ? e.target : e.currentTarget;
       ACTIVE_SCROLL.delete(t);
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(false);
       }
     };
-    document.addEventListener("scroll", handleScrollStart);
-    document.addEventListener("scrollend", handleScrollEnd);
+    document.addEventListener("scroll", handleScrollStart, { capture: true, passive: true });
+    document.addEventListener("scrollend", handleScrollEnd, { capture: true, passive: true });
+    {
+      const wrap = domElements.tableWrap;
+      wrap.addEventListener("scroll", handleScrollStart, { passive: true });
+      wrap.addEventListener("scrollend", handleScrollEnd, { passive: true });
+      domElements.coords.addEventListener("scroll", handleScrollStart, { passive: true });
+      domElements.coords.addEventListener("scrollend", handleScrollEnd, { passive: true });
+    }
     const rectCache = new Map();
     let rectCacheDirty = false;
     let pointerRaf = null;
@@ -3229,10 +3236,12 @@
         pointerRaf = null;
       }
     };
-    const deferMicrotask =
-      typeof queueMicrotask === "function"
-        ? queueMicrotask
-        : (cb) => Promise.resolve().then(cb);
+    function resetInteractionState({ closePopover = false } = {}) {
+      resetScrollState();
+      clearPointerState();
+      if (closePopover) closeMapPopover();
+    }
+    const deferMicrotask = queueMicrotask;
     let DEACTIVATE_QUEUED = false;
     let NEED_CLOSE_POPOVER = false;
     function requestDeactivate({ closePopover = false } = {}) {
@@ -3241,19 +3250,14 @@
       DEACTIVATE_QUEUED = true;
       deferMicrotask(() => {
         DEACTIVATE_QUEUED = false;
-        resetScrollState();
-        clearPointerState();
-        if (NEED_CLOSE_POPOVER) {
-          NEED_CLOSE_POPOVER = false;
-          closeMapPopover();
-        }
+        const closePopover = NEED_CLOSE_POPOVER;
+        NEED_CLOSE_POPOVER = false;
+        resetInteractionState({ closePopover });
       });
     }
     window.addEventListener("blur", () => requestDeactivate());
     window.addEventListener("pagehide", () => {
-      resetScrollState();
-      clearPointerState();
-      closeMapPopover();
+      resetInteractionState({ closePopover: true });
     });
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
@@ -3293,13 +3297,6 @@
         requestRectCacheRefresh();
       }
     };
-    document.addEventListener("pointerout", (e) => {
-      if (e.relatedTarget == null) clearPointerState();
-    }, { capture: true });
-    document.addEventListener("pointercancel", clearPointerState);
-    domElements.tableWrap.addEventListener("pointerenter", () => setStackSpotlightSuppressed(true));
-    domElements.tableWrap.addEventListener("pointerleave", () => setStackSpotlightSuppressed(false));
-    domElements.tableWrap.addEventListener("pointercancel", () => setStackSpotlightSuppressed(false));
     const RESIZE_SCROLL_RESET_DELAY_MS = 150;
     let resizeScrollResetTimer = null;
     const scheduleResizeScrollReset = () => {
@@ -3309,22 +3306,69 @@
         resetScrollState();
       }, RESIZE_SCROLL_RESET_DELAY_MS);
     };
-    window.addEventListener("scroll", invalidateRectCache, { capture: true });
-    window.addEventListener("resize", () => {
+    let SPOTLIGHT_EFFECTS_ENABLED = false;
+    let rectCacheObserver = null;
+    const handlePointerOut = (e) => {
+      if (e.relatedTarget == null) clearPointerState();
+    };
+    const handleTablePointerEnter = () => setStackSpotlightSuppressed(true);
+    const handleTablePointerLeave = () => setStackSpotlightSuppressed(false);
+    const handleWindowResize = () => {
       invalidateRectCache();
       updateTableHeadOffset();
       scheduleResizeScrollReset();
       requestRectCacheRefresh();
-    });
-    const rectCacheObserver = new ResizeObserver(() => {
+    };
+    const handleObservedResize = () => {
       invalidateRectCache();
       requestRectCacheRefresh();
       updateTableHeadOffset();
-    });
-    for (const card of document.querySelectorAll(".card, .card-stack-spotlight")) {
-      rectCacheObserver.observe(card);
+    };
+    function enableSpotlightPointer() {
+      if (SPOTLIGHT_EFFECTS_ENABLED) return;
+      if (document.documentElement.getAttribute("data-perf-mode") === "1") return;
+      SPOTLIGHT_EFFECTS_ENABLED = true;
+      window.addEventListener("scroll", invalidateRectCache, { capture: true, passive: true });
+      window.addEventListener("resize", handleWindowResize, { passive: true });
+      document.addEventListener("pointerout", handlePointerOut, { capture: true });
+      document.addEventListener("pointercancel", clearPointerState);
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
+      domElements.tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
+      domElements.tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
+      domElements.tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
+      rectCacheObserver = new ResizeObserver(handleObservedResize);
+      for (const card of document.querySelectorAll(".card, .card-stack-spotlight")) {
+        rectCacheObserver.observe(card);
+      }
+      if (tbl.tHead) rectCacheObserver.observe(tbl.tHead);
+      requestRectCacheRefresh();
     }
-    if (tbl.tHead) rectCacheObserver.observe(tbl.tHead);
+    function disableSpotlightPointer() {
+      if (!SPOTLIGHT_EFFECTS_ENABLED) return;
+      SPOTLIGHT_EFFECTS_ENABLED = false;
+      window.removeEventListener("scroll", invalidateRectCache, { capture: true });
+      window.removeEventListener("resize", handleWindowResize);
+      document.removeEventListener("pointerout", handlePointerOut, { capture: true });
+      document.removeEventListener("pointercancel", clearPointerState);
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
+      domElements.tableWrap.removeEventListener("pointerenter", handleTablePointerEnter);
+      domElements.tableWrap.removeEventListener("pointerleave", handleTablePointerLeave);
+      domElements.tableWrap.removeEventListener("pointercancel", handleTablePointerLeave);
+      rectCacheObserver?.disconnect();
+      rectCacheObserver = null;
+      if (resizeScrollResetTimer) {
+        clearTimeout(resizeScrollResetTimer);
+        resizeScrollResetTimer = null;
+      }
+      clearPointerState();
+      invalidateRectCache();
+    }
+    function syncSpotlightPerfMode(perfMode) {
+      if (perfMode) disableSpotlightPointer();
+      else enableSpotlightPointer();
+    }
     const flushPointer = () => {
       pointerRaf = null;
       const target = pointerTarget;
@@ -3346,7 +3390,6 @@
       if (pointerRaf !== null) return;
       pointerRaf = requestAnimationFrame(flushPointer);
     }
-    document.addEventListener("pointermove", handlePointerMove);
     function setSpotlightVars(el, clientX, clientY) {
       if (rectCacheDirty) {
         rectCacheDirty = false;
@@ -3396,14 +3439,7 @@
       hasPointer = true;
       updateSpotlightsFromTarget(t, e.clientX, e.clientY);
     }
-    document.addEventListener("pointerdown", handlePointerDownSpotlight, { capture: true });
-    {
-      const wrap = domElements.tableWrap;
-      wrap.addEventListener("scroll", handleScrollStart);
-      wrap.addEventListener("scrollend", handleScrollEnd);
-      domElements.coords.addEventListener("scroll", handleScrollStart);
-      domElements.coords.addEventListener("scrollend", handleScrollEnd);
-    }
+    syncSpotlightPerfMode(document.documentElement.getAttribute("data-perf-mode") === "1");
   </script>
 </body>
 
