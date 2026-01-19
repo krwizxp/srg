@@ -113,6 +113,7 @@
         --panel-shadow: light-dark(0 6px 16px -14px color-mix(in oklch, var(--fg) 18%, transparent),
             0 10px 18px -16px color-mix(in oklch, var(--fg) 40%, transparent));
         --fs-sm: clamp(13px, 0.9vw, 14px);
+        --results-pane-mobile-height: 70dvh;
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
         scrollbar-color: color-mix(in oklch,
@@ -129,7 +130,6 @@
 
       html {
         background-color: var(--page-bg);
-        background-image: none;
         min-block-size: 100%;
       }
 
@@ -215,6 +215,13 @@
         background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
         animation: scroll-shadow-bottom 1s both;
         animation-timeline: scroll(nearest);
+      }
+
+      .table-wrap:not(.has-results)::before,
+      .table-wrap:not(.has-results)::after {
+        content: none;
+        animation: none !important;
+        opacity: 0 !important;
       }
 
       @keyframes skeleton-shimmer-x {
@@ -731,6 +738,11 @@
 
         @container page (inline-size <=900px) {
           block-size: auto;
+
+          .card-stack-bottom .table-wrap {
+            flex: 0 0 var(--results-pane-mobile-height);
+            min-block-size: var(--results-pane-mobile-height);
+          }
         }
 
         .card-stack-spotlight {
@@ -816,6 +828,15 @@
             flex: 1;
             min-block-size: 0;
           }
+
+          @container page (inline-size <=900px) {
+            .table-wrap {
+              flex: 0 0 var(--results-pane-mobile-height);
+              block-size: var(--results-pane-mobile-height);
+              min-block-size: var(--results-pane-mobile-height);
+              max-block-size: var(--results-pane-mobile-height);
+            }
+          }
         }
       }
 
@@ -881,21 +902,35 @@
           pointer-events: none;
         }
 
-        &.has-rows .empty-hint {
+        .filter-empty-hint {
+          display: none;
+          place-items: center;
+          position: absolute;
+          inset-block: 0;
+          inset-inline: 0;
+          inset-block-start: 50px;
+          color: var(--muted);
+          pointer-events: none;
+        }
+
+        &.has-results .empty-hint {
           display: none;
         }
 
+        &.filter-empty .filter-empty-hint {
+          display: grid;
+        }
+
         @container (inline-size <=900px) {
-          max-block-size: 70dvh;
+          block-size: var(--results-pane-mobile-height);
+          min-block-size: var(--results-pane-mobile-height);
+          max-block-size: var(--results-pane-mobile-height);
+          flex: 0 0 var(--results-pane-mobile-height);
           overscroll-behavior: contain;
 
-          &:not(.has-rows) {
-            min-block-size: 100px;
-            overflow: hidden;
-
-            .empty-hint {
-              inset-block-start: 0;
-            }
+          .empty-hint,
+          .filter-empty-hint {
+            inset-block-start: 0;
           }
         }
       }
@@ -951,7 +986,6 @@
           th {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 0;
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
@@ -976,7 +1010,6 @@
           td {
             padding-block: 14px;
             padding-inline: 12px;
-            border-block-end: 0;
             vertical-align: top;
             font-size: var(--fs-sm);
 
@@ -998,12 +1031,6 @@
             @media (any-hover: hover) {
               &:hover {
                 background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
-              }
-            }
-
-            &:last-child {
-              td {
-                border-block-end: none;
               }
             }
 
@@ -1328,7 +1355,6 @@
           }
         }
 
-        position-anchor: auto;
         position-area: block-end span-inline-start;
         position-try-fallbacks: block-end span-inline-end,
         block-start span-inline-start,
@@ -1455,8 +1481,11 @@
         </section>
         <section class="card card-stack-bottom no-spotlight">
           <div class="table-wrap">
-            <p class="empty-hint">
-              데이터를 분석하고 조회를 시작하면 결과가 표시됩니다.
+            <p class="empty-hint" aria-live="polite" aria-atomic="true">
+              random_data.txt 파일을 업로드해 주세요.
+            </p>
+            <p class="filter-empty-hint" aria-live="polite" aria-atomic="true">
+              필터 결과가 없습니다.
             </p>
             <table id="tbl">
               <caption class="sr-only">
@@ -1745,6 +1774,8 @@
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
+      emptyHint: document.querySelector(".table-wrap .empty-hint"),
+      filterEmptyHint: document.querySelector(".table-wrap .filter-empty-hint"),
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       filterQ: document.getElementById("filter-q"),
@@ -1758,7 +1789,6 @@
     };
     const DROP_ZONE_FILE_LABELS =
       domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
-    domElements.coords.addEventListener("focus", (e) => e.target.blur());
     const THEME_STORAGE_KEY = "srg-theme";
     const themeToggle = domElements.themeToggle;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
@@ -1883,6 +1913,7 @@
       if (tr) {
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
+        domElements.tableWrap?.classList.remove("filter-empty");
       }
       bumpFindRehideTimer();
     }
@@ -1931,11 +1962,12 @@
       const hide = shouldHideRowByFilter(tr, f, r);
       if (!hide) {
         if (tr.hasAttribute("hidden")) tr.removeAttribute("hidden");
-        return;
+        return false;
       }
       if (tr.getAttribute("hidden") !== HIDDEN_UNTIL_FOUND) {
         tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
       }
+      return true;
     }
     function clearFindReveals() {
       if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
@@ -1983,15 +2015,21 @@
       const len = rows.length;
       if (len === 0) {
         cancelActiveFilterApply();
+        updateFilterEmptyUI(f.active, 0, 0);
         return;
       }
       const records = AppState.records;
       if (len <= 2000) {
         cancelActiveFilterApply();
+        let visible = 0;
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
-          if (tr) setRowHiddenByFilter(tr, f, records[i]);
+          if (tr) {
+            const hidden = setRowHiddenByFilter(tr, f, records[i]);
+            if (!hidden) visible++;
+          }
         }
+        updateFilterEmptyUI(f.active, visible, len);
         return;
       }
       const existing = FILTER_CTX.job;
@@ -2000,6 +2038,7 @@
         existing.i = 0;
         existing.len = len;
         existing.records = records;
+        existing.visible = 0;
         if (!existing.raf) existing.raf = requestAnimationFrame(existing.step);
         return;
       }
@@ -2011,6 +2050,7 @@
         len,
         f,
         records,
+        visible: 0,
         step: null,
       };
       job.step = () => {
@@ -2023,7 +2063,10 @@
           if (FILTER_CTX.job !== job) return;
           const idx = job.i;
           const tr = job.rows[idx];
-          if (tr) setRowHiddenByFilter(tr, job.f, job.records[idx]);
+          if (tr) {
+            const hidden = setRowHiddenByFilter(tr, job.f, job.records[idx]);
+            if (!hidden) job.visible++;
+          }
           job.i++;
           processed++;
           if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
@@ -2033,6 +2076,7 @@
         if (job.i < job.len) {
           job.raf = requestAnimationFrame(job.step);
         } else {
+          updateFilterEmptyUI(job.f.active, job.visible, job.len);
           FILTER_CTX.job = null;
         }
       };
@@ -2487,6 +2531,36 @@
         el.classList.toggle("stopped", type === "stopped");
       }
     }
+    const EMPTY_HINT_TEXT = {
+      init: "random_data.txt 파일을 업로드해 주세요.",
+      file: "파일 업로드 완료! 좌표 추출을 눌러주세요.",
+      parsing: "좌표를 추출 중입니다.",
+      ready: "좌표 추출 완료. 조회 시작을 눌러주세요.",
+    };
+    function setEmptyHint(kind = "init") {
+      const el = domElements.emptyHint;
+      if (!el) return;
+      el.textContent = EMPTY_HINT_TEXT[kind] || EMPTY_HINT_TEXT.init;
+    }
+    setEmptyHint("init");
+    function updateFilterEmptyUI(isActive, visibleCount, totalRows) {
+      const wrap = domElements.tableWrap;
+      if (!wrap) return;
+      const on = !!(isActive && totalRows > 0 && visibleCount === 0);
+      wrap.classList.toggle("filter-empty", on);
+    }
+    function refreshFilterEmptyUI(f = getLiveFilterSnapshot()) {
+      const wrap = domElements.tableWrap;
+      const tbody = domElements.tbody;
+      if (!wrap || !tbody) return;
+      const totalRows = tbody.rows.length;
+      if (!f.active || totalRows === 0) {
+        wrap.classList.remove("filter-empty");
+        return;
+      }
+      const anyVisible = tbody.querySelector("tr:not([hidden])");
+      wrap.classList.toggle("filter-empty", !anyVisible);
+    }
     const RENDER_CACHE = {
       total: -1,
       success: -1,
@@ -2494,7 +2568,7 @@
       remaining: -1,
       pct: -1,
       exportDisabled: null,
-      hasRows: null,
+      hasResults: null,
       perfMode: null,
     };
     function renderFrame() {
@@ -2532,10 +2606,10 @@
         RENDER_CACHE.exportDisabled = exportDisabled;
         domElements.exportBtn.disabled = exportDisabled;
       }
-      const hasRows = total > 0;
-      if (RENDER_CACHE.hasRows !== hasRows) {
-        RENDER_CACHE.hasRows = hasRows;
-        domElements.tableWrap.classList.toggle("has-rows", hasRows);
+      const hasResults = (domElements.tbody?.rows?.length ?? 0) > 0;
+      if (RENDER_CACHE.hasResults !== hasResults) {
+        RENDER_CACHE.hasResults = hasResults;
+        domElements.tableWrap.classList.toggle("has-results", hasResults);
       }
       const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
       if (RENDER_CACHE.perfMode !== perfMode) {
@@ -2559,6 +2633,7 @@
       resetScrollState();
       domElements.tbody.replaceChildren();
       if (rectCache.size) rectCache.clear();
+      domElements.tableWrap?.classList.remove("filter-empty", "has-results");
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2751,6 +2826,9 @@
         tr.hidden = true;
       }
       domElements.tbody.append(tr);
+      domElements.tableWrap.classList.add("has-results");
+      scheduleRender();
+      if (f.active) refreshFilterEmptyUI(f);
       return tr;
     }
     function fillRow(tr, row) {
@@ -2891,7 +2969,9 @@
     function commitResultRow(tr, r) {
       if (!tr || !tr.isConnected) return;
       fillRow(tr, r);
-      setRowHiddenByFilter(tr, getLiveFilterSnapshot(), r);
+      const f = getLiveFilterSnapshot();
+      setRowHiddenByFilter(tr, f, r);
+      if (f.active) refreshFilterEmptyUI(f);
       pushResultRow(r);
     }
     function startProcessing() {
@@ -2978,6 +3058,7 @@
       clearTable();
       STRING_POOL.clear();
       AppState.setRecords([], "parsing");
+      setEmptyHint("parsing");
       setStatusMessage("파일 분석 중…");
       AppState.controller = new AbortController();
       AppState.inFlight = true;
@@ -2988,6 +3069,7 @@
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
+        setEmptyHint("ready");
         const MAX_DISP = 1_000;
         const disp = [];
         const dispLen = Math.min(records.length, MAX_DISP);
@@ -2999,7 +3081,7 @@
           disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
         domElements.coords.textContent = disp.join("\n");
-        setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 누르세요`);
+        setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`);
       } catch (err) {
         if (err && err.name === "AbortError") {
           setControlsIdle("중지되었습니다.", "stopped");
@@ -3103,7 +3185,8 @@
       clearTable();
       AppState.setRecords([]);
       AppState.setFile(file);
-      setStatusMessage(`파일 선택됨: ${file.name} 추출 버튼을 누르세요`);
+      setEmptyHint("file");
+      setStatusMessage(`파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`);
       for (const el of DROP_ZONE_FILE_LABELS) {
         const strong = document.createElement("strong");
         strong.textContent = file.name;
