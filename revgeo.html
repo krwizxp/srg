@@ -43,7 +43,7 @@
         box-sizing: border-box;
       }
 
-      :is(body, fieldset, h1, h2, p) {
+      :is(body, fieldset, h1, h2, p, pre) {
         margin-block: 0;
         margin-inline: 0;
       }
@@ -220,8 +220,6 @@
       .table-wrap:not(.has-results)::before,
       .table-wrap:not(.has-results)::after {
         content: none;
-        animation: none !important;
-        opacity: 0 !important;
       }
 
       @keyframes skeleton-shimmer-x {
@@ -313,6 +311,7 @@
         gap: 10px;
         position: relative;
         container-type: inline-size;
+        min-block-size: 0;
 
         .card-header {
           display: flex;
@@ -361,6 +360,7 @@
           display: flex;
           align-items: flex-start;
           gap: 14px;
+          color: var(--accent-ink);
 
           .theme-toggle {
             margin-inline-start: auto;
@@ -371,13 +371,12 @@
             flex-wrap: wrap;
 
             .theme-toggle {
-              margin-inline-start: auto;
               margin-block-start: 6px;
             }
           }
 
           svg {
-            color: var(--accent-ink);
+            fill: currentColor;
             inline-size: 36px;
             block-size: 36px;
             flex: 0 0 auto;
@@ -393,7 +392,6 @@
               font-size: clamp(22px, 2vw, 28px);
               font-weight: 800;
               line-height: 1.1;
-              color: var(--accent-ink);
             }
 
             p {
@@ -430,6 +428,8 @@
           align-items: center;
           gap: 10px;
           color: var(--muted);
+          font-weight: 500;
+          font-size: var(--fs-sm);
           box-shadow: var(--panel-shadow);
 
           input[type="file"] {
@@ -444,15 +444,15 @@
             inline-size: 36px;
             block-size: 36px;
             transition: .2s ease;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
           }
 
-          .drop-text {
-            font-weight: 500;
-            font-size: var(--fs-sm);
-
-            strong {
-              color: var(--accent-ink);
-            }
+          .drop-text strong {
+            color: var(--accent-ink);
           }
 
           &:is(:hover, :focus-within) {
@@ -512,17 +512,16 @@
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
           overflow: auto;
-          margin-block: 0;
 
           &:empty::before {
             content: attr(data-placeholder);
             color: var(--muted-strong);
           }
+        }
 
-          &#coords {
-            @container page (inline-size <=900px) {
-              max-block-size: 30dvh;
-            }
+        @container page (inline-size <=900px) {
+          .coords-view {
+            max-block-size: 30dvh;
           }
         }
 
@@ -544,7 +543,6 @@
           padding-block: 12px;
           padding-inline: 8px;
           position: relative;
-          overflow: hidden;
 
           &::after {
             content: "";
@@ -564,7 +562,6 @@
           @media (any-hover: hover) {
             &:hover {
               background: var(--accent-wash);
-              border-color: var(--accent-border);
             }
           }
 
@@ -631,6 +628,11 @@
               display: block;
               inline-size: 18px;
               block-size: 18px;
+              fill: none;
+              stroke: currentColor;
+              stroke-width: 1.6;
+              stroke-linecap: round;
+              stroke-linejoin: round;
             }
 
             .icon-sun {
@@ -655,8 +657,6 @@
       }
 
       :is(.progress-shell, .skeleton-bar) {
-        background: light-dark(color-mix(in oklch, var(--fg) 62%, var(--surface-panel)),
-            color-mix(in oklch, var(--fg) 55%, var(--surface-panel)));
         border-radius: 999px;
       }
 
@@ -691,6 +691,7 @@
       .progress-shell {
         position: relative;
         overflow: hidden;
+        contain: paint;
         background: color-mix(in oklch, var(--fg) 12%, var(--surface-panel));
         block-size: 8px;
         transition: --pct 0.3s cubic-bezier(0.25, 1, 0.5, 1);
@@ -707,13 +708,13 @@
 
         .progress-fill {
           block-size: 100%;
+          overflow: hidden;
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: 0% 50%;
           background: linear-gradient(in oklch 90deg,
               color-mix(in oklch, var(--accent) 85%, var(--fg)),
               color-mix(in oklch, var(--accent) 78%, var(--fg)));
           position: relative;
-          overflow: hidden;
         }
 
         &.active {
@@ -744,19 +745,12 @@
 
         @container page (inline-size <=900px) {
           block-size: auto;
-
-          .card-stack-bottom .table-wrap {
-            flex: 0 0 var(--results-pane-mobile-height);
-            min-block-size: var(--results-pane-mobile-height);
-          }
         }
 
         .card-stack-spotlight {
           position: absolute;
           inset-block: 0;
           inset-inline: 0;
-          border-radius: inherit;
-          overflow: hidden;
           pointer-events: none;
           z-index: 2;
 
@@ -794,7 +788,6 @@
             background: transparent;
             box-shadow: none;
             border-radius: 0;
-            backdrop-filter: none;
           }
         }
 
@@ -810,17 +803,7 @@
           min-block-size: 0;
 
           .table-wrap {
-            flex: 1;
             min-block-size: 0;
-          }
-
-          @container page (inline-size <=900px) {
-            .table-wrap {
-              flex: 0 0 var(--results-pane-mobile-height);
-              block-size: var(--results-pane-mobile-height);
-              min-block-size: var(--results-pane-mobile-height);
-              max-block-size: var(--results-pane-mobile-height);
-            }
           }
         }
       }
@@ -877,17 +860,13 @@
         box-shadow: var(--panel-shadow);
 
         .table-hint {
+          display: grid;
           place-items: center;
           position: absolute;
-          inset-block: 0;
+          inset-block: 50px 0;
           inset-inline: 0;
-          inset-block-start: 50px;
           color: var(--muted);
           pointer-events: none;
-        }
-
-        .empty-hint {
-          display: grid;
         }
 
         .filter-empty-hint {
@@ -904,8 +883,6 @@
 
         @container (inline-size <=900px) {
           block-size: var(--results-pane-mobile-height);
-          min-block-size: var(--results-pane-mobile-height);
-          max-block-size: var(--results-pane-mobile-height);
           flex: 0 0 var(--results-pane-mobile-height);
           overscroll-behavior: contain;
 
@@ -1017,10 +994,7 @@
             &[hidden="until-found"] {
               display: block;
               content-visibility: hidden;
-              margin-block: 0;
-              padding-block: 0;
               block-size: 0;
-              min-block-size: 0;
               overflow: hidden;
             }
           }
@@ -1067,18 +1041,11 @@
               animation-timeline: view();
               animation-range: entry 0% cover 25%;
 
-              @media (any-hover: hover) {
-                &:hover {
-                  border-color: var(--accent-border);
-                }
-              }
-
               td {
                 display: grid;
                 grid-template-columns: 64px 1fr;
                 gap: 10px;
                 align-items: baseline;
-                border: none;
                 padding-block: 2px;
                 padding-inline: 0;
 
@@ -1094,13 +1061,9 @@
 
             :root[data-perf-mode="1"] & tr {
               animation: none !important;
-              transition: none !important;
 
               &:hover {
-                transform: none !important;
-                box-shadow: none !important;
                 background: transparent !important;
-                border-color: var(--line-soft) !important;
               }
             }
           }
@@ -1111,6 +1074,9 @@
           margin-block: 4px;
           position: relative;
           overflow: hidden;
+          contain: paint;
+          background: light-dark(color-mix(in oklch, var(--fg) 62%, var(--surface-panel)),
+              color-mix(in oklch, var(--fg) 55%, var(--surface-panel)));
 
           &::after {
             content: "";
@@ -1150,8 +1116,6 @@
 
       ::view-transition-old(results-card),
       ::view-transition-new(results-card) {
-        height: 100%;
-        width: 100%;
         position: absolute;
         inset: 0;
         mix-blend-mode: plus-lighter;
@@ -1209,44 +1173,17 @@
         animation: none !important;
         transition: none !important;
       }
-
-      html {
-        scroll-behavior: auto !important;
-      }
     }
 
     html.scrolling {
       @media (any-hover: hover) {
-        .card {
-          &:hover::before {
-            opacity: 0 !important;
-          }
-        }
-
-        button {
-          &:hover {
-            transform: none !important;
-            box-shadow: none !important;
-          }
-        }
-
-        .table-wrap {
-          table {
-            tbody {
-              tr {
-                &:hover {
-                  background: transparent !important;
-                  transform: none !important;
-                  box-shadow: none !important;
-                }
-              }
-            }
-          }
+        .table-wrap table tbody tr:hover {
+          background: transparent !important;
         }
       }
     }
 
-    html[data-perf-mode="1"] {
+    :root[data-perf-mode="1"] {
 
       .card::before,
       .card-stack-spotlight::before,
@@ -1269,7 +1206,6 @@
         position: absolute;
         inline-size: 1px;
         block-size: 1px;
-        overflow: hidden;
         clip-path: inset(50%);
       }
 
@@ -1311,12 +1247,13 @@
           flex-wrap: wrap;
           gap: 6px 8px;
           min-inline-size: 85px;
+          color: var(--accent-ink);
+          font-weight: 700;
+          white-space: nowrap;
 
           a {
-            color: var(--accent-ink);
+            color: inherit;
             text-decoration: none;
-            font-weight: 700;
-            white-space: nowrap;
             transition: color 0.2s;
 
             &:focus-visible {
@@ -1351,7 +1288,7 @@
   <main id="app">
     <section class="card">
       <header class="brand">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
           <path
             d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
         </svg>
@@ -1360,15 +1297,13 @@
           <p>random_data.txt 좌표 변환</p>
         </div>
         <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
-          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="4"></circle>
             <path
               d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41">
             </path>
           </svg>
-          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
           </svg>
           <span class="sr-only" id="theme-toggle-label">다크 모드</span>
@@ -1381,9 +1316,8 @@
             random_data.txt 파일 업로드 및 조회 제어
           </legend>
           <label class="drop-zone">
-            <svg class="drop-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
-              aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round"
+            <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
             <span class="drop-text">
@@ -1491,8 +1425,7 @@
       </div>
     </div>
   </main>
-  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" aria-modal="false"
-    tabindex="-1">
+  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" tabindex="-1">
     <div class="map-links" id="map-popover-links">
       <a data-provider-key="Google" href="about:blank" data-url-template="https://www.google.com/maps?q={lat},{lon}"
         target="_blank" rel="noopener noreferrer">Google</a>
@@ -1601,6 +1534,7 @@
     }
     const mapPopover = document.getElementById("map-popover");
     const mapPopoverLinksHost = document.getElementById("map-popover-links");
+    const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     const mapAnchors =
       mapPopoverLinksHost.querySelectorAll("a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
@@ -1628,8 +1562,8 @@
     }
     function readLatLonDataset(el) {
       if (!(el instanceof Element)) return null;
-      const lat = el.dataset?.lat;
-      const lon = el.dataset?.lon;
+      const lat = el.dataset.lat;
+      const lon = el.dataset.lon;
       if (lat == null || lon == null || lat === "" || lon === "") return null;
       return { lat, lon };
     }
@@ -1639,7 +1573,6 @@
       return fillLatLon(link.parts, useLat, useLon);
     }
     let LAST_MAP_INVOKER = null;
-    let MAP_POPOVER_OPEN = false;
     let MAP_POPOVER_PREV_FOCUS = null;
     const focusFirstPopoverLink = () => {
       const first = mapPopoverLinksHost.querySelector("a[href]");
@@ -1659,7 +1592,7 @@
       if (!btn) return;
       const prev = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
-      if (!MAP_POPOVER_OPEN || prev === btn) return;
+      if (!isMapPopoverOpen() || prev === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       const coords = readLatLonDataset(btn);
       if (!coords) return;
@@ -1674,13 +1607,12 @@
       }
     }
     function closeMapPopover() {
-      if (!MAP_POPOVER_OPEN) return;
-      MAP_POPOVER_OPEN = false;
+      if (!isMapPopoverOpen()) return;
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      MAP_POPOVER_OPEN = e.newState === "open";
-      if (!MAP_POPOVER_OPEN) {
+      const open = e.newState === "open";
+      if (!open) {
         if (MAP_POPOVER_PREV_FOCUS && shouldRestorePopoverFocus()) {
           MAP_POPOVER_PREV_FOCUS.focus();
         }
@@ -1767,7 +1699,6 @@
       progLabel: document.getElementById("prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
       emptyHint: document.querySelector(".table-wrap .empty-hint"),
-      filterEmptyHint: document.querySelector(".table-wrap .filter-empty-hint"),
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       filterQ: document.getElementById("filter-q"),
@@ -1782,7 +1713,6 @@
     const DROP_ZONE_FILE_LABELS =
       domElements.dropZoneText.querySelectorAll(".desktop-msg, .mobile-msg");
     const THEME_STORAGE_KEY = "srg-theme";
-    const themeToggle = domElements.themeToggle;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const getStoredTheme = () => {
       try {
@@ -1795,14 +1725,11 @@
     const applyTheme = (theme) => {
       document.documentElement.dataset.theme = theme;
       const isDark = theme === "dark";
-      if (themeToggle) {
-        const label = isDark ? "라이트 모드" : "다크 모드";
-        const labelEl = domElements.themeToggleLabel;
-        if (labelEl) labelEl.textContent = label;
-        themeToggle.setAttribute("aria-label", `${label}로 전환`);
-        themeToggle.setAttribute("title", `${label}로 전환`);
-        themeToggle.setAttribute("aria-pressed", String(isDark));
-      }
+      const label = isDark ? "라이트 모드" : "다크 모드";
+      domElements.themeToggleLabel.textContent = label;
+      domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
+      domElements.themeToggle.setAttribute("title", `${label}로 전환`);
+      domElements.themeToggle.setAttribute("aria-pressed", String(isDark));
     };
     const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
     const resolveTheme = () => getStoredTheme() ?? getSystemTheme();
@@ -1812,21 +1739,19 @@
       if (getStoredTheme()) return;
       syncTheme();
     });
-    if (themeToggle) {
-      themeToggle.addEventListener("click", () => {
-        const current = document.documentElement.dataset.theme;
-        const next = current === "dark" ? "light" : "dark";
-        try {
-          localStorage.setItem(THEME_STORAGE_KEY, next);
-        } catch {
-        }
-        applyTheme(next);
-      });
-    }
+    domElements.themeToggle.addEventListener("click", () => {
+      const current = document.documentElement.dataset.theme;
+      const next = current === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, next);
+      } catch {
+      }
+      applyTheme(next);
+    });
     const updateTableHeadOffset = (() => {
       let lastHeight = -1;
       return () => {
-        if (!domElements.tableWrap || !tbl.tHead) return;
+        if (!tbl.tHead) return;
         const height = tbl.tHead.offsetHeight;
         if (height === lastHeight) return;
         lastHeight = height;
@@ -1900,7 +1825,7 @@
       if (tr) {
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
-        domElements.tableWrap?.classList.remove("filter-empty");
+        domElements.tableWrap.classList.remove("filter-empty");
       }
       bumpFindRehideTimer();
     }
@@ -2529,7 +2454,6 @@
       if (!el) return;
       el.textContent = EMPTY_HINT_TEXT[kind] || EMPTY_HINT_TEXT.init;
     }
-    setEmptyHint("init");
     function syncFilterEmptyUI({ active = false, totalRows = null, visibleCount = null } = {}) {
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
@@ -2616,7 +2540,7 @@
       resetInteractionState({ closePopover: true });
       domElements.tbody.replaceChildren();
       invalidateRectCache();
-      domElements.tableWrap?.classList.remove("filter-empty", "has-results");
+      domElements.tableWrap.classList.remove("filter-empty", "has-results");
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -3084,7 +3008,7 @@
       }
     }
     domElements.tbody.addEventListener("click", (e) => {
-      if (!MAP_POPOVER_OPEN) return;
+      if (!isMapPopoverOpen()) return;
       const target = e.target;
       if (!(target instanceof Element)) return;
       const btn = target.closest("button.map-btn");
@@ -3205,13 +3129,6 @@
     };
     document.addEventListener("scroll", handleScrollStart, { capture: true, passive: true });
     document.addEventListener("scrollend", handleScrollEnd, { capture: true, passive: true });
-    {
-      const wrap = domElements.tableWrap;
-      wrap.addEventListener("scroll", handleScrollStart, { passive: true });
-      wrap.addEventListener("scrollend", handleScrollEnd, { passive: true });
-      domElements.coords.addEventListener("scroll", handleScrollStart, { passive: true });
-      domElements.coords.addEventListener("scrollend", handleScrollEnd, { passive: true });
-    }
     const rectCache = new Map();
     let rectCacheDirty = false;
     let pointerRaf = null;
@@ -3241,14 +3158,13 @@
       clearPointerState();
       if (closePopover) closeMapPopover();
     }
-    const deferMicrotask = queueMicrotask;
     let DEACTIVATE_QUEUED = false;
     let NEED_CLOSE_POPOVER = false;
     function requestDeactivate({ closePopover = false } = {}) {
       if (closePopover) NEED_CLOSE_POPOVER = true;
       if (DEACTIVATE_QUEUED) return;
       DEACTIVATE_QUEUED = true;
-      deferMicrotask(() => {
+      queueMicrotask(() => {
         DEACTIVATE_QUEUED = false;
         const closePopover = NEED_CLOSE_POPOVER;
         NEED_CLOSE_POPOVER = false;
