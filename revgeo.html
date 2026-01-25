@@ -180,14 +180,38 @@
       }
 
       .coords-view {
-        background-image:
-          linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent),
-          linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-        background-repeat: no-repeat;
-        background-position: 50% 0%, 50% 100%;
-        background-size: 100% 0, 100% 0;
-        animation-timeline: scroll(self);
-        animation-name: scroll-shadows;
+        --coords-pad-block: 12px;
+        --coords-pad-inline: 12px;
+        --scroll-shadow-size: 14px;
+        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, transparent);
+      }
+
+      .coords-view[data-has-content]::before,
+      .coords-view[data-has-content]::after {
+        content: "";
+        display: block;
+        position: sticky;
+        inset-inline: 0;
+        block-size: var(--scroll-shadow-size);
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0;
+      }
+
+      .coords-view[data-has-content]::before {
+        inset-block-start: 0;
+        margin-block-start: calc(-1 * var(--scroll-shadow-size));
+        background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+        animation: scroll-shadow-top 1s linear both;
+        animation-timeline: scroll(nearest);
+      }
+
+      .coords-view[data-has-content]::after {
+        inset-block-end: 0;
+        margin-block-end: calc(-1 * var(--scroll-shadow-size));
+        background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+        animation: scroll-shadow-bottom 1s linear both;
+        animation-timeline: scroll(nearest);
       }
 
       .table-wrap::before,
@@ -206,7 +230,7 @@
         inset-block-start: var(--table-head-offset);
         margin-block-start: -14px;
         background: linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-        animation: scroll-shadow-top 1s both;
+        animation: scroll-shadow-top 1s linear both;
         animation-timeline: scroll(nearest);
       }
 
@@ -214,7 +238,7 @@
         inset-block-end: 0;
         margin-block-end: -14px;
         background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-        animation: scroll-shadow-bottom 1s both;
+        animation: scroll-shadow-bottom 1s linear both;
         animation-timeline: scroll(nearest);
       }
 
@@ -239,32 +263,22 @@
         }
       }
 
-      @keyframes scroll-shadows {
-        0% {
-          background-size: 100% 0, 100% 14px;
-        }
-
-        100% {
-          background-size: 100% 14px, 100% 0;
-        }
-      }
-
       @keyframes scroll-shadow-top {
-        0% {
+        from {
           opacity: 0;
         }
 
-        100% {
+        to {
           opacity: 1;
         }
       }
 
       @keyframes scroll-shadow-bottom {
-        0% {
+        from {
           opacity: 1;
         }
 
-        100% {
+        to {
           opacity: 0;
         }
       }
@@ -511,17 +525,32 @@
 
         .coords-view {
           font: inherit;
-          padding-block: 12px;
-          padding-inline: 12px;
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
           overflow: auto;
+        }
 
-          &:empty::before {
-            content: attr(data-placeholder);
-            color: var(--muted-strong);
-          }
+        :where(.coords-view) :is(.coords-placeholder, .coords-content) {
+          display: block;
+          padding-block: var(--coords-pad-block);
+          padding-inline: var(--coords-pad-inline);
+        }
+
+        .coords-view .coords-content {
+          font: inherit;
+        }
+
+        .coords-view .coords-placeholder {
+          color: var(--muted-strong);
+        }
+
+        .coords-view[data-has-content] .coords-placeholder {
+          display: none;
+        }
+
+        .coords-view:not([data-has-content]) .coords-content {
+          display: none;
         }
 
         @container page (inline-size <=900px) {
@@ -1336,8 +1365,9 @@
       </form>
       <div>
         <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"
-          data-placeholder="좌표가 이곳에 표시됩니다."></pre>
+        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"><span
+            class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
+            class="coords-content"></code></pre>
       </div>
       <div class="row-progress">
         <div class="sp">
@@ -1694,6 +1724,7 @@
       emptyHint: document.querySelector(".table-wrap .empty-hint"),
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
+      coordsContent: document.querySelector("#coords .coords-content"),
       filterQ: document.getElementById("filter-q"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
@@ -1702,6 +1733,10 @@
       filterTag: document.getElementById("filter-tag"),
       filterFullAddr: document.getElementById("filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
+    };
+    const setCoordsText = (text) => {
+      domElements.coordsContent.textContent = text;
+      domElements.coords.toggleAttribute("data-has-content", text.length > 0);
     };
     const parseBtn = document.getElementById("parse");
     const startBtn = document.getElementById("start");
@@ -2891,7 +2926,7 @@
     async function handleParse() {
       const file = AppState.droppedFile;
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
-      domElements.coords.textContent = "";
+      setCoordsText("");
       clearTable();
       STRING_POOL.clear();
       AppState.setRecords([], "parsing");
@@ -2917,7 +2952,7 @@
         if (records.length > MAX_DISP) {
           disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
-        domElements.coords.textContent = disp.join("\n");
+        setCoordsText(disp.join("\n"));
         setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`);
       } catch (err) {
         if (err && err.name === "AbortError") {
@@ -3038,7 +3073,7 @@
         setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
         return;
       }
-      domElements.coords.textContent = "";
+      setCoordsText("");
       clearTable();
       AppState.setRecords([]);
       AppState.setFile(file);
