@@ -623,7 +623,8 @@
             color: var(--muted-strong);
             inline-size: 44px;
             block-size: 44px;
-            padding: 0;
+            padding-block: 0;
+            padding-inline: 0;
 
             &::after {
               display: none;
@@ -638,10 +639,6 @@
 
             .icon-sun {
               display: none;
-            }
-
-            .icon-moon {
-              display: block;
             }
           }
         }
@@ -1104,32 +1101,36 @@
         }
       }
 
-      ::view-transition-old(root),
-      ::view-transition-new(root) {
-        animation: none;
-      }
+      html:active-view-transition-type(results) {
 
-      ::view-transition-group(results-card) {
-        animation-duration: 0.5s;
-        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-      }
+        &::view-transition-old(root),
+        &::view-transition-new(root) {
+          animation: none;
+        }
 
-      ::view-transition-old(results-card),
-      ::view-transition-new(results-card) {
-        position: absolute;
-        inset: 0;
-        mix-blend-mode: plus-lighter;
-        backface-visibility: hidden;
-      }
+        &::view-transition-group(results-card) {
+          animation-duration: 0.5s;
+          animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
 
-      ::view-transition-old(results-card) {
-        animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out-blur;
-        transform-origin: 50% 100%;
-      }
+        &::view-transition-old(results-card),
+        &::view-transition-new(results-card) {
+          position: absolute;
+          inset-block: 0;
+          inset-inline: 0;
+          mix-blend-mode: plus-lighter;
+          backface-visibility: hidden;
+        }
 
-      ::view-transition-new(results-card) {
-        animation: 500ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-spring;
-        transform-origin: 50% 0%;
+        &::view-transition-old(results-card) {
+          animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out-blur;
+          transform-origin: 50% 100%;
+        }
+
+        &::view-transition-new(results-card) {
+          animation: 500ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-spring;
+          transform-origin: 50% 0%;
+        }
       }
 
       @keyframes vt-fade-out-blur {
@@ -1273,11 +1274,8 @@
         }
 
         position-area: block-end span-inline-start;
-        position-try-fallbacks: block-end span-inline-end,
-        block-start span-inline-start,
-        block-start span-inline-end,
+        position-try-fallbacks: flip-inline,
         flip-block,
-        flip-inline,
         flip-block flip-inline;
       }
     }
@@ -1485,7 +1483,6 @@
     const RX_EMD = /[읍면동리]$/;
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
-    const RX_REGEXP_ESCAPE = /[\\^$.*+?()[\]{}|]/g;
     const csvEsc = (s) => {
       s = String(s ?? "");
       if (RX_CSV_FORMULA.test(s) || s.startsWith("\t")) {
@@ -1504,10 +1501,7 @@
       STRING_POOL.set(s, s);
       return s;
     }
-    const escapeRegExp =
-      typeof RegExp.escape === "function"
-        ? (s) => RegExp.escape(s)
-        : (s) => String(s).replace(RX_REGEXP_ESCAPE, "\\$&");
+    const escapeRegExp = RegExp.escape;
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -1687,11 +1681,6 @@
       themeToggle: document.getElementById("theme-toggle"),
       themeToggleLabel: document.getElementById("theme-toggle-label"),
       app: document.getElementById("app"),
-      parse: document.getElementById("parse"),
-      start: document.getElementById("start"),
-      pause: document.getElementById("pause"),
-      resume: document.getElementById("resume"),
-      stop: document.getElementById("stop"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
       cntTotal: document.getElementById("cnt-total"),
@@ -1714,6 +1703,11 @@
       filterFullAddr: document.getElementById("filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
     };
+    const parseBtn = document.getElementById("parse");
+    const startBtn = document.getElementById("start");
+    const pauseBtn = document.getElementById("pause");
+    const resumeBtn = document.getElementById("resume");
+    const stopBtn = document.getElementById("stop");
     const root = document.documentElement;
     const PERF_MODE_ATTR = "data-perf-mode";
     const DROP_ZONE_FILE_LABELS = document.querySelectorAll(
@@ -2360,40 +2354,33 @@
     function updateUIState() {
       const s = AppState.status;
       const hasRecords = AppState.records.length > 0;
-      const {
-        parse,
-        start,
-        pause,
-        resume,
-        stop,
-        progShell,
-        dropZone,
-      } = domElements;
+      const progShell = domElements.progShell;
+      const dropZone = domElements.dropZone;
       const isBusy = AppState.isBusy;
       const parseDisabled = isBusy;
       if (UI_CACHE.parseDisabled !== parseDisabled) {
         UI_CACHE.parseDisabled = parseDisabled;
-        parse.disabled = parseDisabled;
+        parseBtn.disabled = parseDisabled;
       }
       const startDisabled = isBusy || !hasRecords;
       if (UI_CACHE.startDisabled !== startDisabled) {
         UI_CACHE.startDisabled = startDisabled;
-        start.disabled = startDisabled;
+        startBtn.disabled = startDisabled;
       }
       const pauseDisabled = s !== "running";
       if (UI_CACHE.pauseDisabled !== pauseDisabled) {
         UI_CACHE.pauseDisabled = pauseDisabled;
-        pause.disabled = pauseDisabled;
+        pauseBtn.disabled = pauseDisabled;
       }
       const resumeDisabled = s !== "paused";
       if (UI_CACHE.resumeDisabled !== resumeDisabled) {
         UI_CACHE.resumeDisabled = resumeDisabled;
-        resume.disabled = resumeDisabled;
+        resumeBtn.disabled = resumeDisabled;
       }
       const stopDisabled = !(AppState.isRunning || s === "parsing") || s === "stopping";
       if (UI_CACHE.stopDisabled !== stopDisabled) {
         UI_CACHE.stopDisabled = stopDisabled;
-        stop.disabled = stopDisabled;
+        stopBtn.disabled = stopDisabled;
       }
       const progActive = s === "running" || s === "pausing";
       if (UI_CACHE.progActive !== progActive) {
@@ -2813,7 +2800,7 @@
     }
     function getErrorMessage(err) {
       try {
-        const msg = err && typeof err === "object" ? err.message : null;
+        const msg = err?.message;
         return msg ? String(msg) : String(err);
       } catch {
         return "Unknown error";
@@ -2978,10 +2965,11 @@
       if (n > 0 && !perfMode) {
         const active = document.activeViewTransition;
         if (active) {
+          active.types.add("results");
           fn();
           return active;
         }
-        return document.startViewTransition(fn);
+        return document.startViewTransition({ update: fn, types: ["results"] });
       }
       return fn();
     };
@@ -3032,10 +3020,7 @@
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
       try {
-        const out = cmd();
-        if (out && typeof out.then === "function") {
-          out.catch(handleCommandError);
-        }
+        Promise.resolve(cmd()).catch(handleCommandError);
       } catch (err) {
         handleCommandError(err);
       }
