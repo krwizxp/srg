@@ -78,6 +78,12 @@
     @layer theme {
       :root {
         color-scheme: light dark;
+        --safe-inline-start: env(safe-area-inset-left);
+        --safe-inline-end: env(safe-area-inset-right);
+        --inline-origin-x: 0%;
+        --inline-angle: 90deg;
+        --shimmer-from: -120%;
+        --shimmer-to: 120%;
         --page-bg: light-dark(oklch(100% 0 0), oklch(12% 0.02 265));
         --card-surface: color-mix(in oklch,
             light-dark(oklch(94.5% 0.014 265 / 0.96), oklch(17% 0.03 265 / 0.82)) 90%,
@@ -117,6 +123,15 @@
             color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) transparent;
       }
 
+      :root[dir="rtl"] {
+        --safe-inline-start: env(safe-area-inset-right);
+        --safe-inline-end: env(safe-area-inset-left);
+        --inline-origin-x: 100%;
+        --inline-angle: 270deg;
+        --shimmer-from: 120%;
+        --shimmer-to: -120%;
+      }
+
       :root[data-theme="light"] {
         color-scheme: light;
       }
@@ -132,7 +147,7 @@
       body {
         color: var(--fg);
         padding-block: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-bottom));
-        padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
+        padding-inline: max(20px, var(--safe-inline-start)) max(20px, var(--safe-inline-end));
         letter-spacing: -.015em;
         font-variant-numeric: tabular-nums;
         font-size: clamp(14px, 1.5vw, 15px);
@@ -145,7 +160,7 @@
 
         @container (inline-size <=800px) {
           padding-block: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-bottom));
-          padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+          padding-inline: max(12px, var(--safe-inline-start)) max(12px, var(--safe-inline-end));
         }
       }
     }
@@ -214,11 +229,10 @@
       :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::after,
       :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::before,
       :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::after {
-        opacity: 0 !important;
         animation: none !important;
       }
 
-      @keyframes scroll-shadow-top-a {
+      @keyframes scroll-shadow-top {
         from {
           opacity: 0;
         }
@@ -228,27 +242,7 @@
         }
       }
 
-      @keyframes scroll-shadow-top-b {
-        from {
-          opacity: 0;
-        }
-
-        to {
-          opacity: 1;
-        }
-      }
-
-      @keyframes scroll-shadow-bottom-a {
-        from {
-          opacity: 1;
-        }
-
-        to {
-          opacity: 0;
-        }
-      }
-
-      @keyframes scroll-shadow-bottom-b {
+      @keyframes scroll-shadow-bottom {
         from {
           opacity: 1;
         }
@@ -270,29 +264,21 @@
         }
 
         :is(.coords-view[data-has-content], .table-wrap.has-results)::before {
-          animation-name: scroll-shadow-top-a;
-        }
-
-        :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-anim="b"]::before {
-          animation-name: scroll-shadow-top-b;
+          animation-name: scroll-shadow-top;
         }
 
         :is(.coords-view[data-has-content], .table-wrap.has-results)::after {
-          animation-name: scroll-shadow-bottom-a;
-        }
-
-        :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-anim="b"]::after {
-          animation-name: scroll-shadow-bottom-b;
+          animation-name: scroll-shadow-bottom;
         }
       }
 
       @keyframes skeleton-shimmer-x {
         from {
-          transform: translateX(-120%);
+          transform: translateX(var(--shimmer-from));
         }
 
         to {
-          transform: translateX(120%);
+          transform: translateX(var(--shimmer-to));
         }
       }
 
@@ -547,8 +533,11 @@
           box-shadow: var(--panel-shadow);
         }
 
-        .coords-view {
+        :where(.coords-view, .coords-view .coords-content) {
           font: inherit;
+        }
+
+        .coords-view {
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
@@ -558,10 +547,6 @@
           display: block;
           padding-block: var(--coords-pad-block);
           padding-inline: var(--coords-pad-inline);
-        }
-
-        .coords-view .coords-content {
-          font: inherit;
         }
 
         .coords-view .coords-placeholder {
@@ -584,7 +569,9 @@
 
         :where(button,
           .filters input[type="search"],
-          .filters select):focus-visible {
+          .filters select,
+          .map-popover,
+          .map-popover a):focus-visible {
           outline: none;
           box-shadow: inset 0 0 0 2px var(--accent-border);
         }
@@ -671,7 +658,6 @@
           &.theme-toggle {
             border-radius: 999px;
             font-size: var(--fs-sm);
-            font-weight: 600;
             color: var(--muted-strong);
             inline-size: 44px;
             block-size: 44px;
@@ -760,8 +746,8 @@
           block-size: 100%;
           overflow: hidden;
           transform: scaleX(calc(var(--pct) / 100));
-          transform-origin: 0% 50%;
-          background: linear-gradient(in oklch 90deg,
+          transform-origin: var(--inline-origin-x) 50%;
+          background: linear-gradient(in oklch var(--inline-angle),
               color-mix(in oklch, var(--accent) 85%, var(--fg)),
               color-mix(in oklch, var(--accent) 78%, var(--fg)));
           position: relative;
@@ -773,8 +759,8 @@
             position: absolute;
             inset-block: 0;
             inset-inline: 0;
-            transform: translateX(-120%);
-            background: linear-gradient(in oklch 90deg,
+            transform: translateX(var(--shimmer-from));
+            background: linear-gradient(in oklch var(--inline-angle),
                 transparent 0%,
                 color-mix(in oklch, var(--page-bg) 75%, transparent) 45%,
                 transparent 100%);
@@ -1130,8 +1116,8 @@
             position: absolute;
             inset-block: 0;
             inset-inline: 0;
-            transform: translateX(-120%);
-            background: linear-gradient(in oklch 90deg,
+            transform: translateX(var(--shimmer-from));
+            background: linear-gradient(in oklch var(--inline-angle),
                 transparent,
                 color-mix(in oklch, var(--accent) 18%, var(--surface-panel)),
                 transparent);
@@ -1283,7 +1269,6 @@
         transition: opacity 0s linear 16ms;
 
         &:focus-visible {
-          outline: none;
           box-shadow:
             0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent),
             0 0 0 2px var(--accent-border);
@@ -1308,7 +1293,6 @@
             transition: color 0.2s;
 
             &:focus-visible {
-              outline: none;
               box-shadow: 0 0 0 2px var(--accent-border);
               border-radius: 8px;
             }
@@ -1819,15 +1803,18 @@
       };
     })();
     updateTableHeadOffset();
+    function syncLayoutMetrics() {
+      updateTableHeadOffset();
+      requestScrollShadowSync(domElements.tableWrap);
+      requestScrollShadowSync(domElements.coords);
+    }
     const SHADOW_SYNC_PENDING = new WeakSet();
-    let SHADOW_REBIND_TOGGLE = false;
     function clearScrollShadowState(el) {
       SHADOW_SYNC_PENDING.delete(el);
       if (!(el instanceof HTMLElement)) return;
       el.removeAttribute("data-at-top");
       el.removeAttribute("data-at-bottom");
       el.removeAttribute("data-shadow-rebind");
-      el.removeAttribute("data-shadow-anim");
     }
     function syncScrollShadowScrollability(el) {
       if (!(el instanceof HTMLElement)) return;
@@ -1852,8 +1839,6 @@
     }
     function rebindScrollShadowTimeline(el) {
       if (!(el instanceof HTMLElement)) return;
-      SHADOW_REBIND_TOGGLE = !SHADOW_REBIND_TOGGLE;
-      el.dataset.shadowAnim = SHADOW_REBIND_TOGGLE ? "b" : "a";
       el.setAttribute("data-shadow-rebind", "");
       requestAnimationFrame(() => {
         el.removeAttribute("data-shadow-rebind");
@@ -3296,9 +3281,7 @@
     const handleTablePointerLeave = () => setStackSpotlightSuppressed(false);
     const handleWindowResize = () => {
       invalidateRectCache();
-      updateTableHeadOffset();
-      requestScrollShadowSync(domElements.tableWrap);
-      requestScrollShadowSync(domElements.coords);
+      syncLayoutMetrics();
       if (resizeScrollResetTimer) clearTimeout(resizeScrollResetTimer);
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
@@ -3309,9 +3292,7 @@
     const handleObservedResize = () => {
       invalidateRectCache();
       requestRectCacheRefresh();
-      updateTableHeadOffset();
-      requestScrollShadowSync(domElements.tableWrap);
-      requestScrollShadowSync(domElements.coords);
+      syncLayoutMetrics();
     };
     function syncSpotlightPerfMode(perfMode) {
       if (perfMode) {
