@@ -193,6 +193,7 @@
         block-size: var(--scroll-shadow-size);
         pointer-events: none;
         z-index: 5;
+        opacity: 0;
       }
 
       .coords-view[data-has-content]::before,
@@ -200,7 +201,6 @@
         inset-block-start: var(--table-head-offset, 0px);
         margin-block-start: calc(-1 * var(--scroll-shadow-size));
         background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
-        opacity: var(--scroll-shadow-progress, 0);
       }
 
       .coords-view[data-has-content]::after,
@@ -208,12 +208,82 @@
         inset-block-end: 0;
         margin-block-end: calc(-1 * var(--scroll-shadow-size));
         background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
-        opacity: calc(1 - var(--scroll-shadow-progress, 0));
       }
 
       :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::before,
-      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::after {
-        opacity: 0;
+      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::after,
+      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::before,
+      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::after {
+        opacity: 0 !important;
+        animation: none !important;
+      }
+
+      @keyframes scroll-shadow-top-a {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes scroll-shadow-top-b {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes scroll-shadow-bottom-a {
+        from {
+          opacity: 1;
+        }
+
+        to {
+          opacity: 0;
+        }
+      }
+
+      @keyframes scroll-shadow-bottom-b {
+        from {
+          opacity: 1;
+        }
+
+        to {
+          opacity: 0;
+        }
+      }
+
+      @supports (animation-timeline: scroll()) {
+
+        :is(.coords-view[data-has-content], .table-wrap.has-results)::before,
+        :is(.coords-view[data-has-content], .table-wrap.has-results)::after {
+          animation-timeline: scroll();
+          animation-range: 0% 100%;
+          animation-duration: 1s;
+          animation-timing-function: linear;
+          animation-fill-mode: both;
+        }
+
+        :is(.coords-view[data-has-content], .table-wrap.has-results)::before {
+          animation-name: scroll-shadow-top-a;
+        }
+
+        :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-anim="b"]::before {
+          animation-name: scroll-shadow-top-b;
+        }
+
+        :is(.coords-view[data-has-content], .table-wrap.has-results)::after {
+          animation-name: scroll-shadow-bottom-a;
+        }
+
+        :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-anim="b"]::after {
+          animation-name: scroll-shadow-bottom-b;
+        }
       }
 
       @keyframes skeleton-shimmer-x {
@@ -1693,7 +1763,7 @@
         clearScrollShadowState(domElements.coords);
         return;
       }
-      requestScrollEdgeSync(domElements.coords);
+      requestScrollShadowSync(domElements.coords);
     };
     const parseBtn = document.getElementById("parse");
     const startBtn = document.getElementById("start");
@@ -1749,57 +1819,45 @@
       };
     })();
     updateTableHeadOffset();
-    const SCROLL_EDGE_EPS = 1;
-    const EDGE_SYNC_PENDING = new WeakSet();
-    const EDGE_PROGRESS = new WeakMap();
+    const SHADOW_SYNC_PENDING = new WeakSet();
+    let SHADOW_REBIND_TOGGLE = false;
     function clearScrollShadowState(el) {
-      EDGE_SYNC_PENDING.delete(el);
-      EDGE_PROGRESS.delete(el);
+      SHADOW_SYNC_PENDING.delete(el);
+      if (!(el instanceof HTMLElement)) return;
       el.removeAttribute("data-at-top");
       el.removeAttribute("data-at-bottom");
-      el.style.removeProperty("--scroll-shadow-progress");
+      el.removeAttribute("data-shadow-rebind");
+      el.removeAttribute("data-shadow-anim");
     }
-    function syncScrollEdges(el) {
-      if (el === domElements.tableWrap) {
-        if (!el.classList.contains("has-results")) {
-          clearScrollShadowState(el);
-          return;
-        }
-      } else if (el === domElements.coords) {
-        if (!el.hasAttribute("data-has-content")) {
-          clearScrollShadowState(el);
-          return;
-        }
-      }
-      const maxY = el.scrollHeight - el.clientHeight;
-      const y = el.scrollTop;
-      const atTop = y <= SCROLL_EDGE_EPS;
-      const atBottom = y >= maxY - SCROLL_EDGE_EPS;
-      el.toggleAttribute("data-at-top", atTop);
-      el.toggleAttribute("data-at-bottom", atBottom);
-      const progress =
-        maxY > SCROLL_EDGE_EPS ? Math.min(1, Math.max(0, y / maxY)) : 0;
-      const nextProgress = progress.toFixed(4);
-      if (EDGE_PROGRESS.get(el) !== nextProgress) {
-        EDGE_PROGRESS.set(el, nextProgress);
-        el.style.setProperty("--scroll-shadow-progress", nextProgress);
-      }
-    }
-    function requestScrollEdgeSync(el) {
+    function syncScrollShadowScrollability(el) {
       if (!(el instanceof HTMLElement)) return;
-      if (el === domElements.tableWrap && !el.classList.contains("has-results")) {
-        clearScrollShadowState(el);
-        return;
+      const maxY = el.scrollHeight - el.clientHeight;
+      const scrollable = maxY > 1;
+      if (scrollable) {
+        el.removeAttribute("data-at-top");
+        el.removeAttribute("data-at-bottom");
+      } else {
+        el.setAttribute("data-at-top", "");
+        el.setAttribute("data-at-bottom", "");
       }
-      if (el === domElements.coords && !el.hasAttribute("data-has-content")) {
-        clearScrollShadowState(el);
-        return;
-      }
-      if (EDGE_SYNC_PENDING.has(el)) return;
-      EDGE_SYNC_PENDING.add(el);
+    }
+    function requestScrollShadowSync(el) {
+      if (!(el instanceof HTMLElement)) return;
+      if (SHADOW_SYNC_PENDING.has(el)) return;
+      SHADOW_SYNC_PENDING.add(el);
       requestAnimationFrame(() => {
-        EDGE_SYNC_PENDING.delete(el);
-        syncScrollEdges(el);
+        SHADOW_SYNC_PENDING.delete(el);
+        syncScrollShadowScrollability(el);
+      });
+    }
+    function rebindScrollShadowTimeline(el) {
+      if (!(el instanceof HTMLElement)) return;
+      SHADOW_REBIND_TOGGLE = !SHADOW_REBIND_TOGGLE;
+      el.dataset.shadowAnim = SHADOW_REBIND_TOGGLE ? "b" : "a";
+      el.setAttribute("data-shadow-rebind", "");
+      requestAnimationFrame(() => {
+        el.removeAttribute("data-shadow-rebind");
+        requestScrollShadowSync(el);
       });
     }
     clearScrollShadowState(domElements.tableWrap);
@@ -2469,11 +2527,11 @@
       const wrap = domElements.tableWrap;
       if (!active || totalRows === 0) {
         wrap.classList.remove("filter-empty");
-        requestScrollEdgeSync(wrap);
+        requestScrollShadowSync(wrap);
         return;
       }
       wrap.classList.toggle("filter-empty", visibleCount === 0);
-      requestScrollEdgeSync(wrap);
+      requestScrollShadowSync(wrap);
     }
     const RENDER_CACHE = {
       total: -1,
@@ -2524,6 +2582,7 @@
       if (RENDER_CACHE.hasResults !== hasResults) {
         RENDER_CACHE.hasResults = hasResults;
         domElements.tableWrap.classList.toggle("has-results", hasResults);
+        requestScrollShadowSync(domElements.tableWrap);
       }
       const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
       if (RENDER_CACHE.perfMode !== perfMode) {
@@ -2548,10 +2607,12 @@
       invalidateRectCache();
       wrap.classList.remove("filter-empty", "has-results");
       clearScrollShadowState(wrap);
+      rebindScrollShadowTimeline(wrap);
       requestAnimationFrame(() => {
         if (wrap.scrollTop !== 0) wrap.scrollTop = 0;
         if (wrap.scrollLeft !== 0) wrap.scrollLeft = 0;
         clearScrollShadowState(wrap);
+        rebindScrollShadowTimeline(wrap);
       });
     }
     function sleep(ms, signal) {
@@ -2760,7 +2821,7 @@
           }
           tbody.append(tr);
           wrap.classList.add("has-results");
-          requestScrollEdgeSync(wrap);
+          requestScrollShadowSync(wrap);
           scheduleRender();
           if (f0.active && tbody.rows.length === 1) {
             wrap.classList.add("filter-empty");
@@ -2882,7 +2943,7 @@
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
-      requestScrollEdgeSync(domElements.tableWrap);
+      requestScrollShadowSync(domElements.tableWrap);
     }
     async function handleExport() {
       try {
@@ -3038,6 +3099,8 @@
       "--start": () => maybeVT(() => {
         AppState.reset("running");
         clearTable();
+        rebindScrollShadowTimeline(domElements.tableWrap);
+        rebindScrollShadowTimeline(domElements.coords);
         setStatusMessage("조회 시작…");
         void runProcessingLoop().catch((err) => {
           console.error(err);
@@ -3052,6 +3115,8 @@
       "--stop": () => {
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
         AppState.setStatus("stopping");
+        rebindScrollShadowTimeline(domElements.tableWrap);
+        rebindScrollShadowTimeline(domElements.coords);
         AppState.resumeHandler?.resolve();
         AppState.resumeHandler = null;
         if (AppState.controller) {
@@ -3123,9 +3188,6 @@
     const handleScrollStart = (e) => {
       closeMapPopover();
       const t = (e.target instanceof Element) ? e.target : e.currentTarget;
-      if (t === domElements.tableWrap || t === domElements.coords) {
-        requestScrollEdgeSync(t);
-      }
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
@@ -3135,9 +3197,6 @@
     const handleScrollEnd = (e) => {
       const t = (e.target instanceof Element) ? e.target : e.currentTarget;
       ACTIVE_SCROLL.delete(t);
-      if (t === domElements.tableWrap || t === domElements.coords) {
-        requestScrollEdgeSync(t);
-      }
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(false);
@@ -3238,8 +3297,8 @@
     const handleWindowResize = () => {
       invalidateRectCache();
       updateTableHeadOffset();
-      requestScrollEdgeSync(domElements.tableWrap);
-      requestScrollEdgeSync(domElements.coords);
+      requestScrollShadowSync(domElements.tableWrap);
+      requestScrollShadowSync(domElements.coords);
       if (resizeScrollResetTimer) clearTimeout(resizeScrollResetTimer);
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
@@ -3251,8 +3310,8 @@
       invalidateRectCache();
       requestRectCacheRefresh();
       updateTableHeadOffset();
-      requestScrollEdgeSync(domElements.tableWrap);
-      requestScrollEdgeSync(domElements.coords);
+      requestScrollShadowSync(domElements.tableWrap);
+      requestScrollShadowSync(domElements.coords);
     };
     function syncSpotlightPerfMode(perfMode) {
       if (perfMode) {
