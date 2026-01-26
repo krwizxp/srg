@@ -73,10 +73,6 @@
         container-name: page;
         overscroll-behavior: none;
       }
-
-      :where([hidden]):not([hidden="until-found" i]) {
-        display: none;
-      }
     }
 
     @layer theme {
@@ -131,7 +127,6 @@
 
       html {
         background-color: var(--page-bg);
-        min-block-size: 100%;
       }
 
       body {
@@ -177,17 +172,20 @@
       .table-wrap {
         flex: 1;
         scrollbar-width: thin;
+        overflow: auto;
+        --scroll-shadow-size: 14px;
+        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, transparent);
       }
 
       .coords-view {
         --coords-pad-block: 12px;
         --coords-pad-inline: 12px;
-        --scroll-shadow-size: 14px;
-        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, transparent);
       }
 
       .coords-view[data-has-content]::before,
-      .coords-view[data-has-content]::after {
+      .coords-view[data-has-content]::after,
+      .table-wrap.has-results::before,
+      .table-wrap.has-results::after {
         content: "";
         display: block;
         position: sticky;
@@ -195,56 +193,27 @@
         block-size: var(--scroll-shadow-size);
         pointer-events: none;
         z-index: 5;
-        opacity: 0;
       }
 
-      .coords-view[data-has-content]::before {
-        inset-block-start: 0;
+      .coords-view[data-has-content]::before,
+      .table-wrap.has-results::before {
+        inset-block-start: var(--table-head-offset, 0px);
         margin-block-start: calc(-1 * var(--scroll-shadow-size));
         background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
-        animation: scroll-shadow-top 1s linear both;
-        animation-timeline: scroll(nearest);
+        opacity: var(--scroll-shadow-progress, 0);
       }
 
-      .coords-view[data-has-content]::after {
+      .coords-view[data-has-content]::after,
+      .table-wrap.has-results::after {
         inset-block-end: 0;
         margin-block-end: calc(-1 * var(--scroll-shadow-size));
         background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
-        animation: scroll-shadow-bottom 1s linear both;
-        animation-timeline: scroll(nearest);
+        opacity: calc(1 - var(--scroll-shadow-progress, 0));
       }
 
-      .table-wrap::before,
-      .table-wrap::after {
-        content: "";
-        display: block;
-        position: sticky;
-        inset-inline: 0;
-        block-size: 14px;
-        pointer-events: none;
-        z-index: 5;
+      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::before,
+      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::after {
         opacity: 0;
-      }
-
-      .table-wrap::before {
-        inset-block-start: var(--table-head-offset);
-        margin-block-start: -14px;
-        background: linear-gradient(180deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-        animation: scroll-shadow-top 1s linear both;
-        animation-timeline: scroll(nearest);
-      }
-
-      .table-wrap::after {
-        inset-block-end: 0;
-        margin-block-end: -14px;
-        background: linear-gradient(0deg, color-mix(in oklch, var(--line-soft) 70%, transparent), transparent);
-        animation: scroll-shadow-bottom 1s linear both;
-        animation-timeline: scroll(nearest);
-      }
-
-      .table-wrap:not(.has-results)::before,
-      .table-wrap:not(.has-results)::after {
-        content: none;
       }
 
       @keyframes skeleton-shimmer-x {
@@ -259,26 +228,6 @@
 
       @keyframes row-fade-in {
         from {
-          opacity: 0;
-        }
-      }
-
-      @keyframes scroll-shadow-top {
-        from {
-          opacity: 0;
-        }
-
-        to {
-          opacity: 1;
-        }
-      }
-
-      @keyframes scroll-shadow-bottom {
-        from {
-          opacity: 1;
-        }
-
-        to {
           opacity: 0;
         }
       }
@@ -509,9 +458,14 @@
           .filters input[type="search"],
           .filters select) {
           border-radius: 12px;
-          border: 0;
           background-color: var(--panel-bg);
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        :where(button,
+          .filters input[type="search"],
+          .filters select) {
+          border: 0;
           color: var(--fg);
         }
 
@@ -528,7 +482,6 @@
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
-          overflow: auto;
         }
 
         :where(.coords-view) :is(.coords-placeholder, .coords-content) {
@@ -878,10 +831,8 @@
       }
 
       .table-wrap {
-        --table-head-offset: 0px;
         border-radius: 20px;
         background-color: var(--panel-bg);
-        overflow: auto;
         scrollbar-gutter: stable;
         position: relative;
 
@@ -1383,7 +1334,7 @@
           <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
             id="cnt-remain">0</strong>건 미처리</output>
       </div>
-      <output id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></output>
+      <output id="status" class="status" role="status"></output>
       <footer>
         <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
       </footer>
@@ -1736,7 +1687,13 @@
     };
     const setCoordsText = (text) => {
       domElements.coordsContent.textContent = text;
-      domElements.coords.toggleAttribute("data-has-content", text.length > 0);
+      const hasContent = text.length > 0;
+      domElements.coords.toggleAttribute("data-has-content", hasContent);
+      if (!hasContent) {
+        clearScrollShadowState(domElements.coords);
+        return;
+      }
+      requestScrollEdgeSync(domElements.coords);
     };
     const parseBtn = document.getElementById("parse");
     const startBtn = document.getElementById("start");
@@ -1792,6 +1749,61 @@
       };
     })();
     updateTableHeadOffset();
+    const SCROLL_EDGE_EPS = 1;
+    const EDGE_SYNC_PENDING = new WeakSet();
+    const EDGE_PROGRESS = new WeakMap();
+    function clearScrollShadowState(el) {
+      EDGE_SYNC_PENDING.delete(el);
+      EDGE_PROGRESS.delete(el);
+      el.removeAttribute("data-at-top");
+      el.removeAttribute("data-at-bottom");
+      el.style.removeProperty("--scroll-shadow-progress");
+    }
+    function syncScrollEdges(el) {
+      if (el === domElements.tableWrap) {
+        if (!el.classList.contains("has-results")) {
+          clearScrollShadowState(el);
+          return;
+        }
+      } else if (el === domElements.coords) {
+        if (!el.hasAttribute("data-has-content")) {
+          clearScrollShadowState(el);
+          return;
+        }
+      }
+      const maxY = el.scrollHeight - el.clientHeight;
+      const y = el.scrollTop;
+      const atTop = y <= SCROLL_EDGE_EPS;
+      const atBottom = y >= maxY - SCROLL_EDGE_EPS;
+      el.toggleAttribute("data-at-top", atTop);
+      el.toggleAttribute("data-at-bottom", atBottom);
+      const progress =
+        maxY > SCROLL_EDGE_EPS ? Math.min(1, Math.max(0, y / maxY)) : 0;
+      const nextProgress = progress.toFixed(4);
+      if (EDGE_PROGRESS.get(el) !== nextProgress) {
+        EDGE_PROGRESS.set(el, nextProgress);
+        el.style.setProperty("--scroll-shadow-progress", nextProgress);
+      }
+    }
+    function requestScrollEdgeSync(el) {
+      if (!(el instanceof HTMLElement)) return;
+      if (el === domElements.tableWrap && !el.classList.contains("has-results")) {
+        clearScrollShadowState(el);
+        return;
+      }
+      if (el === domElements.coords && !el.hasAttribute("data-has-content")) {
+        clearScrollShadowState(el);
+        return;
+      }
+      if (EDGE_SYNC_PENDING.has(el)) return;
+      EDGE_SYNC_PENDING.add(el);
+      requestAnimationFrame(() => {
+        EDGE_SYNC_PENDING.delete(el);
+        syncScrollEdges(el);
+      });
+    }
+    clearScrollShadowState(domElements.tableWrap);
+    clearScrollShadowState(domElements.coords);
     const ACTIVE_SCROLL = new Set();
     const SCROLLING_CLASS = "scrolling";
     const setGlobalScrolling = (on) => {
@@ -2457,9 +2469,11 @@
       const wrap = domElements.tableWrap;
       if (!active || totalRows === 0) {
         wrap.classList.remove("filter-empty");
+        requestScrollEdgeSync(wrap);
         return;
       }
       wrap.classList.toggle("filter-empty", visibleCount === 0);
+      requestScrollEdgeSync(wrap);
     }
     const RENDER_CACHE = {
       total: -1,
@@ -2526,10 +2540,19 @@
     function clearTable() {
       cancelActiveFilterTask();
       clearFindReveals();
+      const wrap = domElements.tableWrap;
+      if (wrap.scrollTop !== 0) wrap.scrollTop = 0;
+      if (wrap.scrollLeft !== 0) wrap.scrollLeft = 0;
       resetInteractionState({ closePopover: true });
       domElements.tbody.replaceChildren();
       invalidateRectCache();
-      domElements.tableWrap.classList.remove("filter-empty", "has-results");
+      wrap.classList.remove("filter-empty", "has-results");
+      clearScrollShadowState(wrap);
+      requestAnimationFrame(() => {
+        if (wrap.scrollTop !== 0) wrap.scrollTop = 0;
+        if (wrap.scrollLeft !== 0) wrap.scrollLeft = 0;
+        clearScrollShadowState(wrap);
+      });
     }
     function sleep(ms, signal) {
       const timeoutSig = AbortSignal.timeout(ms);
@@ -2737,6 +2760,7 @@
           }
           tbody.append(tr);
           wrap.classList.add("has-results");
+          requestScrollEdgeSync(wrap);
           scheduleRender();
           if (f0.active && tbody.rows.length === 1) {
             wrap.classList.add("filter-empty");
@@ -2858,6 +2882,7 @@
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
+      requestScrollEdgeSync(domElements.tableWrap);
     }
     async function handleExport() {
       try {
@@ -3098,6 +3123,9 @@
     const handleScrollStart = (e) => {
       closeMapPopover();
       const t = (e.target instanceof Element) ? e.target : e.currentTarget;
+      if (t === domElements.tableWrap || t === domElements.coords) {
+        requestScrollEdgeSync(t);
+      }
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
@@ -3107,6 +3135,9 @@
     const handleScrollEnd = (e) => {
       const t = (e.target instanceof Element) ? e.target : e.currentTarget;
       ACTIVE_SCROLL.delete(t);
+      if (t === domElements.tableWrap || t === domElements.coords) {
+        requestScrollEdgeSync(t);
+      }
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(false);
@@ -3207,6 +3238,8 @@
     const handleWindowResize = () => {
       invalidateRectCache();
       updateTableHeadOffset();
+      requestScrollEdgeSync(domElements.tableWrap);
+      requestScrollEdgeSync(domElements.coords);
       if (resizeScrollResetTimer) clearTimeout(resizeScrollResetTimer);
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
@@ -3218,6 +3251,8 @@
       invalidateRectCache();
       requestRectCacheRefresh();
       updateTableHeadOffset();
+      requestScrollEdgeSync(domElements.tableWrap);
+      requestScrollEdgeSync(domElements.coords);
     };
     function syncSpotlightPerfMode(perfMode) {
       if (perfMode) {
