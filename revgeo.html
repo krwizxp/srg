@@ -968,21 +968,24 @@
         }
       }
 
+      :is(th, td) {
+        padding-block: 14px;
+        padding-inline: 12px;
+        font-size: var(--fs-sm);
+      }
+
       table {
         inline-size: 100%;
         border-spacing: 0;
 
         thead {
           th {
-            padding-block: 14px;
-            padding-inline: 12px;
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
             background: color-mix(in oklch, var(--surface-panel) 78%, var(--tone-base));
             text-align: start;
             font-weight: 600;
-            font-size: var(--fs-sm);
             color: var(--muted-strong);
             white-space: nowrap;
 
@@ -998,10 +1001,7 @@
 
         tbody {
           td {
-            padding-block: 14px;
-            padding-inline: 12px;
             vertical-align: top;
-            font-size: var(--fs-sm);
 
             &:nth-child(-n + 2) {
               color: var(--muted);
@@ -1292,7 +1292,8 @@
             text-decoration: none;
             transition: color 0.2s;
 
-            &:focus-visible {
+            &:is(:focus, :focus-visible) {
+              outline: none;
               box-shadow: 0 0 0 2px var(--accent-border);
               border-radius: 8px;
             }
@@ -1528,15 +1529,6 @@
       return `"${s}"`;
     };
     const lower = (s) => String(s || "").toLowerCase();
-    const STRING_POOL = new Map();
-    function intern(s) {
-      if (!s) return "";
-      const existing = STRING_POOL.get(s);
-      if (existing !== undefined) return existing;
-      STRING_POOL.set(s, s);
-      return s;
-    }
-    const escapeRegExp = RegExp.escape;
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -1551,7 +1543,6 @@
     const BASE_URL = new URL(
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
     );
-    const LATLON_TOKEN_RE = /{lat}|{lon}/g;
     function isCountryLike(name, lowerCountryName, lowerAdminCountry) {
       const l = lower(name);
       if (!l) return false;
@@ -1567,10 +1558,10 @@
       const a = mapAnchors[i];
       const key = a.dataset.providerKey || "";
       const template = a.dataset.urlTemplate || "";
+      const tokenRe = /{lat}|{lon}/g;
       const parts = [];
       let last = 0;
-      LATLON_TOKEN_RE.lastIndex = 0;
-      for (let m; (m = LATLON_TOKEN_RE.exec(template));) {
+      for (let m; (m = tokenRe.exec(template));) {
         const idx = m.index;
         if (idx > last) parts.push(template.slice(last, idx));
         parts.push(m[0] === "{lat}" ? 0 : 1);
@@ -1605,18 +1596,9 @@
     }
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
-    const focusFirstPopoverLink = () => {
-      if (MAP_PROVIDER_COUNT > 0) {
-        mapAnchors[0].focus();
-        return;
-      }
-      mapPopover.focus();
-    };
     document.addEventListener("command", (e) => {
       if (e.command !== "show-popover") return;
-      const source = e.source;
-      if (!(source instanceof Element)) return;
-      const btn = source.closest("button.map-btn");
+      const btn = e.source?.closest?.("button.map-btn");
       if (!btn) return;
       const prev = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
@@ -1625,7 +1607,6 @@
       const coords = readLatLonDataset(btn);
       if (!coords) return;
       updateMapPopoverLinks(coords.lat, coords.lon);
-      requestAnimationFrame(focusFirstPopoverLink);
     }, EVT_CAPTURE);
     function updateMapPopoverLinks(lat, lon) {
       const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
@@ -1639,13 +1620,13 @@
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      const open = e.newState === "open";
-      if (!open) {
+      if (e.newState !== "open") {
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
-          const shouldRestore =
-            active === document.body || mapPopover.contains(active);
-          if (shouldRestore && MAP_POPOVER_PREV_FOCUS.isConnected) {
+          if (
+            (active === document.body || mapPopover.contains(active)) &&
+            MAP_POPOVER_PREV_FOCUS.isConnected
+          ) {
             MAP_POPOVER_PREV_FOCUS.focus();
           }
         }
@@ -1661,7 +1642,6 @@
       const coords = readLatLonDataset(invoker);
       if (!coords) return;
       updateMapPopoverLinks(coords.lat, coords.lon);
-      requestAnimationFrame(focusFirstPopoverLink);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -1670,8 +1650,9 @@
     const fmtCoord6 = (v) => {
       const n = Number(v);
       if (!Number.isFinite(n)) return String(v ?? "");
-      const rounded = Math.round(n * COORD_POW) / COORD_POW;
-      return rounded.toFixed(COORD_DECIMALS).replace(RX_TRAILING_ZEROS, "");
+      return (Math.round(n * COORD_POW) / COORD_POW)
+        .toFixed(COORD_DECIMALS)
+        .replace(RX_TRAILING_ZEROS, "");
     };
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
@@ -1785,8 +1766,7 @@
       applyTheme(getSystemTheme());
     });
     domElements.themeToggle.addEventListener("click", () => {
-      const current = root.dataset.theme;
-      const next = current === "dark" ? "light" : "dark";
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
       try {
         localStorage.setItem(THEME_STORAGE_KEY, next);
       } catch {
@@ -1816,25 +1796,19 @@
       el.removeAttribute("data-at-bottom");
       el.removeAttribute("data-shadow-rebind");
     }
-    function syncScrollShadowScrollability(el) {
-      if (!(el instanceof HTMLElement)) return;
-      const maxY = el.scrollHeight - el.clientHeight;
-      const scrollable = maxY > 1;
-      if (scrollable) {
-        el.removeAttribute("data-at-top");
-        el.removeAttribute("data-at-bottom");
-      } else {
-        el.setAttribute("data-at-top", "");
-        el.setAttribute("data-at-bottom", "");
-      }
-    }
     function requestScrollShadowSync(el) {
       if (!(el instanceof HTMLElement)) return;
       if (SHADOW_SYNC_PENDING.has(el)) return;
       SHADOW_SYNC_PENDING.add(el);
       requestAnimationFrame(() => {
         SHADOW_SYNC_PENDING.delete(el);
-        syncScrollShadowScrollability(el);
+        if (el.scrollHeight - el.clientHeight > 1) {
+          el.removeAttribute("data-at-top");
+          el.removeAttribute("data-at-bottom");
+        } else {
+          el.setAttribute("data-at-top", "");
+          el.setAttribute("data-at-bottom", "");
+        }
       });
     }
     function rebindScrollShadowTimeline(el) {
@@ -1848,9 +1822,8 @@
     clearScrollShadowState(domElements.tableWrap);
     clearScrollShadowState(domElements.coords);
     const ACTIVE_SCROLL = new Set();
-    const SCROLLING_CLASS = "scrolling";
     const setGlobalScrolling = (on) => {
-      root.classList.toggle(SCROLLING_CLASS, on);
+      root.classList.toggle("scrolling", on);
     };
     const resetScrollState = () => {
       setGlobalScrolling(false);
@@ -1869,11 +1842,10 @@
       document.querySelectorAll("#tbl thead th"),
       (th) => {
         const key = th.dataset.colKey;
-        const base = BASE_COL_CONFIG[key] || {};
         return {
           key,
           label: th.textContent.trim(),
-          ...base,
+          ...(BASE_COL_CONFIG[key] || {}),
         };
       }
     );
@@ -1886,9 +1858,7 @@
       s = String(s ?? "").trim().toLowerCase();
       return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
     };
-    const FILTER_DEBOUNCE_MS = 120;
     const HIDDEN_UNTIL_FOUND = "until-found";
-    const FIND_REHIDE_DELAY_MS = 8000;
     let FIND_REHIDE_TIMER = null;
     let FIND_REVEAL_ACTIVE = false;
     const FIND_REVEALED_ROWS = new Set();
@@ -1901,13 +1871,10 @@
           startChunkedFilterApply(f);
           return;
         }
-        const hiddenRows =
-          domElements.tbody.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`);
-        if (!hiddenRows.length) return;
-        for (const tr of hiddenRows) {
+        for (const tr of domElements.tbody.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`)) {
           tr.removeAttribute("hidden");
         }
-      }, FIND_REHIDE_DELAY_MS);
+      }, 8000);
     }
     function buildFilterSnapshot() {
       const f = {
@@ -1981,8 +1948,6 @@
         FILTER_CTX.timer = null;
       }
     }
-    const FILTER_FRAME_BUDGET_MS = 8;
-    const FILTER_MAX_ROWS_PER_FRAME = 1500;
     function cancelActiveFilterApply() {
       const job = FILTER_CTX.job;
       if (!job) return;
@@ -2011,8 +1976,7 @@
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
           if (tr) {
-            const hidden = setRowHiddenByFilter(tr, f, records[i]);
-            if (!hidden) visible++;
+            if (!setRowHiddenByFilter(tr, f, records[i])) visible++;
           }
         }
         syncFilterEmptyUI(f.active, len, visible);
@@ -2042,20 +2006,18 @@
       job.step = () => {
         if (FILTER_CTX.job !== job) return;
         job.raf = 0;
-        const start = performance.now();
-        const deadline = start + FILTER_FRAME_BUDGET_MS;
+        const deadline = performance.now() + 8;
         let processed = 0;
         while (job.i < job.len) {
           if (FILTER_CTX.job !== job) return;
           const idx = job.i;
           const tr = job.rows[idx];
           if (tr) {
-            const hidden = setRowHiddenByFilter(tr, job.f, job.records[idx]);
-            if (!hidden) job.visible++;
+            if (!setRowHiddenByFilter(tr, job.f, job.records[idx])) job.visible++;
           }
           job.i++;
           processed++;
-          if (processed >= FILTER_MAX_ROWS_PER_FRAME) break;
+          if (processed >= 1500) break;
           if ((processed & 7) === 0 && performance.now() >= deadline) break;
         }
         if (FILTER_CTX.job !== job) return;
@@ -2085,29 +2047,22 @@
         closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
-      }, FILTER_DEBOUNCE_MS);
+      }, 120);
     }
     const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
-    const CSV_HEADER_STR = (() => {
-      const cols = CSV_COLS.map((c) => csvEsc(c.label));
-      const maps = Array.from(
-        { length: MAP_PROVIDER_COUNT },
-        (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`)
-      );
-      return "\uFEFF" + [...cols, ...maps].join(",");
-    })();
     const CSV_ENCODER = new TextEncoder();
-    const CSV_HEADER_BYTES = CSV_ENCODER.encode(CSV_HEADER_STR);
+    const CSV_HEADER_BYTES = (() => CSV_ENCODER.encode(
+      "\uFEFF" + [...CSV_COLS.map((c) => csvEsc(c.label)), ...Array.from({ length: MAP_PROVIDER_COUNT }, (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`))].join(",")
+    ))();
     const AddressFormatter = {
       _getAdminFromGeocoding(gc, countryCode, nonEmptyLabelParts) {
-        const admin = gc.admin || {};
         const byLevel = {};
-        for (const [key, name] of Object.entries(admin)) {
+        for (const [key, name] of Object.entries(gc.admin || {})) {
           const m = RX_LEVEL.exec(key);
           if (m) byLevel[+m[1]] = name;
         }
         const adminCountry = byLevel[2] || "";
-        const countryName = gc.country || adminCountry || "";
+        const countryName = gc.country || adminCountry;
         const lowerCountryName = lower(countryName);
         const lowerAdminCountry = lower(adminCountry);
         const isKoreanPeninsula =
@@ -2140,8 +2095,7 @@
           if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
             sido = city;
           }
-          const isSpecialSido = CONFIG.SPECIAL_CITIES.test(sido);
-          if (isSpecialSido) {
+          if (CONFIG.SPECIAL_CITIES.test(sido)) {
             const sgRaw = [
               cityDistrict,
               level6Kr,
@@ -2161,28 +2115,26 @@
             }
             sigungu = picked || "";
           } else {
-            const cityLikeCandidates = [
+            let cityLike = "";
+            for (const n of [
               city,
               county,
               level6Kr,
               primaryName,
               nonEmptyLabelParts[1],
               nonEmptyLabelParts[0],
-            ];
-            let cityLike = "";
-            for (const n of cityLikeCandidates) {
+            ]) {
               if (n && RX_SIGUN.test(n) && n !== sido) { cityLike = n; break; }
             }
-            const districtCandidates = [
+            let districtLike = "";
+            for (const n of [
               cityDistrict,
               level8,
               level9,
               gc.town,
               gc.locality,
               gc.village,
-            ];
-            let districtLike = "";
-            for (const n of districtCandidates) {
+            ]) {
               if (n && RX_GU.test(n) && n !== cityLike && n !== sido) { districtLike = n; break; }
             }
             if (cityLike && districtLike && districtLike !== cityLike) {
@@ -2191,35 +2143,31 @@
               sigungu = cityLike || districtLike || "";
             }
             if (!sigungu) {
-              const allRaw = [
+              for (const n of [
                 county,
                 level6Kr,
                 cityDistrict,
                 primaryName,
                 nonEmptyLabelParts[0],
                 nonEmptyLabelParts[1],
-              ];
-              for (const n of allRaw) {
+              ]) {
                 if (n && (RX_SIGUN.test(n) || RX_GUGUN.test(n)) && n !== sido) { sigungu = n; break; }
               }
             }
           }
-          const candidates = new Set([
+          let emdOut = "";
+          for (const n of new Set([
             level8, level9, level10, gc.town, gc.village,
             gc.locality, gc.suburb, primaryName,
             nonEmptyLabelParts[0], nonEmptyLabelParts[1],
-          ].filter((n) => n && RX_EMD.test(n)));
-          const exclusions = new Set([sido, sigungu]);
-          let emdOut = "";
-          for (const n of candidates) {
-            if (exclusions.has(n)) continue;
+          ].filter((n) => n && RX_EMD.test(n)))) {
+            if (n === sido || n === sigungu) continue;
             if (emdOut) emdOut += " " + n;
             else emdOut = String(n);
           }
           eupmyeon = emdOut;
         } else {
-          const type = gc.type || "";
-          const isCityOrCounty = type === "city" || type === "county";
+          const isCityOrCounty = gc.type === "city" || gc.type === "county";
           sido =
             level4 ||
             gc.state ||
@@ -2228,29 +2176,27 @@
             gc.county ||
             gc.city ||
             "";
-          const cityLikeCandidates = [
-            city,
-            county,
-            level6,
-            level7,
-            primaryName,
-            nonEmptyLabelParts[1],
-            nonEmptyLabelParts[0],
-          ].filter(Boolean);
           const cityLike =
-            cityLikeCandidates.find((n) => n !== sido) || "";
-          const districtCandidates = [
-            cityDistrict,
-            level8,
-            level9,
-            gc.town,
-            gc.locality,
-            gc.village,
-            gc.suburb,
-            gc.neighbourhood,
-          ].filter(Boolean);
+            [
+              city,
+              county,
+              level6,
+              level7,
+              primaryName,
+              nonEmptyLabelParts[1],
+              nonEmptyLabelParts[0],
+            ].filter(Boolean).find((n) => n !== sido) || "";
           const districtLike =
-            districtCandidates.find(
+            [
+              cityDistrict,
+              level8,
+              level9,
+              gc.town,
+              gc.locality,
+              gc.village,
+              gc.suburb,
+              gc.neighbourhood,
+            ].filter(Boolean).find(
               (n) => n !== cityLike && n !== sido
             ) || "";
           if (cityLike && districtLike && cityLike !== districtLike) {
@@ -2271,28 +2217,28 @@
           if ((!sigungu || sigungu === sido) && isCityOrCounty) {
             sigungu = primaryName || gc.city || gc.county || "";
           }
-          const emdCandidates = [
-            gc.locality,
-            level10,
-            gc.town,
-            gc.village,
-            gc.suburb,
-            gc.neighbourhood,
-            gc.quarter,
-            gc.hamlet,
-            gc.township,
-            gc.residential,
-            gc.name,
-            nonEmptyLabelParts[0],
-            nonEmptyLabelParts[1],
-          ].filter((name) => {
-            if (!name) return false;
-            if (name === sido) return false;
-            if (name === cityLike) return false;
-            if (name === districtLike) return false;
-            return true;
-          });
-          eupmyeon = emdCandidates[0] || "";
+          eupmyeon =
+            [
+              gc.locality,
+              level10,
+              gc.town,
+              gc.village,
+              gc.suburb,
+              gc.neighbourhood,
+              gc.quarter,
+              gc.hamlet,
+              gc.township,
+              gc.residential,
+              gc.name,
+              nonEmptyLabelParts[0],
+              nonEmptyLabelParts[1],
+            ].filter((name) => {
+              if (!name) return false;
+              if (name === sido) return false;
+              if (name === cityLike) return false;
+              if (name === districtLike) return false;
+              return true;
+            })[0] || "";
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
@@ -2307,12 +2253,14 @@
           if (!eupmyeon && districtLike && districtLike !== sido) {
             eupmyeon = districtLike;
             if (sigungu) {
-              const re = new RegExp(
-                `(?:^|\\s+)${escapeRegExp(districtLike)}(?:\\s+|$)`,
-                "g"
-              );
               sigungu = String(sigungu)
-                .replace(re, " ")
+                .replace(
+                  new RegExp(
+                    `(?:^|\\s+)${RegExp.escape(districtLike)}(?:\\s+|$)`,
+                    "g"
+                  ),
+                  " "
+                )
                 .replace(RX_WS, " ")
                 .trim();
             }
@@ -2329,22 +2277,21 @@
         return { sido, sigungu, eupmyeon };
       },
       _getTagFromGeocoding(gc, trimmedParts) {
-        const firstPart = trimmedParts[0] || "";
-        const primary =
+        return [
           gc.name ||
-          firstPart ||
+          trimmedParts[0] ||
           gc.street ||
           gc.city ||
-          "";
-        const secondary = gc.type || "";
-        return [primary, secondary].filter(Boolean).join(", ");
+          "",
+          gc.type || "",
+        ].filter(Boolean).join(", ");
       },
       parse(data) {
-        const feature =
+        const gc = (
           data && typeof data === "object" && Array.isArray(data.features)
             ? (data.features[0] || null)
-            : null;
-        const gc = feature?.properties?.geocoding || null;
+            : null
+        )?.properties?.geocoding || null;
         if (!gc) {
           return {
             addr: {
@@ -2358,19 +2305,21 @@
           };
         }
         const label = String(gc.label || "");
-        const rawParts = label.split(",");
-        const trimmedParts = rawParts.map((s) => s.trim());
-        const nonEmptyParts = trimmedParts.filter(Boolean);
+        const trimmedParts = label.split(",").map((s) => s.trim());
         const countryCode = String(gc.country_code || "").toLowerCase();
         const { sido, sigungu, eupmyeon } =
-          this._getAdminFromGeocoding(gc, countryCode, nonEmptyParts);
-        const tag = this._getTagFromGeocoding(gc, trimmedParts);
-        const fullAddr = label;
-        const addr = { sido, sigungu, eupmyeon, tag, fullAddr };
+          this._getAdminFromGeocoding(gc, countryCode, trimmedParts.filter(Boolean));
+        const addr = {
+          sido,
+          sigungu,
+          eupmyeon,
+          tag: this._getTagFromGeocoding(gc, trimmedParts),
+          fullAddr: label,
+        };
         let kind;
-        if (countryCode === "kr") kind = intern("KR");
-        else if (countryCode === "kp") kind = intern("KP");
-        else if (countryCode) kind = intern("WORLD");
+        if (countryCode === "kr") kind = "KR";
+        else if (countryCode === "kp") kind = "KP";
+        else if (countryCode) kind = "WORLD";
         return { addr, kind };
       }
     };
@@ -2443,7 +2392,6 @@
     };
     function updateUIState() {
       const s = AppState.status;
-      const hasRecords = AppState.records.length > 0;
       const progShell = domElements.progShell;
       const dropZone = domElements.dropZone;
       const isBusy = AppState.isBusy;
@@ -2452,7 +2400,7 @@
         UI_CACHE.parseDisabled = parseDisabled;
         parseBtn.disabled = parseDisabled;
       }
-      const startDisabled = isBusy || !hasRecords;
+      const startDisabled = isBusy || AppState.records.length === 0;
       if (UI_CACHE.startDisabled !== startDisabled) {
         UI_CACHE.startDisabled = startDisabled;
         startBtn.disabled = startDisabled;
@@ -2601,8 +2549,7 @@
       });
     }
     function sleep(ms, signal) {
-      const timeoutSig = AbortSignal.timeout(ms);
-      const combined = AbortSignal.any([signal, timeoutSig]);
+      const combined = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
       const { promise, resolve } = Promise.withResolvers();
       if (combined.aborted) resolve();
       else combined.addEventListener("abort", resolve, { once: true });
@@ -2633,8 +2580,9 @@
         });
     })();
     async function* lineIterator(stream, signal) {
-      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
-      const reader = decoded.getReader();
+      const reader = stream
+        .pipeThrough(new TextDecoderStream(), { signal })
+        .getReader();
       let buffer = "";
       let pendingCR = false;
       let hasCR = false;
@@ -2676,9 +2624,8 @@
             else if (cr === -1) pos = nl;
             else pos = nl < cr ? nl : cr;
             if (pos === -1) break;
-            const ch = buffer[pos];
             yield buffer.substring(start, pos);
-            if (ch === "\r") {
+            if (buffer[pos] === "\r") {
               if (pos + 1 === buffer.length) {
                 pendingCR = true;
                 hasCR = true;
@@ -2700,12 +2647,11 @@
     async function parseFileToRecords(file, signal) {
       const out = [];
       let lastYield = performance.now();
-      const YIELD_INTERVAL_MS = 8;
       let linesSinceYield = 0;
       for await (const line of lineIterator(file.stream(), signal)) {
         signal.throwIfAborted();
         if (++linesSinceYield >= 1000) {
-          if (performance.now() - lastYield >= YIELD_INTERVAL_MS) {
+          if (performance.now() - lastYield >= 8) {
             await yieldToMain();
             lastYield = performance.now();
           }
@@ -2719,9 +2665,8 @@
           const fLon = +lon;
           if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
           if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
-          const isKR = label === "대한민국";
           out.push({
-            set: isKR ? "KR" : "WORLD",
+            set: label === "대한민국" ? "KR" : "WORLD",
             idx: out.length + 1,
             lat: fLat, lon: fLon,
             latStr: lat, lonStr: lon,
@@ -2752,11 +2697,9 @@
         userSignal.throwIfAborted();
         attempt++;
         try {
-          const timeoutSig = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-          const combinedSignal = AbortSignal.any([userSignal, timeoutSig]);
           const res = await fetch(url, {
             headers: FETCH_HEADERS,
-            signal: combinedSignal,
+            signal: AbortSignal.any([userSignal, AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS)]),
           });
           if (res.ok) {
             return res.json();
@@ -2768,8 +2711,7 @@
             await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
             continue;
           }
-          const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+          throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
         } catch (e) {
           userSignal.throwIfAborted();
           if (attempt >= CONFIG.MAX_RETRY) {
@@ -2827,36 +2769,33 @@
               setStatusMessage(
                 `처리 중… (${curDisp}/${totalDisp})`
               );
-            const data = await fetchReverseWithRetry(
-              r.lat,
-              r.lon,
-              AppState.controller.signal
+            const { addr, kind } = AddressFormatter.parse(
+              await fetchReverseWithRetry(
+                r.lat,
+                r.lon,
+                AppState.controller.signal
+              )
             );
-            const { addr, kind } = AddressFormatter.parse(data);
             if (kind) {
               r.set = kind;
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
-            const coords = `${r.latStr},${r.lonStr}`;
             const sido = norm(addr.sido);
             const sigungu = norm(addr.sigungu);
             const emd = norm(addr.eupmyeon);
             const tag = norm(addr.tag);
             const fAddr = norm(r.fullAddr);
-            const q = `${coords} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
-            r._f_kind = intern(norm(r.set));
-            r._f_sido = intern(sido);
-            r._f_sigungu = intern(sigungu);
-            r._f_emd = intern(emd);
-            r._f_tag = intern(tag);
+            r._f_kind = norm(r.set);
+            r._f_sido = sido;
+            r._f_sigungu = sigungu;
+            r._f_emd = emd;
+            r._f_tag = tag;
             r._f_fullAddr = fAddr;
-            r._f_q = q;
+            r._f_q = `${r.latStr},${r.lonStr} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
             commitResultRow(skeletonTr, r);
           } catch (err) {
-            const msg = getErrorMessage(err);
-            const isAbort = err && err.name === "AbortError";
-            if (AppState.isStopping && isAbort) {
+            if (AppState.isStopping && err && err.name === "AbortError") {
               skeletonTr.remove();
               break;
             }
@@ -2869,9 +2808,7 @@
             r._f_sigungu = "";
             r._f_emd = "";
             r._f_tag = "";
-            const normMsg = norm(msg);
-            r._f_fullAddr = normMsg;
-            r._f_q = normMsg;
+            r._f_fullAddr = r._f_q = norm(msg);
             commitResultRow(skeletonTr, r);
             if (!AppState.isStopping)
               setStatusMessage(
@@ -2881,12 +2818,11 @@
           }
         } catch (err) {
           console.error(err);
-          const msg = getErrorMessage(err);
           if (skeletonTr && skeletonTr.isConnected) {
             skeletonTr.remove();
           }
           AppState.resumeHandler = null;
-          setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${msg}`, "error");
+          setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${getErrorMessage(err)}`, "error");
           break;
         } finally {
           AppState.inFlight = false;
@@ -2905,8 +2841,7 @@
     }
     function getErrorMessage(err) {
       try {
-        const msg = err?.message;
-        return msg ? String(msg) : String(err);
+        return String(err?.message || err);
       } catch {
         return "Unknown error";
       }
@@ -2939,23 +2874,9 @@
         }
         const csvColLen = CSV_COLS.length;
         const outRow = new Array(csvColLen + MAP_PROVIDER_COUNT);
-        const makeRow = (r) => {
-          let j = 0;
-          for (let i = 0; i < csvColLen; i++) {
-            outRow[j++] = csvEsc(CSV_COLS[i].val(r));
-          }
-          const { latStr: lat, lonStr: lon } = r;
-          const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
-          const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
-          for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-            outRow[j++] = csvEsc(buildMapHref(MAP_LINKS[i], lat, lon, lat6, lon6));
-          }
-          return outRow.join(",");
-        };
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
         const parts = [CSV_HEADER_BYTES];
-        const CHUNK_CHAR_LIMIT = 1_000_000;
         const totalDisp = fmt(totalRows);
         let chunkLines = [];
         let chunkChars = 0;
@@ -2968,24 +2889,31 @@
           else chunkLines.length = 0;
         };
         for (let i = 0; i < totalRows; i++) {
-          const line = makeRow(records[i]);
+          const r = records[i];
+          let j = 0;
+          for (let k = 0; k < csvColLen; k++) {
+            outRow[j++] = csvEsc(CSV_COLS[k].val(r));
+          }
+          const { latStr: lat, lonStr: lon } = r;
+          const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
+          const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
+          for (let k = 0; k < MAP_PROVIDER_COUNT; k++) {
+            outRow[j++] = csvEsc(buildMapHref(MAP_LINKS[k], lat, lon, lat6, lon6));
+          }
+          const line = outRow.join(",");
           chunkLines.push(line);
           chunkChars += line.length + 1;
-          if (chunkChars >= CHUNK_CHAR_LIMIT) {
+          if (chunkChars >= 1_000_000) {
             flushChunk();
             setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${totalDisp})`);
             await yieldToMain();
           }
         }
         flushChunk();
-        const stamp = new Date().toISOString().replace(RX_STAMP, "-");
-        const base = (AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "");
-        const filename = `${base}_${stamp}.csv`;
-        const blob = new Blob(parts, { type: "text/csv;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(new Blob(parts, { type: "text/csv;charset=utf-8" }));
         const a = document.createElement("a");
         a.href = url;
-        a.download = filename;
+        a.download = `${(AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "")}_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
@@ -2999,7 +2927,6 @@
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
       setCoordsText("");
       clearTable();
-      STRING_POOL.clear();
       AppState.setRecords([], "parsing");
       setEmptyHint("parsing");
       setStatusMessage("파일 분석 중…");
@@ -3015,8 +2942,7 @@
         setEmptyHint("ready");
         const MAX_DISP = 1_000;
         const disp = [];
-        const dispLen = Math.min(records.length, MAX_DISP);
-        for (let i = 0; i < dispLen; i++) {
+        for (let i = 0, dispLen = Math.min(records.length, MAX_DISP); i < dispLen; i++) {
           const r = records[i];
           disp.push(`${r.latStr}, ${r.lonStr}`);
         }
@@ -3046,9 +2972,7 @@
     }
     domElements.tbody.addEventListener("click", (e) => {
       if (!isMapPopoverOpen()) return;
-      const target = e.target;
-      if (!(target instanceof Element)) return;
-      const btn = target.closest("button.map-btn");
+      const btn = e.target?.closest?.("button.map-btn");
       if (!btn) return;
       if (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected && LAST_MAP_INVOKER === btn) return;
       mapPopover.hidePopover();
@@ -3066,9 +2990,7 @@
       }
     );
     const maybeVT = (fn) => {
-      const n = domElements.tbody.childElementCount;
-      const perfMode = root.hasAttribute(PERF_MODE_ATTR);
-      if (n > 0 && !perfMode) {
+      if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
         const active = document.activeViewTransition;
         if (active) {
           active.types.add("results");
@@ -3123,8 +3045,7 @@
     function handleCommandError(err) {
       if (err?.name === "AbortError") return;
       console.error(err);
-      const msg = getErrorMessage(err);
-      setStatusMessage(`명령 실행 중 오류: ${msg}`, "error");
+      setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
     }
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
@@ -3139,8 +3060,7 @@
     function handleFile(file) {
       if (!file) return;
       domElements.file.value = "";
-      const isTxtName = file.name.toLowerCase().endsWith(".txt");
-      if (!isTxtName && file.type !== "text/plain") {
+      if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
         setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
         return;
       }
@@ -3160,35 +3080,29 @@
         el.replaceChildren("선택된 파일: ", strong);
       }
     }
-    domElements.file.addEventListener("change", () => {
-      const file = domElements.file.files?.[0] || null;
-      maybeVT(() => handleFile(file));
-    });
+    domElements.file.addEventListener("change", () =>
+      maybeVT(() => handleFile(domElements.file.files?.[0] || null))
+    );
     domElements.dropZone.addEventListener("dragover", (e) => e.preventDefault());
     domElements.dropZone.addEventListener("drop", (e) => {
       e.preventDefault();
-      const file = e.dataTransfer.files?.[0] || null;
-      maybeVT(() => handleFile(file));
+      maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
-    const handleScrollStart = (e) => {
+    document.addEventListener("scroll", (e) => {
       closeMapPopover();
-      const t = (e.target instanceof Element) ? e.target : e.currentTarget;
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
       }
-      ACTIVE_SCROLL.add(t);
-    };
-    const handleScrollEnd = (e) => {
-      const t = (e.target instanceof Element) ? e.target : e.currentTarget;
-      ACTIVE_SCROLL.delete(t);
+      ACTIVE_SCROLL.add((e.target instanceof Element) ? e.target : e.currentTarget);
+    }, EVT_CAPTURE_PASSIVE);
+    document.addEventListener("scrollend", (e) => {
+      ACTIVE_SCROLL.delete((e.target instanceof Element) ? e.target : e.currentTarget);
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(false);
       }
-    };
-    document.addEventListener("scroll", handleScrollStart, EVT_CAPTURE_PASSIVE);
-    document.addEventListener("scrollend", handleScrollEnd, EVT_CAPTURE_PASSIVE);
+    }, EVT_CAPTURE_PASSIVE);
     const rectCache = new Map();
     let rectCacheDirty = false;
     let pointerRaf = null;
@@ -3270,7 +3184,6 @@
         requestRectCacheRefresh();
       }
     };
-    const RESIZE_SCROLL_RESET_DELAY_MS = 150;
     let resizeScrollResetTimer = null;
     let SPOTLIGHT_EFFECTS_ENABLED = false;
     let rectCacheObserver = null;
@@ -3286,13 +3199,8 @@
       resizeScrollResetTimer = setTimeout(() => {
         resizeScrollResetTimer = null;
         resetScrollState();
-      }, RESIZE_SCROLL_RESET_DELAY_MS);
+      }, 150);
       requestRectCacheRefresh();
-    };
-    const handleObservedResize = () => {
-      invalidateRectCache();
-      requestRectCacheRefresh();
-      syncLayoutMetrics();
     };
     function syncSpotlightPerfMode(perfMode) {
       if (perfMode) {
@@ -3329,7 +3237,14 @@
       domElements.tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
       domElements.tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
       domElements.tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
-      rectCacheObserver = new ResizeObserver(handleObservedResize);
+      rectCacheObserver = new ResizeObserver(
+        syncSpotlightPerfMode._resizeObserverCallback ||
+        (syncSpotlightPerfMode._resizeObserverCallback = () => {
+          invalidateRectCache();
+          requestRectCacheRefresh();
+          syncLayoutMetrics();
+        })
+      );
       for (const node of SPOTLIGHT_OBSERVED_NODES) {
         rectCacheObserver.observe(node);
       }
@@ -3383,8 +3298,7 @@
         current = current.parentElement;
       }
       if (btn) setSpotlightVars(btn, x, y);
-      const inTableStack = tableCardStack.contains(target);
-      if (inTableStack) {
+      if (tableCardStack.contains(target)) {
         if (stackSpotlightSuppressed) return;
         setSpotlightVars(tableCardStackSpotlight, x, y);
         return;
