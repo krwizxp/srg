@@ -1600,9 +1600,11 @@
       if (e.command !== "show-popover") return;
       const btn = e.source?.closest?.("button.map-btn");
       if (!btn) return;
-      const prev = LAST_MAP_INVOKER;
+      if (!isMapPopoverOpen() || LAST_MAP_INVOKER === btn) {
+        LAST_MAP_INVOKER = btn;
+        return;
+      }
       LAST_MAP_INVOKER = btn;
-      if (!isMapPopoverOpen() || prev === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       const coords = readLatLonDataset(btn);
       if (!coords) return;
@@ -1752,12 +1754,11 @@
     };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
-      const isDark = theme === "dark";
-      const label = isDark ? "라이트 모드" : "다크 모드";
+      const label = theme === "dark" ? "라이트 모드" : "다크 모드";
       domElements.themeToggleLabel.textContent = label;
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
       domElements.themeToggle.setAttribute("title", `${label}로 전환`);
-      domElements.themeToggle.setAttribute("aria-pressed", String(isDark));
+      domElements.themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
     };
     const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
     applyTheme(getStoredTheme() ?? getSystemTheme());
@@ -1829,15 +1830,6 @@
       setGlobalScrolling(false);
       ACTIVE_SCROLL.clear();
     };
-    const FILTER_INPUTS = [
-      domElements.filterQ,
-      domElements.filterKind,
-      domElements.filterSido,
-      domElements.filterSigungu,
-      domElements.filterEmd,
-      domElements.filterTag,
-      domElements.filterFullAddr,
-    ];
     const COL_DEFS = Array.from(
       document.querySelectorAll("#tbl thead th"),
       (th) => {
@@ -2392,13 +2384,10 @@
     };
     function updateUIState() {
       const s = AppState.status;
-      const progShell = domElements.progShell;
-      const dropZone = domElements.dropZone;
       const isBusy = AppState.isBusy;
-      const parseDisabled = isBusy;
-      if (UI_CACHE.parseDisabled !== parseDisabled) {
-        UI_CACHE.parseDisabled = parseDisabled;
-        parseBtn.disabled = parseDisabled;
+      if (UI_CACHE.parseDisabled !== isBusy) {
+        UI_CACHE.parseDisabled = isBusy;
+        parseBtn.disabled = isBusy;
       }
       const startDisabled = isBusy || AppState.records.length === 0;
       if (UI_CACHE.startDisabled !== startDisabled) {
@@ -2423,12 +2412,11 @@
       const progActive = s === "running" || s === "pausing";
       if (UI_CACHE.progActive !== progActive) {
         UI_CACHE.progActive = progActive;
-        progShell.classList.toggle("active", progActive);
+        domElements.progShell.classList.toggle("active", progActive);
       }
-      const dropZoneInert = isBusy;
-      if (UI_CACHE.dropZoneInert !== dropZoneInert) {
-        UI_CACHE.dropZoneInert = dropZoneInert;
-        dropZone.toggleAttribute("inert", dropZoneInert);
+      if (UI_CACHE.dropZoneInert !== isBusy) {
+        UI_CACHE.dropZoneInert = isBusy;
+        domElements.dropZone.toggleAttribute("inert", isBusy);
       }
     }
     const STATUS_CACHE = { msg: null, type: null };
@@ -2800,6 +2788,7 @@
               break;
             }
             console.error(err);
+            const msg = getErrorMessage(err);
             r.set = "에러";
             r.addr = null;
             r.fullAddr = msg;
@@ -2963,7 +2952,15 @@
         AppState.controller = null;
       }
     }
-    for (const el of FILTER_INPUTS) {
+    for (const el of [
+      domElements.filterQ,
+      domElements.filterKind,
+      domElements.filterSido,
+      domElements.filterSigungu,
+      domElements.filterEmd,
+      domElements.filterTag,
+      domElements.filterFullAddr,
+    ]) {
       if (el.tagName === "SELECT") {
         el.addEventListener("change", scheduleApplyFilterAll);
       } else {
@@ -3143,9 +3140,8 @@
       DEACTIVATE_QUEUED = true;
       queueMicrotask(() => {
         DEACTIVATE_QUEUED = false;
-        const closePopover = NEED_CLOSE_POPOVER;
+        resetInteractionState({ closePopover: NEED_CLOSE_POPOVER });
         NEED_CLOSE_POPOVER = false;
-        resetInteractionState({ closePopover });
       });
     }
     window.addEventListener("blur", () => requestDeactivate());
