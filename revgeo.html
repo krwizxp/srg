@@ -1511,12 +1511,28 @@
       /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/g;
     const RX_CSV = /[",\n\r]/;
     const RX_CSV_FORMULA = /^[=+\-@]/;
-    const RX_LEVEL = /^level(\d+)$/;
-    const RX_SIGUN = /[시군]$/;
-    const RX_GUGUN = /[구군]$/;
-    const RX_SI = /시$/;
-    const RX_GU = /구$/;
-    const RX_EMD = /[읍면동리]$/;
+    const CC_SI = "시".charCodeAt(0);
+    const CC_GUN = "군".charCodeAt(0);
+    const CC_GU = "구".charCodeAt(0);
+    const CC_EUP = "읍".charCodeAt(0);
+    const CC_MYEON = "면".charCodeAt(0);
+    const CC_DONG = "동".charCodeAt(0);
+    const CC_RI = "리".charCodeAt(0);
+    const lastCharCode = (s) => s.charCodeAt(s.length - 1);
+    const endsWithSi = (s) => lastCharCode(s) === CC_SI;
+    const endsWithGu = (s) => lastCharCode(s) === CC_GU;
+    const endsWithSigun = (s) => {
+      const c = lastCharCode(s);
+      return c === CC_SI || c === CC_GUN;
+    };
+    const endsWithGugun = (s) => {
+      const c = lastCharCode(s);
+      return c === CC_GU || c === CC_GUN;
+    };
+    const endsWithEmd = (s) => {
+      const c = lastCharCode(s);
+      return c === CC_EUP || c === CC_MYEON || c === CC_DONG || c === CC_RI;
+    };
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
     const csvEsc = (s) => {
@@ -1543,10 +1559,10 @@
     const BASE_URL = new URL(
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
     );
+    const BASE_URL_HREF = BASE_URL.href;
     function isCountryLike(name, lowerCountryName, lowerAdminCountry) {
       const l = lower(name);
-      if (!l) return false;
-      return l === lowerCountryName || l === lowerAdminCountry;
+      return !!l && (l === lowerCountryName || l === lowerAdminCountry);
     }
     const mapPopover = document.getElementById("map-popover");
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
@@ -1554,14 +1570,15 @@
       document.querySelectorAll("#map-popover-links a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
+    const RX_MAP_TOKEN = /{lat}|{lon}/g;
     for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
       const a = mapAnchors[i];
       const key = a.dataset.providerKey || "";
       const template = a.dataset.urlTemplate || "";
-      const tokenRe = /{lat}|{lon}/g;
+      RX_MAP_TOKEN.lastIndex = 0;
       const parts = [];
       let last = 0;
-      for (let m; (m = tokenRe.exec(template));) {
+      for (let m; (m = RX_MAP_TOKEN.exec(template));) {
         const idx = m.index;
         if (idx > last) parts.push(template.slice(last, idx));
         parts.push(m[0] === "{lat}" ? 0 : 1);
@@ -1570,17 +1587,11 @@
       if (last < template.length) parts.push(template.slice(last));
       MAP_LINKS[i] = {
         key,
-        parts: parts.length ? parts : [template],
+        parts,
         round6: key === "Naver",
       };
     }
     const MAP_HAS_ROUND6 = MAP_LINKS.some((l) => l.round6);
-    function readLatLonDataset(el) {
-      const lat = el.dataset.lat;
-      const lon = el.dataset.lon;
-      if (lat == null || lon == null || lat === "" || lon === "") return null;
-      return { lat, lon };
-    }
     function buildMapHref(link, lat, lon, lat6, lon6) {
       if (link.round6) {
         lat = lat6;
@@ -1600,15 +1611,12 @@
       if (e.command !== "show-popover") return;
       const btn = e.source?.closest?.("button.map-btn");
       if (!btn) return;
-      if (!isMapPopoverOpen() || LAST_MAP_INVOKER === btn) {
-        LAST_MAP_INVOKER = btn;
-        return;
-      }
+      const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
+      if (!isMapPopoverOpen() || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
-      const coords = readLatLonDataset(btn);
-      if (!coords) return;
-      updateMapPopoverLinks(coords.lat, coords.lon);
+      const ds = btn.dataset;
+      if (ds.lat && ds.lon) updateMapPopoverLinks(ds.lat, ds.lon);
     }, EVT_CAPTURE);
     function updateMapPopoverLinks(lat, lon) {
       const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
@@ -1638,12 +1646,10 @@
       }
       MAP_POPOVER_PREV_FOCUS =
         document.activeElement instanceof HTMLElement ? document.activeElement : LAST_MAP_INVOKER;
-      const invoker =
-        (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected) ? LAST_MAP_INVOKER : null;
-      if (!invoker) return;
-      const coords = readLatLonDataset(invoker);
-      if (!coords) return;
-      updateMapPopoverLinks(coords.lat, coords.lon);
+      const invoker = LAST_MAP_INVOKER;
+      if (!invoker || !invoker.isConnected) return;
+      const ds = invoker.dataset;
+      if (ds.lat && ds.lon) updateMapPopoverLinks(ds.lat, ds.lon);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -1776,18 +1782,22 @@
     });
     const updateTableHeadOffset = (() => {
       let lastHeight = -1;
+      const wrap = domElements.tableWrap;
+      const tHead = tbl.tHead;
       return () => {
-        const height = tbl.tHead.offsetHeight;
+        const height = tHead.offsetHeight;
         if (height === lastHeight) return;
         lastHeight = height;
-        domElements.tableWrap.style.setProperty("--table-head-offset", `${height}px`);
+        wrap.style.setProperty("--table-head-offset", `${height}px`);
       };
     })();
     updateTableHeadOffset();
     function syncLayoutMetrics() {
       updateTableHeadOffset();
-      requestScrollShadowSync(domElements.tableWrap);
-      requestScrollShadowSync(domElements.coords);
+      const wrap = domElements.tableWrap;
+      if (wrap.classList.contains("has-results")) requestScrollShadowSync(wrap);
+      const coords = domElements.coords;
+      if (coords.hasAttribute("data-has-content")) requestScrollShadowSync(coords);
     }
     const SHADOW_SYNC_PENDING = new WeakSet();
     function clearScrollShadowState(el) {
@@ -1993,32 +2003,29 @@
         f,
         records,
         visible: 0,
-        step: null,
-      };
-      job.step = () => {
-        if (FILTER_CTX.job !== job) return;
-        job.raf = 0;
-        const deadline = performance.now() + 8;
-        let processed = 0;
-        while (job.i < job.len) {
+        step: () => {
           if (FILTER_CTX.job !== job) return;
-          const idx = job.i;
-          const tr = job.rows[idx];
-          if (tr) {
-            if (!setRowHiddenByFilter(tr, job.f, job.records[idx])) job.visible++;
+          job.raf = 0;
+          const deadline = performance.now() + 8;
+          let processed = 0;
+          while (job.i < job.len) {
+            const idx = job.i;
+            const tr = job.rows[idx];
+            if (tr) {
+              if (!setRowHiddenByFilter(tr, job.f, job.records[idx])) job.visible++;
+            }
+            job.i++;
+            processed++;
+            if (processed >= 1500) break;
+            if ((processed & 7) === 0 && performance.now() >= deadline) break;
           }
-          job.i++;
-          processed++;
-          if (processed >= 1500) break;
-          if ((processed & 7) === 0 && performance.now() >= deadline) break;
-        }
-        if (FILTER_CTX.job !== job) return;
-        if (job.i < job.len) {
-          job.raf = requestAnimationFrame(job.step);
-        } else {
-          syncFilterEmptyUI(job.f.active, job.len, job.visible);
-          FILTER_CTX.job = null;
-        }
+          if (job.i < job.len) {
+            job.raf = requestAnimationFrame(job.step);
+          } else {
+            syncFilterEmptyUI(job.f.active, job.len, job.visible);
+            FILTER_CTX.job = null;
+          }
+        },
       };
       FILTER_CTX.job = job;
       job.raf = requestAnimationFrame(job.step);
@@ -2043,42 +2050,106 @@
     }
     const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
     const CSV_ENCODER = new TextEncoder();
-    const CSV_HEADER_BYTES = (() => CSV_ENCODER.encode(
-      "\uFEFF" + [...CSV_COLS.map((c) => csvEsc(c.label)), ...Array.from({ length: MAP_PROVIDER_COUNT }, (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`))].join(",")
-    ))();
+    const CSV_HEADER_BYTES = CSV_ENCODER.encode(
+      "\uFEFF" +
+      [
+        ...CSV_COLS.map((c) => csvEsc(c.label)),
+        ...Array.from(
+          { length: MAP_PROVIDER_COUNT },
+          (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`)
+        ),
+      ].join(",")
+    );
     const AddressFormatter = {
-      _getAdminFromGeocoding(gc, countryCode, nonEmptyLabelParts) {
-        const byLevel = {};
-        for (const [key, name] of Object.entries(gc.admin || {})) {
-          const m = RX_LEVEL.exec(key);
-          if (m) byLevel[+m[1]] = name;
+      _getAdminFromGeocoding(gc, countryCode, p0, p1) {
+        let level2 = "";
+        let level4 = "";
+        let level6 = "";
+        let level7 = "";
+        let level8 = "";
+        let level9 = "";
+        let level10 = "";
+        const admin = gc.admin;
+        if (admin && typeof admin === "object") {
+          let filled = 0;
+          for (const key in admin) {
+            if (
+              key.length < 6 ||
+              key.charCodeAt(0) !== 108 || // l
+              key.charCodeAt(1) !== 101 || // e
+              key.charCodeAt(2) !== 118 || // v
+              key.charCodeAt(3) !== 101 || // e
+              key.charCodeAt(4) !== 108 // l
+            ) {
+              continue;
+            }
+            let n = 0;
+            for (let i = 5; i < key.length; i++) {
+              const d = key.charCodeAt(i) - 48;
+              if (d < 0 || d > 9) {
+                n = 0;
+                break;
+              }
+              n = n * 10 + d;
+            }
+            if (!n) continue;
+            const val = admin[key];
+            switch (n) {
+              case 2:
+                level2 = val;
+                filled |= 1;
+                break;
+              case 4:
+                level4 = val;
+                filled |= 2;
+                break;
+              case 6:
+                level6 = val;
+                filled |= 4;
+                break;
+              case 7:
+                level7 = val;
+                filled |= 8;
+                break;
+              case 8:
+                level8 = val;
+                filled |= 16;
+                break;
+              case 9:
+                level9 = val;
+                filled |= 32;
+                break;
+              case 10:
+                level10 = val;
+                filled |= 64;
+                break;
+            }
+            if (filled === 127) break;
+          }
         }
-        const adminCountry = byLevel[2] || "";
+        const adminCountry = level2 || "";
         const countryName = gc.country || adminCountry;
-        const lowerCountryName = lower(countryName);
-        const lowerAdminCountry = lower(adminCountry);
-        const isKoreanPeninsula =
+        let lowerCountryName = "";
+        let lowerAdminCountry = "";
+        let isKoreanPeninsula = false;
+        if (
           countryCode === "kr" ||
           countryCode === "kp" ||
           countryName === "대한민국" ||
-          countryName === "조선민주주의인민공화국" ||
-          lowerCountryName.includes("korea") ||
-          lowerAdminCountry.includes("korea");
+          countryName === "조선민주주의인민공화국"
+        ) {
+          isKoreanPeninsula = true;
+        } else {
+          lowerCountryName = lower(countryName);
+          lowerAdminCountry = lower(adminCountry);
+          isKoreanPeninsula =
+            lowerCountryName.includes("korea") || lowerAdminCountry.includes("korea");
+        }
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
-        const primaryName = gc.name || nonEmptyLabelParts[0] || "";
-        const cityDistrict =
-          gc.city_district ||
-          gc.district ||
-          gc.suburb ||
-          "";
-        const level4 = byLevel[4] || "";
-        const level6 = byLevel[6] || "";
-        const level7 = byLevel[7] || "";
-        const level8 = byLevel[8] || "";
-        const level9 = byLevel[9] || "";
-        const level10 = byLevel[10] || "";
+        const primaryName = gc.name || p0 || "";
+        const cityDistrict = gc.city_district || gc.district || gc.suburb || "";
         const city = gc.city || "";
         const county = gc.county || "";
         if (isKoreanPeninsula) {
@@ -2087,75 +2158,109 @@
           if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
             sido = city;
           }
-          if (CONFIG.SPECIAL_CITIES.test(sido)) {
-            const sgRaw = [
-              cityDistrict,
-              level6Kr,
-              county,
-              primaryName,
-              nonEmptyLabelParts[0],
-              nonEmptyLabelParts[1],
-            ];
+          const isSpecialSido = !!sido && CONFIG.SPECIAL_CITIES.test(sido);
+          if (isSpecialSido) {
             let picked = "";
-            for (const n of sgRaw) {
-              if (n && RX_GUGUN.test(n) && n !== sido) { picked = n; break; }
-            }
+            if (cityDistrict && cityDistrict !== sido && endsWithGugun(cityDistrict)) picked = cityDistrict;
+            else if (level6Kr && level6Kr !== sido && endsWithGugun(level6Kr)) picked = level6Kr;
+            else if (county && county !== sido && endsWithGugun(county)) picked = county;
+            else if (primaryName && primaryName !== sido && endsWithGugun(primaryName)) picked = primaryName;
+            else if (p0 && p0 !== sido && endsWithGugun(p0)) picked = p0;
+            else if (p1 && p1 !== sido && endsWithGugun(p1)) picked = p1;
             if (!picked) {
-              for (const n of sgRaw) {
-                if (n && RX_SI.test(n) && n !== sido && !CONFIG.SPECIAL_CITIES.test(n)) { picked = n; break; }
-              }
+              if (cityDistrict && cityDistrict !== sido && endsWithSi(cityDistrict) && !CONFIG.SPECIAL_CITIES.test(cityDistrict)) picked = cityDistrict;
+              else if (level6Kr && level6Kr !== sido && endsWithSi(level6Kr) && !CONFIG.SPECIAL_CITIES.test(level6Kr)) picked = level6Kr;
+              else if (county && county !== sido && endsWithSi(county) && !CONFIG.SPECIAL_CITIES.test(county)) picked = county;
+              else if (primaryName && primaryName !== sido && endsWithSi(primaryName) && !CONFIG.SPECIAL_CITIES.test(primaryName)) picked = primaryName;
+              else if (p0 && p0 !== sido && endsWithSi(p0) && !CONFIG.SPECIAL_CITIES.test(p0)) picked = p0;
+              else if (p1 && p1 !== sido && endsWithSi(p1) && !CONFIG.SPECIAL_CITIES.test(p1)) picked = p1;
             }
             sigungu = picked || "";
           } else {
             let cityLike = "";
-            for (const n of [
-              city,
-              county,
-              level6Kr,
-              primaryName,
-              nonEmptyLabelParts[1],
-              nonEmptyLabelParts[0],
-            ]) {
-              if (n && RX_SIGUN.test(n) && n !== sido) { cityLike = n; break; }
-            }
+            if (city && city !== sido && endsWithSigun(city)) cityLike = city;
+            else if (county && county !== sido && endsWithSigun(county)) cityLike = county;
+            else if (level6Kr && level6Kr !== sido && endsWithSigun(level6Kr)) cityLike = level6Kr;
+            else if (primaryName && primaryName !== sido && endsWithSigun(primaryName)) cityLike = primaryName;
+            else if (p1 && p1 !== sido && endsWithSigun(p1)) cityLike = p1;
+            else if (p0 && p0 !== sido && endsWithSigun(p0)) cityLike = p0;
             let districtLike = "";
-            for (const n of [
-              cityDistrict,
-              level8,
-              level9,
-              gc.town,
-              gc.locality,
-              gc.village,
-            ]) {
-              if (n && RX_GU.test(n) && n !== cityLike && n !== sido) { districtLike = n; break; }
-            }
+            const town = gc.town;
+            const locality = gc.locality;
+            const village = gc.village;
+            if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido && endsWithGu(cityDistrict)) districtLike = cityDistrict;
+            else if (level8 && level8 !== cityLike && level8 !== sido && endsWithGu(level8)) districtLike = level8;
+            else if (level9 && level9 !== cityLike && level9 !== sido && endsWithGu(level9)) districtLike = level9;
+            else if (town && town !== cityLike && town !== sido && endsWithGu(town)) districtLike = town;
+            else if (locality && locality !== cityLike && locality !== sido && endsWithGu(locality)) districtLike = locality;
+            else if (village && village !== cityLike && village !== sido && endsWithGu(village)) districtLike = village;
             if (cityLike && districtLike && districtLike !== cityLike) {
               sigungu = `${cityLike} ${districtLike}`;
             } else {
               sigungu = cityLike || districtLike || "";
             }
             if (!sigungu) {
-              for (const n of [
-                county,
-                level6Kr,
-                cityDistrict,
-                primaryName,
-                nonEmptyLabelParts[0],
-                nonEmptyLabelParts[1],
-              ]) {
-                if (n && (RX_SIGUN.test(n) || RX_GUGUN.test(n)) && n !== sido) { sigungu = n; break; }
-              }
+              if (county && county !== sido && (endsWithSigun(county) || endsWithGugun(county))) sigungu = county;
+              else if (level6Kr && level6Kr !== sido && (endsWithSigun(level6Kr) || endsWithGugun(level6Kr))) sigungu = level6Kr;
+              else if (cityDistrict && cityDistrict !== sido && (endsWithSigun(cityDistrict) || endsWithGugun(cityDistrict))) sigungu = cityDistrict;
+              else if (primaryName && primaryName !== sido && (endsWithSigun(primaryName) || endsWithGugun(primaryName))) sigungu = primaryName;
+              else if (p0 && p0 !== sido && (endsWithSigun(p0) || endsWithGugun(p0))) sigungu = p0;
+              else if (p1 && p1 !== sido && (endsWithSigun(p1) || endsWithGugun(p1))) sigungu = p1;
             }
           }
           let emdOut = "";
-          for (const n of new Set([
-            level8, level9, level10, gc.town, gc.village,
-            gc.locality, gc.suburb, primaryName,
-            nonEmptyLabelParts[0], nonEmptyLabelParts[1],
-          ].filter((n) => n && RX_EMD.test(n)))) {
-            if (n === sido || n === sigungu) continue;
-            if (emdOut) emdOut += " " + n;
-            else emdOut = String(n);
+          let emd0 = "";
+          let emd1 = "";
+          let emd2 = "";
+          let emd3 = "";
+          let emd4 = "";
+          let emd5 = "";
+          let emd6 = "";
+          let emd7 = "";
+          let emd8 = "";
+          let emd9 = "";
+          let emdCount = 0;
+          for (let i = 0; i < 10; i++) {
+            let n;
+            switch (i) {
+              case 0: n = level8; break;
+              case 1: n = level9; break;
+              case 2: n = level10; break;
+              case 3: n = gc.town; break;
+              case 4: n = gc.village; break;
+              case 5: n = gc.locality; break;
+              case 6: n = gc.suburb; break;
+              case 7: n = primaryName; break;
+              case 8: n = p0; break;
+              case 9: n = p1; break;
+            }
+            if (!n || n === sido || n === sigungu) continue;
+            let dup = false;
+            switch (emdCount) {
+              case 9: if (n === emd8) { dup = true; break; }
+              case 8: if (n === emd7) { dup = true; break; }
+              case 7: if (n === emd6) { dup = true; break; }
+              case 6: if (n === emd5) { dup = true; break; }
+              case 5: if (n === emd4) { dup = true; break; }
+              case 4: if (n === emd3) { dup = true; break; }
+              case 3: if (n === emd2) { dup = true; break; }
+              case 2: if (n === emd1) { dup = true; break; }
+              case 1: if (n === emd0) dup = true;
+            }
+            if (dup || !endsWithEmd(n)) continue;
+            switch (emdCount++) {
+              case 0: emd0 = n; break;
+              case 1: emd1 = n; break;
+              case 2: emd2 = n; break;
+              case 3: emd3 = n; break;
+              case 4: emd4 = n; break;
+              case 5: emd5 = n; break;
+              case 6: emd6 = n; break;
+              case 7: emd7 = n; break;
+              case 8: emd8 = n; break;
+              case 9: emd9 = n; break;
+            }
+            emdOut = emdOut ? emdOut + " " + n : (typeof n === "string" ? n : String(n));
           }
           eupmyeon = emdOut;
         } else {
@@ -2168,29 +2273,28 @@
             gc.county ||
             gc.city ||
             "";
-          const cityLike =
-            [
-              city,
-              county,
-              level6,
-              level7,
-              primaryName,
-              nonEmptyLabelParts[1],
-              nonEmptyLabelParts[0],
-            ].filter(Boolean).find((n) => n !== sido) || "";
-          const districtLike =
-            [
-              cityDistrict,
-              level8,
-              level9,
-              gc.town,
-              gc.locality,
-              gc.village,
-              gc.suburb,
-              gc.neighbourhood,
-            ].filter(Boolean).find(
-              (n) => n !== cityLike && n !== sido
-            ) || "";
+          let cityLike = "";
+          if (city && city !== sido) cityLike = city;
+          else if (county && county !== sido) cityLike = county;
+          else if (level6 && level6 !== sido) cityLike = level6;
+          else if (level7 && level7 !== sido) cityLike = level7;
+          else if (primaryName && primaryName !== sido) cityLike = primaryName;
+          else if (p1 && p1 !== sido) cityLike = p1;
+          else if (p0 && p0 !== sido) cityLike = p0;
+          let districtLike = "";
+          const town = gc.town;
+          const locality = gc.locality;
+          const village = gc.village;
+          const suburb = gc.suburb;
+          const neighbourhood = gc.neighbourhood;
+          if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) districtLike = cityDistrict;
+          else if (level8 && level8 !== cityLike && level8 !== sido) districtLike = level8;
+          else if (level9 && level9 !== cityLike && level9 !== sido) districtLike = level9;
+          else if (town && town !== cityLike && town !== sido) districtLike = town;
+          else if (locality && locality !== cityLike && locality !== sido) districtLike = locality;
+          else if (village && village !== cityLike && village !== sido) districtLike = village;
+          else if (suburb && suburb !== cityLike && suburb !== sido) districtLike = suburb;
+          else if (neighbourhood && neighbourhood !== cityLike && neighbourhood !== sido) districtLike = neighbourhood;
           if (cityLike && districtLike && cityLike !== districtLike) {
             sigungu = `${cityLike} ${districtLike}`;
           } else {
@@ -2209,37 +2313,68 @@
           if ((!sigungu || sigungu === sido) && isCityOrCounty) {
             sigungu = primaryName || gc.city || gc.county || "";
           }
-          eupmyeon =
-            [
-              gc.locality,
-              level10,
-              gc.town,
-              gc.village,
-              gc.suburb,
-              gc.neighbourhood,
-              gc.quarter,
-              gc.hamlet,
-              gc.township,
-              gc.residential,
-              gc.name,
-              nonEmptyLabelParts[0],
-              nonEmptyLabelParts[1],
-            ].filter((name) => {
-              if (!name) return false;
-              if (name === sido) return false;
-              if (name === cityLike) return false;
-              if (name === districtLike) return false;
-              return true;
-            })[0] || "";
+          eupmyeon = "";
+          const level10Local = level10;
+          const quarter = gc.quarter;
+          const hamlet = gc.hamlet;
+          const township = gc.township;
+          const residential = gc.residential;
+          const gcName = gc.name;
+          let cand = locality;
+          if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+          else {
+            cand = level10Local;
+            if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+            else {
+              cand = town;
+              if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+              else {
+                cand = village;
+                if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                else {
+                  cand = suburb;
+                  if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                  else {
+                    cand = neighbourhood;
+                    if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                    else {
+                      cand = quarter;
+                      if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                      else {
+                        cand = hamlet;
+                        if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                        else {
+                          cand = township;
+                          if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                          else {
+                            cand = residential;
+                            if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                            else {
+                              cand = gcName;
+                              if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                              else {
+                                cand = p0;
+                                if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                                else {
+                                  cand = p1;
+                                  if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
-          if (
-            eupmyeon &&
-            isCityOrCounty &&
-            eupmyeon === primaryName &&
-            eupmyeon === sigungu
-          ) {
+          if (eupmyeon && isCityOrCounty && eupmyeon === primaryName && eupmyeon === sigungu) {
             eupmyeon = "";
           }
           if (!eupmyeon && districtLike && districtLike !== sido) {
@@ -2248,7 +2383,7 @@
               sigungu = String(sigungu)
                 .replace(
                   new RegExp(
-                    `(?:^|\\s+)${RegExp.escape(districtLike)}(?:\\s+|$)`,
+                    `(?:^|\s+)${RegExp.escape(districtLike)}(?:\s+|$)`,
                     "g"
                   ),
                   " "
@@ -2268,15 +2403,11 @@
         }
         return { sido, sigungu, eupmyeon };
       },
-      _getTagFromGeocoding(gc, trimmedParts) {
-        return [
-          gc.name ||
-          trimmedParts[0] ||
-          gc.street ||
-          gc.city ||
-          "",
-          gc.type || "",
-        ].filter(Boolean).join(", ");
+      _getTagFromGeocoding(gc, firstLabelPart) {
+        const name = gc.name || firstLabelPart || gc.street || gc.city || "";
+        const type = gc.type || "";
+        if (name && type) return `${name}, ${type}`;
+        return name || type;
       },
       parse(data) {
         const gc = (
@@ -2293,19 +2424,36 @@
               tag: "",
               fullAddr: "",
             },
-            kind: undefined,
           };
         }
         const label = String(gc.label || "");
-        const trimmedParts = label.split(",").map((s) => s.trim());
         const countryCode = String(gc.country_code || "").toLowerCase();
+        let firstLabelPart = "";
+        let p0 = "";
+        let p1 = "";
+        if (label) {
+          let partStart = 0;
+          let partIndex = 0;
+          for (let i = 0; i <= label.length; i++) {
+            if (i === label.length || label.charCodeAt(i) === 44) {
+              const seg = label.slice(partStart, i).trim();
+              if (partIndex === 0) firstLabelPart = seg;
+              if (seg) {
+                if (!p0) p0 = seg;
+                else if (!p1) { p1 = seg; break; }
+              }
+              partIndex++;
+              partStart = i + 1;
+            }
+          }
+        }
         const { sido, sigungu, eupmyeon } =
-          this._getAdminFromGeocoding(gc, countryCode, trimmedParts.filter(Boolean));
+          this._getAdminFromGeocoding(gc, countryCode, p0, p1);
         const addr = {
           sido,
           sigungu,
           eupmyeon,
-          tag: this._getTagFromGeocoding(gc, trimmedParts),
+          tag: this._getTagFromGeocoding(gc, firstLabelPart),
           fullAddr: label,
         };
         let kind;
@@ -2446,12 +2594,11 @@
     }
     function syncFilterEmptyUI(active, totalRows, visibleCount) {
       const wrap = domElements.tableWrap;
-      if (!active || totalRows === 0) {
+      if (active && totalRows > 0) {
+        wrap.classList.toggle("filter-empty", visibleCount === 0);
+      } else {
         wrap.classList.remove("filter-empty");
-        requestScrollShadowSync(wrap);
-        return;
       }
-      wrap.classList.toggle("filter-empty", visibleCount === 0);
       requestScrollShadowSync(wrap);
     }
     const RENDER_CACHE = {
@@ -2466,6 +2613,8 @@
     };
     function renderFrame() {
       AppState.renderReq = null;
+      const wrap = domElements.tableWrap;
+      const tbody = domElements.tbody;
       const total = AppState.records.length;
       const processed = AppState.processedCount;
       const success = AppState.cntSuccess;
@@ -2499,11 +2648,11 @@
         RENDER_CACHE.exportDisabled = exportDisabled;
         domElements.exportBtn.disabled = exportDisabled;
       }
-      const hasResults = domElements.tbody.rows.length > 0;
+      const hasResults = tbody.rows.length > 0;
       if (RENDER_CACHE.hasResults !== hasResults) {
         RENDER_CACHE.hasResults = hasResults;
-        domElements.tableWrap.classList.toggle("has-results", hasResults);
-        requestScrollShadowSync(domElements.tableWrap);
+        wrap.classList.toggle("has-results", hasResults);
+        requestScrollShadowSync(wrap);
       }
       const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
       if (RENDER_CACHE.perfMode !== perfMode) {
@@ -2521,19 +2670,20 @@
       cancelActiveFilterTask();
       clearFindReveals();
       const wrap = domElements.tableWrap;
-      if (wrap.scrollTop !== 0) wrap.scrollTop = 0;
-      if (wrap.scrollLeft !== 0) wrap.scrollLeft = 0;
+      if (wrap.scrollTop || wrap.scrollLeft) {
+        wrap.scrollTop = 0;
+        wrap.scrollLeft = 0;
+      }
       resetInteractionState({ closePopover: true });
       domElements.tbody.replaceChildren();
       invalidateRectCache();
       wrap.classList.remove("filter-empty", "has-results");
-      clearScrollShadowState(wrap);
       rebindScrollShadowTimeline(wrap);
       requestAnimationFrame(() => {
-        if (wrap.scrollTop !== 0) wrap.scrollTop = 0;
-        if (wrap.scrollLeft !== 0) wrap.scrollLeft = 0;
-        clearScrollShadowState(wrap);
-        rebindScrollShadowTimeline(wrap);
+        if (wrap.scrollTop || wrap.scrollLeft) {
+          wrap.scrollTop = 0;
+          wrap.scrollLeft = 0;
+        }
       });
     }
     function sleep(ms, signal) {
@@ -2668,8 +2818,7 @@
       if (AppState.isPausing) {
         AppState.setStatus("paused");
         setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-        if (!AppState.resumeHandler)
-          AppState.resumeHandler = Promise.withResolvers();
+        AppState.resumeHandler ??= Promise.withResolvers();
         scheduleRender();
         await AppState.resumeHandler.promise;
         if (!AppState.isStopping)
@@ -2677,9 +2826,7 @@
       }
     }
     async function fetchReverseWithRetry(lat, lon, userSignal) {
-      const url = new URL(BASE_URL);
-      url.searchParams.set("lat", lat);
-      url.searchParams.set("lon", lon);
+      const url = BASE_URL_HREF + "&lat=" + lat + "&lon=" + lon;
       let attempt = 0;
       while (attempt < CONFIG.MAX_RETRY) {
         userSignal.throwIfAborted();
@@ -2713,6 +2860,9 @@
       const startIndex = AppState.processedCount;
       const total = AppState.records.length;
       const totalDisp = fmt(total);
+      const wrap = domElements.tableWrap;
+      const tbody = domElements.tbody;
+      let hasResultsClass = wrap.classList.contains("has-results");
       for (let i = startIndex; i < total; i++) {
         const curDisp = fmt(i + 1);
         let skeletonTr = null;
@@ -2724,8 +2874,6 @@
           r.fullAddr = "";
           AppState.controller = new AbortController();
           AppState.inFlight = true;
-          const wrap = domElements.tableWrap;
-          const tbody = domElements.tbody;
           const tr = SKELETON_TEMPLATE.cloneNode(true);
           if (IDX_COL_INDEX >= 0) {
             tr.cells[IDX_COL_INDEX].textContent = fmt(r.idx);
@@ -2735,10 +2883,19 @@
             tr.hidden = true;
           }
           tbody.append(tr);
-          wrap.classList.add("has-results");
-          requestScrollShadowSync(wrap);
-          scheduleRender();
-          if (f0.active && tbody.rows.length === 1) {
+          const isFirstRow = !hasResultsClass;
+          if (isFirstRow) {
+            hasResultsClass = true;
+            wrap.classList.add("has-results");
+          }
+          if (
+            isFirstRow ||
+            (wrap.hasAttribute("data-at-top") &&
+              wrap.hasAttribute("data-at-bottom"))
+          ) {
+            requestScrollShadowSync(wrap);
+          }
+          if (f0.active && isFirstRow) {
             wrap.classList.add("filter-empty");
           }
           skeletonTr = tr;
@@ -2781,7 +2938,7 @@
             r._f_tag = tag;
             r._f_fullAddr = fAddr;
             r._f_q = `${r.latStr},${r.lonStr} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
-            commitResultRow(skeletonTr, r);
+            commitResultRow(skeletonTr, r, wrap);
           } catch (err) {
             if (AppState.isStopping && err && err.name === "AbortError") {
               skeletonTr.remove();
@@ -2798,7 +2955,7 @@
             r._f_emd = "";
             r._f_tag = "";
             r._f_fullAddr = r._f_q = norm(msg);
-            commitResultRow(skeletonTr, r);
+            commitResultRow(skeletonTr, r, wrap);
             if (!AppState.isStopping)
               setStatusMessage(
                 `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
@@ -2835,9 +2992,9 @@
         return "Unknown error";
       }
     }
-    function commitResultRow(tr, r) {
+    function commitResultRow(tr, r, wrap) {
       if (!tr || !tr.isConnected) return;
-      for (let i = 0; i < COL_DEFS.length; i++) {
+      for (let i = 0, n = COL_DEFS.length; i < n; i++) {
         const col = COL_DEFS[i];
         const td = tr.cells[i];
         const val = col.val ? col.val(r) : "";
@@ -2845,14 +3002,20 @@
         else td.textContent = val ?? "";
       }
       const f = getLiveFilterSnapshot();
-      setRowHiddenByFilter(tr, f, r);
-      if (f.active && !tr.hasAttribute("hidden")) {
-        domElements.tableWrap.classList.remove("filter-empty");
+      const wasHidden = tr.hidden;
+      const hidden = setRowHiddenByFilter(tr, f, r);
+      if (f.active && !hidden) {
+        wrap.classList.remove("filter-empty");
       }
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
-      requestScrollShadowSync(domElements.tableWrap);
+      if (
+        tr.hidden !== wasHidden ||
+        (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom"))
+      ) {
+        requestScrollShadowSync(wrap);
+      }
     }
     async function handleExport() {
       try {
@@ -2970,8 +3133,7 @@
     domElements.tbody.addEventListener("click", (e) => {
       if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
-      if (!btn) return;
-      if (LAST_MAP_INVOKER && LAST_MAP_INVOKER.isConnected && LAST_MAP_INVOKER === btn) return;
+      if (!btn || btn === LAST_MAP_INVOKER) return;
       mapPopover.hidePopover();
     }, EVT_CAPTURE);
     domElements.tbody.addEventListener(
@@ -3003,7 +3165,6 @@
       "--start": () => maybeVT(() => {
         AppState.reset("running");
         clearTable();
-        rebindScrollShadowTimeline(domElements.tableWrap);
         rebindScrollShadowTimeline(domElements.coords);
         setStatusMessage("조회 시작…");
         void runProcessingLoop().catch((err) => {
@@ -3135,7 +3296,7 @@
     let DEACTIVATE_QUEUED = false;
     let NEED_CLOSE_POPOVER = false;
     function requestDeactivate({ closePopover = false } = {}) {
-      if (closePopover) NEED_CLOSE_POPOVER = true;
+      NEED_CLOSE_POPOVER ||= closePopover;
       if (DEACTIVATE_QUEUED) return;
       DEACTIVATE_QUEUED = true;
       queueMicrotask(() => {
