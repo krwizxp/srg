@@ -1505,12 +1505,26 @@
       </td>
     </tr>
   </template>
+  <template id="tmpl-row">
+    <tr>
+      <td data-label="구분"></td>
+      <td data-label="순번"></td>
+      <td data-label="좌표 (위도,경도)"></td>
+      <td data-label="시·도"></td>
+      <td data-label="시·군·구"></td>
+      <td data-label="읍·면·동·리"></td>
+      <td data-label="지물 태그"></td>
+      <td data-label="전체주소"></td>
+      <td data-label="지도링크">
+        <button type="button" class="map-btn" aria-haspopup="dialog" commandfor="map-popover" command="show-popover"
+          disabled>지도</button>
+      </td>
+    </tr>
+  </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
     const COORD_REGEX =
-      /(?<label>대한민국|세계)\s*위경도\s*[:：]\s*(?<lat>[+-]?\d+(?:\.\d+)?)\s*[,，]\s*(?<lon>[+-]?\d+(?:\.\d+)?)/g;
-    const RX_CSV = /[",\n\r]/;
-    const RX_CSV_FORMULA = /^[=+\-@]/;
+      /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
     const CC_SI = "시".charCodeAt(0);
     const CC_GUN = "군".charCodeAt(0);
     const CC_GU = "구".charCodeAt(0);
@@ -1518,31 +1532,30 @@
     const CC_MYEON = "면".charCodeAt(0);
     const CC_DONG = "동".charCodeAt(0);
     const CC_RI = "리".charCodeAt(0);
-    const lastCharCode = (s) => s.charCodeAt(s.length - 1);
-    const endsWithSi = (s) => lastCharCode(s) === CC_SI;
-    const endsWithGu = (s) => lastCharCode(s) === CC_GU;
-    const endsWithSigun = (s) => {
-      const c = lastCharCode(s);
-      return c === CC_SI || c === CC_GUN;
-    };
-    const endsWithGugun = (s) => {
-      const c = lastCharCode(s);
-      return c === CC_GU || c === CC_GUN;
-    };
-    const endsWithEmd = (s) => {
-      const c = lastCharCode(s);
-      return c === CC_EUP || c === CC_MYEON || c === CC_DONG || c === CC_RI;
-    };
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
+    const RX_RE_ESCAPE = /[.*+?^${}()|[\]\\]/g;
+    const RX_SIGUNGU_STRIP_CACHE = new Map();
     const csvEsc = (s) => {
       s = String(s ?? "");
-      if (RX_CSV_FORMULA.test(s) || s.startsWith("\t")) {
-        s = "'" + s;
+      if (s) {
+        const c0 = s.charCodeAt(0);
+        if (c0 === 9 || c0 === 61 || c0 === 43 || c0 === 45 || c0 === 64) {
+          s = "'" + s;
+        }
       }
-      if (!RX_CSV.test(s)) return s;
-      if (s.includes('"')) s = s.replaceAll('"', '""');
-      return `"${s}"`;
+      let needsQuote = false;
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        if (c === 34) {
+          s = s.replaceAll('"', '""');
+          return `"${s}"`;
+        }
+        if (!needsQuote && (c === 44 || c === 10 || c === 13)) {
+          needsQuote = true;
+        }
+      }
+      return needsQuote ? `"${s}"` : s;
     };
     const lower = (s) => String(s || "").toLowerCase();
     const CONFIG = {
@@ -1556,16 +1569,14 @@
     const EVT_CAPTURE = { capture: true };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const FETCH_HEADERS = { Accept: "application/json" };
-    const BASE_URL = new URL(
-      `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`
-    );
-    const BASE_URL_HREF = BASE_URL.href;
+    const BASE_URL_HREF =
+      `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
     function isCountryLike(name, lowerCountryName, lowerAdminCountry) {
       const l = lower(name);
       return !!l && (l === lowerCountryName || l === lowerAdminCountry);
     }
     const mapPopover = document.getElementById("map-popover");
-    const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
+    let MAP_POPOVER_OPEN = false;
     const mapAnchors =
       document.querySelectorAll("#map-popover-links a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
@@ -1598,6 +1609,26 @@
         lon = lon6;
       }
       const parts = link.parts;
+      switch (parts.length) {
+        case 4:
+          return (
+            parts[0] +
+            (parts[1] === 0 ? lat : lon) +
+            parts[2] +
+            (parts[3] === 0 ? lat : lon)
+          );
+        case 8:
+          return (
+            parts[0] +
+            (parts[1] === 0 ? lat : lon) +
+            parts[2] +
+            (parts[3] === 0 ? lat : lon) +
+            parts[4] +
+            (parts[5] === 0 ? lat : lon) +
+            parts[6] +
+            (parts[7] === 0 ? lat : lon)
+          );
+      }
       let out = "";
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i];
@@ -1613,24 +1644,34 @@
       if (!btn) return;
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
-      if (!isMapPopoverOpen() || prevInvoker === btn) return;
+      if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       const ds = btn.dataset;
-      if (ds.lat && ds.lon) updateMapPopoverLinks(ds.lat, ds.lon);
+      if (ds.lat && ds.lon) updateMapPopoverLinks(ds);
     }, EVT_CAPTURE);
-    function updateMapPopoverLinks(lat, lon) {
-      const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
-      const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
+    function updateMapPopoverLinks(ds) {
+      const lat = ds.lat;
+      const lon = ds.lon;
+      let lat6 = null;
+      let lon6 = null;
+      if (MAP_HAS_ROUND6) {
+        lat6 = ds.lat6;
+        if (lat6 == null) ds.lat6 = lat6 = fmtCoord6(lat);
+        lon6 = ds.lon6;
+        if (lon6 == null) ds.lon6 = lon6 = fmtCoord6(lon);
+      }
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         mapAnchors[i].href = buildMapHref(MAP_LINKS[i], lat, lon, lat6, lon6);
       }
     }
     function closeMapPopover() {
-      if (!isMapPopoverOpen()) return;
+      if (!MAP_POPOVER_OPEN) return;
+      MAP_POPOVER_OPEN = false;
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      if (e.newState !== "open") {
+      MAP_POPOVER_OPEN = e.newState === "open";
+      if (!MAP_POPOVER_OPEN) {
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
           if (
@@ -1649,18 +1690,35 @@
       const invoker = LAST_MAP_INVOKER;
       if (!invoker || !invoker.isConnected) return;
       const ds = invoker.dataset;
-      if (ds.lat && ds.lon) updateMapPopoverLinks(ds.lat, ds.lon);
+      if (ds.lat && ds.lon) updateMapPopoverLinks(ds);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
-    const RX_TRAILING_ZEROS = /\.?0+$/;
+    const COORD_INV_POW = 1 / COORD_POW;
     const fmtCoord6 = (v) => {
-      const n = Number(v);
+      if (typeof v === "string") {
+        const s0 = v;
+        if (!s0) return "";
+        const dot = s0.indexOf(".");
+        if (dot === -1) return s0;
+        if (s0.indexOf("e") === -1 && s0.indexOf("E") === -1) {
+          const fracLen = s0.length - dot - 1;
+          if (fracLen <= COORD_DECIMALS) {
+            let end = s0.length;
+            while (end && s0.charCodeAt(end - 1) === 48) end--;
+            if (end && s0.charCodeAt(end - 1) === 46) end--;
+            return end === s0.length ? s0 : s0.slice(0, end);
+          }
+        }
+      }
+      const n = (typeof v === "number") ? v : Number(v);
       if (!Number.isFinite(n)) return String(v ?? "");
-      return (Math.round(n * COORD_POW) / COORD_POW)
-        .toFixed(COORD_DECIMALS)
-        .replace(RX_TRAILING_ZEROS, "");
+      let s = (Math.round(n * COORD_POW) * COORD_INV_POW).toFixed(COORD_DECIMALS);
+      let end = s.length;
+      while (end && s.charCodeAt(end - 1) === 48) end--;
+      if (end && s.charCodeAt(end - 1) === 46) end--;
+      return end === s.length ? s : s.slice(0, end);
     };
     const addrVal = (key) => (r) => r.addr?.[key];
     const BASE_COL_CONFIG = {
@@ -1669,9 +1727,6 @@
       },
       idx: {
         val: (r) => r.idx,
-        render: (val, td) => {
-          td.textContent = fmt(val);
-        },
       },
       coords: {
         val: (r) => `${r.latStr}, ${r.lonStr}`,
@@ -1687,12 +1742,16 @@
         noCsv: true,
         render: (_, td, r) => {
           const btn = td.lastElementChild;
-          if (!(btn instanceof HTMLButtonElement) || !btn.classList.contains("map-btn")) return;
+          if (!(btn instanceof HTMLButtonElement)) return;
           btn.dataset.lat = r.latStr;
           btn.dataset.lon = r.lonStr;
           btn.disabled = false;
           const skeleton = td.firstElementChild;
-          if (skeleton && skeleton.classList.contains("skeleton-bar")) {
+          if (
+            skeleton &&
+            skeleton !== btn &&
+            skeleton.classList.contains("skeleton-bar")
+          ) {
             skeleton.remove();
           }
         },
@@ -1795,7 +1854,7 @@
     function syncLayoutMetrics() {
       updateTableHeadOffset();
       const wrap = domElements.tableWrap;
-      if (wrap.classList.contains("has-results")) requestScrollShadowSync(wrap);
+      if (RENDER_CACHE.hasResults) requestScrollShadowSync(wrap);
       const coords = domElements.coords;
       if (coords.hasAttribute("data-has-content")) requestScrollShadowSync(coords);
     }
@@ -1854,11 +1913,13 @@
     const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
     const SKELETON_TEMPLATE =
       document.getElementById("tmpl-row-skeleton").content.querySelector("tr");
+    const ROW_TEMPLATE =
+      document.getElementById("tmpl-row").content.querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const RX_WS = /\s+/g;
     const norm = (s) => {
       s = String(s ?? "").trim().toLowerCase();
-      return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
+      return s.indexOf(",") !== -1 ? s.replace(RX_COMMA_WS, ",") : s;
     };
     const HIDDEN_UNTIL_FOUND = "until-found";
     let FIND_REHIDE_TIMER = null;
@@ -1878,24 +1939,43 @@
         }
       }, 8000);
     }
+    const FILTER_MASK_KIND = 1;
+    const FILTER_MASK_SIDO = 2;
+    const FILTER_MASK_SIGUNGU = 4;
+    const FILTER_MASK_EMD = 8;
+    const FILTER_MASK_TAG = 16;
+    const FILTER_MASK_FULLADDR = 32;
+    const FILTER_MASK_Q = 64;
     function buildFilterSnapshot() {
-      const f = {
-        q: norm(domElements.filterQ.value),
-        kind: norm(domElements.filterKind.value),
-        sido: norm(domElements.filterSido.value),
-        sigungu: norm(domElements.filterSigungu.value),
-        emd: norm(domElements.filterEmd.value),
-        tag: norm(domElements.filterTag.value),
-        fullAddr: norm(domElements.filterFullAddr.value),
+      const q = norm(domElements.filterQ.value);
+      const kind = norm(domElements.filterKind.value);
+      const sido = norm(domElements.filterSido.value);
+      const sigungu = norm(domElements.filterSigungu.value);
+      const emd = norm(domElements.filterEmd.value);
+      const tag = norm(domElements.filterTag.value);
+      const fullAddr = norm(domElements.filterFullAddr.value);
+      let mask = 0;
+      if (kind) mask |= FILTER_MASK_KIND;
+      if (sido) mask |= FILTER_MASK_SIDO;
+      if (sigungu) mask |= FILTER_MASK_SIGUNGU;
+      if (emd) mask |= FILTER_MASK_EMD;
+      if (tag) mask |= FILTER_MASK_TAG;
+      if (fullAddr) mask |= FILTER_MASK_FULLADDR;
+      if (q) mask |= FILTER_MASK_Q;
+      return {
+        q,
+        kind,
+        sido,
+        sigungu,
+        emd,
+        tag,
+        fullAddr,
+        mask,
+        active: mask !== 0,
       };
-      f.active = !!(f.q || f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
-      return f;
     }
     let FILTER_SNAP = buildFilterSnapshot();
     let filterDirty = false;
-    function markFilterDirty() {
-      filterDirty = true;
-    }
     function getLiveFilterSnapshot() {
       if (filterDirty) {
         FILTER_SNAP = buildFilterSnapshot();
@@ -1904,33 +1984,37 @@
       return FILTER_SNAP;
     }
     function setRowHiddenByFilter(tr, f, r) {
-      let hide = false;
-      if (!(FIND_REVEAL_ACTIVE && FIND_REVEALED_ROWS.has(tr)) && f.active) {
-        if (!r || r._f_kind === undefined) {
+      const mask = f.mask;
+      if (!mask || (FIND_REVEAL_ACTIVE && FIND_REVEALED_ROWS.has(tr))) {
+        if (tr.hidden) tr.removeAttribute("hidden");
+        return false;
+      }
+      let hide = !r || r._f_kind === undefined;
+      if (!hide) {
+        if ((mask & FILTER_MASK_KIND) && r._f_kind !== f.kind) {
           hide = true;
-        } else if (f.kind && r._f_kind !== f.kind) {
+        } else if ((mask & FILTER_MASK_SIDO) && r._f_sido.indexOf(f.sido) === -1) {
           hide = true;
-        } else if (f.sido && !r._f_sido.includes(f.sido)) {
+        } else if ((mask & FILTER_MASK_SIGUNGU) && r._f_sigungu.indexOf(f.sigungu) === -1) {
           hide = true;
-        } else if (f.sigungu && !r._f_sigungu.includes(f.sigungu)) {
+        } else if ((mask & FILTER_MASK_EMD) && r._f_emd.indexOf(f.emd) === -1) {
           hide = true;
-        } else if (f.emd && !r._f_emd.includes(f.emd)) {
+        } else if ((mask & FILTER_MASK_TAG) && r._f_tag.indexOf(f.tag) === -1) {
           hide = true;
-        } else if (f.tag && !r._f_tag.includes(f.tag)) {
+        } else if (
+          (mask & FILTER_MASK_FULLADDR) &&
+          r._f_fullAddr.indexOf(f.fullAddr) === -1
+        ) {
           hide = true;
-        } else if (f.fullAddr && !r._f_fullAddr.includes(f.fullAddr)) {
-          hide = true;
-        } else if (f.q && !r._f_q.includes(f.q)) {
+        } else if ((mask & FILTER_MASK_Q) && r._f_q.indexOf(f.q) === -1) {
           hide = true;
         }
       }
       if (!hide) {
-        if (tr.hasAttribute("hidden")) tr.removeAttribute("hidden");
+        if (tr.hidden) tr.removeAttribute("hidden");
         return false;
       }
-      if (tr.getAttribute("hidden") !== HIDDEN_UNTIL_FOUND) {
-        tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-      }
+      if (!tr.hidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
       return true;
     }
     function clearFindReveals() {
@@ -1972,14 +2056,13 @@
         return;
       }
       const records = AppState.records;
+      const setHidden = setRowHiddenByFilter;
       if (len <= 2000) {
         cancelActiveFilterApply();
         let visible = 0;
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
-          if (tr) {
-            if (!setRowHiddenByFilter(tr, f, records[i])) visible++;
-          }
+          if (tr && !setHidden(tr, f, records[i])) visible++;
         }
         syncFilterEmptyUI(f.active, len, visible);
         return;
@@ -2006,23 +2089,28 @@
         step: () => {
           if (FILTER_CTX.job !== job) return;
           job.raf = 0;
+          const rows = job.rows;
+          const records = job.records;
+          const fNow = job.f;
+          const len = job.len;
+          let i = job.i;
+          let visible = job.visible;
           const deadline = performance.now() + 8;
           let processed = 0;
-          while (job.i < job.len) {
-            const idx = job.i;
-            const tr = job.rows[idx];
-            if (tr) {
-              if (!setRowHiddenByFilter(tr, job.f, job.records[idx])) job.visible++;
-            }
-            job.i++;
+          while (i < len) {
+            const tr = rows[i];
+            if (tr && !setHidden(tr, fNow, records[i])) visible++;
+            i++;
             processed++;
             if (processed >= 1500) break;
             if ((processed & 7) === 0 && performance.now() >= deadline) break;
           }
-          if (job.i < job.len) {
+          job.i = i;
+          job.visible = visible;
+          if (i < len) {
             job.raf = requestAnimationFrame(job.step);
           } else {
-            syncFilterEmptyUI(job.f.active, job.len, job.visible);
+            syncFilterEmptyUI(fNow.active, len, visible);
             FILTER_CTX.job = null;
           }
         },
@@ -2031,7 +2119,7 @@
       job.raf = requestAnimationFrame(job.step);
     }
     function scheduleApplyFilterAll() {
-      markFilterDirty();
+      filterDirty = true;
       const activeJob = FILTER_CTX.job;
       if (activeJob) {
         activeJob.i = activeJob.len;
@@ -2043,7 +2131,7 @@
       cancelPendingFilterDebounce();
       FILTER_CTX.timer = setTimeout(() => {
         FILTER_CTX.timer = null;
-        closeMapPopover();
+        if (MAP_POPOVER_OPEN) closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, 120);
@@ -2075,11 +2163,11 @@
           for (const key in admin) {
             if (
               key.length < 6 ||
-              key.charCodeAt(0) !== 108 || // l
-              key.charCodeAt(1) !== 101 || // e
-              key.charCodeAt(2) !== 118 || // v
-              key.charCodeAt(3) !== 101 || // e
-              key.charCodeAt(4) !== 108 // l
+              key.charCodeAt(0) !== 108 ||
+              key.charCodeAt(1) !== 101 ||
+              key.charCodeAt(2) !== 118 ||
+              key.charCodeAt(3) !== 101 ||
+              key.charCodeAt(4) !== 108
             ) {
               continue;
             }
@@ -2143,7 +2231,8 @@
           lowerCountryName = lower(countryName);
           lowerAdminCountry = lower(adminCountry);
           isKoreanPeninsula =
-            lowerCountryName.includes("korea") || lowerAdminCountry.includes("korea");
+            lowerCountryName.indexOf("korea") !== -1 ||
+            lowerAdminCountry.indexOf("korea") !== -1;
         }
         let sido = "";
         let sigungu = "";
@@ -2154,58 +2243,191 @@
         const county = gc.county || "";
         if (isKoreanPeninsula) {
           const level6Kr = level6 || level7;
+          const specialCities = CONFIG.SPECIAL_CITIES;
           sido = level4 || gc.state || "";
-          if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) {
-            sido = city;
+          let cityIsSpecial = false;
+          let cityIsSpecialKnown = false;
+          if (!sido && city) {
+            cityIsSpecialKnown = true;
+            cityIsSpecial = specialCities.test(city);
+            if (cityIsSpecial) {
+              sido = city;
+            }
           }
-          const isSpecialSido = !!sido && CONFIG.SPECIAL_CITIES.test(sido);
-          if (isSpecialSido) {
+          let sidoIsSpecial = false;
+          if (sido) {
+            if (sido === city) {
+              if (!cityIsSpecialKnown && city) {
+                cityIsSpecialKnown = true;
+                cityIsSpecial = specialCities.test(city);
+              }
+              sidoIsSpecial = cityIsSpecial;
+            } else {
+              sidoIsSpecial = specialCities.test(sido);
+            }
+          }
+          if (sidoIsSpecial) {
             let picked = "";
-            if (cityDistrict && cityDistrict !== sido && endsWithGugun(cityDistrict)) picked = cityDistrict;
-            else if (level6Kr && level6Kr !== sido && endsWithGugun(level6Kr)) picked = level6Kr;
-            else if (county && county !== sido && endsWithGugun(county)) picked = county;
-            else if (primaryName && primaryName !== sido && endsWithGugun(primaryName)) picked = primaryName;
-            else if (p0 && p0 !== sido && endsWithGugun(p0)) picked = p0;
-            else if (p1 && p1 !== sido && endsWithGugun(p1)) picked = p1;
+            const cd = cityDistrict;
+            const l6 = level6Kr;
+            const co = county;
+            const pn = primaryName;
+            let cdLast = 0;
+            let l6Last = 0;
+            let coLast = 0;
+            let pnLast = 0;
+            let p0Last = 0;
+            let p1Last = 0;
+            if (cd && cd !== sido) {
+              cdLast = cd.charCodeAt(cd.length - 1);
+              if (cdLast === CC_GU || cdLast === CC_GUN) picked = cd;
+            }
+            if (!picked && l6 && l6 !== sido) {
+              l6Last = l6.charCodeAt(l6.length - 1);
+              if (l6Last === CC_GU || l6Last === CC_GUN) picked = l6;
+            }
+            if (!picked && co && co !== sido) {
+              coLast = co.charCodeAt(co.length - 1);
+              if (coLast === CC_GU || coLast === CC_GUN) picked = co;
+            }
+            if (!picked && pn && pn !== sido) {
+              pnLast = pn.charCodeAt(pn.length - 1);
+              if (pnLast === CC_GU || pnLast === CC_GUN) picked = pn;
+            }
+            if (!picked && p0 && p0 !== sido) {
+              p0Last = p0.charCodeAt(p0.length - 1);
+              if (p0Last === CC_GU || p0Last === CC_GUN) picked = p0;
+            }
+            if (!picked && p1 && p1 !== sido) {
+              p1Last = p1.charCodeAt(p1.length - 1);
+              if (p1Last === CC_GU || p1Last === CC_GUN) picked = p1;
+            }
             if (!picked) {
-              if (cityDistrict && cityDistrict !== sido && endsWithSi(cityDistrict) && !CONFIG.SPECIAL_CITIES.test(cityDistrict)) picked = cityDistrict;
-              else if (level6Kr && level6Kr !== sido && endsWithSi(level6Kr) && !CONFIG.SPECIAL_CITIES.test(level6Kr)) picked = level6Kr;
-              else if (county && county !== sido && endsWithSi(county) && !CONFIG.SPECIAL_CITIES.test(county)) picked = county;
-              else if (primaryName && primaryName !== sido && endsWithSi(primaryName) && !CONFIG.SPECIAL_CITIES.test(primaryName)) picked = primaryName;
-              else if (p0 && p0 !== sido && endsWithSi(p0) && !CONFIG.SPECIAL_CITIES.test(p0)) picked = p0;
-              else if (p1 && p1 !== sido && endsWithSi(p1) && !CONFIG.SPECIAL_CITIES.test(p1)) picked = p1;
+              if (
+                cdLast === CC_SI ||
+                l6Last === CC_SI ||
+                coLast === CC_SI ||
+                pnLast === CC_SI ||
+                p0Last === CC_SI ||
+                p1Last === CC_SI
+              ) {
+                const isSpecialCityName = (name) => {
+                  if (!name) return false;
+                  if (name === city) {
+                    if (!cityIsSpecialKnown && city) {
+                      cityIsSpecialKnown = true;
+                      cityIsSpecial = specialCities.test(city);
+                    }
+                    return cityIsSpecial;
+                  }
+                  return specialCities.test(name);
+                };
+                if (cdLast === CC_SI && !isSpecialCityName(cd)) picked = cd;
+                else if (l6Last === CC_SI && !isSpecialCityName(l6)) picked = l6;
+                else if (coLast === CC_SI && !isSpecialCityName(co)) picked = co;
+                else if (pnLast === CC_SI && !isSpecialCityName(pn)) picked = pn;
+                else if (p0Last === CC_SI && !isSpecialCityName(p0)) picked = p0;
+                else if (p1Last === CC_SI && !isSpecialCityName(p1)) picked = p1;
+              }
             }
             sigungu = picked || "";
           } else {
             let cityLike = "";
-            if (city && city !== sido && endsWithSigun(city)) cityLike = city;
-            else if (county && county !== sido && endsWithSigun(county)) cityLike = county;
-            else if (level6Kr && level6Kr !== sido && endsWithSigun(level6Kr)) cityLike = level6Kr;
-            else if (primaryName && primaryName !== sido && endsWithSigun(primaryName)) cityLike = primaryName;
-            else if (p1 && p1 !== sido && endsWithSigun(p1)) cityLike = p1;
-            else if (p0 && p0 !== sido && endsWithSigun(p0)) cityLike = p0;
+            const l6 = level6Kr;
+            const co = county;
+            const pn = primaryName;
+            let cityLast = 0;
+            let coLast = 0;
+            let l6Last = 0;
+            let pnLast = 0;
+            let p1Last = 0;
+            let p0Last = 0;
+            if (city && city !== sido) {
+              cityLast = city.charCodeAt(city.length - 1);
+              if (cityLast === CC_SI || cityLast === CC_GUN) cityLike = city;
+            }
+            if (!cityLike && co && co !== sido) {
+              coLast = co.charCodeAt(co.length - 1);
+              if (coLast === CC_SI || coLast === CC_GUN) cityLike = co;
+            }
+            if (!cityLike && l6 && l6 !== sido) {
+              l6Last = l6.charCodeAt(l6.length - 1);
+              if (l6Last === CC_SI || l6Last === CC_GUN) cityLike = l6;
+            }
+            if (!cityLike && pn && pn !== sido) {
+              pnLast = pn.charCodeAt(pn.length - 1);
+              if (pnLast === CC_SI || pnLast === CC_GUN) cityLike = pn;
+            }
+            if (!cityLike && p1 && p1 !== sido) {
+              p1Last = p1.charCodeAt(p1.length - 1);
+              if (p1Last === CC_SI || p1Last === CC_GUN) cityLike = p1;
+            }
+            if (!cityLike && p0 && p0 !== sido) {
+              p0Last = p0.charCodeAt(p0.length - 1);
+              if (p0Last === CC_SI || p0Last === CC_GUN) cityLike = p0;
+            }
             let districtLike = "";
             const town = gc.town;
             const locality = gc.locality;
             const village = gc.village;
-            if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido && endsWithGu(cityDistrict)) districtLike = cityDistrict;
-            else if (level8 && level8 !== cityLike && level8 !== sido && endsWithGu(level8)) districtLike = level8;
-            else if (level9 && level9 !== cityLike && level9 !== sido && endsWithGu(level9)) districtLike = level9;
-            else if (town && town !== cityLike && town !== sido && endsWithGu(town)) districtLike = town;
-            else if (locality && locality !== cityLike && locality !== sido && endsWithGu(locality)) districtLike = locality;
-            else if (village && village !== cityLike && village !== sido && endsWithGu(village)) districtLike = village;
+            let cdLast = 0;
+            if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) {
+              cdLast = cityDistrict.charCodeAt(cityDistrict.length - 1);
+              if (cdLast === CC_GU) districtLike = cityDistrict;
+            }
+            if (
+              !districtLike &&
+              level8 &&
+              level8 !== cityLike &&
+              level8 !== sido &&
+              level8.charCodeAt(level8.length - 1) === CC_GU
+            ) {
+              districtLike = level8;
+            } else if (
+              !districtLike &&
+              level9 &&
+              level9 !== cityLike &&
+              level9 !== sido &&
+              level9.charCodeAt(level9.length - 1) === CC_GU
+            ) {
+              districtLike = level9;
+            } else if (
+              !districtLike &&
+              town &&
+              town !== cityLike &&
+              town !== sido &&
+              town.charCodeAt(town.length - 1) === CC_GU
+            ) {
+              districtLike = town;
+            } else if (
+              !districtLike &&
+              locality &&
+              locality !== cityLike &&
+              locality !== sido &&
+              locality.charCodeAt(locality.length - 1) === CC_GU
+            ) {
+              districtLike = locality;
+            } else if (
+              !districtLike &&
+              village &&
+              village !== cityLike &&
+              village !== sido &&
+              village.charCodeAt(village.length - 1) === CC_GU
+            ) {
+              districtLike = village;
+            }
             if (cityLike && districtLike && districtLike !== cityLike) {
               sigungu = `${cityLike} ${districtLike}`;
             } else {
               sigungu = cityLike || districtLike || "";
             }
             if (!sigungu) {
-              if (county && county !== sido && (endsWithSigun(county) || endsWithGugun(county))) sigungu = county;
-              else if (level6Kr && level6Kr !== sido && (endsWithSigun(level6Kr) || endsWithGugun(level6Kr))) sigungu = level6Kr;
-              else if (cityDistrict && cityDistrict !== sido && (endsWithSigun(cityDistrict) || endsWithGugun(cityDistrict))) sigungu = cityDistrict;
-              else if (primaryName && primaryName !== sido && (endsWithSigun(primaryName) || endsWithGugun(primaryName))) sigungu = primaryName;
-              else if (p0 && p0 !== sido && (endsWithSigun(p0) || endsWithGugun(p0))) sigungu = p0;
-              else if (p1 && p1 !== sido && (endsWithSigun(p1) || endsWithGugun(p1))) sigungu = p1;
+              if (coLast === CC_SI || coLast === CC_GU || coLast === CC_GUN) sigungu = co;
+              else if (l6Last === CC_SI || l6Last === CC_GU || l6Last === CC_GUN) sigungu = l6;
+              else if (cdLast === CC_SI || cdLast === CC_GU || cdLast === CC_GUN) sigungu = cityDistrict;
+              else if (pnLast === CC_SI || pnLast === CC_GU || pnLast === CC_GUN) sigungu = pn;
+              else if (p0Last === CC_SI || p0Last === CC_GU || p0Last === CC_GUN) sigungu = p0;
+              else if (p1Last === CC_SI || p1Last === CC_GU || p1Last === CC_GUN) sigungu = p1;
             }
           }
           let emdOut = "";
@@ -2247,7 +2469,13 @@
               case 2: if (n === emd1) { dup = true; break; }
               case 1: if (n === emd0) dup = true;
             }
-            if (dup || !endsWithEmd(n)) continue;
+            const lc = n.charCodeAt(n.length - 1);
+            if (
+              dup ||
+              (lc !== CC_EUP && lc !== CC_MYEON && lc !== CC_DONG && lc !== CC_RI)
+            ) {
+              continue;
+            }
             switch (emdCount++) {
               case 0: emd0 = n; break;
               case 1: emd1 = n; break;
@@ -2380,16 +2608,31 @@
           if (!eupmyeon && districtLike && districtLike !== sido) {
             eupmyeon = districtLike;
             if (sigungu) {
-              sigungu = String(sigungu)
-                .replace(
-                  new RegExp(
-                    `(?:^|\s+)${RegExp.escape(districtLike)}(?:\s+|$)`,
-                    "g"
-                  ),
-                  " "
-                )
-                .replace(RX_WS, " ")
-                .trim();
+              let s = String(sigungu);
+              const dl = String(districtLike);
+              if (s === dl) {
+                s = "";
+              } else {
+                const dlLen = dl.length;
+                const cut = s.length - dlLen;
+                if (cut > 0 && s.endsWith(dl) && s.charCodeAt(cut - 1) === 32) {
+                  s = s.slice(0, cut - 1).trim();
+                } else {
+                  let rx = RX_SIGUNGU_STRIP_CACHE.get(dl);
+                  if (!rx) {
+                    if (RX_SIGUNGU_STRIP_CACHE.size > 4096) RX_SIGUNGU_STRIP_CACHE.clear();
+                    const esc = dl.replace(RX_RE_ESCAPE, "\\$&");
+                    rx = new RegExp(`(?:^|\\s+)${esc}(?:\\s+|$)`, "g");
+                    RX_SIGUNGU_STRIP_CACHE.set(dl, rx);
+                  }
+                  rx.lastIndex = 0;
+                  s = s
+                    .replace(rx, " ")
+                    .replace(RX_WS, " ")
+                    .trim();
+                }
+              }
+              sigungu = s;
             }
           }
         }
@@ -2402,12 +2645,6 @@
           sigungu = "";
         }
         return { sido, sigungu, eupmyeon };
-      },
-      _getTagFromGeocoding(gc, firstLabelPart) {
-        const name = gc.name || firstLabelPart || gc.street || gc.city || "";
-        const type = gc.type || "";
-        if (name && type) return `${name}, ${type}`;
-        return name || type;
       },
       parse(data) {
         const gc = (
@@ -2432,28 +2669,40 @@
         let p0 = "";
         let p1 = "";
         if (label) {
-          let partStart = 0;
-          let partIndex = 0;
-          for (let i = 0; i <= label.length; i++) {
-            if (i === label.length || label.charCodeAt(i) === 44) {
-              const seg = label.slice(partStart, i).trim();
-              if (partIndex === 0) firstLabelPart = seg;
+          const comma0 = label.indexOf(",");
+          if (comma0 === -1) {
+            const seg0 = label.trim();
+            firstLabelPart = seg0;
+            p0 = seg0;
+          } else {
+            const seg0 = label.slice(0, comma0).trim();
+            firstLabelPart = seg0;
+            if (seg0) p0 = seg0;
+            let start = comma0 + 1;
+            while (start < label.length) {
+              const comma = label.indexOf(",", start);
+              const end = comma === -1 ? label.length : comma;
+              const seg = label.slice(start, end).trim();
               if (seg) {
                 if (!p0) p0 = seg;
-                else if (!p1) { p1 = seg; break; }
+                else { p1 = seg; break; }
               }
-              partIndex++;
-              partStart = i + 1;
+              if (comma === -1) break;
+              start = comma + 1;
             }
           }
         }
         const { sido, sigungu, eupmyeon } =
           this._getAdminFromGeocoding(gc, countryCode, p0, p1);
+        const tagName = gc.name || firstLabelPart || gc.street || gc.city || "";
+        const tagType = gc.type || "";
+        let tag = tagName;
+        if (tagType) tag = tag ? tag + ", " + tagType : tagType;
         const addr = {
           sido,
           sigungu,
           eupmyeon,
-          tag: this._getTagFromGeocoding(gc, firstLabelPart),
+          tag,
           fullAddr: label,
         };
         let kind;
@@ -2599,7 +2848,7 @@
       } else {
         wrap.classList.remove("filter-empty");
       }
-      requestScrollShadowSync(wrap);
+      if (RENDER_CACHE.hasResults) requestScrollShadowSync(wrap);
     }
     const RENDER_CACHE = {
       total: -1,
@@ -2678,6 +2927,7 @@
       domElements.tbody.replaceChildren();
       invalidateRectCache();
       wrap.classList.remove("filter-empty", "has-results");
+      RENDER_CACHE.hasResults = false;
       rebindScrollShadowTimeline(wrap);
       requestAnimationFrame(() => {
         if (wrap.scrollTop || wrap.scrollLeft) {
@@ -2687,11 +2937,23 @@
       });
     }
     function sleep(ms, signal) {
-      const combined = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
-      const { promise, resolve } = Promise.withResolvers();
-      if (combined.aborted) resolve();
-      else combined.addEventListener("abort", resolve, { once: true });
-      return promise.then(() => {
+      if (ms <= 0 || signal.aborted) {
+        return Promise.resolve().then(() => {
+          signal.throwIfAborted();
+        });
+      }
+      return new Promise((resolve) => {
+        let id = 0;
+        const onAbort = () => {
+          clearTimeout(id);
+          resolve();
+        };
+        id = setTimeout(() => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, ms);
+        signal.addEventListener("abort", onAbort, { once: true });
+      }).then(() => {
         signal.throwIfAborted();
       });
     }
@@ -2784,6 +3046,7 @@
     }
     async function parseFileToRecords(file, signal) {
       const out = [];
+      let nextIdx = 1;
       let lastYield = performance.now();
       let linesSinceYield = 0;
       for await (const line of lineIterator(file.stream(), signal)) {
@@ -2798,147 +3061,238 @@
         if (line.indexOf("위경도") === -1) continue;
         COORD_REGEX.lastIndex = 0;
         for (let m; (m = COORD_REGEX.exec(line));) {
-          const { label, lat, lon } = m.groups;
+          const lat = m[2];
+          const lon = m[3];
           const fLat = +lat;
           const fLon = +lon;
-          if (Number.isNaN(fLat) || Number.isNaN(fLon)) continue;
-          if (Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
+          if (fLat !== fLat || fLon !== fLon) continue;
+          if (fLat < -90 || fLat > 90 || fLon < -180 || fLon > 180) continue;
           out.push({
-            set: label === "대한민국" ? "KR" : "WORLD",
-            idx: out.length + 1,
+            set: m[1] === "대한민국" ? "KR" : "WORLD",
+            idx: nextIdx++,
+            idxDisp: "",
             lat: fLat, lon: fLon,
             latStr: lat, lonStr: lon,
+            cacheKey: fLat + "," + fLon,
+            coordKey: lat + "," + lon,
+            lat6: null, lon6: null,
             addr: null, fullAddr: "",
           });
         }
       }
       return out;
     }
-    async function performPauseCheck() {
-      if (AppState.isPausing) {
-        AppState.setStatus("paused");
-        setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-        AppState.resumeHandler ??= Promise.withResolvers();
-        scheduleRender();
-        await AppState.resumeHandler.promise;
-        if (!AppState.isStopping)
-          setStatusMessage("재개합니다…");
-      }
+    function performPauseCheck() {
+      if (!AppState.isPausing) return null;
+      AppState.setStatus("paused");
+      setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
+      AppState.resumeHandler ??= Promise.withResolvers();
+      scheduleRender();
+      return AppState.resumeHandler.promise.then(() => {
+        if (!AppState.isStopping) setStatusMessage("재개합니다…");
+      });
     }
-    async function fetchReverseWithRetry(lat, lon, userSignal) {
-      const url = BASE_URL_HREF + "&lat=" + lat + "&lon=" + lon;
+    const REVERSE_PARSED_CACHE = new Map();
+    const REVERSE_PARSED_CACHE_KEYS = [];
+    let REVERSE_PARSED_CACHE_HEAD = 0;
+    const REVERSE_PARSED_CACHE_MAX = 5_000;
+    let LAST_REVERSE_FETCH_AT = 0;
+    async function fetchReverseWithRetry(url, userSignal) {
+      const maxRetry = CONFIG.MAX_RETRY;
+      const timeoutMs = CONFIG.REQUEST_TIMEOUT_MS;
+      const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
+      const headers = FETCH_HEADERS;
+      const signalAny = AbortSignal.any;
+      const signalTimeout = AbortSignal.timeout;
       let attempt = 0;
-      while (attempt < CONFIG.MAX_RETRY) {
+      while (++attempt <= maxRetry) {
         userSignal.throwIfAborted();
-        attempt++;
+        if (LAST_REVERSE_FETCH_AT) {
+          const now = performance.now();
+          const remaining = baseDelayMs - (now - LAST_REVERSE_FETCH_AT);
+          if (remaining > 0) await sleep(remaining, userSignal);
+        }
+        LAST_REVERSE_FETCH_AT = performance.now();
         try {
           const res = await fetch(url, {
-            headers: FETCH_HEADERS,
-            signal: AbortSignal.any([userSignal, AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS)]),
+            headers,
+            signal: signalAny([userSignal, signalTimeout(timeoutMs)]),
           });
           if (res.ok) {
             return res.json();
           }
-          if (res.status === 429 || res.status >= 500) {
-            if (attempt >= CONFIG.MAX_RETRY) {
-              throw new Error(`HTTP ${res.status}: rate limited or server error`);
-            }
-            await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
-            continue;
+          if (res.status !== 429 && res.status < 500) {
+            throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
           }
-          throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          if (attempt >= maxRetry) {
+            throw new Error(`HTTP ${res.status}: rate limited or server error`);
+          }
         } catch (e) {
           userSignal.throwIfAborted();
-          if (attempt >= CONFIG.MAX_RETRY) {
+          if (attempt >= maxRetry) {
             throw e;
           }
-          await sleep(CONFIG.RATE_LIMIT_DELAY_MS * attempt, userSignal);
         }
+        await sleep(baseDelayMs * attempt, userSignal);
       }
     }
     async function runProcessingLoop() {
+      const records = AppState.records;
       const startIndex = AppState.processedCount;
-      const total = AppState.records.length;
+      const total = records.length;
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
-      let hasResultsClass = wrap.classList.contains("has-results");
+      const idxColIndex = IDX_COL_INDEX;
+      const skeletonTemplate = SKELETON_TEMPLATE;
+      const rowTemplate = ROW_TEMPLATE;
+      const fmtInt = fmt;
+      let hasResultsClass = RENDER_CACHE.hasResults ?? wrap.classList.contains("has-results");
+      let lastStatusUpdate = 0;
+      let lastYield = performance.now();
+      const reverseCache = REVERSE_PARSED_CACHE;
+      const reverseCacheKeys = REVERSE_PARSED_CACHE_KEYS;
+      const baseHref = BASE_URL_HREF;
+      let pendingFrag = null;
+      let pendingCount = 0;
+      const flushPending = () => {
+        if (!pendingFrag) return;
+        tbody.append(pendingFrag);
+        pendingFrag = null;
+        pendingCount = 0;
+        invalidateRectCache();
+        if (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom")) {
+          requestScrollShadowSync(wrap);
+        }
+      };
       for (let i = startIndex; i < total; i++) {
-        const curDisp = fmt(i + 1);
+        const i1 = i + 1;
         let skeletonTr = null;
+        let needsFetch = false;
         try {
-          await performPauseCheck();
+          const pausePromise = performPauseCheck();
+          if (pausePromise) await pausePromise;
           if (!AppState.isRunning) break;
-          const r = AppState.records[i];
-          r.addr = null;
-          r.fullAddr = "";
-          AppState.controller = new AbortController();
-          AppState.inFlight = true;
-          const tr = SKELETON_TEMPLATE.cloneNode(true);
-          if (IDX_COL_INDEX >= 0) {
-            tr.cells[IDX_COL_INDEX].textContent = fmt(r.idx);
+          const r = records[i];
+          const cacheKey = r.cacheKey;
+          let parsed = reverseCache.get(cacheKey);
+          needsFetch = !parsed;
+          let signal = null;
+          let controller = null;
+          if (needsFetch) {
+            controller = new AbortController();
+            signal = controller.signal;
+            flushPending();
+            AppState.controller = controller;
+            AppState.inFlight = true;
           }
-          const f0 = getLiveFilterSnapshot();
+          const tr = (parsed ? rowTemplate : skeletonTemplate).cloneNode(true);
+          if (idxColIndex >= 0) {
+            tr.cells[idxColIndex].textContent = r.idxDisp || (r.idxDisp = fmtInt(r.idx));
+          }
+          const f0 = filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP;
           if (f0.active) {
-            tr.hidden = true;
+            tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
           }
-          tbody.append(tr);
           const isFirstRow = !hasResultsClass;
           if (isFirstRow) {
             hasResultsClass = true;
             wrap.classList.add("has-results");
-          }
-          if (
-            isFirstRow ||
-            (wrap.hasAttribute("data-at-top") &&
-              wrap.hasAttribute("data-at-bottom"))
-          ) {
+            RENDER_CACHE.hasResults = true;
             requestScrollShadowSync(wrap);
           }
           if (f0.active && isFirstRow) {
             wrap.classList.add("filter-empty");
           }
-          skeletonTr = tr;
-          try {
-            if (i > startIndex)
-              await sleep(
-                CONFIG.RATE_LIMIT_DELAY_MS,
-                AppState.controller.signal
-              );
-            await performPauseCheck();
-            if (!AppState.isRunning) {
-              skeletonTr.remove();
-              break;
+          if (needsFetch) {
+            tbody.append(tr);
+            if (
+              (wrap.hasAttribute("data-at-top") &&
+                wrap.hasAttribute("data-at-bottom"))
+            ) {
+              requestScrollShadowSync(wrap);
             }
-            if (!AppState.isPaused)
-              setStatusMessage(
-                `처리 중… (${curDisp}/${totalDisp})`
+          } else {
+            (pendingFrag ??= document.createDocumentFragment()).append(tr);
+            if (++pendingCount >= 200) flushPending();
+          }
+          skeletonTr = tr;
+          let now = 0;
+          try {
+            if (needsFetch) {
+              const pausePromise = performPauseCheck();
+              if (pausePromise) await pausePromise;
+              if (!AppState.isRunning) {
+                skeletonTr.remove();
+                break;
+              }
+            }
+            if (!AppState.isPaused) {
+              now = performance.now();
+              if (now - lastStatusUpdate >= 200 || i === startIndex || i1 === total) {
+                lastStatusUpdate = now;
+                setStatusMessage(`처리 중… (${fmtInt(i1)}/${totalDisp})`);
+              }
+            }
+            if (!parsed) {
+              const url = baseHref + "&lat=" + r.lat + "&lon=" + r.lon;
+              parsed = AddressFormatter.parse(
+                await fetchReverseWithRetry(
+                  url,
+                  signal
+                )
               );
-            const { addr, kind } = AddressFormatter.parse(
-              await fetchReverseWithRetry(
-                r.lat,
-                r.lon,
-                AppState.controller.signal
-              )
-            );
+              reverseCache.set(cacheKey, parsed);
+              reverseCacheKeys.push(cacheKey);
+              if (reverseCacheKeys.length - REVERSE_PARSED_CACHE_HEAD > REVERSE_PARSED_CACHE_MAX) {
+                const dropKey = reverseCacheKeys[REVERSE_PARSED_CACHE_HEAD++];
+                reverseCache.delete(dropKey);
+                if (
+                  REVERSE_PARSED_CACHE_HEAD > 1024 &&
+                  REVERSE_PARSED_CACHE_HEAD * 2 > reverseCacheKeys.length
+                ) {
+                  reverseCacheKeys.splice(0, REVERSE_PARSED_CACHE_HEAD);
+                  REVERSE_PARSED_CACHE_HEAD = 0;
+                }
+              }
+            }
+            const addr = parsed.addr;
+            const kind = parsed.kind;
             if (kind) {
               r.set = kind;
+              r._f_kind = parsed.kindLower || (parsed.kindLower = kind.toLowerCase());
+            } else {
+              r._f_kind = lower(r.set);
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
-            const sido = norm(addr.sido);
-            const sigungu = norm(addr.sigungu);
-            const emd = norm(addr.eupmyeon);
-            const tag = norm(addr.tag);
-            const fAddr = norm(r.fullAddr);
-            r._f_kind = norm(r.set);
-            r._f_sido = sido;
-            r._f_sigungu = sigungu;
-            r._f_emd = emd;
-            r._f_tag = tag;
-            r._f_fullAddr = fAddr;
-            r._f_q = `${r.latStr},${r.lonStr} ${sido} ${sigungu} ${emd} ${tag} ${fAddr}`.trim();
-            commitResultRow(skeletonTr, r, wrap);
+            let nSido = parsed.nSido;
+            if (nSido === undefined) {
+              nSido = parsed.nSido = norm(addr.sido);
+              const nSigungu = parsed.nSigungu = norm(addr.sigungu);
+              const nEmd = parsed.nEmd = norm(addr.eupmyeon);
+              const nTag = parsed.nTag = norm(addr.tag);
+              const nFullAddr = parsed.nFullAddr = norm(addr.fullAddr);
+              let qRest = "";
+              if (nSido) qRest = nSido;
+              if (nSigungu) qRest = qRest ? qRest + " " + nSigungu : nSigungu;
+              if (nEmd) qRest = qRest ? qRest + " " + nEmd : nEmd;
+              if (nTag) qRest = qRest ? qRest + " " + nTag : nTag;
+              if (nFullAddr) qRest = qRest ? qRest + " " + nFullAddr : nFullAddr;
+              parsed.qRest = qRest;
+            }
+            const nSigungu = parsed.nSigungu;
+            const nEmd = parsed.nEmd;
+            const nTag = parsed.nTag;
+            const nFullAddr = parsed.nFullAddr;
+            r._f_sido = nSido;
+            r._f_sigungu = nSigungu;
+            r._f_emd = nEmd;
+            r._f_tag = nTag;
+            r._f_fullAddr = nFullAddr;
+            const qRest = parsed.qRest ?? "";
+            r._f_q = qRest ? r.coordKey + " " + qRest : r.coordKey;
+            commitResultRow(skeletonTr, r, wrap, f0);
           } catch (err) {
             if (AppState.isStopping && err && err.name === "AbortError") {
               skeletonTr.remove();
@@ -2955,26 +3309,38 @@
             r._f_emd = "";
             r._f_tag = "";
             r._f_fullAddr = r._f_q = norm(msg);
-            commitResultRow(skeletonTr, r, wrap);
+            commitResultRow(skeletonTr, r, wrap, f0);
             if (!AppState.isStopping)
               setStatusMessage(
-                `에러 발생: (${curDisp}/${totalDisp}) ${msg}`,
+                `에러 발생: (${fmtInt(i1)}/${totalDisp}) ${msg}`,
                 "error"
               );
+          } finally {
+            if (!needsFetch) {
+              if (!now) now = performance.now();
+              if (now - lastYield >= 8) {
+                flushPending();
+                await yieldToMain();
+                lastYield = performance.now();
+              }
+            }
           }
         } catch (err) {
           console.error(err);
-          if (skeletonTr && skeletonTr.isConnected) {
+          if (skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)) {
             skeletonTr.remove();
           }
           AppState.resumeHandler = null;
-          setControlsIdle(`오류로 중단됨: (${curDisp}/${totalDisp}) ${getErrorMessage(err)}`, "error");
+          setControlsIdle(`오류로 중단됨: (${fmtInt(i1)}/${totalDisp}) ${getErrorMessage(err)}`, "error");
           break;
         } finally {
-          AppState.inFlight = false;
-          AppState.controller = null;
+          if (needsFetch) {
+            AppState.inFlight = false;
+            AppState.controller = null;
+          }
         }
       }
+      flushPending();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
       } else if (AppState.processedCount >= AppState.records.length) {
@@ -2992,27 +3358,34 @@
         return "Unknown error";
       }
     }
-    function commitResultRow(tr, r, wrap) {
-      if (!tr || !tr.isConnected) return;
-      for (let i = 0, n = COL_DEFS.length; i < n; i++) {
-        const col = COL_DEFS[i];
-        const td = tr.cells[i];
+    function commitResultRow(tr, r, wrap, f) {
+      if (!tr) return;
+      const connected = tr.isConnected;
+      if (!connected && !tr.parentNode) return;
+      const colDefs = COL_DEFS;
+      const cells = tr.cells;
+      const idxColIndex = IDX_COL_INDEX;
+      for (let i = 0, n = colDefs.length; i < n; i++) {
+        if (i === idxColIndex) continue;
+        const col = colDefs[i];
+        const td = cells[i];
         const val = col.val ? col.val(r) : "";
         if (col.render) col.render(val, td, r);
         else td.textContent = val ?? "";
       }
-      const f = getLiveFilterSnapshot();
+      const fNow = filterDirty ? getLiveFilterSnapshot() : f;
       const wasHidden = tr.hidden;
-      const hidden = setRowHiddenByFilter(tr, f, r);
-      if (f.active && !hidden) {
+      const hidden = setRowHiddenByFilter(tr, fNow, r);
+      if (fNow.active && !hidden) {
         wrap.classList.remove("filter-empty");
       }
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
       if (
-        tr.hidden !== wasHidden ||
-        (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom"))
+        connected &&
+        (hidden !== wasHidden ||
+          (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom")))
       ) {
         requestScrollShadowSync(wrap);
       }
@@ -3025,7 +3398,13 @@
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
         const csvColLen = CSV_COLS.length;
-        const outRow = new Array(csvColLen + MAP_PROVIDER_COUNT);
+        const mapProviderCount = MAP_PROVIDER_COUNT;
+        const csvCols = CSV_COLS;
+        const mapLinks = MAP_LINKS;
+        const escCell = csvEsc;
+        const buildHref = buildMapHref;
+        const hasRound6 = MAP_HAS_ROUND6;
+        const outRow = new Array(csvColLen + mapProviderCount);
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
         const parts = [CSV_HEADER_BYTES];
@@ -3044,13 +3423,20 @@
           const r = records[i];
           let j = 0;
           for (let k = 0; k < csvColLen; k++) {
-            outRow[j++] = csvEsc(CSV_COLS[k].val(r));
+            outRow[j++] = escCell(csvCols[k].val(r));
           }
-          const { latStr: lat, lonStr: lon } = r;
-          const lat6 = MAP_HAS_ROUND6 ? fmtCoord6(lat) : null;
-          const lon6 = MAP_HAS_ROUND6 ? fmtCoord6(lon) : null;
-          for (let k = 0; k < MAP_PROVIDER_COUNT; k++) {
-            outRow[j++] = csvEsc(buildMapHref(MAP_LINKS[k], lat, lon, lat6, lon6));
+          const lat = r.latStr;
+          const lon = r.lonStr;
+          let lat6 = null;
+          let lon6 = null;
+          if (hasRound6) {
+            lat6 = r.lat6;
+            if (lat6 == null) r.lat6 = lat6 = fmtCoord6(lat);
+            lon6 = r.lon6;
+            if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
+          }
+          for (let k = 0; k < mapProviderCount; k++) {
+            outRow[j++] = '"' + buildHref(mapLinks[k], lat, lon, lat6, lon6) + '"';
           }
           const line = outRow.join(",");
           chunkLines.push(line);
@@ -3131,10 +3517,10 @@
       }
     }
     domElements.tbody.addEventListener("click", (e) => {
-      if (!isMapPopoverOpen()) return;
+      if (!MAP_POPOVER_OPEN) return;
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
-      mapPopover.hidePopover();
+      closeMapPopover();
     }, EVT_CAPTURE);
     domElements.tbody.addEventListener(
       "beforematch",
@@ -3148,18 +3534,21 @@
         bumpFindRehideTimer();
       }
     );
-    const maybeVT = (fn) => {
-      if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
-        const active = document.activeViewTransition;
-        if (active) {
-          active.types.add("results");
-          fn();
-          return active;
+    const startViewTransition = document.startViewTransition?.bind(document);
+    const maybeVT = startViewTransition
+      ? (fn) => {
+        if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
+          const active = document.activeViewTransition;
+          if (active) {
+            active.types.add("results");
+            fn();
+            return active;
+          }
+          return startViewTransition({ update: fn, types: ["results"] });
         }
-        return document.startViewTransition({ update: fn, types: ["results"] });
+        return fn();
       }
-      return fn();
-    };
+      : (fn) => fn();
     const COMMANDS = {
       "--parse": () => maybeVT(handleParse),
       "--start": () => maybeVT(() => {
@@ -3194,7 +3583,7 @@
       "--export": handleExport,
       "--filter-clear": () => {
         domElements.filtersForm.reset();
-        markFilterDirty();
+        filterDirty = true;
         cancelActiveFilterTask();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
@@ -3208,11 +3597,7 @@
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      try {
-        Promise.resolve(cmd()).catch(handleCommandError);
-      } catch (err) {
-        handleCommandError(err);
-      }
+      Promise.try(cmd).catch(handleCommandError);
     });
     domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
@@ -3229,6 +3614,9 @@
       setCoordsText("");
       clearTable();
       AppState.setRecords([]);
+      REVERSE_PARSED_CACHE.clear();
+      REVERSE_PARSED_CACHE_KEYS.length = 0;
+      REVERSE_PARSED_CACHE_HEAD = 0;
       AppState.setFile(file);
       setEmptyHint("file");
       setStatusMessage(`파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`);
@@ -3247,7 +3635,7 @@
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
     document.addEventListener("scroll", (e) => {
-      closeMapPopover();
+      if (MAP_POPOVER_OPEN) closeMapPopover();
       if (ACTIVE_SCROLL.size === 0) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
@@ -3291,7 +3679,7 @@
     function resetInteractionState({ closePopover = false } = {}) {
       resetScrollState();
       clearPointerState();
-      if (closePopover) closeMapPopover();
+      if (closePopover && MAP_POPOVER_OPEN) closeMapPopover();
     }
     let DEACTIVATE_QUEUED = false;
     let NEED_CLOSE_POPOVER = false;
@@ -3316,8 +3704,6 @@
     });
     const invalidateRectCache = () => {
       rectCacheDirty = true;
-      if (rectCache.size === 0) return;
-      rectCache.clear();
     };
     const requestRectCacheRefresh = () => {
       if (pointerRaf !== null) return;
