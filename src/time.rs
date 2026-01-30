@@ -14,12 +14,16 @@ use std::{
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT_SECS: u64 = 5;
-const DISPLAY_UPDATE_MILLIS: u64 = 45;
 const NUM_SAMPLES: usize = 10;
-const ADAPTIVE_POLL_MILLIS: u64 = 10;
 const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
 const MAX_CALIBRATION_FAILURES: u32 = 100;
+const KST_OFFSET_SECS_U64: u64 = 9 * 3600;
+const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64 as i64;
+const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
+const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
+const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const DISPLAY_UPDATE_INTERVAL: Duration = Duration::from_millis(45);
 #[cfg(target_os = "windows")]
 mod high_res_timer {
     #[link(name = "winmm")]
@@ -198,7 +202,7 @@ struct TimeSample {
     rtt: Duration,
     server_time: SystemTime,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct ServerTime {
     anchor_server_time: SystemTime,
     anchor_instant: Instant,
@@ -235,8 +239,9 @@ impl ServerTime {
         let smoothed_rtt_nanos = (old_rtt_nanos * 7 + new_rtt_nanos * 3) / 10;
         let smoothed_rtt = Duration::from_nanos_u128(smoothed_rtt_nanos);
         ServerTime {
+            anchor_server_time: self.anchor_server_time,
+            anchor_instant: self.anchor_instant,
             baseline_rtt: smoothed_rtt,
-            ..self.clone()
         }
     }
     fn current_server_time(&self) -> Result<SystemTime> {
@@ -246,12 +251,11 @@ impl ServerTime {
     fn calculate_display_time(&self) -> Result<DisplayableTime> {
         let current_time = self.current_server_time()?;
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
-        let total_seconds_kst =
-            since_epoch.as_secs() as i64 + Duration::from_hours(9).as_secs() as i64;
+        let total_seconds_kst = since_epoch.as_secs() as i64 + KST_OFFSET_SECS;
         let millis = since_epoch.subsec_millis();
         let days_since_epoch = total_seconds_kst.div_euclid(86400);
         let day_of_week_num = (days_since_epoch + 4).rem_euclid(7);
-        let day_of_week_str = ["일", "월", "화", "수", "목", "금", "토"][day_of_week_num as usize];
+        let day_of_week_str = DAY_OF_WEEK_KO[day_of_week_num as usize];
         let sec_of_day = total_seconds_kst.rem_euclid(86400);
         let hour = (sec_of_day / 3600) as u32;
         let minute = ((sec_of_day % 3600) / 60) as u32;
@@ -324,54 +328,6 @@ static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("c
 static TCP_TIMEOUT_SECS_STR: LazyLock<String> = LazyLock::new(|| TCP_TIMEOUT_SECS.to_string());
 #[cfg(target_os = "linux")]
 static XDO_TOOL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("xdotool"));
-fn is_curl_available() -> bool {
-    *CURL_AVAILABLE
-}
-#[cfg(target_os = "linux")]
-fn is_xdotool_available() -> bool {
-    *XDO_TOOL_AVAILABLE
-}
-fn ask_for_target_time(input_buf: &mut String) -> ioResult<Option<SystemTime>> {
-    get_validated_input(
-        "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
-        input_buf,
-        |s| {
-            if s.is_empty() {
-                return Ok(None);
-            }
-            let mut parts = s.split(':');
-            if let (Some(h_str), Some(m_str), Some(s_str)) =
-                (parts.next(), parts.next(), parts.next())
-                && parts.next().is_none()
-                && let (Ok(h), Ok(m), Ok(s)) = (
-                    h_str.parse::<u32>(),
-                    m_str.parse::<u32>(),
-                    s_str.parse::<u32>(),
-                )
-                && h <= 23
-                && m <= 59
-                && s <= 59
-            {
-                let now_local = SystemTime::now();
-                let since_epoch = now_local
-                    .duration_since(UNIX_EPOCH)
-                    .map_err(|_| "시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.")?;
-                let today_start_secs_utc =
-                    ((since_epoch.as_secs() + Duration::from_hours(9).as_secs()) / 86400 * 86400)
-                        - Duration::from_hours(9).as_secs();
-                let target_secs_of_day = u64::from(h * 3600 + m * 60 + s);
-                let mut target_time =
-                    UNIX_EPOCH + Duration::from_secs(today_start_secs_utc + target_secs_of_day);
-                if now_local > target_time {
-                    target_time += Duration::from_hours(24)
-                }
-                Ok(Some(target_time))
-            } else {
-                Err("잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).")
-            }
-        },
-    )
-}
 impl AppState {
     fn new() -> Result<Self> {
         let mut user_input_buf = String::with_capacity(256);
@@ -386,7 +342,45 @@ impl AppState {
                 }
             },
         )?;
-        let target_time = ask_for_target_time(&mut user_input_buf)?;
+        let target_time = get_validated_input(
+            "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
+            &mut user_input_buf,
+            |s| {
+                if s.is_empty() {
+                    return Ok(None);
+                }
+                let mut parts = s.split(':');
+                if let (Some(h_str), Some(m_str), Some(s_str)) =
+                    (parts.next(), parts.next(), parts.next())
+                    && parts.next().is_none()
+                    && let (Ok(h), Ok(m), Ok(s)) = (
+                        h_str.parse::<u32>(),
+                        m_str.parse::<u32>(),
+                        s_str.parse::<u32>(),
+                    )
+                    && h <= 23
+                    && m <= 59
+                    && s <= 59
+                {
+                    let now_local = SystemTime::now();
+                    let since_epoch = now_local
+                        .duration_since(UNIX_EPOCH)
+                        .map_err(|_| "시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.")?;
+                    let today_start_secs_utc =
+                        ((since_epoch.as_secs() + KST_OFFSET_SECS_U64) / 86400 * 86400)
+                            - KST_OFFSET_SECS_U64;
+                    let target_secs_of_day = u64::from(h * 3600 + m * 60 + s);
+                    let mut target_time =
+                        UNIX_EPOCH + Duration::from_secs(today_start_secs_utc + target_secs_of_day);
+                    if now_local > target_time {
+                        target_time += Duration::from_hours(24)
+                    }
+                    Ok(Some(target_time))
+                } else {
+                    Err("잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).")
+                }
+            },
+        )?;
         let trigger_action: Option<TriggerAction> = if target_time.is_some() {
             Some(get_validated_input(
                 "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
@@ -425,14 +419,13 @@ impl AppState {
         println!("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)");
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || -> ioResult<()> {
-            io::stdin().read_line(&mut String::new())?;
+            let mut line = String::new();
+            io::stdin().read_line(&mut line)?;
             let _ = tx.send(());
             Ok(())
         });
         let mut activity = Activity::MeasureBaselineRtt;
         let mut last_display_update = Instant::now();
-        const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
-        let mut stdout_handle = io::stdout();
         let mut message_buffer = String::with_capacity(256);
         let mut network_context = NetworkContext {
             tcp_line_buffer: Vec::with_capacity(256),
@@ -442,21 +435,16 @@ impl AppState {
             let activity_poll = match activity {
                 Activity::MeasureBaselineRtt
                 | Activity::CalibrateOnTick
-                | Activity::FinalCountdown { .. } => Duration::from_millis(ADAPTIVE_POLL_MILLIS),
-                _ => Duration::from_millis(DISPLAY_UPDATE_MILLIS),
+                | Activity::FinalCountdown { .. } => ADAPTIVE_POLL_INTERVAL,
+                _ => DISPLAY_UPDATE_INTERVAL,
             };
-            let before_wait = Instant::now();
-            let elapsed = before_wait.duration_since(last_display_update);
+            let elapsed = last_display_update.elapsed();
             let remaining_display = if elapsed >= DISPLAY_INTERVAL {
-                Duration::from_millis(0)
+                Duration::ZERO
             } else {
                 DISPLAY_INTERVAL - elapsed
             };
-            let poll_timeout = if activity_poll < remaining_display {
-                activity_poll
-            } else {
-                remaining_display
-            };
+            let poll_timeout = activity_poll.min(remaining_display);
             match rx.recv_timeout(poll_timeout) {
                 Ok(()) => break,
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -465,12 +453,14 @@ impl AppState {
             let now = Instant::now();
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
                 if let Some(st) = &self.server_time {
-                    write!(&mut stdout_handle, "\r서버 시간: ")?;
-                    if let Err(e) = st.current_display_time(&mut stdout_handle, true) {
-                        write!(&mut stdout_handle, "시간 표시 오류: {e}")?
+                    let stdout = io::stdout();
+                    let mut out = stdout.lock();
+                    write!(out, "\r서버 시간: ")?;
+                    if let Err(e) = st.current_display_time(&mut out, true) {
+                        write!(out, "시간 표시 오류: {e}")?;
                     }
-                    write!(&mut stdout_handle, " \r")?;
-                    stdout_handle.flush()?;
+                    write!(out, " \r")?;
+                    out.flush()?;
                 }
                 last_display_update = now
             }
@@ -503,20 +493,21 @@ impl AppState {
         msg_buf: &'a mut String,
         net_ctx: &mut NetworkContext,
     ) -> (Activity, Option<&'a str>) {
+        let now = Instant::now();
         if self.baseline_rtt_attempts == 0 {
             if self.last_sample.is_none() {
                 println!("1단계: RTT 기준값 측정을 시작합니다...")
             }
             let placeholder = TimeSample {
-                response_received_inst: Instant::now(),
+                response_received_inst: now,
                 rtt: Duration::ZERO,
                 server_time: UNIX_EPOCH,
             };
             self.baseline_rtt_samples = [placeholder; NUM_SAMPLES];
             self.baseline_rtt_valid_count = 0;
-            self.baseline_rtt_next_sample_at = Instant::now();
+            self.baseline_rtt_next_sample_at = now;
         }
-        if Instant::now() < self.baseline_rtt_next_sample_at {
+        if now < self.baseline_rtt_next_sample_at {
             return (Activity::MeasureBaselineRtt, None);
         }
         let attempt_index = self.baseline_rtt_attempts;
@@ -535,8 +526,7 @@ impl AppState {
             }
         }
         self.baseline_rtt_attempts = attempt_index + 1;
-        self.baseline_rtt_next_sample_at =
-            Instant::now() + Duration::from_millis(ADAPTIVE_POLL_MILLIS);
+        self.baseline_rtt_next_sample_at = Instant::now() + ADAPTIVE_POLL_INTERVAL;
         if self.baseline_rtt_attempts < NUM_SAMPLES {
             return (Activity::MeasureBaselineRtt, None);
         }
@@ -546,19 +536,29 @@ impl AppState {
         if sample_count == 0 {
             return transition_to_retry("유효한 RTT 샘플을 얻지 못했습니다.");
         }
-        let total_rtt: Duration = self
-            .baseline_rtt_samples
-            .iter()
-            .take(sample_count)
-            .map(|s| s.rtt)
-            .sum();
-        let avg_rtt = total_rtt / (sample_count as u32);
-        self.baseline_rtt = Some(avg_rtt);
+        let mut rtt_nanos = [0u128; NUM_SAMPLES];
+        let mut filled = 0usize;
+        for sample in self.baseline_rtt_samples.iter() {
+            if sample.rtt > Duration::ZERO {
+                rtt_nanos[filled] = sample.rtt.as_nanos();
+                filled += 1;
+                if filled >= sample_count {
+                    break;
+                }
+            }
+        }
+        let rtts = &mut rtt_nanos[..filled];
+        rtts.sort_unstable();
+        let trim = filled / 5;
+        let window = &rtts[trim..(filled - trim)];
+        let sum_nanos: u128 = window.iter().sum();
+        let baseline_rtt = Duration::from_nanos_u128(sum_nanos / (window.len() as u128));
+        self.baseline_rtt = Some(baseline_rtt);
         self.calibration_failure_count = 0;
         let _ = write!(
             msg_buf,
             "[완료] RTT 기준값: {rtt_ms}ms. 2단계: 정밀 보정을 시작합니다.",
-            rtt_ms = avg_rtt.as_millis()
+            rtt_ms = baseline_rtt.as_millis()
         );
         (Activity::CalibrateOnTick, Some(msg_buf))
     }
@@ -744,11 +744,11 @@ pub fn run() -> Result<()> {
         eprintln!("[경고] {e}. 시간 오차가 클 수 있습니다.")
     }
     #[cfg(target_os = "windows")]
-    if !is_curl_available() {
+    if !*CURL_AVAILABLE {
         eprintln!("[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다.")
     }
     #[cfg(target_os = "linux")]
-    if !is_xdotool_available() {
+    if !*XDO_TOOL_AVAILABLE {
         eprintln!(
             "[경고] 'xdotool'이 설치되지 않았습니다. 액션 기능이 동작하지 않습니다.\n(설치 방법: sudo apt-get install xdotool 또는 유사한 패키지 관리자 명령어)"
         )
@@ -883,6 +883,7 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
     let request_start_inst = Instant::now();
     let tcp_host_uri = host.strip_prefix("http://").unwrap_or(host);
     let (tcp_host_no_port, _) = tcp_host_uri.split_once(':').unwrap_or((tcp_host_uri, ""));
+    let tcp_timeout = Duration::from_secs(TCP_TIMEOUT_SECS);
     let socket_addr_result: ioResult<net::SocketAddr> =
         if let Ok(ip_addr) = tcp_host_no_port.parse::<net::IpAddr>() {
             Ok(net::SocketAddr::new(ip_addr, 80))
@@ -892,10 +893,9 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Host not found"))
         };
     let socket_addr = socket_addr_result?;
-    let mut stream =
-        TcpStream::connect_timeout(&socket_addr, Duration::from_secs(TCP_TIMEOUT_SECS))?;
-    stream.set_read_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(TCP_TIMEOUT_SECS)))?;
+    let mut stream = TcpStream::connect_timeout(&socket_addr, tcp_timeout)?;
+    stream.set_read_timeout(Some(tcp_timeout))?;
+    stream.set_write_timeout(Some(tcp_timeout))?;
     stream.write_all(b"HEAD / HTTP/1.1\r\nHost: ")?;
     stream.write_all(tcp_host_no_port.as_bytes())?;
     stream.write_all(b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n")?;
@@ -922,45 +922,40 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
     }
     Err(Error::HeaderNotFound("Date (TCP)".into()))
 }
-fn fetch_server_time_sample_curl_with_fallback(
-    host: &str,
-    net_ctx: &mut NetworkContext,
-) -> Result<TimeSample> {
-    let base_host = host.strip_prefix("http://").unwrap_or(host);
-    let mut url_buf = [0u8; 512];
-    let mut last_error = None;
-    for (protocol, context_str) in [
-        ("https://", "HTTPS (fallback)"),
-        ("http://", "HTTP (fallback)"),
-    ] {
-        let url_str = {
-            let len = {
-                let mut cursor = io::Cursor::new(&mut url_buf[..]);
-                write!(&mut cursor, "{protocol}{base_host}")
-                    .map_err(|_| Error::Parse("URL 생성 버퍼가 작습니다".into()))?;
-                cursor.position() as usize
-            };
-            str::from_utf8(&url_buf[..len])
-                .map_err(|_| Error::Parse("URL 생성 중 UTF-8 변환 실패".into()))?
-        };
-        match fetch_server_time_sample_curl(url_str, context_str, net_ctx) {
-            Ok(sample) => return Ok(sample),
-            Err(e) => last_error = Some(e),
-        }
-    }
-    Err(last_error.unwrap_or_else(|| Error::SyncFailed("Curl 폴백 시도 중 알 수 없는 오류".into())))
-}
 fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<TimeSample> {
     if host.len() >= 8 && host[..8].eq_ignore_ascii_case("https://") {
         return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx);
     }
     tcp_attempt(&mut net_ctx.tcp_line_buffer, host).or_else(|_| {
-        if !is_curl_available() {
+        if !*CURL_AVAILABLE {
             return Err(Error::SyncFailed(
                 "TCP 연결에 실패했고 curl을 사용할 수 없습니다.".into(),
             ));
         }
-        fetch_server_time_sample_curl_with_fallback(host, net_ctx)
+        let base_host = host.strip_prefix("http://").unwrap_or(host);
+        let mut url_buf = [0u8; 512];
+        let mut last_error = None;
+        for (protocol, context_str) in [
+            ("https://", "HTTPS (fallback)"),
+            ("http://", "HTTP (fallback)"),
+        ] {
+            let protocol_bytes = protocol.as_bytes();
+            let host_bytes = base_host.as_bytes();
+            let len = protocol_bytes.len() + host_bytes.len();
+            if len > url_buf.len() {
+                return Err(Error::Parse("URL 생성 버퍼가 작습니다".into()));
+            }
+            url_buf[..protocol_bytes.len()].copy_from_slice(protocol_bytes);
+            url_buf[protocol_bytes.len()..len].copy_from_slice(host_bytes);
+            let url_str = str::from_utf8(&url_buf[..len])
+                .map_err(|_| Error::Parse("URL 생성 중 UTF-8 변환 실패".into()))?;
+            match fetch_server_time_sample_curl(url_str, context_str, net_ctx) {
+                Ok(sample) => return Ok(sample),
+                Err(e) => last_error = Some(e),
+            }
+        }
+        Err(last_error
+            .unwrap_or_else(|| Error::SyncFailed("Curl 폴백 시도 중 알 수 없는 오류".into())))
     })
 }
 fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {

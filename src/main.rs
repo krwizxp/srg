@@ -13,7 +13,7 @@ use std::{
     sync::{
         LazyLock, Mutex, MutexGuard,
         atomic::{AtomicU64, Ordering},
-        mpsc::{SyncSender, sync_channel},
+        mpsc::{TryRecvError, sync_channel},
     },
     thread::{ScopedJoinHandle, available_parallelism, scope, sleep},
     time::{Duration, Instant},
@@ -46,6 +46,8 @@ static TWO_DIGITS: LazyLock<[[u8; 2]; 100]> =
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const BUFFER_SIZE: usize = 1016;
+const BUFFERS_PER_WORKER: usize = 8;
+type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 const fn bitmask_const<const B: u8>() -> u64 {
     let b: u32 = {
         let b = B as u32;
@@ -142,10 +144,10 @@ impl RandomBitBuffer {
 fn main() -> Result<ExitCode> {
     let file_mutex = Mutex::new(open_or_create_file()?);
     #[cfg(target_arch = "x86_64")]
-    let mut num_64 = process_single_random_data(&file_mutex)?.0;
+    let mut num_64 = process_single_random_data(&file_mutex)?;
     #[cfg(not(target_arch = "x86_64"))]
     let mut num_64: u64 = 0;
-    let mut input_buffer = String::new();
+    let mut input_buffer = String::with_capacity(256);
     let menu_prompt = format_args!("{MENU}");
     loop {
         match read_line_reuse(menu_prompt, &mut input_buffer)? {
@@ -156,7 +158,7 @@ fn main() -> Result<ExitCode> {
                 }
                 #[cfg(not(target_arch = "x86_64"))]
                 {
-                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                    print_x86_64_only_feature_disabled();
                 }
             }
             "2" => {
@@ -174,29 +176,28 @@ fn main() -> Result<ExitCode> {
                 }
                 #[cfg(not(target_arch = "x86_64"))]
                 {
-                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                    print_x86_64_only_feature_disabled();
                 }
             }
             "3" => {
                 #[cfg(target_arch = "x86_64")]
                 {
                     ensure_file_exists_and_reopen(&file_mutex)?;
-                    num_64 = process_single_random_data(&file_mutex)?.0;
+                    num_64 = process_single_random_data(&file_mutex)?;
                 }
                 #[cfg(not(target_arch = "x86_64"))]
                 {
-                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                    print_x86_64_only_feature_disabled();
                 }
             }
             "4" => {
                 #[cfg(target_arch = "x86_64")]
                 {
-                    ensure_file_exists_and_reopen(&file_mutex)?;
                     num_64 = regenerate_multiple(&file_mutex, &mut input_buffer)?;
                 }
                 #[cfg(not(target_arch = "x86_64"))]
                 {
-                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                    print_x86_64_only_feature_disabled();
                 }
             }
             "5" => {
@@ -218,12 +219,16 @@ fn main() -> Result<ExitCode> {
                 }
                 #[cfg(not(target_arch = "x86_64"))]
                 {
-                    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
+                    print_x86_64_only_feature_disabled();
                 }
             }
             _ => return Ok(ExitCode::SUCCESS),
         }
     }
+}
+#[cfg(not(target_arch = "x86_64"))]
+fn print_x86_64_only_feature_disabled() {
+    println!("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.");
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
     if !Path::new(FILE_NAME).try_exists()? {
@@ -240,25 +245,25 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
     mutex.lock().map_err(|_| Box::from(context_msg))
 }
-fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<(u64, RandomDataSet)> {
-    let (num_64, data) = generate_random_data()?;
-    let mut file_buffer = [0; BUFFER_SIZE];
-    let file_len = format_data_into_buffer(&data, &mut file_buffer, false)?;
+fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<u64> {
+    let data = generate_random_data()?;
+    let num_64 = data.num_64;
+    let mut buffer = [0u8; BUFFER_SIZE];
+    let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        write_buffer_to_file_guard(&mut file_guard, &file_buffer[..file_len])?;
+        write_buffer_to_file_guard(&mut file_guard, &buffer[..file_len])?;
         file_guard.flush()?
     }
     if *IS_TERMINAL {
-        let mut console_buffer = [0; BUFFER_SIZE];
-        let console_len = format_data_into_buffer(&data, &mut console_buffer, true)?;
-        write_slice_to_console(&console_buffer[..console_len])?
+        let console_len = format_data_into_buffer(&data, &mut buffer, true)?;
+        write_slice_to_console(&buffer[..console_len])?
     } else {
-        write_slice_to_console(&file_buffer[..file_len])?
+        write_slice_to_console(&buffer[..file_len])?
     }
-    Ok((num_64, data))
+    Ok(num_64)
 }
-fn generate_random_data() -> Result<(u64, RandomDataSet)> {
+fn generate_random_data() -> Result<RandomDataSet> {
     let num = get_hardware_random()?;
     let mut data = RandomDataSet {
         num_64: num,
@@ -352,7 +357,7 @@ fn generate_random_data() -> Result<(u64, RandomDataSet)> {
                 _ => num >> (36 - (i as u8 - 4) * 4),
             } & 0xF) as usize]
         });
-    Ok((num, data))
+    Ok(data)
 }
 fn get_hardware_random() -> Result<u64> {
     match *RNG_SOURCE {
@@ -515,7 +520,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
 }
 fn format_data_into_buffer(
     data: &RandomDataSet,
-    buffer: &mut [u8],
+    buffer: &mut [u8; BUFFER_SIZE],
     use_colors: bool,
 ) -> Result<usize> {
     let mut slice = &mut buffer[..];
@@ -677,7 +682,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     const MAX_PLAYERS: usize = 512;
     let n: usize;
     let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-    let mut result_input_buffer = String::new();
+    let mut result_input_buffer = String::with_capacity(256);
     let players_prompt =
         format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): ");
     loop {
@@ -834,21 +839,12 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
         }
     }
 }
-fn generate_and_send_random_data(
-    sender: &SyncSender<([u8; BUFFER_SIZE], usize)>,
-    reuse_buffer: &mut [u8; BUFFER_SIZE],
-) -> Result<()> {
-    let (_, data) = generate_random_data()?;
-    let len = format_data_into_buffer(&data, reuse_buffer, false)?;
-    sender.send((*reuse_buffer, len))?;
-    Ok(())
-}
 fn regenerate_multiple(
     file_mutex: &Mutex<BufWriter<File>>,
     input_buffer: &mut String,
 ) -> Result<u64> {
+    let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
     let requested_count: u64 = loop {
-        let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
         match read_line_reuse(count_prompt, input_buffer)?.parse::<u64>() {
             Ok(0) => eprintln!("1 이상의 값을 입력해 주세요."),
             Ok(n) => break n,
@@ -857,26 +853,39 @@ fn regenerate_multiple(
     };
     if requested_count == 1 {
         ensure_file_exists_and_reopen(file_mutex)?;
-        return process_single_random_data(file_mutex).map(|(num, _)| num);
+        return process_single_random_data(file_mutex);
     }
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
-    let (sender, receiver) =
-        sync_channel::<([u8; BUFFER_SIZE], usize)>((multi_thread_count as usize).clamp(1, 32768));
+    let max_threads = available_parallelism().map_or(4, |n| n.get());
+    let calculated_thread_count = multi_thread_count.min(max_threads as u64).max(1) as usize;
     let start_time = Instant::now();
+    let in_flight_buffers = calculated_thread_count.saturating_mul(BUFFERS_PER_WORKER);
+    let (sender, receiver) = sync_channel::<(DataBuffer, usize, usize)>(in_flight_buffers);
+    let mut buffer_return_txs = Vec::with_capacity(calculated_thread_count);
+    let mut buffer_return_rxs = Vec::with_capacity(calculated_thread_count);
+    for _ in 0..calculated_thread_count {
+        let (tx, rx) = sync_channel::<DataBuffer>(BUFFERS_PER_WORKER);
+        for _ in 0..BUFFERS_PER_WORKER {
+            tx.send(Box::new([0u8; BUFFER_SIZE]))?;
+        }
+        buffer_return_txs.push(tx);
+        buffer_return_rxs.push(rx);
+    }
     let completed = AtomicU64::new(0);
-    let mut last_generated_num: Option<u64> = None;
-    let mut last_generated_data: Option<RandomDataSet> = None;
-    scope(|s| -> Result<()> {
-        let writer_thread = s.spawn(move || -> Result<(u64, RandomDataSet)> {
+    let final_data = scope(|s| -> Result<RandomDataSet> {
+        let buffer_return_txs = buffer_return_txs;
+        let writer_thread = s.spawn(move || -> Result<RandomDataSet> {
             let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
-            while let Ok((data_buffer, data_len)) = receiver.recv() {
+            while let Ok((data_buffer, data_len, worker_idx)) = receiver.recv() {
                 write_buffer_to_file_guard(&mut file_guard, &data_buffer[..data_len])?;
-                while let Ok((more_buffer, more_len)) = receiver.try_recv() {
-                    write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?
+                let _ = buffer_return_txs[worker_idx].send(data_buffer);
+                while let Ok((more_buffer, more_len, more_worker_idx)) = receiver.try_recv() {
+                    write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?;
+                    let _ = buffer_return_txs[more_worker_idx].send(more_buffer);
                 }
             }
-            let (final_num_64, final_data) = generate_random_data()?;
+            let final_data = generate_random_data()?;
             let mut final_buffer_file = [0u8; BUFFER_SIZE];
             let final_bytes_written_file =
                 format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
@@ -885,16 +894,20 @@ fn regenerate_multiple(
                 &final_buffer_file[..final_bytes_written_file],
             )?;
             file_guard.flush()?;
-            Ok((final_num_64, final_data))
+            Ok(final_data)
         });
         let completed_ref = &completed;
         let progress_thread: Option<ScopedJoinHandle<Result<()>>> = if *IS_TERMINAL {
             Some(s.spawn(move || -> Result<()> {
                 let mut elapsed_buf = [0u8; 16];
                 let mut eta_buf = [0u8; 16];
-                while completed_ref.load(Ordering::Relaxed) < multi_thread_count {
+                loop {
+                    let completed_now = completed_ref.load(Ordering::Relaxed);
+                    if completed_now >= multi_thread_count {
+                        break;
+                    }
                     print_progress(
-                        completed_ref.load(Ordering::Relaxed),
+                        completed_now,
                         requested_count,
                         &start_time,
                         &mut elapsed_buf,
@@ -907,48 +920,82 @@ fn regenerate_multiple(
         } else {
             None
         };
-        let calculated_thread_count =
-            (multi_thread_count as usize).min(available_parallelism().map_or(4, |n| n.get()));
-        if calculated_thread_count > 0 {
-            let base_count = multi_thread_count / calculated_thread_count as u64;
-            let remainder = multi_thread_count % calculated_thread_count as u64;
-            for i in 0..calculated_thread_count {
-                let sender_clone = sender.clone();
-                s.spawn(move || -> Result<()> {
-                    let loop_count = base_count + if (i as u64) < remainder { 1 } else { 0 };
-                    let mut reuse_buffer = [0u8; BUFFER_SIZE];
-                    for _ in 0..loop_count {
-                        if generate_and_send_random_data(&sender_clone, &mut reuse_buffer).is_ok() {
+        let base_count = multi_thread_count / calculated_thread_count as u64;
+        let remainder = multi_thread_count % calculated_thread_count as u64;
+        for (i, return_rx) in buffer_return_rxs.into_iter().enumerate() {
+            let sender_clone = sender.clone();
+            s.spawn(move || -> Result<()> {
+                let loop_count = base_count + if (i as u64) < remainder { 1 } else { 0 };
+                let mut local_pool = Vec::with_capacity(BUFFERS_PER_WORKER);
+                for _ in 0..BUFFERS_PER_WORKER {
+                    match return_rx.try_recv() {
+                        Ok(buf) => local_pool.push(buf),
+                        Err(TryRecvError::Empty) => break,
+                        Err(TryRecvError::Disconnected) => return Ok(()),
+                    }
+                }
+                for _ in 0..loop_count {
+                    let mut buffer = match local_pool.pop() {
+                        Some(buf) => buf,
+                        None => match return_rx.recv() {
+                            Ok(buf) => buf,
+                            Err(_) => break,
+                        },
+                    };
+                    let len = match generate_random_data() {
+                        Ok(data) => match format_data_into_buffer(&data, buffer.as_mut(), false) {
+                            Ok(len) => len,
+                            Err(_) => {
+                                local_pool.push(buffer);
+                                continue;
+                            }
+                        },
+                        Err(_) => {
+                            local_pool.push(buffer);
+                            continue;
+                        }
+                    };
+                    match sender_clone.send((buffer, len, i)) {
+                        Ok(()) => {
                             completed_ref.fetch_add(1, Ordering::Relaxed);
+                            while local_pool.len() < BUFFERS_PER_WORKER {
+                                match return_rx.try_recv() {
+                                    Ok(buf) => local_pool.push(buf),
+                                    Err(TryRecvError::Empty) => break,
+                                    Err(TryRecvError::Disconnected) => break,
+                                }
+                            }
+                        }
+                        Err(send_err) => {
+                            let (_returned_buffer, _, _) = send_err.0;
+                            break;
                         }
                     }
-                    Ok(())
-                });
-            }
+                }
+                Ok(())
+            });
         }
         drop(sender);
         if let Some(handle) = progress_thread {
             join_thread(handle, "진행률 스레드 패닉 발생")?
         }
-        let (num, data) = join_thread(writer_thread, "쓰기 스레드 패닉 발생")?;
-        last_generated_num = Some(num);
-        last_generated_data = Some(data);
-        Ok(())
+        join_thread(writer_thread, "쓰기 스레드 패닉 발생")
     })?;
+    let mut elapsed_buf = [0u8; 16];
+    let mut eta_buf = [0u8; 16];
     print_progress(
         requested_count,
         requested_count,
         &start_time,
-        &mut [0u8; 16],
-        &mut [0u8; 16],
+        &mut elapsed_buf,
+        &mut eta_buf,
     )?;
     println!("\n총 {requested_count}개의 데이터 생성 완료 ({FILE_NAME} 저장됨).\n");
     stdout().flush()?;
-    let final_data = last_generated_data.ok_or("최종 데이터를 가져오지 못했습니다.")?;
     let mut buffer = [0u8; BUFFER_SIZE];
     let bytes_written = format_data_into_buffer(&final_data, &mut buffer, *IS_TERMINAL)?;
     write_slice_to_console(&buffer[..bytes_written])?;
-    Ok(last_generated_num.ok_or("최종 데이터의 num_64를 가져오지 못했습니다.")?)
+    Ok(final_data.num_64)
 }
 fn print_progress(
     completed: u64,
@@ -1008,6 +1055,5 @@ fn format_time_into(seconds: f64, buf: &mut [u8]) -> IoRst<usize> {
     Ok(7)
 }
 fn join_thread<T>(handle: ScopedJoinHandle<'_, Result<T>>, panic_msg: &'static str) -> Result<T> {
-    let join_err = ioErr::other(panic_msg);
-    handle.join().map_err(|_| join_err)?
+    handle.join().map_err(|_| ioErr::other(panic_msg))?
 }
