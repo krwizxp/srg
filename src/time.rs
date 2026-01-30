@@ -233,8 +233,7 @@ impl ServerTime {
         let old_rtt_nanos = self.baseline_rtt.as_nanos();
         let new_rtt_nanos = new_rtt.as_nanos();
         let smoothed_rtt_nanos = (old_rtt_nanos * 7 + new_rtt_nanos * 3) / 10;
-        let capped = smoothed_rtt_nanos.min(u128::from(u64::MAX));
-        let smoothed_rtt = Duration::from_nanos(capped as u64);
+        let smoothed_rtt = Duration::from_nanos_u128(smoothed_rtt_nanos);
         ServerTime {
             baseline_rtt: smoothed_rtt,
             ..self.clone()
@@ -298,6 +297,10 @@ struct AppState {
     target_time: Option<SystemTime>,
     server_time: Option<ServerTime>,
     baseline_rtt: Option<Duration>,
+    baseline_rtt_samples: [TimeSample; NUM_SAMPLES],
+    baseline_rtt_attempts: usize,
+    baseline_rtt_valid_count: usize,
+    baseline_rtt_next_sample_at: Instant,
     next_full_sync_at: Instant,
     last_sample: Option<TimeSample>,
     trigger_action: Option<TriggerAction>,
@@ -318,6 +321,7 @@ struct NetworkContext {
     curl_stderr_buf: String,
 }
 static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("curl"));
+static TCP_TIMEOUT_SECS_STR: LazyLock<String> = LazyLock::new(|| TCP_TIMEOUT_SECS.to_string());
 #[cfg(target_os = "linux")]
 static XDO_TOOL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("xdotool"));
 fn is_curl_available() -> bool {
@@ -396,12 +400,21 @@ impl AppState {
         } else {
             None
         };
+        let baseline_placeholder = TimeSample {
+            response_received_inst: Instant::now(),
+            rtt: Duration::ZERO,
+            server_time: UNIX_EPOCH,
+        };
         Ok(AppState {
             host,
             target_time,
             trigger_action,
             server_time: None,
             baseline_rtt: None,
+            baseline_rtt_samples: [baseline_placeholder; NUM_SAMPLES],
+            baseline_rtt_attempts: 0,
+            baseline_rtt_valid_count: 0,
+            baseline_rtt_next_sample_at: Instant::now(),
             next_full_sync_at: Instant::now(),
             last_sample: None,
             live_rtt: None,
@@ -452,12 +465,12 @@ impl AppState {
             let now = Instant::now();
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
                 if let Some(st) = &self.server_time {
-                    print!("\r서버 시간: ");
+                    write!(&mut stdout_handle, "\r서버 시간: ")?;
                     if let Err(e) = st.current_display_time(&mut stdout_handle, true) {
-                        print!("시간 표시 오류: {e}")
+                        write!(&mut stdout_handle, "시간 표시 오류: {e}")?
                     }
-                    print!(" \r");
-                    stdout_handle.flush()?
+                    write!(&mut stdout_handle, " \r")?;
+                    stdout_handle.flush()?;
                 }
                 last_display_update = now
             }
@@ -490,35 +503,55 @@ impl AppState {
         msg_buf: &'a mut String,
         net_ctx: &mut NetworkContext,
     ) -> (Activity, Option<&'a str>) {
-        if self.last_sample.is_none() {
-            println!("1단계: RTT 기준값 측정을 시작합니다...")
-        }
-        let placeholder = TimeSample {
-            response_received_inst: Instant::now(),
-            rtt: Duration::ZERO,
-            server_time: UNIX_EPOCH,
-        };
-        let mut samples = [placeholder; NUM_SAMPLES];
-        let mut sample_count = 0;
-        for sample_slot in &mut samples {
-            match fetch_server_time_sample(&self.host, net_ctx) {
-                Ok(sample) if sample.rtt > Duration::ZERO => {
-                    *sample_slot = sample;
-                    sample_count += 1;
-                    self.last_sample = Some(sample)
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    let _ = write!(msg_buf, "RTT 샘플 수집 실패: {e}");
-                    return transition_to_retry(msg_buf);
-                }
+        if self.baseline_rtt_attempts == 0 {
+            if self.last_sample.is_none() {
+                println!("1단계: RTT 기준값 측정을 시작합니다...")
             }
-            thread::sleep(Duration::from_millis(ADAPTIVE_POLL_MILLIS))
+            let placeholder = TimeSample {
+                response_received_inst: Instant::now(),
+                rtt: Duration::ZERO,
+                server_time: UNIX_EPOCH,
+            };
+            self.baseline_rtt_samples = [placeholder; NUM_SAMPLES];
+            self.baseline_rtt_valid_count = 0;
+            self.baseline_rtt_next_sample_at = Instant::now();
         }
+        if Instant::now() < self.baseline_rtt_next_sample_at {
+            return (Activity::MeasureBaselineRtt, None);
+        }
+        let attempt_index = self.baseline_rtt_attempts;
+        match fetch_server_time_sample(&self.host, net_ctx) {
+            Ok(sample) if sample.rtt > Duration::ZERO => {
+                self.baseline_rtt_samples[attempt_index] = sample;
+                self.baseline_rtt_valid_count += 1;
+                self.last_sample = Some(sample);
+            }
+            Ok(_) => {}
+            Err(e) => {
+                self.baseline_rtt_attempts = 0;
+                self.baseline_rtt_valid_count = 0;
+                let _ = write!(msg_buf, "RTT 샘플 수집 실패: {e}");
+                return transition_to_retry(msg_buf);
+            }
+        }
+        self.baseline_rtt_attempts = attempt_index + 1;
+        self.baseline_rtt_next_sample_at =
+            Instant::now() + Duration::from_millis(ADAPTIVE_POLL_MILLIS);
+        if self.baseline_rtt_attempts < NUM_SAMPLES {
+            return (Activity::MeasureBaselineRtt, None);
+        }
+        let sample_count = self.baseline_rtt_valid_count;
+        self.baseline_rtt_attempts = 0;
+        self.baseline_rtt_valid_count = 0;
         if sample_count == 0 {
             return transition_to_retry("유효한 RTT 샘플을 얻지 못했습니다.");
         }
-        let total_rtt: Duration = samples.iter().take(sample_count).map(|s| s.rtt).sum();
+        let total_rtt: Duration = self
+            .baseline_rtt_samples
+            .iter()
+            .take(sample_count)
+            .map(|s| s.rtt)
+            .sum();
         let avg_rtt = total_rtt / (sample_count as u32);
         self.baseline_rtt = Some(avg_rtt);
         self.calibration_failure_count = 0;
@@ -641,7 +674,7 @@ impl AppState {
             * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM - FINAL_COUNTDOWN_RTT_ALPHA_NUM)
             + sample.rtt.as_nanos() * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_NUM))
             / u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM);
-        let live_rtt = Duration::from_nanos(new_rtt_nanos as u64);
+        let live_rtt = Duration::from_nanos_u128(new_rtt_nanos);
         self.live_rtt = Some(live_rtt);
         let effective_rtt = live_rtt.max(sample.rtt);
         let one_way_delay = effective_rtt / 2;
@@ -785,16 +818,16 @@ fn fetch_server_time_sample_curl(
 ) -> Result<TimeSample> {
     net_ctx.curl_stderr_buf.clear();
     let time_before_curl_call_inst = Instant::now();
-    let timeout_str = TCP_TIMEOUT_SECS.to_string();
+    let timeout_str = TCP_TIMEOUT_SECS_STR.as_str();
     let output = Command::new("curl")
         .args([
             "-sI",
             "--ssl-no-revoke",
             "-L",
             "--max-time",
-            &timeout_str,
+            timeout_str,
             "--connect-timeout",
-            &timeout_str,
+            timeout_str,
             "-w",
             "\n%{time_starttransfer}",
             url_str,
@@ -960,19 +993,28 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     let year = year_str
         .parse::<i32>()
         .map_err(|_| Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
-    let mut time_parts = time_str.split(':');
-    let mut expect_time =
-        |msg: &'static str| time_parts.next().ok_or(Error::Parse(Cow::Borrowed(msg)));
-    let h = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
-        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let m = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
-        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let s = parse_u32_digits(expect_time(ERR_TIME_FMT)?)
-        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let mb = month_str.as_bytes();
-    if mb.len() < 3 {
-        return Err(Error::Parse(Cow::Borrowed(ERR_MONTH)));
+    #[inline]
+    fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
+        if d0.is_ascii_digit() && d1.is_ascii_digit() {
+            Some(((d0 - b'0') as u32) * 10 + (d1 - b'0') as u32)
+        } else {
+            None
+        }
     }
+    let time_bytes = time_str.as_bytes();
+    let t = time_bytes
+        .as_array::<8>()
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    if t[2] != b':' || t[5] != b':' {
+        return Err(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)));
+    }
+    let h = parse_two_digits(t[0], t[1]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let m = parse_two_digits(t[3], t[4]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let s = parse_two_digits(t[6], t[7]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let mb = month_str
+        .as_bytes()
+        .as_array::<3>()
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_MONTH)))?;
     let a = mb[0].to_ascii_lowercase();
     let b = mb[1].to_ascii_lowercase();
     let c = mb[2].to_ascii_lowercase();

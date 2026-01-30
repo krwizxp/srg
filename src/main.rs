@@ -4,7 +4,6 @@ use std::{
     array,
     char::from_u32,
     error::Error,
-    fmt::{Display, Formatter, Result as fmtResult},
     fs::File,
     io::{BufWriter, Error as ioErr, IsTerminal, Result as IoRst, Write, stdin, stdout},
     is_x86_feature_detected,
@@ -138,30 +137,6 @@ impl RandomBitBuffer {
             value: get_hardware_random()?,
             bits_remaining: 64,
         })
-    }
-}
-struct HexCodeFormatter<'a> {
-    data: &'a RandomDataSet,
-    use_colors: bool,
-}
-impl Display for HexCodeFormatter<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmtResult {
-        let v = self.data.num_64;
-        let r = (v >> 56) as u8;
-        let g = (v >> 48) as u8;
-        let b = (v >> 40) as u8;
-        let r2 = (v >> 32) as u8;
-        let g2 = (v >> 24) as u8;
-        let b2 = (v >> 16) as u8;
-        let (hex1, hex2) = ((v >> 40) & 0xFF_FFFF, (v >> 16) & 0xFF_FFFF);
-        if self.use_colors {
-            write!(
-                f,
-                "{RGB_PREFIX}{r};{g};{b}{SGR_SUFFIX}#{hex1:06X}{COLOR_RESET} {RGB_PREFIX}{r2};{g2};{b2}{SGR_SUFFIX}#{hex2:06X}{COLOR_RESET}",
-            )
-        } else {
-            write!(f, "#{hex1:06X} #{hex2:06X}")
-        }
     }
 }
 fn main() -> Result<ExitCode> {
@@ -557,6 +532,8 @@ fn format_output<W: Write>(writer: &mut W, data: &RandomDataSet, use_colors: boo
     let b5 = (v >> 16) as u8;
     let b6 = (v >> 8) as u8;
     let b7 = v as u8;
+    let hex1 = (v >> 40) & 0xFF_FFFF;
+    let hex2 = (v >> 16) & 0xFF_FFFF;
     write!(
         writer,
         concat!(
@@ -598,7 +575,16 @@ fn format_output<W: Write>(writer: &mut W, data: &RandomDataSet, use_colors: boo
         b5,
         b6,
         b7,
-        HexCodeFormatter { data, use_colors },
+        std::fmt::from_fn(|f| {
+            if use_colors {
+                write!(
+                    f,
+                    "{RGB_PREFIX}{b0};{b1};{b2}{SGR_SUFFIX}#{hex1:06X}{COLOR_RESET} {RGB_PREFIX}{b3};{b4};{b5}{SGR_SUFFIX}#{hex2:06X}{COLOR_RESET}",
+                )
+            } else {
+                write!(f, "#{hex1:06X} #{hex2:06X}")
+            }
+        }),
         data.numeric_password,
         data.password[0],
         data.password[1],
@@ -848,11 +834,13 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
         }
     }
 }
-fn generate_and_send_random_data(sender: &SyncSender<([u8; BUFFER_SIZE], usize)>) -> Result<()> {
+fn generate_and_send_random_data(
+    sender: &SyncSender<([u8; BUFFER_SIZE], usize)>,
+    reuse_buffer: &mut [u8; BUFFER_SIZE],
+) -> Result<()> {
     let (_, data) = generate_random_data()?;
-    let mut buffer = [0; BUFFER_SIZE];
-    let len = format_data_into_buffer(&data, &mut buffer, false)?;
-    sender.send((buffer, len))?;
+    let len = format_data_into_buffer(&data, reuse_buffer, false)?;
+    sender.send((*reuse_buffer, len))?;
     Ok(())
 }
 fn regenerate_multiple(
@@ -902,13 +890,15 @@ fn regenerate_multiple(
         let completed_ref = &completed;
         let progress_thread: Option<ScopedJoinHandle<Result<()>>> = if *IS_TERMINAL {
             Some(s.spawn(move || -> Result<()> {
+                let mut elapsed_buf = [0u8; 16];
+                let mut eta_buf = [0u8; 16];
                 while completed_ref.load(Ordering::Relaxed) < multi_thread_count {
                     print_progress(
                         completed_ref.load(Ordering::Relaxed),
                         requested_count,
                         &start_time,
-                        &mut [0u8; 16],
-                        &mut [0u8; 16],
+                        &mut elapsed_buf,
+                        &mut eta_buf,
                     )?;
                     sleep(Duration::from_millis(100))
                 }
@@ -926,8 +916,9 @@ fn regenerate_multiple(
                 let sender_clone = sender.clone();
                 s.spawn(move || -> Result<()> {
                     let loop_count = base_count + if (i as u64) < remainder { 1 } else { 0 };
+                    let mut reuse_buffer = [0u8; BUFFER_SIZE];
                     for _ in 0..loop_count {
-                        if generate_and_send_random_data(&sender_clone).is_ok() {
+                        if generate_and_send_random_data(&sender_clone, &mut reuse_buffer).is_ok() {
                             completed_ref.fetch_add(1, Ordering::Relaxed);
                         }
                     }
@@ -954,15 +945,9 @@ fn regenerate_multiple(
     println!("\n총 {requested_count}개의 데이터 생성 완료 ({FILE_NAME} 저장됨).\n");
     stdout().flush()?;
     let final_data = last_generated_data.ok_or("최종 데이터를 가져오지 못했습니다.")?;
-    if *IS_TERMINAL {
-        let mut buffer = [0; BUFFER_SIZE];
-        let bytes_written_console = format_data_into_buffer(&final_data, &mut buffer, true)?;
-        write_slice_to_console(&buffer[..bytes_written_console])?
-    } else {
-        let mut buffer = [0; BUFFER_SIZE];
-        let bytes_written_file = format_data_into_buffer(&final_data, &mut buffer, false)?;
-        write_slice_to_console(&buffer[..bytes_written_file])?
-    }
+    let mut buffer = [0u8; BUFFER_SIZE];
+    let bytes_written = format_data_into_buffer(&final_data, &mut buffer, *IS_TERMINAL)?;
+    write_slice_to_console(&buffer[..bytes_written])?;
     Ok(last_generated_num.ok_or("최종 데이터의 num_64를 가져오지 못했습니다.")?)
 }
 fn print_progress(

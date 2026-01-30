@@ -1534,7 +1534,6 @@
     const CC_RI = "리".charCodeAt(0);
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
-    const RX_RE_ESCAPE = /[.*+?^${}()|[\]\\]/g;
     const RX_SIGUNGU_STRIP_CACHE = new Map();
     const csvEsc = (s) => {
       s = String(s ?? "");
@@ -1551,9 +1550,7 @@
           s = s.replaceAll('"', '""');
           return `"${s}"`;
         }
-        if (!needsQuote && (c === 44 || c === 10 || c === 13)) {
-          needsQuote = true;
-        }
+        if (!needsQuote && (c === 44 || c === 10 || c === 13)) needsQuote = true;
       }
       return needsQuote ? `"${s}"` : s;
     };
@@ -1568,6 +1565,7 @@
     };
     const EVT_CAPTURE = { capture: true };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
+    const EVT_ONCE = { once: true };
     const FETCH_HEADERS = { Accept: "application/json" };
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
@@ -1581,6 +1579,7 @@
       document.querySelectorAll("#map-popover-links a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
+    let mapHasRound6 = false;
     const RX_MAP_TOKEN = /{lat}|{lon}/g;
     for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
       const a = mapAnchors[i];
@@ -1596,46 +1595,74 @@
         last = idx + m[0].length;
       }
       if (last < template.length) parts.push(template.slice(last));
+      const round6 = key === "Naver";
+      if (round6) mapHasRound6 = true;
+      let build;
+      if (parts.length === 4) {
+        const p0 = parts[0];
+        const t1 = parts[1];
+        const p2 = parts[2];
+        const t3 = parts[3];
+        build = round6
+          ? (lat, lon, lat6, lon6) =>
+            p0 + (t1 === 0 ? lat6 : lon6) + p2 + (t3 === 0 ? lat6 : lon6)
+          : (lat, lon) =>
+            p0 + (t1 === 0 ? lat : lon) + p2 + (t3 === 0 ? lat : lon);
+      } else if (parts.length === 8) {
+        const p0 = parts[0];
+        const t1 = parts[1];
+        const p2 = parts[2];
+        const t3 = parts[3];
+        const p4 = parts[4];
+        const t5 = parts[5];
+        const p6 = parts[6];
+        const t7 = parts[7];
+        build = round6
+          ? (lat, lon, lat6, lon6) =>
+            p0 +
+            (t1 === 0 ? lat6 : lon6) +
+            p2 +
+            (t3 === 0 ? lat6 : lon6) +
+            p4 +
+            (t5 === 0 ? lat6 : lon6) +
+            p6 +
+            (t7 === 0 ? lat6 : lon6)
+          : (lat, lon) =>
+            p0 +
+            (t1 === 0 ? lat : lon) +
+            p2 +
+            (t3 === 0 ? lat : lon) +
+            p4 +
+            (t5 === 0 ? lat : lon) +
+            p6 +
+            (t7 === 0 ? lat : lon);
+      } else {
+        build = round6
+          ? (lat, lon, lat6, lon6) => {
+            lat = lat6;
+            lon = lon6;
+            let out = "";
+            for (let i = 0; i < parts.length; i++) {
+              const p = parts[i];
+              out += p === 0 ? lat : p === 1 ? lon : p;
+            }
+            return out;
+          }
+          : (lat, lon) => {
+            let out = "";
+            for (let i = 0; i < parts.length; i++) {
+              const p = parts[i];
+              out += p === 0 ? lat : p === 1 ? lon : p;
+            }
+            return out;
+          };
+      }
       MAP_LINKS[i] = {
         key,
-        parts,
-        round6: key === "Naver",
+        build,
       };
     }
-    const MAP_HAS_ROUND6 = MAP_LINKS.some((l) => l.round6);
-    function buildMapHref(link, lat, lon, lat6, lon6) {
-      if (link.round6) {
-        lat = lat6;
-        lon = lon6;
-      }
-      const parts = link.parts;
-      switch (parts.length) {
-        case 4:
-          return (
-            parts[0] +
-            (parts[1] === 0 ? lat : lon) +
-            parts[2] +
-            (parts[3] === 0 ? lat : lon)
-          );
-        case 8:
-          return (
-            parts[0] +
-            (parts[1] === 0 ? lat : lon) +
-            parts[2] +
-            (parts[3] === 0 ? lat : lon) +
-            parts[4] +
-            (parts[5] === 0 ? lat : lon) +
-            parts[6] +
-            (parts[7] === 0 ? lat : lon)
-          );
-      }
-      let out = "";
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        out += (p === 0) ? lat : (p === 1) ? lon : p;
-      }
-      return out;
-    }
+    const MAP_HAS_ROUND6 = mapHasRound6;
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
     document.addEventListener("command", (e) => {
@@ -1646,22 +1673,26 @@
       LAST_MAP_INVOKER = btn;
       if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
-      const ds = btn.dataset;
-      if (ds.lat && ds.lon) updateMapPopoverLinks(ds);
+      updateMapPopoverFromInvoker(btn);
     }, EVT_CAPTURE);
-    function updateMapPopoverLinks(ds) {
-      const lat = ds.lat;
-      const lon = ds.lon;
+    function updateMapPopoverFromInvoker(invoker) {
+      const idxStr = invoker.dataset.idx;
+      if (!idxStr) return;
+      const r = AppState.records[idxStr | 0];
+      if (!r) return;
+      const lat = r.latStr;
+      const lon = r.lonStr;
+      if (!lat || !lon) return;
       let lat6 = null;
       let lon6 = null;
       if (MAP_HAS_ROUND6) {
-        lat6 = ds.lat6;
-        if (lat6 == null) ds.lat6 = lat6 = fmtCoord6(lat);
-        lon6 = ds.lon6;
-        if (lon6 == null) ds.lon6 = lon6 = fmtCoord6(lon);
+        lat6 = r.lat6;
+        if (lat6 == null) r.lat6 = lat6 = fmtCoord6(lat);
+        lon6 = r.lon6;
+        if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
       }
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        mapAnchors[i].href = buildMapHref(MAP_LINKS[i], lat, lon, lat6, lon6);
+        mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
       }
     }
     function closeMapPopover() {
@@ -1689,8 +1720,7 @@
         document.activeElement instanceof HTMLElement ? document.activeElement : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
       if (!invoker || !invoker.isConnected) return;
-      const ds = invoker.dataset;
-      if (ds.lat && ds.lon) updateMapPopoverLinks(ds);
+      updateMapPopoverFromInvoker(invoker);
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -1719,43 +1749,6 @@
       while (end && s.charCodeAt(end - 1) === 48) end--;
       if (end && s.charCodeAt(end - 1) === 46) end--;
       return end === s.length ? s : s.slice(0, end);
-    };
-    const addrVal = (key) => (r) => r.addr?.[key];
-    const BASE_COL_CONFIG = {
-      kind: {
-        val: (r) => r.set,
-      },
-      idx: {
-        val: (r) => r.idx,
-      },
-      coords: {
-        val: (r) => `${r.latStr}, ${r.lonStr}`,
-      },
-      sido: { val: addrVal("sido") },
-      sigungu: { val: addrVal("sigungu") },
-      emd: { val: addrVal("eupmyeon") },
-      tag: { val: addrVal("tag") },
-      fullAddr: {
-        val: (r) => r.fullAddr,
-      },
-      maps: {
-        noCsv: true,
-        render: (_, td, r) => {
-          const btn = td.lastElementChild;
-          if (!(btn instanceof HTMLButtonElement)) return;
-          btn.dataset.lat = r.latStr;
-          btn.dataset.lon = r.lonStr;
-          btn.disabled = false;
-          const skeleton = td.firstElementChild;
-          if (
-            skeleton &&
-            skeleton !== btn &&
-            skeleton.classList.contains("skeleton-bar")
-          ) {
-            skeleton.remove();
-          }
-        },
-      },
     };
     const tbl = document.getElementById("tbl");
     const domElements = {
@@ -1891,26 +1884,45 @@
     }
     clearScrollShadowState(domElements.tableWrap);
     clearScrollShadowState(domElements.coords);
-    const ACTIVE_SCROLL = new Set();
+    let SCROLL_ACTIVE = false;
+    let SCROLL_LAST_TS = 0;
+    let SCROLL_IDLE_RAF = 0;
+    const SCROLL_IDLE_MS = 120;
     const setGlobalScrolling = (on) => {
       root.classList.toggle("scrolling", on);
     };
     const resetScrollState = () => {
       setGlobalScrolling(false);
-      ACTIVE_SCROLL.clear();
-    };
-    const COL_DEFS = Array.from(
-      document.querySelectorAll("#tbl thead th"),
-      (th) => {
-        const key = th.dataset.colKey;
-        return {
-          key,
-          label: th.textContent.trim(),
-          ...(BASE_COL_CONFIG[key] || {}),
-        };
+      SCROLL_ACTIVE = false;
+      SCROLL_LAST_TS = 0;
+      if (SCROLL_IDLE_RAF) {
+        cancelAnimationFrame(SCROLL_IDLE_RAF);
+        SCROLL_IDLE_RAF = 0;
       }
-    );
-    const IDX_COL_INDEX = COL_DEFS.findIndex((c) => c.key === "idx");
+    };
+    const checkScrollIdle = () => {
+      if (!SCROLL_ACTIVE) {
+        SCROLL_IDLE_RAF = 0;
+        return;
+      }
+      if (performance.now() - SCROLL_LAST_TS >= SCROLL_IDLE_MS) {
+        SCROLL_IDLE_RAF = 0;
+        SCROLL_ACTIVE = false;
+        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
+        setGlobalScrolling(false);
+        return;
+      }
+      SCROLL_IDLE_RAF = requestAnimationFrame(checkScrollIdle);
+    };
+    const KIND_COL_INDEX = 0;
+    const IDX_COL_INDEX = 1;
+    const COORDS_COL_INDEX = 2;
+    const SIDO_COL_INDEX = 3;
+    const SIGUNGU_COL_INDEX = 4;
+    const EMD_COL_INDEX = 5;
+    const TAG_COL_INDEX = 6;
+    const FULLADDR_COL_INDEX = 7;
+    const MAPS_COL_INDEX = 8;
     const SKELETON_TEMPLATE =
       document.getElementById("tmpl-row-skeleton").content.querySelector("tr");
     const ROW_TEMPLATE =
@@ -1918,13 +1930,24 @@
     const RX_COMMA_WS = /\s*,\s*/g;
     const RX_WS = /\s+/g;
     const norm = (s) => {
-      s = String(s ?? "").trim().toLowerCase();
+      if (s == null) return "";
+      if (typeof s !== "string") s = String(s);
+      s = s.trim();
+      if (!s) return "";
+      s = s.toLowerCase();
       return s.indexOf(",") !== -1 ? s.replace(RX_COMMA_WS, ",") : s;
     };
     const HIDDEN_UNTIL_FOUND = "until-found";
     let FIND_REHIDE_TIMER = null;
     let FIND_REVEAL_ACTIVE = false;
     const FIND_REVEALED_ROWS = new Set();
+    function unhideUntilFoundRows() {
+      const rows = domElements.tbody.rows;
+      for (let i = 0; i < rows.length; i++) {
+        const tr = rows[i];
+        if (tr.hidden) tr.removeAttribute("hidden");
+      }
+    }
     function bumpFindRehideTimer() {
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = setTimeout(() => {
@@ -1934,44 +1957,149 @@
           startChunkedFilterApply(f);
           return;
         }
-        for (const tr of domElements.tbody.querySelectorAll(`tr[hidden="${HIDDEN_UNTIL_FOUND}"]`)) {
-          tr.removeAttribute("hidden");
-        }
+        unhideUntilFoundRows();
       }, 8000);
     }
-    const FILTER_MASK_KIND = 1;
-    const FILTER_MASK_SIDO = 2;
-    const FILTER_MASK_SIGUNGU = 4;
-    const FILTER_MASK_EMD = 8;
-    const FILTER_MASK_TAG = 16;
-    const FILTER_MASK_FULLADDR = 32;
-    const FILTER_MASK_Q = 64;
     function buildFilterSnapshot() {
-      const q = norm(domElements.filterQ.value);
-      const kind = norm(domElements.filterKind.value);
+      let q = norm(domElements.filterQ.value);
+      const kind = domElements.filterKind.value;
       const sido = norm(domElements.filterSido.value);
       const sigungu = norm(domElements.filterSigungu.value);
       const emd = norm(domElements.filterEmd.value);
       const tag = norm(domElements.filterTag.value);
       const fullAddr = norm(domElements.filterFullAddr.value);
-      let mask = 0;
-      if (kind) mask |= FILTER_MASK_KIND;
-      if (sido) mask |= FILTER_MASK_SIDO;
-      if (sigungu) mask |= FILTER_MASK_SIGUNGU;
-      if (emd) mask |= FILTER_MASK_EMD;
-      if (tag) mask |= FILTER_MASK_TAG;
-      if (fullAddr) mask |= FILTER_MASK_FULLADDR;
-      if (q) mask |= FILTER_MASK_Q;
+      let qMode = 0;
+      let q1 = "";
+      let qTokens = null;
+      if (q) {
+        const pipe = q.indexOf("|");
+        if (pipe !== -1) {
+          qMode = 2;
+          let toks = null;
+          let start = 0;
+          while (true) {
+            const end = q.indexOf("|", start);
+            const seg = (end === -1 ? q.slice(start) : q.slice(start, end)).trim();
+            if (seg) (toks ??= []).push(seg);
+            if (end === -1) break;
+            start = end + 1;
+          }
+          if (!toks) {
+            q = "";
+            qMode = 0;
+          } else if (toks.length === 1) {
+            qMode = 1;
+            q1 = toks[0];
+            qTokens = null;
+          } else {
+            qTokens = toks;
+          }
+        } else {
+          qMode = 1;
+          const s = q;
+          const n = s.length;
+          let start = -1;
+          let toks = null;
+          for (let i = 0; i <= n; i++) {
+            const c = i < n ? s.charCodeAt(i) : 32;
+            if (c <= 32) {
+              if (start !== -1) {
+                const t = s.slice(start, i);
+                if (toks) toks.push(t);
+                else q1 = t;
+                start = -1;
+              }
+            } else if (start === -1) {
+              if (!toks && q1) {
+                toks = [q1];
+                q1 = "";
+              }
+              start = i;
+            }
+          }
+          if (toks) {
+            if (toks.length === 1) {
+              q1 = toks[0];
+              qTokens = null;
+            } else {
+              qTokens = toks;
+            }
+          } else if (!q1) {
+            q = "";
+            qMode = 0;
+          }
+        }
+      }
+      if (qTokens && qTokens.length > 1) {
+        let hasDup = false;
+        outer: for (let i = 1; i < qTokens.length; i++) {
+          const t = qTokens[i];
+          for (let j = 0; j < i; j++) {
+            if (qTokens[j] === t) {
+              hasDup = true;
+              break outer;
+            }
+          }
+        }
+        if (hasDup) {
+          const out = [];
+          for (let i = 0; i < qTokens.length; i++) {
+            const t = qTokens[i];
+            let dup = false;
+            for (let j = 0; j < out.length; j++) {
+              if (out[j] === t) {
+                dup = true;
+                break;
+              }
+            }
+            if (!dup) out.push(t);
+          }
+          qTokens = out;
+        }
+        if (qTokens.length === 1) {
+          qMode = 1;
+          q1 = qTokens[0];
+          qTokens = null;
+        } else if (qMode !== 2) {
+          qTokens.sort((a, b) => b.length - a.length);
+        }
+      }
+      let qTest = null;
+      if (qMode) {
+        if (!qTokens) {
+          const needle = q1;
+          qTest = (r) => getQSearch(r).indexOf(needle) !== -1;
+        } else if (qMode === 2) {
+          const needles = qTokens;
+          qTest = (r) => {
+            const hay = getQSearch(r);
+            for (let i = 0; i < needles.length; i++) {
+              if (hay.indexOf(needles[i]) !== -1) return true;
+            }
+            return false;
+          };
+        } else {
+          const needles = qTokens;
+          qTest = (r) => {
+            const hay = getQSearch(r);
+            for (let i = 0; i < needles.length; i++) {
+              if (hay.indexOf(needles[i]) === -1) return false;
+            }
+            return true;
+          };
+        }
+      }
+      const active = !!(kind || sido || sigungu || emd || tag || fullAddr || qTest);
+      if (!active) return { active: false };
       return {
-        q,
+        active: true,
         kind,
         sido,
         sigungu,
         emd,
         tag,
         fullAddr,
-        mask,
-        active: mask !== 0,
+        qTest,
       };
     }
     let FILTER_SNAP = buildFilterSnapshot();
@@ -1983,43 +2111,72 @@
       }
       return FILTER_SNAP;
     }
-    function setRowHiddenByFilter(tr, f, r) {
-      const mask = f.mask;
-      if (!mask || (FIND_REVEAL_ACTIVE && FIND_REVEALED_ROWS.has(tr))) {
-        if (tr.hidden) tr.removeAttribute("hidden");
+    const Q_SEARCH_SEP = "\u0000";
+    const getQSearch = (r) => {
+      let s = r._q;
+      if (s != null) return s;
+      return (r._q =
+        r._f_fullAddr +
+        Q_SEARCH_SEP +
+        r._f_tag +
+        Q_SEARCH_SEP +
+        r._f_emd +
+        Q_SEARCH_SEP +
+        r._f_sigungu +
+        Q_SEARCH_SEP +
+        r._f_sido +
+        Q_SEARCH_SEP +
+        r.latStr +
+        "," +
+        r.lonStr);
+    };
+    function setRowHiddenByFilterActive(tr, wasHidden, f, r) {
+      if (FIND_REVEALED_ROWS.has(tr)) {
+        if (wasHidden) tr.removeAttribute("hidden");
         return false;
       }
-      let hide = !r || r._f_kind === undefined;
-      if (!hide) {
-        if ((mask & FILTER_MASK_KIND) && r._f_kind !== f.kind) {
-          hide = true;
-        } else if ((mask & FILTER_MASK_SIDO) && r._f_sido.indexOf(f.sido) === -1) {
-          hide = true;
-        } else if ((mask & FILTER_MASK_SIGUNGU) && r._f_sigungu.indexOf(f.sigungu) === -1) {
-          hide = true;
-        } else if ((mask & FILTER_MASK_EMD) && r._f_emd.indexOf(f.emd) === -1) {
-          hide = true;
-        } else if ((mask & FILTER_MASK_TAG) && r._f_tag.indexOf(f.tag) === -1) {
-          hide = true;
-        } else if (
-          (mask & FILTER_MASK_FULLADDR) &&
-          r._f_fullAddr.indexOf(f.fullAddr) === -1
-        ) {
-          hide = true;
-        } else if ((mask & FILTER_MASK_Q) && r._f_q.indexOf(f.q) === -1) {
-          hide = true;
-        }
-      }
-      if (!hide) {
-        if (tr.hidden) tr.removeAttribute("hidden");
-        return false;
-      }
-      if (!tr.hidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-      return true;
+      return setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r);
     }
+    function setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r) {
+      if (!r || r._f_kind === undefined) {
+        if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
+        return true;
+      }
+      const kind = f.kind;
+      const sido = f.sido;
+      const sigungu = f.sigungu;
+      const emd = f.emd;
+      const tag = f.tag;
+      const fullAddr = f.fullAddr;
+      const qTest = f.qTest;
+      let hide = false;
+      if (kind && r._f_kind !== kind) {
+        hide = true;
+      } else if (sido && r._f_sido.indexOf(sido) === -1) {
+        hide = true;
+      } else if (sigungu && r._f_sigungu.indexOf(sigungu) === -1) {
+        hide = true;
+      } else if (emd && r._f_emd.indexOf(emd) === -1) {
+        hide = true;
+      } else if (tag && r._f_tag.indexOf(tag) === -1) {
+        hide = true;
+      } else if (fullAddr && r._f_fullAddr.indexOf(fullAddr) === -1) {
+        hide = true;
+      } else if (qTest && !qTest(r)) {
+        hide = true;
+      }
+      if (hide) {
+        if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
+        return true;
+      }
+      if (wasHidden) tr.removeAttribute("hidden");
+      return false;
+    }
+    let setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
     function clearFindReveals() {
       if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
       FIND_REVEAL_ACTIVE = false;
+      setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
       FIND_REVEALED_ROWS.clear();
@@ -2052,19 +2209,26 @@
       const len = rows.length;
       if (len === 0) {
         cancelActiveFilterApply();
-        syncFilterEmptyUI(f.active, 0, 0);
+        syncFilterEmptyUI(f.active, 0, false);
+        return;
+      }
+      if (!f.active) {
+        cancelActiveFilterApply();
+        unhideUntilFoundRows();
+        syncFilterEmptyUI(false, len, true);
         return;
       }
       const records = AppState.records;
-      const setHidden = setRowHiddenByFilter;
+      const setHidden = setHiddenByFilterActiveFn;
       if (len <= 2000) {
         cancelActiveFilterApply();
-        let visible = 0;
+        let anyVisible = false;
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
-          if (tr && !setHidden(tr, f, records[i])) visible++;
+          const wasHidden = tr.hidden;
+          if (!setHidden(tr, wasHidden, f, records[i])) anyVisible = true;
         }
-        syncFilterEmptyUI(f.active, len, visible);
+        syncFilterEmptyUI(true, len, anyVisible);
         return;
       }
       const existing = FILTER_CTX.job;
@@ -2073,7 +2237,7 @@
         existing.i = 0;
         existing.len = len;
         existing.records = records;
-        existing.visible = 0;
+        existing.anyVisible = false;
         if (!existing.raf) existing.raf = requestAnimationFrame(existing.step);
         return;
       }
@@ -2085,7 +2249,7 @@
         len,
         f,
         records,
-        visible: 0,
+        anyVisible: false,
         step: () => {
           if (FILTER_CTX.job !== job) return;
           job.raf = 0;
@@ -2094,23 +2258,25 @@
           const fNow = job.f;
           const len = job.len;
           let i = job.i;
-          let visible = job.visible;
+          let anyVisible = job.anyVisible;
+          const setHidden = setHiddenByFilterActiveFn;
           const deadline = performance.now() + 8;
           let processed = 0;
           while (i < len) {
             const tr = rows[i];
-            if (tr && !setHidden(tr, fNow, records[i])) visible++;
+            const wasHidden = tr.hidden;
+            if (!setHidden(tr, wasHidden, fNow, records[i])) anyVisible = true;
             i++;
             processed++;
             if (processed >= 1500) break;
             if ((processed & 7) === 0 && performance.now() >= deadline) break;
           }
           job.i = i;
-          job.visible = visible;
+          job.anyVisible = anyVisible;
           if (i < len) {
             job.raf = requestAnimationFrame(job.step);
           } else {
-            syncFilterEmptyUI(fNow.active, len, visible);
+            syncFilterEmptyUI(true, len, anyVisible);
             FILTER_CTX.job = null;
           }
         },
@@ -2136,18 +2302,23 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, 120);
     }
-    const CSV_COLS = COL_DEFS.filter((c) => !c.noCsv);
     const CSV_ENCODER = new TextEncoder();
-    const CSV_HEADER_BYTES = CSV_ENCODER.encode(
-      "\uFEFF" +
-      [
-        ...CSV_COLS.map((c) => csvEsc(c.label)),
-        ...Array.from(
-          { length: MAP_PROVIDER_COUNT },
-          (_, i) => csvEsc(`지도링크(${MAP_LINKS[i].key})`)
-        ),
-      ].join(",")
-    );
+    const CSV_NL_BYTES = CSV_ENCODER.encode("\n");
+    const CSV_HEADER_BYTES = (() => {
+      let header = "\uFEFF";
+      header += csvEsc("구분");
+      header += "," + csvEsc("순번");
+      header += "," + csvEsc("좌표 (위도,경도)");
+      header += "," + csvEsc("시·도");
+      header += "," + csvEsc("시·군·구");
+      header += "," + csvEsc("읍·면·동·리");
+      header += "," + csvEsc("지물 태그");
+      header += "," + csvEsc("전체주소");
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        header += "," + csvEsc("지도링크(" + MAP_LINKS[i].key + ")");
+      }
+      return CSV_ENCODER.encode(header);
+    })();
     const AddressFormatter = {
       _getAdminFromGeocoding(gc, countryCode, p0, p1) {
         let level2 = "";
@@ -2621,7 +2792,7 @@
                   let rx = RX_SIGUNGU_STRIP_CACHE.get(dl);
                   if (!rx) {
                     if (RX_SIGUNGU_STRIP_CACHE.size > 4096) RX_SIGUNGU_STRIP_CACHE.clear();
-                    const esc = dl.replace(RX_RE_ESCAPE, "\\$&");
+                    const esc = RegExp.escape(dl);
                     rx = new RegExp(`(?:^|\\s+)${esc}(?:\\s+|$)`, "g");
                     RX_SIGUNGU_STRIP_CACHE.set(dl, rx);
                   }
@@ -2841,10 +3012,10 @@
       domElements.emptyHint.textContent =
         EMPTY_HINT_TEXT[kind] || EMPTY_HINT_TEXT.init;
     }
-    function syncFilterEmptyUI(active, totalRows, visibleCount) {
+    function syncFilterEmptyUI(active, totalRows, anyVisible) {
       const wrap = domElements.tableWrap;
       if (active && totalRows > 0) {
-        wrap.classList.toggle("filter-empty", visibleCount === 0);
+        wrap.classList.toggle("filter-empty", !anyVisible);
       } else {
         wrap.classList.remove("filter-empty");
       }
@@ -2938,9 +3109,8 @@
     }
     function sleep(ms, signal) {
       if (ms <= 0 || signal.aborted) {
-        return Promise.resolve().then(() => {
-          signal.throwIfAborted();
-        });
+        signal.throwIfAborted();
+        return Promise.resolve();
       }
       return new Promise((resolve) => {
         let id = 0;
@@ -2952,7 +3122,7 @@
           signal.removeEventListener("abort", onAbort);
           resolve();
         }, ms);
-        signal.addEventListener("abort", onAbort, { once: true });
+        signal.addEventListener("abort", onAbort, EVT_ONCE);
       }).then(() => {
         signal.throwIfAborted();
       });
@@ -3070,27 +3240,24 @@
           out.push({
             set: m[1] === "대한민국" ? "KR" : "WORLD",
             idx: nextIdx++,
-            idxDisp: "",
-            lat: fLat, lon: fLon,
-            latStr: lat, lonStr: lon,
+            _f_kind: undefined,
+            _f_sido: "",
+            _f_sigungu: "",
+            _f_emd: "",
+            _f_tag: "",
+            _f_fullAddr: "",
+            latStr: lat,
+            lonStr: lon,
             cacheKey: fLat + "," + fLon,
-            coordKey: lat + "," + lon,
-            lat6: null, lon6: null,
-            addr: null, fullAddr: "",
+            lat6: null,
+            lon6: null,
+            addr: null,
+            fullAddr: "",
+            _q: null,
           });
         }
       }
       return out;
-    }
-    function performPauseCheck() {
-      if (!AppState.isPausing) return null;
-      AppState.setStatus("paused");
-      setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-      AppState.resumeHandler ??= Promise.withResolvers();
-      scheduleRender();
-      return AppState.resumeHandler.promise.then(() => {
-        if (!AppState.isStopping) setStatusMessage("재개합니다…");
-      });
     }
     const REVERSE_PARSED_CACHE = new Map();
     const REVERSE_PARSED_CACHE_KEYS = [];
@@ -3104,19 +3271,24 @@
       const headers = FETCH_HEADERS;
       const signalAny = AbortSignal.any;
       const signalTimeout = AbortSignal.timeout;
+      const anySignals = [userSignal, null];
       let attempt = 0;
       while (++attempt <= maxRetry) {
         userSignal.throwIfAborted();
+        let now = performance.now();
         if (LAST_REVERSE_FETCH_AT) {
-          const now = performance.now();
           const remaining = baseDelayMs - (now - LAST_REVERSE_FETCH_AT);
-          if (remaining > 0) await sleep(remaining, userSignal);
+          if (remaining > 0) {
+            await sleep(remaining, userSignal);
+            now = performance.now();
+          }
         }
-        LAST_REVERSE_FETCH_AT = performance.now();
+        LAST_REVERSE_FETCH_AT = now;
+        anySignals[1] = signalTimeout(timeoutMs);
         try {
           const res = await fetch(url, {
             headers,
-            signal: signalAny([userSignal, signalTimeout(timeoutMs)]),
+            signal: signalAny(anySignals),
           });
           if (res.ok) {
             return res.json();
@@ -3143,7 +3315,6 @@
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
-      const idxColIndex = IDX_COL_INDEX;
       const skeletonTemplate = SKELETON_TEMPLATE;
       const rowTemplate = ROW_TEMPLATE;
       const fmtInt = fmt;
@@ -3170,8 +3341,14 @@
         let skeletonTr = null;
         let needsFetch = false;
         try {
-          const pausePromise = performPauseCheck();
-          if (pausePromise) await pausePromise;
+          if (AppState.isPausing) {
+            AppState.setStatus("paused");
+            setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
+            const resumeHandler = (AppState.resumeHandler ??= Promise.withResolvers());
+            scheduleRender();
+            await resumeHandler.promise;
+            if (!AppState.isStopping) setStatusMessage("재개합니다…");
+          }
           if (!AppState.isRunning) break;
           const r = records[i];
           const cacheKey = r.cacheKey;
@@ -3187,9 +3364,9 @@
             AppState.inFlight = true;
           }
           const tr = (parsed ? rowTemplate : skeletonTemplate).cloneNode(true);
-          if (idxColIndex >= 0) {
-            tr.cells[idxColIndex].textContent = r.idxDisp || (r.idxDisp = fmtInt(r.idx));
-          }
+          tr.cells[IDX_COL_INDEX].textContent = "" + i1;
+          const mapBtn = tr.cells[MAPS_COL_INDEX].lastElementChild;
+          mapBtn.dataset.idx = "" + i;
           const f0 = filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP;
           if (f0.active) {
             tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
@@ -3200,9 +3377,7 @@
             wrap.classList.add("has-results");
             RENDER_CACHE.hasResults = true;
             requestScrollShadowSync(wrap);
-          }
-          if (f0.active && isFirstRow) {
-            wrap.classList.add("filter-empty");
+            if (f0.active) wrap.classList.add("filter-empty");
           }
           if (needsFetch) {
             tbody.append(tr);
@@ -3220,8 +3395,6 @@
           let now = 0;
           try {
             if (needsFetch) {
-              const pausePromise = performPauseCheck();
-              if (pausePromise) await pausePromise;
               if (!AppState.isRunning) {
                 skeletonTr.remove();
                 break;
@@ -3235,7 +3408,7 @@
               }
             }
             if (!parsed) {
-              const url = baseHref + "&lat=" + r.lat + "&lon=" + r.lon;
+              const url = baseHref + "&lat=" + r.latStr + "&lon=" + r.lonStr;
               parsed = AddressFormatter.parse(
                 await fetchReverseWithRetry(
                   url,
@@ -3262,24 +3435,17 @@
               r.set = kind;
               r._f_kind = parsed.kindLower || (parsed.kindLower = kind.toLowerCase());
             } else {
-              r._f_kind = lower(r.set);
+              r._f_kind = r.set === "KR" ? "kr" : r.set === "WORLD" ? "world" : lower(r.set);
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
             let nSido = parsed.nSido;
             if (nSido === undefined) {
               nSido = parsed.nSido = norm(addr.sido);
-              const nSigungu = parsed.nSigungu = norm(addr.sigungu);
-              const nEmd = parsed.nEmd = norm(addr.eupmyeon);
-              const nTag = parsed.nTag = norm(addr.tag);
-              const nFullAddr = parsed.nFullAddr = norm(addr.fullAddr);
-              let qRest = "";
-              if (nSido) qRest = nSido;
-              if (nSigungu) qRest = qRest ? qRest + " " + nSigungu : nSigungu;
-              if (nEmd) qRest = qRest ? qRest + " " + nEmd : nEmd;
-              if (nTag) qRest = qRest ? qRest + " " + nTag : nTag;
-              if (nFullAddr) qRest = qRest ? qRest + " " + nFullAddr : nFullAddr;
-              parsed.qRest = qRest;
+              parsed.nSigungu = norm(addr.sigungu);
+              parsed.nEmd = norm(addr.eupmyeon);
+              parsed.nTag = norm(addr.tag);
+              parsed.nFullAddr = norm(addr.fullAddr);
             }
             const nSigungu = parsed.nSigungu;
             const nEmd = parsed.nEmd;
@@ -3290,9 +3456,7 @@
             r._f_emd = nEmd;
             r._f_tag = nTag;
             r._f_fullAddr = nFullAddr;
-            const qRest = parsed.qRest ?? "";
-            r._f_q = qRest ? r.coordKey + " " + qRest : r.coordKey;
-            commitResultRow(skeletonTr, r, wrap, f0);
+            commitResultRow(skeletonTr, r, wrap, filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP);
           } catch (err) {
             if (AppState.isStopping && err && err.name === "AbortError") {
               skeletonTr.remove();
@@ -3308,8 +3472,8 @@
             r._f_sigungu = "";
             r._f_emd = "";
             r._f_tag = "";
-            r._f_fullAddr = r._f_q = norm(msg);
-            commitResultRow(skeletonTr, r, wrap, f0);
+            r._f_fullAddr = norm(msg);
+            commitResultRow(skeletonTr, r, wrap, filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP);
             if (!AppState.isStopping)
               setStatusMessage(
                 `에러 발생: (${fmtInt(i1)}/${totalDisp}) ${msg}`,
@@ -3362,22 +3526,36 @@
       if (!tr) return;
       const connected = tr.isConnected;
       if (!connected && !tr.parentNode) return;
-      const colDefs = COL_DEFS;
       const cells = tr.cells;
-      const idxColIndex = IDX_COL_INDEX;
-      for (let i = 0, n = colDefs.length; i < n; i++) {
-        if (i === idxColIndex) continue;
-        const col = colDefs[i];
-        const td = cells[i];
-        const val = col.val ? col.val(r) : "";
-        if (col.render) col.render(val, td, r);
-        else td.textContent = val ?? "";
+      const latStr = r.latStr;
+      const lonStr = r.lonStr;
+      cells[KIND_COL_INDEX].textContent = r.set;
+      cells[COORDS_COL_INDEX].textContent = latStr + ", " + lonStr;
+      const addr = r.addr;
+      if (addr) {
+        cells[SIDO_COL_INDEX].textContent = addr.sido;
+        cells[SIGUNGU_COL_INDEX].textContent = addr.sigungu;
+        cells[EMD_COL_INDEX].textContent = addr.eupmyeon;
+        cells[TAG_COL_INDEX].textContent = addr.tag;
+      } else {
+        cells[SIDO_COL_INDEX].textContent =
+          cells[SIGUNGU_COL_INDEX].textContent =
+          cells[EMD_COL_INDEX].textContent =
+          cells[TAG_COL_INDEX].textContent = "";
       }
-      const fNow = filterDirty ? getLiveFilterSnapshot() : f;
+      cells[FULLADDR_COL_INDEX].textContent = r.fullAddr;
+      const td = cells[MAPS_COL_INDEX];
+      const btn = td.lastElementChild;
+      btn.disabled = false;
+      const sk = td.firstElementChild;
+      if (sk !== btn) sk.remove();
       const wasHidden = tr.hidden;
-      const hidden = setRowHiddenByFilter(tr, fNow, r);
-      if (fNow.active && !hidden) {
-        wrap.classList.remove("filter-empty");
+      let hidden = false;
+      if (f.active) {
+        hidden = setHiddenByFilterActiveFn(tr, wasHidden, f, r);
+        if (!hidden) wrap.classList.remove("filter-empty");
+      } else if (wasHidden) {
+        tr.removeAttribute("hidden");
       }
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
@@ -3397,14 +3575,10 @@
         if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
-        const csvColLen = CSV_COLS.length;
         const mapProviderCount = MAP_PROVIDER_COUNT;
-        const csvCols = CSV_COLS;
         const mapLinks = MAP_LINKS;
         const escCell = csvEsc;
-        const buildHref = buildMapHref;
         const hasRound6 = MAP_HAS_ROUND6;
-        const outRow = new Array(csvColLen + mapProviderCount);
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
         const parts = [CSV_HEADER_BYTES];
@@ -3414,19 +3588,38 @@
         const flushChunk = () => {
           const n = chunkLines.length;
           if (n === 0) return;
-          parts.push(CSV_ENCODER.encode("\n" + chunkLines.join("\n")));
+          parts.push(CSV_NL_BYTES, CSV_ENCODER.encode(chunkLines.join("\n")));
           chunkChars = 0;
           if (n > 20_000) chunkLines = [];
           else chunkLines.length = 0;
         };
         for (let i = 0; i < totalRows; i++) {
           const r = records[i];
-          let j = 0;
-          for (let k = 0; k < csvColLen; k++) {
-            outRow[j++] = escCell(csvCols[k].val(r));
-          }
           const lat = r.latStr;
           const lon = r.lonStr;
+          const coords = lat + ", " + lon;
+          let line =
+            escCell(r.set) +
+            "," +
+            escCell(r.idx) +
+            "," +
+            escCell(coords) +
+            ",";
+          const addr = r.addr;
+          if (addr) {
+            line +=
+              escCell(addr.sido) +
+              "," +
+              escCell(addr.sigungu) +
+              "," +
+              escCell(addr.eupmyeon) +
+              "," +
+              escCell(addr.tag) +
+              ",";
+          } else {
+            line += ",,,,";
+          }
+          line += escCell(r.fullAddr);
           let lat6 = null;
           let lon6 = null;
           if (hasRound6) {
@@ -3436,9 +3629,8 @@
             if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
           }
           for (let k = 0; k < mapProviderCount; k++) {
-            outRow[j++] = '"' + buildHref(mapLinks[k], lat, lon, lat6, lon6) + '"';
+            line += ',"' + mapLinks[k].build(lat, lon, lat6, lon6) + '"';
           }
-          const line = outRow.join(",");
           chunkLines.push(line);
           chunkChars += line.length + 1;
           if (chunkChars >= 1_000_000) {
@@ -3501,21 +3693,13 @@
         AppState.controller = null;
       }
     }
-    for (const el of [
-      domElements.filterQ,
-      domElements.filterKind,
-      domElements.filterSido,
-      domElements.filterSigungu,
-      domElements.filterEmd,
-      domElements.filterTag,
-      domElements.filterFullAddr,
-    ]) {
-      if (el.tagName === "SELECT") {
-        el.addEventListener("change", scheduleApplyFilterAll);
-      } else {
-        el.addEventListener("input", scheduleApplyFilterAll);
-      }
-    }
+    domElements.filterQ.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterKind.addEventListener("change", scheduleApplyFilterAll);
+    domElements.filterSido.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterSigungu.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterEmd.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterTag.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterFullAddr.addEventListener("input", scheduleApplyFilterAll);
     domElements.tbody.addEventListener("click", (e) => {
       if (!MAP_POPOVER_OPEN) return;
       const btn = e.target?.closest?.("button.map-btn");
@@ -3528,27 +3712,27 @@
         const tr = e.target instanceof Element ? e.target.closest("tr") : null;
         if (!tr) return;
         FIND_REVEAL_ACTIVE = true;
+        setHiddenByFilterActiveFn = setRowHiddenByFilterActive;
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
         domElements.tableWrap.classList.remove("filter-empty");
         bumpFindRehideTimer();
       }
     );
-    const startViewTransition = document.startViewTransition?.bind(document);
-    const maybeVT = startViewTransition
-      ? (fn) => {
-        if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
-          const active = document.activeViewTransition;
-          if (active) {
-            active.types.add("results");
-            fn();
-            return active;
-          }
-          return startViewTransition({ update: fn, types: ["results"] });
+    const startViewTransition = document.startViewTransition.bind(document);
+    const VIEW_TRANSITION_RESULTS_TYPES = ["results"];
+    const maybeVT = (fn) => {
+      if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
+        const active = document.activeViewTransition;
+        if (active) {
+          active.types.add("results");
+          fn();
+          return active;
         }
-        return fn();
+        return startViewTransition({ update: fn, types: VIEW_TRANSITION_RESULTS_TYPES });
       }
-      : (fn) => fn();
+      return fn();
+    };
     const COMMANDS = {
       "--parse": () => maybeVT(handleParse),
       "--start": () => maybeVT(() => {
@@ -3597,7 +3781,15 @@
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      Promise.try(cmd).catch(handleCommandError);
+      try {
+        const ret = cmd();
+        const then = ret && ret.then;
+        if (typeof then === "function") {
+          then.call(ret, null, handleCommandError);
+        }
+      } catch (err) {
+        handleCommandError(err);
+      }
     });
     domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
@@ -3636,18 +3828,13 @@
     });
     document.addEventListener("scroll", (e) => {
       if (MAP_POPOVER_OPEN) closeMapPopover();
-      if (ACTIVE_SCROLL.size === 0) {
+      if (!SCROLL_ACTIVE) {
         if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
         setGlobalScrolling(true);
       }
-      ACTIVE_SCROLL.add((e.target instanceof Element) ? e.target : e.currentTarget);
-    }, EVT_CAPTURE_PASSIVE);
-    document.addEventListener("scrollend", (e) => {
-      ACTIVE_SCROLL.delete((e.target instanceof Element) ? e.target : e.currentTarget);
-      if (ACTIVE_SCROLL.size === 0) {
-        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
-        setGlobalScrolling(false);
-      }
+      SCROLL_ACTIVE = true;
+      SCROLL_LAST_TS = performance.now();
+      if (!SCROLL_IDLE_RAF) SCROLL_IDLE_RAF = requestAnimationFrame(checkScrollIdle);
     }, EVT_CAPTURE_PASSIVE);
     const rectCache = new Map();
     let rectCacheDirty = false;
@@ -3657,8 +3844,10 @@
     let pointerTarget = null;
     let lastPointerTarget = null;
     let hasPointer = false;
-    const tableCardStack = domElements.tableWrap.closest(".card-stack");
+    const tableWrap = domElements.tableWrap;
+    const tableCardStack = tableWrap.closest(".card-stack");
     const tableCardStackSpotlight = tableCardStack.querySelector(".card-stack-spotlight");
+    const docBody = document.body;
     const SPOTLIGHT_OBSERVED_NODES = document.querySelectorAll(
       ".card, .card-stack-spotlight"
     );
@@ -3707,7 +3896,7 @@
     };
     const requestRectCacheRefresh = () => {
       if (pointerRaf !== null) return;
-      if (!hasPointer || ACTIVE_SCROLL.size > 0) return;
+      if (!hasPointer || SCROLL_ACTIVE) return;
       let target = lastPointerTarget;
       if (target && !target.isConnected) target = null;
       if (!target) {
@@ -3755,9 +3944,9 @@
         document.removeEventListener("pointercancel", clearPointerState);
         document.removeEventListener("pointermove", handlePointerMove);
         document.removeEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE);
-        domElements.tableWrap.removeEventListener("pointerenter", handleTablePointerEnter);
-        domElements.tableWrap.removeEventListener("pointerleave", handleTablePointerLeave);
-        domElements.tableWrap.removeEventListener("pointercancel", handleTablePointerLeave);
+        tableWrap.removeEventListener("pointerenter", handleTablePointerEnter);
+        tableWrap.removeEventListener("pointerleave", handleTablePointerLeave);
+        tableWrap.removeEventListener("pointercancel", handleTablePointerLeave);
         rectCacheObserver.disconnect();
         rectCacheObserver = null;
         if (resizeScrollResetTimer) {
@@ -3777,9 +3966,9 @@
       document.addEventListener("pointercancel", clearPointerState);
       document.addEventListener("pointermove", handlePointerMove);
       document.addEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE);
-      domElements.tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
-      domElements.tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
-      domElements.tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
+      tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
+      tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
+      tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
       rectCacheObserver = new ResizeObserver(
         syncSpotlightPerfMode._resizeObserverCallback ||
         (syncSpotlightPerfMode._resizeObserverCallback = () => {
@@ -3798,17 +3987,18 @@
       pointerRaf = null;
       const target = pointerTarget;
       pointerTarget = null;
-      if (!target || ACTIVE_SCROLL.size > 0) return;
+      if (!target || SCROLL_ACTIVE) return;
       lastPointerTarget = target;
       updateSpotlightsFromTarget(target, pointerX, pointerY);
     };
     function handlePointerMove(e) {
-      if (e.pointerType && e.pointerType !== "mouse") return;
-      if (ACTIVE_SCROLL.size > 0) return;
+      const pt = e.pointerType;
+      if (pt && pt !== "mouse") return;
+      if (SCROLL_ACTIVE) return;
       pointerX = e.clientX;
       pointerY = e.clientY;
       let target = e.target;
-      if (!(target instanceof Element)) target = target?.parentElement;
+      if (target && target.nodeType !== 1) target = target.parentElement;
       pointerTarget = target;
       hasPointer = true;
       if (pointerRaf !== null) return;
@@ -3824,25 +4014,26 @@
         rect = el.getBoundingClientRect();
         rectCache.set(el, rect);
       }
-      el.style.setProperty("--mouse-x", `${clientX - rect.left}px`);
-      el.style.setProperty("--mouse-y", `${clientY - rect.top}px`);
+      el.style.setProperty("--mouse-x", (clientX - rect.left) + "px");
+      el.style.setProperty("--mouse-y", (clientY - rect.top) + "px");
     }
     function updateSpotlightsFromTarget(target, x, y) {
-      const isTableTarget = domElements.tableWrap.contains(target);
+      const isTableTarget = tableWrap.contains(target);
       if (isTableTarget !== stackSpotlightSuppressed) {
         setStackSpotlightSuppressed(isTableTarget);
       }
       let btn = null;
       let card = null;
       let current = target;
-      while (current && current !== document.body) {
+      while (current && current !== docBody) {
         if (!btn && current.tagName === "BUTTON") btn = current;
         if (!card && current.classList.contains("card")) card = current;
+        if (btn && card) break;
         current = current.parentElement;
       }
       if (btn) setSpotlightVars(btn, x, y);
+      if (stackSpotlightSuppressed) return;
       if (tableCardStack.contains(target)) {
-        if (stackSpotlightSuppressed) return;
         setSpotlightVars(tableCardStackSpotlight, x, y);
         return;
       }
@@ -3851,14 +4042,17 @@
       }
     }
     function handlePointerDownSpotlight(e) {
-      if (ACTIVE_SCROLL.size > 0) return;
-      const t = (e.target instanceof Element) ? e.target : null;
+      if (SCROLL_ACTIVE) return;
+      let t = e.target;
+      if (t && t.nodeType !== 1) t = t.parentElement;
       if (!t) return;
-      pointerX = e.clientX;
-      pointerY = e.clientY;
+      const x = e.clientX;
+      const y = e.clientY;
+      pointerX = x;
+      pointerY = y;
       lastPointerTarget = t;
       hasPointer = true;
-      updateSpotlightsFromTarget(t, e.clientX, e.clientY);
+      updateSpotlightsFromTarget(t, x, y);
     }
     syncSpotlightPerfMode(root.hasAttribute(PERF_MODE_ATTR));
   </script>
