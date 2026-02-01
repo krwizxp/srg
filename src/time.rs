@@ -21,6 +21,19 @@ const MAX_CALIBRATION_FAILURES: u32 = 100;
 const KST_OFFSET_SECS_U64: u64 = 9 * 3600;
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64 as i64;
 const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
+const DIGITS: [u8; 10] = *b"0123456789";
+const fn make_two_digits_table() -> [[u8; 2]; 100] {
+    let mut table = [[0u8; 2]; 100];
+    let mut i = 0usize;
+    while i < 100 {
+        let tens = (i as u8) / 10;
+        let ones = (i as u8) % 10;
+        table[i] = [b'0' + tens, b'0' + ones];
+        i += 1;
+    }
+    table
+}
+const TWO_DIGITS: [[u8; 2]; 100] = make_two_digits_table();
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const DISPLAY_UPDATE_INTERVAL: Duration = Duration::from_millis(45);
@@ -218,6 +231,130 @@ struct DisplayableTime {
     second: u32,
     millis: u32,
 }
+#[inline(never)]
+#[cold]
+fn write_zero_err() -> io::Error {
+    io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer")
+}
+struct SliceCursor<'a> {
+    buf: &'a mut [u8],
+    pos: usize,
+}
+impl<'a> SliceCursor<'a> {
+    #[inline(always)]
+    fn new(buf: &'a mut [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+    #[inline(always)]
+    fn remaining(&self) -> usize {
+        self.buf.len() - self.pos
+    }
+    #[inline(always)]
+    fn written_len(&self) -> usize {
+        self.pos
+    }
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> ioResult<()> {
+        let len = bytes.len();
+        if self.remaining() < len {
+            return Err(write_zero_err());
+        }
+        let end = self.pos + len;
+        self.buf[self.pos..end].copy_from_slice(bytes);
+        self.pos = end;
+        Ok(())
+    }
+    #[inline(always)]
+    fn write_byte(&mut self, b: u8) -> ioResult<()> {
+        if self.remaining() < 1 {
+            return Err(write_zero_err());
+        }
+        self.buf[self.pos] = b;
+        self.pos += 1;
+        Ok(())
+    }
+    #[inline(always)]
+    fn write_u32_dec(&mut self, mut n: u32) -> ioResult<()> {
+        let mut tmp = [0u8; 10];
+        let mut i = tmp.len();
+        while n >= 100 {
+            let rem = (n % 100) as usize;
+            n /= 100;
+            i -= 2;
+            tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+        }
+        if n >= 10 {
+            let rem = n as usize;
+            i -= 2;
+            tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+        } else {
+            i -= 1;
+            tmp[i] = b'0' + (n as u8);
+        }
+        self.write_bytes(&tmp[i..])
+    }
+    #[inline(always)]
+    fn write_year_padded4(&mut self, year: i32) -> ioResult<()> {
+        if year >= 0 {
+            let y = year as u32;
+            if y < 10_000 {
+                if self.remaining() < 4 {
+                    return Err(write_zero_err());
+                }
+                let hi = (y / 100) as usize;
+                let lo = (y % 100) as usize;
+                let start = self.pos;
+                self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[hi]);
+                self.buf[start + 2..start + 4].copy_from_slice(&TWO_DIGITS[lo]);
+                self.pos = start + 4;
+                return Ok(());
+            }
+            return self.write_u32_dec(y);
+        }
+        self.write_byte(b'-')?;
+        let abs = if year == i32::MIN {
+            (i32::MAX as u32) + 1
+        } else {
+            (-year) as u32
+        };
+        if abs < 1000 {
+            if self.remaining() < 3 {
+                return Err(write_zero_err());
+            }
+            let hundreds = (abs / 100) as usize;
+            let rem = (abs % 100) as usize;
+            let start = self.pos;
+            self.buf[start] = DIGITS[hundreds];
+            self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
+            self.pos = start + 3;
+            return Ok(());
+        }
+        self.write_u32_dec(abs)
+    }
+    #[inline(always)]
+    fn write_u32_2digits(&mut self, v: u32) -> ioResult<()> {
+        if self.remaining() < 2 {
+            return Err(write_zero_err());
+        }
+        let start = self.pos;
+        self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[v as usize]);
+        self.pos = start + 2;
+        Ok(())
+    }
+    #[inline(always)]
+    fn write_u32_3digits(&mut self, v: u32) -> ioResult<()> {
+        if self.remaining() < 3 {
+            return Err(write_zero_err());
+        }
+        let hundreds = (v / 100) as usize;
+        let rem = (v % 100) as usize;
+        let start = self.pos;
+        self.buf[start] = DIGITS[hundreds];
+        self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
+        self.pos = start + 3;
+        Ok(())
+    }
+}
 impl ServerTime {
     fn from_tick_sample(sample: TimeSample, baseline_rtt: Duration) -> Result<Self> {
         let mut server_time_at_tick = sample.server_time;
@@ -272,21 +409,29 @@ impl ServerTime {
             millis,
         })
     }
-    fn current_display_time(&self, w: &mut impl ioWrite, show_millis: bool) -> Result<()> {
+    fn write_current_display_time_buf(
+        &self,
+        cur: &mut SliceCursor<'_>,
+        show_millis: bool,
+    ) -> Result<()> {
         let dt = self.calculate_display_time()?;
-        write!(
-            w,
-            "{year:04}-{month:02}-{day:02}({day_str}) {hour:02}:{min:02}:{sec:02}",
-            year = dt.year,
-            month = dt.month,
-            day = dt.day_of_month,
-            day_str = dt.day_of_week_str,
-            hour = dt.hour,
-            min = dt.minute,
-            sec = dt.second
-        )?;
+        cur.write_year_padded4(dt.year).map_err(Error::Io)?;
+        cur.write_byte(b'-').map_err(Error::Io)?;
+        cur.write_u32_2digits(dt.month).map_err(Error::Io)?;
+        cur.write_byte(b'-').map_err(Error::Io)?;
+        cur.write_u32_2digits(dt.day_of_month).map_err(Error::Io)?;
+        cur.write_byte(b'(').map_err(Error::Io)?;
+        cur.write_bytes(dt.day_of_week_str.as_bytes())
+            .map_err(Error::Io)?;
+        cur.write_bytes(b") ").map_err(Error::Io)?;
+        cur.write_u32_2digits(dt.hour).map_err(Error::Io)?;
+        cur.write_byte(b':').map_err(Error::Io)?;
+        cur.write_u32_2digits(dt.minute).map_err(Error::Io)?;
+        cur.write_byte(b':').map_err(Error::Io)?;
+        cur.write_u32_2digits(dt.second).map_err(Error::Io)?;
         if show_millis {
-            write!(w, ".{millis:03}", millis = dt.millis)?;
+            cur.write_byte(b'.').map_err(Error::Io)?;
+            cur.write_u32_3digits(dt.millis).map_err(Error::Io)?;
         }
         Ok(())
     }
@@ -325,7 +470,7 @@ struct NetworkContext {
     curl_stderr_buf: String,
 }
 static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("curl"));
-static TCP_TIMEOUT_SECS_STR: LazyLock<String> = LazyLock::new(|| TCP_TIMEOUT_SECS.to_string());
+const TCP_TIMEOUT_SECS_STR: &str = "5";
 #[cfg(target_os = "linux")]
 static XDO_TOOL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| is_command_available("xdotool"));
 impl AppState {
@@ -431,6 +576,7 @@ impl AppState {
             tcp_line_buffer: Vec::with_capacity(256),
             curl_stderr_buf: String::with_capacity(1024),
         };
+        let stdout = io::stdout();
         loop {
             let activity_poll = match activity {
                 Activity::MeasureBaselineRtt
@@ -453,14 +599,29 @@ impl AppState {
             let now = Instant::now();
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
                 if let Some(st) = &self.server_time {
-                    let stdout = io::stdout();
-                    let mut out = stdout.lock();
-                    write!(out, "\r서버 시간: ")?;
-                    if let Err(e) = st.current_display_time(&mut out, true) {
-                        write!(out, "시간 표시 오류: {e}")?;
+                    let mut line_buf = [0u8; 80];
+                    let mut cur = SliceCursor::new(&mut line_buf);
+                    match (|| -> Result<()> {
+                        cur.write_bytes("\r서버 시간: ".as_bytes())
+                            .map_err(Error::Io)?;
+                        st.write_current_display_time_buf(&mut cur, true)?;
+                        cur.write_bytes(b" \r").map_err(Error::Io)?;
+                        Ok(())
+                    })() {
+                        Ok(()) => {
+                            let used = cur.written_len();
+                            let mut out = stdout.lock();
+                            out.write_all(&line_buf[..used])?;
+                            out.flush()?;
+                        }
+                        Err(e) => {
+                            let mut out = stdout.lock();
+                            out.write_all("\r서버 시간: ".as_bytes())?;
+                            write!(out, "시간 표시 오류: {e}")?;
+                            out.write_all(b" \r")?;
+                            out.flush()?;
+                        }
                     }
-                    write!(out, " \r")?;
-                    out.flush()?;
                 }
                 last_display_update = now
             }
@@ -818,7 +979,7 @@ fn fetch_server_time_sample_curl(
 ) -> Result<TimeSample> {
     net_ctx.curl_stderr_buf.clear();
     let time_before_curl_call_inst = Instant::now();
-    let timeout_str = TCP_TIMEOUT_SECS_STR.as_str();
+    let timeout_str = TCP_TIMEOUT_SECS_STR;
     let output = Command::new("curl")
         .args([
             "-sI",
@@ -923,7 +1084,11 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, host: &str) -> Result<TimeSample> {
     Err(Error::HeaderNotFound("Date (TCP)".into()))
 }
 fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<TimeSample> {
-    if host.len() >= 8 && host[..8].eq_ignore_ascii_case("https://") {
+    if host
+        .as_bytes()
+        .get(..8)
+        .is_some_and(|p| p.eq_ignore_ascii_case(b"https://"))
+    {
         return fetch_server_time_sample_curl(host, "HTTPS (explicit)", net_ctx);
     }
     tcp_attempt(&mut net_ctx.tcp_line_buffer, host).or_else(|_| {
@@ -984,10 +1149,42 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         }
         Some(v)
     }
+    fn parse_i32_digits(s: &str) -> Option<i32> {
+        let bytes = s.as_bytes();
+        if bytes.is_empty() {
+            return None;
+        }
+        let mut i = 0usize;
+        let mut negative = false;
+        match bytes[0] {
+            b'+' => i = 1,
+            b'-' => {
+                negative = true;
+                i = 1;
+            }
+            _ => {}
+        }
+        if i == bytes.len() {
+            return None;
+        }
+        let mut v: i32 = 0;
+        while i < bytes.len() {
+            let b = bytes[i];
+            if !b.is_ascii_digit() {
+                return None;
+            }
+            let digit = (b - b'0') as i32;
+            v = if negative {
+                v.checked_mul(10)?.checked_sub(digit)?
+            } else {
+                v.checked_mul(10)?.checked_add(digit)?
+            };
+            i += 1;
+        }
+        Some(v)
+    }
     let day = parse_u32_digits(day_str).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
-    let year = year_str
-        .parse::<i32>()
-        .map_err(|_| Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
+    let year = parse_i32_digits(year_str).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
     #[inline]
     fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
         if d0.is_ascii_digit() && d1.is_ascii_digit() {

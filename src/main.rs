@@ -1,7 +1,6 @@
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::{_rdrand64_step, _rdseed64_step};
 use std::{
-    array,
     char::from_u32,
     error::Error,
     fs::File,
@@ -19,6 +18,14 @@ use std::{
     time::{Duration, Instant},
 };
 mod time;
+#[inline(never)]
+#[cold]
+fn write_zero_err() -> ioErr {
+    ioErr::new(
+        std::io::ErrorKind::WriteZero,
+        "failed to write whole buffer",
+    )
+}
 enum RngSource {
     RdSeed,
     RdRand,
@@ -41,22 +48,32 @@ static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
 static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| stdout().is_terminal());
-static TWO_DIGITS: LazyLock<[[u8; 2]; 100]> =
-    LazyLock::new(|| array::from_fn(|i| [b'0' + (i / 10) as u8, b'0' + (i % 10) as u8]));
+const fn make_two_digits_table() -> [[u8; 2]; 100] {
+    let mut table = [[0u8; 2]; 100];
+    let mut i = 0usize;
+    while i < 100 {
+        let tens = (i as u8) / 10;
+        let ones = (i as u8) % 10;
+        table[i] = [b'0' + tens, b'0' + ones];
+        i += 1;
+    }
+    table
+}
+const TWO_DIGITS: [[u8; 2]; 100] = make_two_digits_table();
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const BUFFER_SIZE: usize = 1016;
 const BUFFERS_PER_WORKER: usize = 8;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 const fn bitmask_const<const B: u8>() -> u64 {
-    let b: u32 = {
-        let b = B as u32;
-        if b > 64 { 64 } else { b }
-    };
-    if b == 0 {
-        0
-    } else {
-        u64::MAX.unbounded_shr(64 - b)
+    let mut b = B as u32;
+    if b > 64 {
+        b = 64;
+    }
+    match b {
+        0 => 0,
+        64 => u64::MAX,
+        _ => (1u64 << b) - 1,
     }
 }
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
@@ -65,9 +82,6 @@ const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     if a < b { a } else { b }
 }
 const U32_MAX_INV: f64 = 1.0 / (u32::MAX as f64);
-const RGB_PREFIX: &str = "\x1B[38;2;";
-const SGR_SUFFIX: &str = "m";
-const COLOR_RESET: &str = "\x1B[0m";
 const BAR_WIDTH: usize = 10;
 const BAR_FULL: [&str; BAR_WIDTH + 1] = [
     "[          ]",
@@ -83,7 +97,39 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
     "[██████████]",
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
-const DIGITS: &[u8; 10] = b"0123456789";
+const DIGITS: [u8; 10] = *b"0123456789";
+const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
+const fn make_bin8_table() -> [[u8; 8]; 256] {
+    let mut table = [[0u8; 8]; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        let mut bit = 0usize;
+        while bit < 8 {
+            let shift = 7 - bit;
+            table[i][bit] = if ((i as u8) >> shift) & 1 == 1 {
+                b'1'
+            } else {
+                b'0'
+            };
+            bit += 1;
+        }
+        i += 1;
+    }
+    table
+}
+const BIN8_TABLE: [[u8; 8]; 256] = make_bin8_table();
+const fn make_hex_byte_table() -> [[u8; 2]; 256] {
+    let mut table = [[0u8; 2]; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        let hi = (i >> 4) & 0xF;
+        let lo = i & 0xF;
+        table[i] = [HEX_UPPER[hi], HEX_UPPER[lo]];
+        i += 1;
+    }
+    table
+}
+const HEX_BYTE_TABLE: [[u8; 2]; 256] = make_hex_byte_table();
 #[cfg(target_arch = "x86_64")]
 const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 기타: 종료\n선택해 주세요: ";
 #[cfg(not(target_arch = "x86_64"))]
@@ -308,23 +354,37 @@ fn generate_random_data() -> Result<RandomDataSet> {
     let mut hangul = ['\0'; 4];
     for (i, slot) in hangul.iter_mut().enumerate() {
         let mut index = ((num >> (48 - 16 * i)) & 0xFFFF) as u32;
-        while index > 55859 {
+        while index > 55_859 {
             if supplemental.is_none() {
-                supplemental = Some(RandomBitBuffer::new()?)
+                supplemental = Some(RandomBitBuffer::new()?);
             }
-            if let Some(supp) = supplemental.as_ref() {
-                if let Some(valid_index) = (0..4)
-                    .map(|i| ((supp.value >> (48 - 16 * i)) & 0xFFFF) as u32)
-                    .find(|&candidate| candidate <= 55859)
-                {
-                    index = valid_index;
-                    break;
-                } else {
-                    supplemental = Some(RandomBitBuffer::new()?)
-                }
+            let supp_value = supplemental
+                .as_ref()
+                .expect("supplemental must be Some")
+                .value;
+            let c0 = ((supp_value >> 48) & 0xFFFF) as u32;
+            if c0 <= 55_859 {
+                index = c0;
+                break;
             }
+            let c1 = ((supp_value >> 32) & 0xFFFF) as u32;
+            if c1 <= 55_859 {
+                index = c1;
+                break;
+            }
+            let c2 = ((supp_value >> 16) & 0xFFFF) as u32;
+            if c2 <= 55_859 {
+                index = c2;
+                break;
+            }
+            let c3 = (supp_value & 0xFFFF) as u32;
+            if c3 <= 55_859 {
+                index = c3;
+                break;
+            }
+            supplemental = Some(RandomBitBuffer::new()?);
         }
-        *slot = from_u32(0xAC00 + (index % 11172)).ok_or("한글 음절 변환 실패")?
+        *slot = from_u32(0xAC00 + (index % 11_172)).ok_or("한글 음절 변환 실패")?;
     }
     data.hangul_syllables = hangul;
     let upper_32_bits = num >> 32;
@@ -345,18 +405,16 @@ fn generate_random_data() -> Result<RandomDataSet> {
     data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_xxx);
     data.galaxy_y = galaxy_coord::<0x81, 0x7F>(data.nms_portal_yy as u16);
     data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_zzz);
-    data.glyph_string
-        .iter_mut()
-        .enumerate()
-        .for_each(|(i, slot)| {
-            *slot = GLYPHS[(match i {
-                0 => data.planet_number as u64,
-                1 => (data.solar_system_index >> 8) as u64,
-                2 => (data.solar_system_index >> 4) as u64,
-                3 => data.solar_system_index as u64,
-                _ => num >> (36 - (i as u8 - 4) * 4),
-            } & 0xF) as usize]
-        });
+    for (i, slot) in data.glyph_string.iter_mut().enumerate() {
+        let nibble = (match i {
+            0 => data.planet_number as u64,
+            1 => (data.solar_system_index >> 8) as u64,
+            2 => (data.solar_system_index >> 4) as u64,
+            3 => data.solar_system_index as u64,
+            _ => num >> (36 - (i as u8 - 4) * 4),
+        } & 0xF) as usize;
+        *slot = GLYPHS[nibble];
+    }
     Ok(data)
 }
 fn get_hardware_random() -> Result<u64> {
@@ -495,26 +553,26 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     supplemental: &mut Option<RandomBitBuffer>,
 ) -> Result<u64> {
     let mask: u64 = bitmask_const::<BITS>();
-    if let Some(value) = shifts
-        .iter()
-        .map(|&shift| (num >> shift) & mask)
-        .find(|&v| v <= max_value)
-    {
-        return Ok(value);
+    for &shift in shifts {
+        let v = (num >> shift) & mask;
+        if v <= max_value {
+            return Ok(v);
+        }
     }
     loop {
-        if supplemental
-            .as_ref()
-            .is_none_or(|supp| supp.bits_remaining < BITS)
-        {
-            *supplemental = Some(RandomBitBuffer::new()?)
+        let need_new = match supplemental.as_ref() {
+            Some(supp) => supp.bits_remaining < BITS,
+            None => true,
+        };
+        if need_new {
+            *supplemental = Some(RandomBitBuffer::new()?);
         }
-        if let Some(supp) = supplemental.as_mut() {
-            let extracted = (supp.value >> (supp.bits_remaining - BITS)) & mask;
-            supp.bits_remaining -= BITS;
-            if extracted <= max_value {
-                return Ok(extracted);
-            }
+        let supp = supplemental.as_mut().expect("supplemental must be Some");
+        let shift = supp.bits_remaining - BITS;
+        let extracted = (supp.value >> shift) & mask;
+        supp.bits_remaining = shift;
+        if extracted <= max_value {
+            return Ok(extracted);
         }
     }
 }
@@ -527,129 +585,482 @@ fn format_data_into_buffer(
     format_output(&mut slice, data, use_colors)?;
     Ok(BUFFER_SIZE - slice.len())
 }
-fn format_output<W: Write>(writer: &mut W, data: &RandomDataSet, use_colors: bool) -> IoRst<()> {
+struct BufCursor<'a> {
+    buf: &'a mut [u8],
+    pos: usize,
+}
+impl<'a> BufCursor<'a> {
+    #[inline(always)]
+    fn new(buf: &'a mut [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+    #[inline(always)]
+    fn remaining(&self) -> usize {
+        self.buf.len() - self.pos
+    }
+    #[inline(always)]
+    fn written_len(&self) -> usize {
+        self.pos
+    }
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> IoRst<()> {
+        let len = bytes.len();
+        if self.remaining() < len {
+            return Err(write_zero_err());
+        }
+        let end = self.pos + len;
+        self.buf[self.pos..end].copy_from_slice(bytes);
+        self.pos = end;
+        Ok(())
+    }
+    #[inline(always)]
+    fn write_byte(&mut self, b: u8) -> IoRst<()> {
+        if self.remaining() < 1 {
+            return Err(write_zero_err());
+        }
+        self.buf[self.pos] = b;
+        self.pos += 1;
+        Ok(())
+    }
+}
+#[inline(always)]
+fn cursor_write_fmt(cur: &mut BufCursor<'_>, args: std::fmt::Arguments<'_>) -> IoRst<()> {
+    let start = cur.pos;
+    let mut slice = &mut cur.buf[start..];
+    let before = slice.len();
+    let res = slice.write_fmt(args);
+    let after = slice.len();
+    cur.pos += before - after;
+    res
+}
+#[inline(always)]
+fn buf_write_bytes(cur: &mut BufCursor<'_>, bytes: &[u8]) -> IoRst<()> {
+    cur.write_bytes(bytes)
+}
+#[inline(always)]
+fn buf_write_byte(cur: &mut BufCursor<'_>, byte: u8) -> IoRst<()> {
+    cur.write_byte(byte)
+}
+#[inline(always)]
+fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -> IoRst<()> {
+    let mut total = 0usize;
+    let mut i = 0usize;
+    while i < N {
+        total += chars[i].len_utf8();
+        i += 1;
+    }
+    if cur.remaining() < total {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let end = start + total;
+    let head = &mut cur.buf[start..end];
+    let mut pos = 0usize;
+    let mut j = 0usize;
+    while j < N {
+        let written = chars[j].encode_utf8(&mut head[pos..]).len();
+        pos += written;
+        j += 1;
+    }
+    cur.pos = end;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_u8_dec(cur: &mut BufCursor<'_>, n: u8) -> IoRst<()> {
+    if n >= 100 {
+        if cur.remaining() < 3 {
+            return Err(write_zero_err());
+        }
+        let hundreds = (n / 100) as usize;
+        let rem = (n % 100) as usize;
+        let start = cur.pos;
+        cur.buf[start] = DIGITS[hundreds];
+        cur.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
+        cur.pos = start + 3;
+        Ok(())
+    } else if n >= 10 {
+        if cur.remaining() < 2 {
+            return Err(write_zero_err());
+        }
+        let start = cur.pos;
+        cur.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[n as usize]);
+        cur.pos = start + 2;
+        Ok(())
+    } else {
+        if cur.remaining() < 1 {
+            return Err(write_zero_err());
+        }
+        cur.buf[cur.pos] = b'0' + n;
+        cur.pos += 1;
+        Ok(())
+    }
+}
+#[inline(always)]
+fn buf_write_u8_array_spaced<const N: usize>(cur: &mut BufCursor<'_>, nums: &[u8; N]) -> IoRst<()> {
+    let mut total = N.saturating_sub(1);
+    let mut i = 0usize;
+    while i < N {
+        let n = nums[i];
+        total += if n >= 100 {
+            3
+        } else if n >= 10 {
+            2
+        } else {
+            1
+        };
+        i += 1;
+    }
+    if cur.remaining() < total {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let end = start + total;
+    let head = &mut cur.buf[start..end];
+    let mut pos = 0usize;
+    let mut j = 0usize;
+    while j < N {
+        if j != 0 {
+            head[pos] = b' ';
+            pos += 1;
+        }
+        let n = nums[j];
+        if n >= 100 {
+            let hundreds = (n / 100) as usize;
+            let rem = (n % 100) as usize;
+            head[pos] = DIGITS[hundreds];
+            head[pos + 1..pos + 3].copy_from_slice(&TWO_DIGITS[rem]);
+            pos += 3;
+        } else if n >= 10 {
+            head[pos..pos + 2].copy_from_slice(&TWO_DIGITS[n as usize]);
+            pos += 2;
+        } else {
+            head[pos] = b'0' + n;
+            pos += 1;
+        }
+        j += 1;
+    }
+    cur.pos = end;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
+    if cur.remaining() < 7 {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + 7];
+    head[0] = b'#';
+    head[1..3].copy_from_slice(&HEX_BYTE_TABLE[b0 as usize]);
+    head[3..5].copy_from_slice(&HEX_BYTE_TABLE[b1 as usize]);
+    head[5..7].copy_from_slice(&HEX_BYTE_TABLE[b2 as usize]);
+    cur.pos = start + 7;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_m_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
+    if cur.remaining() < 8 {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + 8];
+    head[0] = b'm';
+    head[1] = b'#';
+    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[b0 as usize]);
+    head[4..6].copy_from_slice(&HEX_BYTE_TABLE[b1 as usize]);
+    head[6..8].copy_from_slice(&HEX_BYTE_TABLE[b2 as usize]);
+    cur.pos = start + 8;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_bin8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
+    const PREFIX: &str = "2진수: ";
+    const PREFIX_LEN: usize = PREFIX.len();
+    const LINE_LEN: usize = PREFIX_LEN + 8 * 8 + 7 + 1;
+    if cur.remaining() < LINE_LEN {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + LINE_LEN];
+    head[..PREFIX_LEN].copy_from_slice(PREFIX.as_bytes());
+    let mut pos = PREFIX_LEN;
+    let mut i = 0usize;
+    while i < 8 {
+        let b = bytes[i] as usize;
+        head[pos..pos + 8].copy_from_slice(&BIN8_TABLE[b]);
+        pos += 8;
+        if i != 7 {
+            head[pos] = b' ';
+            pos += 1;
+        } else {
+            head[pos] = b'\n';
+            pos += 1;
+        }
+        i += 1;
+    }
+    cur.pos = start + LINE_LEN;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_hex8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
+    const PREFIX: &str = "16진수: ";
+    const PREFIX_LEN: usize = PREFIX.len();
+    const LINE_LEN: usize = PREFIX_LEN + 8 * 2 + 7 + 1;
+    if cur.remaining() < LINE_LEN {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + LINE_LEN];
+    head[..PREFIX_LEN].copy_from_slice(PREFIX.as_bytes());
+    let mut pos = PREFIX_LEN;
+    let mut i = 0usize;
+    while i < 8 {
+        let b = bytes[i] as usize;
+        head[pos..pos + 2].copy_from_slice(&HEX_BYTE_TABLE[b]);
+        pos += 2;
+        if i != 7 {
+            head[pos] = b' ';
+            pos += 1;
+        } else {
+            head[pos] = b'\n';
+            pos += 1;
+        }
+        i += 1;
+    }
+    cur.pos = start + LINE_LEN;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_ascii8(cur: &mut BufCursor<'_>, chars: &[char; 8]) -> IoRst<()> {
+    if cur.remaining() < 8 {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + 8];
+    head[0] = chars[0] as u8;
+    head[1] = chars[1] as u8;
+    head[2] = chars[2] as u8;
+    head[3] = chars[3] as u8;
+    head[4] = chars[4] as u8;
+    head[5] = chars[5] as u8;
+    head[6] = chars[6] as u8;
+    head[7] = chars[7] as u8;
+    cur.pos = start + 8;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoRst<()> {
+    let mut tmp = [0u8; 10];
+    let mut i = tmp.len();
+    while n >= 100 {
+        let rem = (n % 100) as usize;
+        n /= 100;
+        i -= 2;
+        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+    }
+    if n >= 10 {
+        let rem = n as usize;
+        i -= 2;
+        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+    } else {
+        i -= 1;
+        tmp[i] = b'0' + (n as u8);
+    }
+    buf_write_bytes(cur, &tmp[i..])
+}
+#[inline(always)]
+fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
+    let mut tmp = [0u8; 20];
+    let mut i = tmp.len();
+    while n >= 100 {
+        let rem = (n % 100) as usize;
+        n /= 100;
+        i -= 2;
+        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+    }
+    if n >= 10 {
+        let rem = n as usize;
+        i -= 2;
+        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+    } else {
+        i -= 1;
+        tmp[i] = b'0' + (n as u8);
+    }
+    buf_write_bytes(cur, &tmp[i..])
+}
+#[inline(always)]
+fn buf_write_i64_dec(cur: &mut BufCursor<'_>, n: i64) -> IoRst<()> {
+    if n < 0 {
+        buf_write_byte(cur, b'-')?;
+        let abs = if n == i64::MIN {
+            (i64::MAX as u64) + 1
+        } else {
+            (-n) as u64
+        };
+        buf_write_u64_dec(cur, abs)
+    } else {
+        buf_write_u64_dec(cur, n as u64)
+    }
+}
+#[inline(always)]
+fn buf_write_u32_dec_0pad_6(cur: &mut BufCursor<'_>, n: u32) -> IoRst<()> {
+    if n >= 1_000_000 {
+        return buf_write_u32_dec(cur, n);
+    }
+    let hi = (n / 10_000) as usize;
+    let rem = (n % 10_000) as usize;
+    let mid = rem / 100;
+    let lo = rem % 100;
+    if cur.remaining() < 6 {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + 6];
+    head[0..2].copy_from_slice(&TWO_DIGITS[hi]);
+    head[2..4].copy_from_slice(&TWO_DIGITS[mid]);
+    head[4..6].copy_from_slice(&TWO_DIGITS[lo]);
+    cur.pos = start + 6;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_u64_octal(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
+    if n == 0 {
+        return buf_write_byte(cur, b'0');
+    }
+    let mut tmp = [0u8; 22];
+    let mut i = tmp.len();
+    while n != 0 {
+        i -= 1;
+        tmp[i] = b'0' + ((n & 7) as u8);
+        n >>= 3;
+    }
+    buf_write_bytes(cur, &tmp[i..])
+}
+#[inline(always)]
+fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
+    if cur.remaining() < 4 {
+        return Err(write_zero_err());
+    }
+    let start = cur.pos;
+    let head = &mut cur.buf[start..start + 4];
+    head[0..2].copy_from_slice(&HEX_BYTE_TABLE[(v >> 8) as usize]);
+    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[(v & 0xFF) as usize]);
+    cur.pos = start + 4;
+    Ok(())
+}
+#[inline(always)]
+fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
+    if v < 0x1000 {
+        if cur.remaining() < 3 {
+            return Err(write_zero_err());
+        }
+        let start = cur.pos;
+        let head = &mut cur.buf[start..start + 3];
+        let hi = (v >> 8) as usize;
+        let lo = (v & 0xFF) as usize;
+        head[0] = HEX_UPPER[hi];
+        head[1..3].copy_from_slice(&HEX_BYTE_TABLE[lo]);
+        cur.pos = start + 3;
+        Ok(())
+    } else {
+        buf_write_hex_u16_0pad4(cur, v)
+    }
+}
+fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool) -> IoRst<()> {
+    let buf = std::mem::take(writer);
+    let mut cur = BufCursor::new(buf);
     let v = data.num_64;
-    let b0 = (v >> 56) as u8;
-    let b1 = (v >> 48) as u8;
-    let b2 = (v >> 40) as u8;
-    let b3 = (v >> 32) as u8;
-    let b4 = (v >> 24) as u8;
-    let b5 = (v >> 16) as u8;
-    let b6 = (v >> 8) as u8;
-    let b7 = v as u8;
-    let hex1 = (v >> 40) & 0xFF_FFFF;
-    let hex2 = (v >> 16) & 0xFF_FFFF;
-    write!(
-        writer,
-        concat!(
-            "64비트 난수: {0} (유부호 정수: {1})\n",
-            "2진수: {2:08b} {3:08b} {4:08b} {5:08b} {6:08b} {7:08b} {8:08b} {9:08b}\n",
-            "8진수: {10:o}\n",
-            "16진수: {11:02X} {12:02X} {13:02X} {14:02X} {15:02X} {16:02X} {17:02X} {18:02X}\n",
-            "Hex 코드: {19}\n",
-            "바이트 배열: {11} {12} {13} {14} {15} {16} {17} {18}\n",
-            "6자리 숫자 비밀번호: {20:06}\n",
-            "8자리 비밀번호: {21}{22}{23}{24}{25}{26}{27}{28}\n",
-            "로또 번호: {29} {30} {31} {32} {33} {34}\n",
-            "일본 로또 7 번호: {35} {36} {37} {38} {39} {40} {41}\n",
-            "유로밀리언 번호: {72} {73} {74} {75} {76} + {77} {78}\n",
-            "한글 음절 4글자: {42}{43}{44}{45}\n",
-            "대한민국 위경도: {46}, {47}\n",
-            "세계 위경도: {48}, {49}\n",
-            "NMS 은하 번호: {50}\n",
-            "NMS 포탈 주소: {51} {52:03X} {53:02X} {54:03X} {55:03X} ",
-            "({56}{57}{58}{59}{60}{61}{62}{63}{64}{65}{66}{67})\n",
-            "NMS 은하 좌표: {68:04X}:{69:04X}:{70:04X}:{71:04X}",
+    let bytes = v.to_be_bytes();
+    let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
+    buf_write_bytes(&mut cur, "64비트 난수: ".as_bytes())?;
+    buf_write_u64_dec(&mut cur, v)?;
+    buf_write_bytes(&mut cur, " (유부호 정수: ".as_bytes())?;
+    buf_write_i64_dec(&mut cur, v as i64)?;
+    buf_write_bytes(&mut cur, ")\n".as_bytes())?;
+    buf_write_bin8_line(&mut cur, &bytes)?;
+    buf_write_bytes(&mut cur, "8진수: ".as_bytes())?;
+    buf_write_u64_octal(&mut cur, v)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_hex8_line(&mut cur, &bytes)?;
+    buf_write_bytes(&mut cur, "Hex 코드: ".as_bytes())?;
+    if use_colors {
+        buf_write_bytes(&mut cur, b"\x1B[38;2;")?;
+        buf_write_u8_dec(&mut cur, b0)?;
+        buf_write_byte(&mut cur, b';')?;
+        buf_write_u8_dec(&mut cur, b1)?;
+        buf_write_byte(&mut cur, b';')?;
+        buf_write_u8_dec(&mut cur, b2)?;
+        buf_write_m_hash_hex24_from_bytes(&mut cur, b0, b1, b2)?;
+        buf_write_bytes(&mut cur, b"\x1B[0m \x1B[38;2;")?;
+        buf_write_u8_dec(&mut cur, b3)?;
+        buf_write_byte(&mut cur, b';')?;
+        buf_write_u8_dec(&mut cur, b4)?;
+        buf_write_byte(&mut cur, b';')?;
+        buf_write_u8_dec(&mut cur, b5)?;
+        buf_write_m_hash_hex24_from_bytes(&mut cur, b3, b4, b5)?;
+        buf_write_bytes(&mut cur, b"\x1B[0m")?;
+    } else {
+        buf_write_hash_hex24_from_bytes(&mut cur, b0, b1, b2)?;
+        buf_write_byte(&mut cur, b' ')?;
+        buf_write_hash_hex24_from_bytes(&mut cur, b3, b4, b5)?;
+    }
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "바이트 배열: ".as_bytes())?;
+    buf_write_u8_array_spaced(&mut cur, &bytes)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "6자리 숫자 비밀번호: ".as_bytes())?;
+    buf_write_u32_dec_0pad_6(&mut cur, data.numeric_password)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "8자리 비밀번호: ".as_bytes())?;
+    buf_write_ascii8(&mut cur, &data.password)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "로또 번호: ".as_bytes())?;
+    buf_write_u8_array_spaced(&mut cur, &data.lotto_numbers)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "일본 로또 7 번호: ".as_bytes())?;
+    buf_write_u8_array_spaced(&mut cur, &data.lotto7_numbers)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "유로밀리언 번호: ".as_bytes())?;
+    buf_write_u8_array_spaced(&mut cur, &data.euro_millions_main_numbers)?;
+    buf_write_bytes(&mut cur, " + ".as_bytes())?;
+    buf_write_u8_array_spaced(&mut cur, &data.euro_millions_lucky_stars)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "한글 음절 4글자: ".as_bytes())?;
+    buf_write_chars(&mut cur, &data.hangul_syllables)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    cursor_write_fmt(
+        &mut cur,
+        format_args!(
+            "대한민국 위경도: {}, {}\n세계 위경도: {}, {}\n",
+            data.kor_coords.0, data.kor_coords.1, data.world_coords.0, data.world_coords.1
         ),
-        data.num_64,
-        data.num_64 as i64,
-        b0,
-        b1,
-        b2,
-        b3,
-        b4,
-        b5,
-        b6,
-        b7,
-        data.num_64,
-        b0,
-        b1,
-        b2,
-        b3,
-        b4,
-        b5,
-        b6,
-        b7,
-        std::fmt::from_fn(|f| {
-            if use_colors {
-                write!(
-                    f,
-                    "{RGB_PREFIX}{b0};{b1};{b2}{SGR_SUFFIX}#{hex1:06X}{COLOR_RESET} {RGB_PREFIX}{b3};{b4};{b5}{SGR_SUFFIX}#{hex2:06X}{COLOR_RESET}",
-                )
-            } else {
-                write!(f, "#{hex1:06X} #{hex2:06X}")
-            }
-        }),
-        data.numeric_password,
-        data.password[0],
-        data.password[1],
-        data.password[2],
-        data.password[3],
-        data.password[4],
-        data.password[5],
-        data.password[6],
-        data.password[7],
-        data.lotto_numbers[0],
-        data.lotto_numbers[1],
-        data.lotto_numbers[2],
-        data.lotto_numbers[3],
-        data.lotto_numbers[4],
-        data.lotto_numbers[5],
-        data.lotto7_numbers[0],
-        data.lotto7_numbers[1],
-        data.lotto7_numbers[2],
-        data.lotto7_numbers[3],
-        data.lotto7_numbers[4],
-        data.lotto7_numbers[5],
-        data.lotto7_numbers[6],
-        data.hangul_syllables[0],
-        data.hangul_syllables[1],
-        data.hangul_syllables[2],
-        data.hangul_syllables[3],
-        data.kor_coords.0,
-        data.kor_coords.1,
-        data.world_coords.0,
-        data.world_coords.1,
-        (b0 as u16).wrapping_add(1),
-        data.planet_number,
-        data.solar_system_index,
-        data.nms_portal_yy,
-        data.nms_portal_zzz,
-        data.nms_portal_xxx,
-        data.glyph_string[0],
-        data.glyph_string[1],
-        data.glyph_string[2],
-        data.glyph_string[3],
-        data.glyph_string[4],
-        data.glyph_string[5],
-        data.glyph_string[6],
-        data.glyph_string[7],
-        data.glyph_string[8],
-        data.glyph_string[9],
-        data.glyph_string[10],
-        data.glyph_string[11],
-        data.galaxy_x,
-        data.galaxy_y,
-        data.galaxy_z,
-        data.solar_system_index,
-        data.euro_millions_main_numbers[0],
-        data.euro_millions_main_numbers[1],
-        data.euro_millions_main_numbers[2],
-        data.euro_millions_main_numbers[3],
-        data.euro_millions_main_numbers[4],
-        data.euro_millions_lucky_stars[0],
-        data.euro_millions_lucky_stars[1]
     )?;
+    buf_write_bytes(&mut cur, "NMS 은하 번호: ".as_bytes())?;
+    buf_write_u32_dec(&mut cur, (b0 as u16).wrapping_add(1) as u32)?;
+    buf_write_byte(&mut cur, b'\n')?;
+    buf_write_bytes(&mut cur, "NMS 포탈 주소: ".as_bytes())?;
+    buf_write_u8_dec(&mut cur, data.planet_number)?;
+    buf_write_byte(&mut cur, b' ')?;
+    buf_write_hex_u16_min3(&mut cur, data.solar_system_index)?;
+    buf_write_byte(&mut cur, b' ')?;
+    buf_write_bytes(&mut cur, &HEX_BYTE_TABLE[data.nms_portal_yy as usize])?;
+    buf_write_byte(&mut cur, b' ')?;
+    buf_write_hex_u16_min3(&mut cur, data.nms_portal_zzz)?;
+    buf_write_byte(&mut cur, b' ')?;
+    buf_write_hex_u16_min3(&mut cur, data.nms_portal_xxx)?;
+    buf_write_byte(&mut cur, b' ')?;
+    buf_write_byte(&mut cur, b'(')?;
+    buf_write_chars(&mut cur, &data.glyph_string)?;
+    buf_write_bytes(&mut cur, ")\n".as_bytes())?;
+    buf_write_bytes(&mut cur, "NMS 은하 좌표: ".as_bytes())?;
+    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_x)?;
+    buf_write_byte(&mut cur, b':')?;
+    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_y)?;
+    buf_write_byte(&mut cur, b':')?;
+    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_z)?;
+    buf_write_byte(&mut cur, b':')?;
+    buf_write_hex_u16_0pad4(&mut cur, data.solar_system_index)?;
+    let BufCursor { buf, pos } = cur;
+    *writer = &mut buf[pos..];
     Ok(())
 }
 fn write_buffer_to_file_guard(
@@ -671,8 +1082,7 @@ fn read_line_reuse<'a>(prompt: std::fmt::Arguments, buffer: &'a mut String) -> I
     buffer.clear();
     {
         let mut out = stdout().lock();
-        use std::io::Write as _;
-        write!(out, "{}", prompt)?;
+        out.write_fmt(prompt)?;
         out.flush()?;
     }
     stdin().read_line(buffer)?;
@@ -680,60 +1090,59 @@ fn read_line_reuse<'a>(prompt: std::fmt::Arguments, buffer: &'a mut String) -> I
 }
 fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     const MAX_PLAYERS: usize = 512;
-    let n: usize;
+    let mut players_storage = String::with_capacity(256);
     let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-    let mut result_input_buffer = String::with_capacity(256);
     let players_prompt =
         format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): ");
-    loop {
-        let mut temp_count = 0;
-        let mut validation_success = true;
-        for (i, _) in
-            parse_comma_separated(read_line_reuse(players_prompt, player_input_buffer)?).enumerate()
-        {
-            if i >= MAX_PLAYERS {
+    let n: usize = loop {
+        let line = read_line_reuse(players_prompt, player_input_buffer)?;
+        let mut count = 0usize;
+        for _ in line.split(',') {
+            count += 1;
+            if count > MAX_PLAYERS {
                 eprintln!("플레이어 수가 최대 {MAX_PLAYERS}명을 초과했습니다.");
-                validation_success = false;
+                count = 0;
                 break;
             }
-            temp_count = i + 1;
         }
-        if !validation_success {
+        if count == 0 {
             continue;
         }
-        if !(2..=MAX_PLAYERS).contains(&temp_count) {
-            if temp_count < 2 {
-                eprintln!("플레이어 수는 최소 2명이어야 합니다.");
-            }
+        if count < 2 {
+            eprintln!("플레이어 수는 최소 2명이어야 합니다.");
             continue;
         }
-        n = temp_count;
-        for (i, player_slice) in parse_comma_separated(player_input_buffer)
-            .take(n)
-            .enumerate()
-        {
-            players_array[i] = player_slice;
-        }
-        break;
+        players_storage.clear();
+        players_storage.push_str(line);
+        break count;
+    };
+    for (i, part) in players_storage.split(',').enumerate() {
+        players_array[i] = part.trim();
     }
+    let mut result_input_buffer = String::with_capacity(256);
+    let mut results_storage = String::with_capacity(256);
     let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
     let result_prompt =
         format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): ");
     loop {
-        let temp_count =
-            parse_comma_separated(read_line_reuse(result_prompt, &mut result_input_buffer)?)
-                .count();
-        if temp_count != n {
-            eprintln!("결과값의 개수({temp_count})가 플레이어 수({n})와 일치하지 않습니다.\n");
+        let line = read_line_reuse(result_prompt, &mut result_input_buffer)?;
+        let mut count = 0usize;
+        for _ in line.split(',') {
+            count += 1;
+            if count > n {
+                break;
+            }
+        }
+        if count != n {
+            eprintln!("결과값의 개수({count})가 플레이어 수({n})와 일치하지 않습니다.\n");
             continue;
         }
-        for (i, result_slice) in parse_comma_separated(&result_input_buffer)
-            .take(n)
-            .enumerate()
-        {
-            results_array[i] = result_slice;
-        }
+        results_storage.clear();
+        results_storage.push_str(line);
         break;
+    }
+    for (i, part) in results_storage.split(',').enumerate() {
+        results_array[i] = part.trim();
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
@@ -745,17 +1154,10 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         current_seed ^= get_hardware_random()?;
         indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize);
     }
-    players_array
-        .iter()
-        .take(n)
-        .zip(indices_slice.iter())
-        .for_each(|(player, &result_index)| {
-            println!("{player} -> {result}", result = results_array[result_index]);
-        });
+    for (player, &result_index) in players_array[..n].iter().zip(indices_slice.iter()) {
+        println!("{player} -> {result}", result = results_array[result_index]);
+    }
     Ok(())
-}
-fn parse_comma_separated(input: &str) -> impl Iterator<Item = &str> {
-    input.split(',').map(str::trim)
 }
 fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Result<()> {
     const MIN_ALLOWED_VALUE: i64 = i64::MIN + 1;
@@ -832,8 +1234,9 @@ fn read_parse_f64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<f6
 }
 fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
     let threshold = s.wrapping_neg() % s;
+    let s128 = s as u128;
     loop {
-        let m = ((get_hardware_random()? ^ seed_mod) as u128) * s as u128;
+        let m = ((get_hardware_random()? ^ seed_mod) as u128) * s128;
         if (m as u64) >= threshold {
             return Ok((m >> 64) as u64);
         }
@@ -858,7 +1261,7 @@ fn regenerate_multiple(
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
     let max_threads = available_parallelism().map_or(4, |n| n.get());
-    let calculated_thread_count = multi_thread_count.min(max_threads as u64).max(1) as usize;
+    let calculated_thread_count = multi_thread_count.min(max_threads as u64) as usize;
     let start_time = Instant::now();
     let in_flight_buffers = calculated_thread_count.saturating_mul(BUFFERS_PER_WORKER);
     let (sender, receiver) = sync_channel::<(DataBuffer, usize, usize)>(in_flight_buffers);
@@ -899,8 +1302,8 @@ fn regenerate_multiple(
         let completed_ref = &completed;
         let progress_thread: Option<ScopedJoinHandle<Result<()>>> = if *IS_TERMINAL {
             Some(s.spawn(move || -> Result<()> {
-                let mut elapsed_buf = [0u8; 16];
-                let mut eta_buf = [0u8; 16];
+                let mut elapsed_buf = [0u8; 7];
+                let mut eta_buf = [0u8; 7];
                 loop {
                     let completed_now = completed_ref.load(Ordering::Relaxed);
                     if completed_now >= multi_thread_count {
@@ -981,8 +1384,8 @@ fn regenerate_multiple(
         }
         join_thread(writer_thread, "쓰기 스레드 패닉 발생")
     })?;
-    let mut elapsed_buf = [0u8; 16];
-    let mut eta_buf = [0u8; 16];
+    let mut elapsed_buf = [0u8; 7];
+    let mut eta_buf = [0u8; 7];
     print_progress(
         requested_count,
         requested_count,
@@ -1022,19 +1425,31 @@ fn print_progress(
     let eta_len = format_time_into(eta_secs, eta_buf)?;
     let filled = ((progress * BAR_WIDTH as f64).floor() as usize).min(BAR_WIDTH);
     let bar = BAR_FULL[filled];
+    let percent = (progress * 100.0).floor() as u32;
+    let mut line = [0u8; 128];
+    let mut cur = BufCursor::new(&mut line);
+    buf_write_byte(&mut cur, b'\r')?;
+    buf_write_bytes(&mut cur, bar.as_bytes())?;
+    buf_write_byte(&mut cur, b' ')?;
+    if percent < 10 {
+        buf_write_bytes(&mut cur, b"  ")?;
+    } else if percent < 100 {
+        buf_write_byte(&mut cur, b' ')?;
+    }
+    buf_write_u8_dec(&mut cur, percent as u8)?;
+    buf_write_byte(&mut cur, b'%')?;
+    buf_write_bytes(&mut cur, b" (")?;
+    buf_write_u64_dec(&mut cur, completed)?;
+    buf_write_byte(&mut cur, b'/')?;
+    buf_write_u64_dec(&mut cur, total)?;
+    buf_write_bytes(&mut cur, ") | 소요: ".as_bytes())?;
+    buf_write_bytes(&mut cur, &elapsed_buf[..elapsed_len])?;
+    buf_write_bytes(&mut cur, " | ETA: ".as_bytes())?;
+    buf_write_bytes(&mut cur, &eta_buf[..eta_len])?;
+    buf_write_bytes(&mut cur, b" \x1b[K")?;
+    let used = cur.written_len();
     let mut out = stdout().lock();
-    let elapsed_str = str::from_utf8(&elapsed_buf[..elapsed_len]).unwrap_or("--:--.-");
-    let eta_str = str::from_utf8(&eta_buf[..eta_len]).unwrap_or("--:--.-");
-    write!(
-        out,
-        "\r{} {:>3}% ({}/{}) | 소요: {} | ETA: {} \x1b[K",
-        bar,
-        (progress * 100.0).floor() as u32,
-        completed,
-        total,
-        elapsed_str,
-        eta_str,
-    )?;
+    out.write_all(&line[..used])?;
     out.flush()?;
     Ok(())
 }
@@ -1047,11 +1462,11 @@ fn format_time_into(seconds: f64, buf: &mut [u8]) -> IoRst<usize> {
     let minutes = (deci / 600).min(99) as usize;
     let sec_whole = ((deci / 10) % 60) as usize;
     let tenths = (deci % 10) as usize;
-    let mut out = *b"00:00.0";
-    out[0..2].copy_from_slice(&TWO_DIGITS[minutes]);
-    out[3..5].copy_from_slice(&TWO_DIGITS[sec_whole]);
-    out[6] = DIGITS[tenths];
-    buf[..7].copy_from_slice(&out);
+    buf[0..2].copy_from_slice(&TWO_DIGITS[minutes]);
+    buf[2] = b':';
+    buf[3..5].copy_from_slice(&TWO_DIGITS[sec_whole]);
+    buf[5] = b'.';
+    buf[6] = DIGITS[tenths];
     Ok(7)
 }
 fn join_thread<T>(handle: ScopedJoinHandle<'_, Result<T>>, panic_msg: &'static str) -> Result<T> {
