@@ -1563,8 +1563,8 @@
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
       BIG_MODE_THRESHOLD: 1000,
     };
-    const EVT_CAPTURE = { capture: true };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
+    const EVT_PASSIVE = { passive: true };
     const EVT_ONCE = { once: true };
     const FETCH_HEADERS = { Accept: "application/json" };
     const BASE_URL_HREF =
@@ -1674,7 +1674,7 @@
       if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       updateMapPopoverFromInvoker(btn);
-    }, EVT_CAPTURE);
+    }, EVT_CAPTURE_PASSIVE);
     function updateMapPopoverFromInvoker(invoker) {
       const idxStr = invoker.dataset.idx;
       if (!idxStr) return;
@@ -3705,7 +3705,7 @@
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
-    }, EVT_CAPTURE);
+    }, EVT_CAPTURE_PASSIVE);
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
@@ -3919,6 +3919,11 @@
     let resizeScrollResetTimer = null;
     let SPOTLIGHT_EFFECTS_ENABLED = false;
     let rectCacheObserver = null;
+    const onSpotlightResize = () => {
+      invalidateRectCache();
+      requestRectCacheRefresh();
+      syncLayoutMetrics();
+    };
     const handlePointerOut = (e) => {
       if (e.relatedTarget == null) clearPointerState();
     };
@@ -3940,10 +3945,10 @@
         SPOTLIGHT_EFFECTS_ENABLED = false;
         window.removeEventListener("scroll", invalidateRectCache, EVT_CAPTURE_PASSIVE);
         window.removeEventListener("resize", handleWindowResize);
-        document.removeEventListener("pointerout", handlePointerOut, EVT_CAPTURE);
+        document.removeEventListener("pointerout", handlePointerOut, EVT_CAPTURE_PASSIVE);
         document.removeEventListener("pointercancel", clearPointerState);
         document.removeEventListener("pointermove", handlePointerMove);
-        document.removeEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE);
+        document.removeEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE_PASSIVE);
         tableWrap.removeEventListener("pointerenter", handleTablePointerEnter);
         tableWrap.removeEventListener("pointerleave", handleTablePointerLeave);
         tableWrap.removeEventListener("pointercancel", handleTablePointerLeave);
@@ -3962,21 +3967,14 @@
       SPOTLIGHT_EFFECTS_ENABLED = true;
       window.addEventListener("scroll", invalidateRectCache, EVT_CAPTURE_PASSIVE);
       window.addEventListener("resize", handleWindowResize);
-      document.addEventListener("pointerout", handlePointerOut, EVT_CAPTURE);
-      document.addEventListener("pointercancel", clearPointerState);
-      document.addEventListener("pointermove", handlePointerMove);
-      document.addEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE);
+      document.addEventListener("pointerout", handlePointerOut, EVT_CAPTURE_PASSIVE);
+      document.addEventListener("pointercancel", clearPointerState, EVT_PASSIVE);
+      document.addEventListener("pointermove", handlePointerMove, EVT_PASSIVE);
+      document.addEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE_PASSIVE);
       tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
       tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
       tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
-      rectCacheObserver = new ResizeObserver(
-        syncSpotlightPerfMode._resizeObserverCallback ||
-        (syncSpotlightPerfMode._resizeObserverCallback = () => {
-          invalidateRectCache();
-          requestRectCacheRefresh();
-          syncLayoutMetrics();
-        })
-      );
+      rectCacheObserver = new ResizeObserver(onSpotlightResize);
       for (const node of SPOTLIGHT_OBSERVED_NODES) {
         rectCacheObserver.observe(node);
       }
