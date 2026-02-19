@@ -54,11 +54,11 @@
         border: 0;
       }
 
-      :is(input, button, select) {
+      :is(input, button, select, textarea) {
         font: inherit;
       }
 
-      :is(input, select) {
+      :is(input, select, textarea) {
         @media (pointer: coarse) {
           font-size: 16px !important;
           letter-spacing: -0.03em;
@@ -298,6 +298,21 @@
         overflow: hidden;
       }
 
+      #app>section.card>.left-pane-scroll {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        block-size: 100%;
+        min-block-size: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+
+      #app>section.card>.left-pane-scroll>* {
+        flex-shrink: 0;
+      }
+
       :is(.card, .card-stack-spotlight) {
         --spotlight-radius: 800px;
       }
@@ -324,8 +339,12 @@
       }
 
       .card {
+        --card-pad-inline: clamp(20px, 2.5vw, 32px);
+        --control-pad-block: 10px;
+        --control-pad-inline: 12px;
+        --control-min-block-size: 44px;
         padding-block: clamp(20px, 2.5vw, 32px);
-        padding-inline: clamp(20px, 2.5vw, 32px);
+        padding-inline: var(--card-pad-inline);
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -348,12 +367,22 @@
           }
         }
 
-        >div:has(#coords) {
+        .left-pane-scroll>div:has(#coords) {
           flex: 1;
           display: flex;
           flex-direction: column;
           min-block-size: 0;
           gap: 6px;
+          margin-inline-end: calc(-1 * var(--card-pad-inline));
+          padding-inline-end: var(--card-pad-inline);
+        }
+
+        .left-pane-scroll:has(.manual-rng[open])>div:has(#coords) {
+          flex: 0 0 auto;
+        }
+
+        .left-pane-scroll:has(.manual-rng[open]) #coords {
+          max-block-size: min(32dvh, 280px);
         }
 
         footer {
@@ -512,7 +541,9 @@
         :where(.coords-view,
           button,
           .filters input[type="search"],
-          .filters select) {
+          .filters select,
+          .manual-rng input[type="text"],
+          .manual-rng textarea) {
           border-radius: 12px;
           background-color: var(--panel-bg);
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -520,7 +551,9 @@
 
         :where(button,
           .filters input[type="search"],
-          .filters select) {
+          .filters select,
+          .manual-rng input[type="text"],
+          .manual-rng textarea) {
           border: 0;
           color: var(--fg);
         }
@@ -529,11 +562,13 @@
           .drop-zone,
           .table-wrap,
           .filters input[type="search"],
-          .filters select) {
+          .filters select,
+          .manual-rng input[type="text"],
+          .manual-rng textarea) {
           box-shadow: var(--panel-shadow);
         }
 
-        :where(.coords-view, .coords-view .coords-content) {
+        :where(.coords-view) {
           font: inherit;
         }
 
@@ -547,6 +582,7 @@
           display: block;
           padding-block: var(--coords-pad-block);
           padding-inline: var(--coords-pad-inline);
+          font: inherit;
         }
 
         .coords-view .coords-placeholder {
@@ -570,6 +606,8 @@
         :where(button,
           .filters input[type="search"],
           .filters select,
+          .manual-rng input[type="text"],
+          .manual-rng textarea,
           .map-popover,
           .map-popover a):focus-visible {
           outline: none;
@@ -886,6 +924,146 @@
         }
       }
 
+      .manual-rng {
+        margin-block-start: 2px;
+        border: 1px solid var(--line-soft);
+        border-radius: 14px;
+        background: var(--panel-bg);
+        box-shadow: var(--panel-shadow);
+        padding-inline: 14px;
+        padding-block: 12px;
+
+        summary {
+          cursor: pointer;
+          font-weight: 700;
+          color: var(--accent-ink);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          user-select: none;
+
+          &::marker {
+            content: "";
+          }
+
+          &::before {
+            content: "▸";
+            transition: transform .2s ease;
+            color: var(--muted-strong);
+          }
+        }
+
+        &[open] summary::before {
+          transform: rotate(90deg);
+        }
+
+        .manual-rng-body {
+          margin-block-start: 10px;
+          display: grid;
+          gap: 10px;
+          min-block-size: 0;
+        }
+
+        &[open] .manual-rng-body {
+          max-block-size: min(52dvh, 420px);
+          overflow-y: auto;
+          padding-inline-end: 4px;
+          scrollbar-width: thin;
+        }
+
+        .manual-rng-help {
+          color: var(--muted);
+          font-size: var(--fs-sm);
+          line-height: 1.35;
+        }
+
+        .manual-rng-field {
+          display: grid;
+          gap: 6px;
+        }
+
+        :is(input[type="text"], textarea) {
+          inline-size: 100%;
+          padding-block: var(--control-pad-block, 10px);
+          padding-inline: var(--control-pad-inline, 12px);
+          font-size: var(--fs-sm);
+          font-weight: 500;
+          line-height: 1.45;
+
+          &::placeholder {
+            color: var(--muted-strong);
+            opacity: 1;
+          }
+        }
+
+        input[type="text"] {
+          min-block-size: var(--control-min-block-size, 44px);
+          caret-color: var(--accent-ink);
+        }
+
+        .manual-rng-label {
+          font-size: var(--fs-sm);
+          font-weight: 600;
+          color: var(--muted-strong);
+        }
+
+        .manual-rng-meta {
+          color: var(--muted);
+          font-size: var(--fs-sm);
+          line-height: 1.35;
+          white-space: pre-wrap;
+        }
+
+        .manual-rng-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+
+          #runBtn,
+          #clearBtn,
+          #saveOutput {
+            min-inline-size: 120px;
+            padding-inline: 12px;
+          }
+
+          #copyOutput {
+            inline-size: 44px;
+            block-size: 44px;
+            padding-inline: 0;
+            padding-block: 0;
+
+            svg {
+              inline-size: 18px;
+              block-size: 18px;
+              fill: none;
+              stroke: currentColor;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+              stroke-width: 1.8;
+            }
+          }
+        }
+
+        textarea {
+          min-block-size: 90px;
+          resize: vertical;
+          scrollbar-width: thin;
+          caret-color: var(--accent-ink);
+        }
+
+        :is(input[type="text"], textarea):focus-visible {
+          box-shadow: inset 0 0 0 2px var(--accent-border), var(--panel-shadow);
+        }
+
+        #output.coords-view {
+          max-block-size: 260px;
+        }
+
+        #error {
+          color: color-mix(in oklch, var(--err) 75%, var(--fg));
+        }
+      }
+
       .table-wrap {
         border-radius: 20px;
         background-color: var(--panel-bg);
@@ -932,8 +1110,9 @@
         margin-block: 10px 12px;
 
         :is(input[type="search"], select) {
-          padding-block: 10px;
-          padding-inline: 12px;
+          padding-block: var(--control-pad-block, 10px);
+          padding-inline: var(--control-pad-inline, 12px);
+          min-block-size: var(--control-min-block-size, 44px);
         }
 
         input[type="search"] {
@@ -1320,79 +1499,116 @@
 <body>
   <main id="app">
     <section class="card">
-      <header class="brand">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
-          <path
-            d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
-        </svg>
-        <div>
-          <h1>SRG 역지오코딩</h1>
-          <p>random_data.txt 좌표 변환</p>
-        </div>
-        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
-          <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="4"></circle>
+      <div class="left-pane-scroll">
+        <header class="brand">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
             <path
-              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41">
-            </path>
+              d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
           </svg>
-          <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
-          </svg>
-          <span class="sr-only" id="theme-toggle-label">다크 모드</span>
-        </button>
-      </header>
-      <h2 class="sr-only">파일 업로드 및 실행</h2>
-      <form>
-        <fieldset class="row">
-          <legend class="sr-only">
-            random_data.txt 파일 업로드 및 조회 제어
-          </legend>
-          <label class="drop-zone">
-            <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-            </svg>
-            <span class="drop-text">
-              <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong> 업로드</span>
-              <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
-            </span>
-            <input type="file" id="file" accept=".txt">
-          </label>
-          <div class="row">
-            <button type="button" id="parse" commandfor="app" command="--parse">좌표 추출</button>
-            <button type="button" id="start" commandfor="app" command="--start" disabled>조회 시작</button>
-            <button type="button" id="pause" commandfor="app" command="--pause" disabled>일시정지</button>
-            <button type="button" id="resume" commandfor="app" command="--resume" disabled>재개</button>
-            <button type="button" id="stop" commandfor="app" command="--stop" disabled>중지</button>
-            <button type="button" id="export" commandfor="app" command="--export" disabled>CSV 내보내기</button>
+          <div>
+            <h1>SRG 역지오코딩</h1>
+            <p>random_data.txt 좌표 변환</p>
           </div>
-        </fieldset>
-      </form>
-      <div>
-        <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-        <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"><span
+          <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41">
+              </path>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+            </svg>
+            <span class="sr-only" id="theme-toggle-label">다크 모드</span>
+          </button>
+        </header>
+        <h2 class="sr-only">파일 업로드 및 실행</h2>
+        <form>
+          <fieldset class="row">
+            <legend class="sr-only">
+              random_data.txt 파일 업로드 및 조회 제어
+            </legend>
+            <label class="drop-zone">
+              <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+              <span class="drop-text">
+                <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong> 업로드</span>
+                <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
+              </span>
+              <input type="file" id="file" accept=".txt">
+            </label>
+            <div class="row">
+              <button type="button" id="parse" commandfor="app" command="--parse">좌표 추출</button>
+              <button type="button" id="start" commandfor="app" command="--start" disabled>조회 시작</button>
+              <button type="button" id="pause" commandfor="app" command="--pause" disabled>일시정지</button>
+              <button type="button" id="resume" commandfor="app" command="--resume" disabled>재개</button>
+              <button type="button" id="stop" commandfor="app" command="--stop" disabled>중지</button>
+              <button type="button" id="export" commandfor="app" command="--export" disabled>CSV 내보내기</button>
+            </div>
+          </fieldset>
+        </form>
+        <details class="manual-rng no-spotlight">
+          <summary>직접 입력 난수 변환</summary>
+          <div class="manual-rng-body">
+            <p class="manual-rng-help">기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.</p>
+            <label class="manual-rng-field" for="num64">
+              <span class="manual-rng-label">기본 난수값</span>
+              <input id="num64" type="text" inputmode="numeric" placeholder="예: 123456789 또는 0x1122334455667788">
+              <span class="manual-rng-meta">입력 범위: 0 ~ 18446744073709551615<br>(0x0 ~ 0xFFFFFFFFFFFFFFFF)</span>
+            </label>
+            <label class="manual-rng-field" for="suppValues">
+              <span class="manual-rng-label">보조 난수값 목록 (선택)</span>
+              <textarea id="suppValues" placeholder="쉼표/공백/줄바꿈 구분
+예) 0x123456789ABCDEF0
+18446744073709551615"></textarea>
+              <span class="manual-rng-meta">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
+            </label>
+            <div class="manual-rng-actions">
+              <button id="runBtn" type="button">변환 실행</button>
+              <button id="saveOutput" type="button">random_data.txt 저장</button>
+              <button id="copyOutput" type="button" title="클립보드 복사" aria-label="클립보드 복사">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span class="sr-only">클립보드 복사</span>
+              </button>
+              <button id="clearBtn" type="button">출력 지우기</button>
+            </div>
+            <div id="meta" class="manual-rng-meta"></div>
+            <div id="error" class="manual-rng-meta"></div>
+            <pre id="output" class="coords-view" role="region" aria-label="변환 결과" tabindex="-1"><span
+              class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
+              class="coords-content"></code></pre>
+          </div>
+        </details>
+        <div>
+          <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
+          <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"><span
             class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
             class="coords-content"></code></pre>
-      </div>
-      <div class="row-progress">
-        <div class="sp">
-          <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
-          <div id="prog-shell" class="progress-shell">
-            <progress id="prog" value="0" max="100"></progress>
-            <div class="progress-visual">
-              <div class="progress-fill"></div>
+        </div>
+        <div class="row-progress">
+          <div class="sp">
+            <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
+            <div id="prog-shell" class="progress-shell">
+              <progress id="prog" value="0" max="100"></progress>
+              <div class="progress-visual">
+                <div class="progress-fill"></div>
+              </div>
             </div>
           </div>
+          <output id="counts">총 <strong id="cnt-total">0</strong>건 중
+            <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
+              id="cnt-remain">0</strong>건 미처리</output>
         </div>
-        <output id="counts">총 <strong id="cnt-total">0</strong>건 중
-          <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
-            id="cnt-remain">0</strong>건 미처리</output>
+        <output id="status" class="status"></output>
+        <footer>
+          <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
+        </footer>
       </div>
-      <output id="status" class="status"></output>
-      <footer>
-        <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
-      </footer>
     </section>
     <div class="card-stack">
       <div class="card-stack-spotlight"></div>
@@ -4053,6 +4269,588 @@
       updateSpotlightsFromTarget(t, x, y);
     }
     syncSpotlightPerfMode(root.hasAttribute(PERF_MODE_ATTR));
+  </script>
+  <script>
+    "use strict";
+    (() => {
+      const U64_MAX = (1n << 64n) - 1n;
+      const U64_SIGN_BIT = 1n << 63n;
+      const U32_MAX_INV = 1 / 4294967295;
+      const GLYPHS = [
+        "🌅",
+        "🐦",
+        "👫",
+        "🦕",
+        "🌘",
+        "🎈",
+        "⛵",
+        "🕷",
+        "🦋",
+        "🌀",
+        "🧊",
+        "🐟",
+        "⛺",
+        "🚀",
+        "🌳",
+        "🔯",
+      ];
+      const MAX_U64_DEC = U64_MAX.toString(10);
+      const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
+      function createDataSet(num64) {
+        return {
+          num_64: num64,
+          seen_lotto: 0n,
+          seen_lotto7: 0n,
+          seen_euro_millions_main: 0n,
+          seen_euro_millions_lucky: 0n,
+          kor_coords: [0, 0],
+          world_coords: [0, 0],
+          lotto_next_idx: 0,
+          lotto7_next_idx: 0,
+          euro_main_next_idx: 0,
+          euro_lucky_next_idx: 0,
+          numeric_password: 0,
+          glyph_string: new Array(12).fill("\0"),
+          password: new Array(8).fill("\0"),
+          hangul_syllables: new Array(4).fill("\0"),
+          solar_system_index: 0,
+          nms_portal_zzz: 0,
+          nms_portal_xxx: 0,
+          galaxy_x: 0,
+          galaxy_y: 0,
+          galaxy_z: 0,
+          lotto7_numbers: new Array(7).fill(0),
+          lotto_numbers: new Array(6).fill(0),
+          euro_millions_main_numbers: new Array(5).fill(0),
+          euro_millions_lucky_stars: new Array(2).fill(0),
+          numeric_password_digits: 0,
+          password_len: 0,
+          planet_number: 0,
+          nms_portal_yy: 0,
+        };
+      }
+      function isComplete(data) {
+        return (
+          data.numeric_password_digits >= 6 &&
+          data.lotto_next_idx >= 6 &&
+          data.lotto7_next_idx >= 7 &&
+          data.password_len >= 8 &&
+          data.euro_main_next_idx >= 5
+        );
+      }
+      function parseU64(raw) {
+        const input = String(raw || "").trim();
+        if (input.length === 0) {
+          throw new Error("빈 값은 허용되지 않습니다.");
+        }
+        let value;
+        if (/^0[xX][0-9a-fA-F]+$/.test(input)) {
+          value = BigInt(input);
+        } else if (/^\d+$/.test(input)) {
+          value = BigInt(input);
+        } else {
+          throw new Error(
+            `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+          );
+        }
+        if (value < 0n || value > U64_MAX) {
+          throw new Error(
+            `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+          );
+        }
+        return value;
+      }
+      function u64ToBytesBe(v) {
+        const bytes = new Array(8);
+        for (let i = 0; i < 8; i += 1) {
+          const shift = BigInt((7 - i) * 8);
+          bytes[i] = Number((v >> shift) & 0xffn);
+        }
+        return bytes;
+      }
+      function reverseBitsU64(v) {
+        let x = v & U64_MAX;
+        let out = 0n;
+        for (let i = 0; i < 64; i += 1) {
+          out = (out << 1n) | (x & 1n);
+          x >>= 1n;
+        }
+        return out;
+      }
+      function processLottoNumbers(byte, modulus, numbers, seen, nextIdx) {
+        if (nextIdx >= numbers.length) {
+          return { inserted: false, seen, nextIdx };
+        }
+        const number = (byte % modulus) + 1;
+        const mask = 1n << BigInt(number);
+        if ((seen & mask) === 0n) {
+          numbers[nextIdx] = number;
+          const updatedSeen = seen | mask;
+          const updatedIdx = nextIdx + 1;
+          if (updatedIdx === numbers.length) {
+            numbers.sort((a, b) => a - b);
+          }
+          return { inserted: true, seen: updatedSeen, nextIdx: updatedIdx };
+        }
+        return { inserted: false, seen, nextIdx };
+      }
+      function fillDataFieldsFromU64(v, data) {
+        const bytes = u64ToBytesBe(v);
+        for (const byte of bytes) {
+          if (byte > 249) {
+            continue;
+          }
+          if (data.numeric_password_digits < 6) {
+            data.numeric_password = data.numeric_password * 10 + (byte % 10);
+            data.numeric_password_digits += 1;
+            if (isComplete(data)) {
+              return;
+            }
+          }
+          if (data.euro_main_next_idx < 5) {
+            const res = processLottoNumbers(
+              byte,
+              50,
+              data.euro_millions_main_numbers,
+              data.seen_euro_millions_main,
+              data.euro_main_next_idx,
+            );
+            if (res.inserted) {
+              data.seen_euro_millions_main = res.seen;
+              data.euro_main_next_idx = res.nextIdx;
+              if (isComplete(data)) {
+                return;
+              }
+            }
+          }
+          if (byte > 224) {
+            continue;
+          }
+          if (data.lotto_next_idx < 6) {
+            const res = processLottoNumbers(
+              byte,
+              45,
+              data.lotto_numbers,
+              data.seen_lotto,
+              data.lotto_next_idx,
+            );
+            if (res.inserted) {
+              data.seen_lotto = res.seen;
+              data.lotto_next_idx = res.nextIdx;
+              if (isComplete(data)) {
+                return;
+              }
+            }
+          }
+          if (byte > 221) {
+            continue;
+          }
+          if (data.lotto7_next_idx < 7) {
+            const res = processLottoNumbers(
+              byte,
+              37,
+              data.lotto7_numbers,
+              data.seen_lotto7,
+              data.lotto7_next_idx,
+            );
+            if (res.inserted) {
+              data.seen_lotto7 = res.seen;
+              data.lotto7_next_idx = res.nextIdx;
+              if (isComplete(data)) {
+                return;
+              }
+            }
+          }
+          if (byte > 187) {
+            continue;
+          }
+          if (data.password_len < 8) {
+            const charCode = (byte % 94) + 33;
+            data.password[data.password_len] = String.fromCodePoint(charCode);
+            data.password_len += 1;
+            if (isComplete(data)) {
+              return;
+            }
+          }
+        }
+      }
+      function bitmaskConst(bits) {
+        if (bits <= 0) {
+          return 0n;
+        }
+        if (bits >= 64) {
+          return U64_MAX;
+        }
+        return (1n << BigInt(bits)) - 1n;
+      }
+      function extractValidBitsForNms(bits, num, shifts, maxValue, reason, supplementalRef, nextSupp) {
+        const mask = bitmaskConst(bits);
+        const maxBig = BigInt(maxValue);
+        for (const shift of shifts) {
+          const v = (num >> BigInt(shift)) & mask;
+          if (v <= maxBig) {
+            return Number(v);
+          }
+        }
+        for (; ;) {
+          const hasSupp = supplementalRef.current !== null;
+          const needNew = !hasSupp || supplementalRef.current.bitsRemaining < bits;
+          if (needNew) {
+            supplementalRef.current = nextSupp(reason);
+          }
+          const supp = supplementalRef.current;
+          const shift = supp.bitsRemaining - bits;
+          const extracted = (supp.value >> BigInt(shift)) & mask;
+          supp.bitsRemaining = shift;
+          if (extracted <= maxBig) {
+            return Number(extracted);
+          }
+        }
+      }
+      function galaxyCoord(value, sub, add) {
+        const a = (value - sub + 0x10000) & 0xffff;
+        const b = (value + add) & 0xffff;
+        return a < b ? a : b;
+      }
+      function generateRandomDataFromNum(num, nextSupp) {
+        const data = createDataSet(num);
+        fillDataFieldsFromU64(num, data);
+        const supplementalRef = { current: null };
+        while (!isComplete(data)) {
+          const newSupp = nextSupp("기본 필드 보완");
+          fillDataFieldsFromU64(newSupp.value, data);
+          supplementalRef.current = newSupp;
+        }
+        let luckyStarSource =
+          supplementalRef.current !== null
+            ? reverseBitsU64(supplementalRef.current.value)
+            : reverseBitsU64(num);
+        luckyStarLoop: for (; ;) {
+          for (const byte of u64ToBytesBe(luckyStarSource)) {
+            if (byte > 251) {
+              continue;
+            }
+            const res = processLottoNumbers(
+              byte,
+              12,
+              data.euro_millions_lucky_stars,
+              data.seen_euro_millions_lucky,
+              data.euro_lucky_next_idx,
+            );
+            if (res.inserted) {
+              data.seen_euro_millions_lucky = res.seen;
+              data.euro_lucky_next_idx = res.nextIdx;
+              if (data.euro_lucky_next_idx >= 2) {
+                break luckyStarLoop;
+              }
+            }
+          }
+          if (data.euro_lucky_next_idx < 2) {
+            const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
+            luckyStarSource = reverseBitsU64(newSupp.value);
+            supplementalRef.current = newSupp;
+          } else {
+            break;
+          }
+        }
+        const hangul = new Array(4).fill("\0");
+        for (let i = 0; i < 4; i += 1) {
+          let index = Number((num >> BigInt(48 - 16 * i)) & 0xffffn);
+          while (index > 55859) {
+            if (supplementalRef.current === null) {
+              supplementalRef.current = nextSupp("한글 음절 보완");
+            }
+            const suppValue = supplementalRef.current.value;
+            const c0 = Number((suppValue >> 48n) & 0xffffn);
+            if (c0 <= 55859) {
+              index = c0;
+              break;
+            }
+            const c1 = Number((suppValue >> 32n) & 0xffffn);
+            if (c1 <= 55859) {
+              index = c1;
+              break;
+            }
+            const c2 = Number((suppValue >> 16n) & 0xffffn);
+            if (c2 <= 55859) {
+              index = c2;
+              break;
+            }
+            const c3 = Number(suppValue & 0xffffn);
+            if (c3 <= 55859) {
+              index = c3;
+              break;
+            }
+            supplementalRef.current = nextSupp("한글 음절 보완 재시도");
+          }
+          hangul[i] = String.fromCodePoint(0xac00 + (index % 11172));
+        }
+        data.hangul_syllables = hangul;
+        const upper32 = Number((num >> 32n) & 0xffff_ffffn);
+        const lower32 = Number(num & 0xffff_ffffn);
+        const upperRatio = upper32 * U32_MAX_INV;
+        const lowerRatio = lower32 * U32_MAX_INV;
+        data.kor_coords = [33.1125 + 5.504167 * upperRatio, 124.609722 + 7.263056 * lowerRatio];
+        data.world_coords = [-90 + 180 * upperRatio, -180 + 360 * lowerRatio];
+        data.planet_number =
+          (extractValidBitsForNms(
+            4,
+            num,
+            [52, 4, 0],
+            11,
+            "NMS 행성 번호 보완",
+            supplementalRef,
+            nextSupp,
+          ) %
+            6) +
+          1;
+        data.solar_system_index =
+          (extractValidBitsForNms(
+            12,
+            num,
+            [40],
+            3834,
+            "NMS 태양계 번호 보완",
+            supplementalRef,
+            nextSupp,
+          ) %
+            767) +
+          1;
+        data.nms_portal_yy = upper32 & 0xff;
+        data.nms_portal_zzz = Number((num >> 20n) & 0xfffn);
+        data.nms_portal_xxx = Number((num >> 8n) & 0xfffn);
+        data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x801, 0x7ff);
+        data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x81, 0x7f);
+        data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x801, 0x7ff);
+        for (let i = 0; i < data.glyph_string.length; i += 1) {
+          let nibbleSource;
+          if (i === 0) {
+            nibbleSource = BigInt(data.planet_number);
+          } else if (i === 1) {
+            nibbleSource = BigInt(data.solar_system_index >> 8);
+          } else if (i === 2) {
+            nibbleSource = BigInt(data.solar_system_index >> 4);
+          } else if (i === 3) {
+            nibbleSource = BigInt(data.solar_system_index);
+          } else {
+            nibbleSource = num >> BigInt(36 - (i - 4) * 4);
+          }
+          const nibble = Number(nibbleSource & 0xfn);
+          data.glyph_string[i] = GLYPHS[nibble];
+        }
+        return data;
+      }
+      function toSignedI64String(v) {
+        if ((v & U64_SIGN_BIT) !== 0n) {
+          return (v - (1n << 64n)).toString(10);
+        }
+        return v.toString(10);
+      }
+      function hexByte(value) {
+        return value.toString(16).toUpperCase().padStart(2, "0");
+      }
+      function hexU16Pad4(value) {
+        return (value & 0xffff).toString(16).toUpperCase().padStart(4, "0");
+      }
+      function hexU16Min3(value) {
+        const v = value & 0xffff;
+        if (v < 0x1000) {
+          return v.toString(16).toUpperCase().padStart(3, "0");
+        }
+        return v.toString(16).toUpperCase().padStart(4, "0");
+      }
+      function formatU32Dec0Pad6(n) {
+        if (n >= 1_000_000) {
+          return String(n);
+        }
+        return String(n).padStart(6, "0");
+      }
+      function formatOutput(data) {
+        const v = data.num_64;
+        const bytes = u64ToBytesBe(v);
+        const [b0, b1, b2, b3, b4, b5] = bytes;
+        const lines = [];
+        lines.push(`64비트 난수: ${v.toString(10)} (유부호 정수: ${toSignedI64String(v)})`);
+        lines.push(`2진수: ${bytes.map((b) => b.toString(2).padStart(8, "0")).join(" ")}`);
+        lines.push(`8진수: ${v.toString(8)}`);
+        lines.push(`16진수: ${bytes.map((b) => hexByte(b)).join(" ")}`);
+        lines.push(`Hex 코드: #${hexByte(b0)}${hexByte(b1)}${hexByte(b2)} #${hexByte(b3)}${hexByte(b4)}${hexByte(b5)}`);
+        lines.push(`바이트 배열: ${bytes.join(" ")}`);
+        lines.push(`6자리 숫자 비밀번호: ${formatU32Dec0Pad6(data.numeric_password)}`);
+        lines.push(`8자리 비밀번호: ${data.password.join("")}`);
+        lines.push(`로또 번호: ${data.lotto_numbers.join(" ")}`);
+        lines.push(`일본 로또 7 번호: ${data.lotto7_numbers.join(" ")}`);
+        lines.push(
+          `유로밀리언 번호: ${data.euro_millions_main_numbers.join(" ")} + ${data.euro_millions_lucky_stars.join(" ")}`,
+        );
+        lines.push(`한글 음절 4글자: ${data.hangul_syllables.join("")}`);
+        lines.push(`대한민국 위경도: ${data.kor_coords[0]}, ${data.kor_coords[1]}`);
+        lines.push(`세계 위경도: ${data.world_coords[0]}, ${data.world_coords[1]}`);
+        lines.push(`NMS 은하 번호: ${((b0 + 1) & 0xffff).toString(10)}`);
+        lines.push(
+          `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)} ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)} ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")})`,
+        );
+        lines.push(
+          `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)}:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)}`,
+        );
+        return lines.join("\n");
+      }
+      function parseSuppTokens(raw) {
+        return String(raw || "")
+          .split(/[\s,]+/g)
+          .map((token) => token.trim())
+          .filter((token) => token.length > 0);
+      }
+      function promptSuppValue(index, reason) {
+        for (; ;) {
+          const input = window.prompt(
+            `supp 값 #${index} 입력 (${reason})\n최소값 예: 0 또는 0x0\n최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}`,
+            "",
+          );
+          if (input === null) {
+            throw new Error("supp 입력이 취소되어 생성을 중단했습니다.");
+          }
+          try {
+            return parseU64(input);
+          } catch (err) {
+            window.alert(err.message);
+          }
+        }
+      }
+      function downloadRandomDataTxt(text) {
+        const blob = new Blob([text.endsWith("\n") ? text : `${text}\n`], {
+          type: "text/plain;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "random_data.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+      async function copyTextToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.inset = "0";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        if (!ok) {
+          throw new Error("클립보드 복사에 실패했습니다.");
+        }
+      }
+      function main() {
+        const num64Input = document.getElementById("num64");
+        const suppInput = document.getElementById("suppValues");
+        const runBtn = document.getElementById("runBtn");
+        const clearBtn = document.getElementById("clearBtn");
+        const saveBtn = document.getElementById("saveOutput");
+        const copyBtn = document.getElementById("copyOutput");
+        const output = document.getElementById("output");
+        const outputContent = output?.querySelector(".coords-content");
+        const error = document.getElementById("error");
+        const meta = document.getElementById("meta");
+        if (
+          !num64Input ||
+          !suppInput ||
+          !runBtn ||
+          !clearBtn ||
+          !saveBtn ||
+          !copyBtn ||
+          !output ||
+          !outputContent ||
+          !error ||
+          !meta
+        ) {
+          return;
+        }
+        const setManualOutputText = (text) => {
+          const value = String(text ?? "");
+          outputContent.textContent = value;
+          if (value.length > 0) {
+            output.setAttribute("data-has-content", "");
+          } else {
+            output.removeAttribute("data-has-content");
+          }
+        };
+        let lastGeneratedText = "";
+        runBtn.addEventListener("click", () => {
+          error.textContent = "";
+          meta.textContent = "";
+          try {
+            const num64 = parseU64(num64Input.value);
+            const suppQueue = parseSuppTokens(suppInput.value);
+            let suppInputCount = 0;
+            let queueIndex = 0;
+            const nextSupp = (reason) => {
+              const suppIndex = suppInputCount + 1;
+              let value;
+              if (queueIndex < suppQueue.length) {
+                const token = suppQueue[queueIndex];
+                queueIndex += 1;
+                value = parseU64(token);
+              } else {
+                value = promptSuppValue(suppIndex, reason);
+              }
+              suppInputCount += 1;
+              return { value, bitsRemaining: 64 };
+            };
+            const data = generateRandomDataFromNum(num64, nextSupp);
+            lastGeneratedText = formatOutput(data);
+            setManualOutputText(lastGeneratedText);
+            meta.textContent = `사전 입력 사용: ${queueIndex}개`;
+          } catch (err) {
+            lastGeneratedText = "";
+            setManualOutputText("");
+            error.textContent = err instanceof Error ? err.message : String(err);
+          }
+        });
+        saveBtn.addEventListener("click", () => {
+          error.textContent = "";
+          if (!lastGeneratedText) {
+            error.textContent = "저장할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
+            return;
+          }
+          downloadRandomDataTxt(lastGeneratedText);
+          meta.textContent =
+            (meta.textContent ? `${meta.textContent}\n` : "") +
+            "random_data.txt 저장 요청을 완료했습니다.";
+        });
+        copyBtn.addEventListener("click", async () => {
+          error.textContent = "";
+          if (!lastGeneratedText) {
+            error.textContent = "복사할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
+            return;
+          }
+          try {
+            await copyTextToClipboard(lastGeneratedText);
+            meta.textContent =
+              (meta.textContent ? `${meta.textContent}\n` : "") +
+              "변환 결과를 클립보드에 복사했습니다.";
+          } catch (err) {
+            error.textContent = err instanceof Error ? err.message : "클립보드 복사에 실패했습니다.";
+          }
+        });
+        clearBtn.addEventListener("click", () => {
+          lastGeneratedText = "";
+          error.textContent = "";
+          meta.textContent = "";
+          setManualOutputText("");
+        });
+      }
+      main();
+    })();
   </script>
 </body>
 
