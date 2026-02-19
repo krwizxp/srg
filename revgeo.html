@@ -4733,24 +4733,10 @@
         setTimeout(() => URL.revokeObjectURL(url), 0);
       }
       async function copyTextToClipboard(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-          return;
+        if (!navigator.clipboard || !window.isSecureContext) {
+          throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
         }
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.inset = "0";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        ta.remove();
-        if (!ok) {
-          throw new Error("클립보드 복사에 실패했습니다.");
-        }
+        await navigator.clipboard.writeText(text);
       }
       function main() {
         const num64Input = document.getElementById("num64");
