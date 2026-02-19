@@ -131,9 +131,9 @@ const fn make_hex_byte_table() -> [[u8; 2]; 256] {
 }
 const HEX_BYTE_TABLE: [[u8; 2]; 256] = make_hex_byte_table();
 #[cfg(target_arch = "x86_64")]
-const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 기타: 종료\n선택해 주세요: ";
+const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ";
 #[cfg(not(target_arch = "x86_64"))]
-const MENU: &str = "\n5: 서버 시간 확인, 기타(1~4, 6 제외): 종료\n(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n선택해 주세요: ";
+const MENU: &str = "\n5: 서버 시간 확인, 7: num_64/supp 수동 입력 생성, 기타(1~4, 6 제외): 종료\n(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n선택해 주세요: ";
 #[derive(Default)]
 struct RandomDataSet {
     num_64: u64,
@@ -186,7 +186,14 @@ impl RandomBitBuffer {
             bits_remaining: 64,
         })
     }
+    fn from_value(value: u64) -> Self {
+        Self {
+            value,
+            bits_remaining: 64,
+        }
+    }
 }
+type SupplementalProvider<'a> = dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'a;
 fn main() -> Result<ExitCode> {
     let file_mutex = Mutex::new(open_or_create_file()?);
     #[cfg(target_arch = "x86_64")]
@@ -268,6 +275,10 @@ fn main() -> Result<ExitCode> {
                     print_x86_64_only_feature_disabled();
                 }
             }
+            "7" => {
+                ensure_file_exists_and_reopen(&file_mutex)?;
+                num_64 = process_manual_random_data(&file_mutex, &mut input_buffer)?
+            }
             _ => return Ok(ExitCode::SUCCESS),
         }
     }
@@ -291,26 +302,70 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
     mutex.lock().map_err(|_| Box::from(context_msg))
 }
-fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<u64> {
-    let data = generate_random_data()?;
-    let num_64 = data.num_64;
+fn persist_and_print_random_data(
+    file_mutex: &Mutex<BufWriter<File>>,
+    data: &RandomDataSet,
+) -> Result<()> {
     let mut buffer = [0u8; BUFFER_SIZE];
-    let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
+    let file_len = format_data_into_buffer(data, &mut buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
         write_buffer_to_file_guard(&mut file_guard, &buffer[..file_len])?;
         file_guard.flush()?
     }
     if *IS_TERMINAL {
-        let console_len = format_data_into_buffer(&data, &mut buffer, true)?;
+        let console_len = format_data_into_buffer(data, &mut buffer, true)?;
         write_slice_to_console(&buffer[..console_len])?
     } else {
         write_slice_to_console(&buffer[..file_len])?
     }
+    Ok(())
+}
+fn process_single_random_data(file_mutex: &Mutex<BufWriter<File>>) -> Result<u64> {
+    let data = generate_random_data()?;
+    let num_64 = data.num_64;
+    persist_and_print_random_data(file_mutex, &data)?;
+    Ok(num_64)
+}
+fn process_manual_random_data(
+    file_mutex: &Mutex<BufWriter<File>>,
+    input_buffer: &mut String,
+) -> Result<u64> {
+    println!("\nnum_64/supp 수동 입력 생성 모드");
+    let num_64 = read_parse_u64(
+        format_args!(
+            "num_64를 입력해 주세요 (최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}): ",
+            u64::MAX,
+            u64::MAX
+        ),
+        input_buffer,
+    )?;
+    let mut supp_input_count = 0usize;
+    let mut next_supp = |reason: &'static str| -> Result<RandomBitBuffer> {
+        supp_input_count += 1;
+        let supp = read_parse_u64(
+            format_args!(
+                "supp 값 #{supp_input_count} 입력 ({reason}, 최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}): ",
+                u64::MAX,
+                u64::MAX
+            ),
+            input_buffer,
+        )?;
+        Ok(RandomBitBuffer::from_value(supp))
+    };
+    let data = generate_random_data_from_num(num_64, &mut next_supp)?;
+    persist_and_print_random_data(file_mutex, &data)?;
     Ok(num_64)
 }
 fn generate_random_data() -> Result<RandomDataSet> {
     let num = get_hardware_random()?;
+    let mut next_supp = |_reason: &'static str| RandomBitBuffer::new();
+    generate_random_data_from_num(num, &mut next_supp)
+}
+fn generate_random_data_from_num(
+    num: u64,
+    next_supp: &mut SupplementalProvider<'_>,
+) -> Result<RandomDataSet> {
     let mut data = RandomDataSet {
         num_64: num,
         ..Default::default()
@@ -318,7 +373,7 @@ fn generate_random_data() -> Result<RandomDataSet> {
     fill_data_fields_from_u64(num, &mut data);
     let mut supplemental: Option<RandomBitBuffer> = None;
     while !data.is_complete() {
-        let new_supp = RandomBitBuffer::new()?;
+        let new_supp = next_supp("기본 필드 보완")?;
         fill_data_fields_from_u64(new_supp.value, &mut data);
         supplemental = Some(new_supp)
     }
@@ -344,7 +399,7 @@ fn generate_random_data() -> Result<RandomDataSet> {
             }
         }
         if data.euro_lucky_next_idx < 2 {
-            let new_supp = RandomBitBuffer::new()?;
+            let new_supp = next_supp("유로밀리언 럭키 스타 보완")?;
             lucky_star_source = new_supp.value.reverse_bits();
             supplemental = Some(new_supp)
         } else {
@@ -356,7 +411,7 @@ fn generate_random_data() -> Result<RandomDataSet> {
         let mut index = ((num >> (48 - 16 * i)) & 0xFFFF) as u32;
         while index > 55_859 {
             if supplemental.is_none() {
-                supplemental = Some(RandomBitBuffer::new()?);
+                supplemental = Some(next_supp("한글 음절 보완")?);
             }
             let supp_value = supplemental
                 .as_ref()
@@ -382,7 +437,7 @@ fn generate_random_data() -> Result<RandomDataSet> {
                 index = c3;
                 break;
             }
-            supplemental = Some(RandomBitBuffer::new()?);
+            supplemental = Some(next_supp("한글 음절 보완 재시도")?);
         }
         *slot = from_u32(0xAC00 + (index % 11_172)).ok_or("한글 음절 변환 실패")?;
     }
@@ -395,10 +450,26 @@ fn generate_random_data() -> Result<RandomDataSet> {
         124.609722 + 7.263056 * lower_ratio,
     );
     data.world_coords = (-90.0 + 180.0 * upper_ratio, -180.0 + 360.0 * lower_ratio);
-    data.planet_number =
-        extract_valid_bits_for_nms::<4>(num, &[52, 4, 0], 11, &mut supplemental)? as u8 % 6 + 1;
-    data.solar_system_index =
-        extract_valid_bits_for_nms::<12>(num, &[40], 3834, &mut supplemental)? as u16 % 767 + 1;
+    data.planet_number = extract_valid_bits_for_nms::<4>(
+        num,
+        &[52, 4, 0],
+        11,
+        "NMS 행성 번호 보완",
+        &mut supplemental,
+        next_supp,
+    )? as u8
+        % 6
+        + 1;
+    data.solar_system_index = extract_valid_bits_for_nms::<12>(
+        num,
+        &[40],
+        3834,
+        "NMS 태양계 번호 보완",
+        &mut supplemental,
+        next_supp,
+    )? as u16
+        % 767
+        + 1;
     data.nms_portal_yy = upper_32_bits as u8;
     data.nms_portal_zzz = ((num >> 20) & 0xFFF) as u16;
     data.nms_portal_xxx = ((num >> 8) & 0xFFF) as u16;
@@ -550,7 +621,9 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     num: u64,
     shifts: &[u8],
     max_value: u64,
+    reason: &'static str,
     supplemental: &mut Option<RandomBitBuffer>,
+    next_supp: &mut SupplementalProvider<'_>,
 ) -> Result<u64> {
     let mask: u64 = bitmask_const::<BITS>();
     for &shift in shifts {
@@ -565,7 +638,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             None => true,
         };
         if need_new {
-            *supplemental = Some(RandomBitBuffer::new()?);
+            *supplemental = Some(next_supp(reason)?);
         }
         let supp = supplemental.as_mut().expect("supplemental must be Some");
         let shift = supp.bits_remaining - BITS;
@@ -1197,6 +1270,26 @@ fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i6
         match read_line_reuse(prompt, buffer)?.parse::<i64>() {
             Ok(n) => return Ok(n),
             Err(_) => eprintln!("유효한 정수 형식이 아닙니다.\n"),
+        }
+    }
+}
+fn read_parse_u64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<u64> {
+    loop {
+        let raw = read_line_reuse(prompt, buffer)?;
+        let parsed = if let Some(hex) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
+            u64::from_str_radix(hex, 16)
+        } else {
+            raw.parse::<u64>()
+        };
+        match parsed {
+            Ok(n) => return Ok(n),
+            Err(_) => {
+                eprintln!(
+                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}).\n",
+                    u64::MAX,
+                    u64::MAX
+                )
+            }
         }
     }
 }
