@@ -12,7 +12,7 @@ use std::{
     sync::{
         LazyLock, Mutex, MutexGuard,
         atomic::{AtomicU64, Ordering},
-        mpsc::{TryRecvError, sync_channel},
+        mpsc::{Receiver, SyncSender, TryRecvError, sync_channel},
     },
     thread::{ScopedJoinHandle, available_parallelism, scope, sleep},
     time::{Duration, Instant},
@@ -50,12 +50,12 @@ static GLYPHS: [char; 16] = [
 static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| stdout().is_terminal());
 const fn make_two_digits_table() -> [[u8; 2]; 100] {
     let mut table = [[0u8; 2]; 100];
-    let mut i = 0usize;
-    while i < 100 {
-        let tens = (i as u8) / 10;
-        let ones = (i as u8) % 10;
-        table[i] = [b'0' + tens, b'0' + ones];
-        i += 1;
+    let mut idx = 0usize;
+    let mut value = 0u8;
+    while idx < 100 {
+        table[idx] = [b'0' + value / 10, b'0' + value % 10];
+        idx += 1;
+        value += 1;
     }
     table
 }
@@ -101,19 +101,21 @@ const DIGITS: [u8; 10] = *b"0123456789";
 const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
 const fn make_bin8_table() -> [[u8; 8]; 256] {
     let mut table = [[0u8; 8]; 256];
-    let mut i = 0usize;
-    while i < 256 {
+    let mut idx = 0usize;
+    let mut byte = 0u8;
+    while idx < 256 {
         let mut bit = 0usize;
         while bit < 8 {
             let shift = 7 - bit;
-            table[i][bit] = if ((i as u8) >> shift) & 1 == 1 {
+            table[idx][bit] = if ((byte >> shift) & 1) == 1 {
                 b'1'
             } else {
                 b'0'
             };
             bit += 1;
         }
-        i += 1;
+        idx += 1;
+        byte = byte.wrapping_add(1);
     }
     table
 }
@@ -167,7 +169,7 @@ struct RandomDataSet {
     nms_portal_yy: u8,
 }
 impl RandomDataSet {
-    fn is_complete(&self) -> bool {
+    const fn is_complete(&self) -> bool {
         self.numeric_password_digits >= 6
             && self.lotto_next_idx >= 6
             && self.lotto7_next_idx >= 7
@@ -186,7 +188,7 @@ impl RandomBitBuffer {
             bits_remaining: 64,
         })
     }
-    fn from_value(value: u64) -> Self {
+    const fn from_value(value: u64) -> Self {
         Self {
             value,
             bits_remaining: 64,
@@ -262,11 +264,11 @@ fn main() -> Result<ExitCode> {
                 #[cfg(target_arch = "x86_64")]
                 {
                     match std::fs::remove_file(FILE_NAME) {
-                        Ok(_) => {
-                            println!("파일 '{FILE_NAME}'를 삭제했습니다.")
+                        Ok(()) => {
+                            println!("파일 '{FILE_NAME}'를 삭제했습니다.");
                         }
                         Err(e) => {
-                            eprintln!("{e}")
+                            eprintln!("{e}");
                         }
                     }
                 }
@@ -277,7 +279,7 @@ fn main() -> Result<ExitCode> {
             }
             "7" => {
                 ensure_file_exists_and_reopen(&file_mutex)?;
-                num_64 = process_manual_random_data(&file_mutex, &mut input_buffer)?
+                num_64 = process_manual_random_data(&file_mutex, &mut input_buffer)?;
             }
             _ => return Ok(ExitCode::SUCCESS),
         }
@@ -289,13 +291,13 @@ fn print_x86_64_only_feature_disabled() {
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
     if !Path::new(FILE_NAME).try_exists()? {
-        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?
+        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?;
     }
     Ok(())
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
     Ok(BufWriter::with_capacity(
-        1048576,
+        1_048_576,
         File::options().create(true).append(true).open(FILE_NAME)?,
     ))
 }
@@ -311,13 +313,13 @@ fn persist_and_print_random_data(
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
         write_buffer_to_file_guard(&mut file_guard, &buffer[..file_len])?;
-        file_guard.flush()?
+        file_guard.flush()?;
     }
     if *IS_TERMINAL {
         let console_len = format_data_into_buffer(data, &mut buffer, true)?;
-        write_slice_to_console(&buffer[..console_len])?
+        write_slice_to_console(&buffer[..console_len])?;
     } else {
-        write_slice_to_console(&buffer[..file_len])?
+        write_slice_to_console(&buffer[..file_len])?;
     }
     Ok(())
 }
@@ -362,26 +364,15 @@ fn generate_random_data() -> Result<RandomDataSet> {
     let mut next_supp = |_reason: &'static str| RandomBitBuffer::new();
     generate_random_data_from_num(num, &mut next_supp)
 }
-fn generate_random_data_from_num(
+fn fill_euro_lucky_stars(
+    data: &mut RandomDataSet,
     num: u64,
+    supplemental: &mut Option<RandomBitBuffer>,
     next_supp: &mut SupplementalProvider<'_>,
-) -> Result<RandomDataSet> {
-    let mut data = RandomDataSet {
-        num_64: num,
-        ..Default::default()
-    };
-    fill_data_fields_from_u64(num, &mut data);
-    let mut supplemental: Option<RandomBitBuffer> = None;
-    while !data.is_complete() {
-        let new_supp = next_supp("기본 필드 보완")?;
-        fill_data_fields_from_u64(new_supp.value, &mut data);
-        supplemental = Some(new_supp)
-    }
-    let mut lucky_star_source = if let Some(ref supp) = supplemental {
-        supp.value.reverse_bits()
-    } else {
-        num.reverse_bits()
-    };
+) -> Result<()> {
+    let mut lucky_star_source = supplemental
+        .as_ref()
+        .map_or_else(|| num.reverse_bits(), |supp| supp.value.reverse_bits());
     'lucky_star_loop: loop {
         for byte in lucky_star_source.to_be_bytes() {
             if byte > 251 {
@@ -398,92 +389,119 @@ fn generate_random_data_from_num(
                 break 'lucky_star_loop;
             }
         }
-        if data.euro_lucky_next_idx < 2 {
-            let new_supp = next_supp("유로밀리언 럭키 스타 보완")?;
-            lucky_star_source = new_supp.value.reverse_bits();
-            supplemental = Some(new_supp)
-        } else {
+        if data.euro_lucky_next_idx >= 2 {
             break;
         }
+        let new_supp = next_supp("유로밀리언 럭키 스타 보완")?;
+        lucky_star_source = new_supp.value.reverse_bits();
+        *supplemental = Some(new_supp);
     }
+    Ok(())
+}
+fn find_hangul_candidate(supp_value: u64) -> Option<u32> {
+    for shift in [48usize, 32, 16, 0] {
+        let candidate =
+            u32::try_from((supp_value >> shift) & 0xFFFF).expect("16-bit chunk fits into u32");
+        if candidate <= 55_859 {
+            return Some(candidate);
+        }
+    }
+    None
+}
+fn fill_hangul_syllables(
+    num: u64,
+    supplemental: &mut Option<RandomBitBuffer>,
+    next_supp: &mut SupplementalProvider<'_>,
+) -> Result<[char; 4]> {
     let mut hangul = ['\0'; 4];
-    for (i, slot) in hangul.iter_mut().enumerate() {
-        let mut index = ((num >> (48 - 16 * i)) & 0xFFFF) as u32;
-        while index > 55_859 {
+    for (idx, slot) in hangul.iter_mut().enumerate() {
+        let mut syllable_index = u32::try_from((num >> (48usize - 16 * idx)) & 0xFFFF)
+            .expect("16-bit chunk fits into u32");
+        while syllable_index > 55_859 {
             if supplemental.is_none() {
-                supplemental = Some(next_supp("한글 음절 보완")?);
+                *supplemental = Some(next_supp("한글 음절 보완")?);
             }
             let supp_value = supplemental
                 .as_ref()
                 .expect("supplemental must be Some")
                 .value;
-            let c0 = ((supp_value >> 48) & 0xFFFF) as u32;
-            if c0 <= 55_859 {
-                index = c0;
-                break;
+            if let Some(candidate) = find_hangul_candidate(supp_value) {
+                syllable_index = candidate;
+            } else {
+                *supplemental = Some(next_supp("한글 음절 보완 재시도")?);
             }
-            let c1 = ((supp_value >> 32) & 0xFFFF) as u32;
-            if c1 <= 55_859 {
-                index = c1;
-                break;
-            }
-            let c2 = ((supp_value >> 16) & 0xFFFF) as u32;
-            if c2 <= 55_859 {
-                index = c2;
-                break;
-            }
-            let c3 = (supp_value & 0xFFFF) as u32;
-            if c3 <= 55_859 {
-                index = c3;
-                break;
-            }
-            supplemental = Some(next_supp("한글 음절 보완 재시도")?);
         }
-        *slot = from_u32(0xAC00 + (index % 11_172)).ok_or("한글 음절 변환 실패")?;
+        *slot = from_u32(0xAC00 + (syllable_index % 11_172)).ok_or("한글 음절 변환 실패")?;
     }
-    data.hangul_syllables = hangul;
-    let upper_32_bits = num >> 32;
-    let upper_ratio = (upper_32_bits as f64) * U32_MAX_INV;
-    let lower_ratio = ((num & 0xFFFF_FFFF) as f64) * U32_MAX_INV;
+    Ok(hangul)
+}
+fn generate_random_data_from_num(
+    num: u64,
+    next_supp: &mut SupplementalProvider<'_>,
+) -> Result<RandomDataSet> {
+    let mut data = RandomDataSet {
+        num_64: num,
+        ..Default::default()
+    };
+    fill_data_fields_from_u64(num, &mut data);
+    let mut supplemental: Option<RandomBitBuffer> = None;
+    while !data.is_complete() {
+        let new_supp = next_supp("기본 필드 보완")?;
+        fill_data_fields_from_u64(new_supp.value, &mut data);
+        supplemental = Some(new_supp);
+    }
+    fill_euro_lucky_stars(&mut data, num, &mut supplemental, next_supp)?;
+    data.hangul_syllables = fill_hangul_syllables(num, &mut supplemental, next_supp)?;
+    let upper_32_bits = u32::try_from(num >> 32).expect("upper 32 bits always fit u32");
+    let lower_32_bits =
+        u32::try_from(num & u64::from(u32::MAX)).expect("lower 32 bits always fit u32");
+    let upper_ratio = f64::from(upper_32_bits) * U32_MAX_INV;
+    let lower_ratio = f64::from(lower_32_bits) * U32_MAX_INV;
     data.kor_coords = (
-        33.112500 + 5.504167 * upper_ratio,
-        124.609722 + 7.263056 * lower_ratio,
+        5.504_167_f64.mul_add(upper_ratio, 33.112_500),
+        7.263_056_f64.mul_add(lower_ratio, 124.609_722),
     );
-    data.world_coords = (-90.0 + 180.0 * upper_ratio, -180.0 + 360.0 * lower_ratio);
-    data.planet_number = extract_valid_bits_for_nms::<4>(
+    data.world_coords = (
+        180.0f64.mul_add(upper_ratio, -90.0),
+        360.0f64.mul_add(lower_ratio, -180.0),
+    );
+    let planet_number = extract_valid_bits_for_nms::<4>(
         num,
         &[52, 4, 0],
         11,
         "NMS 행성 번호 보완",
         &mut supplemental,
         next_supp,
-    )? as u8
-        % 6
+    )? % 6
         + 1;
-    data.solar_system_index = extract_valid_bits_for_nms::<12>(
+    data.planet_number = u8::try_from(planet_number).expect("planet number is in 1..=6");
+    let solar_system_index = extract_valid_bits_for_nms::<12>(
         num,
         &[40],
         3834,
         "NMS 태양계 번호 보완",
         &mut supplemental,
         next_supp,
-    )? as u16
-        % 767
+    )? % 767
         + 1;
-    data.nms_portal_yy = upper_32_bits as u8;
-    data.nms_portal_zzz = ((num >> 20) & 0xFFF) as u16;
-    data.nms_portal_xxx = ((num >> 8) & 0xFFF) as u16;
+    data.solar_system_index =
+        u16::try_from(solar_system_index).expect("solar system index is in 1..=767");
+    data.nms_portal_yy =
+        u8::try_from(upper_32_bits & u32::from(u8::MAX)).expect("masked to 8 bits");
+    data.nms_portal_zzz = u16::try_from((num >> 20) & 0xFFF).expect("masked to 12 bits");
+    data.nms_portal_xxx = u16::try_from((num >> 8) & 0xFFF).expect("masked to 12 bits");
     data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_xxx);
-    data.galaxy_y = galaxy_coord::<0x81, 0x7F>(data.nms_portal_yy as u16);
+    data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(data.nms_portal_yy));
     data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(data.nms_portal_zzz);
-    for (i, slot) in data.glyph_string.iter_mut().enumerate() {
-        let nibble = (match i {
-            0 => data.planet_number as u64,
-            1 => (data.solar_system_index >> 8) as u64,
-            2 => (data.solar_system_index >> 4) as u64,
-            3 => data.solar_system_index as u64,
-            _ => num >> (36 - (i as u8 - 4) * 4),
-        } & 0xF) as usize;
+    for (idx, slot) in data.glyph_string.iter_mut().enumerate() {
+        let nibble_source = match idx {
+            0 => u64::from(data.planet_number),
+            1 => u64::from(data.solar_system_index >> 8),
+            2 => u64::from(data.solar_system_index >> 4),
+            3 => u64::from(data.solar_system_index),
+            _ => num >> (36usize - (idx - 4) * 4),
+        };
+        let nibble = usize::try_from(nibble_source & 0xF).expect("nibble fits into usize");
         *slot = GLYPHS[nibble];
     }
     Ok(data)
@@ -498,10 +516,13 @@ fn get_hardware_random() -> Result<u64> {
 #[cfg(target_arch = "x86_64")]
 fn rdseed_impl() -> Result<u64> {
     let mut v = 0u64;
-    while unsafe { _rdseed64_step(&mut v) } != 1 {
-        std::hint::spin_loop()
+    for _ in 0..1_000 {
+        if unsafe { _rdseed64_step(&mut v) } == 1 {
+            return Ok(v);
+        }
+        std::hint::spin_loop();
     }
-    Ok(v)
+    Err("RDSEED 실패".into())
 }
 #[cfg(not(target_arch = "x86_64"))]
 fn rdseed_impl() -> Result<u64> {
@@ -585,7 +606,7 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         if data.password_len < 8
             && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
             && {
-                data.password[data.password_len as usize] = ch;
+                data.password[usize::from(data.password_len)] = ch;
                 data.password_len += 1;
                 data.is_complete()
             }
@@ -611,7 +632,7 @@ fn process_lotto_numbers(
         *seen |= mask;
         *next_idx += 1;
         if *next_idx == numbers.len() {
-            numbers.sort_unstable()
+            numbers.sort_unstable();
         }
         return true;
     }
@@ -633,10 +654,9 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         }
     }
     loop {
-        let need_new = match supplemental.as_ref() {
-            Some(supp) => supp.bits_remaining < BITS,
-            None => true,
-        };
+        let need_new = supplemental
+            .as_ref()
+            .is_none_or(|supp| supp.bits_remaining < BITS);
         if need_new {
             *supplemental = Some(next_supp(reason)?);
         }
@@ -654,28 +674,22 @@ fn format_data_into_buffer(
     buffer: &mut [u8; BUFFER_SIZE],
     use_colors: bool,
 ) -> Result<usize> {
-    let mut slice = &mut buffer[..];
-    format_output(&mut slice, data, use_colors)?;
-    Ok(BUFFER_SIZE - slice.len())
+    Ok(format_output(buffer.as_mut_slice(), data, use_colors)?)
 }
 struct BufCursor<'a> {
     buf: &'a mut [u8],
     pos: usize,
 }
 impl<'a> BufCursor<'a> {
-    #[inline(always)]
-    fn new(buf: &'a mut [u8]) -> Self {
+    const fn new(buf: &'a mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
-    #[inline(always)]
-    fn remaining(&self) -> usize {
+    const fn remaining(&self) -> usize {
         self.buf.len() - self.pos
     }
-    #[inline(always)]
-    fn written_len(&self) -> usize {
+    const fn written_len(&self) -> usize {
         self.pos
     }
-    #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> IoRst<()> {
         let len = bytes.len();
         if self.remaining() < len {
@@ -686,7 +700,6 @@ impl<'a> BufCursor<'a> {
         self.pos = end;
         Ok(())
     }
-    #[inline(always)]
     fn write_byte(&mut self, b: u8) -> IoRst<()> {
         if self.remaining() < 1 {
             return Err(write_zero_err());
@@ -696,7 +709,6 @@ impl<'a> BufCursor<'a> {
         Ok(())
     }
 }
-#[inline(always)]
 fn cursor_write_fmt(cur: &mut BufCursor<'_>, args: std::fmt::Arguments<'_>) -> IoRst<()> {
     let start = cur.pos;
     let mut slice = &mut cur.buf[start..];
@@ -706,15 +718,12 @@ fn cursor_write_fmt(cur: &mut BufCursor<'_>, args: std::fmt::Arguments<'_>) -> I
     cur.pos += before - after;
     res
 }
-#[inline(always)]
 fn buf_write_bytes(cur: &mut BufCursor<'_>, bytes: &[u8]) -> IoRst<()> {
     cur.write_bytes(bytes)
 }
-#[inline(always)]
 fn buf_write_byte(cur: &mut BufCursor<'_>, byte: u8) -> IoRst<()> {
     cur.write_byte(byte)
 }
-#[inline(always)]
 fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -> IoRst<()> {
     let mut total = 0usize;
     let mut i = 0usize;
@@ -738,37 +747,35 @@ fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -
     cur.pos = end;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_u8_dec(cur: &mut BufCursor<'_>, n: u8) -> IoRst<()> {
     if n >= 100 {
         if cur.remaining() < 3 {
             return Err(write_zero_err());
         }
-        let hundreds = (n / 100) as usize;
-        let rem = (n % 100) as usize;
+        let hundreds = usize::from(n / 100);
+        let rem = usize::from(n % 100);
         let start = cur.pos;
         cur.buf[start] = DIGITS[hundreds];
         cur.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
         cur.pos = start + 3;
-        Ok(())
-    } else if n >= 10 {
+        return Ok(());
+    }
+    if n >= 10 {
         if cur.remaining() < 2 {
             return Err(write_zero_err());
         }
         let start = cur.pos;
-        cur.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[n as usize]);
+        cur.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[usize::from(n)]);
         cur.pos = start + 2;
-        Ok(())
-    } else {
-        if cur.remaining() < 1 {
-            return Err(write_zero_err());
-        }
-        cur.buf[cur.pos] = b'0' + n;
-        cur.pos += 1;
-        Ok(())
+        return Ok(());
     }
+    if cur.remaining() < 1 {
+        return Err(write_zero_err());
+    }
+    cur.buf[cur.pos] = b'0' + n;
+    cur.pos += 1;
+    Ok(())
 }
-#[inline(always)]
 fn buf_write_u8_array_spaced<const N: usize>(cur: &mut BufCursor<'_>, nums: &[u8; N]) -> IoRst<()> {
     let mut total = N.saturating_sub(1);
     let mut i = 0usize;
@@ -798,13 +805,13 @@ fn buf_write_u8_array_spaced<const N: usize>(cur: &mut BufCursor<'_>, nums: &[u8
         }
         let n = nums[j];
         if n >= 100 {
-            let hundreds = (n / 100) as usize;
-            let rem = (n % 100) as usize;
+            let hundreds = usize::from(n / 100);
+            let rem = usize::from(n % 100);
             head[pos] = DIGITS[hundreds];
             head[pos + 1..pos + 3].copy_from_slice(&TWO_DIGITS[rem]);
             pos += 3;
         } else if n >= 10 {
-            head[pos..pos + 2].copy_from_slice(&TWO_DIGITS[n as usize]);
+            head[pos..pos + 2].copy_from_slice(&TWO_DIGITS[usize::from(n)]);
             pos += 2;
         } else {
             head[pos] = b'0' + n;
@@ -815,7 +822,6 @@ fn buf_write_u8_array_spaced<const N: usize>(cur: &mut BufCursor<'_>, nums: &[u8
     cur.pos = end;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
     if cur.remaining() < 7 {
         return Err(write_zero_err());
@@ -823,13 +829,12 @@ fn buf_write_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: 
     let start = cur.pos;
     let head = &mut cur.buf[start..start + 7];
     head[0] = b'#';
-    head[1..3].copy_from_slice(&HEX_BYTE_TABLE[b0 as usize]);
-    head[3..5].copy_from_slice(&HEX_BYTE_TABLE[b1 as usize]);
-    head[5..7].copy_from_slice(&HEX_BYTE_TABLE[b2 as usize]);
+    head[1..3].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b0)]);
+    head[3..5].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b1)]);
+    head[5..7].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b2)]);
     cur.pos = start + 7;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_m_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
     if cur.remaining() < 8 {
         return Err(write_zero_err());
@@ -838,14 +843,13 @@ fn buf_write_m_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2
     let head = &mut cur.buf[start..start + 8];
     head[0] = b'm';
     head[1] = b'#';
-    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[b0 as usize]);
-    head[4..6].copy_from_slice(&HEX_BYTE_TABLE[b1 as usize]);
-    head[6..8].copy_from_slice(&HEX_BYTE_TABLE[b2 as usize]);
+    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b0)]);
+    head[4..6].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b1)]);
+    head[6..8].copy_from_slice(&HEX_BYTE_TABLE[usize::from(b2)]);
     cur.pos = start + 8;
     Ok(())
 }
-#[inline(always)]
-fn buf_write_bin8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
+fn buf_write_bin8_line(cur: &mut BufCursor<'_>, bytes: [u8; 8]) -> IoRst<()> {
     const PREFIX: &str = "2진수: ";
     const PREFIX_LEN: usize = PREFIX.len();
     const LINE_LEN: usize = PREFIX_LEN + 8 * 8 + 7 + 1;
@@ -858,23 +862,17 @@ fn buf_write_bin8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
     let mut pos = PREFIX_LEN;
     let mut i = 0usize;
     while i < 8 {
-        let b = bytes[i] as usize;
+        let b = usize::from(bytes[i]);
         head[pos..pos + 8].copy_from_slice(&BIN8_TABLE[b]);
         pos += 8;
-        if i != 7 {
-            head[pos] = b' ';
-            pos += 1;
-        } else {
-            head[pos] = b'\n';
-            pos += 1;
-        }
+        head[pos] = if i == 7 { b'\n' } else { b' ' };
+        pos += 1;
         i += 1;
     }
     cur.pos = start + LINE_LEN;
     Ok(())
 }
-#[inline(always)]
-fn buf_write_hex8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
+fn buf_write_hex8_line(cur: &mut BufCursor<'_>, bytes: [u8; 8]) -> IoRst<()> {
     const PREFIX: &str = "16진수: ";
     const PREFIX_LEN: usize = PREFIX.len();
     const LINE_LEN: usize = PREFIX_LEN + 8 * 2 + 7 + 1;
@@ -887,100 +885,94 @@ fn buf_write_hex8_line(cur: &mut BufCursor<'_>, bytes: &[u8; 8]) -> IoRst<()> {
     let mut pos = PREFIX_LEN;
     let mut i = 0usize;
     while i < 8 {
-        let b = bytes[i] as usize;
+        let b = usize::from(bytes[i]);
         head[pos..pos + 2].copy_from_slice(&HEX_BYTE_TABLE[b]);
         pos += 2;
-        if i != 7 {
-            head[pos] = b' ';
-            pos += 1;
-        } else {
-            head[pos] = b'\n';
-            pos += 1;
-        }
+        head[pos] = if i == 7 { b'\n' } else { b' ' };
+        pos += 1;
         i += 1;
     }
     cur.pos = start + LINE_LEN;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_ascii8(cur: &mut BufCursor<'_>, chars: &[char; 8]) -> IoRst<()> {
     if cur.remaining() < 8 {
         return Err(write_zero_err());
     }
     let start = cur.pos;
     let head = &mut cur.buf[start..start + 8];
-    head[0] = chars[0] as u8;
-    head[1] = chars[1] as u8;
-    head[2] = chars[2] as u8;
-    head[3] = chars[3] as u8;
-    head[4] = chars[4] as u8;
-    head[5] = chars[5] as u8;
-    head[6] = chars[6] as u8;
-    head[7] = chars[7] as u8;
+    let mut i = 0usize;
+    while i < 8 {
+        head[i] = u8::try_from(u32::from(chars[i])).map_err(|_| {
+            ioErr::new(
+                std::io::ErrorKind::InvalidData,
+                "password contains non-ASCII character",
+            )
+        })?;
+        i += 1;
+    }
     cur.pos = start + 8;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoRst<()> {
     let mut tmp = [0u8; 10];
     let mut i = tmp.len();
     while n >= 100 {
-        let rem = (n % 100) as usize;
+        let rem = usize::try_from(n % 100).expect("remainder is in 0..100");
         n /= 100;
         i -= 2;
         tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
     }
     if n >= 10 {
-        let rem = n as usize;
+        let rem = usize::try_from(n).expect("n is in 10..100");
         i -= 2;
         tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
     } else {
         i -= 1;
-        tmp[i] = b'0' + (n as u8);
+        let digit = u8::try_from(n).expect("n is in 0..10");
+        tmp[i] = b'0' + digit;
     }
     buf_write_bytes(cur, &tmp[i..])
 }
-#[inline(always)]
 fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
     let mut tmp = [0u8; 20];
     let mut i = tmp.len();
     while n >= 100 {
-        let rem = (n % 100) as usize;
+        let rem = usize::from(u8::try_from(n % 100).expect("remainder is in 0..100"));
         n /= 100;
         i -= 2;
         tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
     }
     if n >= 10 {
-        let rem = n as usize;
+        let rem = usize::from(u8::try_from(n).expect("n is in 10..100"));
         i -= 2;
         tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
     } else {
         i -= 1;
-        tmp[i] = b'0' + (n as u8);
+        let digit = u8::try_from(n).expect("n is in 0..10");
+        tmp[i] = b'0' + digit;
     }
     buf_write_bytes(cur, &tmp[i..])
 }
-#[inline(always)]
 fn buf_write_i64_dec(cur: &mut BufCursor<'_>, n: i64) -> IoRst<()> {
     if n < 0 {
         buf_write_byte(cur, b'-')?;
         let abs = if n == i64::MIN {
-            (i64::MAX as u64) + 1
+            i64::MAX.cast_unsigned() + 1
         } else {
-            (-n) as u64
+            (-n).cast_unsigned()
         };
         buf_write_u64_dec(cur, abs)
     } else {
-        buf_write_u64_dec(cur, n as u64)
+        buf_write_u64_dec(cur, n.cast_unsigned())
     }
 }
-#[inline(always)]
 fn buf_write_u32_dec_0pad_6(cur: &mut BufCursor<'_>, n: u32) -> IoRst<()> {
     if n >= 1_000_000 {
         return buf_write_u32_dec(cur, n);
     }
-    let hi = (n / 10_000) as usize;
-    let rem = (n % 10_000) as usize;
+    let hi = usize::try_from(n / 10_000).expect("chunk fits usize");
+    let rem = usize::try_from(n % 10_000).expect("chunk fits usize");
     let mid = rem / 100;
     let lo = rem % 100;
     if cur.remaining() < 6 {
@@ -994,7 +986,6 @@ fn buf_write_u32_dec_0pad_6(cur: &mut BufCursor<'_>, n: u32) -> IoRst<()> {
     cur.pos = start + 6;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_u64_octal(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
     if n == 0 {
         return buf_write_byte(cur, b'0');
@@ -1003,24 +994,25 @@ fn buf_write_u64_octal(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
     let mut i = tmp.len();
     while n != 0 {
         i -= 1;
-        tmp[i] = b'0' + ((n & 7) as u8);
+        let oct_digit = u8::try_from(n & 7).expect("octal digit is in 0..8");
+        tmp[i] = b'0' + oct_digit;
         n >>= 3;
     }
     buf_write_bytes(cur, &tmp[i..])
 }
-#[inline(always)]
 fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
     if cur.remaining() < 4 {
         return Err(write_zero_err());
     }
     let start = cur.pos;
     let head = &mut cur.buf[start..start + 4];
-    head[0..2].copy_from_slice(&HEX_BYTE_TABLE[(v >> 8) as usize]);
-    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[(v & 0xFF) as usize]);
+    let upper = usize::from(u8::try_from(v >> 8).expect("upper byte fits"));
+    let lower = usize::from(u8::try_from(v & 0xFF).expect("lower byte fits"));
+    head[0..2].copy_from_slice(&HEX_BYTE_TABLE[upper]);
+    head[2..4].copy_from_slice(&HEX_BYTE_TABLE[lower]);
     cur.pos = start + 4;
     Ok(())
 }
-#[inline(always)]
 fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
     if v < 0x1000 {
         if cur.remaining() < 3 {
@@ -1028,8 +1020,8 @@ fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
         }
         let start = cur.pos;
         let head = &mut cur.buf[start..start + 3];
-        let hi = (v >> 8) as usize;
-        let lo = (v & 0xFF) as usize;
+        let hi = usize::from(u8::try_from(v >> 8).expect("upper byte fits"));
+        let lo = usize::from(u8::try_from(v & 0xFF).expect("lower byte fits"));
         head[0] = HEX_UPPER[hi];
         head[1..3].copy_from_slice(&HEX_BYTE_TABLE[lo]);
         cur.pos = start + 3;
@@ -1038,8 +1030,7 @@ fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
         buf_write_hex_u16_0pad4(cur, v)
     }
 }
-fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool) -> IoRst<()> {
-    let buf = std::mem::take(writer);
+fn format_output(buf: &mut [u8], data: &RandomDataSet, use_colors: bool) -> IoRst<usize> {
     let mut cur = BufCursor::new(buf);
     let v = data.num_64;
     let bytes = v.to_be_bytes();
@@ -1047,13 +1038,13 @@ fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool)
     buf_write_bytes(&mut cur, "64비트 난수: ".as_bytes())?;
     buf_write_u64_dec(&mut cur, v)?;
     buf_write_bytes(&mut cur, " (유부호 정수: ".as_bytes())?;
-    buf_write_i64_dec(&mut cur, v as i64)?;
-    buf_write_bytes(&mut cur, ")\n".as_bytes())?;
-    buf_write_bin8_line(&mut cur, &bytes)?;
+    buf_write_i64_dec(&mut cur, v.cast_signed())?;
+    buf_write_bytes(&mut cur, b")\n")?;
+    buf_write_bin8_line(&mut cur, bytes)?;
     buf_write_bytes(&mut cur, "8진수: ".as_bytes())?;
     buf_write_u64_octal(&mut cur, v)?;
     buf_write_byte(&mut cur, b'\n')?;
-    buf_write_hex8_line(&mut cur, &bytes)?;
+    buf_write_hex8_line(&mut cur, bytes)?;
     buf_write_bytes(&mut cur, "Hex 코드: ".as_bytes())?;
     if use_colors {
         buf_write_bytes(&mut cur, b"\x1B[38;2;")?;
@@ -1094,7 +1085,7 @@ fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool)
     buf_write_byte(&mut cur, b'\n')?;
     buf_write_bytes(&mut cur, "유로밀리언 번호: ".as_bytes())?;
     buf_write_u8_array_spaced(&mut cur, &data.euro_millions_main_numbers)?;
-    buf_write_bytes(&mut cur, " + ".as_bytes())?;
+    buf_write_bytes(&mut cur, b" + ")?;
     buf_write_u8_array_spaced(&mut cur, &data.euro_millions_lucky_stars)?;
     buf_write_byte(&mut cur, b'\n')?;
     buf_write_bytes(&mut cur, "한글 음절 4글자: ".as_bytes())?;
@@ -1108,14 +1099,14 @@ fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool)
         ),
     )?;
     buf_write_bytes(&mut cur, "NMS 은하 번호: ".as_bytes())?;
-    buf_write_u32_dec(&mut cur, (b0 as u16).wrapping_add(1) as u32)?;
+    buf_write_u32_dec(&mut cur, u32::from(u16::from(b0).wrapping_add(1)))?;
     buf_write_byte(&mut cur, b'\n')?;
     buf_write_bytes(&mut cur, "NMS 포탈 주소: ".as_bytes())?;
     buf_write_u8_dec(&mut cur, data.planet_number)?;
     buf_write_byte(&mut cur, b' ')?;
     buf_write_hex_u16_min3(&mut cur, data.solar_system_index)?;
     buf_write_byte(&mut cur, b' ')?;
-    buf_write_bytes(&mut cur, &HEX_BYTE_TABLE[data.nms_portal_yy as usize])?;
+    buf_write_bytes(&mut cur, &HEX_BYTE_TABLE[usize::from(data.nms_portal_yy)])?;
     buf_write_byte(&mut cur, b' ')?;
     buf_write_hex_u16_min3(&mut cur, data.nms_portal_zzz)?;
     buf_write_byte(&mut cur, b' ')?;
@@ -1123,7 +1114,7 @@ fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool)
     buf_write_byte(&mut cur, b' ')?;
     buf_write_byte(&mut cur, b'(')?;
     buf_write_chars(&mut cur, &data.glyph_string)?;
-    buf_write_bytes(&mut cur, ")\n".as_bytes())?;
+    buf_write_bytes(&mut cur, b")\n")?;
     buf_write_bytes(&mut cur, "NMS 은하 좌표: ".as_bytes())?;
     buf_write_hex_u16_0pad4(&mut cur, data.galaxy_x)?;
     buf_write_byte(&mut cur, b':')?;
@@ -1132,9 +1123,7 @@ fn format_output(writer: &mut &mut [u8], data: &RandomDataSet, use_colors: bool)
     buf_write_hex_u16_0pad4(&mut cur, data.galaxy_z)?;
     buf_write_byte(&mut cur, b':')?;
     buf_write_hex_u16_0pad4(&mut cur, data.solar_system_index)?;
-    let BufCursor { buf, pos } = cur;
-    *writer = &mut buf[pos..];
-    Ok(())
+    Ok(cur.written_len())
 }
 fn write_buffer_to_file_guard(
     file_guard: &mut MutexGuard<BufWriter<File>>,
@@ -1225,7 +1214,10 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     let mut current_seed = num_64;
     for i in (1..n).rev() {
         current_seed ^= get_hardware_random()?;
-        indices_slice.swap(i, random_bounded((i + 1) as u64, current_seed)? as usize);
+        let upper_bound = u64::try_from(i + 1).expect("index bound fits into u64");
+        let swap_index = usize::try_from(random_bounded(upper_bound, current_seed)?)
+            .expect("random_bounded result fits into usize");
+        indices_slice.swap(i, swap_index);
     }
     for (player, &result_index) in players_array[..n].iter().zip(indices_slice.iter()) {
         println!("{player} -> {result}", result = results_array[result_index]);
@@ -1246,20 +1238,23 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
         if n >= MIN_ALLOWED_VALUE {
             break n;
         }
-        eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n")
+        eprintln!("{MIN_ALLOWED_VALUE} 이상의 값을 입력해 주세요.\n");
     };
     let max_value = loop {
         let n = read_parse_i64(format_args!("최댓값을 입력해 주세요: "), input_buffer)?;
         if n >= min_value {
             break n;
         }
-        eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
+        eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n");
     };
-    let range_size = max_value.wrapping_sub(min_value).wrapping_add(1) as u64;
+    let range_size = max_value
+        .wrapping_sub(min_value)
+        .wrapping_add(1)
+        .cast_unsigned();
     let rand_offset = if range_size == 0 {
-        (get_hardware_random()? ^ seed_modifier) as i64
+        (get_hardware_random()? ^ seed_modifier).cast_signed()
     } else {
-        random_bounded(range_size, seed_modifier)? as i64
+        random_bounded(range_size, seed_modifier)?.cast_signed()
     };
     let result = min_value.wrapping_add(rand_offset);
     println!("무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})");
@@ -1276,11 +1271,10 @@ fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i6
 fn read_parse_u64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<u64> {
     loop {
         let raw = read_line_reuse(prompt, buffer)?;
-        let parsed = if let Some(hex) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
-            u64::from_str_radix(hex, 16)
-        } else {
-            raw.parse::<u64>()
-        };
+        let parsed = raw
+            .strip_prefix("0x")
+            .or_else(|| raw.strip_prefix("0X"))
+            .map_or_else(|| raw.parse::<u64>(), |hex| u64::from_str_radix(hex, 16));
         match parsed {
             Ok(n) => return Ok(n),
             Err(_) => {
@@ -1288,7 +1282,7 @@ fn read_parse_u64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<u6
                     "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}).\n",
                     u64::MAX,
                     u64::MAX
-                )
+                );
             }
         }
     }
@@ -1302,15 +1296,16 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
         let num = read_parse_f64(fmax_prompt, input_buffer)?;
         if num >= min_value {
             break num;
-        } else {
-            eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n")
         }
+        eprintln!("최댓값은 최솟값보다 크거나 같아야 합니다.\n");
     };
-    let scale = (get_hardware_random()? ^ seed_modifier) as f64 / (u64::MAX as f64);
-    let result = if min_value == max_value {
+    let random_u32 = u32::try_from((get_hardware_random()? ^ seed_modifier) >> 32)
+        .expect("upper 32 bits always fit u32");
+    let scale = f64::from(random_u32) * U32_MAX_INV;
+    let result = if min_value.to_bits() == max_value.to_bits() {
         min_value
     } else {
-        min_value + scale * (max_value - min_value)
+        scale.mul_add(max_value - min_value, min_value)
     };
     println!("무작위 실수({min_value} ~ {max_value}): {result}");
     Ok(())
@@ -1320,18 +1315,128 @@ fn read_parse_f64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<f6
         match read_line_reuse(prompt, buffer)?.parse::<f64>() {
             Ok(n) if n.is_finite() && !n.is_subnormal() => return Ok(n),
             _ => {
-                eprintln!("유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).\n")
+                eprintln!("유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).\n");
             }
         }
     }
 }
 fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
     let threshold = s.wrapping_neg() % s;
-    let s128 = s as u128;
+    let s128 = u128::from(s);
     loop {
-        let m = ((get_hardware_random()? ^ seed_mod) as u128) * s128;
-        if (m as u64) >= threshold {
-            return Ok((m >> 64) as u64);
+        let m = u128::from(get_hardware_random()? ^ seed_mod) * s128;
+        let low_bits = u64::try_from(m & u128::from(u64::MAX)).expect("masked to 64 bits");
+        if low_bits >= threshold {
+            let high_bits =
+                u64::try_from(m >> 64).expect("upper 64 bits always fit into u64 after shift");
+            return Ok(high_bits);
+        }
+    }
+}
+fn writer_thread_main(
+    file_mutex: &Mutex<BufWriter<File>>,
+    receiver: &Receiver<(DataBuffer, usize, usize)>,
+    buffer_return_senders: &[SyncSender<DataBuffer>],
+) -> Result<RandomDataSet> {
+    let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
+    while let Ok((data_buffer, data_len, worker_idx)) = receiver.recv() {
+        write_buffer_to_file_guard(&mut file_guard, &data_buffer[..data_len])?;
+        let _ = buffer_return_senders[worker_idx].send(data_buffer);
+        while let Ok((more_buffer, more_len, more_worker_idx)) = receiver.try_recv() {
+            write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?;
+            let _ = buffer_return_senders[more_worker_idx].send(more_buffer);
+        }
+    }
+    drop(file_guard);
+    let final_data = generate_random_data()?;
+    let mut final_buffer_file = [0u8; BUFFER_SIZE];
+    let final_bytes_written_file =
+        format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
+    {
+        let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드 종료 처리)")?;
+        write_buffer_to_file_guard(
+            &mut file_guard,
+            &final_buffer_file[..final_bytes_written_file],
+        )?;
+        file_guard.flush()?;
+    }
+    Ok(final_data)
+}
+fn progress_thread_main(
+    completed_ref: &AtomicU64,
+    multi_thread_count: u64,
+    requested_count: u64,
+    start_time: &Instant,
+) -> Result<()> {
+    let mut elapsed_buf = [0u8; 7];
+    let mut eta_buf = [0u8; 7];
+    loop {
+        let completed_now = completed_ref.load(Ordering::Relaxed);
+        if completed_now >= multi_thread_count {
+            break;
+        }
+        print_progress(
+            completed_now,
+            requested_count,
+            start_time,
+            &mut elapsed_buf,
+            &mut eta_buf,
+        )?;
+        sleep(Duration::from_millis(100));
+    }
+    Ok(())
+}
+fn worker_thread_main(
+    worker_idx: usize,
+    return_rx: &Receiver<DataBuffer>,
+    sender_clone: &SyncSender<(DataBuffer, usize, usize)>,
+    completed_ref: &AtomicU64,
+    base_count: u64,
+    remainder: u64,
+) {
+    let worker_idx_u64 = u64::try_from(worker_idx).expect("worker index fits u64");
+    let loop_count = base_count + u64::from(worker_idx_u64 < remainder);
+    let mut local_pool = Vec::with_capacity(BUFFERS_PER_WORKER);
+    for _ in 0..BUFFERS_PER_WORKER {
+        match return_rx.try_recv() {
+            Ok(buffer) => local_pool.push(buffer),
+            Err(TryRecvError::Empty) => break,
+            Err(TryRecvError::Disconnected) => return,
+        }
+    }
+    for _ in 0..loop_count {
+        let mut buffer = match local_pool.pop() {
+            Some(buf) => buf,
+            None => match return_rx.recv() {
+                Ok(buf) => buf,
+                Err(_) => break,
+            },
+        };
+        let len = if let Ok(data) = generate_random_data() {
+            if let Ok(len) = format_data_into_buffer(&data, buffer.as_mut(), false) {
+                len
+            } else {
+                local_pool.push(buffer);
+                continue;
+            }
+        } else {
+            local_pool.push(buffer);
+            continue;
+        };
+        match sender_clone.send((buffer, len, worker_idx)) {
+            Ok(()) => {
+                completed_ref.fetch_add(1, Ordering::Relaxed);
+                while local_pool.len() < BUFFERS_PER_WORKER {
+                    match return_rx.try_recv() {
+                        Ok(buf) => local_pool.push(buf),
+                        Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
+                    }
+                }
+            }
+            Err(send_err) => {
+                let (_returned_buffer, _, _) = send_err.0;
+                break;
+            }
         }
     }
 }
@@ -1353,127 +1458,60 @@ fn regenerate_multiple(
     }
     ensure_file_exists_and_reopen(file_mutex)?;
     let multi_thread_count = requested_count.saturating_sub(1);
-    let max_threads = available_parallelism().map_or(4, |n| n.get());
-    let calculated_thread_count = multi_thread_count.min(max_threads as u64) as usize;
+    let max_threads = available_parallelism().map_or(4, std::num::NonZero::get);
+    let max_threads_u64 = u64::try_from(max_threads).expect("thread count fits u64");
+    let calculated_thread_count =
+        usize::try_from(multi_thread_count.min(max_threads_u64)).expect("thread count fits usize");
     let start_time = Instant::now();
     let in_flight_buffers = calculated_thread_count.saturating_mul(BUFFERS_PER_WORKER);
     let (sender, receiver) = sync_channel::<(DataBuffer, usize, usize)>(in_flight_buffers);
-    let mut buffer_return_txs = Vec::with_capacity(calculated_thread_count);
-    let mut buffer_return_rxs = Vec::with_capacity(calculated_thread_count);
+    let mut buffer_return_senders = Vec::with_capacity(calculated_thread_count);
+    let mut buffer_return_receivers = Vec::with_capacity(calculated_thread_count);
     for _ in 0..calculated_thread_count {
         let (tx, rx) = sync_channel::<DataBuffer>(BUFFERS_PER_WORKER);
         for _ in 0..BUFFERS_PER_WORKER {
             tx.send(Box::new([0u8; BUFFER_SIZE]))?;
         }
-        buffer_return_txs.push(tx);
-        buffer_return_rxs.push(rx);
+        buffer_return_senders.push(tx);
+        buffer_return_receivers.push(rx);
     }
     let completed = AtomicU64::new(0);
     let final_data = scope(|s| -> Result<RandomDataSet> {
-        let buffer_return_txs = buffer_return_txs;
-        let writer_thread = s.spawn(move || -> Result<RandomDataSet> {
-            let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
-            while let Ok((data_buffer, data_len, worker_idx)) = receiver.recv() {
-                write_buffer_to_file_guard(&mut file_guard, &data_buffer[..data_len])?;
-                let _ = buffer_return_txs[worker_idx].send(data_buffer);
-                while let Ok((more_buffer, more_len, more_worker_idx)) = receiver.try_recv() {
-                    write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?;
-                    let _ = buffer_return_txs[more_worker_idx].send(more_buffer);
-                }
-            }
-            let final_data = generate_random_data()?;
-            let mut final_buffer_file = [0u8; BUFFER_SIZE];
-            let final_bytes_written_file =
-                format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
-            write_buffer_to_file_guard(
-                &mut file_guard,
-                &final_buffer_file[..final_bytes_written_file],
-            )?;
-            file_guard.flush()?;
-            Ok(final_data)
-        });
+        let buffer_return_senders = buffer_return_senders;
+        let writer_thread =
+            s.spawn(move || writer_thread_main(file_mutex, &receiver, &buffer_return_senders));
         let completed_ref = &completed;
         let progress_thread: Option<ScopedJoinHandle<Result<()>>> = if *IS_TERMINAL {
-            Some(s.spawn(move || -> Result<()> {
-                let mut elapsed_buf = [0u8; 7];
-                let mut eta_buf = [0u8; 7];
-                loop {
-                    let completed_now = completed_ref.load(Ordering::Relaxed);
-                    if completed_now >= multi_thread_count {
-                        break;
-                    }
-                    print_progress(
-                        completed_now,
-                        requested_count,
-                        &start_time,
-                        &mut elapsed_buf,
-                        &mut eta_buf,
-                    )?;
-                    sleep(Duration::from_millis(100))
-                }
-                Ok(())
+            Some(s.spawn(move || {
+                progress_thread_main(
+                    completed_ref,
+                    multi_thread_count,
+                    requested_count,
+                    &start_time,
+                )
             }))
         } else {
             None
         };
-        let base_count = multi_thread_count / calculated_thread_count as u64;
-        let remainder = multi_thread_count % calculated_thread_count as u64;
-        for (i, return_rx) in buffer_return_rxs.into_iter().enumerate() {
+        let thread_count_u64 = u64::try_from(calculated_thread_count).expect("thread count fits");
+        let base_count = multi_thread_count / thread_count_u64;
+        let remainder = multi_thread_count % thread_count_u64;
+        for (i, return_rx) in buffer_return_receivers.into_iter().enumerate() {
             let sender_clone = sender.clone();
-            s.spawn(move || -> Result<()> {
-                let loop_count = base_count + if (i as u64) < remainder { 1 } else { 0 };
-                let mut local_pool = Vec::with_capacity(BUFFERS_PER_WORKER);
-                for _ in 0..BUFFERS_PER_WORKER {
-                    match return_rx.try_recv() {
-                        Ok(buf) => local_pool.push(buf),
-                        Err(TryRecvError::Empty) => break,
-                        Err(TryRecvError::Disconnected) => return Ok(()),
-                    }
-                }
-                for _ in 0..loop_count {
-                    let mut buffer = match local_pool.pop() {
-                        Some(buf) => buf,
-                        None => match return_rx.recv() {
-                            Ok(buf) => buf,
-                            Err(_) => break,
-                        },
-                    };
-                    let len = match generate_random_data() {
-                        Ok(data) => match format_data_into_buffer(&data, buffer.as_mut(), false) {
-                            Ok(len) => len,
-                            Err(_) => {
-                                local_pool.push(buffer);
-                                continue;
-                            }
-                        },
-                        Err(_) => {
-                            local_pool.push(buffer);
-                            continue;
-                        }
-                    };
-                    match sender_clone.send((buffer, len, i)) {
-                        Ok(()) => {
-                            completed_ref.fetch_add(1, Ordering::Relaxed);
-                            while local_pool.len() < BUFFERS_PER_WORKER {
-                                match return_rx.try_recv() {
-                                    Ok(buf) => local_pool.push(buf),
-                                    Err(TryRecvError::Empty) => break,
-                                    Err(TryRecvError::Disconnected) => break,
-                                }
-                            }
-                        }
-                        Err(send_err) => {
-                            let (_returned_buffer, _, _) = send_err.0;
-                            break;
-                        }
-                    }
-                }
-                Ok(())
+            s.spawn(move || {
+                worker_thread_main(
+                    i,
+                    &return_rx,
+                    &sender_clone,
+                    completed_ref,
+                    base_count,
+                    remainder,
+                );
             });
         }
         drop(sender);
         if let Some(handle) = progress_thread {
-            join_thread(handle, "진행률 스레드 패닉 발생")?
+            join_thread(handle, "진행률 스레드 패닉 발생")?;
         }
         join_thread(writer_thread, "쓰기 스레드 패닉 발생")
     })?;
@@ -1503,22 +1541,34 @@ fn print_progress(
     if !*IS_TERMINAL {
         return Ok(());
     }
-    let elapsed_secs = start_time.elapsed().as_secs_f64();
-    let progress = if total == 0 {
-        1.0
+    let elapsed_millis = start_time.elapsed().as_millis();
+    let elapsed_deci = elapsed_millis / 100;
+    let eta_deci = if total == 0 || completed >= total {
+        Some(0)
+    } else if completed == 0 {
+        None
     } else {
-        completed as f64 / total as f64
+        Some(
+            elapsed_millis.saturating_mul(u128::from(total - completed))
+                / (u128::from(completed) * 100),
+        )
     };
-    let eta_secs = match progress {
-        p if p >= 1.0 => 0.0,
-        p if p < 1e-9 => f64::INFINITY,
-        _ => elapsed_secs * (total - completed) as f64 / completed as f64,
+    let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf);
+    let eta_len = format_time_into(eta_deci, eta_buf);
+    let bar_width_u64 = u64::try_from(BAR_WIDTH).expect("bar width fits u64");
+    let filled_u64 = if total == 0 {
+        bar_width_u64
+    } else {
+        completed.saturating_mul(bar_width_u64) / total
     };
-    let elapsed_len = format_time_into(elapsed_secs, elapsed_buf)?;
-    let eta_len = format_time_into(eta_secs, eta_buf)?;
-    let filled = ((progress * BAR_WIDTH as f64).floor() as usize).min(BAR_WIDTH);
+    let filled = usize::try_from(filled_u64.min(bar_width_u64)).expect("filled width fits usize");
     let bar = BAR_FULL[filled];
-    let percent = (progress * 100.0).floor() as u32;
+    let percent_u64 = if total == 0 {
+        100
+    } else {
+        completed.saturating_mul(100) / total
+    };
+    let percent = u8::try_from(percent_u64.min(100)).expect("percentage fits u8");
     let mut line = [0u8; 128];
     let mut cur = BufCursor::new(&mut line);
     buf_write_byte(&mut cur, b'\r')?;
@@ -1529,7 +1579,7 @@ fn print_progress(
     } else if percent < 100 {
         buf_write_byte(&mut cur, b' ')?;
     }
-    buf_write_u8_dec(&mut cur, percent as u8)?;
+    buf_write_u8_dec(&mut cur, percent)?;
     buf_write_byte(&mut cur, b'%')?;
     buf_write_bytes(&mut cur, b" (")?;
     buf_write_u64_dec(&mut cur, completed)?;
@@ -1537,7 +1587,7 @@ fn print_progress(
     buf_write_u64_dec(&mut cur, total)?;
     buf_write_bytes(&mut cur, ") | 소요: ".as_bytes())?;
     buf_write_bytes(&mut cur, &elapsed_buf[..elapsed_len])?;
-    buf_write_bytes(&mut cur, " | ETA: ".as_bytes())?;
+    buf_write_bytes(&mut cur, b" | ETA: ")?;
     buf_write_bytes(&mut cur, &eta_buf[..eta_len])?;
     buf_write_bytes(&mut cur, b" \x1b[K")?;
     let used = cur.written_len();
@@ -1546,21 +1596,20 @@ fn print_progress(
     out.flush()?;
     Ok(())
 }
-fn format_time_into(seconds: f64, buf: &mut [u8]) -> IoRst<usize> {
-    if !seconds.is_finite() || seconds < 0.0 {
+fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
+    let Some(deci) = deci_seconds else {
         buf[..7].copy_from_slice(INVALID_TIME);
-        return Ok(7);
-    }
-    let deci: u64 = (seconds * 10.0).round() as u64;
-    let minutes = (deci / 600).min(99) as usize;
-    let sec_whole = ((deci / 10) % 60) as usize;
-    let tenths = (deci % 10) as usize;
+        return 7;
+    };
+    let minutes = usize::try_from((deci / 600).min(99)).expect("minutes is in 0..=99");
+    let sec_whole = usize::try_from((deci / 10) % 60).expect("second component is in 0..=59");
+    let tenths = usize::try_from(deci % 10).expect("tenths component is in 0..=9");
     buf[0..2].copy_from_slice(&TWO_DIGITS[minutes]);
     buf[2] = b':';
     buf[3..5].copy_from_slice(&TWO_DIGITS[sec_whole]);
     buf[5] = b'.';
     buf[6] = DIGITS[tenths];
-    Ok(7)
+    7
 }
 fn join_thread<T>(handle: ScopedJoinHandle<'_, Result<T>>, panic_msg: &'static str) -> Result<T> {
     handle.join().map_err(|_| ioErr::other(panic_msg))?

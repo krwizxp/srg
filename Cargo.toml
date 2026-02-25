@@ -2,6 +2,11 @@
 name = "srg"
 version = "1.5.0"
 edition = "2024"
+description = "Hardware RNG-based random data generator with high-precision server time sync utility"
+license = "MIT"
+repository = "https://github.com/krwizxp/srg"
+keywords = ["random", "rng", "cli", "time-sync", "utilities"]
+categories = ["command-line-utilities", "date-and-time", "encoding"]
 
 [profile.release]
 codegen-units = 1

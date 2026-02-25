@@ -19,17 +19,17 @@ const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
 const MAX_CALIBRATION_FAILURES: u32 = 100;
 const KST_OFFSET_SECS_U64: u64 = 9 * 3600;
-const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64 as i64;
+const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
 const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
 const DIGITS: [u8; 10] = *b"0123456789";
 const fn make_two_digits_table() -> [[u8; 2]; 100] {
     let mut table = [[0u8; 2]; 100];
-    let mut i = 0usize;
-    while i < 100 {
-        let tens = (i as u8) / 10;
-        let ones = (i as u8) % 10;
-        table[i] = [b'0' + tens, b'0' + ones];
-        i += 1;
+    let mut idx = 0usize;
+    let mut value = 0u8;
+    while idx < 100 {
+        table[idx] = [b'0' + value / 10, b'0' + value % 10];
+        idx += 1;
+        value += 1;
     }
     table
 }
@@ -108,15 +108,13 @@ mod windows_input {
         union: InputUnion,
     }
     impl Input {
-        #[inline(always)]
-        fn mouse(mi: MouseInput) -> Self {
+        const fn mouse(mi: MouseInput) -> Self {
             Self {
                 r#type: INPUT_MOUSE,
                 union: InputUnion { mi },
             }
         }
-        #[inline(always)]
-        fn keyboard(ki: KeybdInput) -> Self {
+        const fn keyboard(ki: KeybdInput) -> Self {
             Self {
                 r#type: INPUT_KEYBOARD,
                 union: InputUnion { ki },
@@ -133,11 +131,11 @@ mod windows_input {
     }
     fn send_input_events(inputs: &[Input]) {
         unsafe {
-            SendInput(
-                inputs.len() as u32,
-                inputs.as_ptr(),
-                std::mem::size_of::<Input>() as i32,
-            );
+            let input_count = u32::try_from(inputs.len())
+                .expect("SendInput input count fits within u32 on supported targets");
+            let input_size = i32::try_from(std::mem::size_of::<Input>())
+                .expect("INPUT struct size always fits in i32");
+            SendInput(input_count, inputs.as_ptr(), input_size);
         }
     }
     pub fn send_mouse_click() {
@@ -151,7 +149,7 @@ mod windows_input {
                 ..Default::default()
             }),
         ];
-        send_input_events(&inputs)
+        send_input_events(&inputs);
     }
     pub fn send_f5_press() {
         let inputs = [
@@ -165,7 +163,7 @@ mod windows_input {
                 ..Default::default()
             }),
         ];
-        send_input_events(&inputs)
+        send_input_events(&inputs);
     }
 }
 #[derive(Debug)]
@@ -179,31 +177,31 @@ pub enum Error {
 }
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        Error::Io(err)
+        Self::Io(err)
     }
 }
 impl From<SystemTimeError> for Error {
     fn from(err: SystemTimeError) -> Self {
-        Error::Time(err)
+        Self::Time(err)
     }
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "I/O 오류: {e}"),
-            Error::Time(e) => write!(f, "시스템 시간 오류: {e}"),
-            Error::Parse(msg) => write!(f, "파싱 오류: {msg}"),
-            Error::HeaderNotFound(header) => write!(f, "{header} 헤더를 찾을 수 없음"),
-            Error::Curl(stderr) => write!(f, "curl 실행 실패: {stderr}"),
-            Error::SyncFailed(msg) => write!(f, "서버 시간 확인 실패: {msg}"),
+            Self::Io(e) => write!(f, "I/O 오류: {e}"),
+            Self::Time(e) => write!(f, "시스템 시간 오류: {e}"),
+            Self::Parse(msg) => write!(f, "파싱 오류: {msg}"),
+            Self::HeaderNotFound(header) => write!(f, "{header} 헤더를 찾을 수 없음"),
+            Self::Curl(stderr) => write!(f, "curl 실행 실패: {stderr}"),
+            Self::SyncFailed(msg) => write!(f, "서버 시간 확인 실패: {msg}"),
         }
     }
 }
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            Error::Io(e) => Some(e),
-            Error::Time(e) => Some(e),
+            Self::Io(e) => Some(e),
+            Self::Time(e) => Some(e),
             _ => None,
         }
     }
@@ -217,7 +215,7 @@ struct TimeSample {
 }
 #[derive(Debug)]
 struct ServerTime {
-    anchor_server_time: SystemTime,
+    anchor_time: SystemTime,
     anchor_instant: Instant,
     baseline_rtt: Duration,
 }
@@ -241,19 +239,15 @@ struct SliceCursor<'a> {
     pos: usize,
 }
 impl<'a> SliceCursor<'a> {
-    #[inline(always)]
-    fn new(buf: &'a mut [u8]) -> Self {
+    const fn new(buf: &'a mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
-    #[inline(always)]
-    fn remaining(&self) -> usize {
+    const fn remaining(&self) -> usize {
         self.buf.len() - self.pos
     }
-    #[inline(always)]
-    fn written_len(&self) -> usize {
+    const fn written_len(&self) -> usize {
         self.pos
     }
-    #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> ioResult<()> {
         let len = bytes.len();
         if self.remaining() < len {
@@ -264,7 +258,6 @@ impl<'a> SliceCursor<'a> {
         self.pos = end;
         Ok(())
     }
-    #[inline(always)]
     fn write_byte(&mut self, b: u8) -> ioResult<()> {
         if self.remaining() < 1 {
             return Err(write_zero_err());
@@ -273,36 +266,35 @@ impl<'a> SliceCursor<'a> {
         self.pos += 1;
         Ok(())
     }
-    #[inline(always)]
     fn write_u32_dec(&mut self, mut n: u32) -> ioResult<()> {
         let mut tmp = [0u8; 10];
         let mut i = tmp.len();
         while n >= 100 {
-            let rem = (n % 100) as usize;
+            let rem = usize::try_from(n % 100).expect("remainder is in 0..100");
             n /= 100;
             i -= 2;
             tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
         }
         if n >= 10 {
-            let rem = n as usize;
+            let rem = usize::try_from(n).expect("n is in 10..100");
             i -= 2;
             tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
         } else {
             i -= 1;
-            tmp[i] = b'0' + (n as u8);
+            let digit = u8::try_from(n).expect("n is in 0..10");
+            tmp[i] = b'0' + digit;
         }
         self.write_bytes(&tmp[i..])
     }
-    #[inline(always)]
     fn write_year_padded4(&mut self, year: i32) -> ioResult<()> {
         if year >= 0 {
-            let y = year as u32;
+            let y = year.cast_unsigned();
             if y < 10_000 {
                 if self.remaining() < 4 {
                     return Err(write_zero_err());
                 }
-                let hi = (y / 100) as usize;
-                let lo = (y % 100) as usize;
+                let hi = usize::try_from(y / 100).expect("year chunk fits usize");
+                let lo = usize::try_from(y % 100).expect("year chunk fits usize");
                 let start = self.pos;
                 self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[hi]);
                 self.buf[start + 2..start + 4].copy_from_slice(&TWO_DIGITS[lo]);
@@ -313,16 +305,16 @@ impl<'a> SliceCursor<'a> {
         }
         self.write_byte(b'-')?;
         let abs = if year == i32::MIN {
-            (i32::MAX as u32) + 1
+            i32::MAX.cast_unsigned() + 1
         } else {
-            (-year) as u32
+            (-year).cast_unsigned()
         };
         if abs < 1000 {
             if self.remaining() < 3 {
                 return Err(write_zero_err());
             }
-            let hundreds = (abs / 100) as usize;
-            let rem = (abs % 100) as usize;
+            let hundreds = usize::try_from(abs / 100).expect("hundreds fits usize");
+            let rem = usize::try_from(abs % 100).expect("remainder fits usize");
             let start = self.pos;
             self.buf[start] = DIGITS[hundreds];
             self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
@@ -331,23 +323,22 @@ impl<'a> SliceCursor<'a> {
         }
         self.write_u32_dec(abs)
     }
-    #[inline(always)]
     fn write_u32_2digits(&mut self, v: u32) -> ioResult<()> {
         if self.remaining() < 2 {
             return Err(write_zero_err());
         }
         let start = self.pos;
-        self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[v as usize]);
+        let idx = usize::try_from(v).expect("v is in 0..100");
+        self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[idx]);
         self.pos = start + 2;
         Ok(())
     }
-    #[inline(always)]
     fn write_u32_3digits(&mut self, v: u32) -> ioResult<()> {
         if self.remaining() < 3 {
             return Err(write_zero_err());
         }
-        let hundreds = (v / 100) as usize;
-        let rem = (v % 100) as usize;
+        let hundreds = usize::try_from(v / 100).expect("hundreds is in 0..10");
+        let rem = usize::try_from(v % 100).expect("remainder is in 0..100");
         let start = self.pos;
         self.buf[start] = DIGITS[hundreds];
         self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
@@ -362,42 +353,52 @@ impl ServerTime {
         let nanos_to_subtract = since_epoch.subsec_nanos();
         server_time_at_tick -= Duration::from_nanos(u64::from(nanos_to_subtract));
         let one_way_delay = sample.rtt / 2;
-        let anchor_server_time = server_time_at_tick;
-        let anchor_instant = sample.response_received_inst - one_way_delay;
-        Ok(ServerTime {
-            anchor_server_time,
+        let anchor_time = server_time_at_tick;
+        let anchor_instant = sample
+            .response_received_inst
+            .checked_sub(one_way_delay)
+            .unwrap_or(sample.response_received_inst);
+        Ok(Self {
+            anchor_time,
             anchor_instant,
             baseline_rtt,
         })
     }
-    fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
+    const fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
         let old_rtt_nanos = self.baseline_rtt.as_nanos();
         let new_rtt_nanos = new_rtt.as_nanos();
         let smoothed_rtt_nanos = (old_rtt_nanos * 7 + new_rtt_nanos * 3) / 10;
         let smoothed_rtt = Duration::from_nanos_u128(smoothed_rtt_nanos);
-        ServerTime {
-            anchor_server_time: self.anchor_server_time,
+        Self {
+            anchor_time: self.anchor_time,
             anchor_instant: self.anchor_instant,
             baseline_rtt: smoothed_rtt,
         }
     }
-    fn current_server_time(&self) -> Result<SystemTime> {
+    fn current_server_time(&self) -> SystemTime {
         let elapsed_since_anchor = self.anchor_instant.elapsed();
-        Ok(self.anchor_server_time + elapsed_since_anchor)
+        self.anchor_time + elapsed_since_anchor
     }
     fn calculate_display_time(&self) -> Result<DisplayableTime> {
-        let current_time = self.current_server_time()?;
+        let current_time = self.current_server_time();
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
-        let total_seconds_kst = since_epoch.as_secs() as i64 + KST_OFFSET_SECS;
+        let total_seconds_kst = since_epoch.as_secs().cast_signed() + KST_OFFSET_SECS;
         let millis = since_epoch.subsec_millis();
         let days_since_epoch = total_seconds_kst.div_euclid(86400);
         let day_of_week_num = (days_since_epoch + 4).rem_euclid(7);
-        let day_of_week_str = DAY_OF_WEEK_KO[day_of_week_num as usize];
+        let day_of_week_idx = usize::try_from(day_of_week_num)
+            .map_err(|_| Error::Parse(Cow::Borrowed("요일 계산 중 범위 오류")))?;
+        let day_of_week_str = DAY_OF_WEEK_KO[day_of_week_idx];
         let sec_of_day = total_seconds_kst.rem_euclid(86400);
-        let hour = (sec_of_day / 3600) as u32;
-        let minute = ((sec_of_day % 3600) / 60) as u32;
-        let second = (sec_of_day % 60) as u32;
-        let (year, month, day_of_month) = civil_from_days(days_since_epoch as i32);
+        let hour = u32::try_from(sec_of_day / 3600)
+            .map_err(|_| Error::Parse(Cow::Borrowed("시 계산 중 범위 오류")))?;
+        let minute = u32::try_from((sec_of_day % 3600) / 60)
+            .map_err(|_| Error::Parse(Cow::Borrowed("분 계산 중 범위 오류")))?;
+        let second = u32::try_from(sec_of_day % 60)
+            .map_err(|_| Error::Parse(Cow::Borrowed("초 계산 중 범위 오류")))?;
+        let day_index = i32::try_from(days_since_epoch)
+            .map_err(|_| Error::Parse(Cow::Borrowed("일자 계산 중 범위 오류")))?;
+        let (year, month, day_of_month) = civil_from_days(day_index);
         Ok(DisplayableTime {
             year,
             month,
@@ -518,7 +519,7 @@ impl AppState {
                     let mut target_time =
                         UNIX_EPOCH + Duration::from_secs(today_start_secs_utc + target_secs_of_day);
                     if now_local > target_time {
-                        target_time += Duration::from_hours(24)
+                        target_time += Duration::from_hours(24);
                     }
                     Ok(Some(target_time))
                 } else {
@@ -544,7 +545,7 @@ impl AppState {
             rtt: Duration::ZERO,
             server_time: UNIX_EPOCH,
         };
-        Ok(AppState {
+        Ok(Self {
             host,
             target_time,
             trigger_action,
@@ -588,13 +589,12 @@ impl AppState {
             let remaining_display = if elapsed >= DISPLAY_INTERVAL {
                 Duration::ZERO
             } else {
-                DISPLAY_INTERVAL - elapsed
+                DISPLAY_INTERVAL.saturating_sub(elapsed)
             };
             let poll_timeout = activity_poll.min(remaining_display);
             match rx.recv_timeout(poll_timeout) {
-                Ok(()) => break,
+                Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
             let now = Instant::now();
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
@@ -623,7 +623,7 @@ impl AppState {
                         }
                     }
                 }
-                last_display_update = now
+                last_display_update = now;
             }
             message_buffer.clear();
             let (next_activity, log_opt_msg) = match activity {
@@ -643,7 +643,7 @@ impl AppState {
                 Activity::Retrying { retry_at } => Self::handle_retrying(retry_at),
             };
             if let Some(console_msg) = log_opt_msg {
-                println!("\n{console_msg}")
+                println!("\n{console_msg}");
             }
             activity = next_activity;
         }
@@ -657,7 +657,7 @@ impl AppState {
         let now = Instant::now();
         if self.baseline_rtt_attempts == 0 {
             if self.last_sample.is_none() {
-                println!("1단계: RTT 기준값 측정을 시작합니다...")
+                println!("1단계: RTT 기준값 측정을 시작합니다...");
             }
             let placeholder = TimeSample {
                 response_received_inst: now,
@@ -699,7 +699,7 @@ impl AppState {
         }
         let mut rtt_nanos = [0u128; NUM_SAMPLES];
         let mut filled = 0usize;
-        for sample in self.baseline_rtt_samples.iter() {
+        for sample in &self.baseline_rtt_samples {
             if sample.rtt > Duration::ZERO {
                 rtt_nanos[filled] = sample.rtt.as_nanos();
                 filled += 1;
@@ -713,7 +713,8 @@ impl AppState {
         let trim = filled / 5;
         let window = &rtts[trim..(filled - trim)];
         let sum_nanos: u128 = window.iter().sum();
-        let baseline_rtt = Duration::from_nanos_u128(sum_nanos / (window.len() as u128));
+        let window_len = u128::try_from(window.len()).expect("slice length fits u128");
+        let baseline_rtt = Duration::from_nanos_u128(sum_nanos / window_len);
         self.baseline_rtt = Some(baseline_rtt);
         self.calibration_failure_count = 0;
         let _ = write!(
@@ -728,20 +729,17 @@ impl AppState {
         _msg_buf: &'a mut str,
         net_ctx: &mut NetworkContext,
     ) -> (Activity, Option<&'a str>) {
-        let current_sample = match fetch_server_time_sample(&self.host, net_ctx) {
-            Ok(sample) => {
-                self.calibration_failure_count = 0;
-                sample
+        let current_sample = if let Ok(sample) = fetch_server_time_sample(&self.host, net_ctx) {
+            self.calibration_failure_count = 0;
+            sample
+        } else {
+            self.calibration_failure_count += 1;
+            if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
+                return transition_to_retry(
+                    "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
+                );
             }
-            Err(_) => {
-                self.calibration_failure_count += 1;
-                if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
-                    return transition_to_retry(
-                        "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
-                    );
-                }
-                return (Activity::CalibrateOnTick, None);
-            }
+            return (Activity::CalibrateOnTick, None);
         };
         if let Some(prev_sample) = self.last_sample
             && let Some(baseline_rtt) = self.baseline_rtt
@@ -758,17 +756,11 @@ impl AppState {
         self.last_sample = Some(current_sample);
         (Activity::CalibrateOnTick, None)
     }
-    fn handle_predicting<'a>(&mut self, msg_buf: &'a mut String) -> (Activity, Option<&'a str>) {
+    fn handle_predicting<'a>(&mut self, _msg_buf: &'a mut String) -> (Activity, Option<&'a str>) {
         let Some(server_time) = self.server_time.as_ref() else {
             return (Activity::MeasureBaselineRtt, None);
         };
-        let estimated_server_time = match server_time.current_server_time() {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = write!(msg_buf, "[오류] 예측 중 시간 계산 실패: {e}");
-                return transition_to_retry(msg_buf);
-            }
-        };
+        let estimated_server_time = server_time.current_server_time();
         if let Some(target_time) = self.target_time.take_if(|target| {
             target
                 .duration_since(estimated_server_time)
@@ -798,7 +790,7 @@ impl AppState {
         log_message: fmt::Arguments,
     ) -> (Activity, Option<&'a str>) {
         if let Some(action) = self.trigger_action {
-            trigger_action(action)
+            trigger_action(action);
         }
         let _ = msg_buf.write_fmt(log_message);
         (Activity::Finished, Some(msg_buf))
@@ -823,13 +815,7 @@ impl AppState {
             );
         };
         *st = st.recalibrate_with_rtt(sample.rtt);
-        let current_server_time = match st.current_server_time() {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = write!(msg_buf, "카운트다운 시간 계산 실패: {e}");
-                return (Activity::FinalCountdown { target_time }, Some(msg_buf));
-            }
-        };
+        let current_server_time = st.current_server_time();
         let old_rtt = self.live_rtt.unwrap_or(sample.rtt);
         let new_rtt_nanos = (old_rtt.as_nanos()
             * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM - FINAL_COUNTDOWN_RTT_ALPHA_NUM)
@@ -864,7 +850,7 @@ impl AppState {
             _ => (Activity::FinalCountdown { target_time }, None),
         }
     }
-    fn handle_finished() -> (Activity, Option<&'static str>) {
+    const fn handle_finished() -> (Activity, Option<&'static str>) {
         (Activity::Predicting, Some("액션 완료. 예측 모드 전환."))
     }
     fn handle_retrying(retry_at: Instant) -> (Activity, Option<&'static str>) {
@@ -893,7 +879,7 @@ where
             Ok(value) => return Ok(value),
             Err(e) => {
                 if !e.is_empty() {
-                    println!("{e}")
+                    println!("{e}");
                 }
             }
         }
@@ -902,11 +888,13 @@ where
 pub fn run() -> Result<()> {
     #[cfg(target_os = "windows")]
     if let Err(e) = high_res_timer::HighResTimerGuard::new() {
-        eprintln!("[경고] {e}. 시간 오차가 클 수 있습니다.")
+        eprintln!("[경고] {e}. 시간 오차가 클 수 있습니다.");
     }
     #[cfg(target_os = "windows")]
     if !*CURL_AVAILABLE {
-        eprintln!("[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다.")
+        eprintln!(
+            "[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다."
+        );
     }
     #[cfg(target_os = "linux")]
     if !*XDO_TOOL_AVAILABLE {
@@ -942,7 +930,7 @@ fn trigger_action(action: TriggerAction) {
                 &["-e", r#"tell application "System Events" to click"#],
             );
             #[cfg(target_os = "windows")]
-            windows_input::send_mouse_click()
+            windows_input::send_mouse_click();
         }
         TriggerAction::F5Press => {
             #[cfg(target_os = "linux")]
@@ -953,7 +941,7 @@ fn trigger_action(action: TriggerAction) {
                 &["-e", r#"tell application "System Events" to key code 96"#],
             );
             #[cfg(target_os = "windows")]
-            windows_input::send_f5_press()
+            windows_input::send_f5_press();
         }
     }
 }
@@ -967,7 +955,7 @@ fn is_command_available(command: &str) -> bool {
 }
 fn find_date_header_value(line: &[u8]) -> Option<&str> {
     if line.len() > 5 && line[..5].eq_ignore_ascii_case(b"date:") {
-        str::from_utf8(&line[5..]).ok().map(|s| s.trim_ascii())
+        str::from_utf8(&line[5..]).ok().map(str::trim_ascii)
     } else {
         None
     }
@@ -1026,7 +1014,7 @@ fn fetch_server_time_sample_curl(
         .trim_ascii()
         .parse()
         .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
-    let rtt_reported_by_curl = Duration::from_secs_f64(time_starttransfer_secs.max(0.000001));
+    let rtt_reported_by_curl = Duration::from_secs_f64(time_starttransfer_secs.max(0.000_001));
     let date_header_str_slice = headers_part
         .split(|&b| b == b'\n')
         .rev()
@@ -1123,12 +1111,125 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
             .unwrap_or_else(|| Error::SyncFailed("Curl 폴백 시도 중 알 수 없는 오류".into())))
     })
 }
+fn parse_u32_digits(raw: &str) -> Option<u32> {
+    let mut value = 0u32;
+    if raw.is_empty() {
+        return None;
+    }
+    for &byte in raw.as_bytes() {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value * 10 + u32::from(byte - b'0');
+    }
+    Some(value)
+}
+fn parse_i32_digits(raw: &str) -> Option<i32> {
+    let bytes = raw.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+    let mut idx = 0usize;
+    let mut negative = false;
+    match bytes[0] {
+        b'+' => idx = 1,
+        b'-' => {
+            negative = true;
+            idx = 1;
+        }
+        _ => {}
+    }
+    if idx == bytes.len() {
+        return None;
+    }
+    let mut value: i32 = 0;
+    while idx < bytes.len() {
+        let byte = bytes[idx];
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        let digit = i32::from(byte - b'0');
+        value = if negative {
+            value.checked_mul(10)?.checked_sub(digit)?
+        } else {
+            value.checked_mul(10)?.checked_add(digit)?
+        };
+        idx += 1;
+    }
+    Some(value)
+}
+fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
+    if d0.is_ascii_digit() && d1.is_ascii_digit() {
+        Some(u32::from(d0 - b'0') * 10 + u32::from(d1 - b'0'))
+    } else {
+        None
+    }
+}
+fn parse_http_time_components(time_str: &str) -> Result<(u32, u32, u32)> {
+    const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
+    let time_array = time_str
+        .as_bytes()
+        .as_array::<8>()
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    if time_array[2] != b':' || time_array[5] != b':' {
+        return Err(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)));
+    }
+    let hour = parse_two_digits(time_array[0], time_array[1])
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let minute = parse_two_digits(time_array[3], time_array[4])
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    let second = parse_two_digits(time_array[6], time_array[7])
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
+    Ok((hour, minute, second))
+}
+fn parse_http_month(month_str: &str) -> Result<u32> {
+    const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
+    let month_array = month_str
+        .as_bytes()
+        .as_array::<3>()
+        .ok_or(Error::Parse(Cow::Borrowed(ERR_MONTH)))?;
+    let first = month_array[0].to_ascii_lowercase();
+    let second = month_array[1].to_ascii_lowercase();
+    let third = month_array[2].to_ascii_lowercase();
+    match (first, second, third) {
+        (b'j', b'a', b'n') => Ok(1),
+        (b'f', b'e', b'b') => Ok(2),
+        (b'm', b'a', b'r') => Ok(3),
+        (b'a', b'p', b'r') => Ok(4),
+        (b'm', b'a', b'y') => Ok(5),
+        (b'j', b'u', b'n') => Ok(6),
+        (b'j', b'u', b'l') => Ok(7),
+        (b'a', b'u', b'g') => Ok(8),
+        (b's', b'e', b'p') => Ok(9),
+        (b'o', b'c', b't') => Ok(10),
+        (b'n', b'o', b'v') => Ok(11),
+        (b'd', b'e', b'c') => Ok(12),
+        _ => Err(Error::Parse(Cow::Borrowed(ERR_MONTH))),
+    }
+}
+fn unix_timestamp_to_system_time(timestamp_secs: i64) -> Result<SystemTime> {
+    const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
+    let secs_i128 = i128::from(timestamp_secs);
+    if secs_i128 >= 0 {
+        let secs_u64 =
+            u64::try_from(secs_i128).map_err(|_| Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
+        UNIX_EPOCH
+            .checked_add(Duration::from_secs(secs_u64))
+            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
+    } else {
+        let abs_i128 = secs_i128
+            .checked_abs()
+            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
+        let abs_secs =
+            u64::try_from(abs_i128).map_err(|_| Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
+        UNIX_EPOCH
+            .checked_sub(Duration::from_secs(abs_secs))
+            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
+    }
+}
 fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     const ERR_BAD_FORMAT: &str = "HTTP Date 파싱 실패: 형식이 올바르지 않습니다.";
     const ERR_NUM_CONV: &str = "HTTP Date 파싱 실패: 날짜 또는 시간의 숫자 변환에 실패했습니다.";
-    const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
-    const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
-    const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     let mut parts = raw_date.split_ascii_whitespace();
     let mut expect_part = |msg: &'static str| parts.next().ok_or(Error::Parse(Cow::Borrowed(msg)));
     let _weekday = expect_part(ERR_BAD_FORMAT)?;
@@ -1136,132 +1237,39 @@ fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     let month_str = expect_part(ERR_BAD_FORMAT)?;
     let year_str = expect_part(ERR_BAD_FORMAT)?;
     let time_str = expect_part(ERR_BAD_FORMAT)?;
-    fn parse_u32_digits(s: &str) -> Option<u32> {
-        let mut v = 0u32;
-        if s.is_empty() {
-            return None;
-        }
-        for &b in s.as_bytes() {
-            if !b.is_ascii_digit() {
-                return None;
-            }
-            v = v * 10 + (b - b'0') as u32;
-        }
-        Some(v)
-    }
-    fn parse_i32_digits(s: &str) -> Option<i32> {
-        let bytes = s.as_bytes();
-        if bytes.is_empty() {
-            return None;
-        }
-        let mut i = 0usize;
-        let mut negative = false;
-        match bytes[0] {
-            b'+' => i = 1,
-            b'-' => {
-                negative = true;
-                i = 1;
-            }
-            _ => {}
-        }
-        if i == bytes.len() {
-            return None;
-        }
-        let mut v: i32 = 0;
-        while i < bytes.len() {
-            let b = bytes[i];
-            if !b.is_ascii_digit() {
-                return None;
-            }
-            let digit = (b - b'0') as i32;
-            v = if negative {
-                v.checked_mul(10)?.checked_sub(digit)?
-            } else {
-                v.checked_mul(10)?.checked_add(digit)?
-            };
-            i += 1;
-        }
-        Some(v)
-    }
     let day = parse_u32_digits(day_str).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
     let year = parse_i32_digits(year_str).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM_CONV)))?;
-    #[inline]
-    fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
-        if d0.is_ascii_digit() && d1.is_ascii_digit() {
-            Some(((d0 - b'0') as u32) * 10 + (d1 - b'0') as u32)
-        } else {
-            None
-        }
-    }
-    let time_bytes = time_str.as_bytes();
-    let t = time_bytes
-        .as_array::<8>()
-        .ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    if t[2] != b':' || t[5] != b':' {
-        return Err(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)));
-    }
-    let h = parse_two_digits(t[0], t[1]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let m = parse_two_digits(t[3], t[4]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let s = parse_two_digits(t[6], t[7]).ok_or(Error::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let mb = month_str
-        .as_bytes()
-        .as_array::<3>()
-        .ok_or(Error::Parse(Cow::Borrowed(ERR_MONTH)))?;
-    let a = mb[0].to_ascii_lowercase();
-    let b = mb[1].to_ascii_lowercase();
-    let c = mb[2].to_ascii_lowercase();
-    let month = match (a, b, c) {
-        (b'j', b'a', b'n') => 1,
-        (b'f', b'e', b'b') => 2,
-        (b'm', b'a', b'r') => 3,
-        (b'a', b'p', b'r') => 4,
-        (b'm', b'a', b'y') => 5,
-        (b'j', b'u', b'n') => 6,
-        (b'j', b'u', b'l') => 7,
-        (b'a', b'u', b'g') => 8,
-        (b's', b'e', b'p') => 9,
-        (b'o', b'c', b't') => 10,
-        (b'n', b'o', b'v') => 11,
-        (b'd', b'e', b'c') => 12,
-        _ => return Err(Error::Parse(Cow::Borrowed(ERR_MONTH))),
-    };
+    let month = parse_http_month(month_str)?;
+    let (hour, minute, second) = parse_http_time_components(time_str)?;
     let days = days_from_civil(year, month, day);
-    let timestamp_secs =
-        i64::from(days) * 86400 + i64::from(h) * 3600 + i64::from(m) * 60 + i64::from(s);
-    let ts_i128 = i128::from(timestamp_secs);
-    if ts_i128 >= 0 {
-        let secs_u64 = ts_i128 as u64;
-        UNIX_EPOCH
-            .checked_add(Duration::from_secs(secs_u64))
-            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
-    } else {
-        let abs_i128 = (-ts_i128) as i128;
-        if abs_i128 < 0 || abs_i128 as u128 > u128::from(u64::MAX) {
-            return Err(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)));
-        }
-        let abs_secs = abs_i128 as u64;
-        UNIX_EPOCH
-            .checked_sub(Duration::from_secs(abs_secs))
-            .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
-    }
+    let timestamp_secs = i64::from(days) * 86_400
+        + i64::from(hour) * 3_600
+        + i64::from(minute) * 60
+        + i64::from(second);
+    unix_timestamp_to_system_time(timestamp_secs)
 }
-fn days_from_civil(y: i32, m: u32, d: u32) -> i32 {
+const fn days_from_civil(y: i32, m: u32, d: u32) -> i32 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y.rem_euclid(400);
-    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) as i32 + 2) / 5 + d as i32 - 1;
+    let shifted_month: i32 = if m > 2 {
+        (m - 3).cast_signed()
+    } else {
+        (m + 9).cast_signed()
+    };
+    let doy = (153 * shifted_month + 2) / 5 + d.cast_signed() - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146097 + doe - 719468
+    era * 146_097 + doe - 719_468
 }
 fn civil_from_days(z: i32) -> (i32, u32, u32) {
-    let z = z + 719468;
-    let era = z.div_euclid(146097);
-    let doe = z.rem_euclid(146097);
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = (if mp < 10 { mp + 3 } else { mp - 9 }) as u32;
-    (y + if m <= 2 { 1 } else { 0 }, m, d)
+    let d = (doy - (153 * mp + 2) / 5 + 1).cast_unsigned();
+    let m = (if mp < 10 { mp + 3 } else { mp - 9 }).cast_unsigned();
+    (y + i32::from(m <= 2), m, d)
 }
