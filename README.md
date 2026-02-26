@@ -18,6 +18,29 @@ SRG는 하드웨어 난수(RDSEED/RDRAND)를 활용해 다양한 랜덤 데이�
   - RTT 기반 보정
   - 목표 시각 도달 시 액션 실행(좌클릭/F5)
 
+## revgeo.html (웹 도구)
+
+`revgeo.html`은 SRG 출력 데이터를 브라우저에서 확인/가공하기 위한 보조 도구입니다.
+
+- `random_data.txt` 또는 텍스트 입력에서 좌표 추출
+- 좌표 역지오코딩(주소 조회), 진행 제어(시작/일시정지/재개/중지)
+- 결과 필터링/CSV 내보내기/지도 보기
+- 수동 변환 모드
+  - `num_64`와 `supp` 값을 직접 입력해 SRG 형식 결과를 즉시 생성
+  - 생성 결과를 `random_data.txt`로 저장하거나 클립보드 복사
+
+### 사용 방법
+
+1. 파일 브라우저에서 `revgeo.html`을 엽니다.
+2. `random_data.txt`를 드래그 앤 드롭하거나 텍스트를 붙여넣습니다.
+3. `좌표 추출` 후 `조회 시작`으로 역지오코딩을 실행합니다.
+4. 필요 시 수동 변환 패널에서 `기본 난수값/보조 난수값`을 입력해 결과를 비교/검증합니다.
+
+### 참고 사항
+
+- 역지오코딩은 외부 네트워크(예: OSM Nominatim) 연결이 필요합니다.
+- 클립보드 복사는 브라우저/보안 컨텍스트 정책(HTTPS 등)에 따라 제한될 수 있습니다.
+
 ## 빌드 및 실행
 
 ```bash
@@ -43,13 +66,6 @@ cargo run --release
 ## 서버 시간 동기화 관련 의존성
 
 - 공통: `curl`(TCP 실패 시 폴백)
-- Linux 액션 실행: `xdotool` 또는 `wtype` 또는 `ydotool`
+- Linux 액션 실행: `xdotool` (좌클릭/F5 액션 사용 시 필요)
 - Windows: 고해상도 타이머(`winmm`) 및 입력 이벤트(`user32`) 사용
 - macOS: `osascript` 기반 입력 이벤트 실행
-
-## 품질 점검(개발용)
-
-```bash
-cargo fmt
-cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery -W clippy::cargo
-```
