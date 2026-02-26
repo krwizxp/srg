@@ -730,6 +730,33 @@ impl AppState {
         let sample = match fetch_server_time_sample(&self.host, net_ctx) {
             Ok(s) => s,
             Err(e) => {
+                if let Some(st) = self.server_time.as_ref() {
+                    let current_server_time = st.current_server_time();
+                    let effective_rtt = self.live_rtt.unwrap_or(st.baseline_rtt);
+                    let one_way_delay = effective_rtt / 2;
+                    match target_time.duration_since(current_server_time) {
+                        Ok(duration_until_target) if duration_until_target <= one_way_delay => {
+                            return self.trigger_and_finish(
+                                msg_buf,
+                                format_args!(
+                                    "\n>>> 액션 실행! (예측값 기준 강제 실행, 목표 도달까지 {:.1}ms 남음) (지연 예측: {:.1}ms, 원인: 카운트다운 샘플 실패: {e})",
+                                    duration_until_target.as_secs_f64() * 1000.0,
+                                    one_way_delay.as_secs_f64() * 1000.0
+                                ),
+                            );
+                        }
+                        Err(_) => {
+                            return self.trigger_and_finish(
+                                msg_buf,
+                                format_args!(
+                                    "\n>>> 액션 실행! (예측값 기준 강제 실행, 시간 초과) (지연 예측: {:.1}ms, 원인: 카운트다운 샘플 실패: {e})",
+                                    one_way_delay.as_secs_f64() * 1000.0
+                                ),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
                 let _ = write!(msg_buf, "카운트다운 샘플 획득 실패: {e}");
                 return (Activity::FinalCountdown { target_time }, Some(msg_buf));
             }
@@ -799,7 +826,13 @@ where
         print!("{prompt}");
         io::stdout().flush()?;
         input_buf.clear();
-        io::stdin().read_line(input_buf)?;
+        let bytes_read = io::stdin().read_line(input_buf)?;
+        if bytes_read == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "표준 입력이 종료되었습니다.",
+            ));
+        }
         let trimmed = input_buf.trim();
         match validator(trimmed) {
             Ok(value) => return Ok(value),
