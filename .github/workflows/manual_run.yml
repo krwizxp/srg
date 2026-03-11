@@ -1,0 +1,221 @@
+name: Run SRG Manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Action to run
+        required: true
+        type: choice
+        default: generate-multiple
+        options:
+          - generate-single
+          - generate-multiple
+          - ladder
+          - random-integer
+          - random-float
+          - time-sync-observe
+      count:
+        description: Record count for generate-multiple
+        required: true
+        default: "10"
+        type: string
+      players:
+        description: Comma-separated player names for ladder
+        required: true
+        default: Alice,Bob
+        type: string
+      results:
+        description: Comma-separated ladder results
+        required: true
+        default: Win,Lose
+        type: string
+      int_min:
+        description: Minimum integer for random-integer
+        required: true
+        default: "1"
+        type: string
+      int_max:
+        description: Maximum integer for random-integer
+        required: true
+        default: "100"
+        type: string
+      float_min:
+        description: Minimum float for random-float
+        required: true
+        default: "0"
+        type: string
+      float_max:
+        description: Maximum float for random-float
+        required: true
+        default: "1"
+        type: string
+      time_host:
+        description: Host for time-sync-observe
+        required: true
+        default: www.google.com
+        type: string
+      observe_seconds:
+        description: Seconds to observe server time before stopping
+        required: true
+        default: "10"
+        type: string
+      artifact_name:
+        description: Uploaded artifact name
+        required: true
+        default: srg-result
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: windows-2025
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Run selected SRG action
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $action = "${{ inputs.action }}"
+          $artifactDir = Join-Path $PWD "artifacts"
+          $exePath = Join-Path $PWD "target\release\srg.exe"
+          $logPath = Join-Path $artifactDir "srg_console.log"
+          $dataPath = Join-Path $PWD "random_data.txt"
+          $copiedDataPath = Join-Path $artifactDir "random_data.txt"
+
+          New-Item -ItemType Directory -Force $artifactDir | Out-Null
+          Remove-Item $dataPath -Force -ErrorAction SilentlyContinue
+
+          function Require-NonEmpty([string] $value, [string] $name) {
+            if ([string]::IsNullOrWhiteSpace($value)) {
+              throw "$name is required for action '$action'."
+            }
+          }
+
+          function Start-SrgProcess {
+            $proc = New-Object System.Diagnostics.Process
+            $proc.StartInfo.FileName = $exePath
+            $proc.StartInfo.WorkingDirectory = $PWD
+            $proc.StartInfo.UseShellExecute = $false
+            $proc.StartInfo.RedirectStandardInput = $true
+            $proc.StartInfo.RedirectStandardOutput = $true
+            $proc.StartInfo.RedirectStandardError = $true
+            $proc.StartInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+            $proc.StartInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+            $null = $proc.Start()
+            return $proc
+          }
+
+          function Finish-SrgProcess([System.Diagnostics.Process] $proc) {
+            $stdout = $proc.StandardOutput.ReadToEnd()
+            $stderr = $proc.StandardError.ReadToEnd()
+            $proc.WaitForExit()
+            $combined = if ([string]::IsNullOrEmpty($stderr)) {
+              $stdout
+            } else {
+              "$stdout`r`n[stderr]`r`n$stderr"
+            }
+            Set-Content -Path $logPath -Value $combined -Encoding utf8NoBOM
+            if ($proc.ExitCode -ne 0) {
+              throw "srg.exe exited with code $($proc.ExitCode). See artifacts/srg_console.log."
+            }
+          }
+
+          function Run-SrgWithLines([string[]] $lines) {
+            $proc = Start-SrgProcess
+            foreach ($line in $lines) {
+              $proc.StandardInput.WriteLine($line)
+            }
+            $proc.StandardInput.Close()
+            Finish-SrgProcess $proc
+          }
+
+          switch ($action) {
+            "generate-single" {
+              Run-SrgWithLines @("6", "3", "q")
+            }
+            "generate-multiple" {
+              [ulong] $count = "${{ inputs.count }}"
+              if ($count -lt 1 -or $count -gt 100000) {
+                throw "count must be between 1 and 100000."
+              }
+              Run-SrgWithLines @("6", "4", "$count", "q")
+            }
+            "ladder" {
+              $players = "${{ inputs.players }}"
+              $results = "${{ inputs.results }}"
+              Require-NonEmpty $players "players"
+              Require-NonEmpty $results "results"
+              Run-SrgWithLines @("6", "1", $players, $results, "q")
+            }
+            "random-integer" {
+              [long] $min = "${{ inputs.int_min }}"
+              [long] $max = "${{ inputs.int_max }}"
+              if ($max -lt $min) {
+                throw "int_max must be greater than or equal to int_min."
+              }
+              Run-SrgWithLines @("6", "2", "1", "$min", "$max", "q")
+            }
+            "random-float" {
+              [double] $min = "${{ inputs.float_min }}"
+              [double] $max = "${{ inputs.float_max }}"
+              if (-not [double]::IsFinite($min) -or -not [double]::IsFinite($max)) {
+                throw "float_min and float_max must be finite."
+              }
+              if ($max -lt $min) {
+                throw "float_max must be greater than or equal to float_min."
+              }
+              Run-SrgWithLines @("6", "2", "2", "$min", "$max", "q")
+            }
+            "time-sync-observe" {
+              $host = "${{ inputs.time_host }}"
+              [int] $observeSeconds = "${{ inputs.observe_seconds }}"
+              Require-NonEmpty $host "time_host"
+              if ($observeSeconds -lt 1 -or $observeSeconds -gt 60) {
+                throw "observe_seconds must be between 1 and 60."
+              }
+              $proc = Start-SrgProcess
+              $proc.StandardInput.WriteLine("6")
+              $proc.StandardInput.WriteLine("5")
+              $proc.StandardInput.WriteLine($host)
+              $proc.StandardInput.WriteLine("")
+              Start-Sleep -Seconds $observeSeconds
+              $proc.StandardInput.WriteLine("")
+              $proc.StandardInput.WriteLine("q")
+              $proc.StandardInput.Close()
+              Finish-SrgProcess $proc
+            }
+            default {
+              throw "Unsupported action: $action"
+            }
+          }
+
+          if (Test-Path $dataPath) {
+            Copy-Item $dataPath $copiedDataPath -Force
+          }
+
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts\*
+          if-no-files-found: error
+          retention-days: 14
