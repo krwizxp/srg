@@ -4720,7 +4720,8 @@
         }
       }
       function downloadRandomDataTxt(text) {
-        const blob = new Blob([text.endsWith("\n") ? text : `${text}\n`], {
+        const body = text.endsWith("\n") ? text : `${text}\n`;
+        const blob = new Blob(["\uFEFF", body], {
           type: "text/plain;charset=utf-8",
         });
         const url = URL.createObjectURL(blob);

@@ -3,10 +3,10 @@ use std::arch::x86_64::{_rdrand64_step, _rdseed64_step};
 use std::{
     char::from_u32,
     error::Error,
-    fs::File,
-    io::{BufWriter, Error as ioErr, IsTerminal, Result as IoRst, Write, stdin, stdout},
+    fs::{self, File},
+    io::{BufWriter, Error as ioErr, IsTerminal, Read, Result as IoRst, Write, stdin, stdout},
     is_x86_feature_detected,
-    path::Path,
+    path::{Path, PathBuf},
     process::ExitCode,
     result::Result as stdResult,
     sync::{
@@ -64,6 +64,7 @@ const fn make_two_digits_table() -> [[u8; 2]; 100] {
 const TWO_DIGITS: [[u8; 2]; 100] = make_two_digits_table();
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
+const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
 const BUFFER_SIZE: usize = 1016;
 const BUFFERS_PER_WORKER: usize = 8;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
@@ -389,7 +390,78 @@ fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<
     }
     Ok(())
 }
+fn ensure_file_has_utf8_bom(path: &Path) -> Result<()> {
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            if metadata.len() == 0 {
+                write_utf8_bom_to_empty_file(path)?;
+            } else if !file_starts_with_utf8_bom(path)? {
+                prepend_utf8_bom(path)?;
+            }
+            Ok(())
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            write_utf8_bom_to_empty_file(path)?;
+            Ok(())
+        }
+        Err(err) => Err(Box::new(err)),
+    }
+}
+fn write_utf8_bom_to_empty_file(path: &Path) -> Result<()> {
+    let mut file = File::options()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)?;
+    file.write_all(UTF8_BOM)?;
+    file.flush()?;
+    Ok(())
+}
+fn file_starts_with_utf8_bom(path: &Path) -> Result<bool> {
+    let mut file = File::open(path)?;
+    let mut bom = [0u8; UTF8_BOM.len()];
+    let bytes_read = file.read(&mut bom)?;
+    Ok(bytes_read == UTF8_BOM.len() && bom == *UTF8_BOM)
+}
+fn prepend_utf8_bom(path: &Path) -> Result<()> {
+    let temp_path = path_with_suffix(path, ".bom.tmp");
+    let backup_path = path_with_suffix(path, ".bom.bak");
+    if temp_path.try_exists()? {
+        fs::remove_file(&temp_path)?;
+    }
+    if backup_path.try_exists()? {
+        fs::remove_file(&backup_path)?;
+    }
+    let mut source = File::open(path)?;
+    let mut temp = File::options()
+        .create_new(true)
+        .write(true)
+        .open(&temp_path)?;
+    temp.write_all(UTF8_BOM)?;
+    std::io::copy(&mut source, &mut temp)?;
+    temp.flush()?;
+    drop(source);
+    drop(temp);
+    fs::rename(path, &backup_path)?;
+    match fs::rename(&temp_path, path) {
+        Ok(()) => {
+            fs::remove_file(&backup_path)?;
+            Ok(())
+        }
+        Err(err) => {
+            let _ = fs::rename(&backup_path, path);
+            let _ = fs::remove_file(&temp_path);
+            Err(Box::new(err))
+        }
+    }
+}
+fn path_with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut os = path.as_os_str().to_owned();
+    os.push(suffix);
+    PathBuf::from(os)
+}
 fn open_or_create_file() -> Result<BufWriter<File>> {
+    ensure_file_has_utf8_bom(Path::new(FILE_NAME))?;
     Ok(BufWriter::with_capacity(
         1_048_576,
         File::options().create(true).append(true).open(FILE_NAME)?,
