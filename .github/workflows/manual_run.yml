@@ -82,9 +82,7 @@ jobs:
 
       - name: Install Rust
         id: toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo registry and target
         uses: actions/cache@v5
@@ -95,12 +93,9 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
-            ${{ runner.os }}-cargo-
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Run selected SRG action
         id: run_srg

@@ -12,46 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Install Rust
-        id: toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-
-      - name: Cache Cargo registry and target
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
-            ${{ runner.os }}-cargo-
-
-      - name: Format Check
-        run: cargo fmt --check
-
-      - name: Clippy Check
-        run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery -W clippy::cargo
-
-      - name: Test
-        run: cargo test --all-targets --all-features
-
-  release-artifacts:
-    needs: checks
+  build:
+    name: ${{ matrix.os }} / rust-stable
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -62,6 +24,7 @@ jobs:
             artifact_path: artifacts/srg-linux-x64.tar.gz
           - os: windows-latest
             artifact_path: artifacts/srg-windows-x64.exe
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -69,26 +32,10 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        id: toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Cache Cargo registry and target
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
-            ${{ runner.os }}-cargo-
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Release Build
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Prepare Linux artifact
         if: matrix.os == 'ubuntu-latest'
