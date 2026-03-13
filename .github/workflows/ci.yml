@@ -23,7 +23,7 @@ jobs:
           - os: ubuntu-latest
             artifact_path: artifacts/srg-linux-x64.tar.gz
           - os: windows-latest
-            artifact_path: artifacts/srg-windows-x64.exe
+            artifact_path: target/release/srg-windows-x64.exe
 
     steps:
       - name: Checkout
@@ -42,15 +42,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          cp target/release/srg artifacts/srg-linux-x64
-          tar -C artifacts -czf artifacts/srg-linux-x64.tar.gz srg-linux-x64
+          tar -C target/release --transform='s|^srg$|srg-linux-x64|' -czf artifacts/srg-linux-x64.tar.gz srg
 
-      - name: Prepare Windows artifact
+      - name: Rename Windows artifact file
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          Copy-Item target\release\srg.exe artifacts\srg-windows-x64.exe -Force
+          Move-Item target\release\srg.exe target\release\srg-windows-x64.exe -Force
 
       - name: Upload Release Binary
         uses: actions/upload-artifact@v7
