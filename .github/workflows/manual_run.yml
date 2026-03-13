@@ -61,7 +61,7 @@ on:
         default: "10"
         type: string
       artifact_name:
-        description: Uploaded artifact name
+        description: Filename prefix for uploaded artifacts
         required: true
         default: srg-result
         type: string
@@ -71,14 +71,17 @@ permissions:
 
 jobs:
   run:
-    runs-on: windows-2025
+    runs-on: windows-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Rust
+        id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -91,27 +94,39 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
             ${{ runner.os }}-cargo-
 
       - name: Build release binary
-        run: cargo build --release --locked
+        run: cargo build --release
 
       - name: Run selected SRG action
+        id: run_srg
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
           $action = "${{ inputs.action }}"
+          $artifactPrefix = "${{ inputs.artifact_name }}"
+          if ([string]::IsNullOrWhiteSpace($artifactPrefix)) {
+            $artifactPrefix = "srg-result"
+          }
+          $artifactPrefix = $artifactPrefix.Trim()
+          $artifactPrefix = $artifactPrefix -replace '[\\/:*?"<>|]', '-'
+
           $artifactDir = Join-Path $PWD "artifacts"
           $exePath = Join-Path $PWD "target\release\srg.exe"
-          $logPath = Join-Path $artifactDir "srg_console.log"
+          $logPath = Join-Path $artifactDir ("{0}-console.log" -f $artifactPrefix)
           $dataPath = Join-Path $PWD "random_data.txt"
-          $copiedDataPath = Join-Path $artifactDir "random_data.txt"
+          $copiedDataPath = Join-Path $artifactDir ("{0}-random_data.txt" -f $artifactPrefix)
 
           New-Item -ItemType Directory -Force $artifactDir | Out-Null
           Remove-Item $dataPath -Force -ErrorAction SilentlyContinue
+          Set-Content -Path $logPath -Value "" -Encoding utf8NoBOM
+
+          "log_artifact_path=$logPath" >> $env:GITHUB_OUTPUT
 
           function Require-NonEmpty([string] $value, [string] $name) {
             if ([string]::IsNullOrWhiteSpace($value)) {
@@ -144,7 +159,7 @@ jobs:
             }
             Set-Content -Path $logPath -Value $combined -Encoding utf8NoBOM
             if ($proc.ExitCode -ne 0) {
-              throw "srg.exe exited with code $($proc.ExitCode). See artifacts/srg_console.log."
+              throw "srg.exe exited with code $($proc.ExitCode). See $logPath."
             }
           }
 
@@ -157,74 +172,91 @@ jobs:
             Finish-SrgProcess $proc
           }
 
-          switch ($action) {
-            "generate-single" {
-              Run-SrgWithLines @("6", "3", "q")
-            }
-            "generate-multiple" {
-              [ulong] $count = "${{ inputs.count }}"
-              if ($count -lt 1 -or $count -gt 100000) {
-                throw "count must be between 1 and 100000."
+          try {
+            switch ($action) {
+              "generate-single" {
+                Run-SrgWithLines @("6", "3", "q")
               }
-              Run-SrgWithLines @("6", "4", "$count", "q")
-            }
-            "ladder" {
-              $players = "${{ inputs.players }}"
-              $results = "${{ inputs.results }}"
-              Require-NonEmpty $players "players"
-              Require-NonEmpty $results "results"
-              Run-SrgWithLines @("6", "1", $players, $results, "q")
-            }
-            "random-integer" {
-              [long] $min = "${{ inputs.int_min }}"
-              [long] $max = "${{ inputs.int_max }}"
-              if ($max -lt $min) {
-                throw "int_max must be greater than or equal to int_min."
+              "generate-multiple" {
+                [ulong] $count = "${{ inputs.count }}"
+                if ($count -lt 1 -or $count -gt 100000) {
+                  throw "count must be between 1 and 100000."
+                }
+                Run-SrgWithLines @("6", "4", "$count", "q")
               }
-              Run-SrgWithLines @("6", "2", "1", "$min", "$max", "q")
-            }
-            "random-float" {
-              [double] $min = "${{ inputs.float_min }}"
-              [double] $max = "${{ inputs.float_max }}"
-              if (-not [double]::IsFinite($min) -or -not [double]::IsFinite($max)) {
-                throw "float_min and float_max must be finite."
+              "ladder" {
+                $players = "${{ inputs.players }}"
+                $results = "${{ inputs.results }}"
+                Require-NonEmpty $players "players"
+                Require-NonEmpty $results "results"
+                Run-SrgWithLines @("6", "1", $players, $results, "q")
               }
-              if ($max -lt $min) {
-                throw "float_max must be greater than or equal to float_min."
+              "random-integer" {
+                [long] $min = "${{ inputs.int_min }}"
+                [long] $max = "${{ inputs.int_max }}"
+                if ($max -lt $min) {
+                  throw "int_max must be greater than or equal to int_min."
+                }
+                Run-SrgWithLines @("6", "2", "1", "$min", "$max", "q")
               }
-              Run-SrgWithLines @("6", "2", "2", "$min", "$max", "q")
-            }
-            "time-sync-observe" {
-              $host = "${{ inputs.time_host }}"
-              [int] $observeSeconds = "${{ inputs.observe_seconds }}"
-              Require-NonEmpty $host "time_host"
-              if ($observeSeconds -lt 1 -or $observeSeconds -gt 60) {
-                throw "observe_seconds must be between 1 and 60."
+              "random-float" {
+                [double] $min = "${{ inputs.float_min }}"
+                [double] $max = "${{ inputs.float_max }}"
+                if (-not [double]::IsFinite($min) -or -not [double]::IsFinite($max)) {
+                  throw "float_min and float_max must be finite."
+                }
+                if ($max -lt $min) {
+                  throw "float_max must be greater than or equal to float_min."
+                }
+                Run-SrgWithLines @("6", "2", "2", "$min", "$max", "q")
               }
-              $proc = Start-SrgProcess
-              $proc.StandardInput.WriteLine("6")
-              $proc.StandardInput.WriteLine("5")
-              $proc.StandardInput.WriteLine($host)
-              $proc.StandardInput.WriteLine("")
-              Start-Sleep -Seconds $observeSeconds
-              $proc.StandardInput.WriteLine("")
-              $proc.StandardInput.WriteLine("q")
-              $proc.StandardInput.Close()
-              Finish-SrgProcess $proc
+              "time-sync-observe" {
+                $host = "${{ inputs.time_host }}"
+                [int] $observeSeconds = "${{ inputs.observe_seconds }}"
+                Require-NonEmpty $host "time_host"
+                if ($observeSeconds -lt 1 -or $observeSeconds -gt 60) {
+                  throw "observe_seconds must be between 1 and 60."
+                }
+                $proc = Start-SrgProcess
+                $proc.StandardInput.WriteLine("6")
+                $proc.StandardInput.WriteLine("5")
+                $proc.StandardInput.WriteLine($host)
+                $proc.StandardInput.WriteLine("")
+                Start-Sleep -Seconds $observeSeconds
+                $proc.StandardInput.WriteLine("")
+                $proc.StandardInput.WriteLine("q")
+                $proc.StandardInput.Close()
+                Finish-SrgProcess $proc
+              }
+              default {
+                throw "Unsupported action: $action"
+              }
             }
-            default {
-              throw "Unsupported action: $action"
+
+            if (Test-Path $dataPath) {
+              Copy-Item $dataPath $copiedDataPath -Force
+              "data_artifact_path=$copiedDataPath" >> $env:GITHUB_OUTPUT
             }
           }
-
-          if (Test-Path $dataPath) {
-            Copy-Item $dataPath $copiedDataPath -Force
+          catch {
+            Add-Content -Path $logPath -Value ("`r`n[workflow-error]`r`n" + $_.Exception.Message) -Encoding utf8NoBOM
+            throw
           }
 
-      - name: Upload run artifacts
+      - name: Upload console log artifact
+        if: ${{ always() && steps.run_srg.outputs.log_artifact_path != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.artifact_name }}
-          path: artifacts\*
+          path: ${{ steps.run_srg.outputs.log_artifact_path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload generated data artifact
+        if: ${{ always() && steps.run_srg.outputs.data_artifact_path != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.run_srg.outputs.data_artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: 14

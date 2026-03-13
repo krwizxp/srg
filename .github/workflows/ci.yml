@@ -4,14 +4,25 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Rust
+        id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -25,8 +36,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
             ${{ runner.os }}-cargo-
 
       - name: Format Check
@@ -41,21 +53,23 @@ jobs:
   release-artifacts:
     needs: checks
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: srg-release-linux
-            binary_path: target/release/srg
+            artifact_path: artifacts/srg-linux-x64.tar.gz
           - os: windows-latest
-            artifact_name: srg-release-windows
-            binary_path: target/release/srg.exe
+            artifact_path: artifacts/srg-windows-x64.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Rust
+        id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -68,17 +82,33 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
             ${{ runner.os }}-cargo-
 
       - name: Release Build
-        run: cargo build --release --locked
+        run: cargo build --release
+
+      - name: Prepare Linux artifact
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp target/release/srg artifacts/srg-linux-x64
+          tar -C artifacts -czf artifacts/srg-linux-x64.tar.gz srg-linux-x64
+
+      - name: Prepare Windows artifact
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item target\release\srg.exe artifacts\srg-windows-x64.exe -Force
 
       - name: Upload Release Binary
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.binary_path }}
+          path: ${{ matrix.artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: 14
