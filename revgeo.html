@@ -1773,6 +1773,14 @@
       return needsQuote ? `"${s}"` : s;
     };
     const lower = (s) => String(s || "").toLowerCase();
+    const geocodeText = (v) => (typeof v === "string" ? v : "");
+    const firstGeocodeText = (...vals) => {
+      for (let i = 0; i < vals.length; i++) {
+        const v = vals[i];
+        if (typeof v === "string" && v) return v;
+      }
+      return "";
+    };
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -2570,7 +2578,7 @@
               n = n * 10 + d;
             }
             if (!n) continue;
-            const val = admin[key];
+            const val = geocodeText(admin[key]);
             switch (n) {
               case 2:
                 level2 = val;
@@ -2604,8 +2612,27 @@
             if (filled === 127) break;
           }
         }
-        const adminCountry = level2 || "";
-        const countryName = gc.country || adminCountry;
+        const gcCountry = geocodeText(gc.country);
+        const gcName = geocodeText(gc.name);
+        const gcCityDistrict = geocodeText(gc.city_district);
+        const gcDistrict = geocodeText(gc.district);
+        const gcSuburb = geocodeText(gc.suburb);
+        const gcCity = geocodeText(gc.city);
+        const gcCounty = geocodeText(gc.county);
+        const gcState = geocodeText(gc.state);
+        const gcRegion = geocodeText(gc.region);
+        const gcProvince = geocodeText(gc.province);
+        const gcTown = geocodeText(gc.town);
+        const gcLocality = geocodeText(gc.locality);
+        const gcVillage = geocodeText(gc.village);
+        const gcNeighbourhood = geocodeText(gc.neighbourhood);
+        const gcMunicipality = geocodeText(gc.municipality);
+        const gcQuarter = geocodeText(gc.quarter);
+        const gcHamlet = geocodeText(gc.hamlet);
+        const gcTownship = geocodeText(gc.township);
+        const gcResidential = geocodeText(gc.residential);
+        const adminCountry = level2;
+        const countryName = gcCountry || adminCountry;
         let lowerCountryName = "";
         let lowerAdminCountry = "";
         let isKoreanPeninsula = false;
@@ -2626,14 +2653,14 @@
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
-        const primaryName = gc.name || p0 || "";
-        const cityDistrict = gc.city_district || gc.district || gc.suburb || "";
-        const city = gc.city || "";
-        const county = gc.county || "";
+        const primaryName = firstGeocodeText(gcName, p0);
+        const cityDistrict = firstGeocodeText(gcCityDistrict, gcDistrict, gcSuburb);
+        const city = gcCity;
+        const county = gcCounty;
         if (isKoreanPeninsula) {
           const level6Kr = level6 || level7;
           const specialCities = CONFIG.SPECIAL_CITIES;
-          sido = level4 || gc.state || "";
+          sido = level4 || gcState || "";
           let cityIsSpecial = false;
           let cityIsSpecialKnown = false;
           if (!sido && city) {
@@ -2837,10 +2864,10 @@
               case 0: n = level8; break;
               case 1: n = level9; break;
               case 2: n = level10; break;
-              case 3: n = gc.town; break;
-              case 4: n = gc.village; break;
-              case 5: n = gc.locality; break;
-              case 6: n = gc.suburb; break;
+              case 3: n = gcTown; break;
+              case 4: n = gcVillage; break;
+              case 5: n = gcLocality; break;
+              case 6: n = gcSuburb; break;
               case 7: n = primaryName; break;
               case 8: n = p0; break;
               case 9: n = p1; break;
@@ -2884,11 +2911,11 @@
           const isCityOrCounty = gc.type === "city" || gc.type === "county";
           sido =
             level4 ||
-            gc.state ||
-            gc.region ||
-            gc.province ||
-            gc.county ||
-            gc.city ||
+            gcState ||
+            gcRegion ||
+            gcProvince ||
+            gcCounty ||
+            gcCity ||
             "";
           let cityLike = "";
           if (city && city !== sido) cityLike = city;
@@ -2899,11 +2926,11 @@
           else if (p1 && p1 !== sido) cityLike = p1;
           else if (p0 && p0 !== sido) cityLike = p0;
           let districtLike = "";
-          const town = gc.town;
-          const locality = gc.locality;
-          const village = gc.village;
-          const suburb = gc.suburb;
-          const neighbourhood = gc.neighbourhood;
+          const town = gcTown;
+          const locality = gcLocality;
+          const village = gcVillage;
+          const suburb = gcSuburb;
+          const neighbourhood = gcNeighbourhood;
           if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) districtLike = cityDistrict;
           else if (level8 && level8 !== cityLike && level8 !== sido) districtLike = level8;
           else if (level9 && level9 !== cityLike && level9 !== sido) districtLike = level9;
@@ -2920,23 +2947,22 @@
               districtLike ||
               level6 ||
               level8 ||
-              gc.city ||
-              gc.town ||
-              gc.county ||
-              gc.district ||
-              gc.municipality ||
+              gcCity ||
+              gcTown ||
+              gcCounty ||
+              gcDistrict ||
+              gcMunicipality ||
               "";
           }
           if ((!sigungu || sigungu === sido) && isCityOrCounty) {
-            sigungu = primaryName || gc.city || gc.county || "";
+            sigungu = primaryName || gcCity || gcCounty || "";
           }
           eupmyeon = "";
           const level10Local = level10;
-          const quarter = gc.quarter;
-          const hamlet = gc.hamlet;
-          const township = gc.township;
-          const residential = gc.residential;
-          const gcName = gc.name;
+          const quarter = gcQuarter;
+          const hamlet = gcHamlet;
+          const township = gcTownship;
+          const residential = gcResidential;
           let cand = locality;
           if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
           else {
@@ -3082,8 +3108,8 @@
         }
         const { sido, sigungu, eupmyeon } =
           this._getAdminFromGeocoding(gc, countryCode, p0, p1);
-        const tagName = gc.name || firstLabelPart || gc.street || gc.city || "";
-        const tagType = gc.type || "";
+        const tagName = firstGeocodeText(gc.name, firstLabelPart, gc.street, gc.city);
+        const tagType = geocodeText(gc.type);
         let tag = tagName;
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
         const addr = {
