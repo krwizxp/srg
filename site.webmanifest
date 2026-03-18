@@ -2,10 +2,8 @@
   "name": "SRG 데이터 역지오코딩 도구",
   "short_name": "SRG 역지오코딩",
   "lang": "ko-KR",
-
   "start_url": "revgeo.html",
   "display": "standalone",
-
   "icons": [
     {
       "src": "icon.svg?v=2",

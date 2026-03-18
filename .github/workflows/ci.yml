@@ -1,16 +1,12 @@
 name: CI
-
 on:
   push:
   pull_request:
-
 permissions:
   contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: ${{ matrix.os }} / rust-stable
@@ -24,32 +20,26 @@ jobs:
             artifact_path: artifacts/srg-linux-x64.tar.gz
           - os: windows-latest
             artifact_path: target/release/srg-windows-x64.exe
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-
       - name: Release Build
         run: cargo build --release --locked
-
       - name: Prepare Linux artifact
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
           mkdir -p artifacts
           tar -C target/release --transform='s|^srg$|srg-linux-x64|' -czf artifacts/srg-linux-x64.tar.gz srg
-
       - name: Rename Windows artifact file
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           Move-Item target\release\srg.exe target\release\srg-windows-x64.exe -Force
-
       - name: Upload Release Binary
         uses: actions/upload-artifact@v7
         with:
