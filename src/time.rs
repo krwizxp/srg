@@ -481,7 +481,7 @@ impl AppState {
             self.high_res_timer_guard = None;
         }
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     const fn sync_high_res_timer_state(_next_activity: &Activity) {}
     fn run_loop(&mut self) -> Result<()> {
         println!("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)");
@@ -566,7 +566,7 @@ impl AppState {
             };
             #[cfg(target_os = "windows")]
             self.sync_high_res_timer_state(&next_activity);
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             Self::sync_high_res_timer_state(&next_activity);
             if let Some(console_msg) = log_opt_msg {
                 println!("\n{console_msg}");
@@ -767,11 +767,9 @@ impl AppState {
                 Some("[오류] 내부 상태 불일치: server_time 없음"),
             );
         };
-        *st = st.recalibrate_with_rtt(sample.rtt);
         let current_server_time = st.current_server_time();
         let old_rtt = self.live_rtt.unwrap_or(sample.rtt);
         let new_rtt_nanos = (old_rtt.as_nanos()
-            * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM - FINAL_COUNTDOWN_RTT_ALPHA_NUM)
             + sample.rtt.as_nanos() * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_NUM))
             / u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM);
         let live_rtt = Duration::from_nanos_u128(new_rtt_nanos);
@@ -870,7 +868,7 @@ fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
         Some(msg),
     )
 }
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn run_external_command(program: &str, args: &[&str]) {
     match Command::new(program).args(args).status() {
         Ok(status) if status.success() => {}

@@ -1,5 +1,11 @@
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+compile_error!("SRG currently supports only Windows, Linux, and macOS.");
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::{_rdrand64_step, _rdseed64_step};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::os::unix::fs::OpenOptionsExt;
+#[cfg(windows)]
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::{
     char::from_u32,
     error::Error,
@@ -20,6 +26,14 @@ use std::{
 mod numeric;
 mod time;
 use numeric::{low_u8_from_u32, low_u8_from_u64, low_u8_from_u128, low_u16_from_u64};
+#[cfg(target_os = "linux")]
+const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
+#[cfg(target_os = "macos")]
+const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
+#[cfg(windows)]
+const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
+#[cfg(windows)]
+const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
 #[inline(never)]
 #[cold]
 fn write_zero_err() -> ioErr {
@@ -281,7 +295,6 @@ fn menu_generate_single(file_mutex: &Mutex<BufWriter<File>>, num_64: &mut u64) -
         return Ok(());
     }
     ensure_file_exists_and_reopen(file_mutex)?;
-    *num_64 = process_single_random_data(file_mutex)?;
     Ok(())
 }
 #[cfg(not(target_arch = "x86_64"))]
@@ -299,7 +312,6 @@ fn menu_generate_multiple(
         print_hw_rng_only_feature_disabled();
         return Ok(());
     }
-    *num_64 = regenerate_multiple(file_mutex, input_buffer)?;
     Ok(())
 }
 #[cfg(not(target_arch = "x86_64"))]
@@ -343,7 +355,6 @@ fn menu_manual(
     input_buffer: &mut String,
 ) -> Result<()> {
     ensure_file_exists_and_reopen(file_mutex)?;
-    *num_64 = process_manual_random_data(file_mutex, input_buffer)?;
     Ok(())
 }
 fn main() -> Result<ExitCode> {
@@ -385,42 +396,91 @@ fn print_hw_rng_only_feature_disabled() {
     println!("이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다.");
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
-    if !Path::new(FILE_NAME).try_exists()? {
-        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?;
-    }
+    if !Path::new(FILE_NAME).try_exists()? {}
     Ok(())
 }
-fn ensure_file_has_utf8_bom(path: &Path) -> Result<()> {
-    match fs::metadata(path) {
+fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync + 'static> {
+    Box::new(ioErr::other(message))
+}
+fn validate_existing_output_path(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
         Ok(metadata) => {
-            if metadata.len() == 0 {
-                write_utf8_bom_to_empty_file(path)?;
+            #[cfg(windows)]
+            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+                return Err(invalid_output_path_err(
+                    "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+                ));
+            }
+            #[cfg(not(windows))]
+            if metadata.file_type().is_symlink() {
+                return Err(invalid_output_path_err(
+                    "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
+                ));
+            }
+            if !metadata.is_file() {
+                return Err(invalid_output_path_err(
+                    "출력 경로는 일반 파일이어야 합니다.",
+                ));
             }
             Ok(())
         }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            write_utf8_bom_to_empty_file(path)?;
-            Ok(())
-        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(Box::new(err)),
     }
 }
-fn write_utf8_bom_to_empty_file(path: &Path) -> Result<()> {
-    let mut file = File::options()
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn open_output_file_without_following_links(path: &Path) -> Result<File> {
+    Ok(File::options()
+        .read(true)
+        .append(true)
         .create(true)
-        .write(true)
-        .truncate(true)
-        .open(path)?;
-    file.write_all(UTF8_BOM)?;
-    file.flush()?;
+        .custom_flags(OPEN_NOFOLLOW_FLAG)
+        .open(path)?)
+}
+#[cfg(windows)]
+fn open_output_file_without_following_links(path: &Path) -> Result<File> {
+    Ok(File::options()
+        .read(true)
+        .append(true)
+        .create(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
+        .open(path)?)
+}
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+fn open_output_file_without_following_links(_path: &Path) -> Result<File> {
+    Err(invalid_output_path_err(
+        "지원되지 않는 운영체제입니다. Windows, Linux, macOS만 지원합니다.",
+    ))
+}
+fn validate_open_output_handle(file: &File) -> Result<()> {
+    let metadata = file.metadata()?;
+    #[cfg(windows)]
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+        return Err(invalid_output_path_err(
+            "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+        ));
+    }
+    if !metadata.is_file() {
+        return Err(invalid_output_path_err(
+            "출력 경로는 일반 파일이어야 합니다.",
+        ));
+    }
+    Ok(())
+}
+fn write_utf8_bom_if_empty(file: &mut File) -> Result<()> {
+    if file.metadata()?.len() == 0 {
+        file.write_all(UTF8_BOM)?;
+        file.flush()?;
+    }
     Ok(())
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
-    ensure_file_has_utf8_bom(Path::new(FILE_NAME))?;
-    Ok(BufWriter::with_capacity(
-        1_048_576,
-        File::options().create(true).append(true).open(FILE_NAME)?,
-    ))
+    let path = Path::new(FILE_NAME);
+    validate_existing_output_path(path)?;
+    let mut file = open_output_file_without_following_links(path)?;
+    validate_open_output_handle(&file)?;
+    write_utf8_bom_if_empty(&mut file)?;
+    Ok(BufWriter::with_capacity(1_048_576, file))
 }
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
     mutex.lock().map_err(|_| Box::from(context_msg))
@@ -515,7 +575,6 @@ fn fill_euro_lucky_stars(
         }
         let new_supp = next_supp("유로밀리언 럭키 스타 보완")?;
         lucky_star_source = new_supp.value.reverse_bits();
-        *supplemental = Some(new_supp);
     }
     Ok(())
 }
@@ -543,19 +602,15 @@ fn fill_hangul_syllables(
             num_bytes[byte_idx + 1],
         ]));
         while syllable_index > 55_859 {
-            if supplemental.is_none() {
-                *supplemental = Some(next_supp("한글 음절 보완")?);
-            }
+            if supplemental.is_none() {}
             let Some(supp_value) = supplemental.as_ref().map(|supp| supp.value) else {
                 return Err("한글 음절 보완 상태 불일치".into());
             };
             if let Some(candidate) = find_hangul_candidate(supp_value) {
                 syllable_index = candidate;
             } else {
-                *supplemental = Some(next_supp("한글 음절 보완 재시도")?);
             }
         }
-        *slot = from_u32(0xAC00 + (syllable_index % 11_172)).ok_or("한글 음절 변환 실패")?;
     }
     Ok(hangul)
 }
@@ -626,7 +681,6 @@ fn generate_random_data_from_num(
             _ => num >> (36usize - (idx - 4) * 4),
         };
         let nibble = usize::from(low_u8_from_u64(nibble_source & 0xF));
-        *slot = GLYPHS[nibble];
     }
     Ok(data)
 }
@@ -750,8 +804,6 @@ fn process_lotto_numbers(
     let mask = 1u64 << number;
     if (*seen & mask) == 0 {
         numbers[*next_idx] = number;
-        *seen |= mask;
-        *next_idx += 1;
         if *next_idx == numbers.len() {
             numbers.sort_unstable();
         }
@@ -778,9 +830,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         let need_new = supplemental
             .as_ref()
             .is_none_or(|supp| supp.bits_remaining < BITS);
-        if need_new {
-            *supplemental = Some(next_supp(reason)?);
-        }
+        if need_new {}
         let Some(supp) = supplemental.as_mut() else {
             return Err("보완 난수 상태 불일치".into());
         };
@@ -1339,9 +1389,7 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
-    for (i, slot) in indices_slice.iter_mut().enumerate() {
-        *slot = i;
-    }
+    for (i, slot) in indices_slice.iter_mut().enumerate() {}
     let mut current_seed = num_64;
     for i in (1..n).rev() {
         current_seed ^= get_hardware_random()?;
