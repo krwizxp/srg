@@ -58,6 +58,8 @@ unsafe extern "system" {
     fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
 }
 fn send_input_events(inputs: &[Input]) {
+    // SAFETY: `inputs.as_ptr()` points to a live slice for the duration of the call,
+    // and `cb_size` is computed from the exact Rust representation passed to `SendInput`.
     unsafe {
         let Ok(input_count) = u32::try_from(inputs.len()) else {
             eprintln!("[경고] Windows 입력 이벤트 수 변환 실패");

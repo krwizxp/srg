@@ -83,6 +83,18 @@ impl error::Error for Error {
     }
 }
 pub type Result<T> = stdresult::Result<T, Error>;
+fn parse_err_with_source(context: &'static str, err: impl fmt::Display) -> Error {
+    Error::Parse(Cow::Owned(format!("{context}: {err}")))
+}
+fn parse_result_with_context<T, E>(
+    result: stdresult::Result<T, E>,
+    context: &'static str,
+) -> Result<T>
+where
+    E: fmt::Display,
+{
+    result.map_err(|err| parse_err_with_source(context, err))
+}
 #[derive(Clone, Copy, Debug)]
 struct TimeSample {
     response_received_inst: Instant,
@@ -262,18 +274,20 @@ impl ServerTime {
         let millis = since_epoch.subsec_millis();
         let days_since_epoch = total_seconds_kst.div_euclid(86400);
         let day_of_week_num = (days_since_epoch + 4).rem_euclid(7);
-        let day_of_week_idx = usize::try_from(day_of_week_num)
-            .map_err(|_| Error::Parse(Cow::Borrowed("요일 계산 중 범위 오류")))?;
+        let day_of_week_idx =
+            parse_result_with_context(usize::try_from(day_of_week_num), "요일 계산 중 범위 오류")?;
         let day_of_week_str = DAY_OF_WEEK_KO[day_of_week_idx];
         let sec_of_day = total_seconds_kst.rem_euclid(86400);
-        let hour = u32::try_from(sec_of_day / 3600)
-            .map_err(|_| Error::Parse(Cow::Borrowed("시 계산 중 범위 오류")))?;
-        let minute = u32::try_from((sec_of_day % 3600) / 60)
-            .map_err(|_| Error::Parse(Cow::Borrowed("분 계산 중 범위 오류")))?;
-        let second = u32::try_from(sec_of_day % 60)
-            .map_err(|_| Error::Parse(Cow::Borrowed("초 계산 중 범위 오류")))?;
-        let day_index = i32::try_from(days_since_epoch)
-            .map_err(|_| Error::Parse(Cow::Borrowed("일자 계산 중 범위 오류")))?;
+        let hour =
+            parse_result_with_context(u32::try_from(sec_of_day / 3600), "시 계산 중 범위 오류")?;
+        let minute = parse_result_with_context(
+            u32::try_from((sec_of_day % 3600) / 60),
+            "분 계산 중 범위 오류",
+        )?;
+        let second =
+            parse_result_with_context(u32::try_from(sec_of_day % 60), "초 계산 중 범위 오류")?;
+        let day_index =
+            parse_result_with_context(i32::try_from(days_since_epoch), "일자 계산 중 범위 오류")?;
         let (year, month, day_of_month) = civil_from_days(day_index);
         Ok(DisplayableTime {
             year,
@@ -376,47 +390,50 @@ impl AppState {
         let host = get_validated_input(
             "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
             &mut user_input_buf,
-            |s| {
-                if s.is_empty() {
+            |raw_input| {
+                if raw_input.is_empty() {
                     Err("서버 주소를 비워둘 수 없습니다.")
                 } else {
-                    if has_ignored_address_suffix(s) {
+                    if has_ignored_address_suffix(raw_input) {
                         eprintln!(
                             "[안내] 서버 주소의 경로/쿼리/프래그먼트는 무시되고 호스트만 사용됩니다."
                         );
                     }
-                    Ok(s.to_string())
+                    Ok(raw_input.to_string())
                 }
             },
         )?;
         let target_time = get_validated_input(
             "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
             &mut user_input_buf,
-            |s| {
-                if s.is_empty() {
+            |raw_input| {
+                if raw_input.is_empty() {
                     return Ok(None);
                 }
-                let mut parts = s.split(':');
-                if let (Some(h_str), Some(m_str), Some(s_str)) =
+                let mut parts = raw_input.split(':');
+                if let (Some(hour_str), Some(minute_str), Some(second_str)) =
                     (parts.next(), parts.next(), parts.next())
                     && parts.next().is_none()
-                    && let (Ok(h), Ok(m), Ok(s)) = (
-                        h_str.parse::<u32>(),
-                        m_str.parse::<u32>(),
-                        s_str.parse::<u32>(),
+                    && let (Ok(hour), Ok(minute), Ok(second)) = (
+                        hour_str.parse::<u32>(),
+                        minute_str.parse::<u32>(),
+                        second_str.parse::<u32>(),
                     )
-                    && h <= 23
-                    && m <= 59
-                    && s <= 59
+                    && hour <= 23
+                    && minute <= 59
+                    && second <= 59
                 {
                     let now_local = SystemTime::now();
-                    let since_epoch = now_local
-                        .duration_since(UNIX_EPOCH)
-                        .map_err(|_| "시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.")?;
+                    let since_epoch = match now_local.duration_since(UNIX_EPOCH) {
+                        Ok(duration) => duration,
+                        Err(_duration_err) => {
+                            return Err("시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.");
+                        }
+                    };
                     let today_start_secs_utc =
                         ((since_epoch.as_secs() + KST_OFFSET_SECS_U64) / 86400 * 86400)
                             - KST_OFFSET_SECS_U64;
-                    let target_secs_of_day = u64::from(h * 3600 + m * 60 + s);
+                    let target_secs_of_day = u64::from(hour * 3600 + minute * 60 + second);
                     let mut target_time =
                         UNIX_EPOCH + Duration::from_secs(today_start_secs_utc + target_secs_of_day);
                     if now_local > target_time {
@@ -767,9 +784,11 @@ impl AppState {
                 Some("[오류] 내부 상태 불일치: server_time 없음"),
             );
         };
+        *st = st.recalibrate_with_rtt(sample.rtt);
         let current_server_time = st.current_server_time();
         let old_rtt = self.live_rtt.unwrap_or(sample.rtt);
         let new_rtt_nanos = (old_rtt.as_nanos()
+            * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM - FINAL_COUNTDOWN_RTT_ALPHA_NUM)
             + sample.rtt.as_nanos() * u128::from(FINAL_COUNTDOWN_RTT_ALPHA_NUM))
             / u128::from(FINAL_COUNTDOWN_RTT_ALPHA_DENOM);
         let live_rtt = Duration::from_nanos_u128(new_rtt_nanos);
@@ -976,7 +995,7 @@ fn parse_port(port_str: &str) -> Result<u16> {
         return Err(Error::Parse(Cow::Borrowed(ERR_PORT)));
     }
     let port_num = parse_u32_digits(port_str).ok_or(Error::Parse(Cow::Borrowed(ERR_PORT)))?;
-    let port = u16::try_from(port_num).map_err(|_| Error::Parse(Cow::Borrowed(ERR_PORT)))?;
+    let port = parse_result_with_context(u16::try_from(port_num), ERR_PORT)?;
     if port == 0 {
         return Err(Error::Parse(Cow::Borrowed(ERR_PORT)));
     }
@@ -1110,12 +1129,14 @@ fn fetch_server_time_sample_curl(
         .ok_or_else(|| Error::Parse("curl 응답에서 time_starttransfer 정보 누락".into()))?;
     let headers_part = &stdout_bytes[..pos];
     let time_starttransfer_part = &stdout_bytes[pos + 1..end];
-    let time_starttransfer_str = std::str::from_utf8(time_starttransfer_part)
-        .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
+    let time_starttransfer_str = parse_result_with_context(
+        std::str::from_utf8(time_starttransfer_part),
+        "curl time_starttransfer 파싱 실패",
+    )?;
     let time_starttransfer_secs: f64 = time_starttransfer_str
         .trim_ascii()
         .parse()
-        .map_err(|_| Error::Parse("curl time_starttransfer 파싱 실패".into()))?;
+        .map_err(|err| parse_err_with_source("curl time_starttransfer 파싱 실패", err))?;
     let rtt_reported_by_curl = Duration::from_secs_f64(time_starttransfer_secs.max(0.000_001));
     let date_header_str_slice = headers_part
         .split(|&b| b == b'\n')
@@ -1327,8 +1348,7 @@ fn current_utc_year() -> i32 {
 }
 fn expand_rfc850_year(two_digit_year: u32) -> Result<i32> {
     const ERR_YEAR: &str = "HTTP Date 파싱 실패: rfc850 2자리 연도 변환에 실패했습니다.";
-    let year_2 =
-        i32::try_from(two_digit_year).map_err(|_| Error::Parse(Cow::Borrowed(ERR_YEAR)))?;
+    let year_2 = parse_result_with_context(i32::try_from(two_digit_year), ERR_YEAR)?;
     let current_year = current_utc_year();
     let century_base = current_year.div_euclid(100) * 100;
     let mut expanded = century_base + year_2;
@@ -1371,7 +1391,7 @@ fn parse_http_date_imf_fixdate(raw_date: &str) -> Result<HttpDateComponents> {
     let day = parse_u32_digits(day_token).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM)))?;
     let month = parse_http_month(month_token)?;
     let year_u32 = parse_u32_digits(year_token).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let year = i32::try_from(year_u32).map_err(|_| Error::Parse(Cow::Borrowed(ERR_NUM)))?;
+    let year = parse_result_with_context(i32::try_from(year_u32), ERR_NUM)?;
     let (hour, minute, second) = parse_http_time_components(time_token)?;
     Ok(HttpDateComponents {
         weekday,
@@ -1462,7 +1482,7 @@ fn parse_http_date_asctime(raw_date: &str) -> Result<HttpDateComponents> {
     let day = parse_u32_digits(day_token).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM)))?;
     let month = parse_http_month(month_token)?;
     let year_u32 = parse_u32_digits(year_token).ok_or(Error::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let year = i32::try_from(year_u32).map_err(|_| Error::Parse(Cow::Borrowed(ERR_NUM)))?;
+    let year = parse_result_with_context(i32::try_from(year_u32), ERR_NUM)?;
     let (hour, minute, second) = parse_http_time_components(time_token)?;
     Ok(HttpDateComponents {
         weekday,
@@ -1478,8 +1498,7 @@ fn unix_timestamp_to_system_time(timestamp_secs: i64) -> Result<SystemTime> {
     const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     let secs_i128 = i128::from(timestamp_secs);
     if secs_i128 >= 0 {
-        let secs_u64 =
-            u64::try_from(secs_i128).map_err(|_| Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
+        let secs_u64 = parse_result_with_context(u64::try_from(secs_i128), ERR_TIMESTAMP)?;
         UNIX_EPOCH
             .checked_add(Duration::from_secs(secs_u64))
             .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
@@ -1487,8 +1506,7 @@ fn unix_timestamp_to_system_time(timestamp_secs: i64) -> Result<SystemTime> {
         let abs_i128 = secs_i128
             .checked_abs()
             .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
-        let abs_secs =
-            u64::try_from(abs_i128).map_err(|_| Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
+        let abs_secs = parse_result_with_context(u64::try_from(abs_i128), ERR_TIMESTAMP)?;
         UNIX_EPOCH
             .checked_sub(Duration::from_secs(abs_secs))
             .ok_or(Error::Parse(Cow::Borrowed(ERR_TIMESTAMP)))

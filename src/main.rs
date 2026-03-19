@@ -7,6 +7,7 @@ use std::os::unix::fs::OpenOptionsExt;
 #[cfg(windows)]
 use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::{
+    any::Any,
     char::from_u32,
     error::Error,
     fs::{self, File},
@@ -295,6 +296,7 @@ fn menu_generate_single(file_mutex: &Mutex<BufWriter<File>>, num_64: &mut u64) -
         return Ok(());
     }
     ensure_file_exists_and_reopen(file_mutex)?;
+    *num_64 = process_single_random_data(file_mutex)?;
     Ok(())
 }
 #[cfg(not(target_arch = "x86_64"))]
@@ -312,6 +314,7 @@ fn menu_generate_multiple(
         print_hw_rng_only_feature_disabled();
         return Ok(());
     }
+    *num_64 = regenerate_multiple(file_mutex, input_buffer)?;
     Ok(())
 }
 #[cfg(not(target_arch = "x86_64"))]
@@ -326,8 +329,8 @@ fn menu_generate_multiple(
 fn menu_time_sync() {
     if let Err(e) = time::run()
         && !matches!(
-            e,
-            time::Error::Io(ref io_err)
+            &e,
+            time::Error::Io(io_err)
                 if io_err.kind() == std::io::ErrorKind::UnexpectedEof
         )
     {
@@ -355,6 +358,7 @@ fn menu_manual(
     input_buffer: &mut String,
 ) -> Result<()> {
     ensure_file_exists_and_reopen(file_mutex)?;
+    *num_64 = process_manual_random_data(file_mutex, input_buffer)?;
     Ok(())
 }
 fn main() -> Result<ExitCode> {
@@ -396,11 +400,29 @@ fn print_hw_rng_only_feature_disabled() {
     println!("이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다.");
 }
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
-    if !Path::new(FILE_NAME).try_exists()? {}
+    if !Path::new(FILE_NAME).try_exists()? {
+        *lock_mutex(file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? = open_or_create_file()?;
+    }
     Ok(())
 }
 fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync + 'static> {
     Box::new(ioErr::other(message))
+}
+fn boxed_other_with_source(
+    context_msg: &'static str,
+    err: impl std::fmt::Display,
+) -> Box<dyn Error + Send + Sync + 'static> {
+    Box::new(ioErr::other(format!("{context_msg}: {err}")))
+}
+fn describe_panic_payload(payload: &(dyn Any + Send + 'static)) -> String {
+    match (
+        payload.downcast_ref::<&str>(),
+        payload.downcast_ref::<String>(),
+    ) {
+        (Some(message), None) => (*message).to_owned(),
+        (None, Some(message)) => message.clone(),
+        _ => "non-string panic payload".to_owned(),
+    }
 }
 fn validate_existing_output_path(path: &Path) -> Result<()> {
     match fs::symlink_metadata(path) {
@@ -483,7 +505,9 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
     Ok(BufWriter::with_capacity(1_048_576, file))
 }
 fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
-    mutex.lock().map_err(|_| Box::from(context_msg))
+    mutex
+        .lock()
+        .map_err(|err| boxed_other_with_source(context_msg, err))
 }
 fn persist_and_print_random_data(
     file_mutex: &Mutex<BufWriter<File>>,
@@ -575,6 +599,7 @@ fn fill_euro_lucky_stars(
         }
         let new_supp = next_supp("유로밀리언 럭키 스타 보완")?;
         lucky_star_source = new_supp.value.reverse_bits();
+        *supplemental = Some(new_supp);
     }
     Ok(())
 }
@@ -602,15 +627,19 @@ fn fill_hangul_syllables(
             num_bytes[byte_idx + 1],
         ]));
         while syllable_index > 55_859 {
-            if supplemental.is_none() {}
+            if supplemental.is_none() {
+                *supplemental = Some(next_supp("한글 음절 보완")?);
+            }
             let Some(supp_value) = supplemental.as_ref().map(|supp| supp.value) else {
                 return Err("한글 음절 보완 상태 불일치".into());
             };
             if let Some(candidate) = find_hangul_candidate(supp_value) {
                 syllable_index = candidate;
             } else {
+                *supplemental = Some(next_supp("한글 음절 보완 재시도")?);
             }
         }
+        *slot = from_u32(0xAC00 + (syllable_index % 11_172)).ok_or("한글 음절 변환 실패")?;
     }
     Ok(hangul)
 }
@@ -681,6 +710,7 @@ fn generate_random_data_from_num(
             _ => num >> (36usize - (idx - 4) * 4),
         };
         let nibble = usize::from(low_u8_from_u64(nibble_source & 0xF));
+        *slot = GLYPHS[nibble];
     }
     Ok(data)
 }
@@ -694,6 +724,8 @@ fn get_hardware_random() -> Result<u64> {
 #[cfg(target_arch = "x86_64")]
 fn rdseed_impl() -> u64 {
     let mut v = 0u64;
+    // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed` support,
+    // and the intrinsic writes to the valid mutable pointer to `v`.
     while unsafe { _rdseed64_step(&mut v) } != 1 {
         std::hint::spin_loop();
     }
@@ -707,6 +739,8 @@ const fn rdseed_impl() -> u64 {
 fn rdrand_impl() -> Result<u64> {
     let mut v = 0u64;
     for _ in 0..10 {
+        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdrand` support,
+        // and the intrinsic writes to the valid mutable pointer to `v`.
         if unsafe { _rdrand64_step(&mut v) } == 1 {
             return Ok(v);
         }
@@ -804,6 +838,8 @@ fn process_lotto_numbers(
     let mask = 1u64 << number;
     if (*seen & mask) == 0 {
         numbers[*next_idx] = number;
+        *seen |= mask;
+        *next_idx += 1;
         if *next_idx == numbers.len() {
             numbers.sort_unstable();
         }
@@ -830,7 +866,9 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         let need_new = supplemental
             .as_ref()
             .is_none_or(|supp| supp.bits_remaining < BITS);
-        if need_new {}
+        if need_new {
+            *supplemental = Some(next_supp(reason)?);
+        }
         let Some(supp) = supplemental.as_mut() else {
             return Err("보완 난수 상태 불일치".into());
         };
@@ -1076,10 +1114,10 @@ fn buf_write_ascii8(cur: &mut BufCursor<'_>, chars: &[char; 8]) -> IoRst<()> {
     let head = &mut cur.buf[start..start + 8];
     let mut i = 0usize;
     while i < 8 {
-        head[i] = u8::try_from(u32::from(chars[i])).map_err(|_| {
+        head[i] = u8::try_from(u32::from(chars[i])).map_err(|err| {
             ioErr::new(
                 std::io::ErrorKind::InvalidData,
-                "password contains non-ASCII character",
+                format!("password contains non-ASCII character: {err}"),
             )
         })?;
         i += 1;
@@ -1389,13 +1427,17 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
     }
     println!("사다리타기 결과:");
     let indices_slice = &mut [0usize; MAX_PLAYERS][..n];
-    for (i, slot) in indices_slice.iter_mut().enumerate() {}
+    for (i, slot) in indices_slice.iter_mut().enumerate() {
+        *slot = i;
+    }
     let mut current_seed = num_64;
     for i in (1..n).rev() {
         current_seed ^= get_hardware_random()?;
-        let upper_bound = u64::try_from(i + 1).map_err(|_| "인덱스 상한 변환 실패")?;
+        let upper_bound = u64::try_from(i + 1)
+            .map_err(|err| boxed_other_with_source("인덱스 상한 변환 실패", err))?;
         let swap_index_u64 = random_bounded(upper_bound, current_seed)?;
-        let swap_index = usize::try_from(swap_index_u64).map_err(|_| "인덱스 변환 실패")?;
+        let swap_index = usize::try_from(swap_index_u64)
+            .map_err(|err| boxed_other_with_source("인덱스 변환 실패", err))?;
         indices_slice.swap(i, swap_index);
     }
     for (player, &result_index) in players_array[..n].iter().zip(indices_slice.iter()) {
@@ -1542,12 +1584,13 @@ fn writer_thread_main(
     let final_bytes_written_file =
         format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
     {
-        let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드 종료 처리)")?;
+        let mut final_file_guard =
+            lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드 종료 처리)")?;
         write_buffer_to_file_guard(
-            &mut file_guard,
+            &mut final_file_guard,
             &final_buffer_file[..final_bytes_written_file],
         )?;
-        file_guard.flush()?;
+        final_file_guard.flush()?;
     }
     Ok(final_data)
 }
@@ -1690,9 +1733,10 @@ fn regenerate_multiple(
     let processed = AtomicU64::new(0);
     let failed = AtomicU64::new(0);
     let final_data = scope(|s| -> Result<RandomDataSet> {
-        let buffer_return_senders = buffer_return_senders;
-        let writer_thread =
-            s.spawn(move || writer_thread_main(file_mutex, &receiver, &buffer_return_senders));
+        let writer_buffer_return_senders = buffer_return_senders;
+        let writer_thread = s.spawn(move || {
+            writer_thread_main(file_mutex, &receiver, &writer_buffer_return_senders)
+        });
         let processed_ref = &processed;
         let failed_ref = &failed;
         let progress_thread: Option<ScopedJoinHandle<Result<()>>> = if *IS_TERMINAL {
@@ -1707,8 +1751,8 @@ fn regenerate_multiple(
         } else {
             None
         };
-        let thread_count_u64 =
-            u64::try_from(calculated_thread_count).map_err(|_| "스레드 수 변환 실패")?;
+        let thread_count_u64 = u64::try_from(calculated_thread_count)
+            .map_err(|err| boxed_other_with_source("스레드 수 변환 실패", err))?;
         let base_count = multi_thread_count / thread_count_u64;
         let remainder = multi_thread_count % thread_count_u64;
         let mut worker_handles = Vec::with_capacity(calculated_thread_count);
@@ -1728,9 +1772,12 @@ fn regenerate_multiple(
         }
         drop(sender);
         for handle in worker_handles {
-            handle
-                .join()
-                .map_err(|_| ioErr::other("작업 스레드 패닉 발생"))?;
+            handle.join().map_err(|panic_payload| {
+                ioErr::other(format!(
+                    "작업 스레드 패닉 발생: {}",
+                    describe_panic_payload(panic_payload.as_ref()),
+                ))
+            })?;
         }
         let processed_now = processed_ref.load(Ordering::Relaxed);
         if processed_now < multi_thread_count {
@@ -1841,5 +1888,10 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
     7
 }
 fn join_thread<T>(handle: ScopedJoinHandle<'_, Result<T>>, panic_msg: &'static str) -> Result<T> {
-    handle.join().map_err(|_| ioErr::other(panic_msg))?
+    handle.join().map_err(|panic_payload| {
+        ioErr::other(format!(
+            "{panic_msg}: {}",
+            describe_panic_payload(panic_payload.as_ref()),
+        ))
+    })?
 }

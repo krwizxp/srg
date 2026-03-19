@@ -7,6 +7,29 @@ license = "MIT"
 repository = "https://github.com/krwizxp/srg"
 keywords = ["random", "rng", "cli", "time-sync", "utilities"]
 categories = ["command-line-utilities", "date-and-time", "encoding"]
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
+style = "warn"
+perf = "warn"
+complexity = "warn"
+suspicious = "warn"
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+map_err_ignore = "warn"
+multiple_unsafe_ops_per_block = "warn"
+panic = "warn"
+ref_patterns = "warn"
+shadow_same = "warn"
+shadow_unrelated = "warn"
+todo = "warn"
+undocumented_unsafe_blocks = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+unwrap_used = "warn"
 [profile.release]
 codegen-units = 1
 lto = "fat"
