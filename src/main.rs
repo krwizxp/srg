@@ -724,9 +724,12 @@ fn get_hardware_random() -> Result<u64> {
 #[cfg(target_arch = "x86_64")]
 fn rdseed_impl() -> u64 {
     let mut v = 0u64;
-    // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed` support,
-    // and the intrinsic writes to the valid mutable pointer to `v`.
-    while unsafe { _rdseed64_step(&mut v) } != 1 {
+    loop {
+        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed` support,
+        // and the intrinsic writes to the valid mutable pointer to `v`.
+        if unsafe { _rdseed64_step(&mut v) } == 1 {
+            break;
+        }
         std::hint::spin_loop();
     }
     v
