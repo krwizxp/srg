@@ -122,12 +122,12 @@ struct DisplayableTime {
 fn write_zero_err() -> io::Error {
     io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer")
 }
-struct SliceCursor<'a> {
-    buf: &'a mut [u8],
+struct SliceCursor<'buffer> {
+    buf: &'buffer mut [u8],
     pos: usize,
 }
-impl<'a> SliceCursor<'a> {
-    const fn new(buf: &'a mut [u8]) -> Self {
+impl<'buffer> SliceCursor<'buffer> {
+    const fn new(buf: &'buffer mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
     const fn remaining(&self) -> usize {
@@ -592,11 +592,11 @@ impl AppState {
         }
         Ok(())
     }
-    fn handle_measure_baseline_rtt<'a>(
+    fn handle_measure_baseline_rtt<'message>(
         &mut self,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         net_ctx: &mut NetworkContext,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         let now = Instant::now();
         if self.baseline_rtt_attempts == 0 {
             if self.last_sample.is_none() {
@@ -667,11 +667,11 @@ impl AppState {
         );
         (Activity::CalibrateOnTick, Some(msg_buf))
     }
-    fn handle_calibrate_on_tick<'a>(
+    fn handle_calibrate_on_tick<'message>(
         &mut self,
-        _msg_buf: &'a mut str,
+        _msg_buf: &'message mut str,
         net_ctx: &mut NetworkContext,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         let current_sample = if let Ok(sample) = fetch_server_time_sample(&self.host, net_ctx) {
             self.calibration_failure_count = 0;
             sample
@@ -699,7 +699,10 @@ impl AppState {
         self.last_sample = Some(current_sample);
         (Activity::CalibrateOnTick, None)
     }
-    fn handle_predicting<'a>(&mut self, _msg_buf: &'a mut String) -> (Activity, Option<&'a str>) {
+    fn handle_predicting<'message>(
+        &mut self,
+        _msg_buf: &'message mut String,
+    ) -> (Activity, Option<&'message str>) {
         let Some(server_time) = self.server_time.as_ref() else {
             return (Activity::MeasureBaselineRtt, None);
         };
@@ -727,23 +730,23 @@ impl AppState {
             (Activity::Predicting, None)
         }
     }
-    fn trigger_and_finish<'a>(
+    fn trigger_and_finish<'message>(
         &self,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         log_message: fmt::Arguments,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         if let Some(action) = self.trigger_action {
             trigger_action(action);
         }
         let _ = msg_buf.write_fmt(log_message);
         (Activity::Finished, Some(msg_buf))
     }
-    fn handle_final_countdown<'a>(
+    fn handle_final_countdown<'message>(
         &mut self,
         target_time: SystemTime,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         net_ctx: &mut NetworkContext,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         let sample = match fetch_server_time_sample(&self.host, net_ctx) {
             Ok(s) => s,
             Err(e) => {

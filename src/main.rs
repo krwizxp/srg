@@ -216,7 +216,8 @@ impl RandomBitBuffer {
         }
     }
 }
-type SupplementalProvider<'a> = dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'a;
+type SupplementalProvider<'provider> =
+    dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider;
 fn is_unexpected_eof(err: &(dyn Error + 'static)) -> bool {
     err.downcast_ref::<ioErr>()
         .is_some_and(|io_err| io_err.kind() == std::io::ErrorKind::UnexpectedEof)
@@ -504,7 +505,10 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
     write_utf8_bom_if_empty(&mut file)?;
     Ok(BufWriter::with_capacity(1_048_576, file))
 }
-fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<MutexGuard<'a, T>> {
+fn lock_mutex<'mutex, T>(
+    mutex: &'mutex Mutex<T>,
+    context_msg: &'static str,
+) -> Result<MutexGuard<'mutex, T>> {
     mutex
         .lock()
         .map_err(|err| boxed_other_with_source(context_msg, err))
@@ -890,12 +894,12 @@ fn format_data_into_buffer(
 ) -> Result<usize> {
     Ok(format_output(buffer.as_mut_slice(), data, use_colors)?)
 }
-struct BufCursor<'a> {
-    buf: &'a mut [u8],
+struct BufCursor<'buffer> {
+    buf: &'buffer mut [u8],
     pos: usize,
 }
-impl<'a> BufCursor<'a> {
-    const fn new(buf: &'a mut [u8]) -> Self {
+impl<'buffer> BufCursor<'buffer> {
+    const fn new(buf: &'buffer mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
     const fn remaining(&self) -> usize {
@@ -1356,7 +1360,10 @@ fn write_slice_to_console(data_slice: &[u8]) -> IoRst<()> {
     stdout_lock.flush()?;
     Ok(())
 }
-fn read_line_reuse<'a>(prompt: std::fmt::Arguments, buffer: &'a mut String) -> IoRst<&'a str> {
+fn read_line_reuse<'buffer>(
+    prompt: std::fmt::Arguments,
+    buffer: &'buffer mut String,
+) -> IoRst<&'buffer str> {
     buffer.clear();
     {
         let mut out = stdout().lock();
