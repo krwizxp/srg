@@ -1,5 +1,17 @@
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 compile_error!("SRG currently supports only Windows, Linux, and macOS.");
+mod batch;
+mod buffmt;
+mod numeric;
+mod output;
+mod time;
+use self::{
+    batch::regenerate_multiple,
+    output::{
+        format_data_into_buffer, prefix_slice, write_buffer_to_file_guard, write_slice_to_console,
+    },
+};
+use numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64};
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::{_rdrand64_step, _rdseed64_step};
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -10,23 +22,19 @@ use std::{
     any::Any,
     char::from_u32,
     error::Error,
+    fmt::{Arguments, Display},
     fs::{self, File},
-    io::{BufWriter, Error as ioErr, IsTerminal as _, Result as IoRst, Write as _, stdin, stdout},
+    hint::spin_loop,
+    io::{
+        BufWriter, Error as ioErr, ErrorKind, IsTerminal as _, Result as IoRst, Write as _, stdin,
+        stdout,
+    },
     is_x86_feature_detected,
     path::Path,
     process::ExitCode,
     result::Result as stdResult,
-    sync::{
-        LazyLock, Mutex, MutexGuard,
-        atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver, SyncSender, TryRecvError, sync_channel},
-    },
-    thread::{ScopedJoinHandle, available_parallelism, scope, sleep},
-    time::{Duration, Instant},
+    sync::{LazyLock, Mutex, MutexGuard},
 };
-mod numeric;
-mod time;
-use numeric::{low_u8_from_u32, low_u8_from_u64, low_u8_from_u128, low_u16_from_u64};
 #[cfg(target_os = "linux")]
 const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
 #[cfg(target_os = "macos")]
@@ -35,14 +43,6 @@ const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
 const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
 #[cfg(windows)]
 const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
-#[inline(never)]
-#[cold]
-fn write_zero_err() -> ioErr {
-    ioErr::new(
-        std::io::ErrorKind::WriteZero,
-        "failed to write whole buffer",
-    )
-}
 const fn u64_to_be_bytes(value: u64) -> [u8; 8] {
     [
         low_u8_from_u64(value >> 56_u32),
@@ -61,7 +61,7 @@ enum RngSource {
     None,
 }
 #[cfg(target_arch = "x86_64")]
-static RNG_SOURCE: std::sync::LazyLock<RngSource> = std::sync::LazyLock::new(|| {
+static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| {
     if is_x86_feature_detected!("rdseed") {
         RngSource::RdSeed
     } else if is_x86_feature_detected!("rdrand") {
@@ -72,23 +72,11 @@ static RNG_SOURCE: std::sync::LazyLock<RngSource> = std::sync::LazyLock::new(|| 
     }
 });
 #[cfg(not(target_arch = "x86_64"))]
-static RNG_SOURCE: std::sync::LazyLock<RngSource> = std::sync::LazyLock::new(|| RngSource::None);
+static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| RngSource::None);
 static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
 static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| stdout().is_terminal());
-const fn make_two_digits_table() -> [[u8; 2]; 100] {
-    let mut table = [[0_u8; 2]; 100];
-    let mut idx = 0_usize;
-    let mut value = 0_u8;
-    while idx < 100 {
-        table[idx] = [b'0' + value / 10, b'0' + value % 10];
-        idx += 1;
-        value += 1;
-    }
-    table
-}
-const TWO_DIGITS: [[u8; 2]; 100] = make_two_digits_table();
 type Result<T> = stdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 const FILE_NAME: &str = "random_data.txt";
 const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
@@ -96,10 +84,7 @@ const BUFFER_SIZE: usize = 1016;
 const BUFFERS_PER_WORKER: usize = 8;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 const fn bitmask_const<const B: u8>() -> u64 {
-    let mut b = B as u32;
-    if b > 64 {
-        b = 64;
-    }
+    let b = if B > 64 { 64 } else { B };
     match b {
         0 => 0,
         64 => u64::MAX,
@@ -111,7 +96,7 @@ const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     let b = value.wrapping_add(ADD);
     if a < b { a } else { b }
 }
-const U32_MAX_INV: f64 = 1.0 / (u32::MAX as f64);
+const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
 const TWO_POW_32_F64: f64 = 4_294_967_296.0;
 const U64_UNIT_SCALE: f64 = 1.0 / (TWO_POW_32_F64 * TWO_POW_32_F64);
 const BAR_WIDTH: usize = 10;
@@ -130,41 +115,38 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
     "[██████████]",
 ];
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
-const DIGITS: [u8; 10] = *b"0123456789";
 const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
-const fn make_bin8_table() -> [[u8; 8]; 256] {
+fn make_bin8_table() -> [[u8; 8]; 256] {
     let mut table = [[0_u8; 8]; 256];
-    let mut idx = 0_usize;
     let mut byte = 0_u8;
-    while idx < 256 {
-        let mut bit = 0_usize;
-        while bit < 8 {
+    for row in &mut table {
+        for (bit, slot) in row.iter_mut().enumerate() {
             let shift = 7 - bit;
-            table[idx][bit] = if ((byte >> shift) & 1) == 1 {
+            *slot = if ((byte >> shift) & 1) == 1 {
                 b'1'
             } else {
                 b'0'
             };
-            bit += 1;
         }
-        idx += 1;
         byte = byte.wrapping_add(1);
     }
     table
 }
-const BIN8_TABLE: [[u8; 8]; 256] = make_bin8_table();
-const fn make_hex_byte_table() -> [[u8; 2]; 256] {
+static BIN8_TABLE: LazyLock<[[u8; 8]; 256]> = LazyLock::new(make_bin8_table);
+fn make_hex_byte_table() -> [[u8; 2]; 256] {
     let mut table = [[0_u8; 2]; 256];
-    let mut i = 0_usize;
-    while i < 256 {
-        let hi = (i >> 4_usize) & 0xF;
-        let lo = i & 0xF;
-        table[i] = [HEX_UPPER[hi], HEX_UPPER[lo]];
-        i += 1;
+    let mut value = 0_u8;
+    for slot in &mut table {
+        let hi = usize::from(value >> 4_u8);
+        let lo = usize::from(value & 0xF);
+        if let (Some(hi_byte), Some(lo_byte)) = (HEX_UPPER.get(hi), HEX_UPPER.get(lo)) {
+            *slot = [*hi_byte, *lo_byte];
+        }
+        value = value.wrapping_add(1);
     }
     table
 }
-const HEX_BYTE_TABLE: [[u8; 2]; 256] = make_hex_byte_table();
+static HEX_BYTE_TABLE: LazyLock<[[u8; 2]; 256]> = LazyLock::new(make_hex_byte_table);
 #[cfg(target_arch = "x86_64")]
 const MENU: &str = "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), 4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ";
 #[cfg(not(target_arch = "x86_64"))]
@@ -232,7 +214,7 @@ type SupplementalProvider<'provider> =
     dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider;
 fn is_unexpected_eof(err: &(dyn Error + 'static)) -> bool {
     err.downcast_ref::<ioErr>()
-        .is_some_and(|io_err| io_err.kind() == std::io::ErrorKind::UnexpectedEof)
+        .is_some_and(|io_err| io_err.kind() == ErrorKind::UnexpectedEof)
 }
 #[cfg(target_arch = "x86_64")]
 fn initialize_num_64(file_mutex: &Mutex<BufWriter<File>>) -> Result<u64> {
@@ -341,24 +323,17 @@ fn menu_generate_multiple(
 }
 fn menu_time_sync() {
     if let Err(e) = time::run()
-        && !matches!(
-            &e,
-            time::TimeError::Io(io_err)
-                if io_err.kind() == std::io::ErrorKind::UnexpectedEof
-        )
+        && e.io_kind() != Some(ErrorKind::UnexpectedEof)
     {
         eprintln!("서버 시간 확인 중 오류 발생: {e}");
     }
 }
 #[cfg(target_arch = "x86_64")]
 fn menu_delete_file() {
-    match std::fs::remove_file(FILE_NAME) {
-        Ok(()) => {
-            println!("파일 '{FILE_NAME}'를 삭제했습니다.");
-        }
-        Err(e) => {
-            eprintln!("{e}");
-        }
+    if let Err(e) = fs::remove_file(FILE_NAME) {
+        eprintln!("{e}");
+    } else {
+        println!("파일 '{FILE_NAME}'를 삭제했습니다.");
     }
 }
 #[cfg(not(target_arch = "x86_64"))]
@@ -382,21 +357,23 @@ fn main() -> Result<ExitCode> {
     loop {
         let command = match read_line_reuse(menu_prompt, &mut input_buffer) {
             Ok(cmd) => cmd.to_owned(),
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
                 return Ok(ExitCode::SUCCESS);
             }
             Err(e) => return Err(e.into()),
         };
-        match run_menu_command(
+        let keep_running = match run_menu_command(
             command.as_str(),
             &file_mutex,
             &mut num_64,
             &mut input_buffer,
         ) {
-            Ok(true) => {}
-            Ok(false) => return Ok(ExitCode::SUCCESS),
+            Ok(keep_running) => keep_running,
             Err(e) if is_unexpected_eof(e.as_ref()) => return Ok(ExitCode::SUCCESS),
             Err(e) => return Err(e),
+        };
+        if !keep_running {
+            return Ok(ExitCode::SUCCESS);
         }
     }
 }
@@ -423,7 +400,7 @@ fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync
 }
 fn boxed_other_with_source(
     context_msg: &'static str,
-    err: impl std::fmt::Display,
+    err: impl Display,
 ) -> Box<dyn Error + Send + Sync + 'static> {
     Box::new(ioErr::other(format!("{context_msg}: {err}")))
 }
@@ -438,30 +415,29 @@ fn describe_panic_payload(payload: &(dyn Any + Send + 'static)) -> String {
     }
 }
 fn validate_existing_output_path(path: &Path) -> Result<()> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) => {
-            #[cfg(windows)]
-            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
-                return Err(invalid_output_path_err(
-                    "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
-                ));
-            }
-            #[cfg(not(windows))]
-            if metadata.file_type().is_symlink() {
-                return Err(invalid_output_path_err(
-                    "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
-                ));
-            }
-            if !metadata.is_file() {
-                return Err(invalid_output_path_err(
-                    "출력 경로는 일반 파일이어야 합니다.",
-                ));
-            }
-            Ok(())
-        }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(Box::new(err)),
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(Box::new(err)),
+    };
+    #[cfg(windows)]
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+        return Err(invalid_output_path_err(
+            "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+        ));
     }
+    #[cfg(not(windows))]
+    if metadata.file_type().is_symlink() {
+        return Err(invalid_output_path_err(
+            "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
+        ));
+    }
+    if !metadata.is_file() {
+        return Err(invalid_output_path_err(
+            "출력 경로는 일반 파일이어야 합니다.",
+        ));
+    }
+    Ok(())
 }
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn open_output_file_without_following_links(path: &Path) -> Result<File> {
@@ -533,14 +509,14 @@ fn persist_and_print_random_data(
     let file_len = format_data_into_buffer(data, &mut buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        write_buffer_to_file_guard(&mut file_guard, &buffer[..file_len])?;
+        write_buffer_to_file_guard(&mut file_guard, prefix_slice(&buffer, file_len)?)?;
         file_guard.flush()?;
     }
     if *IS_TERMINAL {
         let console_len = format_data_into_buffer(data, &mut buffer, true)?;
-        write_slice_to_console(&buffer[..console_len])?;
+        write_slice_to_console(prefix_slice(&buffer, console_len)?)?;
     } else {
-        write_slice_to_console(&buffer[..file_len])?;
+        write_slice_to_console(prefix_slice(&buffer, file_len)?)?;
     }
     Ok(())
 }
@@ -557,9 +533,8 @@ fn process_manual_random_data(
     println!("\nnum_64/supp 수동 입력 생성 모드");
     let num_64 = read_parse_u64(
         format_args!(
-            "num_64를 입력해 주세요 (최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}): ",
-            u64::MAX,
-            u64::MAX
+            "num_64를 입력해 주세요 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}): ",
+            max_u64 = u64::MAX
         ),
         input_buffer,
     )?;
@@ -568,9 +543,8 @@ fn process_manual_random_data(
         supp_input_count += 1;
         let supp = read_parse_u64(
             format_args!(
-                "supp 값 #{supp_input_count} 입력 ({reason}, 최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}): ",
-                u64::MAX,
-                u64::MAX
+                "supp 값 #{supp_input_count} 입력 ({reason}, 최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}): ",
+                max_u64 = u64::MAX
             ),
             input_buffer,
         )?;
@@ -719,7 +693,9 @@ fn generate_random_data_from_num(
             _ => num >> (36_usize - (idx - 4) * 4),
         };
         let nibble = usize::from(low_u8_from_u64(nibble_source & 0xF));
-        *slot = GLYPHS[nibble];
+        if let Some(glyph) = GLYPHS.get(nibble).copied() {
+            *slot = glyph;
+        }
     }
     Ok(data)
 }
@@ -739,7 +715,7 @@ fn rdseed_impl() -> u64 {
         if unsafe { _rdseed64_step(&mut v) } == 1_i32 {
             break;
         }
-        std::hint::spin_loop();
+        spin_loop();
     }
     v
 }
@@ -756,7 +732,7 @@ fn rdrand_impl() -> Result<u64> {
         if unsafe { _rdrand64_step(&mut v) } == 1_i32 {
             return Ok(v);
         }
-        std::hint::spin_loop();
+        spin_loop();
     }
     Err("RDRAND 실패".into())
 }
@@ -826,13 +802,13 @@ fn fill_data_fields_from_u64(v: u64, data: &mut RandomDataSet) {
         }
         if data.password_len < 8
             && let Some(ch) = from_u32(u32::from(byte % 94 + 33))
-            && {
-                data.password[usize::from(data.password_len)] = ch;
-                data.password_len += 1;
-                data.is_complete()
-            }
+            && let Some(slot) = data.password.get_mut(usize::from(data.password_len))
         {
-            return;
+            *slot = ch;
+            data.password_len += 1;
+            if data.is_complete() {
+                return;
+            }
         }
     }
 }
@@ -849,7 +825,10 @@ fn process_lotto_numbers(
     let number = (byte % modulus) + 1;
     let mask = 1_u64 << number;
     if (*seen & mask) == 0 {
-        numbers[*next_idx] = number;
+        let Some(slot) = numbers.get_mut(*next_idx) else {
+            return false;
+        };
+        *slot = number;
         *seen |= mask;
         *next_idx += 1;
         if *next_idx == numbers.len() {
@@ -884,7 +863,13 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         let Some(supp) = supplemental.as_mut() else {
             return Err("보완 난수 상태 불일치".into());
         };
-        let shift = supp.bits_remaining - BITS;
+        let Some(shift) = supp.bits_remaining.checked_sub(BITS) else {
+            return Err(format!(
+                "보완 난수 비트 수가 부족합니다. (remaining={}, required={BITS}, reason={reason})",
+                supp.bits_remaining
+            )
+            .into());
+        };
         let extracted = (supp.value >> shift) & mask;
         supp.bits_remaining = shift;
         if extracted <= max_value {
@@ -892,492 +877,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         }
     }
 }
-fn format_data_into_buffer(
-    data: &RandomDataSet,
-    buffer: &mut [u8; BUFFER_SIZE],
-    use_colors: bool,
-) -> Result<usize> {
-    Ok(format_output(buffer.as_mut_slice(), data, use_colors)?)
-}
-struct BufCursor<'buffer> {
-    buf: &'buffer mut [u8],
-    pos: usize,
-}
-impl<'buffer> BufCursor<'buffer> {
-    const fn new(buf: &'buffer mut [u8]) -> Self {
-        Self { buf, pos: 0 }
-    }
-    const fn remaining(&self) -> usize {
-        self.buf.len() - self.pos
-    }
-    const fn written_len(&self) -> usize {
-        self.pos
-    }
-    fn write_bytes(&mut self, bytes: &[u8]) -> IoRst<()> {
-        let len = bytes.len();
-        if self.remaining() < len {
-            return Err(write_zero_err());
-        }
-        let end = self.pos + len;
-        self.buf[self.pos..end].copy_from_slice(bytes);
-        self.pos = end;
-        Ok(())
-    }
-    fn write_byte(&mut self, b: u8) -> IoRst<()> {
-        if self.remaining() < 1 {
-            return Err(write_zero_err());
-        }
-        self.buf[self.pos] = b;
-        self.pos += 1;
-        Ok(())
-    }
-}
-fn cursor_write_fmt(cur: &mut BufCursor<'_>, args: std::fmt::Arguments<'_>) -> IoRst<()> {
-    let start = cur.pos;
-    let mut slice = &mut cur.buf[start..];
-    let before = slice.len();
-    let res = slice.write_fmt(args);
-    let after = slice.len();
-    cur.pos += before - after;
-    res
-}
-fn buf_write_bytes(cur: &mut BufCursor<'_>, bytes: &[u8]) -> IoRst<()> {
-    cur.write_bytes(bytes)
-}
-fn buf_write_byte(cur: &mut BufCursor<'_>, byte: u8) -> IoRst<()> {
-    cur.write_byte(byte)
-}
-fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -> IoRst<()> {
-    let mut total = 0_usize;
-    let mut i = 0_usize;
-    while i < N {
-        total += chars[i].len_utf8();
-        i += 1;
-    }
-    if cur.remaining() < total {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let end = start + total;
-    let head = &mut cur.buf[start..end];
-    let mut pos = 0_usize;
-    let mut j = 0_usize;
-    while j < N {
-        let written = chars[j].encode_utf8(&mut head[pos..]).len();
-        pos += written;
-        j += 1;
-    }
-    cur.pos = end;
-    Ok(())
-}
-fn buf_write_u8_dec(cur: &mut BufCursor<'_>, n: u8) -> IoRst<()> {
-    if n >= 100 {
-        if cur.remaining() < 3 {
-            return Err(write_zero_err());
-        }
-        let hundreds = usize::from(n / 100);
-        let rem = usize::from(n % 100);
-        let start = cur.pos;
-        cur.buf[start] = DIGITS[hundreds];
-        cur.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
-        cur.pos = start + 3;
-        return Ok(());
-    }
-    if n >= 10 {
-        if cur.remaining() < 2 {
-            return Err(write_zero_err());
-        }
-        let start = cur.pos;
-        cur.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[usize::from(n)]);
-        cur.pos = start + 2;
-        return Ok(());
-    }
-    if cur.remaining() < 1 {
-        return Err(write_zero_err());
-    }
-    cur.buf[cur.pos] = b'0' + n;
-    cur.pos += 1;
-    Ok(())
-}
-fn buf_write_u8_array_spaced<const N: usize>(cur: &mut BufCursor<'_>, nums: &[u8; N]) -> IoRst<()> {
-    let mut total = N.saturating_sub(1);
-    let mut i = 0_usize;
-    while i < N {
-        let n = nums[i];
-        total += if n >= 100 {
-            3
-        } else if n >= 10 {
-            2
-        } else {
-            1
-        };
-        i += 1;
-    }
-    if cur.remaining() < total {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let end = start + total;
-    let head = &mut cur.buf[start..end];
-    let mut pos = 0_usize;
-    let mut j = 0_usize;
-    while j < N {
-        if j != 0 {
-            head[pos] = b' ';
-            pos += 1;
-        }
-        let n = nums[j];
-        if n >= 100 {
-            let hundreds = usize::from(n / 100);
-            let rem = usize::from(n % 100);
-            head[pos] = DIGITS[hundreds];
-            head[pos + 1..pos + 3].copy_from_slice(&TWO_DIGITS[rem]);
-            pos += 3;
-        } else if n >= 10 {
-            head[pos..pos + 2].copy_from_slice(&TWO_DIGITS[usize::from(n)]);
-            pos += 2;
-        } else {
-            head[pos] = b'0' + n;
-            pos += 1;
-        }
-        j += 1;
-    }
-    cur.pos = end;
-    Ok(())
-}
-fn buf_write_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
-    if cur.remaining() < 7 {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + 7];
-    let (prefix, rest) = head.split_at_mut(1);
-    prefix[0] = b'#';
-    let (first_hex, rest) = rest.split_at_mut(2);
-    first_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b0)]);
-    let (second_hex, third_hex) = rest.split_at_mut(2);
-    second_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b1)]);
-    third_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b2)]);
-    cur.pos = start + 7;
-    Ok(())
-}
-fn buf_write_m_hash_hex24_from_bytes(cur: &mut BufCursor<'_>, b0: u8, b1: u8, b2: u8) -> IoRst<()> {
-    if cur.remaining() < 8 {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + 8];
-    let (prefix, rest) = head.split_at_mut(2);
-    let (m_prefix, hash_prefix) = prefix.split_at_mut(1);
-    m_prefix[0] = b'm';
-    hash_prefix[0] = b'#';
-    let (first_hex, rest) = rest.split_at_mut(2);
-    first_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b0)]);
-    let (second_hex, third_hex) = rest.split_at_mut(2);
-    second_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b1)]);
-    third_hex.copy_from_slice(&HEX_BYTE_TABLE[usize::from(b2)]);
-    cur.pos = start + 8;
-    Ok(())
-}
-fn buf_write_bin8_line(cur: &mut BufCursor<'_>, bytes: [u8; 8]) -> IoRst<()> {
-    const PREFIX: &str = "2진수: ";
-    const PREFIX_LEN: usize = PREFIX.len();
-    const LINE_LEN: usize = PREFIX_LEN + 8 * 8 + 7 + 1;
-    if cur.remaining() < LINE_LEN {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + LINE_LEN];
-    head[..PREFIX_LEN].copy_from_slice(PREFIX.as_bytes());
-    let mut pos = PREFIX_LEN;
-    let mut i = 0_usize;
-    while i < 8 {
-        let b = usize::from(bytes[i]);
-        head[pos..pos + 8].copy_from_slice(&BIN8_TABLE[b]);
-        pos += 8;
-        head[pos] = if i == 7 { b'\n' } else { b' ' };
-        pos += 1;
-        i += 1;
-    }
-    cur.pos = start + LINE_LEN;
-    Ok(())
-}
-fn buf_write_hex8_line(cur: &mut BufCursor<'_>, bytes: [u8; 8]) -> IoRst<()> {
-    const PREFIX: &str = "16진수: ";
-    const PREFIX_LEN: usize = PREFIX.len();
-    const LINE_LEN: usize = PREFIX_LEN + 8 * 2 + 7 + 1;
-    if cur.remaining() < LINE_LEN {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + LINE_LEN];
-    head[..PREFIX_LEN].copy_from_slice(PREFIX.as_bytes());
-    let mut pos = PREFIX_LEN;
-    let mut i = 0_usize;
-    while i < 8 {
-        let b = usize::from(bytes[i]);
-        head[pos..pos + 2].copy_from_slice(&HEX_BYTE_TABLE[b]);
-        pos += 2;
-        head[pos] = if i == 7 { b'\n' } else { b' ' };
-        pos += 1;
-        i += 1;
-    }
-    cur.pos = start + LINE_LEN;
-    Ok(())
-}
-fn buf_write_ascii8(cur: &mut BufCursor<'_>, chars: &[char; 8]) -> IoRst<()> {
-    if cur.remaining() < 8 {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + 8];
-    let mut i = 0_usize;
-    while i < 8 {
-        head[i] = u8::try_from(u32::from(chars[i])).map_err(|err| {
-            ioErr::new(
-                std::io::ErrorKind::InvalidData,
-                format!("password contains non-ASCII character: {err}"),
-            )
-        })?;
-        i += 1;
-    }
-    cur.pos = start + 8;
-    Ok(())
-}
-fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoRst<()> {
-    let mut tmp = [0_u8; 10];
-    let mut i = tmp.len();
-    while n >= 100 {
-        let rem = usize::from(low_u8_from_u32(n % 100));
-        n /= 100;
-        i -= 2;
-        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
-    }
-    if n >= 10 {
-        let rem = usize::from(low_u8_from_u32(n));
-        i -= 2;
-        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
-    } else {
-        i -= 1;
-        let digit = low_u8_from_u32(n);
-        tmp[i] = b'0' + digit;
-    }
-    buf_write_bytes(cur, &tmp[i..])
-}
-fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
-    let mut tmp = [0_u8; 20];
-    let mut i = tmp.len();
-    while n >= 100 {
-        let rem = usize::from(low_u8_from_u64(n % 100));
-        n /= 100;
-        i -= 2;
-        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
-    }
-    if n >= 10 {
-        let rem = usize::from(low_u8_from_u64(n));
-        i -= 2;
-        tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
-    } else {
-        i -= 1;
-        let digit = low_u8_from_u64(n);
-        tmp[i] = b'0' + digit;
-    }
-    buf_write_bytes(cur, &tmp[i..])
-}
-fn buf_write_i64_dec(cur: &mut BufCursor<'_>, n: i64) -> IoRst<()> {
-    if n < 0 {
-        buf_write_byte(cur, b'-')?;
-        let abs = if n == i64::MIN {
-            i64::MAX.cast_unsigned() + 1
-        } else {
-            (-n).cast_unsigned()
-        };
-        buf_write_u64_dec(cur, abs)
-    } else {
-        buf_write_u64_dec(cur, n.cast_unsigned())
-    }
-}
-fn buf_write_u32_dec_0pad_6(cur: &mut BufCursor<'_>, n: u32) -> IoRst<()> {
-    if n >= 1_000_000 {
-        return buf_write_u32_dec(cur, n);
-    }
-    let hi = usize::from(low_u8_from_u32(n / 10_000));
-    let rem = usize::from(low_u16_from_u64(u64::from(n % 10_000)));
-    let mid = rem / 100;
-    let lo = rem % 100;
-    if cur.remaining() < 6 {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + 6];
-    let (hi_digits, rest) = head.split_at_mut(2);
-    hi_digits.copy_from_slice(&TWO_DIGITS[hi]);
-    let (mid_digits, lo_digits) = rest.split_at_mut(2);
-    mid_digits.copy_from_slice(&TWO_DIGITS[mid]);
-    lo_digits.copy_from_slice(&TWO_DIGITS[lo]);
-    cur.pos = start + 6;
-    Ok(())
-}
-fn buf_write_u64_octal(cur: &mut BufCursor<'_>, mut n: u64) -> IoRst<()> {
-    if n == 0 {
-        return buf_write_byte(cur, b'0');
-    }
-    let mut tmp = [0_u8; 22];
-    let mut i = tmp.len();
-    while n != 0 {
-        i -= 1;
-        let oct_digit = low_u8_from_u64(n & 7);
-        tmp[i] = b'0' + oct_digit;
-        n >>= 3_u32;
-    }
-    buf_write_bytes(cur, &tmp[i..])
-}
-fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
-    if cur.remaining() < 4 {
-        return Err(write_zero_err());
-    }
-    let start = cur.pos;
-    let head = &mut cur.buf[start..start + 4];
-    let upper = usize::from(low_u8_from_u32(u32::from(v >> 8_u32)));
-    let lower = usize::from(low_u8_from_u32(u32::from(v)));
-    let (upper_hex, lower_hex) = head.split_at_mut(2);
-    upper_hex.copy_from_slice(&HEX_BYTE_TABLE[upper]);
-    lower_hex.copy_from_slice(&HEX_BYTE_TABLE[lower]);
-    cur.pos = start + 4;
-    Ok(())
-}
-fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, v: u16) -> IoRst<()> {
-    if v < 0x1000 {
-        if cur.remaining() < 3 {
-            return Err(write_zero_err());
-        }
-        let start = cur.pos;
-        let head = &mut cur.buf[start..start + 3];
-        let hi = usize::from(low_u8_from_u32(u32::from(v >> 8)));
-        let lo = usize::from(low_u8_from_u32(u32::from(v)));
-        let (prefix, suffix) = head.split_at_mut(1);
-        prefix[0] = HEX_UPPER[hi];
-        suffix.copy_from_slice(&HEX_BYTE_TABLE[lo]);
-        cur.pos = start + 3;
-        Ok(())
-    } else {
-        buf_write_hex_u16_0pad4(cur, v)
-    }
-}
-fn format_output(buf: &mut [u8], data: &RandomDataSet, use_colors: bool) -> IoRst<usize> {
-    let mut cur = BufCursor::new(buf);
-    let v = data.num_64;
-    let bytes = u64_to_be_bytes(v);
-    let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
-    buf_write_bytes(&mut cur, "64비트 난수: ".as_bytes())?;
-    buf_write_u64_dec(&mut cur, v)?;
-    buf_write_bytes(&mut cur, " (유부호 정수: ".as_bytes())?;
-    buf_write_i64_dec(&mut cur, v.cast_signed())?;
-    buf_write_bytes(&mut cur, b")\n")?;
-    buf_write_bin8_line(&mut cur, bytes)?;
-    buf_write_bytes(&mut cur, "8진수: ".as_bytes())?;
-    buf_write_u64_octal(&mut cur, v)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_hex8_line(&mut cur, bytes)?;
-    buf_write_bytes(&mut cur, "Hex 코드: ".as_bytes())?;
-    if use_colors {
-        buf_write_bytes(&mut cur, b"\x1B[38;2;")?;
-        buf_write_u8_dec(&mut cur, b0)?;
-        buf_write_byte(&mut cur, b';')?;
-        buf_write_u8_dec(&mut cur, b1)?;
-        buf_write_byte(&mut cur, b';')?;
-        buf_write_u8_dec(&mut cur, b2)?;
-        buf_write_m_hash_hex24_from_bytes(&mut cur, b0, b1, b2)?;
-        buf_write_bytes(&mut cur, b"\x1B[0m \x1B[38;2;")?;
-        buf_write_u8_dec(&mut cur, b3)?;
-        buf_write_byte(&mut cur, b';')?;
-        buf_write_u8_dec(&mut cur, b4)?;
-        buf_write_byte(&mut cur, b';')?;
-        buf_write_u8_dec(&mut cur, b5)?;
-        buf_write_m_hash_hex24_from_bytes(&mut cur, b3, b4, b5)?;
-        buf_write_bytes(&mut cur, b"\x1B[0m")?;
-    } else {
-        buf_write_hash_hex24_from_bytes(&mut cur, b0, b1, b2)?;
-        buf_write_byte(&mut cur, b' ')?;
-        buf_write_hash_hex24_from_bytes(&mut cur, b3, b4, b5)?;
-    }
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "바이트 배열: ".as_bytes())?;
-    buf_write_u8_array_spaced(&mut cur, &bytes)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "6자리 숫자 비밀번호: ".as_bytes())?;
-    buf_write_u32_dec_0pad_6(&mut cur, data.numeric_password)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "8자리 비밀번호: ".as_bytes())?;
-    buf_write_ascii8(&mut cur, &data.password)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "로또 번호: ".as_bytes())?;
-    buf_write_u8_array_spaced(&mut cur, &data.lotto_numbers)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "일본 로또 7 번호: ".as_bytes())?;
-    buf_write_u8_array_spaced(&mut cur, &data.lotto7_numbers)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "유로밀리언 번호: ".as_bytes())?;
-    buf_write_u8_array_spaced(&mut cur, &data.euro_millions_main_numbers)?;
-    buf_write_bytes(&mut cur, b" + ")?;
-    buf_write_u8_array_spaced(&mut cur, &data.euro_millions_lucky_stars)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "한글 음절 4글자: ".as_bytes())?;
-    buf_write_chars(&mut cur, &data.hangul_syllables)?;
-    buf_write_byte(&mut cur, b'\n')?;
-    cursor_write_fmt(
-        &mut cur,
-        format_args!(
-            "대한민국 위경도: {}, {}\n세계 위경도: {}, {}\n",
-            data.kor_coords.0, data.kor_coords.1, data.world_coords.0, data.world_coords.1
-        ),
-    )?;
-    buf_write_bytes(&mut cur, "NMS 은하 번호: ".as_bytes())?;
-    buf_write_u32_dec(&mut cur, u32::from(u16::from(b0).wrapping_add(1)))?;
-    buf_write_byte(&mut cur, b'\n')?;
-    buf_write_bytes(&mut cur, "NMS 포탈 주소: ".as_bytes())?;
-    buf_write_u8_dec(&mut cur, data.planet_number)?;
-    buf_write_byte(&mut cur, b' ')?;
-    buf_write_hex_u16_min3(&mut cur, data.solar_system_index)?;
-    buf_write_byte(&mut cur, b' ')?;
-    buf_write_bytes(&mut cur, &HEX_BYTE_TABLE[usize::from(data.nms_portal_yy)])?;
-    buf_write_byte(&mut cur, b' ')?;
-    buf_write_hex_u16_min3(&mut cur, data.nms_portal_zzz)?;
-    buf_write_byte(&mut cur, b' ')?;
-    buf_write_hex_u16_min3(&mut cur, data.nms_portal_xxx)?;
-    buf_write_byte(&mut cur, b' ')?;
-    buf_write_byte(&mut cur, b'(')?;
-    buf_write_chars(&mut cur, &data.glyph_string)?;
-    buf_write_bytes(&mut cur, b")\n")?;
-    buf_write_bytes(&mut cur, "NMS 은하 좌표: ".as_bytes())?;
-    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_x)?;
-    buf_write_byte(&mut cur, b':')?;
-    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_y)?;
-    buf_write_byte(&mut cur, b':')?;
-    buf_write_hex_u16_0pad4(&mut cur, data.galaxy_z)?;
-    buf_write_byte(&mut cur, b':')?;
-    buf_write_hex_u16_0pad4(&mut cur, data.solar_system_index)?;
-    Ok(cur.written_len())
-}
-fn write_buffer_to_file_guard(
-    file_guard: &mut MutexGuard<BufWriter<File>>,
-    buffer: &[u8],
-) -> stdResult<(), ioErr> {
-    file_guard.write_all(buffer)?;
-    file_guard.write_all(b"\n")?;
-    Ok(())
-}
-fn write_slice_to_console(data_slice: &[u8]) -> IoRst<()> {
-    let mut stdout_lock = stdout().lock();
-    stdout_lock.write_all(data_slice)?;
-    stdout_lock.write_all(b"\n")?;
-    stdout_lock.flush()?;
-    Ok(())
-}
-fn read_line_reuse<'buffer>(
-    prompt: std::fmt::Arguments,
-    buffer: &'buffer mut String,
-) -> IoRst<&'buffer str> {
+fn read_line_reuse<'buffer>(prompt: Arguments, buffer: &'buffer mut String) -> IoRst<&'buffer str> {
     buffer.clear();
     {
         let mut out = stdout().lock();
@@ -1387,7 +887,7 @@ fn read_line_reuse<'buffer>(
     let bytes_read = stdin().read_line(buffer)?;
     if bytes_read == 0 {
         return Err(ioErr::new(
-            std::io::ErrorKind::UnexpectedEof,
+            ErrorKind::UnexpectedEof,
             "표준 입력이 종료되었습니다.",
         ));
     }
@@ -1422,7 +922,10 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         break count;
     };
     for (i, part) in players_storage.split(',').enumerate() {
-        players_array[i] = part.trim();
+        let slot = players_array
+            .get_mut(i)
+            .ok_or_else(|| ioErr::other("플레이어 배열 인덱스 범위 초과"))?;
+        *slot = part.trim();
     }
     let mut result_input_buffer = String::with_capacity(256);
     let mut results_storage = String::with_capacity(256);
@@ -1447,10 +950,16 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
         break;
     }
     for (i, part) in results_storage.split(',').enumerate() {
-        results_array[i] = part.trim();
+        let slot = results_array
+            .get_mut(i)
+            .ok_or_else(|| ioErr::other("결과 배열 인덱스 범위 초과"))?;
+        *slot = part.trim();
     }
     println!("사다리타기 결과:");
-    let indices_slice = &mut [0_usize; MAX_PLAYERS][..n];
+    let mut indices = [0_usize; MAX_PLAYERS];
+    let indices_slice = indices
+        .get_mut(..n)
+        .ok_or_else(|| ioErr::other("인덱스 배열 슬라이스 범위 초과"))?;
     for (i, slot) in indices_slice.iter_mut().enumerate() {
         *slot = i;
     }
@@ -1464,16 +973,23 @@ fn ladder_game(num_64: u64, player_input_buffer: &mut String) -> Result<()> {
             .map_err(|err| boxed_other_with_source("인덱스 변환 실패", err))?;
         indices_slice.swap(i, swap_index);
     }
-    for (player, &result_index) in players_array[..n].iter().zip(indices_slice.iter()) {
-        println!("{player} -> {result}", result = results_array[result_index]);
+    let players = players_array
+        .get(..n)
+        .ok_or_else(|| ioErr::other("플레이어 슬라이스 범위 초과"))?;
+    for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
+        let result = results_array
+            .get(result_index)
+            .copied()
+            .ok_or_else(|| ioErr::other("결과 인덱스 범위 초과"))?;
+        println!("{player} -> {result}");
     }
     Ok(())
 }
 fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Result<()> {
     const MIN_ALLOWED_VALUE: i64 = i64::MIN + 1;
     println!(
-        "\n무작위 정수 생성기(지원 범위: {MIN_ALLOWED_VALUE} ~ {})",
-        i64::MAX
+        "\n무작위 정수 생성기(지원 범위: {MIN_ALLOWED_VALUE} ~ {max_i64})",
+        max_i64 = i64::MAX
     );
     let min_value = loop {
         let n = read_parse_i64(
@@ -1505,7 +1021,7 @@ fn generate_random_integer(seed_modifier: u64, input_buffer: &mut String) -> Res
     println!("무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})");
     Ok(())
 }
-fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i64> {
+fn read_parse_i64(prompt: Arguments, buffer: &mut String) -> Result<i64> {
     loop {
         match read_line_reuse(prompt, buffer)?.parse::<i64>() {
             Ok(n) => return Ok(n),
@@ -1513,7 +1029,7 @@ fn read_parse_i64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<i6
         }
     }
 }
-fn read_parse_u64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<u64> {
+fn read_parse_u64(prompt: Arguments, buffer: &mut String) -> Result<u64> {
     loop {
         let raw = read_line_reuse(prompt, buffer)?;
         let parsed = raw
@@ -1524,9 +1040,8 @@ fn read_parse_u64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<u6
             Ok(n) => return Ok(n),
             Err(_) => {
                 eprintln!(
-                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {} 또는 0x{:X}).\n",
-                    u64::MAX,
-                    u64::MAX
+                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).\n",
+                    max_u64 = u64::MAX
                 );
             }
         }
@@ -1561,7 +1076,7 @@ fn generate_random_float(seed_modifier: u64, input_buffer: &mut String) -> Resul
     println!("무작위 실수({min_value} ~ {max_value}): {result}");
     Ok(())
 }
-fn read_parse_f64(prompt: std::fmt::Arguments, buffer: &mut String) -> Result<f64> {
+fn read_parse_f64(prompt: Arguments, buffer: &mut String) -> Result<f64> {
     loop {
         match read_line_reuse(prompt, buffer)?.parse::<f64>() {
             Ok(n) if n.is_finite() && !n.is_subnormal() => return Ok(n),
@@ -1586,333 +1101,4 @@ fn random_bounded(s: u64, seed_mod: u64) -> Result<u64> {
             return Ok(high_bits);
         }
     }
-}
-fn writer_thread_main(
-    file_mutex: &Mutex<BufWriter<File>>,
-    receiver: &Receiver<(DataBuffer, usize, usize)>,
-    buffer_return_senders: &[SyncSender<DataBuffer>],
-) -> Result<RandomDataSet> {
-    let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
-    while let Ok((data_buffer, data_len, worker_idx)) = receiver.recv() {
-        write_buffer_to_file_guard(&mut file_guard, &data_buffer[..data_len])?;
-        let _send_result = buffer_return_senders[worker_idx].send(data_buffer);
-        while let Ok((more_buffer, more_len, more_worker_idx)) = receiver.try_recv() {
-            write_buffer_to_file_guard(&mut file_guard, &more_buffer[..more_len])?;
-            let _batched_send_result = buffer_return_senders[more_worker_idx].send(more_buffer);
-        }
-    }
-    drop(file_guard);
-    let final_data = generate_random_data()?;
-    let mut final_buffer_file = [0_u8; BUFFER_SIZE];
-    let final_bytes_written_file =
-        format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
-    {
-        let mut final_file_guard =
-            lock_mutex(file_mutex, "Mutex 잠금 실패 (쓰기 스레드 종료 처리)")?;
-        write_buffer_to_file_guard(
-            &mut final_file_guard,
-            &final_buffer_file[..final_bytes_written_file],
-        )?;
-        final_file_guard.flush()?;
-    }
-    Ok(final_data)
-}
-fn progress_thread_main(
-    processed_ref: &AtomicU64,
-    multi_thread_count: u64,
-    requested_count: u64,
-    start_time: &Instant,
-) -> Result<()> {
-    let mut elapsed_buf = [0_u8; 7];
-    let mut eta_buf = [0_u8; 7];
-    loop {
-        let processed_now = processed_ref.load(Ordering::Relaxed);
-        if processed_now >= multi_thread_count {
-            break;
-        }
-        print_progress(
-            processed_now,
-            requested_count,
-            start_time,
-            &mut elapsed_buf,
-            &mut eta_buf,
-        )?;
-        sleep(Duration::from_millis(100));
-    }
-    Ok(())
-}
-fn worker_thread_main(
-    worker_idx: usize,
-    return_rx: &Receiver<DataBuffer>,
-    sender_clone: &SyncSender<(DataBuffer, usize, usize)>,
-    processed_ref: &AtomicU64,
-    failed_ref: &AtomicU64,
-    base_count: u64,
-    remainder: u64,
-) {
-    let Ok(worker_idx_u64) = u64::try_from(worker_idx) else {
-        return;
-    };
-    let loop_count = base_count + u64::from(worker_idx_u64 < remainder);
-    let mut local_pool = Vec::with_capacity(BUFFERS_PER_WORKER);
-    for _ in 0..BUFFERS_PER_WORKER {
-        match return_rx.try_recv() {
-            Ok(buffer) => local_pool.push(buffer),
-            Err(TryRecvError::Empty) => break,
-            Err(TryRecvError::Disconnected) => return,
-        }
-    }
-    for _ in 0..loop_count {
-        let mut buffer = match local_pool.pop() {
-            Some(buf) => buf,
-            None => match return_rx.recv() {
-                Ok(buf) => buf,
-                Err(_) => break,
-            },
-        };
-        let len = if let Ok(data) = generate_random_data() {
-            if let Ok(len) = format_data_into_buffer(&data, buffer.as_mut(), false) {
-                len
-            } else {
-                failed_ref.fetch_add(1, Ordering::Relaxed);
-                processed_ref.fetch_add(1, Ordering::Relaxed);
-                local_pool.push(buffer);
-                continue;
-            }
-        } else {
-            failed_ref.fetch_add(1, Ordering::Relaxed);
-            processed_ref.fetch_add(1, Ordering::Relaxed);
-            local_pool.push(buffer);
-            continue;
-        };
-        match sender_clone.send((buffer, len, worker_idx)) {
-            Ok(()) => {
-                processed_ref.fetch_add(1, Ordering::Relaxed);
-                while local_pool.len() < BUFFERS_PER_WORKER {
-                    match return_rx.try_recv() {
-                        Ok(buf) => local_pool.push(buf),
-                        Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
-                    }
-                }
-            }
-            Err(send_err) => {
-                failed_ref.fetch_add(1, Ordering::Relaxed);
-                processed_ref.fetch_add(1, Ordering::Relaxed);
-                let (_returned_buffer, _, _) = send_err.0;
-                break;
-            }
-        }
-    }
-}
-fn read_requested_count(input_buffer: &mut String) -> Result<u64> {
-    let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
-    loop {
-        match read_line_reuse(count_prompt, input_buffer)?.parse::<u64>() {
-            Ok(0) => eprintln!("1 이상의 값을 입력해 주세요."),
-            Ok(n) => return Ok(n),
-            Err(_) => eprintln!("유효한 숫자를 입력해 주세요."),
-        }
-    }
-}
-fn print_regenerate_summary(requested_count: u64, failed_count: u64) {
-    let success_count = requested_count.saturating_sub(failed_count);
-    if failed_count > 0 {
-        eprintln!("[경고] 생성 중 {failed_count}건의 실패가 발생했습니다.");
-        println!(
-            "\n총 {requested_count}개 요청 중 {success_count}개 데이터 생성 완료 ({FILE_NAME} 저장됨).\n"
-        );
-    } else {
-        println!("\n총 {requested_count}개의 데이터 생성 완료 ({FILE_NAME} 저장됨).\n");
-    }
-}
-fn regenerate_multiple(
-    file_mutex: &Mutex<BufWriter<File>>,
-    input_buffer: &mut String,
-) -> Result<u64> {
-    let requested_count = read_requested_count(input_buffer)?;
-    if requested_count == 1 {
-        ensure_file_exists_and_reopen(file_mutex)?;
-        return process_single_random_data(file_mutex);
-    }
-    ensure_file_exists_and_reopen(file_mutex)?;
-    let multi_thread_count = requested_count.saturating_sub(1);
-    let max_threads = available_parallelism().map_or(4, std::num::NonZero::get);
-    let calculated_thread_count = usize::try_from(multi_thread_count).map_or(max_threads, |n| {
-        if n < max_threads { n } else { max_threads }
-    });
-    let start_time = Instant::now();
-    let in_flight_buffers = calculated_thread_count.saturating_mul(BUFFERS_PER_WORKER);
-    let (sender, receiver) = sync_channel::<(DataBuffer, usize, usize)>(in_flight_buffers);
-    let mut buffer_return_senders = Vec::with_capacity(calculated_thread_count);
-    let mut buffer_return_receivers = Vec::with_capacity(calculated_thread_count);
-    for _ in 0..calculated_thread_count {
-        let (tx, rx) = sync_channel::<DataBuffer>(BUFFERS_PER_WORKER);
-        for _ in 0..BUFFERS_PER_WORKER {
-            tx.send(Box::new([0_u8; BUFFER_SIZE]))?;
-        }
-        buffer_return_senders.push(tx);
-        buffer_return_receivers.push(rx);
-    }
-    let processed = AtomicU64::new(0);
-    let failed = AtomicU64::new(0);
-    let final_data = scope(|s| -> Result<RandomDataSet> {
-        let writer_buffer_return_senders = buffer_return_senders;
-        let writer_thread = s.spawn(move || {
-            writer_thread_main(file_mutex, &receiver, &writer_buffer_return_senders)
-        });
-        let processed_ref = &processed;
-        let failed_ref = &failed;
-        let progress_thread: Option<ScopedJoinHandle<Result<()>>> = (*IS_TERMINAL).then(|| {
-            s.spawn(move || {
-                progress_thread_main(
-                    processed_ref,
-                    multi_thread_count,
-                    requested_count,
-                    &start_time,
-                )
-            })
-        });
-        let thread_count_u64 = u64::try_from(calculated_thread_count)
-            .map_err(|err| boxed_other_with_source("스레드 수 변환 실패", err))?;
-        let base_count = multi_thread_count / thread_count_u64;
-        let remainder = multi_thread_count % thread_count_u64;
-        let mut worker_handles = Vec::with_capacity(calculated_thread_count);
-        for (i, return_rx) in buffer_return_receivers.into_iter().enumerate() {
-            let sender_clone = sender.clone();
-            worker_handles.push(s.spawn(move || {
-                worker_thread_main(
-                    i,
-                    &return_rx,
-                    &sender_clone,
-                    processed_ref,
-                    failed_ref,
-                    base_count,
-                    remainder,
-                );
-            }));
-        }
-        drop(sender);
-        for handle in worker_handles {
-            handle.join().map_err(|panic_payload| {
-                ioErr::other(format!(
-                    "작업 스레드 패닉 발생: {}",
-                    describe_panic_payload(panic_payload.as_ref()),
-                ))
-            })?;
-        }
-        let processed_now = processed_ref.load(Ordering::Relaxed);
-        if processed_now < multi_thread_count {
-            let missing = multi_thread_count - processed_now;
-            failed_ref.fetch_add(missing, Ordering::Relaxed);
-            processed_ref.store(multi_thread_count, Ordering::Relaxed);
-        }
-        if let Some(handle) = progress_thread {
-            join_thread(handle, "진행률 스레드 패닉 발생")?;
-        }
-        join_thread(writer_thread, "쓰기 스레드 패닉 발생")
-    })?;
-    let mut elapsed_buf = [0_u8; 7];
-    let mut eta_buf = [0_u8; 7];
-    print_progress(
-        requested_count,
-        requested_count,
-        &start_time,
-        &mut elapsed_buf,
-        &mut eta_buf,
-    )?;
-    let failed_count = failed.load(Ordering::Relaxed);
-    print_regenerate_summary(requested_count, failed_count);
-    stdout().flush()?;
-    let mut buffer = [0_u8; BUFFER_SIZE];
-    let bytes_written = format_data_into_buffer(&final_data, &mut buffer, *IS_TERMINAL)?;
-    write_slice_to_console(&buffer[..bytes_written])?;
-    Ok(final_data.num_64)
-}
-fn print_progress(
-    completed: u64,
-    total: u64,
-    start_time: &Instant,
-    elapsed_buf: &mut [u8],
-    eta_buf: &mut [u8],
-) -> Result<()> {
-    if !*IS_TERMINAL {
-        return Ok(());
-    }
-    let elapsed_millis = start_time.elapsed().as_millis();
-    let elapsed_deci = elapsed_millis / 100;
-    let eta_deci = if total == 0 || completed >= total {
-        Some(0)
-    } else if completed == 0 {
-        None
-    } else {
-        Some(
-            elapsed_millis.saturating_mul(u128::from(total - completed))
-                / (u128::from(completed) * 100),
-        )
-    };
-    let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf);
-    let eta_len = format_time_into(eta_deci, eta_buf);
-    let bar_width_u64 = BAR_WIDTH_U64;
-    let filled_u64 = if total == 0 {
-        bar_width_u64
-    } else {
-        completed.saturating_mul(bar_width_u64) / total
-    };
-    let filled = usize::from(low_u8_from_u64(filled_u64.min(bar_width_u64)));
-    let bar = BAR_FULL[filled];
-    let percent_u64 = if total == 0 {
-        100
-    } else {
-        completed.saturating_mul(100) / total
-    };
-    let percent = low_u8_from_u64(percent_u64.min(100));
-    let mut line = [0_u8; 128];
-    let mut cur = BufCursor::new(&mut line);
-    buf_write_byte(&mut cur, b'\r')?;
-    buf_write_bytes(&mut cur, bar.as_bytes())?;
-    buf_write_byte(&mut cur, b' ')?;
-    match percent {
-        0..=9 => buf_write_bytes(&mut cur, b"  ")?,
-        10..=99 => buf_write_byte(&mut cur, b' ')?,
-        _ => {}
-    }
-    buf_write_u8_dec(&mut cur, percent)?;
-    buf_write_byte(&mut cur, b'%')?;
-    buf_write_bytes(&mut cur, b" (")?;
-    buf_write_u64_dec(&mut cur, completed)?;
-    buf_write_byte(&mut cur, b'/')?;
-    buf_write_u64_dec(&mut cur, total)?;
-    buf_write_bytes(&mut cur, ") | 소요: ".as_bytes())?;
-    buf_write_bytes(&mut cur, &elapsed_buf[..elapsed_len])?;
-    buf_write_bytes(&mut cur, b" | ETA: ")?;
-    buf_write_bytes(&mut cur, &eta_buf[..eta_len])?;
-    buf_write_bytes(&mut cur, b" \x1b[K")?;
-    let used = cur.written_len();
-    let mut out = stdout().lock();
-    out.write_all(&line[..used])?;
-    out.flush()?;
-    Ok(())
-}
-fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
-    let Some(deci) = deci_seconds else {
-        buf[..7].copy_from_slice(INVALID_TIME);
-        return 7;
-    };
-    let minutes = usize::from(low_u8_from_u128((deci / 600).min(99)));
-    let sec_whole = usize::from(low_u8_from_u128((deci / 10) % 60));
-    let tenths = usize::from(low_u8_from_u128(deci % 10));
-    buf[0..2].copy_from_slice(&TWO_DIGITS[minutes]);
-    buf[2] = b':';
-    buf[3..5].copy_from_slice(&TWO_DIGITS[sec_whole]);
-    buf[5] = b'.';
-    buf[6] = DIGITS[tenths];
-    7
-}
-fn join_thread<T>(handle: ScopedJoinHandle<'_, Result<T>>, panic_msg: &'static str) -> Result<T> {
-    handle.join().map_err(|panic_payload| {
-        ioErr::other(format!(
-            "{panic_msg}: {}",
-            describe_panic_payload(panic_payload.as_ref()),
-        ))
-    })?
 }

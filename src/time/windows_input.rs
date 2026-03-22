@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const MOUSEEVENTF_LEFTDOWN: u32 = 0x0002;
@@ -50,9 +52,9 @@ impl Input {
     }
 }
 #[cfg(target_pointer_width = "64")]
-const _: [(); 40] = [(); std::mem::size_of::<Input>()];
+const _: [(); 40] = [(); size_of::<Input>()];
 #[cfg(target_pointer_width = "32")]
-const _: [(); 28] = [(); std::mem::size_of::<Input>()];
+const _: [(); 28] = [(); size_of::<Input>()];
 #[link(name = "user32")]
 unsafe extern "system" {
     fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
@@ -65,7 +67,7 @@ fn send_input_events(inputs: &[Input]) {
             eprintln!("[경고] Windows 입력 이벤트 수 변환 실패");
             return;
         };
-        let Ok(input_size) = i32::try_from(std::mem::size_of::<Input>()) else {
+        let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
             eprintln!("[경고] Windows 입력 이벤트 크기 변환 실패");
             return;
         };

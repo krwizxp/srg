@@ -1,4 +1,17 @@
-use crate::numeric::low_u8_from_u32;
+mod address;
+#[cfg(target_os = "windows")]
+mod high_res_timer;
+mod http_date;
+#[cfg(target_os = "windows")]
+mod windows_input;
+use self::{
+    address::{ParsedServerAddress, UrlScheme, parse_server_address},
+    http_date::{civil_from_days, parse_http_date_to_systemtime},
+};
+use crate::{
+    buffmt::{ByteCursor, DIGITS, TWO_DIGITS, write_zero_err},
+    numeric::low_u8_from_u32,
+};
 use std::{
     borrow::Cow,
     error,
@@ -22,77 +35,98 @@ const MAX_CALIBRATION_FAILURES: u32 = 100;
 const KST_OFFSET_SECS_U64: u64 = 9 * 3600;
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
 const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
-const DIGITS: [u8; 10] = *b"0123456789";
-const fn make_two_digits_table() -> [[u8; 2]; 100] {
-    let mut table = [[0_u8; 2]; 100];
-    let mut idx = 0_usize;
-    let mut value = 0_u8;
-    while idx < 100 {
-        table[idx] = [b'0' + value / 10, b'0' + value % 10];
-        idx += 1;
-        value += 1;
-    }
-    table
-}
-const TWO_DIGITS: [[u8; 2]; 100] = make_two_digits_table();
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const DISPLAY_UPDATE_INTERVAL: Duration = Duration::from_millis(45);
-#[cfg(target_os = "windows")]
-mod high_res_timer;
-#[cfg(target_os = "windows")]
-mod windows_input;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TimeErrorKind {
+    Io,
+    Time,
+    Parse,
+    HeaderNotFound,
+    Curl,
+    SyncFailed,
+}
 #[derive(Debug)]
-pub enum TimeError {
-    Io(io::Error),
-    Time(SystemTimeError),
-    Parse(Cow<'static, str>),
-    HeaderNotFound(Cow<'static, str>),
-    Curl(String),
-    SyncFailed(Cow<'static, str>),
+pub struct TimeError {
+    kind: TimeErrorKind,
+    detail: Cow<'static, str>,
+    source: Option<Box<dyn error::Error + Send + Sync + 'static>>,
+    io_kind: Option<io::ErrorKind>,
+}
+impl TimeError {
+    fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+            source: None,
+            io_kind: None,
+        }
+    }
+
+    fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::Parse, detail)
+    }
+
+    fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::HeaderNotFound, detail)
+    }
+
+    fn curl(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::Curl, detail)
+    }
+
+    fn sync_failed(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::SyncFailed, detail)
+    }
+
+    pub const fn io_kind(&self) -> Option<io::ErrorKind> {
+        self.io_kind
+    }
 }
 impl From<io::Error> for TimeError {
     fn from(err: io::Error) -> Self {
-        Self::Io(err)
+        let io_kind = err.kind();
+        Self {
+            kind: TimeErrorKind::Io,
+            detail: Cow::Owned(err.to_string()),
+            source: Some(Box::new(err)),
+            io_kind: Some(io_kind),
+        }
     }
 }
 impl From<SystemTimeError> for TimeError {
     fn from(err: SystemTimeError) -> Self {
-        Self::Time(err)
+        Self {
+            kind: TimeErrorKind::Time,
+            detail: Cow::Owned(err.to_string()),
+            source: Some(Box::new(err)),
+            io_kind: None,
+        }
     }
 }
 impl fmt::Display for TimeError {
-    #[expect(
-        clippy::ref_patterns,
-        reason = "explicit reference patterns are needed here to satisfy pattern_type_mismatch on &TimeError"
-    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::Io(ref e) => write!(f, "I/O 오류: {e}"),
-            Self::Time(ref e) => write!(f, "시스템 시간 오류: {e}"),
-            Self::Parse(ref msg) => write!(f, "파싱 오류: {msg}"),
-            Self::HeaderNotFound(ref header) => write!(f, "{header} 헤더를 찾을 수 없음"),
-            Self::Curl(ref stderr) => write!(f, "curl 실행 실패: {stderr}"),
-            Self::SyncFailed(ref msg) => write!(f, "서버 시간 확인 실패: {msg}"),
+        match self.kind {
+            TimeErrorKind::Io => write!(f, "I/O 오류: {}", self.detail),
+            TimeErrorKind::Time => write!(f, "시스템 시간 오류: {}", self.detail),
+            TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
+            TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
+            TimeErrorKind::Curl => write!(f, "curl 실행 실패: {}", self.detail),
+            TimeErrorKind::SyncFailed => write!(f, "서버 시간 확인 실패: {}", self.detail),
         }
     }
 }
 impl error::Error for TimeError {
-    #[expect(
-        clippy::ref_patterns,
-        reason = "explicit reference patterns are needed here to satisfy pattern_type_mismatch on &TimeError"
-    )]
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match *self {
-            Self::Io(ref e) => Some(e),
-            Self::Time(ref e) => Some(e),
-            Self::Parse(_) | Self::HeaderNotFound(_) | Self::Curl(_) | Self::SyncFailed(_) => None,
-        }
+        self.source
+            .as_deref()
+            .map(|source| -> &(dyn error::Error + 'static) { source })
     }
 }
-pub type Result<T> = stdresult::Result<T, TimeError>;
+type Result<T> = stdresult::Result<T, TimeError>;
 fn parse_err_with_source(context: &'static str, err: impl fmt::Display) -> TimeError {
-    TimeError::Parse(Cow::Owned(format!("{context}: {err}")))
+    TimeError::parse(format!("{context}: {err}"))
 }
 fn parse_result_with_context<T, E>(
     result: stdresult::Result<T, E>,
@@ -125,42 +159,29 @@ struct DisplayableTime {
     second: u32,
     millis: u32,
 }
-#[inline(never)]
-#[cold]
-fn write_zero_err() -> io::Error {
-    io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer")
-}
 struct SliceCursor<'buffer> {
-    buf: &'buffer mut [u8],
-    pos: usize,
+    inner: ByteCursor<'buffer>,
 }
 impl<'buffer> SliceCursor<'buffer> {
     const fn new(buf: &'buffer mut [u8]) -> Self {
-        Self { buf, pos: 0 }
-    }
-    const fn remaining(&self) -> usize {
-        self.buf.len() - self.pos
+        Self {
+            inner: ByteCursor::new(buf),
+        }
     }
     const fn written_len(&self) -> usize {
-        self.pos
+        self.inner.written_len()
     }
     fn write_bytes(&mut self, bytes: &[u8]) -> ioResult<()> {
-        let len = bytes.len();
-        if self.remaining() < len {
-            return Err(write_zero_err());
-        }
-        let end = self.pos + len;
-        self.buf[self.pos..end].copy_from_slice(bytes);
-        self.pos = end;
-        Ok(())
+        self.inner.write_bytes(bytes)
     }
     fn write_byte(&mut self, b: u8) -> ioResult<()> {
-        if self.remaining() < 1 {
-            return Err(write_zero_err());
-        }
-        self.buf[self.pos] = b;
-        self.pos += 1;
-        Ok(())
+        self.inner.write_byte(b)
+    }
+    fn digit_byte(index: usize) -> ioResult<u8> {
+        DIGITS.get(index).copied().ok_or_else(write_zero_err)
+    }
+    fn two_digits(index: usize) -> ioResult<&'static [u8; 2]> {
+        TWO_DIGITS.get(index).ok_or_else(write_zero_err)
     }
     fn write_u32_dec(&mut self, mut n: u32) -> ioResult<()> {
         let mut tmp = [0_u8; 10];
@@ -169,32 +190,33 @@ impl<'buffer> SliceCursor<'buffer> {
             let rem = usize::from(low_u8_from_u32(n % 100));
             n /= 100;
             i -= 2;
-            tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+            tmp.get_mut(i..i + 2)
+                .ok_or_else(write_zero_err)?
+                .copy_from_slice(Self::two_digits(rem)?);
         }
         if n >= 10 {
             let rem = usize::from(low_u8_from_u32(n));
             i -= 2;
-            tmp[i..i + 2].copy_from_slice(&TWO_DIGITS[rem]);
+            tmp.get_mut(i..i + 2)
+                .ok_or_else(write_zero_err)?
+                .copy_from_slice(Self::two_digits(rem)?);
         } else {
             i -= 1;
             let digit = low_u8_from_u32(n);
-            tmp[i] = b'0' + digit;
+            *tmp.get_mut(i).ok_or_else(write_zero_err)? = b'0' + digit;
         }
-        self.write_bytes(&tmp[i..])
+        self.write_bytes(tmp.get(i..).ok_or_else(write_zero_err)?)
     }
     fn write_year_padded4(&mut self, year: i32) -> ioResult<()> {
         if year >= 0_i32 {
             let y = year.cast_unsigned();
             if y < 10_000 {
-                if self.remaining() < 4 {
-                    return Err(write_zero_err());
-                }
                 let hi = usize::from(low_u8_from_u32(y / 100));
                 let lo = usize::from(low_u8_from_u32(y % 100));
-                let start = self.pos;
-                self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[hi]);
-                self.buf[start + 2..start + 4].copy_from_slice(&TWO_DIGITS[lo]);
-                self.pos = start + 4;
+                let head = self.inner.take(4)?;
+                let (hi_digits, lo_digits) = head.split_at_mut(2);
+                hi_digits.copy_from_slice(Self::two_digits(hi)?);
+                lo_digits.copy_from_slice(Self::two_digits(lo)?);
                 return Ok(());
             }
             return self.write_u32_dec(y);
@@ -206,39 +228,32 @@ impl<'buffer> SliceCursor<'buffer> {
             (-year).cast_unsigned()
         };
         if abs < 1000 {
-            if self.remaining() < 3 {
-                return Err(write_zero_err());
-            }
             let hundreds = usize::from(low_u8_from_u32(abs / 100));
             let rem = usize::from(low_u8_from_u32(abs % 100));
-            let start = self.pos;
-            self.buf[start] = DIGITS[hundreds];
-            self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
-            self.pos = start + 3;
+            let head = self.inner.take(3)?;
+            let (hundreds_digit, remaining_digits) = head.split_at_mut(1);
+            if let Some(slot) = hundreds_digit.first_mut() {
+                *slot = Self::digit_byte(hundreds)?;
+            }
+            remaining_digits.copy_from_slice(Self::two_digits(rem)?);
             return Ok(());
         }
         self.write_u32_dec(abs)
     }
     fn write_u32_2digits(&mut self, v: u32) -> ioResult<()> {
-        if self.remaining() < 2 {
-            return Err(write_zero_err());
-        }
-        let start = self.pos;
         let idx = usize::from(low_u8_from_u32(v));
-        self.buf[start..start + 2].copy_from_slice(&TWO_DIGITS[idx]);
-        self.pos = start + 2;
+        self.inner.take(2)?.copy_from_slice(Self::two_digits(idx)?);
         Ok(())
     }
     fn write_u32_3digits(&mut self, v: u32) -> ioResult<()> {
-        if self.remaining() < 3 {
-            return Err(write_zero_err());
-        }
         let hundreds = usize::from(low_u8_from_u32(v / 100));
         let rem = usize::from(low_u8_from_u32(v % 100));
-        let start = self.pos;
-        self.buf[start] = DIGITS[hundreds];
-        self.buf[start + 1..start + 3].copy_from_slice(&TWO_DIGITS[rem]);
-        self.pos = start + 3;
+        let head = self.inner.take(3)?;
+        let (hundreds_digit, remaining_digits) = head.split_at_mut(1);
+        if let Some(slot) = hundreds_digit.first_mut() {
+            *slot = Self::digit_byte(hundreds)?;
+        }
+        remaining_digits.copy_from_slice(Self::two_digits(rem)?);
         Ok(())
     }
 }
@@ -284,7 +299,10 @@ impl ServerTime {
         let day_of_week_num = (days_since_epoch + 4).rem_euclid(7);
         let day_of_week_idx =
             parse_result_with_context(usize::try_from(day_of_week_num), "요일 계산 중 범위 오류")?;
-        let day_of_week_str = DAY_OF_WEEK_KO[day_of_week_idx];
+        let day_of_week_str = DAY_OF_WEEK_KO
+            .get(day_of_week_idx)
+            .copied()
+            .ok_or_else(|| TimeError::parse("요일 계산 중 범위 오류"))?;
         let sec_of_day = total_seconds_kst.rem_euclid(86400);
         let hour =
             parse_result_with_context(u32::try_from(sec_of_day / 3600), "시 계산 중 범위 오류")?;
@@ -314,24 +332,24 @@ impl ServerTime {
         show_millis: bool,
     ) -> Result<()> {
         let dt = self.calculate_display_time()?;
-        cur.write_year_padded4(dt.year).map_err(TimeError::Io)?;
-        cur.write_byte(b'-').map_err(TimeError::Io)?;
-        cur.write_u32_2digits(dt.month).map_err(TimeError::Io)?;
-        cur.write_byte(b'-').map_err(TimeError::Io)?;
+        cur.write_year_padded4(dt.year).map_err(TimeError::from)?;
+        cur.write_byte(b'-').map_err(TimeError::from)?;
+        cur.write_u32_2digits(dt.month).map_err(TimeError::from)?;
+        cur.write_byte(b'-').map_err(TimeError::from)?;
         cur.write_u32_2digits(dt.day_of_month)
-            .map_err(TimeError::Io)?;
-        cur.write_byte(b'(').map_err(TimeError::Io)?;
+            .map_err(TimeError::from)?;
+        cur.write_byte(b'(').map_err(TimeError::from)?;
         cur.write_bytes(dt.day_of_week_str.as_bytes())
-            .map_err(TimeError::Io)?;
-        cur.write_bytes(b") ").map_err(TimeError::Io)?;
-        cur.write_u32_2digits(dt.hour).map_err(TimeError::Io)?;
-        cur.write_byte(b':').map_err(TimeError::Io)?;
-        cur.write_u32_2digits(dt.minute).map_err(TimeError::Io)?;
-        cur.write_byte(b':').map_err(TimeError::Io)?;
-        cur.write_u32_2digits(dt.second).map_err(TimeError::Io)?;
+            .map_err(TimeError::from)?;
+        cur.write_bytes(b") ").map_err(TimeError::from)?;
+        cur.write_u32_2digits(dt.hour).map_err(TimeError::from)?;
+        cur.write_byte(b':').map_err(TimeError::from)?;
+        cur.write_u32_2digits(dt.minute).map_err(TimeError::from)?;
+        cur.write_byte(b':').map_err(TimeError::from)?;
+        cur.write_u32_2digits(dt.second).map_err(TimeError::from)?;
         if show_millis {
-            cur.write_byte(b'.').map_err(TimeError::Io)?;
-            cur.write_u32_3digits(dt.millis).map_err(TimeError::Io)?;
+            cur.write_byte(b'.').map_err(TimeError::from)?;
+            cur.write_u32_3digits(dt.millis).map_err(TimeError::from)?;
         }
         Ok(())
     }
@@ -380,12 +398,12 @@ fn has_ignored_address_suffix(raw_input: &str) -> bool {
         .get(..8)
         .is_some_and(|p| p.eq_ignore_ascii_case(b"https://"))
     {
-        &raw_input[8..]
+        raw_input.get(8..).unwrap_or(raw_input)
     } else if input_bytes
         .get(..7)
         .is_some_and(|p| p.eq_ignore_ascii_case(b"http://"))
     {
-        &raw_input[7..]
+        raw_input.get(7..).unwrap_or(raw_input)
     } else {
         raw_input
     };
@@ -547,30 +565,34 @@ impl AppState {
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
             let now = Instant::now();
-            if now.duration_since(last_display_update) >= DISPLAY_INTERVAL {
-                if let Some(st) = self.server_time.as_ref() {
-                    let mut line_buf = [0_u8; 80];
-                    let mut cur = SliceCursor::new(&mut line_buf);
-                    match (|| -> Result<()> {
-                        cur.write_bytes("\r서버 시간: ".as_bytes())
-                            .map_err(TimeError::Io)?;
-                        st.write_current_display_time_buf(&mut cur, true)?;
-                        cur.write_bytes(b" \r").map_err(TimeError::Io)?;
-                        Ok(())
-                    })() {
-                        Ok(()) => {
-                            let used = cur.written_len();
-                            let mut out = stdout.lock();
-                            out.write_all(&line_buf[..used])?;
-                            out.flush()?;
-                        }
-                        Err(e) => {
-                            let mut out = stdout.lock();
-                            out.write_all("\r서버 시간: ".as_bytes())?;
-                            write!(out, "시간 표시 오류: {e}")?;
-                            out.write_all(b" \r")?;
-                            out.flush()?;
-                        }
+            if now.duration_since(last_display_update) >= DISPLAY_INTERVAL
+                && let Some(st) = self.server_time.as_ref()
+            {
+                let mut line_buf = [0_u8; 80];
+                let mut cur = SliceCursor::new(&mut line_buf);
+                match (|| -> Result<()> {
+                    cur.write_bytes("\r서버 시간: ".as_bytes())
+                        .map_err(TimeError::from)?;
+                    st.write_current_display_time_buf(&mut cur, true)?;
+                    cur.write_bytes(b" \r").map_err(TimeError::from)?;
+                    Ok(())
+                })() {
+                    Ok(()) => {
+                        let used = cur.written_len();
+                        let mut out = stdout.lock();
+                        out.write_all(
+                            line_buf
+                                .get(..used)
+                                .ok_or_else(|| io::Error::other("표시 버퍼 사용 길이 계산 실패"))?,
+                        )?;
+                        out.flush()?;
+                    }
+                    Err(e) => {
+                        let mut out = stdout.lock();
+                        out.write_all("\r서버 시간: ".as_bytes())?;
+                        write!(out, "시간 표시 오류: {e}")?;
+                        out.write_all(b" \r")?;
+                        out.flush()?;
                     }
                 }
                 last_display_update = now;
@@ -628,8 +650,14 @@ impl AppState {
         let attempt_index = self.baseline_rtt_attempts;
         match fetch_server_time_sample(&self.host, net_ctx) {
             Ok(sample) if sample.rtt > Duration::ZERO => {
-                self.baseline_rtt_samples[attempt_index] = sample;
-                self.baseline_rtt_valid_count += 1;
+                let Some(slot) = self.baseline_rtt_samples.get_mut(attempt_index) else {
+                    return transition_to_retry("RTT 샘플 인덱스 계산 실패.");
+                };
+                *slot = sample;
+                let Some(next_valid_count) = self.baseline_rtt_valid_count.checked_add(1) else {
+                    return transition_to_retry("RTT 샘플 개수 계산 실패.");
+                };
+                self.baseline_rtt_valid_count = next_valid_count;
                 self.last_sample = Some(sample);
             }
             Ok(_) => {}
@@ -640,7 +668,10 @@ impl AppState {
                 return transition_to_retry(msg_buf);
             }
         }
-        self.baseline_rtt_attempts = attempt_index + 1;
+        let Some(next_attempt_index) = attempt_index.checked_add(1) else {
+            return transition_to_retry("RTT 시도 횟수 계산 실패.");
+        };
+        self.baseline_rtt_attempts = next_attempt_index;
         self.baseline_rtt_next_sample_at = Instant::now() + ADAPTIVE_POLL_INTERVAL;
         if self.baseline_rtt_attempts < NUM_SAMPLES {
             return (Activity::MeasureBaselineRtt, None);
@@ -655,19 +686,32 @@ impl AppState {
         let mut filled = 0_usize;
         for sample in &self.baseline_rtt_samples {
             if sample.rtt > Duration::ZERO {
-                rtt_nanos[filled] = sample.rtt.as_nanos();
-                filled += 1;
+                let Some(slot) = rtt_nanos.get_mut(filled) else {
+                    return transition_to_retry("RTT 샘플 저장 범위 계산 실패.");
+                };
+                *slot = sample.rtt.as_nanos();
+                let Some(next_filled) = filled.checked_add(1) else {
+                    return transition_to_retry("RTT 샘플 개수 계산 실패.");
+                };
+                filled = next_filled;
                 if filled >= sample_count {
                     break;
                 }
             }
         }
-        let rtts = &mut rtt_nanos[..filled];
+        let Some(rtts) = rtt_nanos.get_mut(..filled) else {
+            return transition_to_retry("RTT 샘플 범위 계산 실패.");
+        };
         rtts.sort_unstable();
         let trim = filled / 5;
-        let window = &rtts[trim..(filled - trim)];
+        let Some(window_end) = filled.checked_sub(trim) else {
+            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
+        };
+        let Some(window) = rtts.get(trim..window_end) else {
+            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
+        };
         let sum_nanos: u128 = window.iter().sum();
-        let window_len = window.len() as u128;
+        let window_len = u128::try_from(window.len()).unwrap_or_default();
         let baseline_rtt = Duration::from_nanos_u128(sum_nanos / window_len);
         self.baseline_rtt = Some(baseline_rtt);
         self.calibration_failure_count = 0;
@@ -948,152 +992,12 @@ fn is_command_available(command: &str) -> bool {
         .is_ok_and(|s| s.success())
 }
 fn find_date_header_value(line: &[u8]) -> Option<&str> {
-    if line.len() > 5 && line[..5].eq_ignore_ascii_case(b"date:") {
-        str::from_utf8(&line[5..]).ok().map(str::trim_ascii)
+    let prefix = line.get(..5)?;
+    if prefix.eq_ignore_ascii_case(b"date:") {
+        str::from_utf8(line.get(5..)?).ok().map(str::trim_ascii)
     } else {
         None
     }
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum UrlScheme {
-    Http,
-    Https,
-}
-impl UrlScheme {
-    const fn default_port(self) -> u16 {
-        match self {
-            Self::Http => 80,
-            Self::Https => 443,
-        }
-    }
-    const fn prefix(self) -> &'static str {
-        match self {
-            Self::Http => "http://",
-            Self::Https => "https://",
-        }
-    }
-}
-#[derive(Debug)]
-struct ParsedServerAddress {
-    scheme: Option<UrlScheme>,
-    host: String,
-    host_for_header: String,
-    port: u16,
-    explicit_port: bool,
-}
-impl ParsedServerAddress {
-    fn curl_url(&self, scheme: UrlScheme) -> String {
-        let mut url = String::with_capacity(self.host_for_header.len() + 16);
-        url.push_str(scheme.prefix());
-        url.push_str(&self.host_for_header);
-        if self.explicit_port {
-            url.push(':');
-            url.push_str(&self.port.to_string());
-        }
-        url
-    }
-    fn tcp_host_header_value(&self) -> String {
-        if self.port == UrlScheme::Http.default_port() {
-            return self.host_for_header.clone();
-        }
-        let mut host_header = String::with_capacity(self.host_for_header.len() + 8);
-        host_header.push_str(&self.host_for_header);
-        host_header.push(':');
-        host_header.push_str(&self.port.to_string());
-        host_header
-    }
-}
-fn parse_port(port_str: &str) -> Result<u16> {
-    const ERR_PORT: &str = "서버 주소 파싱 실패: 포트 번호가 유효하지 않습니다 (1~65535).";
-    if port_str.is_empty() {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_PORT)));
-    }
-    let port_num = parse_u32_digits(port_str).ok_or(TimeError::Parse(Cow::Borrowed(ERR_PORT)))?;
-    let port = parse_result_with_context(u16::try_from(port_num), ERR_PORT)?;
-    if port == 0 {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_PORT)));
-    }
-    Ok(port)
-}
-fn parse_authority_host_port(authority: &str, default_port: u16) -> Result<(String, u16, bool)> {
-    const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
-    if let Some(bracketed) = authority.strip_prefix('[') {
-        let close_idx = bracketed
-            .find(']')
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_HOST)))?;
-        let host_part = &bracketed[..close_idx];
-        if host_part.is_empty() {
-            return Err(TimeError::Parse(Cow::Borrowed(ERR_HOST)));
-        }
-        let rem = &bracketed[close_idx + 1..];
-        if rem.is_empty() {
-            return Ok((host_part.to_owned(), default_port, false));
-        }
-        let port_part = rem
-            .strip_prefix(':')
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_HOST)))?;
-        let port = parse_port(port_part)?;
-        return Ok((host_part.to_owned(), port, true));
-    }
-    let colon_count = authority.bytes().filter(|&b| b == b':').count();
-    if colon_count == 1 {
-        let (host_part, port_part) = authority
-            .rsplit_once(':')
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_HOST)))?;
-        if host_part.is_empty() {
-            return Err(TimeError::Parse(Cow::Borrowed(ERR_HOST)));
-        }
-        let port = parse_port(port_part)?;
-        return Ok((host_part.to_owned(), port, true));
-    }
-    if authority.is_empty() {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_HOST)));
-    }
-    Ok((authority.to_owned(), default_port, false))
-}
-fn parse_server_address(raw_input: &str) -> Result<ParsedServerAddress> {
-    const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
-    const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
-    let input = raw_input.trim();
-    if input.is_empty() {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_EMPTY)));
-    }
-    let input_bytes = input.as_bytes();
-    let (scheme, after_scheme) = if input_bytes
-        .get(..8)
-        .is_some_and(|p| p.eq_ignore_ascii_case(b"https://"))
-    {
-        (Some(UrlScheme::Https), &input[8..])
-    } else if input_bytes
-        .get(..7)
-        .is_some_and(|p| p.eq_ignore_ascii_case(b"http://"))
-    {
-        (Some(UrlScheme::Http), &input[7..])
-    } else {
-        (None, input)
-    };
-    let authority_end = after_scheme
-        .bytes()
-        .position(|b| matches!(b, b'/' | b'?' | b'#'))
-        .unwrap_or(after_scheme.len());
-    let authority = &after_scheme[..authority_end];
-    if authority.is_empty() || authority.bytes().any(|byte| byte.is_ascii_whitespace()) {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_HOST)));
-    }
-    let default_port = scheme.map_or(UrlScheme::Http.default_port(), UrlScheme::default_port);
-    let (host, port, explicit_port) = parse_authority_host_port(authority, default_port)?;
-    let host_for_header = if host.contains(':') {
-        format!("[{host}]")
-    } else {
-        host.clone()
-    };
-    Ok(ParsedServerAddress {
-        scheme,
-        host,
-        host_for_header,
-        port,
-        explicit_port,
-    })
 }
 fn fetch_server_time_sample_curl(
     url_str: &str,
@@ -1127,24 +1031,35 @@ fn fetch_server_time_sample_curl(
             net_ctx.curl_stderr_buf.clear();
             let _write_result = write!(
                 &mut net_ctx.curl_stderr_buf,
-                "curl {context} 실패, 상태: {}",
-                output.status
+                "curl {context} 실패, 상태: {status}",
+                status = output.status
             );
         }
-        return Err(TimeError::Curl(mem::take(&mut net_ctx.curl_stderr_buf)));
+        return Err(TimeError::curl(mem::take(&mut net_ctx.curl_stderr_buf)));
     }
     let mut end = stdout_bytes.len();
-    while end > 0 && stdout_bytes[end - 1].is_ascii_whitespace() {
+    while end > 0
+        && stdout_bytes
+            .get(end - 1)
+            .is_some_and(u8::is_ascii_whitespace)
+    {
         end -= 1;
     }
-    let pos = stdout_bytes[..end]
+    let trimmed_stdout = stdout_bytes
+        .get(..end)
+        .ok_or_else(|| TimeError::parse("curl 응답 경계 계산 실패"))?;
+    let pos = trimmed_stdout
         .iter()
         .rposition(|&b| b == b'\n')
-        .ok_or_else(|| TimeError::Parse("curl 응답에서 time_starttransfer 정보 누락".into()))?;
-    let headers_part = &stdout_bytes[..pos];
-    let time_starttransfer_part = &stdout_bytes[pos + 1..end];
+        .ok_or_else(|| TimeError::parse("curl 응답에서 time_starttransfer 정보 누락"))?;
+    let headers_part = trimmed_stdout
+        .get(..pos)
+        .ok_or_else(|| TimeError::parse("curl 응답 헤더 범위 계산 실패"))?;
+    let time_starttransfer_part = trimmed_stdout
+        .get(pos + 1..)
+        .ok_or_else(|| TimeError::parse("curl 응답 time_starttransfer 범위 계산 실패"))?;
     let time_starttransfer_str = parse_result_with_context(
-        std::str::from_utf8(time_starttransfer_part),
+        str::from_utf8(time_starttransfer_part),
         "curl time_starttransfer 파싱 실패",
     )?;
     let time_starttransfer_secs: f64 = time_starttransfer_str
@@ -1156,9 +1071,7 @@ fn fetch_server_time_sample_curl(
         .split(|&b| b == b'\n')
         .rev()
         .find_map(|line| find_date_header_value(line))
-        .ok_or_else(|| {
-            TimeError::HeaderNotFound("curl 응답에서 Date 헤더를 찾을 수 없음".into())
-        })?;
+        .ok_or_else(|| TimeError::header_not_found("curl 응답에서 Date 헤더를 찾을 수 없음"))?;
     let server_time = parse_http_date_to_systemtime(date_header_str_slice)?;
     let response_received_inst = time_before_curl_call_inst + rtt_reported_by_curl;
     Ok(TimeSample {
@@ -1171,10 +1084,10 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, address: &ParsedServerAddress) -> Resu
     let request_start_inst = Instant::now();
     let tcp_timeout = Duration::from_secs(TCP_TIMEOUT_SECS);
     let socket_addr_result: ioResult<net::SocketAddr> =
-        if let Ok(ip_addr) = address.host.parse::<net::IpAddr>() {
-            Ok(net::SocketAddr::new(ip_addr, address.port))
+        if let Ok(ip_addr) = address.host().parse::<net::IpAddr>() {
+            Ok(net::SocketAddr::new(ip_addr, address.port()))
         } else {
-            net::ToSocketAddrs::to_socket_addrs(&(address.host.as_str(), address.port))?
+            net::ToSocketAddrs::to_socket_addrs(&(address.host(), address.port()))?
                 .next()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Host not found"))
         };
@@ -1207,18 +1120,18 @@ fn tcp_attempt(line_buffer: &mut Vec<u8>, address: &ParsedServerAddress) -> Resu
             break;
         }
     }
-    Err(TimeError::HeaderNotFound("Date (TCP)".into()))
+    Err(TimeError::header_not_found("Date (TCP)"))
 }
 fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<TimeSample> {
     let parsed_address = parse_server_address(host)?;
-    if parsed_address.scheme == Some(UrlScheme::Https) {
+    if parsed_address.scheme() == Some(UrlScheme::Https) {
         let https_url = parsed_address.curl_url(UrlScheme::Https);
         return fetch_server_time_sample_curl(&https_url, "HTTPS (explicit)", net_ctx);
     }
     tcp_attempt(&mut net_ctx.tcp_line_buffer, &parsed_address).or_else(|_| {
         if !*CURL_AVAILABLE {
-            return Err(TimeError::SyncFailed(
-                "TCP 연결에 실패했고 curl을 사용할 수 없습니다.".into(),
+            return Err(TimeError::sync_failed(
+                "TCP 연결에 실패했고 curl을 사용할 수 없습니다.",
             ));
         }
         let mut last_error = None;
@@ -1233,7 +1146,7 @@ fn fetch_server_time_sample(host: &str, net_ctx: &mut NetworkContext) -> Result<
             }
         }
         Err(last_error
-            .unwrap_or_else(|| TimeError::SyncFailed("Curl 폴백 시도 중 알 수 없는 오류".into())))
+            .unwrap_or_else(|| TimeError::sync_failed("Curl 폴백 시도 중 알 수 없는 오류")))
     })
 }
 fn parse_u32_digits(raw: &str) -> Option<u32> {
@@ -1248,349 +1161,4 @@ fn parse_u32_digits(raw: &str) -> Option<u32> {
         value = value.checked_mul(10)?.checked_add(u32::from(byte - b'0'))?;
     }
     Some(value)
-}
-fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
-    (d0.is_ascii_digit() && d1.is_ascii_digit())
-        .then(|| u32::from(d0 - b'0') * 10 + u32::from(d1 - b'0'))
-}
-#[derive(Clone, Copy)]
-struct HttpDateComponents {
-    weekday: u32,
-    day: u32,
-    month: u32,
-    year: i32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-}
-fn parse_http_time_components(time_str: &str) -> Result<(u32, u32, u32)> {
-    const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
-    const ERR_TIME_RANGE: &str = "HTTP Date 파싱 실패: 시간 값 범위가 올바르지 않습니다.";
-    let time_array = time_str
-        .as_bytes()
-        .as_array::<8>()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    if time_array[2] != b':' || time_array[5] != b':' {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_TIME_FMT)));
-    }
-    let hour = parse_two_digits(time_array[0], time_array[1])
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let minute = parse_two_digits(time_array[3], time_array[4])
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    let second = parse_two_digits(time_array[6], time_array[7])
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIME_FMT)))?;
-    if hour > 23 || minute > 59 || second > 59 {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_TIME_RANGE)));
-    }
-    Ok((hour, minute, second))
-}
-fn parse_http_month(month_str: &str) -> Result<u32> {
-    const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
-    match month_str {
-        "Jan" => Ok(1),
-        "Feb" => Ok(2),
-        "Mar" => Ok(3),
-        "Apr" => Ok(4),
-        "May" => Ok(5),
-        "Jun" => Ok(6),
-        "Jul" => Ok(7),
-        "Aug" => Ok(8),
-        "Sep" => Ok(9),
-        "Oct" => Ok(10),
-        "Nov" => Ok(11),
-        "Dec" => Ok(12),
-        _ => Err(TimeError::Parse(Cow::Borrowed(ERR_MONTH))),
-    }
-}
-fn parse_http_weekday_short(weekday_str: &str) -> Option<u32> {
-    match weekday_str {
-        "Sun" => Some(0),
-        "Mon" => Some(1),
-        "Tue" => Some(2),
-        "Wed" => Some(3),
-        "Thu" => Some(4),
-        "Fri" => Some(5),
-        "Sat" => Some(6),
-        _ => None,
-    }
-}
-fn parse_http_weekday_long(weekday_str: &str) -> Option<u32> {
-    match weekday_str {
-        "Sunday" => Some(0),
-        "Monday" => Some(1),
-        "Tuesday" => Some(2),
-        "Wednesday" => Some(3),
-        "Thursday" => Some(4),
-        "Friday" => Some(5),
-        "Saturday" => Some(6),
-        _ => None,
-    }
-}
-const fn is_leap_year(year: i32) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
-}
-const fn days_in_month(year: i32, month: u32) -> Option<u32> {
-    match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
-        4 | 6 | 9 | 11 => Some(30),
-        2 => Some(if is_leap_year(year) { 29 } else { 28 }),
-        _ => None,
-    }
-}
-fn current_utc_year() -> i32 {
-    let day_index_i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => {
-            i64::try_from(duration.as_secs() / 86_400).unwrap_or_else(|_| i64::from(i32::MAX))
-        }
-        Err(err) => {
-            let secs_before_epoch = err.duration().as_secs();
-            let days_before_epoch = secs_before_epoch.saturating_add(86_399) / 86_400;
-            let days_before_epoch_i64 =
-                i64::try_from(days_before_epoch).unwrap_or_else(|_| i64::from(i32::MAX));
-            -days_before_epoch_i64
-        }
-    };
-    let day_index = i32::try_from(day_index_i64).unwrap_or_else(|_| {
-        if day_index_i64.is_negative() {
-            i32::MIN
-        } else {
-            i32::MAX
-        }
-    });
-    civil_from_days(day_index).0
-}
-fn expand_rfc850_year(two_digit_year: u32) -> Result<i32> {
-    const ERR_YEAR: &str = "HTTP Date 파싱 실패: rfc850 2자리 연도 변환에 실패했습니다.";
-    let year_2 = parse_result_with_context(i32::try_from(two_digit_year), ERR_YEAR)?;
-    let current_year = current_utc_year();
-    let century_base = current_year.div_euclid(100_i32) * 100_i32;
-    let mut expanded = century_base + year_2;
-    if expanded > current_year + 50_i32 {
-        expanded -= 100_i32;
-    }
-    Ok(expanded)
-}
-fn parse_http_date_imf_fixdate(raw_date: &str) -> Result<HttpDateComponents> {
-    const ERR_FORMAT: &str = "HTTP Date 파싱 실패: IMF-fixdate 형식이 아닙니다.";
-    const ERR_NUM: &str = "HTTP Date 파싱 실패: IMF-fixdate 숫자 변환에 실패했습니다.";
-    let mut parts = raw_date.split_ascii_whitespace();
-    let weekday_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let day_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let month_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let year_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let time_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let tz_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    if parts.next().is_some() || day_token.len() != 2 || year_token.len() != 4 || tz_token != "GMT"
-    {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)));
-    }
-    let weekday_name = weekday_token
-        .strip_suffix(',')
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let weekday = parse_http_weekday_short(weekday_name)
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let day = parse_u32_digits(day_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let month = parse_http_month(month_token)?;
-    let year_u32 = parse_u32_digits(year_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let year = parse_result_with_context(i32::try_from(year_u32), ERR_NUM)?;
-    let (hour, minute, second) = parse_http_time_components(time_token)?;
-    Ok(HttpDateComponents {
-        weekday,
-        day,
-        month,
-        year,
-        hour,
-        minute,
-        second,
-    })
-}
-fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
-    const ERR_FORMAT: &str = "HTTP Date 파싱 실패: rfc850-date 형식이 아닙니다.";
-    const ERR_NUM: &str = "HTTP Date 파싱 실패: rfc850-date 숫자 변환에 실패했습니다.";
-    let mut parts = raw_date.split_ascii_whitespace();
-    let weekday_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let date_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let time_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let tz_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    if parts.next().is_some() || tz_token != "GMT" {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)));
-    }
-    let weekday_name = weekday_token
-        .strip_suffix(',')
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let weekday =
-        parse_http_weekday_long(weekday_name).ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let mut date_parts = date_token.split('-');
-    let day_token = date_parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let month_token = date_parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let year2_token = date_parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    if date_parts.next().is_some() || day_token.len() != 2 || year2_token.len() != 2 {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)));
-    }
-    let day = parse_u32_digits(day_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let month = parse_http_month(month_token)?;
-    let year2 = parse_u32_digits(year2_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let year = expand_rfc850_year(year2)?;
-    let (hour, minute, second) = parse_http_time_components(time_token)?;
-    Ok(HttpDateComponents {
-        weekday,
-        day,
-        month,
-        year,
-        hour,
-        minute,
-        second,
-    })
-}
-fn parse_http_date_asctime(raw_date: &str) -> Result<HttpDateComponents> {
-    const ERR_FORMAT: &str = "HTTP Date 파싱 실패: asctime-date 형식이 아닙니다.";
-    const ERR_NUM: &str = "HTTP Date 파싱 실패: asctime-date 숫자 변환에 실패했습니다.";
-    let mut parts = raw_date.split_ascii_whitespace();
-    let weekday_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let month_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let day_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let time_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let year_token = parts
-        .next()
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    if parts.next().is_some() || !(1..=2).contains(&day_token.len()) || year_token.len() != 4 {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)));
-    }
-    let weekday = parse_http_weekday_short(weekday_token)
-        .ok_or(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))?;
-    let day = parse_u32_digits(day_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let month = parse_http_month(month_token)?;
-    let year_u32 = parse_u32_digits(year_token).ok_or(TimeError::Parse(Cow::Borrowed(ERR_NUM)))?;
-    let year = parse_result_with_context(i32::try_from(year_u32), ERR_NUM)?;
-    let (hour, minute, second) = parse_http_time_components(time_token)?;
-    Ok(HttpDateComponents {
-        weekday,
-        day,
-        month,
-        year,
-        hour,
-        minute,
-        second,
-    })
-}
-fn unix_timestamp_to_system_time(timestamp_secs: i64) -> Result<SystemTime> {
-    const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
-    let secs_i128 = i128::from(timestamp_secs);
-    if secs_i128 >= 0 {
-        let secs_u64 = parse_result_with_context(u64::try_from(secs_i128), ERR_TIMESTAMP)?;
-        UNIX_EPOCH
-            .checked_add(Duration::from_secs(secs_u64))
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
-    } else {
-        let abs_i128 = secs_i128
-            .checked_abs()
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIMESTAMP)))?;
-        let abs_secs = parse_result_with_context(u64::try_from(abs_i128), ERR_TIMESTAMP)?;
-        UNIX_EPOCH
-            .checked_sub(Duration::from_secs(abs_secs))
-            .ok_or(TimeError::Parse(Cow::Borrowed(ERR_TIMESTAMP)))
-    }
-}
-const fn validate_http_date_components(components: HttpDateComponents) -> Result<()> {
-    const ERR_DAY: &str = "HTTP Date 파싱 실패: 날짜 값이 유효하지 않습니다.";
-    let Some(max_day) = days_in_month(components.year, components.month) else {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_DAY)));
-    };
-    if components.day == 0 || components.day > max_day {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_DAY)));
-    }
-    Ok(())
-}
-fn http_date_components_to_systemtime(components: HttpDateComponents) -> Result<SystemTime> {
-    const ERR_WEEKDAY: &str = "HTTP Date 파싱 실패: 요일이 날짜와 일치하지 않습니다.";
-    validate_http_date_components(components)?;
-    let days = days_from_civil(components.year, components.month, components.day);
-    let actual_weekday = (days + 4).rem_euclid(7).cast_unsigned();
-    if actual_weekday != components.weekday {
-        return Err(TimeError::Parse(Cow::Borrowed(ERR_WEEKDAY)));
-    }
-    let timestamp_secs = i64::from(days) * 86_400
-        + i64::from(components.hour) * 3_600
-        + i64::from(components.minute) * 60
-        + i64::from(components.second);
-    unix_timestamp_to_system_time(timestamp_secs)
-}
-fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
-    const ERR_FORMAT: &str = "HTTP Date 파싱 실패: RFC 9110 HTTP-date의 3개 형식(IMF-fixdate/rfc850/asctime) 중 하나가 아닙니다.";
-    if raw_date.as_bytes().get(3).is_some_and(|ch| *ch == b',') {
-        return parse_http_date_imf_fixdate(raw_date).and_then(http_date_components_to_systemtime);
-    }
-    if raw_date.contains(',') {
-        return parse_http_date_rfc850(raw_date).and_then(http_date_components_to_systemtime);
-    }
-    if raw_date.contains("GMT") {
-        return parse_http_date_rfc850(raw_date).and_then(http_date_components_to_systemtime);
-    }
-    if raw_date
-        .as_bytes()
-        .first()
-        .is_some_and(u8::is_ascii_alphabetic)
-    {
-        return parse_http_date_asctime(raw_date).and_then(http_date_components_to_systemtime);
-    }
-    Err(TimeError::Parse(Cow::Borrowed(ERR_FORMAT)))
-}
-const fn days_from_civil(y: i32, m: u32, d: u32) -> i32 {
-    let y = if m <= 2 { y - 1_i32 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let shifted_month: i32 = if m > 2 {
-        (m - 3).cast_signed()
-    } else {
-        (m + 9).cast_signed()
-    };
-    let doy = (153_i32 * shifted_month + 2_i32) / 5_i32 + d.cast_signed() - 1_i32;
-    let doe = yoe * 365_i32 + yoe / 4_i32 - yoe / 100_i32 + doy;
-    era * 146_097 + doe - 719_468
-}
-fn civil_from_days(z: i32) -> (i32, u32, u32) {
-    let z = z + 719_468_i32;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1_460_i32 + doe / 36_524_i32 - doe / 146_096_i32) / 365_i32;
-    let y = yoe + era * 400_i32;
-    let doy = doe - (365_i32 * yoe + yoe / 4_i32 - yoe / 100_i32);
-    let mp = (5_i32 * doy + 2_i32) / 153_i32;
-    let d = (doy - (153 * mp + 2) / 5 + 1).cast_unsigned();
-    let m = (if mp < 10 { mp + 3 } else { mp - 9 }).cast_unsigned();
-    (y + i32::from(m <= 2), m, d)
 }
