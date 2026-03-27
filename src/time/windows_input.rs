@@ -1,5 +1,6 @@
-use std::mem::size_of;
-
+use crate::write_line_ignored;
+use core::mem::size_of;
+use std::io::Write;
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const MOUSEEVENTF_LEFTDOWN: u32 = 0x0002;
@@ -38,16 +39,16 @@ struct Input {
     union: InputUnion,
 }
 impl Input {
-    const fn mouse(mi: MouseInput) -> Self {
-        Self {
-            r#type: INPUT_MOUSE,
-            union: InputUnion { mi },
-        }
-    }
     const fn keyboard(ki: KeybdInput) -> Self {
         Self {
             r#type: INPUT_KEYBOARD,
             union: InputUnion { ki },
+        }
+    }
+    const fn mouse(mi: MouseInput) -> Self {
+        Self {
+            r#type: INPUT_MOUSE,
+            union: InputUnion { mi },
         }
     }
 }
@@ -59,48 +60,65 @@ const _: [(); 28] = [(); size_of::<Input>()];
 unsafe extern "system" {
     fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
 }
-fn send_input_events(inputs: &[Input]) {
+#[derive(Clone, Copy)]
+pub enum InputAction {
+    F5Press,
+    MouseClick,
+}
+fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
     // SAFETY: `inputs.as_ptr()` points to a live slice for the duration of the call,
     // and `cb_size` is computed from the exact Rust representation passed to `SendInput`.
     unsafe {
         let Ok(input_count) = u32::try_from(inputs.len()) else {
-            eprintln!("[경고] Windows 입력 이벤트 수 변환 실패");
+            write_line_ignored(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
             return;
         };
         let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
-            eprintln!("[경고] Windows 입력 이벤트 크기 변환 실패");
+            write_line_ignored(
+                err,
+                format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
+            );
             return;
         };
         let sent = SendInput(input_count, inputs.as_ptr(), input_size);
         if sent != input_count {
-            eprintln!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}");
+            write_line_ignored(
+                err,
+                format_args!(
+                    "[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"
+                ),
+            );
         }
     }
 }
-pub fn send_mouse_click() {
-    let inputs = [
-        Input::mouse(MouseInput {
-            dw_flags: MOUSEEVENTF_LEFTDOWN,
-            ..Default::default()
-        }),
-        Input::mouse(MouseInput {
-            dw_flags: MOUSEEVENTF_LEFTUP,
-            ..Default::default()
-        }),
-    ];
-    send_input_events(&inputs);
-}
-pub fn send_f5_press() {
-    let inputs = [
-        Input::keyboard(KeybdInput {
-            w_vk: VK_F5,
-            ..Default::default()
-        }),
-        Input::keyboard(KeybdInput {
-            w_vk: VK_F5,
-            dw_flags: KEYEVENTF_KEYUP,
-            ..Default::default()
-        }),
-    ];
-    send_input_events(&inputs);
+pub fn send_action(action: InputAction, err: &mut dyn Write) {
+    match action {
+        InputAction::MouseClick => {
+            let inputs = [
+                Input::mouse(MouseInput {
+                    dw_flags: MOUSEEVENTF_LEFTDOWN,
+                    ..Default::default()
+                }),
+                Input::mouse(MouseInput {
+                    dw_flags: MOUSEEVENTF_LEFTUP,
+                    ..Default::default()
+                }),
+            ];
+            send_input_events(&inputs, err);
+        }
+        InputAction::F5Press => {
+            let inputs = [
+                Input::keyboard(KeybdInput {
+                    w_vk: VK_F5,
+                    ..Default::default()
+                }),
+                Input::keyboard(KeybdInput {
+                    w_vk: VK_F5,
+                    dw_flags: KEYEVENTF_KEYUP,
+                    ..Default::default()
+                }),
+            ];
+            send_input_events(&inputs, err);
+        }
+    }
 }

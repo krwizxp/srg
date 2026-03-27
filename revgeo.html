@@ -367,7 +367,7 @@
           }
         }
 
-        .left-pane-scroll>div:has(#coords) {
+        .left-pane-scroll>:has(#coords) {
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -377,7 +377,7 @@
           padding-inline-end: var(--card-pad-inline);
         }
 
-        .left-pane-scroll:has(.manual-rng[open])>div:has(#coords) {
+        .left-pane-scroll:has(.manual-rng[open])>:has(#coords) {
           flex: 0 0 auto;
         }
 
@@ -1525,7 +1525,7 @@
           </button>
         </header>
         <h2 class="sr-only">파일 업로드 및 실행</h2>
-        <form>
+        <div>
           <fieldset class="row">
             <legend class="sr-only">
               random_data.txt 파일 업로드 및 조회 제어
@@ -1550,23 +1550,25 @@
               <button type="button" id="export" commandfor="app" command="--export" disabled>CSV 내보내기</button>
             </div>
           </fieldset>
-        </form>
+        </div>
         <details class="manual-rng no-spotlight">
           <summary>직접 입력 난수 변환</summary>
           <div class="manual-rng-body">
-            <p class="manual-rng-help">기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.</p>
-            <label class="manual-rng-field" for="num64">
-              <span class="manual-rng-label">기본 난수값</span>
-              <input id="num64" type="text" inputmode="numeric" placeholder="예: 123456789 또는 0x1122334455667788">
-              <span class="manual-rng-meta">입력 범위: 0 ~ 18446744073709551615<br>(0x0 ~ 0xFFFFFFFFFFFFFFFF)</span>
-            </label>
-            <label class="manual-rng-field" for="suppValues">
-              <span class="manual-rng-label">보조 난수값 목록 (선택)</span>
-              <textarea id="suppValues" placeholder="쉼표/공백/줄바꿈 구분
+            <p class="manual-rng-help" id="manual-rng-help">기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.</p>
+            <div class="manual-rng-field">
+              <label class="manual-rng-label" for="num64">기본 난수값</label>
+              <input id="num64" type="text" inputmode="numeric" aria-describedby="num64-help"
+                placeholder="예: 123456789 또는 0x1122334455667788">
+              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~ 18446744073709551615<br>(0x0 ~
+                0xFFFFFFFFFFFFFFFF)</span>
+            </div>
+            <div class="manual-rng-field">
+              <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
+              <textarea id="suppValues" aria-describedby="suppValues-help" placeholder="쉼표/공백/줄바꿈 구분
 예) 0x123456789ABCDEF0
 18446744073709551615"></textarea>
-              <span class="manual-rng-meta">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
-            </label>
+              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
+            </div>
             <div class="manual-rng-actions">
               <button id="runBtn" type="button">변환 실행</button>
               <button id="saveOutput" type="button">random_data.txt 저장</button>
@@ -1579,19 +1581,21 @@
               </button>
               <button id="clearBtn" type="button">출력 지우기</button>
             </div>
-            <div id="meta" class="manual-rng-meta"></div>
-            <div id="error" class="manual-rng-meta"></div>
-            <pre id="output" class="coords-view" role="region" aria-label="변환 결과" tabindex="-1"><span
-              class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
-              class="coords-content"></code></pre>
+            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
+            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true"></div>
+            <section aria-label="변환 결과">
+              <pre id="output" class="coords-view"><span
+                class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
+                class="coords-content"></code></pre>
+            </section>
           </div>
         </details>
-        <div>
+        <section aria-labelledby="coords-label">
           <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-          <pre id="coords" class="coords-view" role="region" aria-labelledby="coords-label" tabindex="-1"><span
+          <pre id="coords" class="coords-view"><span
             class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
-            class="coords-content"></code></pre>
-        </div>
+              class="coords-content"></code></pre>
+        </section>
         <div class="row-progress">
           <div class="sp">
             <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
@@ -1607,6 +1611,7 @@
               id="cnt-remain">0</strong>건 미처리</output>
         </div>
         <output id="status" class="status"></output>
+        <div id="status-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
         <footer>
           <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
         </footer>
@@ -1621,7 +1626,7 @@
             <p class="header-desc">좌표별 주소 및 지도 링크</p>
           </header>
           <search>
-            <form class="filters">
+            <div class="filters">
               <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
                 aria-label="전체검색">
               <select id="filter-kind" aria-label="구분">
@@ -1642,7 +1647,7 @@
               <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
                 aria-label="전체주소">
               <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
-            </form>
+            </div>
           </search>
         </section>
         <div class="card card-stack-bottom no-spotlight">
@@ -1718,8 +1723,8 @@
       </td>
       <td data-label="지도링크">
         <div class="skeleton-bar"></div>
-        <button type="button" class="map-btn" aria-haspopup="dialog" commandfor="map-popover" command="show-popover"
-          disabled>지도</button>
+        <button type="button" class="map-btn" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
+          commandfor="map-popover" command="show-popover" disabled>지도</button>
       </td>
     </tr>
   </template>
@@ -1734,8 +1739,8 @@
       <td data-label="지물 태그"></td>
       <td data-label="전체주소"></td>
       <td data-label="지도링크">
-        <button type="button" class="map-btn" aria-haspopup="dialog" commandfor="map-popover" command="show-popover"
-          disabled>지도</button>
+        <button type="button" class="map-btn" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
+          commandfor="map-popover" command="show-popover" disabled>지도</button>
       </td>
     </tr>
   </template>
@@ -1805,6 +1810,16 @@
       document.querySelectorAll("#map-popover-links a[data-url-template]");
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
+    const getMapPopoverFocusTarget = () => {
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        const anchor = mapAnchors[i];
+        if (anchor instanceof HTMLElement && !anchor.hasAttribute("hidden")) return anchor;
+      }
+      return mapPopover;
+    };
+    const setMapPopoverExpanded = (btn, expanded) => {
+      if (btn instanceof HTMLElement) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+    };
     let mapHasRound6 = false;
     const RX_MAP_TOKEN = /{lat}|{lon}/g;
     for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
@@ -1897,6 +1912,7 @@
       if (!btn) return;
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
+      if (prevInvoker && prevInvoker !== btn) setMapPopoverExpanded(prevInvoker, false);
       if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       updateMapPopoverFromInvoker(btn);
@@ -1929,6 +1945,7 @@
     mapPopover.addEventListener("toggle", (e) => {
       MAP_POPOVER_OPEN = e.newState === "open";
       if (!MAP_POPOVER_OPEN) {
+        setMapPopoverExpanded(LAST_MAP_INVOKER, false);
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
           if (
@@ -1946,7 +1963,15 @@
         document.activeElement instanceof HTMLElement ? document.activeElement : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
       if (!invoker || !invoker.isConnected) return;
+      setMapPopoverExpanded(invoker, true);
       updateMapPopoverFromInvoker(invoker);
+      requestAnimationFrame(() => {
+        if (!MAP_POPOVER_OPEN) return;
+        const active = document.activeElement;
+        if (active === document.body || active === invoker || active === mapPopover) {
+          getMapPopoverFocusTarget()?.focus({ preventScroll: true });
+        }
+      });
     });
     const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -1985,6 +2010,7 @@
       app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
+      statusLive: document.getElementById("status-live"),
       cntTotal: document.getElementById("cnt-total"),
       cntSuccess: document.getElementById("cnt-success"),
       cntFail: document.getElementById("cnt-fail"),
@@ -3231,6 +3257,59 @@
       }
     }
     const STATUS_CACHE = { msg: null, type: null };
+    const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
+    const RX_STATUS_PROGRESS = /^처리 중… \(([\d,]+)\/([\d,]+)\)$/;
+    let statusLiveTimer = 0;
+    const FILTER_CONTROL_ELEMENTS = [
+      domElements.filterQ,
+      domElements.filterKind,
+      domElements.filterSido,
+      domElements.filterSigungu,
+      domElements.filterEmd,
+      domElements.filterTag,
+      domElements.filterFullAddr,
+    ];
+    function resetFilterControls() {
+      for (const el of FILTER_CONTROL_ELEMENTS) {
+        el.value = "";
+      }
+    }
+    function setLiveRegionText(el, text) {
+      clearTimeout(statusLiveTimer);
+      if (!el) return;
+      el.textContent = "";
+      if (!text) return;
+      statusLiveTimer = setTimeout(() => {
+        el.textContent = text;
+      }, 24);
+    }
+    function announceStatusMessage(msg, type = "info") {
+      const text = String(msg ?? "").trim();
+      if (!text) {
+        SR_STATUS_CACHE.msg = null;
+        SR_STATUS_CACHE.progressBucket = -1;
+        setLiveRegionText(domElements.statusLive, "");
+        return;
+      }
+      let nextAnnouncement = text;
+      const progressMatch = type === "info" ? RX_STATUS_PROGRESS.exec(text) : null;
+      if (progressMatch) {
+        const processed = Number.parseInt(progressMatch[1].replace(/,/g, ""), 10);
+        const total = Number.parseInt(progressMatch[2].replace(/,/g, ""), 10);
+        if (Number.isFinite(processed) && Number.isFinite(total) && total > 0) {
+          const pct = Math.round((processed / total) * 100);
+          const bucket = total <= 10 ? pct : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
+          if (bucket === SR_STATUS_CACHE.progressBucket && processed !== total) return;
+          SR_STATUS_CACHE.progressBucket = bucket;
+          nextAnnouncement = `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`;
+        }
+      } else {
+        SR_STATUS_CACHE.progressBucket = -1;
+      }
+      if (SR_STATUS_CACHE.msg === nextAnnouncement) return;
+      SR_STATUS_CACHE.msg = nextAnnouncement;
+      setLiveRegionText(domElements.statusLive, nextAnnouncement);
+    }
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
       const nextMsg = String(msg ?? "");
@@ -3244,6 +3323,7 @@
         el.classList.toggle("warn", type === "warn");
         el.classList.toggle("stopped", type === "stopped");
       }
+      announceStatusMessage(nextMsg, type);
     }
     const EMPTY_HINT_TEXT = {
       init: "random_data.txt 파일을 업로드해 주세요.",
@@ -3790,6 +3870,8 @@
       const td = cells[MAPS_COL_INDEX];
       const btn = td.lastElementChild;
       btn.disabled = false;
+      btn.setAttribute("aria-label", `지도 링크 열기: ${latStr}, ${lonStr}`);
+      btn.setAttribute("aria-expanded", "false");
       const sk = td.firstElementChild;
       if (sk !== btn) sk.remove();
       const wasHidden = tr.hidden;
@@ -4009,7 +4091,7 @@
       },
       "--export": handleExport,
       "--filter-clear": () => {
-        domElements.filtersForm.reset();
+        resetFilterControls();
         filterDirty = true;
         cancelActiveFilterTask();
         clearFindReveals();
@@ -4034,7 +4116,6 @@
         handleCommandError(err);
       }
     });
-    domElements.filtersForm.addEventListener("submit", (e) => e.preventDefault());
     function handleFile(file) {
       if (!file) return;
       domElements.file.value = "";
