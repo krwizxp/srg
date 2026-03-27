@@ -908,24 +908,26 @@ impl AppState {
     ) -> (Activity, Option<&'message str>) {
         if let Some(action) = self.trigger_action {
             #[cfg(any(target_os = "linux", target_os = "macos"))]
-            let run_external_command = |program: &str, args: &[&str]| match Command::new(program)
-                .args(args)
-                .status()
-            {
-                Ok(status) if status.success() => {}
-                Ok(status) => {
-                    write_line_ignored(
-                        err,
-                        format_args!("[경고] 명령 실행 실패: {program} {args:?} (상태: {status})"),
-                    );
-                }
-                Err(err) => {
-                    write_line_ignored(
-                        err,
-                        format_args!("[경고] 명령 실행 실패: {program} {args:?} ({err})"),
-                    );
-                }
-            };
+            let mut run_external_command =
+                |program: &str, args: &[&str]| match Command::new(program).args(args).status() {
+                    Ok(status) if status.success() => {}
+                    Ok(status) => {
+                        write_line_ignored(
+                            err,
+                            format_args!(
+                                "[경고] 명령 실행 실패: {program} {args:?} (상태: {status})"
+                            ),
+                        );
+                    }
+                    Err(command_err) => {
+                        write_line_ignored(
+                            err,
+                            format_args!(
+                                "[경고] 명령 실행 실패: {program} {args:?} ({command_err})"
+                            ),
+                        );
+                    }
+                };
             match action {
                 TriggerAction::LeftClick => {
                     #[cfg(target_os = "linux")]
