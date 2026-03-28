@@ -3,6 +3,7 @@ use core::mem::size_of;
 use std::io::Write;
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
+const KEYEVENTF_KEYDOWN: u32 = 0;
 const MOUSEEVENTF_LEFTDOWN: u32 = 0x0002;
 const MOUSEEVENTF_LEFTUP: u32 = 0x0004;
 const KEYEVENTF_KEYUP: u32 = 0x0002;
@@ -38,20 +39,6 @@ struct Input {
     r#type: u32,
     union: InputUnion,
 }
-impl Input {
-    const fn keyboard(ki: KeybdInput) -> Self {
-        Self {
-            r#type: INPUT_KEYBOARD,
-            union: InputUnion { ki },
-        }
-    }
-    const fn mouse(mi: MouseInput) -> Self {
-        Self {
-            r#type: INPUT_MOUSE,
-            union: InputUnion { mi },
-        }
-    }
-}
 #[cfg(target_pointer_width = "64")]
 const _: [(); 40] = [(); size_of::<Input>()];
 #[cfg(target_pointer_width = "32")]
@@ -65,9 +52,32 @@ pub enum InputAction {
     F5Press,
     MouseClick,
 }
+fn keyboard_input(w_vk: u16, dw_flags: u32) -> Input {
+    Input {
+        r#type: INPUT_KEYBOARD,
+        union: InputUnion {
+            ki: KeybdInput {
+                w_vk,
+                dw_flags,
+                ..Default::default()
+            },
+        },
+    }
+}
+fn mouse_input(dw_flags: u32) -> Input {
+    Input {
+        r#type: INPUT_MOUSE,
+        union: InputUnion {
+            mi: MouseInput {
+                dw_flags,
+                ..Default::default()
+            },
+        },
+    }
+}
 fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
-    // SAFETY: `inputs.as_ptr()` points to a live slice for the duration of the call,
-    // and `cb_size` is computed from the exact Rust representation passed to `SendInput`.
+    // SAFETY: `inputs.as_ptr()` stays valid for the whole call.
+    // `cb_size` matches the exact Rust representation passed to `SendInput`.
     unsafe {
         let Ok(input_count) = u32::try_from(inputs.len()) else {
             write_line_ignored(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
@@ -95,28 +105,15 @@ pub fn send_action(action: InputAction, err: &mut dyn Write) {
     match action {
         InputAction::MouseClick => {
             let inputs = [
-                Input::mouse(MouseInput {
-                    dw_flags: MOUSEEVENTF_LEFTDOWN,
-                    ..Default::default()
-                }),
-                Input::mouse(MouseInput {
-                    dw_flags: MOUSEEVENTF_LEFTUP,
-                    ..Default::default()
-                }),
+                mouse_input(MOUSEEVENTF_LEFTDOWN),
+                mouse_input(MOUSEEVENTF_LEFTUP),
             ];
             send_input_events(&inputs, err);
         }
         InputAction::F5Press => {
             let inputs = [
-                Input::keyboard(KeybdInput {
-                    w_vk: VK_F5,
-                    ..Default::default()
-                }),
-                Input::keyboard(KeybdInput {
-                    w_vk: VK_F5,
-                    dw_flags: KEYEVENTF_KEYUP,
-                    ..Default::default()
-                }),
+                keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
+                keyboard_input(VK_F5, KEYEVENTF_KEYUP),
             ];
             send_input_events(&inputs, err);
         }

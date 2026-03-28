@@ -1,34 +1,38 @@
 [package]
 name = "srg"
 version = "1.5.2"
+categories = ["command-line-utilities", "date-and-time", "encoding"]
 edition = "2024"
-description = "Hardware RNG-based random data generator with high-precision server time sync utility"
+keywords = ["random", "rng", "cli", "time-sync", "utilities"]
 license = "MIT"
 repository = "https://github.com/krwizxp/srg"
-keywords = ["random", "rng", "cli", "time-sync", "utilities"]
-categories = ["command-line-utilities", "date-and-time", "encoding"]
+description = """\
+Hardware RNG-based random data generator with high-precision server time sync \
+utility\
+"""
 
 [lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
+big_endian_bytes = "allow"
+blanket_clippy_restriction_lints = "allow"
 cargo = { level = "warn", priority = -1 }
-style = { level = "warn", priority = -1 }
-perf = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
 correctness = { level = "deny", priority = -1 }
-suspicious = { level = "warn", priority = -1 }
-restriction = { level = "warn", priority = -1 }
-blanket_clippy_restriction_lints = "allow"
 implicit_return = "allow"
+little_endian_bytes = "allow"
 missing_docs_in_private_items = "allow"
-question_mark_used = "allow"
-self_named_module_files = "allow"
+non_ascii_literal = "allow"
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
 pub_with_shorthand = "allow"
+question_mark_used = "allow"
+restriction = { level = "warn", priority = -1 }
+self_named_module_files = "allow"
 semicolon_inside_block = "allow"
 separated_literal_suffix = "allow"
-big_endian_bytes = "allow"
-little_endian_bytes = "allow"
-non_ascii_literal = "allow"
+single_char_lifetime_names = "allow"
+style = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
 
 [profile.release]
 codegen-units = 1
