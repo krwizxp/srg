@@ -72,11 +72,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: stable
       - name: Build release binary
         run: cargo build --release --locked
       - name: Run selected SRG action
@@ -97,7 +99,7 @@ jobs:
         run: .\.github\scripts\run-srg.ps1
       - name: Upload console log artifact
         if: ${{ always() && steps.run_srg.outputs.log_artifact_path != '' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           path: ${{ steps.run_srg.outputs.log_artifact_path }}
           archive: false
@@ -105,7 +107,7 @@ jobs:
           retention-days: 14
       - name: Upload generated data artifact
         if: ${{ always() && steps.run_srg.outputs.data_artifact_path != '' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           path: ${{ steps.run_srg.outputs.data_artifact_path }}
           archive: false

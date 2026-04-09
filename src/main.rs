@@ -8,6 +8,8 @@ use self::{
 };
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{_rdrand64_step, _rdseed64_step};
+#[cfg(windows)]
+use core::ffi::c_void;
 use core::{
     char::from_u32,
     error::Error,
@@ -18,9 +20,11 @@ use core::{
     time::Duration,
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt};
 #[cfg(windows)]
 use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
+#[cfg(windows)]
+use std::os::windows::io::AsRawHandle as _;
 use std::{
     fs::{self, File},
     io::{
@@ -178,6 +182,33 @@ const MENU: &str = concat!(
 );
 type Result<T> = StdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
+#[cfg(windows)]
+#[repr(C)]
+struct FileTime {
+    low_date_time: u32,
+    high_date_time: u32,
+}
+#[cfg(windows)]
+#[repr(C)]
+struct ByHandleFileInformation {
+    file_attributes: u32,
+    creation_time: FileTime,
+    last_access_time: FileTime,
+    last_write_time: FileTime,
+    volume_serial_number: u32,
+    file_size_high: u32,
+    file_size_low: u32,
+    number_of_links: u32,
+    file_index_high: u32,
+    file_index_low: u32,
+}
+#[cfg(windows)]
+unsafe extern "system" {
+    fn GetFileInformationByHandle(
+        h_file: *mut c_void,
+        file_information: *mut ByHandleFileInformation,
+    ) -> i32;
+}
 enum RngSource {
     None,
     RdRand,
@@ -433,6 +464,7 @@ impl MenuApp {
             b'5' => self.handle_server_time_command(out, err)?,
             #[cfg(target_arch = "x86_64")]
             b'6' => {
+                validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
                 if let Err(remove_err) = fs::remove_file(FILE_NAME) {
                     writeln!(err, "{remove_err}")?;
                 } else {
@@ -991,6 +1023,68 @@ fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<
 fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync + 'static> {
     Box::new(IoError::other(message))
 }
+fn validate_safe_output_file_path(path: &Path, allow_missing: bool) -> Result<()> {
+    let maybe_metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => Some(metadata),
+        Err(err) if allow_missing && err.kind() == ErrorKind::NotFound => None,
+        Err(err) => return Err(Box::new(err)),
+    };
+    let Some(metadata) = maybe_metadata else {
+        return Ok(());
+    };
+    #[cfg(windows)]
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+        return Err(invalid_output_path_err(
+            "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+        ));
+    }
+    #[cfg(not(windows))]
+    if metadata.file_type().is_symlink() {
+        return Err(invalid_output_path_err(
+            "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
+        ));
+    }
+    if !metadata.is_file() {
+        return Err(invalid_output_path_err(
+            "출력 경로는 일반 파일이어야 합니다.",
+        ));
+    }
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    if metadata.nlink() > 1 {
+        return Err(invalid_output_path_err(
+            "출력 파일은 하드 링크가 아니어야 합니다.",
+        ));
+    }
+    #[cfg(windows)]
+    if file_has_multiple_links(
+        &File::options()
+            .read(true)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
+            .open(path)?,
+    )? {
+        return Err(invalid_output_path_err(
+            "출력 파일은 하드 링크가 아니어야 합니다.",
+        ));
+    }
+    Ok(())
+}
+#[cfg(windows)]
+fn file_has_multiple_links(file: &File) -> IoResult<bool> {
+    use core::mem::MaybeUninit;
+    let mut file_information = MaybeUninit::<ByHandleFileInformation>::zeroed();
+    // SAFETY: `GetFileInformationByHandle` only writes to the provided output
+    // struct and uses the raw OS handle borrowed from `file` for the duration
+    // of this call.
+    let result =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle(), file_information.as_mut_ptr()) };
+    if result == 0_i32 {
+        return Err(IoError::last_os_error());
+    }
+    // SAFETY: The call above succeeded, so the OS initialized the full output
+    // structure.
+    let initialized_file_information = unsafe { file_information.assume_init() };
+    Ok(initialized_file_information.number_of_links > 1)
+}
 fn boxed_other_with_source(
     context_msg: &'static str,
     err: impl Display,
@@ -999,30 +1093,7 @@ fn boxed_other_with_source(
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
     let path = Path::new(FILE_NAME);
-    let maybe_metadata = match fs::symlink_metadata(path) {
-        Ok(metadata) => Some(metadata),
-        Err(err) if err.kind() == ErrorKind::NotFound => None,
-        Err(err) => return Err(Box::new(err)),
-    };
-    if let Some(metadata) = maybe_metadata {
-        #[cfg(windows)]
-        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
-            return Err(invalid_output_path_err(
-                "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
-            ));
-        }
-        #[cfg(not(windows))]
-        if metadata.file_type().is_symlink() {
-            return Err(invalid_output_path_err(
-                "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
-            ));
-        }
-        if !metadata.is_file() {
-            return Err(invalid_output_path_err(
-                "출력 경로는 일반 파일이어야 합니다.",
-            ));
-        }
-    }
+    validate_safe_output_file_path(path, true)?;
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     let mut file = File::options()
         .read(true)
@@ -1041,6 +1112,17 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
     let mut file = return Err(invalid_output_path_err(
         "지원되지 않는 운영체제입니다. Windows, Linux, macOS만 지원합니다.",
     ));
+    match file.try_lock() {
+        Ok(()) => {}
+        Err(fs::TryLockError::WouldBlock) => {
+            return Err(invalid_output_path_err(
+                "다른 srg 인스턴스가 출력 파일을 사용 중입니다.",
+            ));
+        }
+        Err(fs::TryLockError::Error(err)) => {
+            return Err(boxed_other_with_source("출력 파일 잠금 실패", err));
+        }
+    }
     let metadata = file.metadata()?;
     #[cfg(windows)]
     if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
@@ -1051,6 +1133,18 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
     if !metadata.is_file() {
         return Err(invalid_output_path_err(
             "출력 경로는 일반 파일이어야 합니다.",
+        ));
+    }
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    if metadata.nlink() > 1 {
+        return Err(invalid_output_path_err(
+            "출력 파일은 하드 링크가 아니어야 합니다.",
+        ));
+    }
+    #[cfg(windows)]
+    if file_has_multiple_links(&file)? {
+        return Err(invalid_output_path_err(
+            "출력 파일은 하드 링크가 아니어야 합니다.",
         ));
     }
     if metadata.len() == 0 {
