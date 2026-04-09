@@ -2809,9 +2809,9 @@
               if (p0Last === CC_SI || p0Last === CC_GUN) cityLike = p0;
             }
             let districtLike = "";
-            const town = gc.town;
-            const locality = gc.locality;
-            const village = gc.village;
+            const town = gcTown;
+            const locality = gcLocality;
+            const village = gcVillage;
             let cdLast = 0;
             if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) {
               cdLast = cityDistrict.charCodeAt(cityDistrict.length - 1);
