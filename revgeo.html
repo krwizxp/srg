@@ -3473,69 +3473,59 @@
         });
     })();
     async function* lineIterator(stream, signal) {
-      const reader = stream
-        .pipeThrough(new TextDecoderStream(), { signal })
-        .getReader();
+      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
       let buffer = "";
       let pendingCR = false;
       let hasCR = false;
-      try {
-        while (true) {
-          const { value: chunk, done } = await reader.read();
-          if (done) {
-            signal.throwIfAborted();
-            if (buffer) yield buffer;
-            break;
-          }
-          if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
-          if (pendingCR) {
-            if (chunk && chunk[0] === "\n") {
-              buffer += chunk.slice(1);
-            } else {
-              buffer += chunk;
-            }
-            pendingCR = false;
+      for await (const chunk of decoded) {
+        signal.throwIfAborted();
+        if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
+        if (pendingCR) {
+          if (chunk && chunk[0] === "\n") {
+            buffer += chunk.slice(1);
           } else {
             buffer += chunk;
           }
-          let start = 0;
-          if (!hasCR) {
-            while (true) {
-              const nl = buffer.indexOf("\n", start);
-              if (nl === -1) break;
-              yield buffer.substring(start, nl);
-              start = nl + 1;
-            }
-            buffer = buffer.substring(start);
-            continue;
-          }
-          while (start < buffer.length) {
+          pendingCR = false;
+        } else {
+          buffer += chunk;
+        }
+        let start = 0;
+        if (!hasCR) {
+          while (true) {
             const nl = buffer.indexOf("\n", start);
-            const cr = buffer.indexOf("\r", start);
-            let pos;
-            if (nl === -1) pos = cr;
-            else if (cr === -1) pos = nl;
-            else pos = nl < cr ? nl : cr;
-            if (pos === -1) break;
-            yield buffer.substring(start, pos);
-            if (buffer[pos] === "\r") {
-              if (pos + 1 === buffer.length) {
-                pendingCR = true;
-                hasCR = true;
-                start = pos + 1;
-                break;
-              }
-              start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
-            } else {
-              start = pos + 1;
-            }
+            if (nl === -1) break;
+            yield buffer.substring(start, nl);
+            start = nl + 1;
           }
           buffer = buffer.substring(start);
+          continue;
         }
-      } finally {
-        try { await reader.cancel(signal.reason); } catch { }
-        try { reader.releaseLock(); } catch { }
+        while (start < buffer.length) {
+          const nl = buffer.indexOf("\n", start);
+          const cr = buffer.indexOf("\r", start);
+          let pos;
+          if (nl === -1) pos = cr;
+          else if (cr === -1) pos = nl;
+          else pos = nl < cr ? nl : cr;
+          if (pos === -1) break;
+          yield buffer.substring(start, pos);
+          if (buffer[pos] === "\r") {
+            if (pos + 1 === buffer.length) {
+              pendingCR = true;
+              hasCR = true;
+              start = pos + 1;
+              break;
+            }
+            start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
+          } else {
+            start = pos + 1;
+          }
+        }
+        buffer = buffer.substring(start);
       }
+      signal.throwIfAborted();
+      if (buffer) yield buffer;
     }
     async function parseFileToRecords(file, signal) {
       const out = [];
