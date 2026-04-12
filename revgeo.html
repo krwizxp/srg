@@ -3472,13 +3472,37 @@
           channel.port2.postMessage(0);
         });
     })();
-    async function* lineIterator(stream, signal) {
+    async function* decodedChunkIterator(stream, signal) {
       const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
+      const asyncIter = decoded[Symbol.asyncIterator];
+      if (typeof asyncIter === "function") {
+        for await (const chunk of decoded) {
+          signal.throwIfAborted();
+          yield chunk;
+        }
+        return;
+      }
+      const reader = decoded.getReader();
+      try {
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            signal.throwIfAborted();
+            return;
+          }
+          signal.throwIfAborted();
+          yield chunk;
+        }
+      } finally {
+        try { await reader.cancel(signal.reason); } catch { }
+        try { reader.releaseLock(); } catch { }
+      }
+    }
+    async function* lineIterator(stream, signal) {
       let buffer = "";
       let pendingCR = false;
       let hasCR = false;
-      for await (const chunk of decoded) {
-        signal.throwIfAborted();
+      for await (const chunk of decodedChunkIterator(stream, signal)) {
         if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
         if (pendingCR) {
           if (chunk && chunk[0] === "\n") {
