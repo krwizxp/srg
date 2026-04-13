@@ -392,28 +392,6 @@
         line-height: 1.3;
       }
 
-      .runtime-diag {
-        position: fixed;
-        inset-inline: 12px;
-        inset-block-end: max(12px, env(safe-area-inset-bottom));
-        z-index: 80;
-        padding: 8px 10px;
-        border-radius: 12px;
-        background: color-mix(in oklch, var(--surface-panel) 92%, var(--fg) 8%);
-        border: 1px solid var(--line-soft);
-        box-shadow: var(--panel-shadow);
-        color: var(--muted-strong);
-        font-size: 11px;
-        line-height: 1.35;
-        white-space: pre-wrap;
-        word-break: break-word;
-        pointer-events: none;
-
-        &:empty {
-          display: none;
-        }
-      }
-
       &::before {
         z-index: 1;
       }
@@ -1704,7 +1682,6 @@
       </div>
     </div>
   </main>
-  <output id="runtime-diag" class="runtime-diag"></output>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" tabindex="-1">
     <div class="map-links" id="map-popover-links">
       <a data-provider-key="Google" href="about:blank" data-url-template="https://www.google.com/maps?q={lat},{lon}"
@@ -2046,7 +2023,6 @@
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       coordsContent: document.querySelector("#coords .coords-content"),
-      runtimeDiag: document.getElementById("runtime-diag"),
       filterQ: document.getElementById("filter-q"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
@@ -2055,24 +2031,6 @@
       filterTag: document.getElementById("filter-tag"),
       filterFullAddr: document.getElementById("filter-fulladdr"),
       filtersForm: document.querySelector(".filters"),
-    };
-    const setRuntimeDiagText = () => {
-      const el = domElements.runtimeDiag;
-      if (!el || el.textContent) return;
-      try {
-        const blobStream = new Blob(["x"]).stream();
-        const decoded = blobStream.pipeThrough(new TextDecoderStream());
-        const ua = navigator.userAgent;
-        const uaCompact = ua.length > 140 ? ua.slice(0, 140) + "…" : ua;
-        el.textContent =
-          `diag ua=${uaCompact}\n` +
-          `ReadableStream.proto.asyncIterator=${typeof ReadableStream?.prototype?.[Symbol.asyncIterator]}\n` +
-          `Blob.stream().asyncIterator=${typeof blobStream[Symbol.asyncIterator]}\n` +
-          `TextDecoderStream=${typeof TextDecoderStream}\n` +
-          `decoded.asyncIterator=${typeof decoded[Symbol.asyncIterator]}`;
-      } catch (err) {
-        el.textContent = `diag error=${String(err && (err.message || err))}`;
-      }
     };
     const setCoordsText = (text) => {
       domElements.coordsContent.textContent = text;
@@ -2091,7 +2049,6 @@
     const stopBtn = document.getElementById("stop");
     const root = document.documentElement;
     const PERF_MODE_ATTR = "data-perf-mode";
-    setRuntimeDiagText();
     const DROP_ZONE_FILE_LABELS = document.querySelectorAll(
       ".drop-text .desktop-msg, .drop-text .mobile-msg"
     );
