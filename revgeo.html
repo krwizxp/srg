@@ -1473,7 +1473,11 @@
             text-decoration: none;
             transition: color 0.2s;
 
-            &:is(:focus, :focus-visible) {
+            &:focus {
+              outline: none;
+            }
+
+            &:focus-visible {
               outline: none;
               box-shadow: 0 0 0 2px var(--accent-border);
               border-radius: 8px;
@@ -1906,12 +1910,14 @@
     const MAP_HAS_ROUND6 = mapHasRound6;
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
+    let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
     document.addEventListener("command", (e) => {
       if (e.command !== "show-popover") return;
       const btn = e.source?.closest?.("button.map-btn");
       if (!btn) return;
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
+      MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
       if (prevInvoker && prevInvoker !== btn) setMapPopoverExpanded(prevInvoker, false);
       if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
@@ -1957,6 +1963,7 @@
         }
         MAP_POPOVER_PREV_FOCUS = null;
         LAST_MAP_INVOKER = null;
+        MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
         return;
       }
       MAP_POPOVER_PREV_FOCUS =
@@ -1969,7 +1976,11 @@
         if (!MAP_POPOVER_OPEN) return;
         const active = document.activeElement;
         if (active === document.body || active === invoker || active === mapPopover) {
-          getMapPopoverFocusTarget()?.focus({ preventScroll: true });
+          if (MAP_POPOVER_OPEN_WITH_KEYBOARD) {
+            getMapPopoverFocusTarget()?.focus({ preventScroll: true });
+          } else {
+            mapPopover.focus({ preventScroll: true });
+          }
         }
       });
     });
