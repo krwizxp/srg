@@ -1234,7 +1234,7 @@
       padding-block-end: max(var(--page-pad-block-end), env(safe-area-inset-bottom));
     }
 
-    @media (min-width: 901px) {
+    @media (min-width: 941px) {
 
       html,
       body {
@@ -1456,7 +1456,7 @@
       }
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 940px) {
 
       html,
       body {
@@ -1483,6 +1483,56 @@
 
           &:not(.has-results) {
             min-block-size: 220px;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 900px) {
+      .results-card {
+        search {
+          .filters {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            align-items: stretch;
+
+            :is(input[type="search"], select, #filter-clear) {
+              min-inline-size: 0;
+              inline-size: 100%;
+            }
+
+            #filter-q {
+              grid-column: 1 / span 4;
+            }
+
+            #filter-kind {
+              grid-column: 5 / span 2;
+            }
+
+            #filter-sido {
+              grid-column: 1 / span 3;
+            }
+
+            #filter-sigungu {
+              grid-column: 4 / span 3;
+            }
+
+            #filter-emd {
+              grid-column: 1 / span 3;
+            }
+
+            #filter-tag {
+              grid-column: 4 / span 3;
+            }
+
+            #filter-fulladdr {
+              grid-column: 1 / span 4;
+            }
+
+            #filter-clear {
+              grid-column: 5 / span 2;
+              justify-self: stretch;
+            }
           }
         }
       }
