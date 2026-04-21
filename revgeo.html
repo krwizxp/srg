@@ -219,17 +219,30 @@
       }
 
       .table-wrap {
+        --table-head-offset: 0px;
+
         &.has-results {
+          &::before,
           &::after {
             content: "";
             display: block;
             position: sticky;
             inset-inline: 0;
-            inset-block-end: 0;
             block-size: var(--scroll-shadow-size);
-            margin-block-end: calc(-1 * var(--scroll-shadow-size));
             pointer-events: none;
-            z-index: 5;
+            z-index: 11;
+          }
+
+          &::before {
+            inset-block-start: var(--table-head-offset);
+            margin-block-end: calc(-1 * var(--scroll-shadow-size));
+            background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+            opacity: var(--top-shadow-opacity);
+          }
+
+          &::after {
+            inset-block-end: 0;
+            margin-block-start: calc(-1 * var(--scroll-shadow-size));
             background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
             opacity: var(--bottom-shadow-opacity);
           }
@@ -850,17 +863,6 @@
 
             &:nth-child(8) {
               inline-size: 100%;
-            }
-
-            &::after {
-              content: "";
-              position: absolute;
-              inset-inline: 0;
-              inset-block-end: -14px;
-              block-size: 14px;
-              pointer-events: none;
-              opacity: var(--top-shadow-opacity);
-              background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
             }
           }
         }
@@ -2129,9 +2131,16 @@
         const atTop = el.scrollTop <= 1;
         const atBottom = maxScrollTop <= 1 || el.scrollTop >= maxScrollTop - 1;
         const ramp = 200;
-        const topOpacity = maxScrollTop <= 1 ? 0 : Math.min(1, el.scrollTop / ramp);
+        const hasOverflow = maxScrollTop > 1;
+        const floor = 0.16;
+        const topOpacity =
+          !hasOverflow || atTop
+            ? 0
+            : floor + (1 - floor) * Math.min(1, el.scrollTop / ramp);
         const bottomOpacity =
-          maxScrollTop <= 1 ? 0 : Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
+          !hasOverflow || atBottom
+            ? 0
+            : floor + (1 - floor) * Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
         el.style.setProperty("--top-shadow-opacity", topOpacity.toFixed(3));
         el.style.setProperty("--bottom-shadow-opacity", bottomOpacity.toFixed(3));
         el.toggleAttribute("data-at-top", atTop);
@@ -2147,6 +2156,14 @@
       clearScrollShadowState(el);
       el.addEventListener("scroll", () => requestScrollShadowSync(el), EVT_PASSIVE);
     }
+    const shadowResizeObserver = new ResizeObserver(() => {
+      syncTableShadowOffset();
+      requestScrollShadowSync(domElements.tableWrap);
+      requestScrollShadowSync(domElements.coords);
+    });
+    shadowResizeObserver.observe(tbl);
+    shadowResizeObserver.observe(domElements.tbody);
+    shadowResizeObserver.observe(domElements.coords);
     const KIND_COL_INDEX = 0;
     const IDX_COL_INDEX = 1;
     const COORDS_COL_INDEX = 2;
@@ -4149,6 +4166,16 @@
         NEED_CLOSE_POPOVER = false;
       });
     }
+    function syncTableShadowOffset() {
+      const wrap = domElements.tableWrap;
+      if (!(wrap instanceof HTMLElement)) return;
+      const headCell = tbl.tHead?.rows?.[0]?.cells?.[0];
+      let offset = 0;
+      if (headCell instanceof HTMLElement && getComputedStyle(headCell).display !== "none") {
+        offset = Math.round(headCell.getBoundingClientRect().height);
+      }
+      wrap.style.setProperty("--table-head-offset", `${offset}px`);
+    }
     window.addEventListener("blur", () => requestDeactivate());
     window.addEventListener("pagehide", () => {
       resetInteractionState({ closePopover: true });
@@ -4159,6 +4186,7 @@
       }
     });
     const syncViewportShadows = () => {
+      syncTableShadowOffset();
       requestScrollShadowSync(domElements.tableWrap);
       if (domElements.coords.hasAttribute("data-has-content")) {
         requestScrollShadowSync(domElements.coords);
