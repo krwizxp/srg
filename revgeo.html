@@ -222,6 +222,7 @@
         --table-head-offset: 0px;
 
         &.has-results {
+
           &::before,
           &::after {
             content: "";
@@ -1493,7 +1494,7 @@
         search {
           .filters {
             display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-columns: repeat(8, minmax(0, 1fr));
             align-items: stretch;
 
             :is(input[type="search"], select, #filter-clear) {
@@ -1502,35 +1503,35 @@
             }
 
             #filter-q {
-              grid-column: 1 / span 4;
+              grid-column: 1 / span 5;
             }
 
             #filter-kind {
-              grid-column: 5 / span 2;
+              grid-column: 6 / span 3;
             }
 
             #filter-sido {
-              grid-column: 1 / span 3;
-            }
-
-            #filter-sigungu {
-              grid-column: 4 / span 3;
-            }
-
-            #filter-emd {
-              grid-column: 1 / span 3;
-            }
-
-            #filter-tag {
-              grid-column: 4 / span 3;
-            }
-
-            #filter-fulladdr {
               grid-column: 1 / span 4;
             }
 
+            #filter-sigungu {
+              grid-column: 5 / span 4;
+            }
+
+            #filter-emd {
+              grid-column: 1 / span 4;
+            }
+
+            #filter-tag {
+              grid-column: 5 / span 4;
+            }
+
+            #filter-fulladdr {
+              grid-column: 1 / span 5;
+            }
+
             #filter-clear {
-              grid-column: 5 / span 2;
+              grid-column: 6 / span 3;
               justify-self: stretch;
             }
           }
