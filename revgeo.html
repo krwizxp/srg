@@ -100,6 +100,7 @@
             oklch(64% 0.16 270));
         --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
         --accent-border: color-mix(in oklch, var(--accent) 40%, var(--line-soft));
+        --focus-ring: color-mix(in oklch, var(--accent) 62%, var(--fg));
         --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
@@ -424,6 +425,7 @@
         }
 
         :where(.coords-view,
+          .manual-rng>summary,
           button,
           .filters input[type="search"],
           .filters select,
@@ -476,10 +478,24 @@
           .filters select,
           .manual-rng input[type="text"],
           .manual-rng textarea,
-          .map-popover,
           .map-popover a):focus-visible {
-          outline: none;
-          box-shadow: inset 0 0 0 2px var(--accent-border);
+          outline: 2px solid var(--focus-ring);
+          outline-offset: -2px;
+          border-color: var(--focus-ring);
+          box-shadow: none;
+        }
+
+        :where(.coords-view, .manual-rng>summary):focus-visible {
+          outline: 2px solid var(--focus-ring);
+          outline-offset: -2px;
+          box-shadow: none;
+        }
+
+        .drop-zone:has(input[type="file"]:focus-visible) {
+          outline: 2px solid var(--focus-ring);
+          outline-offset: -2px;
+          border-color: var(--focus-ring);
+          box-shadow: none;
         }
 
         button {
@@ -519,9 +535,10 @@
           }
 
           &:is(#parse, #start):focus-visible {
-            box-shadow:
-              inset 0 0 0 2px var(--accent-border),
-              0 0 0 3px var(--accent-border);
+            outline: 2px solid color-mix(in oklch, var(--tone-base) 90%, var(--accent));
+            outline-offset: -2px;
+            border-color: color-mix(in oklch, var(--tone-base) 90%, var(--accent));
+            box-shadow: none;
           }
 
           &#stop {
@@ -777,7 +794,7 @@
         }
 
         :is(input[type="text"], textarea):focus-visible {
-          box-shadow: inset 0 0 0 2px var(--accent-border), var(--panel-shadow);
+          box-shadow: inset 0 0 0 2px var(--focus-ring), var(--panel-shadow);
         }
 
         #output.coords-view {
@@ -1113,13 +1130,15 @@
       .map-popover {
         padding: 10px 12px;
         border-radius: 14px;
+        border: 0;
         max-inline-size: min(360px, 92vw);
+        appearance: none;
         transition: opacity 0s linear 16ms;
 
         &:focus-visible {
           box-shadow:
             0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent),
-            0 0 0 2px var(--accent-border);
+            inset 0 0 0 2px var(--focus-ring);
         }
 
         @starting-style {
@@ -1151,7 +1170,7 @@
 
             &:focus-visible {
               outline: none;
-              box-shadow: 0 0 0 2px var(--accent-border);
+              box-shadow: inset 0 0 0 2px var(--focus-ring);
               border-radius: 8px;
             }
 
