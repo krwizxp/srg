@@ -10,25 +10,25 @@
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
-  <link rel="icon" href="icon.svg">
+  <link rel="icon" href="icon.svg?v=3">
   <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" crossorigin
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
+  <script>
+    (() => {
+      try {
+        const storedTheme = localStorage.getItem("srg-theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = storedTheme || (systemDark ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
   <style>
-    @property --mouse-x {
-      syntax: "<length>";
-      inherits: true;
-      initial-value: 0px;
-    }
-
-    @property --mouse-y {
-      syntax: "<length>";
-      inherits: true;
-      initial-value: 0px;
-    }
-
     @property --pct {
       syntax: "<number>";
       inherits: true;
@@ -49,8 +49,7 @@
       }
 
       fieldset {
-        padding-block: 0;
-        padding-inline: 0;
+        padding: 0;
         border: 0;
       }
 
@@ -104,8 +103,6 @@
         --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
         --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
         --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --spotlight: light-dark(color-mix(in oklch, var(--accent) 7%, transparent),
-            color-mix(in oklch, var(--accent) 14%, transparent));
         --surface-panel: light-dark(color-mix(in oklch,
               oklch(100% 0.008 270 / 0.5) 88%,
               oklch(94.5% 0.014 265 / 0.96)),
@@ -140,15 +137,9 @@
         color-scheme: dark;
       }
 
-      html {
-        background-color: var(--page-bg);
-      }
-
       body {
         color: var(--fg);
-        padding-block: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-bottom));
         padding-inline: max(20px, var(--safe-inline-start)) max(20px, var(--safe-inline-end));
-        letter-spacing: -.015em;
         font-variant-numeric: tabular-nums;
         font-size: clamp(14px, 1.5vw, 15px);
         line-height: 1.6;
@@ -159,7 +150,6 @@
         }
 
         @container (inline-size <=800px) {
-          padding-block: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-bottom));
           padding-inline: max(12px, var(--safe-inline-start)) max(12px, var(--safe-inline-end));
         }
       }
@@ -172,7 +162,8 @@
         display: grid;
         grid-template-columns: clamp(380px, 28vw, 440px) 1fr;
         gap: 20px;
-        block-size: clamp(700px, calc(100dvh - 40px), 1100px);
+        min-block-size: 0;
+        block-size: calc(100dvh - var(--site-header-height) - var(--site-header-gap) - var(--page-pad-block-end));
 
         @container (inline-size <=900px) {
           grid-template-columns: 1fr;
@@ -190,85 +181,58 @@
         overflow: auto;
         --scroll-shadow-size: 14px;
         --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, transparent);
+        --top-shadow-opacity: 0;
+        --bottom-shadow-opacity: 0;
       }
 
       .coords-view {
         --coords-pad-block: 12px;
         --coords-pad-inline: 12px;
-      }
 
-      .coords-view[data-has-content]::before,
-      .coords-view[data-has-content]::after,
-      .table-wrap.has-results::before,
-      .table-wrap.has-results::after {
-        content: "";
-        display: block;
-        position: sticky;
-        inset-inline: 0;
-        block-size: var(--scroll-shadow-size);
-        pointer-events: none;
-        z-index: 5;
-        opacity: 0;
-      }
+        &[data-has-content] {
 
-      .coords-view[data-has-content]::before,
-      .table-wrap.has-results::before {
-        inset-block-start: var(--table-head-offset, 0px);
-        margin-block-start: calc(-1 * var(--scroll-shadow-size));
-        background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
-      }
+          &::before,
+          &::after {
+            content: "";
+            display: block;
+            position: sticky;
+            inset-inline: 0;
+            block-size: var(--scroll-shadow-size);
+            pointer-events: none;
+            z-index: 5;
+          }
 
-      .coords-view[data-has-content]::after,
-      .table-wrap.has-results::after {
-        inset-block-end: 0;
-        margin-block-end: calc(-1 * var(--scroll-shadow-size));
-        background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
-      }
+          &::before {
+            inset-block-start: 0;
+            margin-block-start: calc(-1 * var(--scroll-shadow-size));
+            background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+            opacity: var(--top-shadow-opacity);
+          }
 
-      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::before,
-      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-at-top][data-at-bottom]::after,
-      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::before,
-      :is(.coords-view[data-has-content], .table-wrap.has-results)[data-shadow-rebind]::after {
-        animation: none !important;
-      }
-
-      @keyframes scroll-shadow-top {
-        from {
-          opacity: 0;
-        }
-
-        to {
-          opacity: 1;
+          &::after {
+            inset-block-end: 0;
+            margin-block-end: calc(-1 * var(--scroll-shadow-size));
+            background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+            opacity: var(--bottom-shadow-opacity);
+          }
         }
       }
 
-      @keyframes scroll-shadow-bottom {
-        from {
-          opacity: 1;
-        }
-
-        to {
-          opacity: 0;
-        }
-      }
-
-      @supports (animation-timeline: scroll()) {
-
-        :is(.coords-view[data-has-content], .table-wrap.has-results)::before,
-        :is(.coords-view[data-has-content], .table-wrap.has-results)::after {
-          animation-timeline: scroll();
-          animation-range: 0% 100%;
-          animation-duration: 1s;
-          animation-timing-function: linear;
-          animation-fill-mode: both;
-        }
-
-        :is(.coords-view[data-has-content], .table-wrap.has-results)::before {
-          animation-name: scroll-shadow-top;
-        }
-
-        :is(.coords-view[data-has-content], .table-wrap.has-results)::after {
-          animation-name: scroll-shadow-bottom;
+      .table-wrap {
+        &.has-results {
+          &::after {
+            content: "";
+            display: block;
+            position: sticky;
+            inset-inline: 0;
+            inset-block-end: 0;
+            block-size: var(--scroll-shadow-size);
+            margin-block-end: calc(-1 * var(--scroll-shadow-size));
+            pointer-events: none;
+            z-index: 5;
+            background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+            opacity: var(--bottom-shadow-opacity);
+          }
         }
       }
 
@@ -288,54 +252,23 @@
         }
       }
 
-      :is(.card, .card-stack, .map-popover) {
-        background: var(--card-surface);
-        box-shadow: 0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent);
-      }
+      #app {
+        >section.card {
+          >.left-pane-scroll {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            block-size: 100%;
+            min-block-size: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scrollbar-width: none;
 
-      :is(.card, .card-stack) {
-        border-radius: clamp(20px, 2vw, 28px);
-        overflow: hidden;
-      }
-
-      #app>section.card>.left-pane-scroll {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        block-size: 100%;
-        min-block-size: 0;
-        overflow-x: hidden;
-        overflow-y: auto;
-        scrollbar-width: none;
-      }
-
-      #app>section.card>.left-pane-scroll>* {
-        flex-shrink: 0;
-      }
-
-      :is(.card, .card-stack-spotlight) {
-        --spotlight-radius: 800px;
-      }
-
-      :is(.card, .card-stack-spotlight)::before {
-        content: "";
-        position: absolute;
-        pointer-events: none;
-        inset-block-start: 0;
-        inset-inline-start: 0;
-        inline-size: calc(var(--spotlight-radius) * 2);
-        block-size: calc(var(--spotlight-radius) * 2);
-        background: radial-gradient(in oklch circle,
-            var(--spotlight),
-            transparent 30%);
-        transform: translate3d(calc(var(--mouse-x) - var(--spotlight-radius)),
-            calc(var(--mouse-y) - var(--spotlight-radius)),
-            0);
-        opacity: 0;
-        transition:
-          opacity .5s ease-out,
-          --mouse-x 90ms linear,
-          --mouse-y 90ms linear;
+            >* {
+              flex-shrink: 0;
+            }
+          }
+        }
       }
 
       .card {
@@ -343,6 +276,9 @@
         --control-pad-block: 10px;
         --control-pad-inline: 12px;
         --control-min-block-size: 44px;
+        border: 1px solid var(--line-soft);
+        border-radius: 24px;
+        overflow: hidden;
         padding-block: clamp(20px, 2.5vw, 32px);
         padding-inline: var(--card-pad-inline);
         display: flex;
@@ -360,10 +296,6 @@
 
           h2 {
             font-size: clamp(18px, 1.6vw, 22px);
-          }
-
-          .header-desc {
-            color: var(--muted-strong);
           }
         }
 
@@ -392,66 +324,6 @@
           line-height: 1.3;
         }
 
-        &::before {
-          z-index: 1;
-        }
-
-        &:active:not(.no-spotlight)::before {
-          opacity: 0.6;
-          transition: none;
-        }
-
-        &.no-spotlight::before {
-          opacity: 0;
-        }
-
-        .brand {
-          display: flex;
-          align-items: flex-start;
-          gap: 14px;
-          color: var(--accent-ink);
-
-          .theme-toggle {
-            margin-inline-start: auto;
-            align-self: flex-start;
-          }
-
-          @container page (inline-size <=600px) {
-            flex-wrap: wrap;
-
-            .theme-toggle {
-              margin-block-start: 6px;
-            }
-          }
-
-          svg {
-            fill: currentColor;
-            inline-size: 36px;
-            block-size: 36px;
-            flex: 0 0 auto;
-            margin-block-start: 2px;
-          }
-
-          >div {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-
-            h1 {
-              font-size: clamp(22px, 2vw, 28px);
-              font-weight: 800;
-              line-height: 1.1;
-            }
-
-            p {
-              color: var(--muted-strong);
-              font-size: var(--fs-sm);
-              font-weight: 500;
-              line-height: 1.25;
-            }
-          }
-        }
-
         fieldset.row {
           display: flex;
           flex-direction: column;
@@ -466,15 +338,14 @@
 
         .drop-zone {
           position: relative;
-          border: 1px dashed var(--line-soft);
           border-radius: 18px;
-          padding-block: 12px;
-          padding-inline: 16px;
+          min-block-size: 112px;
+          padding: 12px 16px;
           transition: .2s ease;
-          background: var(--panel-bg);
           display: flex;
           flex-direction: column;
           align-items: center;
+          justify-content: center;
           gap: 10px;
           color: var(--muted);
           font-weight: 500;
@@ -531,7 +402,7 @@
           }
         }
 
-        :where(.drop-icon, .theme-toggle svg) {
+        :where(.drop-icon) {
           fill: none;
           stroke: currentColor;
           stroke-linecap: round;
@@ -545,7 +416,6 @@
           .manual-rng input[type="text"],
           .manual-rng textarea) {
           border-radius: 12px;
-          background-color: var(--panel-bg);
           transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -554,51 +424,35 @@
           .filters select,
           .manual-rng input[type="text"],
           .manual-rng textarea) {
-          border: 0;
           color: var(--fg);
         }
 
-        :where(.coords-view,
-          .drop-zone,
-          .table-wrap,
-          .filters input[type="search"],
-          .filters select,
-          .manual-rng input[type="text"],
-          .manual-rng textarea) {
-          box-shadow: var(--panel-shadow);
-        }
-
-        :where(.coords-view) {
-          font: inherit;
-        }
-
         .coords-view {
+          font: inherit;
           min-block-size: 100px;
           line-height: 1.5;
           font-size: clamp(12px, 3.5cqi, 14px);
-        }
 
-        :where(.coords-view) :is(.coords-placeholder, .coords-content) {
-          display: block;
-          padding-block: var(--coords-pad-block);
-          padding-inline: var(--coords-pad-inline);
-          font: inherit;
-        }
+          :is(.coords-placeholder, .coords-content) {
+            display: block;
+            padding-block: var(--coords-pad-block);
+            padding-inline: var(--coords-pad-inline);
+            font: inherit;
+          }
 
-        .coords-view .coords-placeholder {
-          color: var(--muted-strong);
-        }
+          .coords-placeholder {
+            color: var(--muted-strong);
+          }
 
-        .coords-view[data-has-content] .coords-placeholder {
-          display: none;
-        }
+          &[data-has-content] .coords-placeholder {
+            display: none;
+          }
 
-        .coords-view:not([data-has-content]) .coords-content {
-          display: none;
-        }
+          &:not([data-has-content]) .coords-content {
+            display: none;
+          }
 
-        @container page (inline-size <=900px) {
-          .coords-view {
+          @container page (inline-size <=900px) {
             max-block-size: 30dvh;
           }
         }
@@ -616,7 +470,6 @@
 
         button {
           cursor: pointer;
-          font-weight: 600;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -624,22 +477,6 @@
           white-space: nowrap;
           padding-block: 12px;
           padding-inline: 8px;
-          position: relative;
-
-          &::after {
-            content: "";
-            position: absolute;
-            inset-block: 0;
-            inset-inline: 0;
-            background: radial-gradient(in oklch circle at var(--mouse-x) var(--mouse-y),
-                color-mix(in oklch, var(--accent) 6%, transparent),
-                transparent 70%);
-            opacity: 0;
-            transition:
-              opacity .5s ease-out,
-              --mouse-x 90ms linear,
-              --mouse-y 90ms linear;
-          }
 
           @media (any-hover: hover) {
             &:hover {
@@ -674,8 +511,7 @@
           }
 
           &#stop {
-            color: light-dark(color-mix(in oklch, var(--err) 60%, var(--fg)),
-                color-mix(in oklch, var(--err) 80%, var(--fg)));
+            color: color-mix(in oklch, var(--err) 80%, var(--fg));
 
             &:not(:disabled) {
               &:hover {
@@ -683,55 +519,7 @@
               }
             }
           }
-
-          &:is(#parse, #start, #pause, #resume, #stop, #export, #filter-clear)::after {
-            will-change: opacity;
-          }
-
-          &:not(:disabled):active::after {
-            opacity: 0.4;
-            transition: none;
-          }
-
-          &.theme-toggle {
-            border-radius: 999px;
-            font-size: var(--fs-sm);
-            color: var(--muted-strong);
-            inline-size: 44px;
-            block-size: 44px;
-            padding-block: 0;
-            padding-inline: 0;
-
-            &::after {
-              display: none;
-            }
-
-            svg {
-              display: block;
-              inline-size: 18px;
-              block-size: 18px;
-              stroke-width: 1.6;
-            }
-
-            .icon-sun {
-              display: none;
-            }
-          }
         }
-      }
-
-      :root[data-theme="dark"] .theme-toggle {
-        .icon-sun {
-          display: block;
-        }
-
-        .icon-moon {
-          display: none;
-        }
-      }
-
-      :is(.progress-shell, .skeleton-bar) {
-        border-radius: 999px;
       }
 
       .row-progress {
@@ -763,6 +551,7 @@
       }
 
       .progress-shell {
+        border-radius: 999px;
         position: relative;
         overflow: hidden;
         contain: paint;
@@ -810,97 +599,23 @@
         }
       }
 
-      .card-stack {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        block-size: 100%;
-        min-block-size: 0;
-
-        @container page (inline-size <=900px) {
-          block-size: auto;
-        }
-
-        .card-stack-spotlight {
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          pointer-events: none;
-          z-index: 2;
-
-          &.suppressed::before {
-            opacity: 0;
-          }
-        }
-
-        &:active {
-          .card-stack-spotlight::before {
-            opacity: 0.6;
-            transition: none;
-          }
-
-          .card-stack-spotlight.suppressed::before {
-            opacity: 0;
-          }
-        }
-
-        &:has(.table-wrap:active) {
-          .card-stack-spotlight::before {
-            opacity: 0;
-          }
-        }
-
-        .card-stack-content {
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          min-block-size: 0;
-          position: relative;
-          z-index: 1;
-
-          >.card {
-            background: transparent;
-            box-shadow: none;
-            border-radius: 0;
-          }
-        }
-
-        .card-stack-top {
-          padding-block-end: 0;
-        }
-
-        .card-stack-bottom {
-          padding-block-start: 10px;
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          min-block-size: 0;
-
-          .table-wrap {
-            min-block-size: 0;
-          }
-        }
-      }
-
       .status {
-        padding-block: 12px;
-        padding-inline: 16px;
+        padding: 12px 16px;
         border-radius: 12px;
-        background: light-dark(color-mix(in oklch, var(--muted) 8%, var(--surface-panel)),
-            color-mix(in oklch, var(--muted) 12%, var(--surface-panel)));
-        border-inline-start: 2px solid color-mix(in oklch, var(--muted) 70%, var(--line-soft));
+        background: var(--panel-bg);
+        border: 1px solid var(--line-soft);
         flex-shrink: 0;
         font-weight: 500;
         font-size: var(--fs-sm);
         transition: opacity .3s, transform .3s, display .3s allow-discrete;
 
-        &:empty {
-          display: none;
+        @starting-style {
           opacity: 0;
           transform: translateY(5px);
         }
 
-        @starting-style {
+        &:empty {
+          display: none;
           opacity: 0;
           transform: translateY(5px);
         }
@@ -926,12 +641,8 @@
 
       .manual-rng {
         margin-block-start: 2px;
-        border: 1px solid var(--line-soft);
-        border-radius: 14px;
-        background: var(--panel-bg);
-        box-shadow: var(--panel-shadow);
-        padding-inline: 14px;
-        padding-block: 12px;
+        border-radius: 18px;
+        padding: 16px;
 
         summary {
           cursor: pointer;
@@ -1021,18 +732,16 @@
           gap: 8px;
           flex-wrap: wrap;
 
-          #runBtn,
-          #clearBtn,
-          #saveOutput {
+          :is(#runBtn, #clearBtn, #saveOutput) {
             min-inline-size: 120px;
             padding-inline: 12px;
           }
 
           #copyOutput {
-            inline-size: 44px;
+            inline-size: 46px;
             block-size: 44px;
-            padding-inline: 0;
-            padding-block: 0;
+            min-inline-size: 46px;
+            padding: 0;
 
             svg {
               inline-size: 18px;
@@ -1067,49 +776,15 @@
       }
 
       .table-wrap {
-        border-radius: 20px;
-        background-color: var(--panel-bg);
+        border-radius: 18px;
         scrollbar-gutter: stable;
-        position: relative;
-
-        .table-hint {
-          display: grid;
-          place-items: center;
-          position: absolute;
-          inset-block: 50px 0;
-          inset-inline: 0;
-          color: var(--muted);
-          pointer-events: none;
-        }
-
-        .filter-empty-hint {
-          display: none;
-        }
-
-        &.has-results .empty-hint {
-          display: none;
-        }
-
-        &.filter-empty .filter-empty-hint {
-          display: grid;
-        }
-
-        @container (inline-size <=900px) {
-          block-size: var(--results-pane-mobile-height);
-          flex: 0 0 var(--results-pane-mobile-height);
-          overscroll-behavior: contain;
-
-          .table-hint {
-            inset-block-start: 0;
-          }
-        }
       }
 
       .filters {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
-        margin-block: 10px 12px;
+        margin: 0;
 
         :is(input[type="search"], select) {
           padding-block: var(--control-pad-block, 10px);
@@ -1150,8 +825,7 @@
       }
 
       :is(th, td) {
-        padding-block: 14px;
-        padding-inline: 12px;
+        padding: 14px 12px;
         font-size: var(--fs-sm);
       }
 
@@ -1164,7 +838,7 @@
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: color-mix(in oklch, var(--surface-panel) 78%, var(--tone-base));
+            background: color-mix(in srgb, var(--panel-bg) 88%, var(--surface-panel));
             text-align: start;
             font-weight: 600;
             color: var(--muted-strong);
@@ -1176,6 +850,17 @@
 
             &:nth-child(8) {
               inline-size: 100%;
+            }
+
+            &::after {
+              content: "";
+              position: absolute;
+              inset-inline: 0;
+              inset-block-end: -14px;
+              block-size: 14px;
+              pointer-events: none;
+              opacity: var(--top-shadow-opacity);
+              background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
             }
           }
         }
@@ -1284,6 +969,7 @@
         }
 
         .skeleton-bar {
+          border-radius: 999px;
           block-size: 1.1em;
           margin-block: 4px;
           position: relative;
@@ -1393,24 +1079,6 @@
       }
     }
 
-    html.scrolling {
-      @media (any-hover: hover) {
-        .table-wrap table tbody tr:hover {
-          background: transparent !important;
-        }
-      }
-    }
-
-    :root[data-perf-mode="1"] {
-
-      .card::before,
-      .card-stack-spotlight::before,
-      button::after {
-        opacity: 0 !important;
-        transition: none !important;
-      }
-    }
-
     @layer utilities {
       .caps {
         text-transform: uppercase;
@@ -1428,11 +1096,9 @@
       }
 
       .map-btn {
-        padding-block: 8px;
-        padding-inline: 10px;
+        padding: 8px 10px;
         border-radius: 10px;
         color: var(--accent-ink);
-        font-weight: 700;
       }
 
       td[data-label="지도링크"] {
@@ -1442,10 +1108,8 @@
       }
 
       .map-popover {
-        padding-block: 10px;
-        padding-inline: 12px;
+        padding: 10px 12px;
         border-radius: 14px;
-        border: 0;
         max-inline-size: min(360px, 92vw);
         transition: opacity 0s linear 16ms;
 
@@ -1458,6 +1122,11 @@
         @starting-style {
           opacity: 0;
         }
+
+        position-area: block-end span-inline-start;
+        position-try-fallbacks: flip-inline,
+        flip-block,
+        flip-block flip-inline;
 
         .map-links {
           display: flex;
@@ -1492,41 +1161,392 @@
             }
           }
         }
+      }
+    }
 
-        position-area: block-end span-inline-start;
-        position-try-fallbacks: flip-inline,
-        flip-block,
-        flip-block flip-inline;
+    :root {
+      --site-header-height: 72px;
+      --site-header-gap: 20px;
+      --page-pad-block-end: 20px;
+      --page-bg: #ffffff;
+      --card-surface: #ffffff;
+      --surface-panel: #ffffff;
+      --panel-bg: #f7f9fc;
+      --fg: #161d2d;
+      --tone-base: #f7f9fc;
+      --muted: #6a7284;
+      --muted-strong: #202838;
+      --line-soft: #e8edf4;
+      --accent: #3d82ff;
+      --accent-ink: #3d82ff;
+      --accent-border: #dbe3ef;
+      --accent-wash: #eef5ff;
+      --warn: #d99d25;
+      --err: #d4485c;
+      --panel-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+      --header-bg: rgba(255, 255, 255, 0.96);
+      --header-border: #edf1f6;
+      --shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+      --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.04);
+      --toggle-bg: #ffffff;
+      --toggle-border: #e2e8f0;
+      --toggle-text: #202838;
+      --brand-text: #141b2d;
+    }
+
+    :root[data-theme="dark"] {
+      --page-bg: #010817;
+      --card-surface: #091325;
+      --surface-panel: #091325;
+      --panel-bg: #07101f;
+      --fg: #ffffff;
+      --tone-base: #07101f;
+      --muted: #8f99b5;
+      --muted-strong: #dfe7f8;
+      --line-soft: #12233f;
+      --accent: #3f8dff;
+      --accent-ink: #56a8ff;
+      --accent-border: #1a2e50;
+      --accent-wash: rgba(63, 141, 255, 0.12);
+      --warn: #f1b547;
+      --err: #ff6b81;
+      --panel-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      --header-bg: rgba(1, 8, 23, 0.96);
+      --header-border: rgba(64, 87, 136, 0.22);
+      --toggle-bg: rgba(9, 19, 37, 0.88);
+      --toggle-border: #1a2e50;
+      --toggle-text: #ffffff;
+      --brand-text: #ffffff;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+      --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    html,
+    body {
+      background: var(--page-bg);
+    }
+
+    body {
+      letter-spacing: -0.02em;
+      padding-block-start: calc(var(--site-header-height) + var(--site-header-gap));
+      padding-block-end: max(var(--page-pad-block-end), env(safe-area-inset-bottom));
+    }
+
+    @media (min-width: 901px) {
+
+      html,
+      body {
+        overflow: hidden;
+      }
+    }
+
+    #app {
+      >* {
+        min-block-size: 0;
+      }
+
+      >section.card {
+        block-size: 100%;
+      }
+    }
+
+    .site-header {
+      position: fixed;
+      inset-block-start: 0;
+      inset-inline: 0;
+      z-index: 40;
+      background: var(--header-bg);
+      border-block-end: 1px solid var(--header-border);
+
+      .header-inner {
+        inline-size: min(1600px, calc(100% - 48px));
+        margin-inline: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        block-size: var(--site-header-height);
+      }
+    }
+
+    .site-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-inline-size: 0;
+      color: inherit;
+      text-decoration: none;
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent-border);
+        border-radius: 14px;
+      }
+
+      .brand-mark {
+        inline-size: 28px;
+        block-size: 28px;
+        flex: 0 0 auto;
+      }
+
+      strong {
+        min-inline-size: 0;
+        color: var(--brand-text);
+        font-size: clamp(24px, 2.2vw, 30px);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+    }
+
+    .card,
+    .map-popover {
+      background: var(--card-surface);
+      box-shadow: var(--shadow);
+    }
+
+    .card {
+      .card-intro {
+        display: grid;
+        gap: 12px;
+        padding-block-end: 2px;
+      }
+
+      .card-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.98rem;
+        font-weight: 700;
+        line-height: 1.2;
+
+        .dot {
+          inline-size: 8px;
+          block-size: 8px;
+          border-radius: 999px;
+          background: currentColor;
+          flex: 0 0 auto;
+        }
+
+        &.geo {
+          color: var(--accent);
+        }
+
+        &.reverse {
+          color: #2cc890;
+        }
+      }
+    }
+
+    .drop-zone,
+    .coords-view,
+    .table-wrap,
+    .manual-rng,
+    .filters input[type="search"],
+    .filters select,
+    .manual-rng input[type="text"],
+    .manual-rng textarea,
+    button {
+      border: 1px solid var(--line-soft);
+      box-shadow: none;
+    }
+
+    .drop-zone,
+    .coords-view,
+    .table-wrap,
+    .manual-rng,
+    .filters input[type="search"],
+    .filters select,
+    .manual-rng input[type="text"],
+    .manual-rng textarea {
+      background: var(--panel-bg);
+    }
+
+    button {
+      background: var(--surface-panel);
+      border-radius: 14px;
+      font-weight: 700;
+
+      &:is(#parse, #start, #runBtn, #saveOutput) {
+        background: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 78%, white);
+        color: #ffffff;
+      }
+
+      &:is(#parse, #start, #runBtn, #saveOutput):not(:disabled):hover {
+        background: color-mix(in srgb, var(--accent) 88%, black);
+      }
+
+      &.theme-toggle {
+        inline-size: 46px;
+        block-size: 46px;
+        padding: 0;
+        border-radius: 14px !important;
+        border: 1px solid var(--toggle-border) !important;
+        background: var(--toggle-bg) !important;
+        color: var(--toggle-text) !important;
+        box-shadow: var(--shadow-soft);
+        font-size: 1.35rem;
+        line-height: 1;
+        flex: 0 0 auto;
+        transition: transform .2s ease, border-color .2s ease, background-color .2s ease;
+
+        &:hover {
+          border-color: var(--accent) !important;
+          transform: translateY(-1px);
+        }
+      }
+    }
+
+    .results-card {
+      gap: 0;
+      padding-block-end: clamp(20px, 2.5vw, 32px);
+
+      search {
+        margin-block: 14px 8px;
+      }
+
+      .table-wrap {
+        position: relative;
+        min-block-size: 0;
+
+        &:not(.has-results) {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex: 1 1 auto;
+          min-block-size: 280px;
+          overflow: hidden;
+
+          table {
+            display: none;
+          }
+        }
+
+        .table-hint {
+          display: grid;
+          place-items: center;
+          position: absolute;
+          inset: 0;
+          padding: 24px;
+          color: var(--muted);
+          pointer-events: none;
+          text-align: center;
+        }
+
+        &.has-results {
+          .empty-hint {
+            display: none;
+          }
+        }
+
+        &.filter-empty {
+          .filter-empty-hint {
+            display: grid;
+          }
+        }
+
+        &:not(.filter-empty) {
+          .filter-empty-hint {
+            display: none;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 900px) {
+
+      html,
+      body {
+        overflow: auto;
+      }
+
+      main {
+        block-size: auto;
+      }
+
+      #app {
+        >section.card {
+          block-size: auto;
+        }
+      }
+
+      .results-card {
+        .table-wrap {
+          &.has-results {
+            block-size: var(--results-pane-mobile-height);
+            flex: 0 0 var(--results-pane-mobile-height);
+            overscroll-behavior: contain;
+          }
+
+          &:not(.has-results) {
+            min-block-size: 220px;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --site-header-height: 62px;
+        --site-header-gap: 12px;
+        --page-pad-block-end: 12px;
+      }
+
+      .site-header {
+        .header-inner {
+          inline-size: min(1600px, calc(100% - 28px));
+        }
+      }
+
+      .site-brand {
+        .brand-mark {
+          inline-size: 24px;
+          block-size: 24px;
+        }
+
+        strong {
+          font-size: 1.55rem;
+        }
+      }
+
+      button {
+        &.theme-toggle {
+          inline-size: 42px;
+          block-size: 42px;
+          border-radius: 12px !important;
+          font-size: 1.2rem;
+        }
+      }
+
+      .manual-rng {
+        padding: 14px;
       }
     }
   </style>
 </head>
 
 <body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="site-brand" href="" aria-label="SRG 역지오코딩 홈">
+        <img class="brand-mark" src="./icon.svg?v=3" alt="">
+        <strong>SRG 역지오코딩</strong>
+      </a>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
+        <span id="themeIcon" aria-hidden="true">🌙</span>
+      </button>
+    </div>
+  </header>
   <main id="app">
     <section class="card">
       <div class="left-pane-scroll">
-        <header class="brand">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
-            <path
-              d="M256,0C153.755,0,70.573,83.182,70.573,185.426c0,126.888,165.939,313.167,173.004,321.035 c6.636,7.391,18.222,7.378,24.849,0c7.065-7.868,173.004-194.147,173.004-321.035C441.427,83.182,358.245,0,256,0z M256,278.719c-51.442,0-93.292-41.851-93.292-93.292c0-51.441,41.851-93.292,93.292-93.292 c51.441,0,93.292,41.851,93.292,93.292C349.292,236.868,307.441,278.719,256,278.719z" />
-          </svg>
-          <div>
-            <h1>SRG 역지오코딩</h1>
-            <p>random_data.txt 좌표 변환</p>
+        <header class="card-intro">
+          <div class="card-label reverse">
+            <span class="dot"></span>
+            <span>좌표 추출 및 조회</span>
           </div>
-          <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
-            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4"></circle>
-              <path
-                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41">
-              </path>
-            </svg>
-            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
-            </svg>
-            <span class="sr-only" id="theme-toggle-label">다크 모드</span>
-          </button>
+          <h1 class="sr-only">좌표 추출 및 조회</h1>
         </header>
         <h2 class="sr-only">파일 업로드 및 실행</h2>
         <div>
@@ -1555,7 +1575,7 @@
             </div>
           </fieldset>
         </div>
-        <details class="manual-rng no-spotlight">
+        <details class="manual-rng">
           <summary>직접 입력 난수 변환</summary>
           <div class="manual-rng-body">
             <p class="manual-rng-help" id="manual-rng-help">기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.</p>
@@ -1621,70 +1641,66 @@
         </footer>
       </div>
     </section>
-    <div class="card-stack">
-      <div class="card-stack-spotlight"></div>
-      <div class="card-stack-content">
-        <section class="card card-stack-top no-spotlight">
-          <header class="card-header">
-            <h2>결과 표</h2>
-            <p class="header-desc">좌표별 주소 및 지도 링크</p>
-          </header>
-          <search>
-            <div class="filters">
-              <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
-                aria-label="전체검색">
-              <select id="filter-kind" aria-label="구분">
-                <option value="">구분(전체)</option>
-                <option value="kr">KR</option>
-                <option value="kp">KP</option>
-                <option value="world">WORLD</option>
-                <option value="에러">에러</option>
-              </select>
-              <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도"
-                aria-label="시·도">
-              <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구"
-                aria-label="시·군·구">
-              <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리"
-                aria-label="읍·면·동·리">
-              <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그"
-                aria-label="지물 태그">
-              <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
-                aria-label="전체주소">
-              <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
-            </div>
-          </search>
-        </section>
-        <div class="card card-stack-bottom no-spotlight">
-          <div class="table-wrap">
-            <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
-              random_data.txt 파일을 업로드해 주세요.
-            </p>
-            <p class="table-hint filter-empty-hint" aria-live="polite" aria-atomic="true">
-              필터 결과가 없습니다.
-            </p>
-            <table id="tbl">
-              <caption class="sr-only">
-                역지오코딩 결과 표
-              </caption>
-              <thead>
-                <tr>
-                  <th data-col-key="kind">구분</th>
-                  <th data-col-key="idx">순번</th>
-                  <th data-col-key="coords">좌표 (위도,경도)</th>
-                  <th data-col-key="sido">시·도</th>
-                  <th data-col-key="sigungu">시·군·구</th>
-                  <th data-col-key="emd">읍·면·동·리</th>
-                  <th data-col-key="tag">지물 태그</th>
-                  <th data-col-key="fullAddr">전체주소</th>
-                  <th data-col-key="maps">지도링크</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
+    <section class="card results-card">
+      <header class="card-header card-intro">
+        <div class="card-label geo">
+          <span class="dot"></span>
+          <span>주소 조회 결과</span>
         </div>
+        <h2 class="sr-only">주소 조회 결과</h2>
+      </header>
+      <search>
+        <div class="filters">
+          <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
+            aria-label="전체검색">
+          <select id="filter-kind" aria-label="구분">
+            <option value="">구분(전체)</option>
+            <option value="kr">KR</option>
+            <option value="kp">KP</option>
+            <option value="world">WORLD</option>
+            <option value="에러">에러</option>
+          </select>
+          <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도"
+            aria-label="시·도">
+          <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구"
+            aria-label="시·군·구">
+          <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리"
+            aria-label="읍·면·동·리">
+          <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그"
+            aria-label="지물 태그">
+          <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
+            aria-label="전체주소">
+          <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
+        </div>
+      </search>
+      <div class="table-wrap">
+        <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
+          random_data.txt 파일을 업로드해 주세요.
+        </p>
+        <p class="table-hint filter-empty-hint" aria-live="polite" aria-atomic="true">
+          필터 결과가 없습니다.
+        </p>
+        <table id="tbl">
+          <caption class="sr-only">
+            역지오코딩 결과 표
+          </caption>
+          <thead>
+            <tr>
+              <th data-col-key="kind">구분</th>
+              <th data-col-key="idx">순번</th>
+              <th data-col-key="coords">좌표 (위도,경도)</th>
+              <th data-col-key="sido">시·도</th>
+              <th data-col-key="sigungu">시·군·구</th>
+              <th data-col-key="emd">읍·면·동·리</th>
+              <th data-col-key="tag">지물 태그</th>
+              <th data-col-key="fullAddr">전체주소</th>
+              <th data-col-key="maps">지도링크</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
-    </div>
+    </section>
   </main>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" tabindex="-1">
     <div class="map-links" id="map-popover-links">
@@ -2017,7 +2033,7 @@
       file: document.getElementById("file"),
       dropZone: document.querySelector(".drop-zone"),
       themeToggle: document.getElementById("theme-toggle"),
-      themeToggleLabel: document.getElementById("theme-toggle-label"),
+      themeIcon: document.getElementById("themeIcon"),
       app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
@@ -2041,7 +2057,6 @@
       filterEmd: document.getElementById("filter-emd"),
       filterTag: document.getElementById("filter-tag"),
       filterFullAddr: document.getElementById("filter-fulladdr"),
-      filtersForm: document.querySelector(".filters"),
     };
     const setCoordsText = (text) => {
       domElements.coordsContent.textContent = text;
@@ -2076,7 +2091,7 @@
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
       const label = theme === "dark" ? "라이트 모드" : "다크 모드";
-      domElements.themeToggleLabel.textContent = label;
+      domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
       domElements.themeToggle.setAttribute("title", `${label}로 전환`);
       domElements.themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
@@ -2095,32 +2110,14 @@
       }
       applyTheme(next);
     });
-    const updateTableHeadOffset = (() => {
-      let lastHeight = -1;
-      const wrap = domElements.tableWrap;
-      const tHead = tbl.tHead;
-      return () => {
-        const height = tHead.offsetHeight;
-        if (height === lastHeight) return;
-        lastHeight = height;
-        wrap.style.setProperty("--table-head-offset", `${height}px`);
-      };
-    })();
-    updateTableHeadOffset();
-    function syncLayoutMetrics() {
-      updateTableHeadOffset();
-      const wrap = domElements.tableWrap;
-      if (RENDER_CACHE.hasResults) requestScrollShadowSync(wrap);
-      const coords = domElements.coords;
-      if (coords.hasAttribute("data-has-content")) requestScrollShadowSync(coords);
-    }
     const SHADOW_SYNC_PENDING = new WeakSet();
     function clearScrollShadowState(el) {
       SHADOW_SYNC_PENDING.delete(el);
       if (!(el instanceof HTMLElement)) return;
       el.removeAttribute("data-at-top");
       el.removeAttribute("data-at-bottom");
-      el.removeAttribute("data-shadow-rebind");
+      el.style.setProperty("--top-shadow-opacity", "0");
+      el.style.setProperty("--bottom-shadow-opacity", "0");
     }
     function requestScrollShadowSync(el) {
       if (!(el instanceof HTMLElement)) return;
@@ -2128,55 +2125,28 @@
       SHADOW_SYNC_PENDING.add(el);
       requestAnimationFrame(() => {
         SHADOW_SYNC_PENDING.delete(el);
-        if (el.scrollHeight - el.clientHeight > 1) {
-          el.removeAttribute("data-at-top");
-          el.removeAttribute("data-at-bottom");
-        } else {
-          el.setAttribute("data-at-top", "");
-          el.setAttribute("data-at-bottom", "");
-        }
+        const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+        const atTop = el.scrollTop <= 1;
+        const atBottom = maxScrollTop <= 1 || el.scrollTop >= maxScrollTop - 1;
+        const ramp = 200;
+        const topOpacity = maxScrollTop <= 1 ? 0 : Math.min(1, el.scrollTop / ramp);
+        const bottomOpacity =
+          maxScrollTop <= 1 ? 0 : Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
+        el.style.setProperty("--top-shadow-opacity", topOpacity.toFixed(3));
+        el.style.setProperty("--bottom-shadow-opacity", bottomOpacity.toFixed(3));
+        el.toggleAttribute("data-at-top", atTop);
+        el.toggleAttribute("data-at-bottom", atBottom);
       });
     }
-    function rebindScrollShadowTimeline(el) {
+    function resetScrollShadowState(el) {
       if (!(el instanceof HTMLElement)) return;
-      el.setAttribute("data-shadow-rebind", "");
-      requestAnimationFrame(() => {
-        el.removeAttribute("data-shadow-rebind");
-        requestScrollShadowSync(el);
-      });
+      clearScrollShadowState(el);
+      requestScrollShadowSync(el);
     }
-    clearScrollShadowState(domElements.tableWrap);
-    clearScrollShadowState(domElements.coords);
-    let SCROLL_ACTIVE = false;
-    let SCROLL_LAST_TS = 0;
-    let SCROLL_IDLE_RAF = 0;
-    const SCROLL_IDLE_MS = 120;
-    const setGlobalScrolling = (on) => {
-      root.classList.toggle("scrolling", on);
-    };
-    const resetScrollState = () => {
-      setGlobalScrolling(false);
-      SCROLL_ACTIVE = false;
-      SCROLL_LAST_TS = 0;
-      if (SCROLL_IDLE_RAF) {
-        cancelAnimationFrame(SCROLL_IDLE_RAF);
-        SCROLL_IDLE_RAF = 0;
-      }
-    };
-    const checkScrollIdle = () => {
-      if (!SCROLL_ACTIVE) {
-        SCROLL_IDLE_RAF = 0;
-        return;
-      }
-      if (performance.now() - SCROLL_LAST_TS >= SCROLL_IDLE_MS) {
-        SCROLL_IDLE_RAF = 0;
-        SCROLL_ACTIVE = false;
-        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
-        setGlobalScrolling(false);
-        return;
-      }
-      SCROLL_IDLE_RAF = requestAnimationFrame(checkScrollIdle);
-    };
+    for (const el of [domElements.tableWrap, domElements.coords]) {
+      clearScrollShadowState(el);
+      el.addEventListener("scroll", () => requestScrollShadowSync(el), EVT_PASSIVE);
+    }
     const KIND_COL_INDEX = 0;
     const IDX_COL_INDEX = 1;
     const COORDS_COL_INDEX = 2;
@@ -3413,7 +3383,6 @@
         RENDER_CACHE.perfMode = perfMode;
         if (perfMode) root.setAttribute(PERF_MODE_ATTR, "1");
         else root.removeAttribute(PERF_MODE_ATTR);
-        syncSpotlightPerfMode(perfMode);
       }
     }
     function scheduleRender() {
@@ -3430,10 +3399,9 @@
       }
       resetInteractionState({ closePopover: true });
       domElements.tbody.replaceChildren();
-      invalidateRectCache();
       wrap.classList.remove("filter-empty", "has-results");
       RENDER_CACHE.hasResults = false;
-      rebindScrollShadowTimeline(wrap);
+      resetScrollShadowState(wrap);
       requestAnimationFrame(() => {
         if (wrap.scrollTop || wrap.scrollLeft) {
           wrap.scrollTop = 0;
@@ -3679,10 +3647,7 @@
         tbody.append(pendingFrag);
         pendingFrag = null;
         pendingCount = 0;
-        invalidateRectCache();
-        if (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom")) {
-          requestScrollShadowSync(wrap);
-        }
+        requestScrollShadowSync(wrap);
       };
       for (let i = startIndex; i < total; i++) {
         const i1 = i + 1;
@@ -3729,12 +3694,7 @@
           }
           if (needsFetch) {
             tbody.append(tr);
-            if (
-              (wrap.hasAttribute("data-at-top") &&
-                wrap.hasAttribute("data-at-bottom"))
-            ) {
-              requestScrollShadowSync(wrap);
-            }
+            requestScrollShadowSync(wrap);
           } else {
             (pendingFrag ??= document.createDocumentFragment()).append(tr);
             if (++pendingCount >= 200) flushPending();
@@ -3910,11 +3870,7 @@
       if (r.set === "에러") AppState.cntFail++;
       else AppState.cntSuccess++;
       scheduleRender();
-      if (
-        connected &&
-        (hidden !== wasHidden ||
-          (wrap.hasAttribute("data-at-top") && wrap.hasAttribute("data-at-bottom")))
-      ) {
+      if (connected || hidden !== wasHidden) {
         requestScrollShadowSync(wrap);
       }
     }
@@ -4070,7 +4026,6 @@
       }
     );
     const startViewTransition = document.startViewTransition.bind(document);
-    const VIEW_TRANSITION_RESULTS_TYPES = ["results"];
     const maybeVT = (fn) => {
       if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
         const active = document.activeViewTransition;
@@ -4079,7 +4034,7 @@
           fn();
           return active;
         }
-        return startViewTransition({ update: fn, types: VIEW_TRANSITION_RESULTS_TYPES });
+        return startViewTransition({ update: fn, types: ["results"] });
       }
       return fn();
     };
@@ -4088,7 +4043,7 @@
       "--start": () => maybeVT(() => {
         AppState.reset("running");
         clearTable();
-        rebindScrollShadowTimeline(domElements.coords);
+        resetScrollShadowState(domElements.coords);
         setStatusMessage("조회 시작…");
         void runProcessingLoop().catch((err) => {
           console.error(err);
@@ -4103,8 +4058,8 @@
       "--stop": () => {
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
         AppState.setStatus("stopping");
-        rebindScrollShadowTimeline(domElements.tableWrap);
-        rebindScrollShadowTimeline(domElements.coords);
+        resetScrollShadowState(domElements.tableWrap);
+        resetScrollShadowState(domElements.coords);
         AppState.resumeHandler?.resolve();
         AppState.resumeHandler = null;
         if (AppState.controller) {
@@ -4175,48 +4130,11 @@
       e.preventDefault();
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
-    document.addEventListener("scroll", (e) => {
+    document.addEventListener("scroll", () => {
       if (MAP_POPOVER_OPEN) closeMapPopover();
-      if (!SCROLL_ACTIVE) {
-        if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
-        setGlobalScrolling(true);
-      }
-      SCROLL_ACTIVE = true;
-      SCROLL_LAST_TS = performance.now();
-      if (!SCROLL_IDLE_RAF) SCROLL_IDLE_RAF = requestAnimationFrame(checkScrollIdle);
+      if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
     }, EVT_CAPTURE_PASSIVE);
-    const rectCache = new Map();
-    let rectCacheDirty = false;
-    let pointerRaf = null;
-    let pointerX = 0;
-    let pointerY = 0;
-    let pointerTarget = null;
-    let lastPointerTarget = null;
-    let hasPointer = false;
-    const tableWrap = domElements.tableWrap;
-    const tableCardStack = tableWrap.closest(".card-stack");
-    const tableCardStackSpotlight = tableCardStack.querySelector(".card-stack-spotlight");
-    const docBody = document.body;
-    const SPOTLIGHT_OBSERVED_NODES = document.querySelectorAll(
-      ".card, .card-stack-spotlight"
-    );
-    let stackSpotlightSuppressed = false;
-    const clearPointerState = () => {
-      hasPointer = false;
-      lastPointerTarget = null;
-      pointerTarget = null;
-      if (stackSpotlightSuppressed) {
-        stackSpotlightSuppressed = false;
-        tableCardStackSpotlight.classList.remove("suppressed");
-      }
-      if (pointerRaf !== null) {
-        cancelAnimationFrame(pointerRaf);
-        pointerRaf = null;
-      }
-    };
     function resetInteractionState({ closePopover = false } = {}) {
-      resetScrollState();
-      clearPointerState();
       if (closePopover && MAP_POPOVER_OPEN) closeMapPopover();
     }
     let DEACTIVATE_QUEUED = false;
@@ -4240,168 +4158,14 @@
         requestDeactivate({ closePopover: true });
       }
     });
-    const invalidateRectCache = () => {
-      rectCacheDirty = true;
-    };
-    const requestRectCacheRefresh = () => {
-      if (pointerRaf !== null) return;
-      if (!hasPointer || SCROLL_ACTIVE) return;
-      let target = lastPointerTarget;
-      if (target && !target.isConnected) target = null;
-      if (!target) {
-        target = document.elementFromPoint(pointerX, pointerY);
-      }
-      if (!target) return;
-      pointerTarget = target;
-      pointerRaf = requestAnimationFrame(flushPointer);
-    };
-    const setStackSpotlightSuppressed = (suppressed) => {
-      if (stackSpotlightSuppressed === suppressed) return;
-      stackSpotlightSuppressed = suppressed;
-      tableCardStackSpotlight.classList.toggle("suppressed", suppressed);
-      if (!suppressed) {
-        lastPointerTarget = null;
-        pointerTarget = null;
-        requestRectCacheRefresh();
+    const syncViewportShadows = () => {
+      requestScrollShadowSync(domElements.tableWrap);
+      if (domElements.coords.hasAttribute("data-has-content")) {
+        requestScrollShadowSync(domElements.coords);
       }
     };
-    let resizeScrollResetTimer = null;
-    let SPOTLIGHT_EFFECTS_ENABLED = false;
-    let rectCacheObserver = null;
-    const onSpotlightResize = () => {
-      invalidateRectCache();
-      requestRectCacheRefresh();
-      syncLayoutMetrics();
-    };
-    const handlePointerOut = (e) => {
-      if (e.relatedTarget == null) clearPointerState();
-    };
-    const handleTablePointerEnter = () => setStackSpotlightSuppressed(true);
-    const handleTablePointerLeave = () => setStackSpotlightSuppressed(false);
-    const handleWindowResize = () => {
-      invalidateRectCache();
-      syncLayoutMetrics();
-      if (resizeScrollResetTimer) clearTimeout(resizeScrollResetTimer);
-      resizeScrollResetTimer = setTimeout(() => {
-        resizeScrollResetTimer = null;
-        resetScrollState();
-      }, 150);
-      requestRectCacheRefresh();
-    };
-    function syncSpotlightPerfMode(perfMode) {
-      if (perfMode) {
-        if (!SPOTLIGHT_EFFECTS_ENABLED) return;
-        SPOTLIGHT_EFFECTS_ENABLED = false;
-        window.removeEventListener("scroll", invalidateRectCache, EVT_CAPTURE_PASSIVE);
-        window.removeEventListener("resize", handleWindowResize);
-        document.removeEventListener("pointerout", handlePointerOut, EVT_CAPTURE_PASSIVE);
-        document.removeEventListener("pointercancel", clearPointerState);
-        document.removeEventListener("pointermove", handlePointerMove);
-        document.removeEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE_PASSIVE);
-        tableWrap.removeEventListener("pointerenter", handleTablePointerEnter);
-        tableWrap.removeEventListener("pointerleave", handleTablePointerLeave);
-        tableWrap.removeEventListener("pointercancel", handleTablePointerLeave);
-        rectCacheObserver.disconnect();
-        rectCacheObserver = null;
-        if (resizeScrollResetTimer) {
-          clearTimeout(resizeScrollResetTimer);
-          resizeScrollResetTimer = null;
-        }
-        clearPointerState();
-        invalidateRectCache();
-        return;
-      }
-      if (SPOTLIGHT_EFFECTS_ENABLED) return;
-      if (root.hasAttribute(PERF_MODE_ATTR)) return;
-      SPOTLIGHT_EFFECTS_ENABLED = true;
-      window.addEventListener("scroll", invalidateRectCache, EVT_CAPTURE_PASSIVE);
-      window.addEventListener("resize", handleWindowResize);
-      document.addEventListener("pointerout", handlePointerOut, EVT_CAPTURE_PASSIVE);
-      document.addEventListener("pointercancel", clearPointerState, EVT_PASSIVE);
-      document.addEventListener("pointermove", handlePointerMove, EVT_PASSIVE);
-      document.addEventListener("pointerdown", handlePointerDownSpotlight, EVT_CAPTURE_PASSIVE);
-      tableWrap.addEventListener("pointerenter", handleTablePointerEnter);
-      tableWrap.addEventListener("pointerleave", handleTablePointerLeave);
-      tableWrap.addEventListener("pointercancel", handleTablePointerLeave);
-      rectCacheObserver = new ResizeObserver(onSpotlightResize);
-      for (const node of SPOTLIGHT_OBSERVED_NODES) {
-        rectCacheObserver.observe(node);
-      }
-      rectCacheObserver.observe(tbl.tHead);
-      requestRectCacheRefresh();
-    }
-    const flushPointer = () => {
-      pointerRaf = null;
-      const target = pointerTarget;
-      pointerTarget = null;
-      if (!target || SCROLL_ACTIVE) return;
-      lastPointerTarget = target;
-      updateSpotlightsFromTarget(target, pointerX, pointerY);
-    };
-    function handlePointerMove(e) {
-      const pt = e.pointerType;
-      if (pt && pt !== "mouse") return;
-      if (SCROLL_ACTIVE) return;
-      pointerX = e.clientX;
-      pointerY = e.clientY;
-      let target = e.target;
-      if (target && target.nodeType !== 1) target = target.parentElement;
-      pointerTarget = target;
-      hasPointer = true;
-      if (pointerRaf !== null) return;
-      pointerRaf = requestAnimationFrame(flushPointer);
-    }
-    function setSpotlightVars(el, clientX, clientY) {
-      if (rectCacheDirty) {
-        rectCacheDirty = false;
-        rectCache.clear();
-      }
-      let rect = rectCache.get(el);
-      if (!rect) {
-        rect = el.getBoundingClientRect();
-        rectCache.set(el, rect);
-      }
-      el.style.setProperty("--mouse-x", (clientX - rect.left) + "px");
-      el.style.setProperty("--mouse-y", (clientY - rect.top) + "px");
-    }
-    function updateSpotlightsFromTarget(target, x, y) {
-      const isTableTarget = tableWrap.contains(target);
-      if (isTableTarget !== stackSpotlightSuppressed) {
-        setStackSpotlightSuppressed(isTableTarget);
-      }
-      let btn = null;
-      let card = null;
-      let current = target;
-      while (current && current !== docBody) {
-        if (!btn && current.tagName === "BUTTON") btn = current;
-        if (!card && current.classList.contains("card")) card = current;
-        if (btn && card) break;
-        current = current.parentElement;
-      }
-      if (btn) setSpotlightVars(btn, x, y);
-      if (stackSpotlightSuppressed) return;
-      if (tableCardStack.contains(target)) {
-        setSpotlightVars(tableCardStackSpotlight, x, y);
-        return;
-      }
-      if (card && !card.classList.contains("no-spotlight")) {
-        setSpotlightVars(card, x, y);
-      }
-    }
-    function handlePointerDownSpotlight(e) {
-      if (SCROLL_ACTIVE) return;
-      let t = e.target;
-      if (t && t.nodeType !== 1) t = t.parentElement;
-      if (!t) return;
-      const x = e.clientX;
-      const y = e.clientY;
-      pointerX = x;
-      pointerY = y;
-      lastPointerTarget = t;
-      hasPointer = true;
-      updateSpotlightsFromTarget(t, x, y);
-    }
-    syncSpotlightPerfMode(root.hasAttribute(PERF_MODE_ATTR));
+    window.addEventListener("resize", syncViewportShadows, EVT_PASSIVE);
+    syncViewportShadows();
   </script>
   <script>
     "use strict";
