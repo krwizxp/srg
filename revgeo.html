@@ -10,8 +10,8 @@
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
-  <link rel="icon" href="icon.svg?v=3">
-  <link rel="manifest" href="site.webmanifest">
+  <link rel="icon" id="app-favicon" href="icon.svg?v=4&theme=light" type="image/svg+xml" sizes="any">
+  <link rel="manifest" href="site.webmanifest?v=4">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" crossorigin
@@ -23,8 +23,16 @@
         const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         const theme = storedTheme || (systemDark ? "dark" : "light");
         document.documentElement.dataset.theme = theme;
+        const favicon = document.getElementById("app-favicon");
+        if (favicon instanceof HTMLLinkElement) {
+          favicon.href = `icon.svg?v=4&theme=${theme}`;
+        }
       } catch {
         document.documentElement.dataset.theme = "light";
+        const favicon = document.getElementById("app-favicon");
+        if (favicon instanceof HTMLLinkElement) {
+          favicon.href = "icon.svg?v=4&theme=light";
+        }
       }
     })();
   </script>
@@ -763,26 +771,13 @@
           gap: 8px;
           flex-wrap: wrap;
 
-          :is(#runBtn, #clearBtn, #saveOutput) {
-            min-inline-size: 120px;
-            padding-inline: 12px;
+          .action-btn {
+            min-inline-size: 124px;
+            padding-inline: 14px;
           }
 
           #copyOutput {
-            inline-size: 46px;
-            block-size: 44px;
-            min-inline-size: 46px;
-            padding: 0;
-
-            svg {
-              inline-size: 18px;
-              block-size: 18px;
-              fill: none;
-              stroke: currentColor;
-              stroke-linecap: round;
-              stroke-linejoin: round;
-              stroke-width: 1.8;
-            }
+            min-inline-size: 148px;
           }
         }
 
@@ -1116,9 +1111,15 @@
       }
 
       .map-btn {
-        padding: 8px 10px;
-        border-radius: 10px;
+        inline-size: 38px;
+        block-size: 38px;
+        min-inline-size: 38px;
+        min-block-size: 38px;
+        padding: 0;
+        border-radius: 12px;
         color: var(--accent-ink);
+        justify-self: center;
+        box-shadow: none;
       }
 
       td[data-label="지도링크"] {
@@ -1306,8 +1307,8 @@
       }
 
       .brand-mark {
-        inline-size: 28px;
-        block-size: 28px;
+        inline-size: clamp(34px, 2.8vw, 40px);
+        block-size: clamp(34px, 2.8vw, 40px);
         flex: 0 0 auto;
       }
 
@@ -1389,13 +1390,13 @@
       border-radius: 14px;
       font-weight: 700;
 
-      &:is(#parse, #start, #runBtn, #saveOutput) {
+      &:is(#parse, #start) {
         background: var(--accent);
         border-color: color-mix(in srgb, var(--accent) 78%, white);
         color: #ffffff;
       }
 
-      &:is(#parse, #start, #runBtn, #saveOutput):not(:disabled):hover {
+      &:is(#parse, #start):not(:disabled):hover {
         background: color-mix(in srgb, var(--accent) 88%, black);
       }
 
@@ -1417,6 +1418,165 @@
           border-color: var(--accent) !important;
           transform: translateY(-1px);
         }
+      }
+    }
+
+    .action-btn {
+      --action-bg: var(--surface-panel);
+      --action-hover-bg: var(--accent-wash);
+      --action-border: var(--line-soft);
+      --action-color: var(--fg);
+      align-items: center;
+      gap: 8px;
+      min-block-size: 46px;
+      padding-inline: 12px;
+      border-radius: 18px;
+      border-color: var(--action-border);
+      background: var(--action-bg);
+      color: var(--action-color);
+      box-shadow: var(--shadow-soft);
+      font-size: clamp(13px, 0.92rem, 14px);
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      transition: transform .18s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease;
+
+      .action-btn__icon {
+        inline-size: 16px;
+        block-size: 16px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.9;
+      }
+
+      .action-btn__label {
+        min-inline-size: 0;
+      }
+
+      @media (any-hover: hover) {
+        &:not(:disabled):hover {
+          background: var(--action-hover-bg);
+          transform: translateY(-1px);
+        }
+      }
+
+      &:disabled {
+        box-shadow: none;
+        transform: none;
+      }
+    }
+
+    :is(#parse, #start, #export, #runBtn).action-btn--primary {
+      --action-bg: linear-gradient(135deg,
+          light-dark(#6E61FF, #5D57F7),
+          light-dark(#3CB8FF, #21B3FF));
+      --action-hover-bg: linear-gradient(135deg,
+          light-dark(#6456F6, #6962FF),
+          light-dark(#31AEFF, #38C2FF));
+      --action-border: light-dark(#CFCBFF, #274EA0);
+      --action-color: #ffffff;
+      background: var(--action-bg);
+      color: var(--action-color);
+      border-color: var(--action-border);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        light-dark(0 14px 24px -18px rgba(61, 130, 255, 0.58),
+          0 16px 28px -18px rgba(42, 167, 255, 0.44));
+    }
+
+    :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft {
+      --action-bg: light-dark(#F8FAFC,
+          color-mix(in oklch, var(--surface-panel) 78%, oklch(24% 0.03 268)));
+      --action-hover-bg: light-dark(#F1F5F9,
+          color-mix(in oklch, var(--surface-panel) 72%, oklch(28% 0.03 268)));
+      --action-border: light-dark(#E2E8F0, #1A2E50);
+      --action-color: light-dark(#0F172A, #E6EDF9);
+      background: var(--action-bg);
+      color: var(--action-color);
+      border-color: var(--action-border);
+    }
+
+    #stop.action-btn--danger {
+      --action-bg: light-dark(#FFF1F2,
+          color-mix(in oklch, var(--err) 18%, var(--surface-panel)));
+      --action-hover-bg: light-dark(#FFE4E8,
+          color-mix(in oklch, var(--err) 24%, var(--surface-panel)));
+      --action-border: light-dark(#FFD4DB,
+          color-mix(in oklch, var(--err) 44%, var(--surface-panel)));
+      --action-color: light-dark(#E11D48,
+          color-mix(in oklch, var(--err) 78%, white));
+      background: var(--action-bg);
+      color: var(--action-color);
+      border-color: var(--action-border);
+      box-shadow: light-dark(0 12px 22px -20px rgba(225, 29, 72, 0.42),
+          0 16px 26px -20px rgba(255, 107, 129, 0.34));
+    }
+
+    .action-btn--compact {
+      padding-inline: 14px;
+    }
+
+    .action-btn--icononly {
+      inline-size: 42px;
+      block-size: 42px;
+      min-inline-size: 42px;
+      min-block-size: 42px;
+      padding: 0;
+      gap: 0;
+    }
+
+    .action-btn--icononly .action-btn__icon {
+      inline-size: 18px;
+      block-size: 18px;
+    }
+
+    .map-btn.action-btn--icononly {
+      inline-size: 38px;
+      block-size: 38px;
+      min-inline-size: 38px;
+      min-block-size: 38px;
+      border-radius: 12px;
+      box-shadow: none;
+    }
+
+    .map-btn.action-btn--icononly .action-btn__icon {
+      inline-size: 17px;
+      block-size: 17px;
+    }
+
+    #export.action-btn {
+      gap: 5px;
+      min-block-size: 46px;
+      padding-block: 8px;
+    }
+
+    .action-btn__label--stacked {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      font-size: 12px;
+      line-height: 0.96;
+      text-align: center;
+    }
+
+    @media (any-hover: hover) {
+      :is(#parse, #start, #export, #runBtn).action-btn--primary:not(:disabled):hover {
+        background: var(--action-hover-bg);
+      }
+
+      :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft:not(:disabled):hover {
+        background: var(--action-hover-bg);
+      }
+
+      #stop.action-btn--danger:not(:disabled):hover {
+        background: var(--action-hover-bg);
       }
     }
 
@@ -1573,8 +1733,8 @@
 
       .site-brand {
         .brand-mark {
-          inline-size: 24px;
-          block-size: 24px;
+          inline-size: 30px;
+          block-size: 30px;
         }
 
         strong {
@@ -1602,7 +1762,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="site-brand" href="" aria-label="SRG 역지오코딩 홈">
-        <img class="brand-mark" src="./icon.svg?v=3" alt="">
+        <img class="brand-mark" src="./icon.svg?v=4&theme=light" alt="">
         <strong>SRG 역지오코딩</strong>
       </a>
       <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
@@ -1638,12 +1798,46 @@
               <input type="file" id="file" accept=".txt">
             </label>
             <div class="row">
-              <button type="button" id="parse" commandfor="app" command="--parse">좌표 추출</button>
-              <button type="button" id="start" commandfor="app" command="--start" disabled>조회 시작</button>
-              <button type="button" id="pause" commandfor="app" command="--pause" disabled>일시정지</button>
-              <button type="button" id="resume" commandfor="app" command="--resume" disabled>재개</button>
-              <button type="button" id="stop" commandfor="app" command="--stop" disabled>중지</button>
-              <button type="button" id="export" commandfor="app" command="--export" disabled>CSV 내보내기</button>
+              <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app" command="--parse">
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3.25"></circle>
+                  <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5"></path>
+                </svg>
+                <span class="action-btn__label">좌표 추출</span>
+              </button>
+              <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start" disabled>
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8.5 7.5 16 12l-7.5 4.5z"></path>
+                </svg>
+                <span class="action-btn__label">조회 시작</span>
+              </button>
+              <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause" disabled>
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 7.5v9M15 7.5v9"></path>
+                </svg>
+                <span class="action-btn__label">일시정지</span>
+              </button>
+              <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume" disabled>
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 12h9"></path>
+                  <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
+                </svg>
+                <span class="action-btn__label">재개</span>
+              </button>
+              <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop" disabled>
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="8" y="8" width="8" height="8" rx="1.5"></rect>
+                </svg>
+                <span class="action-btn__label">중지</span>
+              </button>
+              <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app" command="--export" disabled>
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4.5v10"></path>
+                  <path d="m8 10.75 4 4 4-4"></path>
+                  <path d="M5.5 18.5h13"></path>
+                </svg>
+                <span class="action-btn__label action-btn__label--stacked"><span>CSV</span><span>내보내기</span></span>
+              </button>
             </div>
           </fieldset>
         </div>
@@ -1666,16 +1860,35 @@
               <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
             </div>
             <div class="manual-rng-actions">
-              <button id="runBtn" type="button">변환 실행</button>
-              <button id="saveOutput" type="button">random_data.txt 저장</button>
-              <button id="copyOutput" type="button" title="클립보드 복사" aria-label="클립보드 복사">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
+              <button id="runBtn" class="action-btn action-btn--primary" type="button">
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 12h9"></path>
+                  <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
+                </svg>
+                <span class="action-btn__label">변환 실행</span>
+              </button>
+              <button id="saveOutput" class="action-btn action-btn--soft" type="button">
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4.5v10"></path>
+                  <path d="m8 10.75 4 4 4-4"></path>
+                  <path d="M5.5 18.5h13"></path>
+                </svg>
+                <span class="action-btn__label">random_data.txt 저장</span>
+              </button>
+              <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사" aria-label="클립보드 복사">
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="9" y="9" width="10" height="10" rx="2"></rect>
                   <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
                 </svg>
-                <span class="sr-only">클립보드 복사</span>
+                <span class="action-btn__label">클립보드 복사</span>
               </button>
-              <button id="clearBtn" type="button">출력 지우기</button>
+              <button id="clearBtn" class="action-btn action-btn--soft" type="button">
+                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m7.5 7.5 9 9"></path>
+                  <path d="m16.5 7.5-9 9"></path>
+                </svg>
+                <span class="action-btn__label">출력 지우기</span>
+              </button>
             </div>
             <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
             <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true"></div>
@@ -1742,7 +1955,13 @@
             aria-label="지물 태그">
           <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
             aria-label="전체주소">
-          <button type="button" id="filter-clear" commandfor="app" command="--filter-clear">필터 초기화</button>
+          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact" commandfor="app" command="--filter-clear">
+            <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.5 7.5h7a4.25 4.25 0 1 1 0 8.5h-7"></path>
+              <path d="m9.75 4.5-3.25 3 3.25 3"></path>
+            </svg>
+            <span class="action-btn__label">필터 초기화</span>
+          </button>
         </div>
       </search>
       <div class="table-wrap">
@@ -1815,8 +2034,14 @@
       </td>
       <td data-label="지도링크">
         <div class="skeleton-bar"></div>
-        <button type="button" class="map-btn" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
-          commandfor="map-popover" command="show-popover" disabled>지도</button>
+        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
+          commandfor="map-popover" command="show-popover" disabled>
+          <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
+            <circle cx="12" cy="10.75" r="1.8"></circle>
+          </svg>
+          <span class="sr-only">지도</span>
+        </button>
       </td>
     </tr>
   </template>
@@ -1831,8 +2056,14 @@
       <td data-label="지물 태그"></td>
       <td data-label="전체주소"></td>
       <td data-label="지도링크">
-        <button type="button" class="map-btn" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
-          commandfor="map-popover" command="show-popover" disabled>지도</button>
+        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
+          commandfor="map-popover" command="show-popover" disabled>
+          <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
+            <circle cx="12" cy="10.75" r="1.8"></circle>
+          </svg>
+          <span class="sr-only">지도</span>
+        </button>
       </td>
     </tr>
   </template>
@@ -2106,6 +2337,8 @@
       dropZone: document.querySelector(".drop-zone"),
       themeToggle: document.getElementById("theme-toggle"),
       themeIcon: document.getElementById("themeIcon"),
+      brandMark: document.querySelector(".brand-mark"),
+      favicon: document.getElementById("app-favicon"),
       app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
@@ -2151,7 +2384,30 @@
       ".drop-text .desktop-msg, .drop-text .mobile-msg"
     );
     const THEME_STORAGE_KEY = "srg-theme";
+    const ICON_VERSION = "4";
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const buildThemeIconHref = (theme) => `./icon.svg?v=${ICON_VERSION}&theme=${theme}`;
+    const syncThemeIcons = (theme) => {
+      const iconHref = buildThemeIconHref(theme);
+      if (domElements.brandMark instanceof HTMLImageElement) {
+        domElements.brandMark.src = iconHref;
+      }
+      const currentFavicon = domElements.favicon;
+      const nextFavicon = currentFavicon instanceof HTMLLinkElement
+        ? currentFavicon.cloneNode()
+        : document.createElement("link");
+      nextFavicon.id = "app-favicon";
+      nextFavicon.rel = "icon";
+      nextFavicon.type = "image/svg+xml";
+      nextFavicon.sizes = "any";
+      nextFavicon.href = iconHref;
+      if (currentFavicon?.parentNode) {
+        currentFavicon.parentNode.replaceChild(nextFavicon, currentFavicon);
+      } else {
+        document.head.appendChild(nextFavicon);
+      }
+      domElements.favicon = nextFavicon;
+    };
     const getStoredTheme = () => {
       try {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -2162,6 +2418,7 @@
     };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
+      syncThemeIcons(theme);
       const label = theme === "dark" ? "라이트 모드" : "다크 모드";
       domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);

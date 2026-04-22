@@ -44,26 +44,44 @@ mod output;
 pub(crate) mod time;
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 compile_error!("SRG currently supports only Windows, Linux, and macOS.");
-#[cfg(target_os = "linux")]
-const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
-#[cfg(target_os = "macos")]
-const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
-#[cfg(windows)]
-const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
-#[cfg(windows)]
-const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
-#[cfg(target_arch = "x86_64")]
-static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| {
-    if is_x86_feature_detected!("rdseed") {
-        RngSource::RdSeed
-    } else if is_x86_feature_detected!("rdrand") {
-        RngSource::RdRand
-    } else {
-        RngSource::None
+cfg_select! {
+    target_os = "linux" => {
+        const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
     }
-});
-#[cfg(not(target_arch = "x86_64"))]
-static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| RngSource::None);
+    target_os = "macos" => {
+        const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
+    }
+    windows => {
+        const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
+        const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
+    }
+}
+cfg_select! {
+    target_arch = "x86_64" => {
+        static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| {
+            if is_x86_feature_detected!("rdseed") {
+                RngSource::RdSeed
+            } else if is_x86_feature_detected!("rdrand") {
+                RngSource::RdRand
+            } else {
+                RngSource::None
+            }
+        });
+        const MENU: &str = concat!(
+            "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), ",
+            "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, ",
+            "7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ",
+        );
+    }
+    _ => {
+        static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| RngSource::None);
+        const MENU: &str = concat!(
+            "\n5: 서버 시간 확인, 7: num_64/supp 수동 입력 생성, 기타(1~4, 6 제외): 종료\n",
+            "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
+            "선택해 주세요: ",
+        );
+    }
+}
 static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
@@ -168,18 +186,6 @@ static HEX_BYTE_TABLE: LazyLock<[[u8; 2]; 256]> = LazyLock::new(|| {
     }
     table
 });
-#[cfg(target_arch = "x86_64")]
-const MENU: &str = concat!(
-    "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), ",
-    "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, ",
-    "7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ",
-);
-#[cfg(not(target_arch = "x86_64"))]
-const MENU: &str = concat!(
-    "\n5: 서버 시간 확인, 7: num_64/supp 수동 입력 생성, 기타(1~4, 6 제외): 종료\n",
-    "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
-    "선택해 주세요: ",
-);
 type Result<T> = StdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 #[cfg(windows)]
@@ -444,39 +450,39 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<bool> {
-        match command {
-            #[cfg(target_arch = "x86_64")]
-            b'1' => self.handle_ladder_command(out, err)?,
-            #[cfg(not(target_arch = "x86_64"))]
-            b'1' => print_x86_64_only_feature_disabled(out)?,
-            #[cfg(target_arch = "x86_64")]
-            b'2' => self.handle_random_number_command(out, err)?,
-            #[cfg(not(target_arch = "x86_64"))]
-            b'2' => print_x86_64_only_feature_disabled(out)?,
-            #[cfg(target_arch = "x86_64")]
-            b'3' => self.handle_generate_once_command(out, err)?,
-            #[cfg(not(target_arch = "x86_64"))]
-            b'3' => print_x86_64_only_feature_disabled(out)?,
-            #[cfg(target_arch = "x86_64")]
-            b'4' => self.handle_generate_many_command(out, err)?,
-            #[cfg(not(target_arch = "x86_64"))]
-            b'4' => print_x86_64_only_feature_disabled(out)?,
-            b'5' => self.handle_server_time_command(out, err)?,
-            #[cfg(target_arch = "x86_64")]
-            b'6' => {
-                validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
-                if let Err(remove_err) = fs::remove_file(FILE_NAME) {
-                    writeln!(err, "{remove_err}")?;
-                } else {
-                    writeln!(out, "파일 '{FILE_NAME}'를 삭제했습니다.")?;
+        cfg_select! {
+            target_arch = "x86_64" => {
+                match command {
+                    b'1' => self.handle_ladder_command(out, err)?,
+                    b'2' => self.handle_random_number_command(out, err)?,
+                    b'3' => self.handle_generate_once_command(out, err)?,
+                    b'4' => self.handle_generate_many_command(out, err)?,
+                    b'5' => self.handle_server_time_command(out, err)?,
+                    b'6' => {
+                        validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
+                        if let Err(remove_err) = fs::remove_file(FILE_NAME) {
+                            writeln!(err, "{remove_err}")?;
+                        } else {
+                            writeln!(out, "파일 '{FILE_NAME}'를 삭제했습니다.")?;
+                        }
+                    }
+                    b'7' => self.handle_manual_input_command(out, err)?,
+                    _ => return Ok(false),
                 }
+                Ok(true)
             }
-            #[cfg(not(target_arch = "x86_64"))]
-            b'6' => print_x86_64_only_feature_disabled(out)?,
-            b'7' => self.handle_manual_input_command(out, err)?,
-            _ => return Ok(false),
+            _ => {
+                match command {
+                    b'1' | b'2' | b'3' | b'4' | b'6' => {
+                        print_x86_64_only_feature_disabled(out)?;
+                    }
+                    b'5' => self.handle_server_time_command(out, err)?,
+                    b'7' => self.handle_manual_input_command(out, err)?,
+                    _ => return Ok(false),
+                }
+                Ok(true)
+            }
         }
-        Ok(true)
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_generate_many_command(

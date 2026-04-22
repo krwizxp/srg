@@ -395,7 +395,7 @@ fn panic_join_error(context: &'static str, panic_payload: &(dyn Any + Send + 'st
         },
         |message| String::from(*message),
     );
-    IoError::other(format!("{context}: {panic_detail}",))
+    IoError::other(format!("{context}: {panic_detail}"))
 }
 fn elapsed_millis_since(start_time: &Instant) -> u128 {
     Instant::now().duration_since(*start_time).as_millis()
