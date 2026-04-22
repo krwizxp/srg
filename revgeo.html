@@ -779,6 +779,31 @@
           #copyOutput {
             min-inline-size: 148px;
           }
+
+          @container (inline-size <=420px) {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: stretch;
+
+            .action-btn {
+              min-inline-size: 0;
+              inline-size: 100%;
+              block-size: 52px;
+              min-block-size: 52px;
+              justify-content: center;
+              white-space: normal;
+            }
+
+            .action-btn__label {
+              text-align: center;
+              line-height: 1.08;
+              text-wrap: balance;
+            }
+
+            #copyOutput {
+              min-inline-size: 0;
+            }
+          }
         }
 
         textarea {
@@ -1108,6 +1133,10 @@
         inline-size: 1px;
         block-size: 1px;
         clip-path: inset(50%);
+      }
+
+      .nowrap {
+        white-space: nowrap;
       }
 
       .map-btn {
@@ -1798,39 +1827,45 @@
               <input type="file" id="file" accept=".txt">
             </label>
             <div class="row">
-              <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app" command="--parse">
+              <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app"
+                command="--parse">
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="3.25"></circle>
                   <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5"></path>
                 </svg>
                 <span class="action-btn__label">좌표 추출</span>
               </button>
-              <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start" disabled>
+              <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start"
+                disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M8.5 7.5 16 12l-7.5 4.5z"></path>
                 </svg>
                 <span class="action-btn__label">조회 시작</span>
               </button>
-              <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause" disabled>
+              <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause"
+                disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M9 7.5v9M15 7.5v9"></path>
                 </svg>
                 <span class="action-btn__label">일시정지</span>
               </button>
-              <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume" disabled>
+              <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume"
+                disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7 12h9"></path>
                   <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
                 </svg>
                 <span class="action-btn__label">재개</span>
               </button>
-              <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop" disabled>
+              <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop"
+                disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="8" y="8" width="8" height="8" rx="1.5"></rect>
                 </svg>
                 <span class="action-btn__label">중지</span>
               </button>
-              <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app" command="--export" disabled>
+              <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app"
+                command="--export" disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4.5v10"></path>
                   <path d="m8 10.75 4 4 4-4"></path>
@@ -1849,8 +1884,8 @@
               <label class="manual-rng-label" for="num64">기본 난수값</label>
               <input id="num64" type="text" inputmode="numeric" aria-describedby="num64-help"
                 placeholder="예: 123456789 또는 0x1122334455667788">
-              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~ 18446744073709551615<br>(0x0 ~
-                0xFFFFFFFFFFFFFFFF)</span>
+              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~ 18446744073709551615<br><span
+                  class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
             </div>
             <div class="manual-rng-field">
               <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
@@ -1875,7 +1910,8 @@
                 </svg>
                 <span class="action-btn__label">random_data.txt 저장</span>
               </button>
-              <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사" aria-label="클립보드 복사">
+              <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사"
+                aria-label="클립보드 복사">
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="9" y="9" width="10" height="10" rx="2"></rect>
                   <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
@@ -1955,7 +1991,8 @@
             aria-label="지물 태그">
           <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
             aria-label="전체주소">
-          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact" commandfor="app" command="--filter-clear">
+          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact"
+            commandfor="app" command="--filter-clear">
             <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.5 7.5h7a4.25 4.25 0 1 1 0 8.5h-7"></path>
               <path d="m9.75 4.5-3.25 3 3.25 3"></path>
@@ -2034,8 +2071,8 @@
       </td>
       <td data-label="지도링크">
         <div class="skeleton-bar"></div>
-        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
-          commandfor="map-popover" command="show-popover" disabled>
+        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
+          aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
             <circle cx="12" cy="10.75" r="1.8"></circle>
@@ -2056,8 +2093,8 @@
       <td data-label="지물 태그"></td>
       <td data-label="전체주소"></td>
       <td data-label="지도링크">
-        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog" aria-controls="map-popover" aria-expanded="false"
-          commandfor="map-popover" command="show-popover" disabled>
+        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
+          aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
             <circle cx="12" cy="10.75" r="1.8"></circle>
