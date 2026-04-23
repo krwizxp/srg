@@ -876,10 +876,7 @@ impl AppState {
                 out,
                 err,
             );
-            #[cfg(target_os = "windows")]
             self.sync_high_res_timer_state(&next_activity, err);
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
-            Self::sync_high_res_timer_state(&next_activity, err);
             if let Some(console_msg) = log_opt_msg {
                 writeln!(out, "\n{console_msg}")?;
             }
@@ -887,34 +884,38 @@ impl AppState {
         }
         Ok(())
     }
-    #[cfg(target_os = "windows")]
     fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
-        if matches!(next_activity, Activity::FinalCountdown { .. }) {
-            if self.high_res_timer_guard.is_none() {
-                // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
-                // integer input and does not impose additional aliasing or
-                // lifetime requirements.
-                if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
-                    self.high_res_timer_guard = Some(HighResTimerGuard);
+        cfg_select! {
+            windows => {
+                if matches!(next_activity, Activity::FinalCountdown { .. }) {
+                    if self.high_res_timer_guard.is_none() {
+                        // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
+                        // integer input and does not impose additional aliasing or
+                        // lifetime requirements.
+                        if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
+                            self.high_res_timer_guard = Some(HighResTimerGuard);
+                        } else {
+                            write_line_ignored(
+                                err,
+                                format_args!(
+                                    concat!(
+                                        "[경고] Windows 타이머 해상도 {}ms 요청에 실패했습니다. ",
+                                        "카운트다운 정확도가 저하될 수 있습니다."
+                                    ),
+                                    TARGET_PERIOD_MS
+                                ),
+                            );
+                        }
+                    }
                 } else {
-                    write_line_ignored(
-                        err,
-                        format_args!(
-                            concat!(
-                                "[경고] Windows 타이머 해상도 {}ms 요청에 실패했습니다. ",
-                                "카운트다운 정확도가 저하될 수 있습니다."
-                            ),
-                            TARGET_PERIOD_MS
-                        ),
-                    );
+                    self.high_res_timer_guard = None;
                 }
             }
-        } else {
-            self.high_res_timer_guard = None;
+            _ => {
+                let _ = (next_activity, err);
+            }
         }
     }
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    const fn sync_high_res_timer_state(_next_activity: &Activity, _err: &mut dyn io::Write) {}
     fn trigger_and_finish<'a>(
         &self,
         msg_buf: &'a mut String,
@@ -922,54 +923,63 @@ impl AppState {
         err: &mut dyn io::Write,
     ) -> (Activity, Option<&'a str>) {
         if let Some(action) = self.trigger_action {
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
-            let mut run_external_command =
-                |program: &str, args: &[&str]| match Command::new(program).args(args).status() {
-                    Ok(status) if status.success() => {}
-                    Ok(status) => {
-                        write_line_ignored(
-                            err,
-                            format_args!(
-                                "[경고] 명령 실행 실패: {program} {args:?} (상태: {status})"
-                            ),
-                        );
-                    }
-                    Err(command_err) => {
-                        write_line_ignored(
-                            err,
-                            format_args!(
-                                "[경고] 명령 실행 실패: {program} {args:?} ({command_err})"
-                            ),
-                        );
-                    }
-                };
             match action {
                 TriggerAction::LeftClick => {
-                    #[cfg(target_os = "linux")]
-                    run_external_command("xdotool", &["click", "1"]);
-                    #[cfg(target_os = "macos")]
-                    run_external_command(
-                        "osascript",
-                        &["-e", r#"tell application "System Events" to click"#],
-                    );
-                    #[cfg(target_os = "windows")]
-                    windows_input::send_action(windows_input::InputAction::MouseClick, err);
+                    cfg_select! {
+                        target_os = "linux" => {
+                            run_external_command(err, "xdotool", &["click", "1"]);
+                        }
+                        target_os = "macos" => {
+                            run_external_command(
+                                err,
+                                "osascript",
+                                &["-e", r#"tell application "System Events" to click"#],
+                            );
+                        }
+                        windows => {
+                            windows_input::send_action(windows_input::InputAction::MouseClick, err);
+                        }
+                    };
                 }
                 TriggerAction::F5Press => {
-                    #[cfg(target_os = "linux")]
-                    run_external_command("xdotool", &["key", "F5"]);
-                    #[cfg(target_os = "macos")]
-                    run_external_command(
-                        "osascript",
-                        &["-e", r#"tell application "System Events" to key code 96"#],
-                    );
-                    #[cfg(target_os = "windows")]
-                    windows_input::send_action(windows_input::InputAction::F5Press, err);
+                    cfg_select! {
+                        target_os = "linux" => {
+                            run_external_command(err, "xdotool", &["key", "F5"]);
+                        }
+                        target_os = "macos" => {
+                            run_external_command(
+                                err,
+                                "osascript",
+                                &["-e", r#"tell application "System Events" to key code 96"#],
+                            );
+                        }
+                        windows => {
+                            windows_input::send_action(windows_input::InputAction::F5Press, err);
+                        }
+                    };
                 }
             }
         }
         append_fmt(msg_buf, log_message);
         (Activity::Finished, Some(msg_buf))
+    }
+}
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn run_external_command(err: &mut dyn io::Write, program: &str, args: &[&str]) {
+    match Command::new(program).args(args).status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => {
+            write_line_ignored(
+                err,
+                format_args!("[경고] 명령 실행 실패: {program} {args:?} (상태: {status})"),
+            );
+        }
+        Err(command_err) => {
+            write_line_ignored(
+                err,
+                format_args!("[경고] 명령 실행 실패: {program} {args:?} ({command_err})"),
+            );
+        }
     }
 }
 fn parse_err_with_source(context: &'static str, err: impl fmt::Display) -> TimeError {

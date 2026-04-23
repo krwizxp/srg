@@ -680,22 +680,26 @@ impl MenuApp {
         err: &mut dyn Write,
     ) -> Result<()> {
         let time_run_result = (|| -> StdResult<(), time::TimeError> {
-            #[cfg(target_os = "windows")]
-            if !*time::CURL_AVAILABLE {
-                writeln!(
-                    err,
-                    "[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다."
-                )?;
-            }
-            #[cfg(target_os = "linux")]
-            if !*time::XDO_TOOL_AVAILABLE {
-                writeln!(
-                    err,
-                    concat!(
-                        "[경고] 'xdotool'이 설치되지 않았습니다. 액션 기능이 동작하지 않습니다.\n",
-                        "(설치 방법: sudo apt-get install xdotool 또는 유사한 패키지 관리자 명령어)"
-                    )
-                )?;
+            cfg_select! {
+                windows => {
+                    if !*time::CURL_AVAILABLE {
+                        writeln!(
+                            err,
+                            "[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다."
+                        )?;
+                    }
+                }
+                target_os = "linux" => {
+                    if !*time::XDO_TOOL_AVAILABLE {
+                        writeln!(
+                            err,
+                            concat!(
+                                "[경고] 'xdotool'이 설치되지 않았습니다. 액션 기능이 동작하지 않습니다.\n",
+                                "(설치 방법: sudo apt-get install xdotool 또는 유사한 패키지 관리자 명령어)"
+                            )
+                        )?;
+                    }
+                }
             }
             let host = self.read_server_host(out, err)?;
             let target_time = self.read_target_time(out)?;
@@ -706,22 +710,42 @@ impl MenuApp {
                 rtt: Duration::ZERO,
                 server_time: UNIX_EPOCH,
             };
-            let mut app_state = time::AppState {
-                host,
-                target_time,
-                trigger_action,
-                server_time: None,
-                baseline_rtt: None,
-                baseline_rtt_samples: [baseline_placeholder; time::NUM_SAMPLES],
-                baseline_rtt_attempts: 0,
-                baseline_rtt_valid_count: 0,
-                baseline_rtt_next_sample_at: now,
-                next_full_sync_at: now,
-                last_sample: None,
-                live_rtt: None,
-                calibration_failure_count: 0,
-                #[cfg(target_os = "windows")]
-                high_res_timer_guard: None,
+            let mut app_state = cfg_select! {
+                windows => {
+                    time::AppState {
+                        host,
+                        target_time,
+                        trigger_action,
+                        server_time: None,
+                        baseline_rtt: None,
+                        baseline_rtt_samples: [baseline_placeholder; time::NUM_SAMPLES],
+                        baseline_rtt_attempts: 0,
+                        baseline_rtt_valid_count: 0,
+                        baseline_rtt_next_sample_at: now,
+                        next_full_sync_at: now,
+                        last_sample: None,
+                        live_rtt: None,
+                        calibration_failure_count: 0,
+                        high_res_timer_guard: None,
+                    }
+                }
+                _ => {
+                    time::AppState {
+                        host,
+                        target_time,
+                        trigger_action,
+                        server_time: None,
+                        baseline_rtt: None,
+                        baseline_rtt_samples: [baseline_placeholder; time::NUM_SAMPLES],
+                        baseline_rtt_attempts: 0,
+                        baseline_rtt_valid_count: 0,
+                        baseline_rtt_next_sample_at: now,
+                        next_full_sync_at: now,
+                        last_sample: None,
+                        live_rtt: None,
+                        calibration_failure_count: 0,
+                    }
+                }
             };
             app_state.run_loop(out, err)?;
             writeln!(out, "\n프로그램을 종료합니다.")?;
@@ -1038,36 +1062,41 @@ fn validate_safe_output_file_path(path: &Path, allow_missing: bool) -> Result<()
     let Some(metadata) = maybe_metadata else {
         return Ok(());
     };
-    #[cfg(windows)]
-    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
-        return Err(invalid_output_path_err(
-            "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
-        ));
-    }
-    #[cfg(not(windows))]
-    if metadata.file_type().is_symlink() {
-        return Err(invalid_output_path_err(
-            "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
-        ));
+    cfg_select! {
+        windows => {
+            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+                return Err(invalid_output_path_err(
+                    "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+                ));
+            }
+        }
+        _ => {
+            if metadata.file_type().is_symlink() {
+                return Err(invalid_output_path_err(
+                    "출력 파일은 일반 파일이어야 하며 심볼릭 링크는 허용되지 않습니다.",
+                ));
+            }
+        }
     }
     if !metadata.is_file() {
         return Err(invalid_output_path_err(
             "출력 경로는 일반 파일이어야 합니다.",
         ));
     }
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    if metadata.nlink() > 1 {
-        return Err(invalid_output_path_err(
-            "출력 파일은 하드 링크가 아니어야 합니다.",
-        ));
-    }
-    #[cfg(windows)]
-    if file_has_multiple_links(
-        &File::options()
-            .read(true)
-            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
-            .open(path)?,
-    )? {
+    let has_multiple_links = cfg_select! {
+        windows => {
+            file_has_multiple_links(
+                &File::options()
+                    .read(true)
+                    .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
+                    .open(path)?,
+            )?
+        }
+        _ => {
+            metadata.nlink() > 1
+        }
+    };
+    if has_multiple_links {
         return Err(invalid_output_path_err(
             "출력 파일은 하드 링크가 아니어야 합니다.",
         ));
@@ -1100,24 +1129,24 @@ fn boxed_other_with_source(
 fn open_or_create_file() -> Result<BufWriter<File>> {
     let path = Path::new(FILE_NAME);
     validate_safe_output_file_path(path, true)?;
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    let mut file = File::options()
-        .read(true)
-        .append(true)
-        .create(true)
-        .custom_flags(OPEN_NOFOLLOW_FLAG)
-        .open(path)?;
-    #[cfg(windows)]
-    let mut file = File::options()
-        .read(true)
-        .append(true)
-        .create(true)
-        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
-        .open(path)?;
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    let mut file = return Err(invalid_output_path_err(
-        "지원되지 않는 운영체제입니다. Windows, Linux, macOS만 지원합니다.",
-    ));
+    let mut file = cfg_select! {
+        windows => {
+            File::options()
+                .read(true)
+                .append(true)
+                .create(true)
+                .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
+                .open(path)?
+        }
+        _ => {
+            File::options()
+                .read(true)
+                .append(true)
+                .create(true)
+                .custom_flags(OPEN_NOFOLLOW_FLAG)
+                .open(path)?
+        }
+    };
     match file.try_lock() {
         Ok(()) => {}
         Err(fs::TryLockError::WouldBlock) => {
@@ -1130,25 +1159,30 @@ fn open_or_create_file() -> Result<BufWriter<File>> {
         }
     }
     let metadata = file.metadata()?;
-    #[cfg(windows)]
-    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
-        return Err(invalid_output_path_err(
-            "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
-        ));
+    cfg_select! {
+        windows => {
+            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
+                return Err(invalid_output_path_err(
+                    "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
+                ));
+            }
+        }
+        _ => {}
     }
     if !metadata.is_file() {
         return Err(invalid_output_path_err(
             "출력 경로는 일반 파일이어야 합니다.",
         ));
     }
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    if metadata.nlink() > 1 {
-        return Err(invalid_output_path_err(
-            "출력 파일은 하드 링크가 아니어야 합니다.",
-        ));
-    }
-    #[cfg(windows)]
-    if file_has_multiple_links(&file)? {
+    let has_multiple_links = cfg_select! {
+        windows => {
+            file_has_multiple_links(&file)?
+        }
+        _ => {
+            metadata.nlink() > 1
+        }
+    };
+    if has_multiple_links {
         return Err(invalid_output_path_err(
             "출력 파일은 하드 링크가 아니어야 합니다.",
         ));

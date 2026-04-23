@@ -800,6 +800,22 @@
               text-wrap: balance;
             }
 
+            #saveOutput .action-btn__label--savefile {
+              flex-direction: column;
+              justify-content: center;
+              gap: 1px;
+              font-size: 11px;
+              line-height: 0.98;
+            }
+
+            #saveOutput .action-btn__label--savefile > span:first-child {
+              letter-spacing: -0.045em;
+            }
+
+            #saveOutput .action-btn__label--savefile > span:last-child {
+              font-size: 12px;
+            }
+
             #copyOutput {
               min-inline-size: 0;
             }
@@ -1487,6 +1503,16 @@
         min-inline-size: 0;
       }
 
+      .action-btn__label--savefile {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25em;
+      }
+
+      .action-btn__label--savefile > span:first-child {
+        white-space: nowrap;
+      }
+
       @media (any-hover: hover) {
         &:not(:disabled):hover {
           background: var(--action-hover-bg);
@@ -1908,7 +1934,7 @@
                   <path d="m8 10.75 4 4 4-4"></path>
                   <path d="M5.5 18.5h13"></path>
                 </svg>
-                <span class="action-btn__label">random_data.txt 저장</span>
+                <span class="action-btn__label action-btn__label--savefile"><span>random_data.txt</span><span>저장</span></span>
               </button>
               <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사"
                 aria-label="클립보드 복사">
