@@ -14,8 +14,8 @@
     <!-- Light mode palettes -->
     <linearGradient id="tile-light" x1="74" y1="86" x2="438" y2="430" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#191C43"/>
-      <stop offset="0.54" stop-color="#5B4BE2"/>
-      <stop offset="1" stop-color="#2AA7FF"/>
+      <stop offset="0.54" stop-color="oklch(52.3849% 0.281 280.49)"/>
+      <stop offset="1" stop-color="oklch(70.4516% 0.1751 245.52)"/>
     </linearGradient>
     <linearGradient id="pin-light" x1="203" y1="104" x2="309" y2="372" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#FFFFFF"/>
@@ -23,27 +23,27 @@
       <stop offset="1" stop-color="#EAF6FF"/>
     </linearGradient>
     <linearGradient id="core-light" x1="219" y1="169" x2="296" y2="247" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6E61FF"/>
-      <stop offset="1" stop-color="#2AA7FF"/>
+      <stop offset="0" stop-color="oklch(59.5615% 0.2385 280.75)"/>
+      <stop offset="1" stop-color="oklch(70.4516% 0.1751 245.52)"/>
     </linearGradient>
     <radialGradient id="ambient-light" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#5B4BE2" stop-opacity=".20"/>
-      <stop offset="1" stop-color="#5B4BE2" stop-opacity="0"/>
+      <stop offset="0" stop-color="oklch(52.3849% 0.281 280.49)" stop-opacity=".20"/>
+      <stop offset="1" stop-color="oklch(52.3849% 0.281 280.49)" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="shine-top-light" cx="50%" cy="50%" r="50%">
       <stop offset="0" stop-color="#FFFFFF" stop-opacity=".20"/>
       <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="shine-bottom-light" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#2AA7FF" stop-opacity=".30"/>
-      <stop offset="1" stop-color="#2AA7FF" stop-opacity="0"/>
+      <stop offset="0" stop-color="oklch(70.4516% 0.1751 245.52)" stop-opacity=".30"/>
+      <stop offset="1" stop-color="oklch(70.4516% 0.1751 245.52)" stop-opacity="0"/>
     </radialGradient>
 
     <!-- Dark mode palettes -->
     <linearGradient id="tile-dark" x1="74" y1="86" x2="438" y2="430" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#050A1F"/>
       <stop offset="0.55" stop-color="#382AC8"/>
-      <stop offset="1" stop-color="#00B8FF"/>
+      <stop offset="1" stop-color="oklch(73.9192% 0.166 235.34)"/>
     </linearGradient>
     <linearGradient id="pin-dark" x1="203" y1="104" x2="309" y2="372" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#FFFFFF"/>
@@ -51,20 +51,20 @@
       <stop offset="1" stop-color="#DDF7FF"/>
     </linearGradient>
     <linearGradient id="core-dark" x1="219" y1="169" x2="296" y2="247" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8B5CF6"/>
-      <stop offset="1" stop-color="#06B6D4"/>
+      <stop offset="0" stop-color="oklch(60.5631% 0.253 292.72)"/>
+      <stop offset="1" stop-color="oklch(71.4837% 0.156 215.22)"/>
     </linearGradient>
     <radialGradient id="ambient-dark" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#00B8FF" stop-opacity=".26"/>
-      <stop offset="1" stop-color="#00B8FF" stop-opacity="0"/>
+      <stop offset="0" stop-color="oklch(73.9192% 0.166 235.34)" stop-opacity=".26"/>
+      <stop offset="1" stop-color="oklch(73.9192% 0.166 235.34)" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="shine-top-dark" cx="50%" cy="50%" r="50%">
       <stop offset="0" stop-color="#FFFFFF" stop-opacity=".14"/>
       <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="shine-bottom-dark" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#00B8FF" stop-opacity=".34"/>
-      <stop offset="1" stop-color="#00B8FF" stop-opacity="0"/>
+      <stop offset="0" stop-color="oklch(73.9192% 0.166 235.34)" stop-opacity=".34"/>
+      <stop offset="1" stop-color="oklch(73.9192% 0.166 235.34)" stop-opacity="0"/>
     </radialGradient>
 
     <!-- Shared geometry helpers -->
@@ -119,15 +119,15 @@
       <circle cx="256" cy="212" r="94" stroke="#BFF5FF" stroke-opacity=".20" stroke-width="2"/>
       <path d="M256 80v350M88 212h336" stroke="#DDF7FF" stroke-opacity=".18" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 18"/>
 
-      <path d="M111 320C155 256 197 318 237 260C278 202 323 203 391 249" stroke="#67E8F9" stroke-opacity=".22" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M111 320C155 256 197 318 237 260C278 202 323 203 391 249" stroke="#67E8F9" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M111 320C155 256 197 318 237 260C278 202 323 203 391 249" stroke="oklch(86.5073% 0.1412 207.08)" stroke-opacity=".22" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M111 320C155 256 197 318 237 260C278 202 323 203 391 249" stroke="oklch(86.5073% 0.1412 207.08)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="111" cy="320" r="10" fill="#E2F5FF" fill-opacity=".90"/>
       <circle cx="391" cy="249" r="10" fill="#E2F5FF" fill-opacity=".90"/>
     </g>
 
     <path d="M256 106C197.2 106 154 149 154 204C154 282 256 392 256 392C256 392 358 282 358 204C358 149 314.8 106 256 106Z" fill="#000000" opacity=".34" transform="translate(0 18)" filter="url(#blur-shadow)"/>
     <path d="M256 96C191.2 96 144 143.3 144 204C144 289.5 256 408 256 408C256 408 368 289.5 368 204C368 143.3 320.8 96 256 96Z" fill="url(#pin-dark)"/>
-    <circle cx="256" cy="210" r="86" stroke="#67E8F9" stroke-opacity=".56" stroke-width="12"/>
+    <circle cx="256" cy="210" r="86" stroke="oklch(86.5073% 0.1412 207.08)" stroke-opacity=".56" stroke-width="12"/>
     <circle cx="256" cy="210" r="48" fill="url(#core-dark)"/>
     <path d="M256 152v116M198 210h116" stroke="#FFFFFF" stroke-opacity=".96" stroke-width="12" stroke-linecap="round"/>
     <circle cx="256" cy="210" r="14" fill="#FFFFFF" fill-opacity=".24"/>

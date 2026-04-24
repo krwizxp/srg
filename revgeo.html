@@ -18,22 +18,15 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <script>
     (() => {
-      try {
-        const storedTheme = localStorage.getItem("srg-theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = storedTheme || (systemDark ? "dark" : "light");
+      const applyInitialTheme = (theme) => {
         document.documentElement.dataset.theme = theme;
-        const favicon = document.getElementById("app-favicon");
-        if (favicon instanceof HTMLLinkElement) {
-          favicon.href = `icon.svg?v=4&theme=${theme}`;
-        }
-      } catch {
-        document.documentElement.dataset.theme = "light";
-        const favicon = document.getElementById("app-favicon");
-        if (favicon instanceof HTMLLinkElement) {
-          favicon.href = "icon.svg?v=4&theme=light";
-        }
-      }
+        document.getElementById("app-favicon").href =
+          `icon.svg?v=4&theme=${theme}`;
+      };
+      const storedTheme = localStorage.getItem("srg-theme");
+      const systemDark =
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      applyInitialTheme(storedTheme || (systemDark ? "dark" : "light"));
     })();
   </script>
   <style>
@@ -91,59 +84,33 @@
         --inline-angle: 90deg;
         --shimmer-from: -120%;
         --shimmer-to: 120%;
-        --page-bg: light-dark(oklch(100% 0 0), oklch(12% 0.02 265));
-        --card-surface: color-mix(in oklch,
-            light-dark(oklch(94.5% 0.014 265 / 0.96), oklch(17% 0.03 265 / 0.82)) 90%,
-            var(--surface-panel));
-        --fg: light-dark(oklch(18% 0.114 275),
-            oklch(95% 0.04 275));
-        --tone-base: light-dark(oklch(98% 0.008 270), oklch(16% 0.03 270));
-        --muted: light-dark(color-mix(in oklch, var(--fg) 72%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 82%, var(--tone-base)));
-        --muted-strong: light-dark(color-mix(in oklch, var(--fg) 82%, var(--tone-base)),
-            color-mix(in oklch, var(--fg) 90%, var(--tone-base)));
-        --line-soft: light-dark(color-mix(in oklch, var(--fg) 58%, var(--surface-panel)),
-            color-mix(in oklch, var(--fg) 48%, var(--surface-panel)));
-        --accent: light-dark(oklch(50% 0.18 275),
-            oklch(64% 0.16 270));
-        --accent-ink: color-mix(in oklch, var(--accent) 70%, var(--fg));
-        --accent-border: color-mix(in oklch, var(--accent) 40%, var(--line-soft));
         --focus-ring: color-mix(in oklch, var(--accent) 62%, var(--fg));
-        --accent-wash: color-mix(in oklch, var(--accent) 5%, var(--surface-panel));
-        --warn: light-dark(oklch(70% 0.22 65), oklch(82% 0.20 70));
-        --err: light-dark(oklch(58% 0.26 28), oklch(72% 0.24 28));
-        --surface-panel: light-dark(color-mix(in oklch,
-              oklch(100% 0.008 270 / 0.5) 88%,
-              oklch(94.5% 0.014 265 / 0.96)),
-            color-mix(in oklch,
-              oklch(18% 0.08 270 / 0.45) 78%,
-              oklch(17% 0.03 265 / 0.82)));
-        --panel-bg: color-mix(in oklch, var(--surface-panel) 88%, var(--card-surface));
-        --panel-shadow: light-dark(0 6px 16px -14px color-mix(in oklch, var(--fg) 18%, transparent),
-            0 10px 18px -16px color-mix(in oklch, var(--fg) 40%, transparent));
         --fs-sm: clamp(13px, 0.9vw, 14px);
         --results-pane-mobile-height: 70dvh;
-        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-family:
+          "Pretendard", -apple-system, BlinkMacSystemFont, system-ui,
+          sans-serif;
         scrollbar-width: thin;
         scrollbar-color: color-mix(in oklch,
-            color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) transparent;
-      }
+            color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%,
+            var(--accent) 18%) oklch(0% 0 0 / 0);
 
-      :root[dir="rtl"] {
-        --safe-inline-start: env(safe-area-inset-right);
-        --safe-inline-end: env(safe-area-inset-left);
-        --inline-origin-x: 100%;
-        --inline-angle: 270deg;
-        --shimmer-from: 120%;
-        --shimmer-to: -120%;
-      }
+        &[dir="rtl"] {
+          --safe-inline-start: env(safe-area-inset-right);
+          --safe-inline-end: env(safe-area-inset-left);
+          --inline-origin-x: 100%;
+          --inline-angle: 270deg;
+          --shimmer-from: 120%;
+          --shimmer-to: -120%;
+        }
 
-      :root[data-theme="light"] {
-        color-scheme: light;
-      }
+        &[data-theme="light"] {
+          color-scheme: light;
+        }
 
-      :root[data-theme="dark"] {
-        color-scheme: dark;
+        &[data-theme="dark"] {
+          color-scheme: dark;
+        }
       }
 
       body {
@@ -154,7 +121,9 @@
         line-height: 1.6;
 
         &::selection {
-          background: color-mix(in oklch, var(--accent) 25%, var(--card-surface));
+          background: color-mix(in oklch,
+              var(--accent) 25%,
+              var(--card-surface));
           color: var(--fg);
         }
 
@@ -189,7 +158,9 @@
         scrollbar-width: thin;
         overflow: auto;
         --scroll-shadow-size: 14px;
-        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, transparent);
+        --scroll-shadow-color: color-mix(in oklch,
+            var(--line-soft) 70%,
+            oklch(0% 0 0 / 0));
         --top-shadow-opacity: 0;
         --bottom-shadow-opacity: 0;
       }
@@ -214,14 +185,18 @@
           &::before {
             inset-block-start: 0;
             margin-block-start: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+            background: linear-gradient(180deg,
+                var(--scroll-shadow-color),
+                oklch(0% 0 0 / 0));
             opacity: var(--top-shadow-opacity);
           }
 
           &::after {
             inset-block-end: 0;
             margin-block-end: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+            background: linear-gradient(0deg,
+                var(--scroll-shadow-color),
+                oklch(0% 0 0 / 0));
             opacity: var(--bottom-shadow-opacity);
           }
         }
@@ -246,14 +221,18 @@
           &::before {
             inset-block-start: var(--table-head-offset);
             margin-block-end: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+            background: linear-gradient(180deg,
+                var(--scroll-shadow-color),
+                oklch(0% 0 0 / 0));
             opacity: var(--top-shadow-opacity);
           }
 
           &::after {
             inset-block-end: 0;
             margin-block-start: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+            background: linear-gradient(0deg,
+                var(--scroll-shadow-color),
+                oklch(0% 0 0 / 0));
             opacity: var(--bottom-shadow-opacity);
           }
         }
@@ -322,7 +301,7 @@
           }
         }
 
-        .left-pane-scroll>:has(#coords) {
+        .left-pane-scroll> :has(#coords) {
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -332,7 +311,7 @@
           padding-inline-end: var(--card-pad-inline);
         }
 
-        .left-pane-scroll:has(.manual-rng[open])>:has(#coords) {
+        .left-pane-scroll:has(.manual-rng[open])> :has(#coords) {
           flex: 0 0 auto;
         }
 
@@ -364,7 +343,7 @@
           border-radius: 18px;
           min-block-size: 112px;
           padding: 12px 16px;
-          transition: .2s ease;
+          transition: 0.2s ease;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -385,7 +364,7 @@
           .drop-icon {
             inline-size: 36px;
             block-size: 36px;
-            transition: .2s ease;
+            transition: 0.2s ease;
             stroke-width: 1.5;
           }
 
@@ -433,14 +412,14 @@
         }
 
         :where(.coords-view,
-          .manual-rng>summary,
+          .manual-rng > summary,
           button,
           .filters input[type="search"],
           .filters select,
           .manual-rng input[type="text"],
           .manual-rng textarea) {
           border-radius: 12px;
-          transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         :where(button,
@@ -493,7 +472,7 @@
           box-shadow: none;
         }
 
-        :where(.coords-view, .manual-rng>summary):focus-visible {
+        :where(.coords-view, .manual-rng > summary):focus-visible {
           outline: 2px solid var(--focus-ring);
           outline-offset: -2px;
           box-shadow: none;
@@ -516,47 +495,19 @@
           padding-block: 12px;
           padding-inline: 8px;
 
-          @media (any-hover: hover) {
-            &:hover {
-              background: var(--accent-wash);
-            }
-          }
-
           &:disabled {
             opacity: 0.4;
             cursor: not-allowed;
             filter: grayscale(0.8);
           }
 
-          &:is(#parse, #start) {
-            background: light-dark(color-mix(in oklch, var(--accent) 85%, var(--fg)),
-                color-mix(in oklch, var(--accent) 42%, var(--surface-panel)));
-            color: light-dark(color-mix(in oklch, var(--tone-base) 99%, var(--fg)),
-                color-mix(in oklch, var(--fg) 98%, var(--tone-base)));
-
-            &:not(:disabled) {
-              &:hover {
-                background: light-dark(color-mix(in oklch, var(--accent) 82%, var(--fg)),
-                    color-mix(in oklch, var(--accent) 38%, var(--surface-panel)));
-              }
-            }
-          }
-
           &:is(#parse, #start):focus-visible {
             outline: 2px solid color-mix(in oklch, var(--tone-base) 90%, var(--accent));
             outline-offset: -2px;
-            border-color: color-mix(in oklch, var(--tone-base) 90%, var(--accent));
+            border-color: color-mix(in oklch,
+                var(--tone-base) 90%,
+                var(--accent));
             box-shadow: none;
-          }
-
-          &#stop {
-            color: color-mix(in oklch, var(--err) 80%, var(--fg));
-
-            &:not(:disabled) {
-              &:hover {
-                background: color-mix(in oklch, var(--err) 4%, var(--surface-panel));
-              }
-            }
           }
         }
       }
@@ -627,10 +578,10 @@
             inset-inline: 0;
             transform: translateX(var(--shimmer-from));
             background: linear-gradient(in oklch var(--inline-angle),
-                transparent 0%,
-                color-mix(in oklch, var(--page-bg) 75%, transparent) 45%,
-                transparent 100%);
-            opacity: light-dark(.78, .55);
+                oklch(0% 0 0 / 0) 0%,
+                color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%,
+                oklch(0% 0 0 / 0) 100%);
+            opacity: light-dark(0.78, 0.55);
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
             pointer-events: none;
@@ -646,7 +597,7 @@
         flex-shrink: 0;
         font-weight: 500;
         font-size: var(--fs-sm);
-        transition: opacity .3s, transform .3s, display .3s allow-discrete;
+        transition: opacity 0.3s, transform 0.3s, display 0.3s allow-discrete;
 
         @starting-style {
           opacity: 0;
@@ -661,14 +612,22 @@
 
         &.err {
           color: color-mix(in oklch, var(--err) 45%, var(--fg));
-          border-inline-start-color: color-mix(in oklch, var(--err) 70%, var(--line-soft));
-          background: color-mix(in oklch, var(--err) 10%, var(--surface-panel));
+          border-inline-start-color: color-mix(in oklch,
+              var(--err) 70%,
+              var(--line-soft));
+          background: color-mix(in oklch,
+              var(--err) 10%,
+              var(--surface-panel));
         }
 
         &.warn {
           color: color-mix(in oklch, var(--warn) 35%, var(--fg));
-          border-inline-start-color: color-mix(in oklch, var(--warn) 50%, var(--fg));
-          background: color-mix(in oklch, var(--warn) 10%, var(--surface-panel));
+          border-inline-start-color: color-mix(in oklch,
+              var(--warn) 50%,
+              var(--fg));
+          background: color-mix(in oklch,
+              var(--warn) 10%,
+              var(--surface-panel));
         }
 
         &.stopped {
@@ -698,7 +657,7 @@
 
           &::before {
             content: "▸";
-            transition: transform .2s ease;
+            transition: transform 0.2s ease;
             color: var(--muted-strong);
           }
         }
@@ -720,7 +679,10 @@
           padding-inline-end: 4px;
           scrollbar-width: thin;
           scrollbar-color: color-mix(in oklch,
-              color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) transparent;
+              color-mix(in oklch,
+                var(--line-soft) 75%,
+                var(--surface-panel)) 82%,
+              var(--accent) 18%) oklch(0% 0 0 / 0);
         }
 
         .manual-rng-help {
@@ -806,14 +768,14 @@
               gap: 1px;
               font-size: 11px;
               line-height: 0.98;
-            }
 
-            #saveOutput .action-btn__label--savefile > span:first-child {
-              letter-spacing: -0.045em;
-            }
+              >span:first-child {
+                letter-spacing: -0.045em;
+              }
 
-            #saveOutput .action-btn__label--savefile > span:last-child {
-              font-size: 12px;
+              >span:last-child {
+                font-size: 12px;
+              }
             }
 
             #copyOutput {
@@ -862,11 +824,11 @@
         input[type="search"] {
           min-inline-size: 220px;
           flex: 1 1 220px;
-        }
 
-        input[type="search"]::placeholder {
-          color: var(--muted-strong);
-          opacity: 1;
+          &::placeholder {
+            color: var(--muted-strong);
+            opacity: 1;
+          }
         }
 
         select {
@@ -905,13 +867,14 @@
             position: sticky;
             inset-block-start: 0;
             z-index: 10;
-            background: color-mix(in srgb, var(--panel-bg) 88%, var(--surface-panel));
+            background: light-dark(oklch(98.3678% 0.00398 258.32),
+                oklch(17.4973% 0.03507 259.82));
             text-align: start;
             font-weight: 600;
             color: var(--muted-strong);
             white-space: nowrap;
 
-            &:nth-child(-n + 2) {
+            &:nth-child(-n+2) {
               text-align: center;
             }
 
@@ -925,7 +888,7 @@
           td {
             vertical-align: top;
 
-            &:nth-child(-n + 2) {
+            &:nth-child(-n+2) {
               color: var(--muted);
             }
 
@@ -942,7 +905,9 @@
 
             @media (any-hover: hover) {
               &:hover {
-                background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
+                background: color-mix(in oklch,
+                    var(--accent) 4%,
+                    var(--surface-panel));
               }
             }
 
@@ -955,9 +920,9 @@
           }
         }
 
-        @container (inline-size >900px) {
+        @container (inline-size > 900px) {
           tbody {
-            td:nth-child(-n + 2) {
+            td:nth-child(-n+2) {
               text-align: center;
             }
           }
@@ -988,10 +953,13 @@
               gap: 10px;
               padding-block: 16px;
               padding-inline: 16px;
-              background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
+              background: color-mix(in oklch,
+                  var(--surface-panel) 86%,
+                  var(--card-surface));
               border-radius: 16px;
-              box-shadow: 0 1px 2px color-mix(in oklch, var(--fg) 12%, transparent),
-                0 1px 1px color-mix(in oklch, var(--fg) 8%, transparent);
+              box-shadow:
+                0 1px 2px color-mix(in oklch, var(--fg) 12%, oklch(0% 0 0 / 0)),
+                0 1px 1px color-mix(in oklch, var(--fg) 8%, oklch(0% 0 0 / 0));
               animation: row-fade-in 1s both;
               animation-timeline: view();
               animation-range: entry 0% cover 25%;
@@ -1018,7 +986,7 @@
               animation: none !important;
 
               &:hover {
-                background: transparent !important;
+                background: oklch(0% 0 0 / 0) !important;
               }
             }
           }
@@ -1041,9 +1009,9 @@
             inset-inline: 0;
             transform: translateX(var(--shimmer-from));
             background: linear-gradient(in oklch var(--inline-angle),
-                transparent,
+                oklch(0% 0 0 / 0),
                 color-mix(in oklch, var(--accent) 18%, var(--surface-panel)),
-                transparent);
+                oklch(0% 0 0 / 0));
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
           }
@@ -1183,7 +1151,7 @@
 
         &:focus-visible {
           box-shadow:
-            0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, transparent),
+            0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, oklch(0% 0 0 / 0)),
             inset 0 0 0 2px var(--focus-ring);
         }
 
@@ -1236,57 +1204,57 @@
       --site-header-height: 72px;
       --site-header-gap: 20px;
       --page-pad-block-end: 20px;
-      --page-bg: #ffffff;
-      --card-surface: #ffffff;
-      --surface-panel: #ffffff;
-      --panel-bg: #f7f9fc;
-      --fg: #161d2d;
-      --tone-base: #f7f9fc;
-      --muted: #6a7284;
-      --muted-strong: #202838;
-      --line-soft: #e8edf4;
-      --accent: #3d82ff;
-      --accent-ink: #3d82ff;
-      --accent-border: #dbe3ef;
-      --accent-wash: #eef5ff;
-      --warn: #d99d25;
-      --err: #d4485c;
-      --panel-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
-      --header-bg: rgba(255, 255, 255, 0.96);
-      --header-border: #edf1f6;
-      --shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
-      --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.04);
-      --toggle-bg: #ffffff;
-      --toggle-border: #e2e8f0;
-      --toggle-text: #202838;
-      --brand-text: #141b2d;
-    }
+      --page-bg: oklch(100% 0 0);
+      --card-surface: oklch(100% 0 0);
+      --surface-panel: oklch(100% 0 0);
+      --panel-bg: oklch(98.1449% 0.00453 258.32);
+      --fg: oklch(23.2073% 0.03283 265.79);
+      --tone-base: oklch(98.1449% 0.00453 258.32);
+      --muted: oklch(55.1732% 0.02965 266.41);
+      --muted-strong: oklch(27.6759% 0.0319 263.84);
+      --line-soft: oklch(94.4327% 0.01086 256.7);
+      --accent: oklch(62.9919% 0.2104 261.11);
+      --accent-ink: oklch(62.9919% 0.2104 261.11);
+      --accent-border: oklch(91.3301% 0.0447 258.35);
+      --accent-wash: oklch(96.7779% 0.0164 257.2);
+      --warn: oklch(73.5214% 0.1698 78.98);
+      --err: oklch(60.0856% 0.2631 15.86);
+      --panel-shadow: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
+      --header-bg: oklch(100% 0 0 / 0.96);
+      --header-border: oklch(95.654% 0.00797 253.85);
+      --shadow: 0 16px 36px oklch(20.7682% 0.03982 265.75 / 0.05);
+      --shadow-soft: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
+      --toggle-bg: oklch(100% 0 0);
+      --toggle-border: oklch(92.8761% 0.01262 255.51);
+      --toggle-text: oklch(27.6759% 0.0319 263.84);
+      --brand-text: oklch(22.4879% 0.0368 267.24);
 
-    :root[data-theme="dark"] {
-      --page-bg: #010817;
-      --card-surface: #091325;
-      --surface-panel: #091325;
-      --panel-bg: #07101f;
-      --fg: #ffffff;
-      --tone-base: #07101f;
-      --muted: #8f99b5;
-      --muted-strong: #dfe7f8;
-      --line-soft: #12233f;
-      --accent: #3f8dff;
-      --accent-ink: #56a8ff;
-      --accent-border: #1a2e50;
-      --accent-wash: rgba(63, 141, 255, 0.12);
-      --warn: #f1b547;
-      --err: #ff6b81;
-      --panel-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-      --header-bg: rgba(1, 8, 23, 0.96);
-      --header-border: rgba(64, 87, 136, 0.22);
-      --toggle-bg: rgba(9, 19, 37, 0.88);
-      --toggle-border: #1a2e50;
-      --toggle-text: #ffffff;
-      --brand-text: #ffffff;
-      --shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
-      --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.18);
+      &[data-theme="dark"] {
+        --page-bg: oklch(13.4824% 0.03772 255.32);
+        --card-surface: oklch(18.8135% 0.03978 261.32);
+        --surface-panel: oklch(18.8135% 0.03978 261.32);
+        --panel-bg: oklch(17.3147% 0.03443 259.54);
+        --fg: oklch(100% 0 0);
+        --tone-base: oklch(17.3147% 0.03443 259.54);
+        --muted: oklch(68.4542% 0.04287 269.76);
+        --muted-strong: oklch(92.6985% 0.02464 265.59);
+        --line-soft: oklch(25.767% 0.05772 259.88);
+        --accent: oklch(65.3229% 0.1969 258.23);
+        --accent-ink: oklch(71.8796% 0.1599 251.87);
+        --accent-border: oklch(30.3242% 0.1475 260.4);
+        --accent-wash: oklch(65.3229% 0.1969 258.23 / 0.12);
+        --warn: oklch(80.9396% 0.1868 79.23);
+        --err: oklch(71.6163% 0.2181 13.83);
+        --panel-shadow: 0 10px 24px oklch(0% 0 0 / 0.18);
+        --header-bg: oklch(13.4824% 0.03772 255.32 / 0.96);
+        --header-border: oklch(46.12% 0.0851 264.23 / 0.22);
+        --toggle-bg: oklch(18.8135% 0.03978 261.32 / 0.88);
+        --toggle-border: oklch(30.3242% 0.06705 260.4);
+        --toggle-text: oklch(100% 0 0);
+        --brand-text: oklch(100% 0 0);
+        --shadow: 0 18px 40px oklch(0% 0 0 / 0.2);
+        --shadow-soft: 0 10px 24px oklch(0% 0 0 / 0.18);
+      }
     }
 
     html,
@@ -1297,7 +1265,8 @@
     body {
       letter-spacing: -0.02em;
       padding-block-start: calc(var(--site-header-height) + var(--site-header-gap));
-      padding-block-end: max(var(--page-pad-block-end), env(safe-area-inset-bottom));
+      padding-block-end: max(var(--page-pad-block-end),
+          env(safe-area-inset-bottom));
     }
 
     @media (min-width: 941px) {
@@ -1352,8 +1321,8 @@
       }
 
       .brand-mark {
-        inline-size: clamp(34px, 2.8vw, 40px);
-        block-size: clamp(34px, 2.8vw, 40px);
+        inline-size: clamp(36px, 3vw, 44px);
+        block-size: clamp(36px, 3vw, 44px);
         flex: 0 0 auto;
       }
 
@@ -1401,7 +1370,7 @@
         }
 
         &.reverse {
-          color: #2cc890;
+          color: oklch(74.1537% 0.204 163.16);
         }
       }
     }
@@ -1435,16 +1404,6 @@
       border-radius: 14px;
       font-weight: 700;
 
-      &:is(#parse, #start) {
-        background: var(--accent);
-        border-color: color-mix(in srgb, var(--accent) 78%, white);
-        color: #ffffff;
-      }
-
-      &:is(#parse, #start):not(:disabled):hover {
-        background: color-mix(in srgb, var(--accent) 88%, black);
-      }
-
       &.theme-toggle {
         inline-size: 46px;
         block-size: 46px;
@@ -1457,7 +1416,10 @@
         font-size: 1.35rem;
         line-height: 1;
         flex: 0 0 auto;
-        transition: transform .2s ease, border-color .2s ease, background-color .2s ease;
+        transition:
+          transform 0.2s ease,
+          border-color 0.2s ease,
+          background-color 0.2s ease;
 
         &:hover {
           border-color: var(--accent) !important;
@@ -1486,7 +1448,12 @@
       position: relative;
       overflow: hidden;
       isolation: isolate;
-      transition: transform .18s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease;
+      transition:
+        transform 0.18s ease,
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease;
 
       .action-btn__icon {
         inline-size: 16px;
@@ -1507,10 +1474,10 @@
         display: inline-flex;
         align-items: center;
         gap: 0.25em;
-      }
 
-      .action-btn__label--savefile > span:first-child {
-        white-space: nowrap;
+        >span:first-child {
+          white-space: nowrap;
+        }
       }
 
       @media (any-hover: hover) {
@@ -1528,48 +1495,60 @@
 
     :is(#parse, #start, #export, #runBtn).action-btn--primary {
       --action-bg: linear-gradient(135deg,
-          light-dark(#6E61FF, #5D57F7),
-          light-dark(#3CB8FF, #21B3FF));
+          light-dark(oklch(59.5615% 0.2385 280.75),
+            oklch(56.1461% 0.2584 277.61)),
+          light-dark(oklch(74.638% 0.1563 238.96),
+            oklch(73.0225% 0.1669 239.11)));
       --action-hover-bg: linear-gradient(135deg,
-          light-dark(#6456F6, #6962FF),
-          light-dark(#31AEFF, #38C2FF));
-      --action-border: light-dark(#CFCBFF, #274EA0);
-      --action-color: #ffffff;
+          light-dark(oklch(56.4017% 0.259 280.04), oklch(59.3616% 0.2381 279)),
+          light-dark(oklch(72.1505% 0.1672 242.95),
+            oklch(76.8225% 0.1515 232.73)));
+      --action-border: light-dark(oklch(86.2548% 0.077 288.32),
+          oklch(44.3794% 0.2586 262.87));
+      --action-color: oklch(100% 0 0);
       background: var(--action-bg);
       color: var(--action-color);
       border-color: var(--action-border);
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.24),
-        light-dark(0 14px 24px -18px rgba(61, 130, 255, 0.58),
-          0 16px 28px -18px rgba(42, 167, 255, 0.44));
+        inset 0 1px 0 oklch(100% 0 0 / 0.24),
+        light-dark(0 14px 24px -18px oklch(62.9919% 0.2104 261.11 / 0.58),
+          0 16px 28px -18px oklch(70.4516% 0.1751 245.52 / 0.44));
     }
 
-    :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft {
-      --action-bg: light-dark(#F8FAFC,
+    :is(#pause,
+      #resume,
+      #filter-clear,
+      #saveOutput,
+      #copyOutput,
+      #clearBtn,
+      .map-btn).action-btn--soft {
+      --action-bg: light-dark(oklch(98.4152% 0.00341 247.86),
           color-mix(in oklch, var(--surface-panel) 78%, oklch(24% 0.03 268)));
-      --action-hover-bg: light-dark(#F1F5F9,
+      --action-hover-bg: light-dark(oklch(96.826% 0.00685 247.9),
           color-mix(in oklch, var(--surface-panel) 72%, oklch(28% 0.03 268)));
-      --action-border: light-dark(#E2E8F0, #1A2E50);
-      --action-color: light-dark(#0F172A, #E6EDF9);
+      --action-border: light-dark(oklch(92.8761% 0.01262 255.51),
+          oklch(30.3242% 0.06705 260.4));
+      --action-color: light-dark(oklch(20.7682% 0.03982 265.75),
+          oklch(94.4326% 0.01785 261.34));
       background: var(--action-bg);
       color: var(--action-color);
       border-color: var(--action-border);
     }
 
     #stop.action-btn--danger {
-      --action-bg: light-dark(#FFF1F2,
+      --action-bg: light-dark(oklch(96.941% 0.0187 12.42),
           color-mix(in oklch, var(--err) 18%, var(--surface-panel)));
-      --action-hover-bg: light-dark(#FFE4E8,
+      --action-hover-bg: light-dark(oklch(94.1918% 0.0371 7.52),
           color-mix(in oklch, var(--err) 24%, var(--surface-panel)));
-      --action-border: light-dark(#FFD4DB,
+      --action-border: light-dark(oklch(90.8442% 0.0603 7.08),
           color-mix(in oklch, var(--err) 44%, var(--surface-panel)));
-      --action-color: light-dark(#E11D48,
-          color-mix(in oklch, var(--err) 78%, white));
+      --action-color: light-dark(oklch(58.5838% 0.2568 17.58),
+          color-mix(in oklch, var(--err) 78%, oklch(100% 0 0)));
       background: var(--action-bg);
       color: var(--action-color);
       border-color: var(--action-border);
-      box-shadow: light-dark(0 12px 22px -20px rgba(225, 29, 72, 0.42),
-          0 16px 26px -20px rgba(255, 107, 129, 0.34));
+      box-shadow: light-dark(0 12px 22px -20px oklch(58.5838% 0.2568 17.58 / 0.42),
+          0 16px 26px -20px oklch(71.6163% 0.2181 13.83 / 0.34));
     }
 
     .action-btn--compact {
@@ -1583,11 +1562,11 @@
       min-block-size: 42px;
       padding: 0;
       gap: 0;
-    }
 
-    .action-btn--icononly .action-btn__icon {
-      inline-size: 18px;
-      block-size: 18px;
+      .action-btn__icon {
+        inline-size: 18px;
+        block-size: 18px;
+      }
     }
 
     .map-btn.action-btn--icononly {
@@ -1597,11 +1576,11 @@
       min-block-size: 38px;
       border-radius: 12px;
       box-shadow: none;
-    }
 
-    .map-btn.action-btn--icononly .action-btn__icon {
-      inline-size: 17px;
-      block-size: 17px;
+      .action-btn__icon {
+        inline-size: 17px;
+        block-size: 17px;
+      }
     }
 
     #export.action-btn {
@@ -1622,11 +1601,17 @@
     }
 
     @media (any-hover: hover) {
-      :is(#parse, #start, #export, #runBtn).action-btn--primary:not(:disabled):hover {
+      :is(#parse, #start, #export, #runBtn).action-btn--primary:not( :disabled):hover {
         background: var(--action-hover-bg);
       }
 
-      :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft:not(:disabled):hover {
+      :is(#pause,
+        #resume,
+        #filter-clear,
+        #saveOutput,
+        #copyOutput,
+        #clearBtn,
+        .map-btn).action-btn--soft:not(:disabled):hover {
         background: var(--action-hover-bg);
       }
 
@@ -1788,8 +1773,8 @@
 
       .site-brand {
         .brand-mark {
-          inline-size: 30px;
-          block-size: 30px;
+          inline-size: 32px;
+          block-size: 32px;
         }
 
         strong {
@@ -1847,7 +1832,8 @@
                   d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
               </svg>
               <span class="drop-text">
-                <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong> 업로드</span>
+                <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong>
+                  업로드</span>
                 <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
               </span>
               <input type="file" id="file" accept=".txt">
@@ -1857,7 +1843,8 @@
                 command="--parse">
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="3.25"></circle>
-                  <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5"></path>
+                  <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5">
+                  </path>
                 </svg>
                 <span class="action-btn__label">좌표 추출</span>
               </button>
@@ -1905,20 +1892,23 @@
         <details class="manual-rng">
           <summary>직접 입력 난수 변환</summary>
           <div class="manual-rng-body">
-            <p class="manual-rng-help" id="manual-rng-help">기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.</p>
+            <p class="manual-rng-help">
+              기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.
+            </p>
             <div class="manual-rng-field">
               <label class="manual-rng-label" for="num64">기본 난수값</label>
               <input id="num64" type="text" inputmode="numeric" aria-describedby="num64-help"
                 placeholder="예: 123456789 또는 0x1122334455667788">
-              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~ 18446744073709551615<br><span
-                  class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
+              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~
+                18446744073709551615<br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
             </div>
             <div class="manual-rng-field">
               <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
               <textarea id="suppValues" aria-describedby="suppValues-help" placeholder="쉼표/공백/줄바꿈 구분
 예) 0x123456789ABCDEF0
 18446744073709551615"></textarea>
-              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
+              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가
+                입력합니다.</span>
             </div>
             <div class="manual-rng-actions">
               <button id="runBtn" class="action-btn action-btn--primary" type="button">
@@ -1934,13 +1924,15 @@
                   <path d="m8 10.75 4 4 4-4"></path>
                   <path d="M5.5 18.5h13"></path>
                 </svg>
-                <span class="action-btn__label action-btn__label--savefile"><span>random_data.txt</span><span>저장</span></span>
+                <span
+                  class="action-btn__label action-btn__label--savefile"><span>random_data.txt</span><span>저장</span></span>
               </button>
               <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사"
                 aria-label="클립보드 복사">
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
+                  </path>
                 </svg>
                 <span class="action-btn__label">클립보드 복사</span>
               </button>
@@ -1952,8 +1944,10 @@
                 <span class="action-btn__label">출력 지우기</span>
               </button>
             </div>
-            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
-            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true"></div>
+            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true">
+            </div>
+            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true">
+            </div>
             <section aria-label="변환 결과">
               <pre id="output" class="coords-view"><span
                 class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
@@ -1982,7 +1976,8 @@
               id="cnt-remain">0</strong>건 미처리</output>
         </div>
         <output id="status" class="status"></output>
-        <div id="status-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div id="status-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        </div>
         <footer>
           <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
         </footer>
@@ -2040,15 +2035,15 @@
           </caption>
           <thead>
             <tr>
-              <th data-col-key="kind">구분</th>
-              <th data-col-key="idx">순번</th>
-              <th data-col-key="coords">좌표 (위도,경도)</th>
-              <th data-col-key="sido">시·도</th>
-              <th data-col-key="sigungu">시·군·구</th>
-              <th data-col-key="emd">읍·면·동·리</th>
-              <th data-col-key="tag">지물 태그</th>
-              <th data-col-key="fullAddr">전체주소</th>
-              <th data-col-key="maps">지도링크</th>
+              <th>구분</th>
+              <th>순번</th>
+              <th>좌표 (위도,경도)</th>
+              <th>시·도</th>
+              <th>시·군·구</th>
+              <th>읍·면·동·리</th>
+              <th>지물 태그</th>
+              <th>전체주소</th>
+              <th>지도링크</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -2100,7 +2095,8 @@
         <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
           aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
+            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
+            </path>
             <circle cx="12" cy="10.75" r="1.8"></circle>
           </svg>
           <span class="sr-only">지도</span>
@@ -2122,7 +2118,8 @@
         <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
           aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z"></path>
+            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
+            </path>
             <circle cx="12" cy="10.75" r="1.8"></circle>
           </svg>
           <span class="sr-only">지도</span>
@@ -2159,7 +2156,9 @@
           s = s.replaceAll('"', '""');
           return `"${s}"`;
         }
-        if (!needsQuote && (c === 44 || c === 10 || c === 13)) needsQuote = true;
+        if (!needsQuote && (c === 44 || c === 10 || c === 13)) {
+          needsQuote = true;
+        }
       }
       return needsQuote ? `"${s}"` : s;
     };
@@ -2192,19 +2191,24 @@
     }
     const mapPopover = document.getElementById("map-popover");
     let MAP_POPOVER_OPEN = false;
-    const mapAnchors =
-      document.querySelectorAll("#map-popover-links a[data-url-template]");
+    const mapAnchors = document.querySelectorAll(
+      "#map-popover-links a[data-url-template]",
+    );
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
     const getMapPopoverFocusTarget = () => {
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         const anchor = mapAnchors[i];
-        if (anchor instanceof HTMLElement && !anchor.hasAttribute("hidden")) return anchor;
+        if (anchor instanceof HTMLElement && !anchor.hasAttribute("hidden")) {
+          return anchor;
+        }
       }
       return mapPopover;
     };
     const setMapPopoverExpanded = (btn, expanded) => {
-      if (btn instanceof HTMLElement) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      if (btn instanceof HTMLElement) {
+        btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      }
     };
     let mapHasRound6 = false;
     const RX_MAP_TOKEN = /{lat}|{lon}/g;
@@ -2300,7 +2304,9 @@
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
       MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
-      if (prevInvoker && prevInvoker !== btn) setMapPopoverExpanded(prevInvoker, false);
+      if (prevInvoker && prevInvoker !== btn) {
+        setMapPopoverExpanded(prevInvoker, false);
+      }
       if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
       MAP_POPOVER_PREV_FOCUS = btn;
       updateMapPopoverFromInvoker(btn);
@@ -2348,8 +2354,9 @@
         MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
         return;
       }
-      MAP_POPOVER_PREV_FOCUS =
-        document.activeElement instanceof HTMLElement ? document.activeElement : LAST_MAP_INVOKER;
+      MAP_POPOVER_PREV_FOCUS = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
       if (!invoker || !invoker.isConnected) return;
       setMapPopoverExpanded(invoker, true);
@@ -2357,7 +2364,10 @@
       requestAnimationFrame(() => {
         if (!MAP_POPOVER_OPEN) return;
         const active = document.activeElement;
-        if (active === document.body || active === invoker || active === mapPopover) {
+        if (
+          active === document.body || active === invoker ||
+          active === mapPopover
+        ) {
           if (MAP_POPOVER_OPEN_WITH_KEYBOARD) {
             getMapPopoverFocusTarget()?.focus({ preventScroll: true });
           } else {
@@ -2366,7 +2376,8 @@
         }
       });
     });
-    const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
+    const fmt =
+      new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
     const COORD_INV_POW = 1 / COORD_POW;
@@ -2388,7 +2399,9 @@
       }
       const n = (typeof v === "number") ? v : Number(v);
       if (!Number.isFinite(n)) return String(v ?? "");
-      let s = (Math.round(n * COORD_POW) * COORD_INV_POW).toFixed(COORD_DECIMALS);
+      let s = (Math.round(n * COORD_POW) * COORD_INV_POW).toFixed(
+        COORD_DECIMALS,
+      );
       let end = s.length;
       while (end && s.charCodeAt(end - 1) === 48) end--;
       if (end && s.charCodeAt(end - 1) === 46) end--;
@@ -2444,32 +2457,17 @@
     const root = document.documentElement;
     const PERF_MODE_ATTR = "data-perf-mode";
     const DROP_ZONE_FILE_LABELS = document.querySelectorAll(
-      ".drop-text .desktop-msg, .drop-text .mobile-msg"
+      ".drop-text .desktop-msg, .drop-text .mobile-msg",
     );
     const THEME_STORAGE_KEY = "srg-theme";
     const ICON_VERSION = "4";
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const buildThemeIconHref = (theme) => `./icon.svg?v=${ICON_VERSION}&theme=${theme}`;
+    const buildThemeIconHref = (theme) =>
+      `./icon.svg?v=${ICON_VERSION}&theme=${theme}`;
     const syncThemeIcons = (theme) => {
       const iconHref = buildThemeIconHref(theme);
-      if (domElements.brandMark instanceof HTMLImageElement) {
-        domElements.brandMark.src = iconHref;
-      }
-      const currentFavicon = domElements.favicon;
-      const nextFavicon = currentFavicon instanceof HTMLLinkElement
-        ? currentFavicon.cloneNode()
-        : document.createElement("link");
-      nextFavicon.id = "app-favicon";
-      nextFavicon.rel = "icon";
-      nextFavicon.type = "image/svg+xml";
-      nextFavicon.sizes = "any";
-      nextFavicon.href = iconHref;
-      if (currentFavicon?.parentNode) {
-        currentFavicon.parentNode.replaceChild(nextFavicon, currentFavicon);
-      } else {
-        document.head.appendChild(nextFavicon);
-      }
-      domElements.favicon = nextFavicon;
+      domElements.brandMark.src = iconHref;
+      domElements.favicon.href = iconHref;
     };
     const getStoredTheme = () => {
       try {
@@ -2486,7 +2484,10 @@
       domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
       domElements.themeToggle.setAttribute("title", `${label}로 전환`);
-      domElements.themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
+      domElements.themeToggle.setAttribute(
+        "aria-pressed",
+        String(theme === "dark"),
+      );
     };
     const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
     applyTheme(getStoredTheme() ?? getSystemTheme());
@@ -2506,8 +2507,6 @@
     function clearScrollShadowState(el) {
       SHADOW_SYNC_PENDING.delete(el);
       if (!(el instanceof HTMLElement)) return;
-      el.removeAttribute("data-at-top");
-      el.removeAttribute("data-at-bottom");
       el.style.setProperty("--top-shadow-opacity", "0");
       el.style.setProperty("--bottom-shadow-opacity", "0");
     }
@@ -2519,22 +2518,21 @@
         SHADOW_SYNC_PENDING.delete(el);
         const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
         const atTop = el.scrollTop <= 1;
-        const atBottom = maxScrollTop <= 1 || el.scrollTop >= maxScrollTop - 1;
+        const atBottom = maxScrollTop <= 1 ||
+          el.scrollTop >= maxScrollTop - 1;
         const ramp = 200;
         const hasOverflow = maxScrollTop > 1;
         const floor = 0.16;
-        const topOpacity =
-          !hasOverflow || atTop
-            ? 0
-            : floor + (1 - floor) * Math.min(1, el.scrollTop / ramp);
-        const bottomOpacity =
-          !hasOverflow || atBottom
-            ? 0
-            : floor + (1 - floor) * Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
+        const topOpacity = !hasOverflow || atTop
+          ? 0
+          : floor + (1 - floor) * Math.min(1, el.scrollTop / ramp);
+        const bottomOpacity = !hasOverflow || atBottom ? 0 : floor +
+          (1 - floor) * Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
         el.style.setProperty("--top-shadow-opacity", topOpacity.toFixed(3));
-        el.style.setProperty("--bottom-shadow-opacity", bottomOpacity.toFixed(3));
-        el.toggleAttribute("data-at-top", atTop);
-        el.toggleAttribute("data-at-bottom", atBottom);
+        el.style.setProperty(
+          "--bottom-shadow-opacity",
+          bottomOpacity.toFixed(3),
+        );
       });
     }
     function resetScrollShadowState(el) {
@@ -2544,7 +2542,11 @@
     }
     for (const el of [domElements.tableWrap, domElements.coords]) {
       clearScrollShadowState(el);
-      el.addEventListener("scroll", () => requestScrollShadowSync(el), EVT_PASSIVE);
+      el.addEventListener(
+        "scroll",
+        () => requestScrollShadowSync(el),
+        EVT_PASSIVE,
+      );
     }
     const shadowResizeObserver = new ResizeObserver(() => {
       syncTableShadowOffset();
@@ -2563,10 +2565,10 @@
     const TAG_COL_INDEX = 6;
     const FULLADDR_COL_INDEX = 7;
     const MAPS_COL_INDEX = 8;
-    const SKELETON_TEMPLATE =
-      document.getElementById("tmpl-row-skeleton").content.querySelector("tr");
-    const ROW_TEMPLATE =
-      document.getElementById("tmpl-row").content.querySelector("tr");
+    const SKELETON_TEMPLATE = document.getElementById("tmpl-row-skeleton")
+      .content.querySelector("tr");
+    const ROW_TEMPLATE = document.getElementById("tmpl-row").content
+      .querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const RX_WS = /\s+/g;
     const norm = (s) => {
@@ -2619,7 +2621,8 @@
           let start = 0;
           while (true) {
             const end = q.indexOf("|", start);
-            const seg = (end === -1 ? q.slice(start) : q.slice(start, end)).trim();
+            const seg = (end === -1 ? q.slice(start) : q.slice(start, end))
+              .trim();
             if (seg) (toks ??= []).push(seg);
             if (end === -1) break;
             start = end + 1;
@@ -2729,7 +2732,8 @@
           };
         }
       }
-      const active = !!(kind || sido || sigungu || emd || tag || fullAddr || qTest);
+      const active =
+        !!(kind || sido || sigungu || emd || tag || fullAddr || qTest);
       if (!active) return { active: false };
       return {
         active: true,
@@ -2755,8 +2759,7 @@
     const getQSearch = (r) => {
       let s = r._q;
       if (s != null) return s;
-      return (r._q =
-        r._f_fullAddr +
+      return (r._q = r._f_fullAddr +
         Q_SEARCH_SEP +
         r._f_tag +
         Q_SEARCH_SEP +
@@ -2878,7 +2881,9 @@
         existing.len = len;
         existing.records = records;
         existing.anyVisible = false;
-        if (!existing.raf) existing.raf = requestAnimationFrame(existing.step);
+        if (!existing.raf) {
+          existing.raf = requestAnimationFrame(existing.step);
+        }
         return;
       }
       cancelActiveFilterApply();
@@ -2905,7 +2910,9 @@
           while (i < len) {
             const tr = rows[i];
             const wasHidden = tr.hidden;
-            if (!setHidden(tr, wasHidden, fNow, records[i])) anyVisible = true;
+            if (!setHidden(tr, wasHidden, fNow, records[i])) {
+              anyVisible = true;
+            }
             i++;
             processed++;
             if (processed >= 1500) break;
@@ -3060,15 +3067,18 @@
         } else {
           lowerCountryName = lower(countryName);
           lowerAdminCountry = lower(adminCountry);
-          isKoreanPeninsula =
-            lowerCountryName.indexOf("korea") !== -1 ||
+          isKoreanPeninsula = lowerCountryName.indexOf("korea") !== -1 ||
             lowerAdminCountry.indexOf("korea") !== -1;
         }
         let sido = "";
         let sigungu = "";
         let eupmyeon = "";
         const primaryName = firstGeocodeText(gcName, p0);
-        const cityDistrict = firstGeocodeText(gcCityDistrict, gcDistrict, gcSuburb);
+        const cityDistrict = firstGeocodeText(
+          gcCityDistrict,
+          gcDistrict,
+          gcSuburb,
+        );
         const city = gcCity;
         const county = gcCounty;
         if (isKoreanPeninsula) {
@@ -3153,11 +3163,17 @@
                   return specialCities.test(name);
                 };
                 if (cdLast === CC_SI && !isSpecialCityName(cd)) picked = cd;
-                else if (l6Last === CC_SI && !isSpecialCityName(l6)) picked = l6;
-                else if (coLast === CC_SI && !isSpecialCityName(co)) picked = co;
-                else if (pnLast === CC_SI && !isSpecialCityName(pn)) picked = pn;
-                else if (p0Last === CC_SI && !isSpecialCityName(p0)) picked = p0;
-                else if (p1Last === CC_SI && !isSpecialCityName(p1)) picked = p1;
+                else if (l6Last === CC_SI && !isSpecialCityName(l6)) {
+                  picked = l6;
+                } else if (coLast === CC_SI && !isSpecialCityName(co)) {
+                  picked = co;
+                } else if (pnLast === CC_SI && !isSpecialCityName(pn)) {
+                  picked = pn;
+                } else if (p0Last === CC_SI && !isSpecialCityName(p0)) {
+                  picked = p0;
+                } else if (p1Last === CC_SI && !isSpecialCityName(p1)) {
+                  picked = p1;
+                }
               }
             }
             sigungu = picked || "";
@@ -3201,7 +3217,10 @@
             const locality = gcLocality;
             const village = gcVillage;
             let cdLast = 0;
-            if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) {
+            if (
+              cityDistrict && cityDistrict !== cityLike &&
+              cityDistrict !== sido
+            ) {
               cdLast = cityDistrict.charCodeAt(cityDistrict.length - 1);
               if (cdLast === CC_GU) districtLike = cityDistrict;
             }
@@ -3252,12 +3271,23 @@
               sigungu = cityLike || districtLike || "";
             }
             if (!sigungu) {
-              if (coLast === CC_SI || coLast === CC_GU || coLast === CC_GUN) sigungu = co;
-              else if (l6Last === CC_SI || l6Last === CC_GU || l6Last === CC_GUN) sigungu = l6;
-              else if (cdLast === CC_SI || cdLast === CC_GU || cdLast === CC_GUN) sigungu = cityDistrict;
-              else if (pnLast === CC_SI || pnLast === CC_GU || pnLast === CC_GUN) sigungu = pn;
-              else if (p0Last === CC_SI || p0Last === CC_GU || p0Last === CC_GUN) sigungu = p0;
-              else if (p1Last === CC_SI || p1Last === CC_GU || p1Last === CC_GUN) sigungu = p1;
+              if (coLast === CC_SI || coLast === CC_GU || coLast === CC_GUN) {
+                sigungu = co;
+              } else if (
+                l6Last === CC_SI || l6Last === CC_GU || l6Last === CC_GUN
+              ) sigungu = l6;
+              else if (
+                cdLast === CC_SI || cdLast === CC_GU || cdLast === CC_GUN
+              ) sigungu = cityDistrict;
+              else if (
+                pnLast === CC_SI || pnLast === CC_GU || pnLast === CC_GUN
+              ) sigungu = pn;
+              else if (
+                p0Last === CC_SI || p0Last === CC_GU || p0Last === CC_GUN
+              ) sigungu = p0;
+              else if (
+                p1Last === CC_SI || p1Last === CC_GU || p1Last === CC_GUN
+              ) sigungu = p1;
             }
           }
           let emdOut = "";
@@ -3275,56 +3305,131 @@
           for (let i = 0; i < 10; i++) {
             let n;
             switch (i) {
-              case 0: n = level8; break;
-              case 1: n = level9; break;
-              case 2: n = level10; break;
-              case 3: n = gcTown; break;
-              case 4: n = gcVillage; break;
-              case 5: n = gcLocality; break;
-              case 6: n = gcSuburb; break;
-              case 7: n = primaryName; break;
-              case 8: n = p0; break;
-              case 9: n = p1; break;
+              case 0:
+                n = level8;
+                break;
+              case 1:
+                n = level9;
+                break;
+              case 2:
+                n = level10;
+                break;
+              case 3:
+                n = gcTown;
+                break;
+              case 4:
+                n = gcVillage;
+                break;
+              case 5:
+                n = gcLocality;
+                break;
+              case 6:
+                n = gcSuburb;
+                break;
+              case 7:
+                n = primaryName;
+                break;
+              case 8:
+                n = p0;
+                break;
+              case 9:
+                n = p1;
+                break;
             }
             if (!n || n === sido || n === sigungu) continue;
             let dup = false;
             switch (emdCount) {
-              case 9: if (n === emd8) { dup = true; break; }
-              case 8: if (n === emd7) { dup = true; break; }
-              case 7: if (n === emd6) { dup = true; break; }
-              case 6: if (n === emd5) { dup = true; break; }
-              case 5: if (n === emd4) { dup = true; break; }
-              case 4: if (n === emd3) { dup = true; break; }
-              case 3: if (n === emd2) { dup = true; break; }
-              case 2: if (n === emd1) { dup = true; break; }
-              case 1: if (n === emd0) dup = true;
+              case 9:
+                if (n === emd8) {
+                  dup = true;
+                  break;
+                }
+              case 8:
+                if (n === emd7) {
+                  dup = true;
+                  break;
+                }
+              case 7:
+                if (n === emd6) {
+                  dup = true;
+                  break;
+                }
+              case 6:
+                if (n === emd5) {
+                  dup = true;
+                  break;
+                }
+              case 5:
+                if (n === emd4) {
+                  dup = true;
+                  break;
+                }
+              case 4:
+                if (n === emd3) {
+                  dup = true;
+                  break;
+                }
+              case 3:
+                if (n === emd2) {
+                  dup = true;
+                  break;
+                }
+              case 2:
+                if (n === emd1) {
+                  dup = true;
+                  break;
+                }
+              case 1:
+                if (n === emd0) dup = true;
             }
             const lc = n.charCodeAt(n.length - 1);
             if (
               dup ||
-              (lc !== CC_EUP && lc !== CC_MYEON && lc !== CC_DONG && lc !== CC_RI)
+              (lc !== CC_EUP && lc !== CC_MYEON && lc !== CC_DONG &&
+                lc !== CC_RI)
             ) {
               continue;
             }
             switch (emdCount++) {
-              case 0: emd0 = n; break;
-              case 1: emd1 = n; break;
-              case 2: emd2 = n; break;
-              case 3: emd3 = n; break;
-              case 4: emd4 = n; break;
-              case 5: emd5 = n; break;
-              case 6: emd6 = n; break;
-              case 7: emd7 = n; break;
-              case 8: emd8 = n; break;
-              case 9: emd9 = n; break;
+              case 0:
+                emd0 = n;
+                break;
+              case 1:
+                emd1 = n;
+                break;
+              case 2:
+                emd2 = n;
+                break;
+              case 3:
+                emd3 = n;
+                break;
+              case 4:
+                emd4 = n;
+                break;
+              case 5:
+                emd5 = n;
+                break;
+              case 6:
+                emd6 = n;
+                break;
+              case 7:
+                emd7 = n;
+                break;
+              case 8:
+                emd8 = n;
+                break;
+              case 9:
+                emd9 = n;
+                break;
             }
-            emdOut = emdOut ? emdOut + " " + n : (typeof n === "string" ? n : String(n));
+            emdOut = emdOut
+              ? emdOut + " " + n
+              : (typeof n === "string" ? n : String(n));
           }
           eupmyeon = emdOut;
         } else {
           const isCityOrCounty = gc.type === "city" || gc.type === "county";
-          sido =
-            level4 ||
+          sido = level4 ||
             gcState ||
             gcRegion ||
             gcProvince ||
@@ -3336,8 +3441,9 @@
           else if (county && county !== sido) cityLike = county;
           else if (level6 && level6 !== sido) cityLike = level6;
           else if (level7 && level7 !== sido) cityLike = level7;
-          else if (primaryName && primaryName !== sido) cityLike = primaryName;
-          else if (p1 && p1 !== sido) cityLike = p1;
+          else if (primaryName && primaryName !== sido) {
+            cityLike = primaryName;
+          } else if (p1 && p1 !== sido) cityLike = p1;
           else if (p0 && p0 !== sido) cityLike = p0;
           let districtLike = "";
           const town = gcTown;
@@ -3345,19 +3451,29 @@
           const village = gcVillage;
           const suburb = gcSuburb;
           const neighbourhood = gcNeighbourhood;
-          if (cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido) districtLike = cityDistrict;
-          else if (level8 && level8 !== cityLike && level8 !== sido) districtLike = level8;
-          else if (level9 && level9 !== cityLike && level9 !== sido) districtLike = level9;
-          else if (town && town !== cityLike && town !== sido) districtLike = town;
-          else if (locality && locality !== cityLike && locality !== sido) districtLike = locality;
-          else if (village && village !== cityLike && village !== sido) districtLike = village;
-          else if (suburb && suburb !== cityLike && suburb !== sido) districtLike = suburb;
-          else if (neighbourhood && neighbourhood !== cityLike && neighbourhood !== sido) districtLike = neighbourhood;
+          if (
+            cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido
+          ) districtLike = cityDistrict;
+          else if (level8 && level8 !== cityLike && level8 !== sido) {
+            districtLike = level8;
+          } else if (level9 && level9 !== cityLike && level9 !== sido) {
+            districtLike = level9;
+          } else if (town && town !== cityLike && town !== sido) {
+            districtLike = town;
+          } else if (locality && locality !== cityLike && locality !== sido) {
+            districtLike = locality;
+          } else if (village && village !== cityLike && village !== sido) {
+            districtLike = village;
+          } else if (suburb && suburb !== cityLike && suburb !== sido) {
+            districtLike = suburb;
+          } else if (
+            neighbourhood && neighbourhood !== cityLike &&
+            neighbourhood !== sido
+          ) districtLike = neighbourhood;
           if (cityLike && districtLike && cityLike !== districtLike) {
             sigungu = `${cityLike} ${districtLike}`;
           } else {
-            sigungu =
-              cityLike ||
+            sigungu = cityLike ||
               districtLike ||
               level6 ||
               level8 ||
@@ -3378,43 +3494,82 @@
           const township = gcTownship;
           const residential = gcResidential;
           let cand = locality;
-          if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+          if (
+            cand && cand !== sido && cand !== cityLike &&
+            cand !== districtLike
+          ) eupmyeon = cand;
           else {
             cand = level10Local;
-            if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+            if (
+              cand && cand !== sido && cand !== cityLike &&
+              cand !== districtLike
+            ) eupmyeon = cand;
             else {
               cand = town;
-              if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+              if (
+                cand && cand !== sido && cand !== cityLike &&
+                cand !== districtLike
+              ) eupmyeon = cand;
               else {
                 cand = village;
-                if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                if (
+                  cand && cand !== sido && cand !== cityLike &&
+                  cand !== districtLike
+                ) eupmyeon = cand;
                 else {
                   cand = suburb;
-                  if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                  if (
+                    cand && cand !== sido && cand !== cityLike &&
+                    cand !== districtLike
+                  ) eupmyeon = cand;
                   else {
                     cand = neighbourhood;
-                    if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                    if (
+                      cand && cand !== sido && cand !== cityLike &&
+                      cand !== districtLike
+                    ) eupmyeon = cand;
                     else {
                       cand = quarter;
-                      if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                      if (
+                        cand && cand !== sido && cand !== cityLike &&
+                        cand !== districtLike
+                      ) eupmyeon = cand;
                       else {
                         cand = hamlet;
-                        if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                        if (
+                          cand && cand !== sido && cand !== cityLike &&
+                          cand !== districtLike
+                        ) eupmyeon = cand;
                         else {
                           cand = township;
-                          if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                          if (
+                            cand && cand !== sido && cand !== cityLike &&
+                            cand !== districtLike
+                          ) eupmyeon = cand;
                           else {
                             cand = residential;
-                            if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                            if (
+                              cand && cand !== sido && cand !== cityLike &&
+                              cand !== districtLike
+                            ) eupmyeon = cand;
                             else {
                               cand = gcName;
-                              if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                              if (
+                                cand && cand !== sido && cand !== cityLike &&
+                                cand !== districtLike
+                              ) eupmyeon = cand;
                               else {
                                 cand = p0;
-                                if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                                if (
+                                  cand && cand !== sido &&
+                                  cand !== cityLike && cand !== districtLike
+                                ) eupmyeon = cand;
                                 else {
                                   cand = p1;
-                                  if (cand && cand !== sido && cand !== cityLike && cand !== districtLike) eupmyeon = cand;
+                                  if (
+                                    cand && cand !== sido &&
+                                    cand !== cityLike && cand !== districtLike
+                                  ) eupmyeon = cand;
                                 }
                               }
                             }
@@ -3430,7 +3585,10 @@
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
-          if (eupmyeon && isCityOrCounty && eupmyeon === primaryName && eupmyeon === sigungu) {
+          if (
+            eupmyeon && isCityOrCounty && eupmyeon === primaryName &&
+            eupmyeon === sigungu
+          ) {
             eupmyeon = "";
           }
           if (!eupmyeon && districtLike && districtLike !== sido) {
@@ -3443,12 +3601,16 @@
               } else {
                 const dlLen = dl.length;
                 const cut = s.length - dlLen;
-                if (cut > 0 && s.endsWith(dl) && s.charCodeAt(cut - 1) === 32) {
+                if (
+                  cut > 0 && s.endsWith(dl) && s.charCodeAt(cut - 1) === 32
+                ) {
                   s = s.slice(0, cut - 1).trim();
                 } else {
                   let rx = RX_SIGUNGU_STRIP_CACHE.get(dl);
                   if (!rx) {
-                    if (RX_SIGUNGU_STRIP_CACHE.size > 4096) RX_SIGUNGU_STRIP_CACHE.clear();
+                    if (RX_SIGUNGU_STRIP_CACHE.size > 4096) {
+                      RX_SIGUNGU_STRIP_CACHE.clear();
+                    }
                     const esc = RegExp.escape(dl);
                     rx = new RegExp(`(?:^|\\s+)${esc}(?:\\s+|$)`, "g");
                     RX_SIGUNGU_STRIP_CACHE.set(dl, rx);
@@ -3465,9 +3627,15 @@
           }
         }
         if (!isKoreanPeninsula) {
-          if (isCountryLike(sido, lowerCountryName, lowerAdminCountry)) sido = "";
-          if (isCountryLike(sigungu, lowerCountryName, lowerAdminCountry)) sigungu = "";
-          if (isCountryLike(eupmyeon, lowerCountryName, lowerAdminCountry)) eupmyeon = "";
+          if (isCountryLike(sido, lowerCountryName, lowerAdminCountry)) {
+            sido = "";
+          }
+          if (isCountryLike(sigungu, lowerCountryName, lowerAdminCountry)) {
+            sigungu = "";
+          }
+          if (isCountryLike(eupmyeon, lowerCountryName, lowerAdminCountry)) {
+            eupmyeon = "";
+          }
         }
         if (sido && sigungu && sido === sigungu) {
           sigungu = "";
@@ -3513,16 +3681,28 @@
               const seg = label.slice(start, end).trim();
               if (seg) {
                 if (!p0) p0 = seg;
-                else { p1 = seg; break; }
+                else {
+                  p1 = seg;
+                  break;
+                }
               }
               if (comma === -1) break;
               start = comma + 1;
             }
           }
         }
-        const { sido, sigungu, eupmyeon } =
-          this._getAdminFromGeocoding(gc, countryCode, p0, p1);
-        const tagName = firstGeocodeText(gc.name, firstLabelPart, gc.street, gc.city);
+        const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(
+          gc,
+          countryCode,
+          p0,
+          p1,
+        );
+        const tagName = firstGeocodeText(
+          gc.name,
+          firstLabelPart,
+          gc.street,
+          gc.city,
+        );
         const tagType = geocodeText(gc.type);
         let tag = tagName;
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
@@ -3538,7 +3718,7 @@
         else if (countryCode === "kp") kind = "KP";
         else if (countryCode) kind = "WORLD";
         return { addr, kind };
-      }
+      },
     };
     const AppState = {
       records: [],
@@ -3558,7 +3738,8 @@
         );
       },
       get isBusy() {
-        return this.isRunning || this.status === "parsing" || this.status === "stopping";
+        return this.isRunning || this.status === "parsing" ||
+          this.status === "stopping";
       },
       get isPaused() {
         return this.status === "paused";
@@ -3629,7 +3810,8 @@
         UI_CACHE.resumeDisabled = resumeDisabled;
         resumeBtn.disabled = resumeDisabled;
       }
-      const stopDisabled = !(AppState.isRunning || s === "parsing") || s === "stopping";
+      const stopDisabled = !(AppState.isRunning || s === "parsing") ||
+        s === "stopping";
       if (UI_CACHE.stopDisabled !== stopDisabled) {
         UI_CACHE.stopDisabled = stopDisabled;
         stopBtn.disabled = stopDisabled;
@@ -3680,16 +3862,28 @@
         return;
       }
       let nextAnnouncement = text;
-      const progressMatch = type === "info" ? RX_STATUS_PROGRESS.exec(text) : null;
+      const progressMatch = type === "info"
+        ? RX_STATUS_PROGRESS.exec(text)
+        : null;
       if (progressMatch) {
-        const processed = Number.parseInt(progressMatch[1].replace(/,/g, ""), 10);
+        const processed = Number.parseInt(
+          progressMatch[1].replace(/,/g, ""),
+          10,
+        );
         const total = Number.parseInt(progressMatch[2].replace(/,/g, ""), 10);
-        if (Number.isFinite(processed) && Number.isFinite(total) && total > 0) {
+        if (
+          Number.isFinite(processed) && Number.isFinite(total) && total > 0
+        ) {
           const pct = Math.round((processed / total) * 100);
-          const bucket = total <= 10 ? pct : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
-          if (bucket === SR_STATUS_CACHE.progressBucket && processed !== total) return;
+          const bucket = total <= 10
+            ? pct
+            : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
+          if (
+            bucket === SR_STATUS_CACHE.progressBucket && processed !== total
+          ) return;
           SR_STATUS_CACHE.progressBucket = bucket;
-          nextAnnouncement = `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`;
+          nextAnnouncement =
+            `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`;
         }
       } else {
         SR_STATUS_CACHE.progressBucket = -1;
@@ -3720,8 +3914,8 @@
       ready: "좌표 추출 완료. 조회 시작을 눌러주세요.",
     };
     function setEmptyHint(kind = "init") {
-      domElements.emptyHint.textContent =
-        EMPTY_HINT_TEXT[kind] || EMPTY_HINT_TEXT.init;
+      domElements.emptyHint.textContent = EMPTY_HINT_TEXT[kind] ||
+        EMPTY_HINT_TEXT.init;
     }
     function syncFilterEmptyUI(active, totalRows, anyVisible) {
       const wrap = domElements.tableWrap;
@@ -3858,37 +4052,13 @@
           channel.port2.postMessage(0);
         });
     })();
-    async function* decodedChunkIterator(stream, signal) {
-      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
-      const asyncIter = decoded[Symbol.asyncIterator];
-      if (typeof asyncIter === "function") {
-        for await (const chunk of decoded) {
-          signal.throwIfAborted();
-          yield chunk;
-        }
-        return;
-      }
-      const reader = decoded.getReader();
-      try {
-        while (true) {
-          const { value: chunk, done } = await reader.read();
-          if (done) {
-            signal.throwIfAborted();
-            return;
-          }
-          signal.throwIfAborted();
-          yield chunk;
-        }
-      } finally {
-        try { await reader.cancel(signal.reason); } catch { }
-        try { reader.releaseLock(); } catch { }
-      }
-    }
     async function* lineIterator(stream, signal) {
+      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
       let buffer = "";
       let pendingCR = false;
       let hasCR = false;
-      for await (const chunk of decodedChunkIterator(stream, signal)) {
+      for await (const chunk of decoded) {
+        signal.throwIfAborted();
         if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
         if (pendingCR) {
           if (chunk && chunk[0] === "\n") {
@@ -4017,10 +4187,14 @@
             return res.json();
           }
           if (res.status !== 429 && res.status < 500) {
-            throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+            throw new Error(
+              `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
+            );
           }
           if (attempt >= maxRetry) {
-            throw new Error(`HTTP ${res.status}: rate limited or server error`);
+            throw new Error(
+              `HTTP ${res.status}: rate limited or server error`,
+            );
           }
         } catch (e) {
           userSignal.throwIfAborted();
@@ -4041,7 +4215,8 @@
       const skeletonTemplate = SKELETON_TEMPLATE;
       const rowTemplate = ROW_TEMPLATE;
       const fmtInt = fmt;
-      let hasResultsClass = RENDER_CACHE.hasResults ?? wrap.classList.contains("has-results");
+      let hasResultsClass = RENDER_CACHE.hasResults ??
+        wrap.classList.contains("has-results");
       let lastStatusUpdate = 0;
       let lastYield = performance.now();
       const reverseCache = REVERSE_PARSED_CACHE;
@@ -4064,7 +4239,8 @@
           if (AppState.isPausing) {
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-            const resumeHandler = (AppState.resumeHandler ??= Promise.withResolvers());
+            const resumeHandler =
+              (AppState.resumeHandler ??= Promise.withResolvers());
             scheduleRender();
             await resumeHandler.promise;
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
@@ -4083,7 +4259,9 @@
             AppState.controller = controller;
             AppState.inFlight = true;
           }
-          const tr = (parsed ? rowTemplate : skeletonTemplate).cloneNode(true);
+          const tr = (parsed ? rowTemplate : skeletonTemplate).cloneNode(
+            true,
+          );
           tr.cells[IDX_COL_INDEX].textContent = "" + i1;
           const mapBtn = tr.cells[MAPS_COL_INDEX].lastElementChild;
           mapBtn.dataset.idx = "" + i;
@@ -4117,7 +4295,10 @@
             }
             if (!AppState.isPaused) {
               now = performance.now();
-              if (now - lastStatusUpdate >= 200 || i === startIndex || i1 === total) {
+              if (
+                now - lastStatusUpdate >= 200 || i === startIndex ||
+                i1 === total
+              ) {
                 lastStatusUpdate = now;
                 setStatusMessage(`처리 중… (${fmtInt(i1)}/${totalDisp})`);
               }
@@ -4127,12 +4308,15 @@
               parsed = AddressFormatter.parse(
                 await fetchReverseWithRetry(
                   url,
-                  signal
-                )
+                  signal,
+                ),
               );
               reverseCache.set(cacheKey, parsed);
               reverseCacheKeys.push(cacheKey);
-              if (reverseCacheKeys.length - REVERSE_PARSED_CACHE_HEAD > REVERSE_PARSED_CACHE_MAX) {
+              if (
+                reverseCacheKeys.length - REVERSE_PARSED_CACHE_HEAD >
+                REVERSE_PARSED_CACHE_MAX
+              ) {
                 const dropKey = reverseCacheKeys[REVERSE_PARSED_CACHE_HEAD++];
                 reverseCache.delete(dropKey);
                 if (
@@ -4148,9 +4332,14 @@
             const kind = parsed.kind;
             if (kind) {
               r.set = kind;
-              r._f_kind = parsed.kindLower || (parsed.kindLower = kind.toLowerCase());
+              r._f_kind = parsed.kindLower ||
+                (parsed.kindLower = kind.toLowerCase());
             } else {
-              r._f_kind = r.set === "KR" ? "kr" : r.set === "WORLD" ? "world" : lower(r.set);
+              r._f_kind = r.set === "KR"
+                ? "kr"
+                : r.set === "WORLD"
+                  ? "world"
+                  : lower(r.set);
             }
             r.addr = addr;
             r.fullAddr = addr.fullAddr;
@@ -4171,7 +4360,12 @@
             r._f_emd = nEmd;
             r._f_tag = nTag;
             r._f_fullAddr = nFullAddr;
-            commitResultRow(skeletonTr, r, wrap, filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP);
+            commitResultRow(
+              skeletonTr,
+              r,
+              wrap,
+              filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP,
+            );
           } catch (err) {
             if (AppState.isStopping && err && err.name === "AbortError") {
               skeletonTr.remove();
@@ -4188,12 +4382,18 @@
             r._f_emd = "";
             r._f_tag = "";
             r._f_fullAddr = norm(msg);
-            commitResultRow(skeletonTr, r, wrap, filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP);
-            if (!AppState.isStopping)
+            commitResultRow(
+              skeletonTr,
+              r,
+              wrap,
+              filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP,
+            );
+            if (!AppState.isStopping) {
               setStatusMessage(
                 `에러 발생: (${fmtInt(i1)}/${totalDisp}) ${msg}`,
-                "error"
+                "error",
               );
+            }
           } finally {
             if (!needsFetch) {
               if (!now) now = performance.now();
@@ -4206,11 +4406,17 @@
           }
         } catch (err) {
           console.error(err);
-          if (skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)) {
+          if (
+            skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)
+          ) {
             skeletonTr.remove();
           }
           AppState.resumeHandler = null;
-          setControlsIdle(`오류로 중단됨: (${fmtInt(i1)}/${totalDisp}) ${getErrorMessage(err)}`, "error");
+          setControlsIdle(
+            `오류로 중단됨: (${fmtInt(i1)}/${totalDisp}) ${getErrorMessage(err)
+            }`,
+            "error",
+          );
           break;
         } finally {
           if (needsFetch) {
@@ -4256,7 +4462,8 @@
         cells[SIDO_COL_INDEX].textContent =
           cells[SIGUNGU_COL_INDEX].textContent =
           cells[EMD_COL_INDEX].textContent =
-          cells[TAG_COL_INDEX].textContent = "";
+          cells[TAG_COL_INDEX].textContent =
+          "";
       }
       cells[FULLADDR_COL_INDEX].textContent = r.fullAddr;
       const td = cells[MAPS_COL_INDEX];
@@ -4311,8 +4518,7 @@
           const lat = r.latStr;
           const lon = r.lonStr;
           const coords = lat + ", " + lon;
-          let line =
-            escCell(r.set) +
+          let line = escCell(r.set) +
             "," +
             escCell(r.idx) +
             "," +
@@ -4320,8 +4526,7 @@
             ",";
           const addr = r.addr;
           if (addr) {
-            line +=
-              escCell(addr.sido) +
+            line += escCell(addr.sido) +
               "," +
               escCell(addr.sigungu) +
               "," +
@@ -4353,10 +4558,13 @@
           }
         }
         flushChunk();
-        const url = URL.createObjectURL(new Blob(parts, { type: "text/csv;charset=utf-8" }));
+        const url = URL.createObjectURL(
+          new Blob(parts, { type: "text/csv;charset=utf-8" }),
+        );
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${(AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "")}_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`;
+        a.download = `${(AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "")
+          }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
@@ -4376,7 +4584,10 @@
       AppState.controller = new AbortController();
       AppState.inFlight = true;
       try {
-        const records = await parseFileToRecords(file, AppState.controller.signal);
+        const records = await parseFileToRecords(
+          file,
+          AppState.controller.signal,
+        );
         if (!records.length) {
           AppState.setRecords([]);
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
@@ -4385,7 +4596,11 @@
         setEmptyHint("ready");
         const MAX_DISP = 1_000;
         const disp = [];
-        for (let i = 0, dispLen = Math.min(records.length, MAX_DISP); i < dispLen; i++) {
+        for (
+          let i = 0, dispLen = Math.min(records.length, MAX_DISP);
+          i < dispLen;
+          i++
+        ) {
           const r = records[i];
           disp.push(`${r.latStr}, ${r.lonStr}`);
         }
@@ -4393,7 +4608,9 @@
           disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
         setCoordsText(disp.join("\n"));
-        setStatusMessage(`분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`);
+        setStatusMessage(
+          `분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`,
+        );
       } catch (err) {
         if (err && err.name === "AbortError") {
           setControlsIdle("중지되었습니다.", "stopped");
@@ -4409,10 +4626,16 @@
     domElements.filterQ.addEventListener("input", scheduleApplyFilterAll);
     domElements.filterKind.addEventListener("change", scheduleApplyFilterAll);
     domElements.filterSido.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterSigungu.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterSigungu.addEventListener(
+      "input",
+      scheduleApplyFilterAll,
+    );
     domElements.filterEmd.addEventListener("input", scheduleApplyFilterAll);
     domElements.filterTag.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterFullAddr.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filterFullAddr.addEventListener(
+      "input",
+      scheduleApplyFilterAll,
+    );
     domElements.tbody.addEventListener("click", (e) => {
       if (!MAP_POPOVER_OPEN) return;
       const btn = e.target?.closest?.("button.map-btn");
@@ -4422,7 +4645,9 @@
     domElements.tbody.addEventListener(
       "beforematch",
       (e) => {
-        const tr = e.target instanceof Element ? e.target.closest("tr") : null;
+        const tr = e.target instanceof Element
+          ? e.target.closest("tr")
+          : null;
         if (!tr) return;
         FIND_REVEAL_ACTIVE = true;
         setHiddenByFilterActiveFn = setRowHiddenByFilterActive;
@@ -4430,11 +4655,14 @@
         if (tr.hidden) tr.removeAttribute("hidden");
         domElements.tableWrap.classList.remove("filter-empty");
         bumpFindRehideTimer();
-      }
+      },
     );
     const startViewTransition = document.startViewTransition.bind(document);
     const maybeVT = (fn) => {
-      if (domElements.tbody.childElementCount > 0 && !root.hasAttribute(PERF_MODE_ATTR)) {
+      if (
+        domElements.tbody.childElementCount > 0 &&
+        !root.hasAttribute(PERF_MODE_ATTR)
+      ) {
         const active = document.activeViewTransition;
         if (active) {
           active.types.add("results");
@@ -4447,21 +4675,39 @@
     };
     const COMMANDS = {
       "--parse": () => maybeVT(handleParse),
-      "--start": () => maybeVT(() => {
-        AppState.reset("running");
-        clearTable();
-        resetScrollShadowState(domElements.coords);
-        setStatusMessage("조회 시작…");
-        void runProcessingLoop().catch((err) => {
-          console.error(err);
-          AppState.inFlight = false;
-          AppState.controller = null;
-          AppState.resumeHandler = null;
-          setControlsIdle(`오류로 중단됨: ${getErrorMessage(err)}`, "error");
-        });
-      }),
-      "--pause": () => { if (!AppState.isRunning) return; AppState.setStatus("pausing"); if (AppState.inFlight) setStatusMessage("일시정지 요청됨. 현재 작업을 마치고 멈춥니다...", "warn"); },
-      "--resume": () => { if (!AppState.isPaused) return; AppState.setStatus("running"); AppState.resumeHandler?.resolve(); AppState.resumeHandler = null; },
+      "--start": () =>
+        maybeVT(() => {
+          AppState.reset("running");
+          clearTable();
+          resetScrollShadowState(domElements.coords);
+          setStatusMessage("조회 시작…");
+          void runProcessingLoop().catch((err) => {
+            console.error(err);
+            AppState.inFlight = false;
+            AppState.controller = null;
+            AppState.resumeHandler = null;
+            setControlsIdle(
+              `오류로 중단됨: ${getErrorMessage(err)}`,
+              "error",
+            );
+          });
+        }),
+      "--pause": () => {
+        if (!AppState.isRunning) return;
+        AppState.setStatus("pausing");
+        if (AppState.inFlight) {
+          setStatusMessage(
+            "일시정지 요청됨. 현재 작업을 마치고 멈춥니다...",
+            "warn",
+          );
+        }
+      },
+      "--resume": () => {
+        if (!AppState.isPaused) return;
+        AppState.setStatus("running");
+        AppState.resumeHandler?.resolve();
+        AppState.resumeHandler = null;
+      },
       "--stop": () => {
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
         AppState.setStatus("stopping");
@@ -4506,12 +4752,18 @@
     function handleFile(file) {
       if (!file) return;
       domElements.file.value = "";
-      if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
+      if (
+        !file.name.toLowerCase().endsWith(".txt") &&
+        file.type !== "text/plain"
+      ) {
         setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
         return;
       }
       if (AppState.isBusy) {
-        setStatusMessage("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
+        setStatusMessage(
+          "조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.",
+          "warn",
+        );
         return;
       }
       setCoordsText("");
@@ -4522,17 +4774,23 @@
       REVERSE_PARSED_CACHE_HEAD = 0;
       AppState.setFile(file);
       setEmptyHint("file");
-      setStatusMessage(`파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`);
+      setStatusMessage(
+        `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
+      );
       for (const el of DROP_ZONE_FILE_LABELS) {
         const strong = document.createElement("strong");
         strong.textContent = file.name;
         el.replaceChildren("선택된 파일: ", strong);
       }
     }
-    domElements.file.addEventListener("change", () =>
-      maybeVT(() => handleFile(domElements.file.files?.[0] || null))
+    domElements.file.addEventListener(
+      "change",
+      () => maybeVT(() => handleFile(domElements.file.files?.[0] || null)),
     );
-    domElements.dropZone.addEventListener("dragover", (e) => e.preventDefault());
+    domElements.dropZone.addEventListener(
+      "dragover",
+      (e) => e.preventDefault(),
+    );
     domElements.dropZone.addEventListener("drop", (e) => {
       e.preventDefault();
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
@@ -4561,7 +4819,10 @@
       if (!(wrap instanceof HTMLElement)) return;
       const headCell = tbl.tHead?.rows?.[0]?.cells?.[0];
       let offset = 0;
-      if (headCell instanceof HTMLElement && getComputedStyle(headCell).display !== "none") {
+      if (
+        headCell instanceof HTMLElement &&
+        getComputedStyle(headCell).display !== "none"
+      ) {
         offset = Math.round(headCell.getBoundingClientRect().height);
       }
       wrap.style.setProperty("--table-head-offset", `${offset}px`);
@@ -4798,7 +5059,15 @@
         }
         return (1n << BigInt(bits)) - 1n;
       }
-      function extractValidBitsForNms(bits, num, shifts, maxValue, reason, supplementalRef, nextSupp) {
+      function extractValidBitsForNms(
+        bits,
+        num,
+        shifts,
+        maxValue,
+        reason,
+        supplementalRef,
+        nextSupp,
+      ) {
         const mask = bitmaskConst(bits);
         const maxBig = BigInt(maxValue);
         for (const shift of shifts) {
@@ -4809,7 +5078,8 @@
         }
         for (; ;) {
           const hasSupp = supplementalRef.current !== null;
-          const needNew = !hasSupp || supplementalRef.current.bitsRemaining < bits;
+          const needNew = !hasSupp ||
+            supplementalRef.current.bitsRemaining < bits;
           if (needNew) {
             supplementalRef.current = nextSupp(reason);
           }
@@ -4836,10 +5106,9 @@
           fillDataFieldsFromU64(newSupp.value, data);
           supplementalRef.current = newSupp;
         }
-        let luckyStarSource =
-          supplementalRef.current !== null
-            ? reverseBitsU64(supplementalRef.current.value)
-            : reverseBitsU64(num);
+        let luckyStarSource = supplementalRef.current !== null
+          ? reverseBitsU64(supplementalRef.current.value)
+          : reverseBitsU64(num);
         luckyStarLoop: for (; ;) {
           for (const byte of u64ToBytesBe(luckyStarSource)) {
             if (byte > 251) {
@@ -4905,31 +5174,32 @@
         const lower32 = Number(num & 0xffff_ffffn);
         const upperRatio = upper32 * U32_MAX_INV;
         const lowerRatio = lower32 * U32_MAX_INV;
-        data.kor_coords = [33.1125 + 5.504167 * upperRatio, 124.609722 + 7.263056 * lowerRatio];
+        data.kor_coords = [
+          33.1125 + 5.504167 * upperRatio,
+          124.609722 + 7.263056 * lowerRatio,
+        ];
         data.world_coords = [-90 + 180 * upperRatio, -180 + 360 * lowerRatio];
-        data.planet_number =
-          (extractValidBitsForNms(
-            4,
-            num,
-            [52, 4, 0],
-            11,
-            "NMS 행성 번호 보완",
-            supplementalRef,
-            nextSupp,
-          ) %
-            6) +
+        data.planet_number = (extractValidBitsForNms(
+          4,
+          num,
+          [52, 4, 0],
+          11,
+          "NMS 행성 번호 보완",
+          supplementalRef,
+          nextSupp,
+        ) %
+          6) +
           1;
-        data.solar_system_index =
-          (extractValidBitsForNms(
-            12,
-            num,
-            [40],
-            3834,
-            "NMS 태양계 번호 보완",
-            supplementalRef,
-            nextSupp,
-          ) %
-            767) +
+        data.solar_system_index = (extractValidBitsForNms(
+          12,
+          num,
+          [40],
+          3834,
+          "NMS 태양계 번호 보완",
+          supplementalRef,
+          nextSupp,
+        ) %
+          767) +
           1;
         data.nms_portal_yy = upper32 & 0xff;
         data.nms_portal_zzz = Number((num >> 20n) & 0xfffn);
@@ -4985,28 +5255,49 @@
         const bytes = u64ToBytesBe(v);
         const [b0, b1, b2, b3, b4, b5] = bytes;
         const lines = [];
-        lines.push(`64비트 난수: ${v.toString(10)} (유부호 정수: ${toSignedI64String(v)})`);
-        lines.push(`2진수: ${bytes.map((b) => b.toString(2).padStart(8, "0")).join(" ")}`);
+        lines.push(
+          `64비트 난수: ${v.toString(10)} (유부호 정수: ${toSignedI64String(v)
+          })`,
+        );
+        lines.push(
+          `2진수: ${bytes.map((b) => b.toString(2).padStart(8, "0")).join(" ")
+          }`,
+        );
         lines.push(`8진수: ${v.toString(8)}`);
         lines.push(`16진수: ${bytes.map((b) => hexByte(b)).join(" ")}`);
-        lines.push(`Hex 코드: #${hexByte(b0)}${hexByte(b1)}${hexByte(b2)} #${hexByte(b3)}${hexByte(b4)}${hexByte(b5)}`);
+        lines.push(
+          `Hex 코드: #${hexByte(b0)}${hexByte(b1)}${hexByte(b2)} #${hexByte(b3)
+          }${hexByte(b4)}${hexByte(b5)}`,
+        );
         lines.push(`바이트 배열: ${bytes.join(" ")}`);
-        lines.push(`6자리 숫자 비밀번호: ${formatU32Dec0Pad6(data.numeric_password)}`);
+        lines.push(
+          `6자리 숫자 비밀번호: ${formatU32Dec0Pad6(data.numeric_password)}`,
+        );
         lines.push(`8자리 비밀번호: ${data.password.join("")}`);
         lines.push(`로또 번호: ${data.lotto_numbers.join(" ")}`);
         lines.push(`일본 로또 7 번호: ${data.lotto7_numbers.join(" ")}`);
         lines.push(
-          `유로밀리언 번호: ${data.euro_millions_main_numbers.join(" ")} + ${data.euro_millions_lucky_stars.join(" ")}`,
+          `유로밀리언 번호: ${data.euro_millions_main_numbers.join(" ")} + ${data.euro_millions_lucky_stars.join(" ")
+          }`,
         );
         lines.push(`한글 음절 4글자: ${data.hangul_syllables.join("")}`);
-        lines.push(`대한민국 위경도: ${data.kor_coords[0]}, ${data.kor_coords[1]}`);
-        lines.push(`세계 위경도: ${data.world_coords[0]}, ${data.world_coords[1]}`);
-        lines.push(`NMS 은하 번호: ${((b0 + 1) & 0xffff).toString(10)}`);
         lines.push(
-          `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)} ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)} ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")})`,
+          `대한민국 위경도: ${data.kor_coords[0]}, ${data.kor_coords[1]}`,
         );
         lines.push(
-          `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)}:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)}`,
+          `세계 위경도: ${data.world_coords[0]}, ${data.world_coords[1]}`,
+        );
+        lines.push(`NMS 은하 번호: ${((b0 + 1) & 0xffff).toString(10)}`);
+        lines.push(
+          `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
+          } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
+          } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")
+          })`,
+        );
+        lines.push(
+          `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)
+          }:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)
+          }`,
         );
         return lines.join("\n");
       }
@@ -5048,7 +5339,9 @@
       }
       async function copyTextToClipboard(text) {
         if (!navigator.clipboard || !window.isSecureContext) {
-          throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
+          throw new Error(
+            "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
+          );
         }
         await navigator.clipboard.writeText(text);
       }
@@ -5115,13 +5408,16 @@
           } catch (err) {
             lastGeneratedText = "";
             setManualOutputText("");
-            error.textContent = err instanceof Error ? err.message : String(err);
+            error.textContent = err instanceof Error
+              ? err.message
+              : String(err);
           }
         });
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
           if (!lastGeneratedText) {
-            error.textContent = "저장할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
+            error.textContent =
+              "저장할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
           downloadRandomDataTxt(lastGeneratedText);
@@ -5132,7 +5428,8 @@
         copyBtn.addEventListener("click", async () => {
           error.textContent = "";
           if (!lastGeneratedText) {
-            error.textContent = "복사할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
+            error.textContent =
+              "복사할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
           try {
@@ -5141,7 +5438,9 @@
               (meta.textContent ? `${meta.textContent}\n` : "") +
               "변환 결과를 클립보드에 복사했습니다.";
           } catch (err) {
-            error.textContent = err instanceof Error ? err.message : "클립보드 복사에 실패했습니다.";
+            error.textContent = err instanceof Error
+              ? err.message
+              : "클립보드 복사에 실패했습니다.";
           }
         });
         clearBtn.addEventListener("click", () => {
