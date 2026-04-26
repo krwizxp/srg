@@ -3,7 +3,6 @@ use crate::{
     IS_TERMINAL, RandomDataSet, Result,
     buffmt::{ByteCursor, DIGITS, copy_two_digits, digit_byte, write_zero_err},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u8_from_u128, low_u16_from_u64},
-    u64_to_be_bytes,
 };
 use core::fmt::Write as _;
 use std::{
@@ -206,8 +205,6 @@ impl OutputFormatter<'_, '_, '_> {
         let bytes = self.bytes;
         let data = self.data;
         self.write_labeled_u8_array_line("바이트 배열: ".as_bytes(), &bytes)?;
-        self.write_labeled_u8_array_line("로또 번호: ".as_bytes(), &data.lotto_numbers)?;
-        self.write_labeled_u8_array_line("일본 로또 7 번호: ".as_bytes(), &data.lotto7_numbers)?;
         self.write_labeled_line("6자리 숫자 비밀번호: ".as_bytes(), |buffer_cur| {
             if data.numeric_password >= PASSWORD_FULL_WIDTH_THRESHOLD {
                 return buf_write_u32_dec(buffer_cur, data.numeric_password);
@@ -235,6 +232,8 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_line("8자리 비밀번호: ".as_bytes(), |buffer_cur| {
             buffer_cur.write_bytes(&data.password)
         })?;
+        self.write_labeled_u8_array_line("로또 번호: ".as_bytes(), &data.lotto_numbers)?;
+        self.write_labeled_u8_array_line("일본 로또 7 번호: ".as_bytes(), &data.lotto7_numbers)?;
         self.write_labeled_line("유로밀리언 번호: ".as_bytes(), |buffer_cur| {
             buf_write_u8_array_spaced(buffer_cur, &data.euro_millions_main_numbers)?;
             buffer_cur.write_bytes(b" + ")?;
@@ -261,7 +260,7 @@ pub fn format_data_into_buffer(
 ) -> Result<usize> {
     let mut cur = BufCursor::new(buffer.as_mut_slice());
     let mut formatter = OutputFormatter {
-        bytes: u64_to_be_bytes(data.num_64),
+        bytes: data.num_64.to_be_bytes(),
         cursor: &mut cur,
         data,
         use_colors,

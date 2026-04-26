@@ -256,15 +256,21 @@
 
       #app {
         >section.card {
+          &:has(>.left-pane-scroll) {
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+          }
+
           >.left-pane-scroll {
             display: flex;
             flex-direction: column;
+            flex: 0 0 auto;
             gap: 14px;
-            block-size: 100%;
+            block-size: auto;
             min-block-size: 0;
-            overflow-x: hidden;
-            overflow-y: auto;
-            scrollbar-width: none;
+            overflow: visible;
 
             >* {
               flex-shrink: 0;
@@ -302,7 +308,7 @@
         }
 
         .left-pane-scroll> :has(#coords) {
-          flex: 1;
+          flex: 0 0 auto;
           display: flex;
           flex-direction: column;
           min-block-size: 0;
@@ -640,6 +646,8 @@
       .manual-rng {
         margin-block-start: 2px;
         border-radius: 18px;
+        max-inline-size: 100%;
+        min-inline-size: 0;
         padding: 16px;
 
         summary {
@@ -670,7 +678,9 @@
           margin-block-start: 10px;
           display: grid;
           gap: 10px;
+          max-inline-size: 100%;
           min-block-size: 0;
+          min-inline-size: 0;
         }
 
         &[open] .manual-rng-body {
@@ -796,7 +806,16 @@
         }
 
         #output.coords-view {
+          inline-size: 100%;
+          max-inline-size: 100%;
           max-block-size: 260px;
+          min-inline-size: 0;
+          white-space: pre;
+        }
+
+        section[aria-label="변환 결과"] {
+          max-inline-size: 100%;
+          min-inline-size: 0;
         }
 
         #error {
@@ -1899,8 +1918,8 @@
               <label class="manual-rng-label" for="num64">기본 난수값</label>
               <input id="num64" type="text" inputmode="numeric" aria-describedby="num64-help"
                 placeholder="예: 123456789 또는 0x1122334455667788">
-              <span class="manual-rng-meta" id="num64-help">입력 범위: 0 ~
-                18446744073709551615<br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
+              <span class="manual-rng-meta" id="num64-help"><span class="nowrap">입력 범위: 0 ~
+                  18446744073709551615</span><br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
             </div>
             <div class="manual-rng-field">
               <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
@@ -4882,6 +4901,10 @@
       const U64_MAX = (1n << 64n) - 1n;
       const U64_SIGN_BIT = 1n << 63n;
       const U32_MAX_INV = 1 / 4294967295;
+      const HANGUL_BASE_CODE_POINT = 0xac00;
+      const HANGUL_SHIFTS = [48n, 32n, 16n, 0n];
+      const HANGUL_SYLLABLE_MAX = 55859;
+      const HANGUL_SYLLABLE_MODULUS = 11172;
       const GLYPHS = [
         "🌅",
         "🐦",
@@ -5159,45 +5182,32 @@
               }
             }
           }
-          if (data.euro_lucky_next_idx < 2) {
-            const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
-            luckyStarSource = reverseBitsU64(newSupp.value);
-            supplementalRef.current = newSupp;
-          } else {
-            break;
-          }
+          const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
+          luckyStarSource = reverseBitsU64(newSupp.value);
+          supplementalRef.current = newSupp;
         }
-        const hangul = new Array(4).fill("\0");
-        for (let i = 0; i < 4; i += 1) {
-          let index = Number((num >> BigInt(48 - 16 * i)) & 0xffffn);
-          while (index > 55859) {
+        const hangul = new Array(HANGUL_SHIFTS.length).fill("\0");
+        for (let i = 0; i < HANGUL_SHIFTS.length; i += 1) {
+          let index = Number((num >> HANGUL_SHIFTS[i]) & 0xffffn);
+          while (index > HANGUL_SYLLABLE_MAX) {
             if (supplementalRef.current === null) {
               supplementalRef.current = nextSupp("한글 음절 보완");
             }
             const suppValue = supplementalRef.current.value;
-            const c0 = Number((suppValue >> 48n) & 0xffffn);
-            if (c0 <= 55859) {
-              index = c0;
-              break;
+            for (const shift of HANGUL_SHIFTS) {
+              const candidate = Number((suppValue >> shift) & 0xffffn);
+              if (candidate <= HANGUL_SYLLABLE_MAX) {
+                index = candidate;
+                break;
+              }
             }
-            const c1 = Number((suppValue >> 32n) & 0xffffn);
-            if (c1 <= 55859) {
-              index = c1;
-              break;
+            if (index > HANGUL_SYLLABLE_MAX) {
+              supplementalRef.current = nextSupp("한글 음절 보완 재시도");
             }
-            const c2 = Number((suppValue >> 16n) & 0xffffn);
-            if (c2 <= 55859) {
-              index = c2;
-              break;
-            }
-            const c3 = Number(suppValue & 0xffffn);
-            if (c3 <= 55859) {
-              index = c3;
-              break;
-            }
-            supplementalRef.current = nextSupp("한글 음절 보완 재시도");
           }
-          hangul[i] = String.fromCodePoint(0xac00 + (index % 11172));
+          hangul[i] = String.fromCodePoint(
+            HANGUL_BASE_CODE_POINT + (index % HANGUL_SYLLABLE_MODULUS),
+          );
         }
         data.hangul_syllables = hangul;
         const upper32 = Number((num >> 32n) & 0xffff_ffffn);

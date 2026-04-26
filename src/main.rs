@@ -352,7 +352,7 @@ impl RandomDataBuilder<'_, '_> {
             .as_ref()
             .map_or_else(|| self.num.reverse_bits(), |supp| supp.value.reverse_bits());
         'lucky_star_loop: loop {
-            for byte in u64_to_be_bytes(lucky_star_source) {
+            for byte in lucky_star_source.to_be_bytes() {
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
                     continue;
                 }
@@ -962,9 +962,6 @@ fn split_u64_to_u32_pair(value: u64) -> (u32, u32) {
         u32_from_halves(low_u16_from_u64(value >> 16_u32), low_u16_from_u64(value)),
     )
 }
-const fn u64_to_be_bytes(value: u64) -> [u8; 8] {
-    value.to_be_bytes()
-}
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     let lower_bound = value.wrapping_sub(SUB);
     let upper_bound = value.wrapping_add(ADD);
@@ -1290,7 +1287,7 @@ fn get_hardware_random() -> Result<u64> {
     }
 }
 fn fill_data_fields_from_u64(value: u64, data: &mut RandomDataSet) {
-    for byte in u64_to_be_bytes(value) {
+    for byte in value.to_be_bytes() {
         if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
             continue;
         }
@@ -1413,7 +1410,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     supplemental: &mut Option<RandomBitBuffer>,
     next_supp: &mut SupplementalProvider<'_>,
 ) -> Result<u64> {
-    let bit_count = if BITS > 64 { 64 } else { BITS };
+    let bit_count = BITS.min(64);
     let mask = match bit_count {
         0 => 0,
         64 => u64::MAX,
