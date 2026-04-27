@@ -876,6 +876,7 @@ impl AppState {
                 out,
                 err,
             );
+            #[cfg(windows)]
             self.sync_high_res_timer_state(&next_activity, err);
             if let Some(console_msg) = log_opt_msg {
                 writeln!(out, "\n{console_msg}")?;
@@ -884,36 +885,30 @@ impl AppState {
         }
         Ok(())
     }
+    #[cfg(windows)]
     fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
-        cfg_select! {
-            windows => {
-                if matches!(next_activity, Activity::FinalCountdown { .. }) {
-                    if self.high_res_timer_guard.is_none() {
-                        // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
-                        // integer input and does not impose additional aliasing or
-                        // lifetime requirements.
-                        if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
-                            self.high_res_timer_guard = Some(HighResTimerGuard);
-                        } else {
-                            write_line_ignored(
-                                err,
-                                format_args!(
-                                    concat!(
-                                        "[경고] Windows 타이머 해상도 {}ms 요청에 실패했습니다. ",
-                                        "카운트다운 정확도가 저하될 수 있습니다."
-                                    ),
-                                    TARGET_PERIOD_MS
-                                ),
-                            );
-                        }
-                    }
+        if matches!(next_activity, Activity::FinalCountdown { .. }) {
+            if self.high_res_timer_guard.is_none() {
+                // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
+                // integer input and does not impose additional aliasing or
+                // lifetime requirements.
+                if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
+                    self.high_res_timer_guard = Some(HighResTimerGuard);
                 } else {
-                    self.high_res_timer_guard = None;
+                    write_line_ignored(
+                        err,
+                        format_args!(
+                            concat!(
+                                "[경고] Windows 타이머 해상도 {}ms 요청에 실패했습니다. ",
+                                "카운트다운 정확도가 저하될 수 있습니다."
+                            ),
+                            TARGET_PERIOD_MS
+                        ),
+                    );
                 }
             }
-            _ => {
-                let _ = (next_activity, err);
-            }
+        } else {
+            self.high_res_timer_guard = None;
         }
     }
     fn trigger_and_finish<'a>(

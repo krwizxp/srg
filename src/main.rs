@@ -20,7 +20,7 @@ use core::{
     time::Duration,
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt};
+use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
 #[cfg(windows)]
 use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
 #[cfg(windows)]
