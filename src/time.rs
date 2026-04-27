@@ -1137,21 +1137,7 @@ fn fetch_server_time_sample_curl(
             mem::take(&mut net_ctx.curl_stderr_buf),
         ));
     }
-    let mut end = stdout_bytes.len();
-    while end > 0
-        && end
-            .checked_sub(1)
-            .and_then(|idx| stdout_bytes.get(idx))
-            .is_some_and(u8::is_ascii_whitespace)
-    {
-        let Some(next_end) = end.checked_sub(1) else {
-            break;
-        };
-        end = next_end;
-    }
-    let trimmed_stdout = stdout_bytes
-        .get(..end)
-        .ok_or_else(|| TimeError::parse("curl 응답 경계 계산 실패"))?;
+    let trimmed_stdout = stdout_bytes.trim_ascii_end();
     let pos = trimmed_stdout
         .iter()
         .rposition(|&byte| byte == b'\n')
@@ -1175,9 +1161,8 @@ fn fetch_server_time_sample_curl(
         .map_err(|err| parse_err_with_source("curl time_starttransfer 파싱 실패", err))?;
     let reported_rtt = Duration::from_secs_f64(transfer_time_secs.max(MIN_TRANSFER_TIME_SECS));
     let date_header = headers_part
-        .split(|&byte| byte == b'\n')
-        .rev()
-        .find_map(|line| find_date_header_value(line))
+        .rsplit(|&byte| byte == b'\n')
+        .find_map(find_date_header_value)
         .ok_or_else(|| TimeError::header_not_found("curl 응답에서 Date 헤더를 찾을 수 없음"))?;
     let server_time = parse_http_date_to_systemtime(date_header)?;
     let response_received_inst = request_start_inst
@@ -1290,16 +1275,15 @@ fn resolve_tcp_socket_addr(
     Ok(socket_addr)
 }
 fn parse_u32_digits(raw: &str) -> Option<u32> {
-    let mut value = 0_u32;
     if raw.is_empty() {
         return None;
     }
-    for &byte in raw.as_bytes() {
+
+    raw.as_bytes().iter().try_fold(0_u32, |value, byte| {
         if !byte.is_ascii_digit() {
             return None;
         }
         let digit = byte.checked_sub(b'0')?;
-        value = value.checked_mul(10)?.checked_add(u32::from(digit))?;
-    }
-    Some(value)
+        value.checked_mul(10)?.checked_add(u32::from(digit))
+    })
 }

@@ -69,10 +69,13 @@ impl OutputFormatter<'_, '_, '_> {
         })
     }
     fn write_nms_lines(&mut self) -> Result<()> {
-        let bytes = self.bytes;
+        let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            buf_write_u32_dec(buffer_cur, u32::from(u16::from(bytes[0]).wrapping_add(1)))
+            buf_write_u32_dec(
+                buffer_cur,
+                u32::from(u16::from(galaxy_number_byte).wrapping_add(1)),
+            )
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number)?;

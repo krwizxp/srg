@@ -45,8 +45,6 @@ const MONTH_TERM_DIVISOR_I64: i64 = 5;
 const MONTH_TERM_MULTIPLIER_I64: i64 = 153;
 const MONTH_TERM_OFFSET_I64: i64 = 2;
 const TIME_COMPONENT_LEN: usize = 8;
-const TIME_SEPARATOR_FIRST_IDX: usize = 2;
-const TIME_SEPARATOR_SECOND_IDX: usize = 5;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 #[derive(Clone, Copy)]
 struct HttpDateComponents {
@@ -214,21 +212,26 @@ fn parse_with_time(
 ) -> Result<HttpDateComponents> {
     const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
     const ERR_TIME_RANGE: &str = "HTTP Date 파싱 실패: 시간 값 범위가 올바르지 않습니다.";
-    let time_array = (time_token
+    let &[
+        hour_tens,
+        hour_ones,
+        b':',
+        minute_tens,
+        minute_ones,
+        b':',
+        second_tens,
+        second_ones,
+    ] = time_token
         .as_bytes()
         .as_array::<TIME_COMPONENT_LEN>()
-        .ok_or_else(|| TimeError::parse(ERR_TIME_FMT)))?;
-    if time_array[TIME_SEPARATOR_FIRST_IDX] != b':' || time_array[TIME_SEPARATOR_SECOND_IDX] != b':'
-    {
+        .ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?
+    else {
         return Err(TimeError::parse(ERR_TIME_FMT));
-    }
+    };
     let (hour, minute, second) = (
-        parse_two_digits(time_array[0], time_array[1])
-            .ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
-        parse_two_digits(time_array[3], time_array[4])
-            .ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
-        parse_two_digits(time_array[6], time_array[7])
-            .ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
+        parse_two_digits(hour_tens, hour_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
+        parse_two_digits(minute_tens, minute_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
+        parse_two_digits(second_tens, second_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
     );
     if hour > MAX_HTTP_HOUR
         || minute > MAX_HTTP_MINUTE_OR_SECOND

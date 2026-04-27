@@ -90,7 +90,6 @@ const FILE_NAME: &str = "random_data.txt";
 const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
-const BITS_PER_U16: u32 = 16;
 const BUFFER_SIZE: usize = 1016;
 const BYTE_BITS: u8 = 64;
 const EURO_LUCKY_MODULUS: u8 = 12;
@@ -934,9 +933,6 @@ impl MenuApp {
         }
     }
 }
-fn u32_from_halves(upper: u16, lower: u16) -> u32 {
-    (u32::from(upper) << BITS_PER_U16) | u32::from(lower)
-}
 fn checked_add_one_u64(value: u64, err_msg: &'static str) -> Result<u64> {
     value
         .checked_add(ONE_BASED_OFFSET_U64)
@@ -953,13 +949,12 @@ fn glyph_from_low_nibble(value: u64) -> Option<char> {
         .get(usize::from(low_u8_from_u64(value & NIBBLE_MASK_U64)))
         .copied()
 }
-fn split_u64_to_u32_pair(value: u64) -> (u32, u32) {
+const fn split_u64_to_u32_pair(value: u64) -> (u32, u32) {
+    let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
+
     (
-        u32_from_halves(
-            low_u16_from_u64(value >> 48_u32),
-            low_u16_from_u64(value >> 32_u32),
-        ),
-        u32_from_halves(low_u16_from_u64(value >> 16_u32), low_u16_from_u64(value)),
+        u32::from_be_bytes([b0, b1, b2, b3]),
+        u32::from_be_bytes([b4, b5, b6, b7]),
     )
 }
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
