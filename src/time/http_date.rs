@@ -368,7 +368,9 @@ pub fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     );
     let raw_bytes = raw_date.as_bytes();
     let has_comma = raw_bytes.contains(&b',');
-    let has_gmt = raw_bytes.windows(3).any(|window| window == b"GMT");
+    let has_gmt = raw_bytes
+        .array_windows::<3>()
+        .any(|window| window == b"GMT");
     if raw_bytes
         .get(IMF_FIXDATE_WEEKDAY_COMMA_INDEX)
         .is_some_and(|ch| *ch == b',')
