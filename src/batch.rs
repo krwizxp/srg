@@ -78,13 +78,13 @@ impl ProgressReporter<'_> {
             if processed_now >= self.pending_count {
                 break;
             }
-            let elapsed_millis = elapsed_millis_since(self.start_time);
+            let elapsed = elapsed_since(self.start_time);
             output::print_progress(
                 &mut out,
                 processed_now,
                 &mut progress_buffers.line,
                 self.requested_count,
-                elapsed_millis,
+                elapsed,
                 &mut progress_buffers.elapsed,
                 &mut progress_buffers.eta,
             )?;
@@ -356,13 +356,13 @@ impl BatchRegenerator<'_, '_, '_> {
     }
     fn write_summary(&mut self, final_data: &RandomDataSet, failed_count: u64) -> Result<u64> {
         let mut progress_buffers = ProgressBuffers::new();
-        let elapsed_millis = elapsed_millis_since(&self.start_time);
+        let elapsed = elapsed_since(&self.start_time);
         output::print_progress(
             self.out,
             self.requested_count,
             &mut progress_buffers.line,
             self.requested_count,
-            elapsed_millis,
+            elapsed,
             &mut progress_buffers.elapsed,
             &mut progress_buffers.eta,
         )?;
@@ -397,8 +397,8 @@ fn panic_join_error(context: &'static str, panic_payload: &(dyn Any + Send + 'st
     );
     IoError::other(format!("{context}: {panic_detail}"))
 }
-fn elapsed_millis_since(start_time: &Instant) -> u128 {
-    Instant::now().duration_since(*start_time).as_millis()
+fn elapsed_since(start_time: &Instant) -> Duration {
+    Instant::now().duration_since(*start_time)
 }
 pub fn regenerate_with_count(
     file_mutex: &Mutex<BufWriter<File>>,

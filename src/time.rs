@@ -52,7 +52,7 @@ const FOUR_DIGIT_WIDTH: usize = 4;
 const HALF_RTT_DIVISOR: u32 = 2;
 const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
-const MIN_TRANSFER_TIME_SECS: f64 = 0.000_001;
+const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const MINUTE_SECONDS_I64: i64 = 60;
 const RTT_TRIM_DIVISOR: usize = 5;
 const TCP_HEAD_REQUEST_PREFIX: &[u8] = b"HEAD / HTTP/1.1\r\nHost: ";
@@ -1154,7 +1154,8 @@ fn fetch_server_time_sample_curl(
         .trim_ascii()
         .parse()
         .map_err(|err| parse_err_with_source("curl time_starttransfer 파싱 실패", err))?;
-    let reported_rtt = Duration::from_secs_f64(transfer_time_secs.max(MIN_TRANSFER_TIME_SECS));
+    let reported_rtt =
+        Duration::from_secs_f64(transfer_time_secs.max(MIN_TRANSFER_TIME.as_secs_f64()));
     let date_header = headers_part
         .rsplit(|&byte| byte == b'\n')
         .find_map(find_date_header_value)

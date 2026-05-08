@@ -4,7 +4,7 @@ use crate::{
     buffmt::{ByteCursor, DIGITS, copy_two_digits, digit_byte, write_zero_err},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u8_from_u128, low_u16_from_u64},
 };
-use core::fmt::Write as _;
+use core::{fmt::Write as _, time::Duration};
 use std::{
     fs::File,
     io::{BufWriter, Error as IoError, Result as IoResult, Write, stdout},
@@ -507,13 +507,14 @@ pub fn print_progress(
     completed: u64,
     line_buf: &mut [u8; PROGRESS_LINE_BUF_LEN],
     total: u64,
-    elapsed_millis: u128,
+    elapsed: Duration,
     elapsed_buf: &mut [u8],
     eta_buf: &mut [u8],
 ) -> Result<()> {
     if !*IS_TERMINAL {
         return Ok(());
     }
+    let elapsed_millis = elapsed.as_millis();
     let elapsed_deci = elapsed_millis.div_euclid(ELAPSED_MILLIS_PER_DECI);
     let eta_deci = if total == 0 || completed >= total {
         Some(0)
