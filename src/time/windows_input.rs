@@ -39,10 +39,15 @@ struct Input {
     r#type: u32,
     union: InputUnion,
 }
-#[cfg(target_pointer_width = "64")]
-const _: [(); 40] = [(); size_of::<Input>()];
-#[cfg(target_pointer_width = "32")]
-const _: [(); 28] = [(); size_of::<Input>()];
+cfg_select! {
+    target_pointer_width = "64" => {
+        const _: [(); 40] = [(); size_of::<Input>()];
+    }
+    target_pointer_width = "32" => {
+        const _: [(); 28] = [(); size_of::<Input>()];
+    }
+    _ => {}
+}
 #[link(name = "user32")]
 unsafe extern "system" {
     fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;

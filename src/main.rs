@@ -6,10 +6,6 @@ use self::{
         format_data_into_buffer, prefix_slice, write_buffer_to_file_guard, write_slice_to_console,
     },
 };
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_rdrand64_step, _rdseed64_step};
-#[cfg(windows)]
-use core::ffi::c_void;
 use core::{
     char::from_u32,
     error::Error,
@@ -19,12 +15,6 @@ use core::{
     result::Result as StdResult,
     time::Duration,
 };
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
-#[cfg(windows)]
-use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
-#[cfg(windows)]
-use std::os::windows::io::AsRawHandle as _;
 use std::{
     fs::{self, File},
     io::{
@@ -37,6 +27,23 @@ use std::{
     sync::{LazyLock, Mutex, MutexGuard},
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
+cfg_select! {
+    target_arch = "x86_64" => {
+        use core::arch::x86_64::{_rdrand64_step, _rdseed64_step};
+    }
+    _ => {}
+}
+cfg_select! {
+    windows => {
+        use core::ffi::c_void;
+        use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
+        use std::os::windows::io::AsRawHandle as _;
+    }
+    any(target_os = "linux", target_os = "macos") => {
+        use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
+    }
+    _ => {}
+}
 mod batch;
 mod buffmt;
 mod numeric;
@@ -1220,43 +1227,43 @@ fn generate_random_data() -> Result<RandomDataSet> {
 }
 fn get_hardware_random() -> Result<u64> {
     match *RNG_SOURCE {
-        RngSource::RdSeed => {
-            #[cfg(target_arch = "x86_64")]
-            {
-                let mut value = 0_u64;
-                loop {
-                    // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed`
-                    // support, and the intrinsic writes to the valid mutable pointer to `value`.
-                    if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
-                        break Ok(value);
+        RngSource::RdSeed => cfg_select! {
+            target_arch = "x86_64" => {
+                {
+                    let mut value = 0_u64;
+                    loop {
+                        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed`
+                        // support, and the intrinsic writes to the valid mutable pointer to `value`.
+                        if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+                            break Ok(value);
+                        }
+                        spin_loop();
                     }
-                    spin_loop();
                 }
             }
-            #[cfg(not(target_arch = "x86_64"))]
-            {
+            _ => {
                 Ok(0)
             }
-        }
-        RngSource::RdRand => {
-            #[cfg(target_arch = "x86_64")]
-            {
-                let mut value = 0_u64;
-                for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
-                    // SAFETY: `RNG_SOURCE` only routes here after confirming `rdrand`
-                    // support, and the intrinsic writes to the valid mutable pointer to `value`.
-                    if unsafe { _rdrand64_step(&mut value) } == 1_i32 {
-                        return Ok(value);
+        },
+        RngSource::RdRand => cfg_select! {
+            target_arch = "x86_64" => {
+                {
+                    let mut value = 0_u64;
+                    for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
+                        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdrand`
+                        // support, and the intrinsic writes to the valid mutable pointer to `value`.
+                        if unsafe { _rdrand64_step(&mut value) } == 1_i32 {
+                            return Ok(value);
+                        }
+                        spin_loop();
                     }
-                    spin_loop();
+                    Err("RDRAND 실패".into())
                 }
-                Err("RDRAND 실패".into())
             }
-            #[cfg(not(target_arch = "x86_64"))]
-            {
+            _ => {
                 Err("RDSEED·RDRAND 모두 미지원합니다.".into())
             }
-        }
+        },
         RngSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
     }
 }

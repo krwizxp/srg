@@ -21,13 +21,19 @@ use std::{
 };
 pub mod address;
 mod http_date;
-#[cfg(target_os = "linux")]
-mod linux_input;
-#[cfg(target_os = "macos")]
-mod macos_input;
 mod native_http;
-#[cfg(target_os = "windows")]
-mod windows_input;
+cfg_select! {
+    target_os = "linux" => {
+        mod linux_input;
+    }
+    target_os = "macos" => {
+        mod macos_input;
+    }
+    target_os = "windows" => {
+        mod windows_input;
+    }
+    _ => {}
+}
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT_SECS: u64 = 5;
@@ -69,27 +75,27 @@ const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const U32_TWO_DIGIT_THRESHOLD: u32 = 10;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
-#[cfg(target_os = "windows")]
-const TIMERR_NOERROR: u32 = 0;
-#[cfg(target_os = "windows")]
-const TARGET_PERIOD_MS: u32 = 1;
-#[cfg(target_os = "windows")]
-pub struct HighResTimerGuard;
-#[cfg(target_os = "windows")]
-#[link(name = "winmm")]
-unsafe extern "system" {
-    fn timeBeginPeriod(u_period: u32) -> u32;
-    fn timeEndPeriod(u_period: u32) -> u32;
-}
-#[cfg(target_os = "windows")]
-impl Drop for HighResTimerGuard {
-    fn drop(&mut self) {
-        // SAFETY: This releases the timer period requested when the guard was
-        // created using the same value on the same process.
-        unsafe {
-            timeEndPeriod(TARGET_PERIOD_MS);
+cfg_select! {
+    target_os = "windows" => {
+        const TIMERR_NOERROR: u32 = 0;
+        const TARGET_PERIOD_MS: u32 = 1;
+        pub struct HighResTimerGuard;
+        #[link(name = "winmm")]
+        unsafe extern "system" {
+            fn timeBeginPeriod(u_period: u32) -> u32;
+            fn timeEndPeriod(u_period: u32) -> u32;
+        }
+        impl Drop for HighResTimerGuard {
+            fn drop(&mut self) {
+                // SAFETY: This releases the timer period requested when the guard was
+                // created using the same value on the same process.
+                unsafe {
+                    timeEndPeriod(TARGET_PERIOD_MS);
+                }
+            }
         }
     }
+    _ => {}
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TimeErrorKind {
@@ -856,8 +862,12 @@ impl AppState {
                 out,
                 err,
             );
-            #[cfg(windows)]
-            self.sync_high_res_timer_state(&next_activity, err);
+            cfg_select! {
+                windows => {
+                    self.sync_high_res_timer_state(&next_activity, err);
+                }
+                _ => {}
+            }
             if let Some(console_msg) = log_opt_msg {
                 writeln!(out, "\n{console_msg}")?;
             }
