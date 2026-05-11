@@ -11,25 +11,27 @@ use crate::{
     write_line_ignored,
 };
 use alloc::{borrow::Cow, fmt, str};
-use core::{fmt::Write as _, mem, ops::Mul as _, result as stdresult, time::Duration};
+use core::{fmt::Write as _, ops::Mul as _, result as stdresult, time::Duration};
 use std::{
     io::{self, BufRead as _, BufReader, Result as IoResult, Write as _},
     net::{self, TcpStream},
-    process::{Command, Stdio},
-    sync::{LazyLock, mpsc},
+    sync::mpsc,
     thread,
     time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
 pub mod address;
 mod http_date;
+#[cfg(target_os = "linux")]
+mod linux_input;
+#[cfg(target_os = "macos")]
+mod macos_input;
+mod native_http;
 #[cfg(target_os = "windows")]
 mod windows_input;
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT_SECS: u64 = 5;
 const TCP_TIMEOUT: Duration = Duration::from_secs(TCP_TIMEOUT_SECS);
-const TCP_TIMEOUT_SECS_STR: &str = "5";
-const CURL_STDERR_BUF_CAPACITY: usize = 1024;
 const DAY_SECONDS_I64: i64 = 86_400;
 const DAYS_PER_WEEK_I64: i64 = 7;
 const DISPLAY_LINE_BUF_LEN: usize = 80;
@@ -71,23 +73,6 @@ const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 const TIMERR_NOERROR: u32 = 0;
 #[cfg(target_os = "windows")]
 const TARGET_PERIOD_MS: u32 = 1;
-pub static CURL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| {
-    Command::new("curl")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-});
-#[cfg(target_os = "linux")]
-pub static XDO_TOOL_AVAILABLE: LazyLock<bool> = LazyLock::new(|| {
-    Command::new("xdotool")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-});
 #[cfg(target_os = "windows")]
 pub struct HighResTimerGuard;
 #[cfg(target_os = "windows")]
@@ -108,9 +93,9 @@ impl Drop for HighResTimerGuard {
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TimeErrorKind {
-    Curl,
     HeaderNotFound,
     Io,
+    NativeHttp,
     Parse,
     SyncFailed,
     Time,
@@ -137,9 +122,6 @@ impl TimeError {
     }
     fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::Parse, detail)
-    }
-    fn sync_failed(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(TimeErrorKind::SyncFailed, detail)
     }
 }
 impl From<io::Error> for TimeError {
@@ -168,7 +150,7 @@ impl fmt::Display for TimeError {
             TimeErrorKind::Time => write!(f, "시스템 시간 오류: {}", self.detail),
             TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
             TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
-            TimeErrorKind::Curl => write!(f, "curl 실행 실패: {}", self.detail),
+            TimeErrorKind::NativeHttp => write!(f, "native HTTP 요청 실패: {}", self.detail),
             TimeErrorKind::SyncFailed => write!(f, "서버 시간 확인 실패: {}", self.detail),
         }
     }
@@ -417,7 +399,6 @@ pub struct AppState {
 }
 struct NetworkContext {
     cached_tcp_socket_addr: Option<net::SocketAddr>,
-    curl_stderr_buf: String,
     tcp_line_buffer: Vec<u8>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -816,7 +797,6 @@ impl AppState {
         let mut network_context = NetworkContext {
             cached_tcp_socket_addr: None,
             tcp_line_buffer: Vec::with_capacity(TCP_LINE_BUF_CAPACITY),
-            curl_stderr_buf: String::with_capacity(CURL_STDERR_BUF_CAPACITY),
         };
         let mut line_buf = [0_u8; DISPLAY_LINE_BUF_LEN];
         loop {
@@ -922,14 +902,10 @@ impl AppState {
                 TriggerAction::LeftClick => {
                     cfg_select! {
                         target_os = "linux" => {
-                            run_external_command(err, "xdotool", &["click", "1"]);
+                            linux_input::send_action(linux_input::InputAction::MouseClick, err);
                         }
                         target_os = "macos" => {
-                            run_external_command(
-                                err,
-                                "osascript",
-                                &["-e", r#"tell application "System Events" to click"#],
-                            );
+                            macos_input::send_action(macos_input::InputAction::MouseClick, err);
                         }
                         windows => {
                             windows_input::send_action(windows_input::InputAction::MouseClick, err);
@@ -939,14 +915,10 @@ impl AppState {
                 TriggerAction::F5Press => {
                     cfg_select! {
                         target_os = "linux" => {
-                            run_external_command(err, "xdotool", &["key", "F5"]);
+                            linux_input::send_action(linux_input::InputAction::F5Press, err);
                         }
                         target_os = "macos" => {
-                            run_external_command(
-                                err,
-                                "osascript",
-                                &["-e", r#"tell application "System Events" to key code 96"#],
-                            );
+                            macos_input::send_action(macos_input::InputAction::F5Press, err);
                         }
                         windows => {
                             windows_input::send_action(windows_input::InputAction::F5Press, err);
@@ -958,27 +930,6 @@ impl AppState {
         append_fmt(msg_buf, log_message);
         (Activity::Finished, Some(msg_buf))
     }
-}
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn run_external_command(err: &mut dyn io::Write, program: &str, args: &[&str]) {
-    match Command::new(program).args(args).status() {
-        Ok(status) if status.success() => {}
-        Ok(status) => {
-            write_line_ignored(
-                err,
-                format_args!("[경고] 명령 실행 실패: {program} {args:?} (상태: {status})"),
-            );
-        }
-        Err(command_err) => {
-            write_line_ignored(
-                err,
-                format_args!("[경고] 명령 실행 실패: {program} {args:?} ({command_err})"),
-            );
-        }
-    }
-}
-fn parse_err_with_source(context: &'static str, err: impl fmt::Display) -> TimeError {
-    TimeError::parse(format!("{context}: {err}"))
 }
 fn owned_detail(err: impl fmt::Display) -> Cow<'static, str> {
     Cow::Owned(err.to_string())
@@ -1017,7 +968,7 @@ fn parse_result_with_context<T, E>(
 where
     E: fmt::Display,
 {
-    result.map_err(|err| parse_err_with_source(context, err))
+    result.map_err(|err| TimeError::parse(format!("{context}: {err}")))
 }
 pub fn get_validated_input<T, F>(
     prompt: &str,
@@ -1086,97 +1037,16 @@ fn find_date_header_value(line: &[u8]) -> Option<&str> {
         None
     }
 }
-fn fetch_server_time_sample_curl(
-    url_str: &str,
-    context: &str,
-    net_ctx: &mut NetworkContext,
-) -> Result<TimeSample> {
-    net_ctx.curl_stderr_buf.clear();
-    let request_start_inst = Instant::now();
-    let output = Command::new("curl")
-        .args([
-            "-sI",
-            "--ssl-no-revoke",
-            "-L",
-            "--max-time",
-            TCP_TIMEOUT_SECS_STR,
-            "--connect-timeout",
-            TCP_TIMEOUT_SECS_STR,
-            "-w",
-            "\n%{time_starttransfer}",
-            url_str,
-        ])
-        .output()?;
-    let stdout_bytes = output.stdout;
-    let stderr_bytes = output.stderr;
-    if !output.status.success() {
-        if stderr_bytes.is_empty() {
-            net_ctx.curl_stderr_buf.clear();
-        } else {
-            net_ctx
-                .curl_stderr_buf
-                .push_str(&String::from_utf8_lossy(&stderr_bytes));
-        }
-        if net_ctx.curl_stderr_buf.trim().is_empty() {
-            net_ctx.curl_stderr_buf.clear();
-            net_ctx.curl_stderr_buf.push_str("curl ");
-            net_ctx.curl_stderr_buf.push_str(context);
-            net_ctx.curl_stderr_buf.push_str(" 실패, 상태: ");
-            append_fmt(
-                &mut net_ctx.curl_stderr_buf,
-                format_args!("{}", output.status),
-            );
-        }
-        return Err(TimeError::new(
-            TimeErrorKind::Curl,
-            mem::take(&mut net_ctx.curl_stderr_buf),
-        ));
-    }
-    let trimmed_stdout = stdout_bytes.trim_ascii_end();
-    let pos = trimmed_stdout
-        .iter()
-        .rposition(|&byte| byte == b'\n')
-        .ok_or_else(|| TimeError::parse("curl 응답에서 time_starttransfer 정보 누락"))?;
-    let headers_part = trimmed_stdout
-        .get(..pos)
-        .ok_or_else(|| TimeError::parse("curl 응답 헤더 범위 계산 실패"))?;
-    let transfer_time_start = pos
-        .checked_add(1)
-        .ok_or_else(|| TimeError::parse("curl 응답 time_starttransfer 범위 계산 실패"))?;
-    let transfer_time_part = trimmed_stdout
-        .get(transfer_time_start..)
-        .ok_or_else(|| TimeError::parse("curl 응답 time_starttransfer 범위 계산 실패"))?;
-    let transfer_time_str = parse_result_with_context(
-        str::from_utf8(transfer_time_part),
-        "curl time_starttransfer 파싱 실패",
-    )?;
-    let transfer_time_secs: f64 = transfer_time_str
-        .trim_ascii()
-        .parse()
-        .map_err(|err| parse_err_with_source("curl time_starttransfer 파싱 실패", err))?;
-    let reported_rtt =
-        Duration::from_secs_f64(transfer_time_secs.max(MIN_TRANSFER_TIME.as_secs_f64()));
-    let date_header = headers_part
-        .rsplit(|&byte| byte == b'\n')
-        .find_map(find_date_header_value)
-        .ok_or_else(|| TimeError::header_not_found("curl 응답에서 Date 헤더를 찾을 수 없음"))?;
-    let server_time = parse_http_date_to_systemtime(date_header)?;
-    let response_received_inst = request_start_inst
-        .checked_add(reported_rtt)
-        .ok_or_else(|| TimeError::parse("응답 수신 시각 계산 실패"))?;
-    Ok(TimeSample {
-        response_received_inst,
-        rtt: reported_rtt,
-        server_time,
-    })
+fn fetch_server_time_sample_native_http(url_str: &str, context: &str) -> Result<TimeSample> {
+    native_http::NATIVE_HTTP.fetch_head_sample(url_str, context)
 }
 fn fetch_server_time_sample(
     parsed_address: &ParsedServer,
     net_ctx: &mut NetworkContext,
 ) -> Result<TimeSample> {
     if parsed_address.scheme() == Some(UrlScheme::Https) {
-        let https_url = parsed_address.curl_url(UrlScheme::Https);
-        return fetch_server_time_sample_curl(https_url, "HTTPS (explicit)", net_ctx);
+        let https_url = parsed_address.url(UrlScheme::Https);
+        return fetch_server_time_sample_native_http(https_url, "HTTPS (explicit)");
     }
     let tcp_attempt_result = {
         let request_start_inst = Instant::now();
@@ -1233,24 +1103,23 @@ fn fetch_server_time_sample(
         }
     };
     tcp_attempt_result.or_else(|_| {
-        if !*CURL_AVAILABLE {
-            return Err(TimeError::sync_failed(
-                "TCP 연결에 실패했고 curl을 사용할 수 없습니다.",
-            ));
-        }
         let mut last_error = None;
         for (scheme, context_str) in [
             (UrlScheme::Https, "HTTPS (fallback)"),
             (UrlScheme::Http, "HTTP (fallback)"),
         ] {
-            let url = parsed_address.curl_url(scheme);
-            match fetch_server_time_sample_curl(url, context_str, net_ctx) {
+            let url = parsed_address.url(scheme);
+            match fetch_server_time_sample_native_http(url, context_str) {
                 Ok(sample) => return Ok(sample),
                 Err(err) => last_error = Some(err),
             }
         }
-        Err(last_error
-            .unwrap_or_else(|| TimeError::sync_failed("Curl 폴백 시도 중 알 수 없는 오류")))
+        Err(last_error.unwrap_or_else(|| {
+            TimeError::new(
+                TimeErrorKind::SyncFailed,
+                "native HTTP 폴백 시도 중 알 수 없는 오류",
+            )
+        }))
     })
 }
 fn resolve_tcp_socket_addr(

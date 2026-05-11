@@ -33,12 +33,6 @@ pub struct ParsedServer {
     tcp_host_header: Box<str>,
 }
 impl ParsedServer {
-    pub fn curl_url(&self, scheme: UrlScheme) -> &str {
-        match scheme {
-            UrlScheme::Http => &self.http_url,
-            UrlScheme::Https => &self.secure_url,
-        }
-    }
     pub fn host(&self) -> &str {
         &self.host
     }
@@ -53,6 +47,12 @@ impl ParsedServer {
     }
     pub fn tcp_host_header_value(&self) -> &str {
         &self.tcp_host_header
+    }
+    pub fn url(&self, scheme: UrlScheme) -> &str {
+        match scheme {
+            UrlScheme::Http => &self.http_url,
+            UrlScheme::Https => &self.secure_url,
+        }
     }
 }
 impl TryFrom<&str> for ParsedServer {

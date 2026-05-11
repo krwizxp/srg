@@ -679,27 +679,6 @@ impl MenuApp {
         err: &mut dyn Write,
     ) -> Result<()> {
         let time_run_result = (|| -> StdResult<(), time::TimeError> {
-            cfg_select! {
-                windows => {
-                    if !*time::CURL_AVAILABLE {
-                        writeln!(
-                            err,
-                            "[경고] 'curl' 명령어를 찾을 수 없습니다. TCP 연결 실패 시 대체 수단이 없습니다."
-                        )?;
-                    }
-                }
-                target_os = "linux" => {
-                    if !*time::XDO_TOOL_AVAILABLE {
-                        writeln!(
-                            err,
-                            concat!(
-                                "[경고] 'xdotool'이 설치되지 않았습니다. 액션 기능이 동작하지 않습니다.\n",
-                                "(설치 방법: sudo apt-get install xdotool 또는 유사한 패키지 관리자 명령어)"
-                            )
-                        )?;
-                    }
-                }
-            }
             let host = self.read_server_host(out, err)?;
             let target_time = self.read_target_time(out)?;
             let trigger_action = self.read_trigger_action(out, target_time)?;
