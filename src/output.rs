@@ -219,9 +219,14 @@ impl OutputFormatter<'_, '_, '_> {
                 data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR),
             )));
             let head = buffer_cur.take(PASSWORD_WIDTH)?;
-            let (hi_digits, rest) = head.split_at_mut(TWO_DIGIT_WIDTH);
+            let Some((hi_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+                return Err(write_zero_err());
+            };
             copy_two_digits(hi_digits, hi)?;
-            let (mid_digits, lo_digits) = rest.split_at_mut(TWO_DIGIT_WIDTH);
+            let Some((mid_digits, lo_digits)) = rest.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+            else {
+                return Err(write_zero_err());
+            };
             copy_two_digits(
                 mid_digits,
                 rem.div_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)),
@@ -399,9 +404,16 @@ fn buf_write_m_hash_hex24_from_bytes(
     Ok(())
 }
 fn buf_write_hex24_bytes(buf: &mut [u8], b0: u8, b1: u8, b2: u8) -> IoResult<()> {
-    let (first_hex, remaining_hex_bytes) = buf.split_at_mut(TWO_DIGIT_WIDTH);
+    let Some((first_hex, remaining_hex_bytes)) = buf.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+    else {
+        return Err(write_zero_err());
+    };
     first_hex.copy_from_slice(hex_byte(usize::from(b0))?);
-    let (second_hex, third_hex) = remaining_hex_bytes.split_at_mut(TWO_DIGIT_WIDTH);
+    let Some((second_hex, third_hex)) =
+        remaining_hex_bytes.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+    else {
+        return Err(write_zero_err());
+    };
     second_hex.copy_from_slice(hex_byte(usize::from(b1))?);
     third_hex.copy_from_slice(hex_byte(usize::from(b2))?);
     Ok(())
@@ -456,7 +468,9 @@ fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> 
     let head = cur.take(HEX_U16_FULL_WIDTH)?;
     let upper = usize::from(low_u8_from_u32(u32::from(value >> 8_u32)));
     let lower = usize::from(low_u8_from_u32(u32::from(value)));
-    let (upper_hex, lower_hex) = head.split_at_mut(TWO_DIGIT_WIDTH);
+    let Some((upper_hex, lower_hex)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+        return Err(write_zero_err());
+    };
     upper_hex.copy_from_slice(hex_byte(upper)?);
     lower_hex.copy_from_slice(hex_byte(lower)?);
     Ok(())
@@ -595,7 +609,9 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
             .rem_euclid(SECONDS_PER_MINUTE_U128),
     ));
     let tenths = usize::from(low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND)));
-    let (minute_digits, rest) = head.split_at_mut(TWO_DIGIT_WIDTH);
+    let Some((minute_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+        return 0;
+    };
     if copy_two_digits(minute_digits, minutes).is_err() {
         return 0;
     }
@@ -603,7 +619,10 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
         return 0;
     };
     *separator = b':';
-    let (second_digits, tenth_part) = remainder.split_at_mut(TWO_DIGIT_WIDTH);
+    let Some((second_digits, tenth_part)) = remainder.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+    else {
+        return 0;
+    };
     if copy_two_digits(second_digits, sec_whole).is_err() {
         return 0;
     }

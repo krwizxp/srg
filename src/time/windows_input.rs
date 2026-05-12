@@ -81,29 +81,25 @@ fn mouse_input(dw_flags: u32) -> Input {
     }
 }
 fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
+    let Ok(input_count) = u32::try_from(inputs.len()) else {
+        write_line_ignored(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
+        return;
+    };
+    let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
+        write_line_ignored(
+            err,
+            format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
+        );
+        return;
+    };
     // SAFETY: `inputs.as_ptr()` stays valid for the whole call.
     // `cb_size` matches the exact Rust representation passed to `SendInput`.
-    unsafe {
-        let Ok(input_count) = u32::try_from(inputs.len()) else {
-            write_line_ignored(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
-            return;
-        };
-        let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
-            write_line_ignored(
-                err,
-                format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
-            );
-            return;
-        };
-        let sent = SendInput(input_count, inputs.as_ptr(), input_size);
-        if sent != input_count {
-            write_line_ignored(
-                err,
-                format_args!(
-                    "[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"
-                ),
-            );
-        }
+    let sent = unsafe { SendInput(input_count, inputs.as_ptr(), input_size) };
+    if sent != input_count {
+        write_line_ignored(
+            err,
+            format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
+        );
     }
 }
 pub fn send_action(action: InputAction, err: &mut dyn Write) {

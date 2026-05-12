@@ -295,9 +295,7 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
                 .unwrap_or_else(|_| i64::from(i32::MAX)),
             Err(err) => {
                 let secs_before_epoch = err.duration().as_secs();
-                let days_before_epoch = secs_before_epoch
-                    .saturating_add(SECS_PER_DAY_U64 - 1)
-                    .div_euclid(SECS_PER_DAY_U64);
+                let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
                 let days_before_epoch_i64 =
                     i64::try_from(days_before_epoch).unwrap_or_else(|_| i64::from(i32::MAX));
                 days_before_epoch_i64.checked_neg().unwrap_or(i64::MIN)

@@ -7,6 +7,7 @@ use self::{
     },
 };
 use core::{
+    array::from_fn,
     char::from_u32,
     error::Error,
     fmt::{Arguments, Display},
@@ -160,48 +161,41 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
 static BIN8_TABLE: LazyLock<[[u8; 8]; 256]> = LazyLock::new(|| {
-    let mut table = [[0_u8; 8]; 256];
-    let mut byte = 0_u8;
-    for row in &mut table {
-        for (bit, slot) in row.iter_mut().enumerate() {
+    from_fn(|byte_index| {
+        let byte = u8::try_from(byte_index).unwrap_or_default();
+        from_fn(|bit| {
             let shift = 7_usize.saturating_sub(bit);
-            *slot = if ((byte >> shift) & 1) == 1 {
+            if ((byte >> shift) & 1) == 1 {
                 b'1'
             } else {
                 b'0'
-            };
-        }
-        byte = byte.wrapping_add(1);
-    }
-    table
+            }
+        })
+    })
 });
 static HEX_BYTE_TABLE: LazyLock<[[u8; 2]; 256]> = LazyLock::new(|| {
-    let mut table = [[0_u8; 2]; 256];
-    let mut value = 0_u8;
-    for slot in &mut table {
+    from_fn(|value_index| {
+        let value = u8::try_from(value_index).unwrap_or_default();
         let hi = usize::from(value >> 4_u8);
         let lo = usize::from(value & low_u8_from_u64(NIBBLE_MASK_U64));
-        let Some(&hi_byte) = HEX_UPPER.get(hi) else {
-            continue;
-        };
-        let Some(&lo_byte) = HEX_UPPER.get(lo) else {
-            continue;
-        };
-        *slot = [hi_byte, lo_byte];
-        value = value.wrapping_add(1);
-    }
-    table
+        [
+            HEX_UPPER.get(hi).copied().unwrap_or_default(),
+            HEX_UPPER.get(lo).copied().unwrap_or_default(),
+        ]
+    })
 });
 type Result<T> = StdResult<T, Box<dyn Error + Send + Sync + 'static>>;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 #[cfg(windows)]
 #[repr(C)]
+#[derive(Default)]
 struct FileTime {
     low_date_time: u32,
     high_date_time: u32,
 }
 #[cfg(windows)]
 #[repr(C)]
+#[derive(Default)]
 struct ByHandleFileInformation {
     file_attributes: u32,
     creation_time: FileTime,
@@ -215,16 +209,50 @@ struct ByHandleFileInformation {
     file_index_low: u32,
 }
 #[cfg(windows)]
+impl TryFrom<&File> for ByHandleFileInformation {
+    type Error = IoError;
+    fn try_from(file: &File) -> IoResult<Self> {
+        let mut file_information = Self::default();
+        // SAFETY: `GetFileInformationByHandle` only writes to the provided output
+        // struct and uses the raw OS handle borrowed from `file` for the duration
+        // of this call.
+        let result =
+            unsafe { GetFileInformationByHandle(file.as_raw_handle(), &raw mut file_information) };
+        if result == 0_i32 {
+            return Err(IoError::last_os_error());
+        }
+        Ok(file_information)
+    }
+}
+#[cfg(windows)]
 unsafe extern "system" {
     fn GetFileInformationByHandle(
         h_file: *mut c_void,
         file_information: *mut ByHandleFileInformation,
     ) -> i32;
 }
+#[derive(Clone, Copy)]
 enum RngSource {
     None,
     RdRand,
     RdSeed,
+}
+impl RngSource {
+    #[cfg(target_arch = "x86_64")]
+    fn try_hardware_value(self) -> Option<u64> {
+        let mut value = 0_u64;
+        match self {
+            Self::RdSeed => {
+                // SAFETY: callers only use this after confirming `rdseed` support.
+                (unsafe { _rdseed64_step(&mut value) } == 1_i32).then_some(value)
+            }
+            Self::RdRand => {
+                // SAFETY: callers only use this after confirming `rdrand` support.
+                (unsafe { _rdrand64_step(&mut value) } == 1_i32).then_some(value)
+            }
+            Self::None => None,
+        }
+    }
 }
 #[derive(Default)]
 struct RandomDataSet {
@@ -404,8 +432,13 @@ impl RandomDataBuilder<'_, '_> {
         let solar_system_index =
             checked_add_one_u64(solar_system_index_base, "NMS 태양계 번호 계산 실패")?;
         self.data.solar_system_index = low_u16_from_u64(solar_system_index);
-        let (prefix_glyphs, suffix_glyphs) =
-            self.data.glyph_string.split_at_mut(NMS_GLYPH_PREFIX_COUNT);
+        let Some((prefix_glyphs, suffix_glyphs)) = self
+            .data
+            .glyph_string
+            .split_first_chunk_mut::<NMS_GLYPH_PREFIX_COUNT>()
+        else {
+            return Err(IoError::other("NMS glyph prefix 길이가 올바르지 않습니다.").into());
+        };
         for (slot, nibble_source) in prefix_glyphs.iter_mut().zip([
             u64::from(self.data.planet_number),
             u64::from(self.data.solar_system_index >> 8_u32),
@@ -559,13 +592,10 @@ impl MenuApp {
                 "결과 배열 인덱스 범위 초과",
             )?;
             writeln!(command_out, "사다리타기 결과:")?;
-            let mut indices = [0_usize; MAX_PLAYERS];
+            let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
             let indices_slice = indices
                 .get_mut(..n)
                 .ok_or_else(|| IoError::other("인덱스 배열 슬라이스 범위 초과"))?;
-            for (index, slot) in indices_slice.iter_mut().enumerate() {
-                *slot = index;
-            }
             for index in (1..indices_slice.len()).rev() {
                 seed ^= get_hardware_random()?;
                 let next_index = checked_add_one_usize(index)
@@ -888,12 +918,10 @@ impl MenuApp {
             let command = {
                 let mut prompt_out = stdout().lock();
                 match read_line_reuse(menu_prompt, &mut self.input_buffer, &mut prompt_out) {
-                    Ok(command_str) => match command_str.as_bytes() {
-                        b"1" | b"2" | b"3" | b"4" | b"5" | b"6" | b"7" => {
-                            command_str.as_bytes().first().copied().unwrap_or_default()
-                        }
-                        _ => 0,
-                    },
+                    Ok(command_str) if let &[command @ b'1'..=b'7'] = command_str.as_bytes() => {
+                        command
+                    }
+                    Ok(_) => 0,
                     Err(read_err) if read_err.kind() == ErrorKind::UnexpectedEof => {
                         return Ok(ExitCode::SUCCESS);
                     }
@@ -1083,20 +1111,7 @@ fn validate_safe_output_file_path(path: &Path, allow_missing: bool) -> Result<()
 }
 #[cfg(windows)]
 fn file_has_multiple_links(file: &File) -> IoResult<bool> {
-    use core::mem::MaybeUninit;
-    let mut file_information = MaybeUninit::<ByHandleFileInformation>::zeroed();
-    // SAFETY: `GetFileInformationByHandle` only writes to the provided output
-    // struct and uses the raw OS handle borrowed from `file` for the duration
-    // of this call.
-    let result =
-        unsafe { GetFileInformationByHandle(file.as_raw_handle(), file_information.as_mut_ptr()) };
-    if result == 0_i32 {
-        return Err(IoError::last_os_error());
-    }
-    // SAFETY: The call above succeeded, so the OS initialized the full output
-    // structure.
-    let initialized_file_information = unsafe { file_information.assume_init() };
-    Ok(initialized_file_information.number_of_links > 1)
+    Ok(ByHandleFileInformation::try_from(file)?.number_of_links > 1)
 }
 fn boxed_other_with_source(
     context_msg: &'static str,
@@ -1230,11 +1245,8 @@ fn get_hardware_random() -> Result<u64> {
         RngSource::RdSeed => cfg_select! {
             target_arch = "x86_64" => {
                 {
-                    let mut value = 0_u64;
                     loop {
-                        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdseed`
-                        // support, and the intrinsic writes to the valid mutable pointer to `value`.
-                        if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+                        if let Some(value) = RngSource::RdSeed.try_hardware_value() {
                             break Ok(value);
                         }
                         spin_loop();
@@ -1248,11 +1260,8 @@ fn get_hardware_random() -> Result<u64> {
         RngSource::RdRand => cfg_select! {
             target_arch = "x86_64" => {
                 {
-                    let mut value = 0_u64;
                     for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
-                        // SAFETY: `RNG_SOURCE` only routes here after confirming `rdrand`
-                        // support, and the intrinsic writes to the valid mutable pointer to `value`.
-                        if unsafe { _rdrand64_step(&mut value) } == 1_i32 {
+                        if let Some(value) = RngSource::RdRand.try_hardware_value() {
                             return Ok(value);
                         }
                         spin_loop();

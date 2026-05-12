@@ -1,5 +1,8 @@
 use crate::write_line_ignored;
-use core::{ffi::c_void, ptr::null_mut};
+use core::{
+    ffi::c_void,
+    ptr::{NonNull, null_mut},
+};
 use std::io::Write;
 
 const EVENT_LEFT_MOUSE_DOWN: CGEventType = 1;
@@ -29,7 +32,21 @@ pub enum InputAction {
 }
 
 struct Event {
-    raw: CGEventRef,
+    raw: NonNull<c_void>,
+}
+
+#[derive(Clone, Copy)]
+enum EventRequest {
+    Current,
+    Keyboard {
+        key_down: bool,
+        virtual_key: CGKeyCode,
+    },
+    Mouse {
+        mouse_button: CGMouseButton,
+        mouse_cursor_position: CGPoint,
+        mouse_type: CGEventType,
+    },
 }
 
 #[link(name = "ApplicationServices", kind = "framework")]
@@ -53,28 +70,74 @@ unsafe extern "C" {
 
 impl Drop for Event {
     fn drop(&mut self) {
-        if !self.raw.is_null() {
-            // SAFETY: raw is a CoreFoundation object returned by CGEventCreate* and released exactly once here.
-            unsafe {
-                CFRelease(self.raw.cast_const());
-            }
+        // SAFETY: raw is a CoreFoundation object returned by CGEventCreate* and released exactly once here.
+        unsafe {
+            CFRelease(self.raw.as_ptr().cast_const());
         }
     }
 }
 
 impl Event {
-    fn new(raw: CGEventRef, context: &str) -> Result<Self, String> {
-        if raw.is_null() {
-            Err(format!("{context}: CGEvent 생성 실패"))
-        } else {
-            Ok(Self { raw })
-        }
+    fn create(request: EventRequest, context: &str) -> Result<Self, String> {
+        let raw_ptr = match request {
+            // SAFETY: null asks CoreGraphics to use the default source.
+            EventRequest::Current => unsafe { CGEventCreate(null_mut()) },
+            EventRequest::Keyboard {
+                key_down,
+                virtual_key,
+            } => {
+                // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
+                unsafe { CGEventCreateKeyboardEvent(null_mut(), virtual_key, key_down) }
+            }
+            EventRequest::Mouse {
+                mouse_button,
+                mouse_cursor_position,
+                mouse_type,
+            } => {
+                // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
+                unsafe {
+                    CGEventCreateMouseEvent(
+                        null_mut(),
+                        mouse_type,
+                        mouse_cursor_position,
+                        mouse_button,
+                    )
+                }
+            }
+        };
+        let Some(raw) = NonNull::new(raw_ptr) else {
+            return Err(format!("{context}: CGEvent 생성 실패"));
+        };
+        Ok(Self { raw })
     }
-
+    fn keyboard(virtual_key: CGKeyCode, key_down: bool, context: &str) -> Result<Self, String> {
+        Self::create(
+            EventRequest::Keyboard {
+                key_down,
+                virtual_key,
+            },
+            context,
+        )
+    }
+    fn mouse(
+        mouse_type: CGEventType,
+        mouse_cursor_position: CGPoint,
+        mouse_button: CGMouseButton,
+        context: &str,
+    ) -> Result<Self, String> {
+        Self::create(
+            EventRequest::Mouse {
+                mouse_button,
+                mouse_cursor_position,
+                mouse_type,
+            },
+            context,
+        )
+    }
     fn post(&self) {
         // SAFETY: raw is a live CGEventRef retained by self.
         unsafe {
-            CGEventPost(HID_EVENT_TAP, self.raw);
+            CGEventPost(HID_EVENT_TAP, self.raw.as_ptr());
         }
     }
 }
@@ -83,49 +146,27 @@ pub fn send_action(action: InputAction, err: &mut dyn Write) {
     let result: Result<(), String> = (|| {
         match action {
             InputAction::MouseClick => {
-                // SAFETY: null source asks CoreGraphics to create the event with the default source.
-                let current = Event::new(
-                    unsafe { CGEventCreate(null_mut()) },
-                    "현재 마우스 위치 조회",
-                )?;
+                let current = Event::create(EventRequest::Current, "현재 마우스 위치 조회")?;
                 // SAFETY: current.raw is a live CGEventRef.
-                let point = unsafe { CGEventGetLocation(current.raw) };
-                post_event(
-                    // SAFETY: null source and current point/button values satisfy CGEventCreateMouseEvent's contract.
-                    unsafe {
-                        CGEventCreateMouseEvent(
-                            null_mut(),
-                            EVENT_LEFT_MOUSE_DOWN,
-                            point,
-                            MOUSE_BUTTON_LEFT,
-                        )
-                    },
+                let point = unsafe { CGEventGetLocation(current.raw.as_ptr()) };
+                Event::mouse(
+                    EVENT_LEFT_MOUSE_DOWN,
+                    point,
+                    MOUSE_BUTTON_LEFT,
                     "마우스 누름",
-                )?;
-                post_event(
-                    // SAFETY: null source and current point/button values satisfy CGEventCreateMouseEvent's contract.
-                    unsafe {
-                        CGEventCreateMouseEvent(
-                            null_mut(),
-                            EVENT_LEFT_MOUSE_UP,
-                            point,
-                            MOUSE_BUTTON_LEFT,
-                        )
-                    },
+                )?
+                .post();
+                Event::mouse(
+                    EVENT_LEFT_MOUSE_UP,
+                    point,
+                    MOUSE_BUTTON_LEFT,
                     "마우스 뗌",
-                )?;
+                )?
+                .post();
             }
             InputAction::F5Press => {
-                post_event(
-                    // SAFETY: KEY_CODE_F5 is the macOS virtual key code for F5.
-                    unsafe { CGEventCreateKeyboardEvent(null_mut(), KEY_CODE_F5, true) },
-                    "F5 누름",
-                )?;
-                post_event(
-                    // SAFETY: KEY_CODE_F5 is the macOS virtual key code for F5.
-                    unsafe { CGEventCreateKeyboardEvent(null_mut(), KEY_CODE_F5, false) },
-                    "F5 뗌",
-                )?;
+                Event::keyboard(KEY_CODE_F5, true, "F5 누름")?.post();
+                Event::keyboard(KEY_CODE_F5, false, "F5 뗌")?.post();
             }
         }
         Ok(())
@@ -133,10 +174,4 @@ pub fn send_action(action: InputAction, err: &mut dyn Write) {
     if let Err(source) = result {
         write_line_ignored(err, format_args!("[경고] macOS native 입력 실패: {source}"));
     }
-}
-
-fn post_event(raw: CGEventRef, context: &str) -> Result<(), String> {
-    let event = Event::new(raw, context)?;
-    event.post();
-    Ok(())
 }

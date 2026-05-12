@@ -25,14 +25,31 @@ mod native_http;
 cfg_select! {
     target_os = "linux" => {
         mod linux_input;
+        mod native_input {
+            pub(super) use super::linux_input::{InputAction, send_action};
+        }
     }
     target_os = "macos" => {
         mod macos_input;
+        mod native_input {
+            pub(super) use super::macos_input::{InputAction, send_action};
+        }
     }
     target_os = "windows" => {
         mod windows_input;
+        mod native_input {
+            pub(super) use super::windows_input::{InputAction, send_action};
+        }
     }
-    _ => {}
+    _ => {
+        mod native_input {
+            pub(super) enum InputAction {
+                F5Press,
+                MouseClick,
+            }
+            pub(super) fn send_action(_action: InputAction, _err: &mut dyn std::io::Write) {}
+        }
+    }
 }
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
@@ -80,18 +97,30 @@ cfg_select! {
         const TIMERR_NOERROR: u32 = 0;
         const TARGET_PERIOD_MS: u32 = 1;
         pub struct HighResTimerGuard;
+        struct HighResTimerRequest;
         #[link(name = "winmm")]
         unsafe extern "system" {
             fn timeBeginPeriod(u_period: u32) -> u32;
             fn timeEndPeriod(u_period: u32) -> u32;
         }
+        impl TryFrom<HighResTimerRequest> for HighResTimerGuard {
+            type Error = ();
+            fn try_from(_value: HighResTimerRequest) -> stdresult::Result<Self, Self::Error> {
+                // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
+                // integer input and does not impose additional aliasing or
+                // lifetime requirements.
+                if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
+                    Ok(Self)
+                } else {
+                    Err(())
+                }
+            }
+        }
         impl Drop for HighResTimerGuard {
             fn drop(&mut self) {
                 // SAFETY: This releases the timer period requested when the guard was
                 // created using the same value on the same process.
-                unsafe {
-                    timeEndPeriod(TARGET_PERIOD_MS);
-                }
+                unsafe { timeEndPeriod(TARGET_PERIOD_MS) };
             }
         }
     }
@@ -258,7 +287,10 @@ impl SliceCursor<'_> {
                     year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
                 ));
                 let head = self.inner.take(FOUR_DIGIT_WIDTH)?;
-                let (hi_digits, lo_digits) = head.split_at_mut(TWO_DIGIT_WIDTH);
+                let Some((hi_digits, lo_digits)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+                else {
+                    return Err(write_zero_err());
+                };
                 Self::copy_two_digits(hi_digits, hi)?;
                 Self::copy_two_digits(lo_digits, lo)?;
                 return Ok(());
@@ -879,11 +911,8 @@ impl AppState {
     fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
         if matches!(next_activity, Activity::FinalCountdown { .. }) {
             if self.high_res_timer_guard.is_none() {
-                // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
-                // integer input and does not impose additional aliasing or
-                // lifetime requirements.
-                if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
-                    self.high_res_timer_guard = Some(HighResTimerGuard);
+                if let Ok(guard) = HighResTimerGuard::try_from(HighResTimerRequest) {
+                    self.high_res_timer_guard = Some(guard);
                 } else {
                     write_line_ignored(
                         err,
@@ -910,30 +939,10 @@ impl AppState {
         if let Some(action) = self.trigger_action {
             match action {
                 TriggerAction::LeftClick => {
-                    cfg_select! {
-                        target_os = "linux" => {
-                            linux_input::send_action(linux_input::InputAction::MouseClick, err);
-                        }
-                        target_os = "macos" => {
-                            macos_input::send_action(macos_input::InputAction::MouseClick, err);
-                        }
-                        windows => {
-                            windows_input::send_action(windows_input::InputAction::MouseClick, err);
-                        }
-                    };
+                    native_input::send_action(native_input::InputAction::MouseClick, err);
                 }
                 TriggerAction::F5Press => {
-                    cfg_select! {
-                        target_os = "linux" => {
-                            linux_input::send_action(linux_input::InputAction::F5Press, err);
-                        }
-                        target_os = "macos" => {
-                            macos_input::send_action(macos_input::InputAction::F5Press, err);
-                        }
-                        windows => {
-                            windows_input::send_action(windows_input::InputAction::F5Press, err);
-                        }
-                    };
+                    native_input::send_action(native_input::InputAction::F5Press, err);
                 }
             }
         }

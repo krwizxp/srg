@@ -1,4 +1,5 @@
 use alloc::fmt;
+use core::array::from_fn;
 use std::{io, sync::LazyLock};
 const DECIMAL_BASE_U8: u8 = 10;
 const SINGLE_BYTE_WIDTH: usize = 1;
@@ -6,17 +7,18 @@ const TWO_DIGIT_TABLE_LEN: usize = 100;
 const UTF8_MAX_CHAR_LEN: usize = 4;
 pub const DIGITS: [u8; 10] = *b"0123456789";
 pub static TWO_DIGITS: LazyLock<[[u8; 2]; TWO_DIGIT_TABLE_LEN]> = LazyLock::new(|| {
-    let mut table = [[0_u8; 2]; TWO_DIGIT_TABLE_LEN];
-    for (slot, value) in table.iter_mut().zip(0_u8..) {
-        let Some(&tens) = DIGITS.get(usize::from(value.div_euclid(DECIMAL_BASE_U8))) else {
-            continue;
-        };
-        let Some(&ones) = DIGITS.get(usize::from(value.rem_euclid(DECIMAL_BASE_U8))) else {
-            continue;
-        };
-        *slot = [tens, ones];
-    }
-    table
+    from_fn(|index| {
+        let value = u8::try_from(index).unwrap_or_default();
+        let tens = DIGITS
+            .get(usize::from(value.div_euclid(DECIMAL_BASE_U8)))
+            .copied()
+            .unwrap_or_default();
+        let ones = DIGITS
+            .get(usize::from(value.rem_euclid(DECIMAL_BASE_U8)))
+            .copied()
+            .unwrap_or_default();
+        [tens, ones]
+    })
 });
 pub struct ByteCursor<'a> {
     buf: &'a mut [u8],
