@@ -31,6 +31,10 @@ pub enum InputAction {
     MouseClick,
 }
 
+pub(super) struct PreparedInput {
+    active: bool,
+}
+
 struct Event {
     raw: NonNull<c_void>,
 }
@@ -142,8 +146,20 @@ impl Event {
     }
 }
 
-pub fn send_action(action: InputAction, err: &mut dyn Write) {
-    let result: Result<(), String> = (|| {
+impl PreparedInput {
+    pub(super) const EMPTY: Self = Self { active: false };
+
+    pub(super) fn prepare(&mut self, action: Option<InputAction>, _err: &mut dyn Write) {
+        self.active = action.is_some();
+    }
+
+    pub(super) const fn reset(&mut self) {
+        self.active = false;
+    }
+
+    pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
+        self.active = false;
+        let result: Result<(), String> = (|| {
         match action {
             InputAction::MouseClick => {
                 let current = Event::create(EventRequest::Current, "현재 마우스 위치 조회")?;
@@ -171,7 +187,8 @@ pub fn send_action(action: InputAction, err: &mut dyn Write) {
         }
         Ok(())
     })();
-    if let Err(source) = result {
-        write_line_ignored(err, format_args!("[경고] macOS native 입력 실패: {source}"));
+        if let Err(source) = result {
+            write_line_ignored(err, format_args!("[경고] macOS native 입력 실패: {source}"));
+        }
     }
 }

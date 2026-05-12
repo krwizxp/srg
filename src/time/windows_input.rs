@@ -57,6 +57,37 @@ pub enum InputAction {
     F5Press,
     MouseClick,
 }
+pub(super) struct PreparedInput {
+    active: bool,
+}
+impl PreparedInput {
+    pub(super) const EMPTY: Self = Self { active: false };
+    pub(super) fn prepare(&mut self, action: Option<InputAction>, _err: &mut dyn Write) {
+        self.active = action.is_some();
+    }
+    pub(super) const fn reset(&mut self) {
+        self.active = false;
+    }
+    pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
+        self.active = false;
+        match action {
+            InputAction::MouseClick => {
+                let inputs = [
+                    mouse_input(MOUSEEVENTF_LEFTDOWN),
+                    mouse_input(MOUSEEVENTF_LEFTUP),
+                ];
+                send_input_events(&inputs, err);
+            }
+            InputAction::F5Press => {
+                let inputs = [
+                    keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
+                    keyboard_input(VK_F5, KEYEVENTF_KEYUP),
+                ];
+                send_input_events(&inputs, err);
+            }
+        }
+    }
+}
 fn keyboard_input(w_vk: u16, dw_flags: u32) -> Input {
     Input {
         r#type: INPUT_KEYBOARD,
@@ -100,23 +131,5 @@ fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
             err,
             format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
         );
-    }
-}
-pub fn send_action(action: InputAction, err: &mut dyn Write) {
-    match action {
-        InputAction::MouseClick => {
-            let inputs = [
-                mouse_input(MOUSEEVENTF_LEFTDOWN),
-                mouse_input(MOUSEEVENTF_LEFTUP),
-            ];
-            send_input_events(&inputs, err);
-        }
-        InputAction::F5Press => {
-            let inputs = [
-                keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
-                keyboard_input(VK_F5, KEYEVENTF_KEYUP),
-            ];
-            send_input_events(&inputs, err);
-        }
     }
 }

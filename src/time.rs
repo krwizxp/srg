@@ -26,28 +26,58 @@ cfg_select! {
     target_os = "linux" => {
         mod linux_input;
         mod native_input {
-            pub(super) use super::linux_input::{InputAction, send_action};
+            pub(super) use super::linux_input::{InputAction, PreparedInput};
         }
     }
     target_os = "macos" => {
         mod macos_input;
         mod native_input {
-            pub(super) use super::macos_input::{InputAction, send_action};
+            pub(super) use super::macos_input::{InputAction, PreparedInput};
         }
     }
     target_os = "windows" => {
         mod windows_input;
         mod native_input {
-            pub(super) use super::windows_input::{InputAction, send_action};
+            pub(super) use super::windows_input::{InputAction, PreparedInput};
         }
     }
     _ => {
         mod native_input {
+            use std::io;
+
+            #[derive(Clone, Copy)]
             pub(super) enum InputAction {
                 F5Press,
                 MouseClick,
             }
-            pub(super) fn send_action(_action: InputAction, _err: &mut dyn std::io::Write) {}
+
+            pub(super) struct PreparedInput {
+                active: bool,
+            }
+
+            impl PreparedInput {
+                pub(super) const EMPTY: Self = Self { active: false };
+
+                pub(super) fn prepare(
+                    &mut self,
+                    action: Option<InputAction>,
+                    _err: &mut dyn io::Write,
+                ) {
+                    self.active = action.is_some();
+                }
+
+                pub(super) const fn reset(&mut self) {
+                    self.active = false;
+                }
+
+                pub(super) fn send(
+                    &mut self,
+                    _action: InputAction,
+                    _err: &mut dyn io::Write,
+                ) {
+                    self.active = false;
+                }
+            }
         }
     }
 }
@@ -418,6 +448,14 @@ pub enum TriggerAction {
     F5Press,
     LeftClick,
 }
+impl From<TriggerAction> for native_input::InputAction {
+    fn from(action: TriggerAction) -> Self {
+        match action {
+            TriggerAction::LeftClick => Self::MouseClick,
+            TriggerAction::F5Press => Self::F5Press,
+        }
+    }
+}
 pub struct AppState {
     pub baseline_rtt: Option<Duration>,
     pub baseline_rtt_attempts: usize,
@@ -439,6 +477,12 @@ struct NetworkContext {
     cached_tcp_socket_addr: Option<net::SocketAddr>,
     tcp_line_buffer: Vec<u8>,
 }
+struct LoopRuntime<'a> {
+    err: &'a mut dyn io::Write,
+    network_context: &'a mut NetworkContext,
+    out: &'a mut dyn io::Write,
+    prepared_input: &'a mut native_input::PreparedInput,
+}
 #[derive(Clone, Copy, Debug)]
 enum Activity {
     CalibrateOnTick,
@@ -452,6 +496,11 @@ enum CountdownDecision {
     TriggerLate,
     TriggerWithRemaining(Duration),
     Wait,
+}
+impl Activity {
+    const fn is_final_countdown(&self) -> bool {
+        matches!(self, Self::FinalCountdown { .. })
+    }
 }
 impl AppState {
     fn begin_baseline_rtt_measurement(&mut self, now: Instant, out: &mut dyn io::Write) {
@@ -585,6 +634,7 @@ impl AppState {
         target_time: SystemTime,
         msg_buf: &'a mut String,
         net_ctx: &mut NetworkContext,
+        prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
     ) -> (Activity, Option<&'a str>) {
         let sample = match fetch_server_time_sample(&self.host, net_ctx) {
@@ -594,6 +644,7 @@ impl AppState {
                     target_time,
                     msg_buf,
                     &fetch_err,
+                    prepared_input,
                     err,
                 );
             }
@@ -624,35 +675,37 @@ impl AppState {
         match decide_countdown_action(target_time, current_server_time, one_way_delay) {
             CountdownDecision::TriggerWithRemaining(duration_until_target) => {
                 self.trigger_and_finish(
-     msg_buf,
-     format_args!(
-         "\n>>> 액션 실행! (목표 도달까지 {:.1}ms 남음) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
-         duration_millis_f64(duration_until_target),
-         duration_millis_f64(one_way_delay),
-         duration_millis_f64(sample.rtt)
-     ),
-     err
-)
+                    msg_buf,
+                    format_args!(
+                        "\n>>> 액션 실행! (목표 도달까지 {:.1}ms 남음) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
+                        duration_millis_f64(duration_until_target),
+                        duration_millis_f64(one_way_delay),
+                        duration_millis_f64(sample.rtt)
+                    ),
+                    prepared_input,
+                    err,
+                )
             }
-            CountdownDecision::TriggerLate => {
-                self.trigger_and_finish(
-     msg_buf,
-     format_args!(
-         "\n>>> 액션 실행! (시간 초과) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
-         duration_millis_f64(one_way_delay),
-         duration_millis_f64(sample.rtt)
-     ),
-     err
-)
-            }
+            CountdownDecision::TriggerLate => self.trigger_and_finish(
+                msg_buf,
+                format_args!(
+                    "\n>>> 액션 실행! (시간 초과) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
+                    duration_millis_f64(one_way_delay),
+                    duration_millis_f64(sample.rtt)
+                ),
+                prepared_input,
+                err,
+            ),
             CountdownDecision::Wait => (Activity::FinalCountdown { target_time }, None),
         }
     }
+
     fn handle_final_countdown_fetch_error<'a>(
         &self,
         target_time: SystemTime,
         msg_buf: &'a mut String,
         err: &TimeError,
+        prepared_input: &mut native_input::PreparedInput,
         stderr: &mut dyn io::Write,
     ) -> (Activity, Option<&'a str>) {
         if let Some(st) = self.server_time.as_ref() {
@@ -676,6 +729,7 @@ impl AppState {
                             duration_millis_f64(one_way_delay),
                             err
                         ),
+                        prepared_input,
                         stderr,
                     );
                 }
@@ -690,6 +744,7 @@ impl AppState {
                             duration_millis_f64(one_way_delay),
                             err
                         ),
+                        prepared_input,
                         stderr,
                     );
                 }
@@ -699,6 +754,7 @@ impl AppState {
         append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", err);
         (Activity::FinalCountdown { target_time }, Some(msg_buf))
     }
+
     fn handle_measure_baseline_rtt<'a>(
         &mut self,
         msg_buf: &'a mut String,
@@ -785,22 +841,27 @@ impl AppState {
         &mut self,
         activity: &Activity,
         message_buffer: &'a mut String,
-        network_context: &mut NetworkContext,
         now: Instant,
-        out: &mut dyn io::Write,
-        err: &mut dyn io::Write,
+        runtime: &mut LoopRuntime<'_>,
     ) -> (Activity, Option<&'a str>) {
         match *activity {
-            Activity::MeasureBaselineRtt => {
-                self.handle_measure_baseline_rtt(message_buffer, network_context, now, out)
-            }
+            Activity::MeasureBaselineRtt => self.handle_measure_baseline_rtt(
+                message_buffer,
+                runtime.network_context,
+                now,
+                runtime.out,
+            ),
             Activity::CalibrateOnTick => {
-                self.handle_calibrate_on_tick(message_buffer, network_context)
+                self.handle_calibrate_on_tick(message_buffer, runtime.network_context)
             }
             Activity::Predicting => self.handle_predicting(message_buffer, now),
-            Activity::FinalCountdown { target_time } => {
-                self.handle_final_countdown(target_time, message_buffer, network_context, err)
-            }
+            Activity::FinalCountdown { target_time } => self.handle_final_countdown(
+                target_time,
+                message_buffer,
+                runtime.network_context,
+                runtime.prepared_input,
+                runtime.err,
+            ),
             Activity::Finished => (Activity::Predicting, Some("액션 완료. 예측 모드 전환.")),
             Activity::Retrying { retry_at } => {
                 if now >= retry_at {
@@ -836,6 +897,7 @@ impl AppState {
             cached_tcp_socket_addr: None,
             tcp_line_buffer: Vec::with_capacity(TCP_LINE_BUF_CAPACITY),
         };
+        let mut prepared_input = native_input::PreparedInput::EMPTY;
         let mut line_buf = [0_u8; DISPLAY_LINE_BUF_LEN];
         loop {
             let activity_poll = match activity {
@@ -886,14 +948,16 @@ impl AppState {
                 last_display_update = now;
             }
             message_buffer.clear();
-            let (next_activity, log_opt_msg) = self.next_activity(
-                &activity,
-                &mut message_buffer,
-                &mut network_context,
-                now,
-                out,
-                err,
-            );
+            let (next_activity, log_opt_msg) = {
+                let mut runtime = LoopRuntime {
+                    err,
+                    network_context: &mut network_context,
+                    out,
+                    prepared_input: &mut prepared_input,
+                };
+                self.next_activity(&activity, &mut message_buffer, now, &mut runtime)
+            };
+            self.sync_prepared_input_state(&activity, &next_activity, &mut prepared_input, err);
             cfg_select! {
                 windows => {
                     self.sync_high_res_timer_state(&next_activity, err);
@@ -909,7 +973,7 @@ impl AppState {
     }
     #[cfg(windows)]
     fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
-        if matches!(next_activity, Activity::FinalCountdown { .. }) {
+        if next_activity.is_final_countdown() {
             if self.high_res_timer_guard.is_none() {
                 if let Ok(guard) = HighResTimerGuard::try_from(HighResTimerRequest) {
                     self.high_res_timer_guard = Some(guard);
@@ -930,21 +994,36 @@ impl AppState {
             self.high_res_timer_guard = None;
         }
     }
+    fn sync_prepared_input_state(
+        &self,
+        previous_activity: &Activity,
+        next_activity: &Activity,
+        prepared_input: &mut native_input::PreparedInput,
+        err: &mut dyn io::Write,
+    ) {
+        let entering_final_countdown =
+            next_activity.is_final_countdown() && !previous_activity.is_final_countdown();
+        if entering_final_countdown {
+            prepared_input.prepare(
+                self.trigger_action.map(native_input::InputAction::from),
+                err,
+            );
+            return;
+        }
+        if !next_activity.is_final_countdown() {
+            prepared_input.reset();
+        }
+    }
+
     fn trigger_and_finish<'a>(
         &self,
         msg_buf: &'a mut String,
         log_message: fmt::Arguments,
+        prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
     ) -> (Activity, Option<&'a str>) {
-        if let Some(action) = self.trigger_action {
-            match action {
-                TriggerAction::LeftClick => {
-                    native_input::send_action(native_input::InputAction::MouseClick, err);
-                }
-                TriggerAction::F5Press => {
-                    native_input::send_action(native_input::InputAction::F5Press, err);
-                }
-            }
+        if let Some(action) = self.trigger_action.map(native_input::InputAction::from) {
+            prepared_input.send(action, err);
         }
         append_fmt(msg_buf, log_message);
         (Activity::Finished, Some(msg_buf))
