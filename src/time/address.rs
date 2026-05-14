@@ -5,18 +5,10 @@ const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있�
 const ERR_PORT: &str = "서버 주소 파싱 실패: 포트 번호가 유효하지 않습니다 (1~65535).";
 const DEFAULT_HTTP_PORT: u16 = 80;
 const DEFAULT_HTTPS_PORT: u16 = 443;
-const ASCII_ZERO: u8 = b'0';
-const DECIMAL_BASE_U16: u16 = 10;
-const HOST_PORT_SEPARATOR_LEN: usize = 1;
 const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
 const HTTPS_SCHEME_PREFIX: &str = "https://";
 const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
-const IPV6_BRACKET_EXTRA_LEN: usize = 2;
-const PORT_DEC_LEN_FIVE_THRESHOLD: u16 = 10_000;
-const PORT_DEC_LEN_FOUR_THRESHOLD: u16 = 1_000;
-const PORT_DEC_LEN_THREE_THRESHOLD: u16 = 100;
-const PORT_DEC_LEN_TWO_THRESHOLD: u16 = 10;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UrlScheme {
     Http,
@@ -74,17 +66,19 @@ impl TryFrom<&str> for ParsedServer {
         } else {
             Some(UrlScheme::Http)
         };
-        let authority_end = authority_end_index(after_scheme);
-        let authority = after_scheme.get(..authority_end).unwrap_or(after_scheme);
-        if authority.is_empty() || authority.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        let authority = match after_scheme.split_once(['/', '?', '#']) {
+            Some((authority, _)) => authority,
+            None => after_scheme,
+        };
+        if authority.is_empty() || authority.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let default_port = if matches!(scheme, Some(UrlScheme::Https)) {
+        let default_port = if scheme == Some(UrlScheme::Https) {
             DEFAULT_HTTPS_PORT
         } else {
             DEFAULT_HTTP_PORT
         };
-        let colon_count = authority.bytes().filter(|&byte| byte == b':').count();
+        let colon_count = authority.matches(':').count();
         let (host_part, port, explicit_port) = if let Some(bracketed) = authority.strip_prefix('[')
         {
             let (host_part, rem) = bracketed
@@ -114,12 +108,7 @@ impl TryFrom<&str> for ParsedServer {
             .ok()
             .map(|ip_addr| net::SocketAddr::new(ip_addr, port));
         let host_for_header = if host_part.contains(':') {
-            let mut wrapped_host =
-                String::with_capacity(host_part.len().saturating_add(IPV6_BRACKET_EXTRA_LEN));
-            wrapped_host.push('[');
-            wrapped_host.push_str(host_part);
-            wrapped_host.push(']');
-            wrapped_host
+            format!("[{host_part}]")
         } else {
             host_part.to_owned()
         };
@@ -128,10 +117,7 @@ impl TryFrom<&str> for ParsedServer {
         let tcp_host_header = if port == DEFAULT_HTTP_PORT {
             host_for_header
         } else {
-            let capacity = host_plus_port_capacity(host_for_header.len(), port);
-            let mut host_header = String::with_capacity(capacity);
-            append_host_with_optional_port(&mut host_header, &host_for_header, true, port);
-            host_header
+            format!("{host_for_header}:{port}")
         };
         Ok(Self {
             scheme,
@@ -150,89 +136,32 @@ pub fn strip_scheme_prefix(input: &str) -> &str {
         .get(..HTTPS_SCHEME_PREFIX_LEN)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX.as_bytes()))
     {
-        input.get(HTTPS_SCHEME_PREFIX_LEN..).unwrap_or(input)
+        let Some((_, rest)) = input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN) else {
+            return input;
+        };
+        rest
     } else if input_bytes
         .get(..HTTP_SCHEME_PREFIX_LEN)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX.as_bytes()))
     {
-        input.get(HTTP_SCHEME_PREFIX_LEN..).unwrap_or(input)
+        let Some((_, rest)) = input.split_at_checked(HTTP_SCHEME_PREFIX_LEN) else {
+            return input;
+        };
+        rest
     } else {
         input
     }
-}
-pub fn authority_end_index(after_scheme: &str) -> usize {
-    after_scheme
-        .bytes()
-        .position(|byte| matches!(byte, b'/' | b'?' | b'#'))
-        .unwrap_or(after_scheme.len())
 }
 fn build_url(host_for_header: &str, explicit_port: bool, port: u16, scheme: UrlScheme) -> String {
     let scheme_prefix = match scheme {
         UrlScheme::Http => HTTP_SCHEME_PREFIX,
         UrlScheme::Https => HTTPS_SCHEME_PREFIX,
     };
-    let capacity = scheme_prefix
-        .len()
-        .checked_add(host_for_header.len())
-        .map_or(host_for_header.len(), |value| {
-            if explicit_port {
-                host_plus_port_capacity(value, port)
-            } else {
-                value
-            }
-        });
-    let mut url = String::with_capacity(capacity);
-    url.push_str(scheme_prefix);
-    append_host_with_optional_port(&mut url, host_for_header, explicit_port, port);
-    url
-}
-fn append_host_with_optional_port(
-    target: &mut String,
-    host_for_header: &str,
-    include_port: bool,
-    port: u16,
-) {
-    target.push_str(host_for_header);
-    if include_port {
-        let mut digit_buf = [0_u8; 5];
-        let mut index = digit_buf.len();
-        let mut remaining = port;
-        loop {
-            let Some(next_index) = index.checked_sub(1) else {
-                return;
-            };
-            index = next_index;
-            let digit = u8::try_from(remaining.rem_euclid(DECIMAL_BASE_U16)).unwrap_or_default();
-            if let Some(slot) = digit_buf.get_mut(index) {
-                *slot = ASCII_ZERO.checked_add(digit).unwrap_or(ASCII_ZERO);
-            }
-            remaining = remaining.div_euclid(DECIMAL_BASE_U16);
-            if remaining == 0 {
-                break;
-            }
-        }
-        target.push(':');
-        for digit in digit_buf.iter().skip(index).copied() {
-            target.push(char::from(digit));
-        }
-    }
-}
-fn host_plus_port_capacity(base_len: usize, port: u16) -> usize {
-    let port_len = if port >= PORT_DEC_LEN_FIVE_THRESHOLD {
-        5
-    } else if port >= PORT_DEC_LEN_FOUR_THRESHOLD {
-        4
-    } else if port >= PORT_DEC_LEN_THREE_THRESHOLD {
-        3
-    } else if port >= PORT_DEC_LEN_TWO_THRESHOLD {
-        2
+    if explicit_port {
+        format!("{scheme_prefix}{host_for_header}:{port}")
     } else {
-        1
-    };
-    base_len
-        .checked_add(HOST_PORT_SEPARATOR_LEN)
-        .and_then(|value| value.checked_add(port_len))
-        .unwrap_or(base_len)
+        format!("{scheme_prefix}{host_for_header}")
+    }
 }
 fn parse_port(port_part: &str) -> Result<u16> {
     if port_part.is_empty() {

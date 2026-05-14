@@ -1,24 +1,40 @@
+#[cfg(target_arch = "x86_64")]
 use crate::{
-    BAR_FULL, BAR_WIDTH_U64, BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, INVALID_TIME,
-    IS_TERMINAL, RandomDataSet, Result,
-    buffmt::{ByteCursor, DIGITS, copy_two_digits, digit_byte, write_zero_err},
-    numeric::{low_u8_from_u32, low_u8_from_u64, low_u8_from_u128, low_u16_from_u64},
+    BAR_FULL, BAR_WIDTH_U64, INVALID_TIME, IS_TERMINAL, buffmt::DIGITS, numeric::low_u8_from_u128,
 };
-use core::{fmt::Write as _, time::Duration};
-use std::{
-    fs::File,
-    io::{BufWriter, Error as IoError, Result as IoResult, Write, stdout},
-    sync::MutexGuard,
+use crate::{
+    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, RandomDataSet, Result,
+    buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
+    numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
+use core::fmt::Write as _;
+#[cfg(target_arch = "x86_64")]
+use core::time::Duration;
+#[cfg(target_arch = "x86_64")]
+use std::io::Error as IoError;
+#[cfg(not(target_arch = "x86_64"))]
+use std::io::Result as IoResult;
+#[cfg(not(target_arch = "x86_64"))]
+use std::io::Write as _;
+use std::io::stdout;
+#[cfg(target_arch = "x86_64")]
+use std::io::{Result as IoResult, Write};
+#[cfg(target_arch = "x86_64")]
+use std::{fs::File, io::BufWriter, sync::MutexGuard};
+#[cfg(target_arch = "x86_64")]
 pub const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
+#[cfg(target_arch = "x86_64")]
 const DECI_PER_MINUTE: u128 = 600;
+#[cfg(target_arch = "x86_64")]
 const DECI_PER_SECOND: u128 = 10;
+#[cfg(target_arch = "x86_64")]
 const ELAPSED_MILLIS_PER_DECI: u128 = 100;
 const FOUR_DIGIT_WIDTH: usize = 4;
 const HASH_HEX24_LEN: usize = 7;
 const HEX_U16_FULL_WIDTH: usize = FOUR_DIGIT_WIDTH;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
+#[cfg(target_arch = "x86_64")]
 const MAX_TIME_MINUTES: u128 = 99;
 const M_HASH_HEX24_LEN: usize = 8;
 const OCTAL_DIGIT_MASK: u64 = 7;
@@ -27,10 +43,14 @@ const OCTAL_TMP_LEN: usize = 22;
 const PASSWORD_FULL_WIDTH_THRESHOLD: u32 = 1_000_000;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
+#[cfg(target_arch = "x86_64")]
 const PERCENT_WIDTH: usize = 3;
+#[cfg(target_arch = "x86_64")]
 const PERCENT_SCALE_U64: u64 = 100;
+#[cfg(target_arch = "x86_64")]
 const SECONDS_PER_MINUTE_U128: u128 = 60;
 const THREE_DIGIT_WIDTH: usize = 3;
+#[cfg(target_arch = "x86_64")]
 const TIME_BUF_LEN: usize = 7;
 const TWO_DIGIT_WIDTH: usize = 2;
 const U32_DEC_BUF_LEN: usize = 10;
@@ -136,7 +156,7 @@ impl OutputFormatter<'_, '_, '_> {
                 *slot = digit_byte(usize::from(oct_digit))?;
                 octal_number >>= OCTAL_SHIFT_BITS;
             }
-            buffer_cur.write_bytes(tmp.get(index..).ok_or_else(write_zero_err)?)
+            buffer_cur.write_bytes(suffix_slice(&tmp, index)?)
         })?;
         self.write_prefixed_byte_groups("16진수: ", 2, |byte| {
             hex_byte(usize::from(byte)).map(<[u8; 2]>::as_slice)
@@ -290,6 +310,12 @@ fn sub_from_index(value: &mut usize, amount: usize) -> IoResult<()> {
 pub fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
     slice.get(..len).ok_or_else(write_zero_err)
 }
+fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
+    slice
+        .split_at_checked(start)
+        .map(|(_, suffix)| suffix)
+        .ok_or_else(write_zero_err)
+}
 fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut [u8]> {
     let end = start.checked_add(len).ok_or_else(write_zero_err)?;
     slice.get_mut(start..end).ok_or_else(write_zero_err)
@@ -439,7 +465,7 @@ fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoResult<()> {
         let slot = tmp.get_mut(i).ok_or_else(write_zero_err)?;
         *slot = digit_byte(usize::from(digit))?;
     }
-    cur.write_bytes(tmp.get(i..).ok_or_else(write_zero_err)?)
+    cur.write_bytes(suffix_slice(&tmp, i)?)
 }
 fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoResult<()> {
     let mut tmp = [0_u8; U64_DEC_BUF_LEN];
@@ -462,7 +488,7 @@ fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoResult<()> {
         let slot = tmp.get_mut(i).ok_or_else(write_zero_err)?;
         *slot = digit_byte(usize::from(digit))?;
     }
-    cur.write_bytes(tmp.get(i..).ok_or_else(write_zero_err)?)
+    cur.write_bytes(suffix_slice(&tmp, i)?)
 }
 fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> {
     let head = cur.take(HEX_U16_FULL_WIDTH)?;
@@ -490,6 +516,7 @@ fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> {
         buf_write_hex_u16_0pad4(cur, value)
     }
 }
+#[cfg(target_arch = "x86_64")]
 fn scaled_progress_value(
     completed: u64,
     total: u64,
@@ -505,6 +532,7 @@ fn scaled_progress_value(
         .checked_div(total)
         .ok_or_else(|| IoError::other(err_msg))
 }
+#[cfg(target_arch = "x86_64")]
 pub fn write_buffer_to_file_guard(
     file_guard: &mut MutexGuard<BufWriter<File>>,
     buffer: &[u8],
@@ -516,6 +544,7 @@ pub fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
     stdout_lock.write_all(data_slice)?;
     stdout_lock.flush()
 }
+#[cfg(target_arch = "x86_64")]
 pub fn print_progress(
     out: &mut dyn Write,
     completed: u64,
@@ -593,6 +622,7 @@ pub fn print_progress(
     out.flush()?;
     Ok(())
 }
+#[cfg(target_arch = "x86_64")]
 fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
     let Some(head) = buf.get_mut(..TIME_BUF_LEN) else {
         return 0;
@@ -612,9 +642,9 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
     let Some((minute_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
         return 0;
     };
-    if copy_two_digits(minute_digits, minutes).is_err() {
+    let Ok(()) = copy_two_digits(minute_digits, minutes) else {
         return 0;
-    }
+    };
     let Some((separator, remainder)) = rest.split_first_mut() else {
         return 0;
     };
@@ -623,9 +653,9 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
     else {
         return 0;
     };
-    if copy_two_digits(second_digits, sec_whole).is_err() {
+    let Ok(()) = copy_two_digits(second_digits, sec_whole) else {
         return 0;
-    }
+    };
     let Some((decimal_point, tenths_digit)) = tenth_part.split_first_mut() else {
         return 0;
     };

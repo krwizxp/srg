@@ -70,16 +70,12 @@ impl HttpDateComponents {
         )
         .ok()
         .ok_or_else(|| TimeError::parse(ERR_DAY))?;
-        let max_day = HTTP_MONTH_DAY_MAX.get(month_index).copied().map_or_else(
-            || Err(TimeError::parse(ERR_DAY)),
-            |day| {
-                if self.month == 2 && leap_year {
-                    Ok(FEBRUARY_DAY_LEAP)
-                } else {
-                    Ok(day)
-                }
-            },
-        )?;
+        let Some(mut max_day) = HTTP_MONTH_DAY_MAX.get(month_index).copied() else {
+            return Err(TimeError::parse(ERR_DAY));
+        };
+        if self.month == 2 && leap_year {
+            max_day = FEBRUARY_DAY_LEAP;
+        }
         if self.day == 0 || self.day > max_day {
             return Err(TimeError::parse(ERR_DAY));
         }
@@ -162,8 +158,8 @@ fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
     if !(d0.is_ascii_digit() && d1.is_ascii_digit()) {
         return None;
     }
-    let tens = (d0.checked_sub(b'0'))?;
-    let ones = (d1.checked_sub(b'0'))?;
+    let tens = d0.checked_sub(b'0')?;
+    let ones = d1.checked_sub(b'0')?;
     (u32::from(tens).checked_mul(DECIMAL_BASE_U32))?.checked_add(u32::from(ones))
 }
 fn parse_http_month(month_str: &str) -> Result<u32> {
@@ -202,6 +198,26 @@ fn parse_i32_token(raw: &str, err: &'static str) -> Result<i32> {
 }
 fn parse_u32_token(raw: &str, err: &'static str) -> Result<u32> {
     parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))
+}
+fn next_date_part<'a>(
+    parts: &mut impl Iterator<Item = &'a str>,
+    err: &'static str,
+) -> Result<&'a str> {
+    parts.next().ok_or_else(|| TimeError::parse(err))
+}
+fn strip_date_suffix<'a>(raw: &'a str, suffix: char, err: &'static str) -> Result<&'a str> {
+    raw.strip_suffix(suffix)
+        .ok_or_else(|| TimeError::parse(err))
+}
+fn ensure_parts_exhausted<'a>(
+    parts: &mut impl Iterator<Item = &'a str>,
+    err: &'static str,
+) -> Result<()> {
+    if parts.next().is_none() {
+        Ok(())
+    } else {
+        Err(TimeError::parse(err))
+    }
 }
 fn parse_with_time(
     day: u32,
@@ -255,32 +271,23 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
     const ERR_YEAR: &str = "HTTP Date 파싱 실패: rfc850 2자리 연도 변환에 실패했습니다.";
     let mut parts = raw_date.split_ascii_whitespace();
     let (weekday_token, date_token, time_token, tz_token) = (
-        parts.next().ok_or_else(|| TimeError::parse(ERR_FORMAT))?,
-        parts.next().ok_or_else(|| TimeError::parse(ERR_FORMAT))?,
-        parts.next().ok_or_else(|| TimeError::parse(ERR_FORMAT))?,
-        parts.next().ok_or_else(|| TimeError::parse(ERR_FORMAT))?,
+        next_date_part(&mut parts, ERR_FORMAT)?,
+        next_date_part(&mut parts, ERR_FORMAT)?,
+        next_date_part(&mut parts, ERR_FORMAT)?,
+        next_date_part(&mut parts, ERR_FORMAT)?,
     );
-    if parts.next().is_some() || tz_token != "GMT" {
+    ensure_parts_exhausted(&mut parts, ERR_FORMAT)?;
+    if tz_token != "GMT" {
         return Err(TimeError::parse(ERR_FORMAT));
     }
-    let weekday_name = (weekday_token
-        .strip_suffix(',')
-        .ok_or_else(|| TimeError::parse(ERR_FORMAT)))?;
+    let weekday_name = strip_date_suffix(weekday_token, ',', ERR_FORMAT)?;
     let weekday = parse_http_weekday(weekday_name).ok_or_else(|| TimeError::parse(ERR_FORMAT))?;
     let mut date_parts = date_token.split('-');
-    let day_token = (date_parts
-        .next()
-        .ok_or_else(|| TimeError::parse(ERR_FORMAT)))?;
-    let month_token = (date_parts
-        .next()
-        .ok_or_else(|| TimeError::parse(ERR_FORMAT)))?;
-    let year2_token = (date_parts
-        .next()
-        .ok_or_else(|| TimeError::parse(ERR_FORMAT)))?;
-    if date_parts.next().is_some()
-        || day_token.len() != TWO_DIGIT_LEN
-        || year2_token.len() != TWO_DIGIT_LEN
-    {
+    let day_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
+    let month_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
+    let year2_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
+    ensure_parts_exhausted(&mut date_parts, ERR_FORMAT)?;
+    if day_token.len() != TWO_DIGIT_LEN || year2_token.len() != TWO_DIGIT_LEN {
         return Err(TimeError::parse(ERR_FORMAT));
     }
     let (day, month, year2) = (
@@ -288,26 +295,23 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
         parse_http_month(month_token)?,
         parse_u32_token(year2_token, ERR_NUM)?,
     );
-    let year_two_digits = (parse_result_with_context(i32::try_from(year2), ERR_YEAR))?;
+    let year_two_digits = parse_result_with_context(i32::try_from(year2), ERR_YEAR)?;
     let current_year = {
         let day_index_i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(duration) => i64::try_from(duration.as_secs().div_euclid(SECS_PER_DAY_U64))
-                .unwrap_or_else(|_| i64::from(i32::MAX)),
+            Ok(duration) => clamp_u64_day_count(duration.as_secs().div_euclid(SECS_PER_DAY_U64)),
             Err(err) => {
                 let secs_before_epoch = err.duration().as_secs();
                 let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
-                let days_before_epoch_i64 =
-                    i64::try_from(days_before_epoch).unwrap_or_else(|_| i64::from(i32::MAX));
-                days_before_epoch_i64.checked_neg().unwrap_or(i64::MIN)
+                clamp_u64_day_count(days_before_epoch)
+                    .checked_neg()
+                    .map_or(i64::MIN, |converted| converted)
             }
         };
-        let day_index = i32::try_from(day_index_i64).unwrap_or_else(|_| {
-            if day_index_i64.is_negative() {
-                i32::MIN
-            } else {
-                i32::MAX
-            }
-        });
+        let day_index = match i32::try_from(day_index_i64) {
+            Ok(converted) => converted,
+            Err(_) if day_index_i64.is_negative() => i32::MIN,
+            Err(_) => i32::MAX,
+        };
         civil_from_days(day_index).map_or_else(
             || {
                 if day_index.is_negative() {
@@ -339,6 +343,12 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
     };
     parse_with_time(day, month, year, weekday, time_token)
 }
+fn clamp_u64_day_count(value: u64) -> i64 {
+    let Ok(converted) = i64::try_from(value) else {
+        return i64::from(i32::MAX);
+    };
+    converted
+}
 fn http_date_components_to_systemtime(components: HttpDateComponents) -> Result<SystemTime> {
     const ERR_UNIX_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     let days = components.days_since_epoch()?;
@@ -346,20 +356,20 @@ fn http_date_components_to_systemtime(components: HttpDateComponents) -> Result<
     let timestamp_secs = components.timestamp_secs(days)?;
     let secs_i128 = i128::from(timestamp_secs);
     if secs_i128 >= 0 {
-        let secs_u64 = (parse_result_with_context(u64::try_from(secs_i128), ERR_UNIX_TIMESTAMP))?;
+        let secs_u64 = parse_result_with_context(u64::try_from(secs_i128), ERR_UNIX_TIMESTAMP)?;
         return UNIX_EPOCH
             .checked_add(Duration::from_secs(secs_u64))
             .ok_or_else(|| TimeError::parse(ERR_UNIX_TIMESTAMP));
     }
-    let abs_i128 = (secs_i128
+    let abs_i128 = secs_i128
         .checked_abs()
-        .ok_or_else(|| TimeError::parse(ERR_UNIX_TIMESTAMP)))?;
-    let abs_secs = (parse_result_with_context(u64::try_from(abs_i128), ERR_UNIX_TIMESTAMP))?;
+        .ok_or_else(|| TimeError::parse(ERR_UNIX_TIMESTAMP))?;
+    let abs_secs = parse_result_with_context(u64::try_from(abs_i128), ERR_UNIX_TIMESTAMP)?;
     UNIX_EPOCH
         .checked_sub(Duration::from_secs(abs_secs))
         .ok_or_else(|| TimeError::parse(ERR_UNIX_TIMESTAMP))
 }
-pub fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
+pub(super) fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     const ERR_FORMAT: &str = concat!(
         "HTTP Date 파싱 실패: RFC 9110 HTTP-date의 3개 형식",
         "(IMF-fixdate/rfc850/asctime) 중 하나가 아닙니다."
@@ -376,22 +386,20 @@ pub fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         const ERR_IMF_FORMAT: &str = "HTTP Date 파싱 실패: IMF-fixdate 형식이 아닙니다.";
         const ERR_IMF_NUM: &str = "HTTP Date 파싱 실패: IMF-fixdate 숫자 변환에 실패했습니다.";
         let mut parts = raw_date.split_ascii_whitespace();
-        let weekday_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        let day_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        let month_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        let year_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        let time_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        let tz_token = (parts.next().ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
-        if parts.next().is_some()
-            || day_token.len() != TWO_DIGIT_LEN
+        let weekday_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        let day_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        let month_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        let year_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        let time_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        let tz_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
+        ensure_parts_exhausted(&mut parts, ERR_IMF_FORMAT)?;
+        if day_token.len() != TWO_DIGIT_LEN
             || year_token.len() != FOUR_DIGIT_LEN
             || tz_token != "GMT"
         {
             return Err(TimeError::parse(ERR_IMF_FORMAT));
         }
-        let weekday_name = (weekday_token
-            .strip_suffix(',')
-            .ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT)))?;
+        let weekday_name = strip_date_suffix(weekday_token, ',', ERR_IMF_FORMAT)?;
         let weekday =
             parse_http_weekday(weekday_name).ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
         let day = parse_u32_token(day_token, ERR_IMF_NUM)?;
@@ -410,29 +418,17 @@ pub fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
         const ERR_ASCTIME_FORMAT: &str = "HTTP Date 파싱 실패: asctime-date 형식이 아닙니다.";
         const ERR_ASCTIME_NUM: &str = "HTTP Date 파싱 실패: asctime-date 숫자 변환에 실패했습니다.";
         let mut parts = raw_date.split_ascii_whitespace();
-        let weekday_token = (parts
-            .next()
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
-        let month_token = (parts
-            .next()
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
-        let day_token = (parts
-            .next()
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
-        let time_token = (parts
-            .next()
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
-        let year_token = (parts
-            .next()
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
-        if parts.next().is_some()
-            || !(1..=TWO_DIGIT_LEN).contains(&day_token.len())
-            || year_token.len() != FOUR_DIGIT_LEN
-        {
+        let weekday_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
+        let month_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
+        let day_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
+        let time_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
+        let year_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
+        ensure_parts_exhausted(&mut parts, ERR_ASCTIME_FORMAT)?;
+        if !(1..=TWO_DIGIT_LEN).contains(&day_token.len()) || year_token.len() != FOUR_DIGIT_LEN {
             return Err(TimeError::parse(ERR_ASCTIME_FORMAT));
         }
-        let weekday = (parse_http_weekday(weekday_token)
-            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT)))?;
+        let weekday = parse_http_weekday(weekday_token)
+            .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT))?;
         let day = parse_u32_token(day_token, ERR_ASCTIME_NUM)?;
         let month = parse_http_month(month_token)?;
         let year = parse_i32_token(year_token, ERR_ASCTIME_NUM)?;
@@ -441,40 +437,39 @@ pub fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     }
     Err(TimeError::parse(ERR_FORMAT))
 }
-pub fn civil_from_days(z: i32) -> Option<(i32, u32, u32)> {
-    let shifted_days = (i64::from(z).checked_add(DAYS_UNTIL_UNIX_EPOCH_I64))?;
+pub(super) fn civil_from_days(z: i32) -> Option<(i32, u32, u32)> {
+    let shifted_days = i64::from(z).checked_add(DAYS_UNTIL_UNIX_EPOCH_I64)?;
     let era = shifted_days.div_euclid(DAYS_PER_400_YEARS_I64);
     let doe = shifted_days.rem_euclid(DAYS_PER_400_YEARS_I64);
-    let yoe_after_first = (doe.checked_sub((doe.checked_div(DAYS_PER_4_YEARS_I64))?))?;
-    let yoe_after_second =
-        (yoe_after_first.checked_add((doe.checked_div(DAYS_PER_100_YEARS_I64))?))?;
+    let yoe_after_first = doe.checked_sub(doe.checked_div(DAYS_PER_4_YEARS_I64)?)?;
+    let yoe_after_second = yoe_after_first.checked_add(doe.checked_div(DAYS_PER_100_YEARS_I64)?)?;
     let yoe_numerator =
-        (yoe_after_second.checked_sub((doe.checked_div(DAYS_PER_400_YEARS_I64 - 1_i64))?))?;
-    let yoe = (yoe_numerator.checked_div(DAYS_PER_COMMON_YEAR_I64))?;
-    let y = (yoe.checked_add((era.checked_mul(i64::from(LEAP_YEAR_ERA_DIVISOR_I32)))?))?;
-    let year_days = (DAYS_PER_COMMON_YEAR_I64.checked_mul(yoe))?;
-    let leap_days = (yoe.checked_div(i64::from(LEAP_YEAR_DIVISOR_I32)))?;
-    let skipped_centuries = (yoe.checked_div(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32)))?;
-    let doy = (doe.checked_sub(
-        (year_days
+        yoe_after_second.checked_sub(doe.checked_div(DAYS_PER_400_YEARS_I64 - 1_i64)?)?;
+    let yoe = yoe_numerator.checked_div(DAYS_PER_COMMON_YEAR_I64)?;
+    let y = yoe.checked_add(era.checked_mul(i64::from(LEAP_YEAR_ERA_DIVISOR_I32))?)?;
+    let year_days = DAYS_PER_COMMON_YEAR_I64.checked_mul(yoe)?;
+    let leap_days = yoe.checked_div(i64::from(LEAP_YEAR_DIVISOR_I32))?;
+    let skipped_centuries = yoe.checked_div(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))?;
+    let doy = doe.checked_sub(
+        year_days
             .checked_add(leap_days)?
-            .checked_sub(skipped_centuries))?,
-    ))?;
-    let mp = (MONTH_TERM_DIVISOR_I64
+            .checked_sub(skipped_centuries)?,
+    )?;
+    let mp = MONTH_TERM_DIVISOR_I64
         .checked_mul(doy)?
         .checked_add(MONTH_TERM_OFFSET_I64)?
-        .checked_div(MONTH_TERM_MULTIPLIER_I64))?;
-    let month_term = (MONTH_TERM_MULTIPLIER_I64
+        .checked_div(MONTH_TERM_MULTIPLIER_I64)?;
+    let month_term = MONTH_TERM_MULTIPLIER_I64
         .checked_mul(mp)?
         .checked_add(MONTH_TERM_OFFSET_I64)?
-        .checked_div(MONTH_TERM_DIVISOR_I64))?;
-    let day = (u32::try_from((doy.checked_sub(month_term)?.checked_add(1_i64))?).ok())?;
+        .checked_div(MONTH_TERM_DIVISOR_I64)?;
+    let day = u32::try_from(doy.checked_sub(month_term)?.checked_add(1_i64)?).ok()?;
     let month_i64 = if mp < DECIMAL_BASE_I64 {
-        (mp.checked_add(MARCH_BASE_MONTH_OFFSET_I64))?
+        mp.checked_add(MARCH_BASE_MONTH_OFFSET_I64)?
     } else {
-        (mp.checked_sub(PRE_MARCH_MONTH_OFFSET_I64))?
+        mp.checked_sub(PRE_MARCH_MONTH_OFFSET_I64)?
     };
-    let month = (u32::try_from(month_i64).ok())?;
-    let year = (i32::try_from((y.checked_add(i64::from(month <= MARCH_MONTH_THRESHOLD)))?).ok())?;
+    let month = u32::try_from(month_i64).ok()?;
+    let year = i32::try_from(y.checked_add(i64::from(month <= MARCH_MONTH_THRESHOLD))?).ok()?;
     Some((year, month, day))
 }

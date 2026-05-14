@@ -41,10 +41,10 @@ struct Input {
 }
 cfg_select! {
     target_pointer_width = "64" => {
-        const _: [(); 40] = [(); size_of::<Input>()];
+        const _: () = assert!(size_of::<Input>() == 40, "Windows INPUT x64 size mismatch");
     }
     target_pointer_width = "32" => {
-        const _: [(); 28] = [(); size_of::<Input>()];
+        const _: () = assert!(size_of::<Input>() == 28, "Windows INPUT x86 size mismatch");
     }
     _ => {}
 }
@@ -53,23 +53,21 @@ unsafe extern "system" {
     fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
 }
 #[derive(Clone, Copy)]
-pub enum InputAction {
+pub(super) enum InputAction {
     F5Press,
     MouseClick,
 }
-pub(super) struct PreparedInput {
-    active: bool,
-}
+pub(super) struct PreparedInput;
 impl PreparedInput {
-    pub(super) const EMPTY: Self = Self { active: false };
-    pub(super) fn prepare(&mut self, action: Option<InputAction>, _err: &mut dyn Write) {
-        self.active = action.is_some();
+    pub(super) const EMPTY: Self = Self;
+    pub(super) fn prepare(&mut self, _action: Option<InputAction>, _err: &mut dyn Write) {
+        *self = Self;
     }
     pub(super) const fn reset(&mut self) {
-        self.active = false;
+        *self = Self;
     }
     pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
-        self.active = false;
+        *self = Self;
         match action {
             InputAction::MouseClick => {
                 let inputs = [

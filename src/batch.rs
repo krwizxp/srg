@@ -387,14 +387,11 @@ impl BatchRegenerator<'_, '_, '_> {
     }
 }
 fn panic_join_error(context: &'static str, panic_payload: &(dyn Any + Send + 'static)) -> IoError {
-    let panic_detail = panic_payload.downcast_ref::<&str>().map_or_else(
-        || {
-            panic_payload
-                .downcast_ref::<String>()
-                .map_or_else(|| String::from("non-string panic payload"), Clone::clone)
-        },
-        |message| String::from(*message),
-    );
+    let panic_detail = panic_payload
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| panic_payload.downcast_ref::<&str>().copied())
+        .unwrap_or("non-string panic payload");
     IoError::other(format!("{context}: {panic_detail}"))
 }
 fn elapsed_since(start_time: &Instant) -> Duration {

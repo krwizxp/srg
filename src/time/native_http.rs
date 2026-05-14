@@ -2,8 +2,8 @@ use super::{
     MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, TimeError, TimeErrorKind, TimeSample,
     find_date_header_value, http_date::parse_http_date_to_systemtime,
 };
-use alloc::{borrow::Cow, string::String};
-use core::time::Duration;
+use alloc::string::String;
+use core::{fmt::Display, time::Duration};
 use std::time::{Instant, SystemTime};
 cfg_select! {
     any(target_os = "linux", target_os = "macos") => {
@@ -194,10 +194,7 @@ cfg_select! {
                 .find_map(find_date_header_value)
                 .map(str::to_owned)
             else {
-                let mut out = String::with_capacity(context.len().saturating_add(28));
-                out.push_str(context);
-                out.push_str(" 응답에서 Date");
-                return Err(TimeError::header_not_found(out));
+                return Err(super::missing_date(context));
             };
             let rtt = response_received_inst
                 .saturating_duration_since(request_start)
@@ -220,15 +217,14 @@ cfg_select! {
     fn curl_error(context: &str, code: CurlCode) -> String {
         // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.
         let raw_ptr = unsafe { curl_easy_strerror(code) };
-        let message = NonNull::new(raw_ptr.cast_mut()).map_or_else(
-            || String::from("unknown curl error"),
-            |message_ptr| {
-                // SAFETY: libcurl guarantees a valid NUL-terminated string for non-null strerror results.
-                unsafe { CStr::from_ptr(message_ptr.as_ptr()) }
-                    .to_string_lossy()
-                    .into_owned()
-            },
-        );
+        let message = if raw_ptr.is_null() {
+            String::from("unknown curl error")
+        } else {
+            // SAFETY: libcurl guarantees a valid NUL-terminated string for non-null strerror results.
+            unsafe { CStr::from_ptr(raw_ptr) }
+                .to_string_lossy()
+                .into_owned()
+        };
         format!("{context} 실패: {message} ({code})")
     }
     unsafe extern "C" fn write_vec_callback(
@@ -253,14 +249,17 @@ cfg_select! {
         let bytes = unsafe { slice::from_raw_parts(bytes_ptr.as_ptr(), len) };
         // SAFETY: userdata is the CurlBuffer pointer set before curl_easy_perform.
         let target = unsafe { target_ptr.as_mut() };
-        if target.bytes.try_reserve(bytes.len()).is_err() {
+        let Ok(()) = target.bytes.try_reserve(bytes.len()) else {
             return 0;
-        }
+        };
         target.bytes.extend_from_slice(bytes);
         len
     }
     fn tcp_timeout_secs() -> c_long {
-        c_long::try_from(TCP_TIMEOUT.as_secs()).unwrap_or(5)
+        let Ok(seconds) = c_long::try_from(TCP_TIMEOUT.as_secs()) else {
+            return 5;
+        };
+        seconds
     }
         }
     }
@@ -473,7 +472,9 @@ cfg_select! {
                 )
             };
             let session = self.non_null_handle(raw_session, "WinHttpOpen", context)?;
-            let timeout = i32::try_from(TCP_TIMEOUT.as_millis()).unwrap_or(5_000_i32);
+            let Ok(timeout) = i32::try_from(TCP_TIMEOUT.as_millis()) else {
+                return Err(error(context, "WinHTTP timeout 변환 실패"));
+            };
             // SAFETY: session is a valid WinHTTP session handle.
             unsafe { WinHttpSetTimeouts(session.as_ptr(), timeout, timeout, timeout, timeout) };
             Ok(session)
@@ -543,11 +544,10 @@ cfg_select! {
             } else {
                 return Err(error(context, "지원하지 않는 URL scheme입니다."));
             };
-            let authority_end = rest
-                .bytes()
-                .position(|byte| matches!(byte, b'/' | b'?' | b'#'))
-                .unwrap_or(rest.len());
-            let authority = rest.get(..authority_end).unwrap_or(rest);
+            let authority = match rest.split_once(['/', '?', '#']) {
+                Some((authority, _)) => authority,
+                None => rest,
+            };
             if authority.is_empty() {
                 return Err(error(context, "URL host가 비어 있습니다."));
             }
@@ -621,7 +621,7 @@ cfg_select! {
         }
     }
     fn wide(value: &str) -> Vec<u16> {
-        OsStr::new(value).encode_wide().chain([0]).collect()
+        OsStr::new(value).encode_wide().chain([0]).collect::<Vec<_>>()
     }
         }
     }
@@ -662,17 +662,9 @@ impl NativeHttp {
         })
     }
 }
-fn error(context: &str, detail: impl Into<Cow<'static, str>>) -> TimeError {
-    let mut out = String::with_capacity(context.len().saturating_add(2));
-    out.push_str(context);
-    out.push_str(": ");
-    out.push_str(&detail.into());
-    TimeError::new(TimeErrorKind::NativeHttp, out)
+fn error(context: &str, detail: impl Display) -> TimeError {
+    TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
 }
-#[cfg(target_os = "windows")]
 fn missing_date(context: &str) -> TimeError {
-    let mut out = String::with_capacity(context.len().saturating_add(28));
-    out.push_str(context);
-    out.push_str(" 응답에서 Date");
-    TimeError::header_not_found(out)
+    TimeError::header_not_found(format!("{context} 응답에서 Date"))
 }

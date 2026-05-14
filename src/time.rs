@@ -44,38 +44,30 @@ cfg_select! {
     _ => {
         mod native_input {
             use std::io;
-
             #[derive(Clone, Copy)]
             pub(super) enum InputAction {
                 F5Press,
                 MouseClick,
             }
-
-            pub(super) struct PreparedInput {
-                active: bool,
-            }
-
+            pub(super) struct PreparedInput;
             impl PreparedInput {
-                pub(super) const EMPTY: Self = Self { active: false };
-
+                pub(super) const EMPTY: Self = Self;
                 pub(super) fn prepare(
                     &mut self,
-                    action: Option<InputAction>,
+                    _action: Option<InputAction>,
                     _err: &mut dyn io::Write,
                 ) {
-                    self.active = action.is_some();
+                    *self = Self;
                 }
-
                 pub(super) const fn reset(&mut self) {
-                    self.active = false;
+                    *self = Self;
                 }
-
                 pub(super) fn send(
                     &mut self,
                     _action: InputAction,
                     _err: &mut dyn io::Write,
                 ) {
-                    self.active = false;
+                    *self = Self;
                 }
             }
         }
@@ -100,6 +92,7 @@ const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
 const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const COUNTDOWN_DELAY_ERROR: &str = "카운트다운 지연 계산 실패";
 const DISPLAY_STATUS_PREFIX: &str = "\r서버 시간: ";
 const DISPLAY_UPDATE_INTERVAL: Duration = Duration::from_millis(45);
 const FINAL_COUNTDOWN_WINDOW: Duration = Duration::from_secs(10);
@@ -304,7 +297,10 @@ impl SliceCursor<'_> {
             let digit = usize::from(low_u8_from_u32(n));
             *tmp.get_mut(i).ok_or_else(write_zero_err)? = Self::digit_byte(digit)?;
         }
-        self.write_bytes(tmp.get(i..).ok_or_else(write_zero_err)?)
+        let Some((_, suffix)) = tmp.split_at_checked(i) else {
+            return Err(write_zero_err());
+        };
+        self.write_bytes(suffix)
     }
     fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
         if year >= 0_i32 {
@@ -400,9 +396,10 @@ impl ServerTime {
     }
     fn current_server_time_at(&self, now: Instant) -> SystemTime {
         let elapsed_since_anchor = now.duration_since(self.anchor_instant);
-        self.anchor_time
-            .checked_add(elapsed_since_anchor)
-            .unwrap_or(self.anchor_time)
+        let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
+            return self.anchor_time;
+        };
+        server_time
     }
     fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
         let smoothed_rtt_nanos =
@@ -555,7 +552,9 @@ impl AppState {
             return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
         };
         let sum_nanos: u128 = window.iter().sum();
-        let window_len = u128::try_from(window.len()).unwrap_or_default();
+        let Ok(window_len) = u128::try_from(window.len()) else {
+            return transition_to_retry("RTT 샘플 수 변환 실패.");
+        };
         let Some(avg_nanos) = sum_nanos.checked_div(window_len) else {
             return transition_to_retry("RTT 기준값 계산 실패.");
         };
@@ -669,7 +668,7 @@ impl AppState {
         self.live_rtt = Some(live_rtt);
         let effective_rtt = live_rtt.max(sample.rtt);
         let Some(one_way_delay) = effective_one_way_delay(effective_rtt) else {
-            msg_buf.push_str("카운트다운 지연 계산 실패");
+            msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
             return (Activity::FinalCountdown { target_time }, Some(msg_buf));
         };
         match decide_countdown_action(target_time, current_server_time, one_way_delay) {
@@ -699,7 +698,6 @@ impl AppState {
             CountdownDecision::Wait => (Activity::FinalCountdown { target_time }, None),
         }
     }
-
     fn handle_final_countdown_fetch_error<'a>(
         &self,
         target_time: SystemTime,
@@ -713,7 +711,7 @@ impl AppState {
             let current_server_time = st.current_server_time_at(now);
             let effective_rtt = self.live_rtt.unwrap_or(st.baseline_rtt);
             let Some(one_way_delay) = effective_one_way_delay(effective_rtt) else {
-                msg_buf.push_str("카운트다운 지연 계산 실패");
+                msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
                 return (Activity::FinalCountdown { target_time }, Some(msg_buf));
             };
             match decide_countdown_action(target_time, current_server_time, one_way_delay) {
@@ -754,7 +752,6 @@ impl AppState {
         append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", err);
         (Activity::FinalCountdown { target_time }, Some(msg_buf))
     }
-
     fn handle_measure_baseline_rtt<'a>(
         &mut self,
         msg_buf: &'a mut String,
@@ -875,7 +872,7 @@ impl AppState {
             }
         }
     }
-    pub(crate) fn run_loop(
+    pub(super) fn run_loop(
         &mut self,
         out: &mut dyn io::Write,
         err: &mut dyn io::Write,
@@ -1014,7 +1011,6 @@ impl AppState {
             prepared_input.reset();
         }
     }
-
     fn trigger_and_finish<'a>(
         &self,
         msg_buf: &'a mut String,
@@ -1030,14 +1026,13 @@ impl AppState {
     }
 }
 fn owned_detail(err: impl fmt::Display) -> Cow<'static, str> {
-    Cow::Owned(err.to_string())
+    Cow::Owned(format!("{err}"))
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
     duration.as_secs_f64().mul(MILLIS_PER_SECOND_F64)
 }
 fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display) {
-    target.push_str(prefix);
-    append_fmt(target, format_args!("{err}"));
+    append_fmt(target, format_args!("{prefix}{err}"));
 }
 const fn effective_one_way_delay(rtt: Duration) -> Option<Duration> {
     rtt.checked_div(HALF_RTT_DIVISOR)
@@ -1101,7 +1096,9 @@ where
 }
 fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
     let now = Instant::now();
-    let retry_at = now.checked_add(RETRY_DELAY).unwrap_or(now);
+    let Some(retry_at) = now.checked_add(RETRY_DELAY) else {
+        return (Activity::Retrying { retry_at: now }, Some(msg));
+    };
     (Activity::Retrying { retry_at }, Some(msg))
 }
 fn blend_weighted_nanos(
@@ -1111,26 +1108,24 @@ fn blend_weighted_nanos(
     total_weight: u32,
 ) -> u128 {
     let old_weight = total_weight.saturating_sub(new_weight);
-    old_value
-        .checked_mul(u128::from(old_weight))
-        .map_or(new_value, |weighted_old| {
-            new_value
-                .checked_mul(u128::from(new_weight))
-                .map_or(new_value, |weighted_new| {
-                    weighted_old
-                        .checked_add(weighted_new)
-                        .map_or(new_value, |weighted_sum| {
-                            weighted_sum
-                                .checked_div(u128::from(total_weight))
-                                .unwrap_or(new_value)
-                        })
-                })
-        })
+    let Some(weighted_old) = old_value.checked_mul(u128::from(old_weight)) else {
+        return new_value;
+    };
+    let Some(weighted_new) = new_value.checked_mul(u128::from(new_weight)) else {
+        return new_value;
+    };
+    let Some(weighted_sum) = weighted_old.checked_add(weighted_new) else {
+        return new_value;
+    };
+    let Some(weighted_average) = weighted_sum.checked_div(u128::from(total_weight)) else {
+        return new_value;
+    };
+    weighted_average
 }
 fn find_date_header_value(line: &[u8]) -> Option<&str> {
-    let prefix = line.get(..5)?;
+    let (prefix, value) = line.split_at_checked(5)?;
     if prefix.eq_ignore_ascii_case(b"date:") {
-        str::from_utf8(line.get(5..)?).ok().map(str::trim_ascii)
+        str::from_utf8(value).map(str::trim_ascii).ok()
     } else {
         None
     }
@@ -1241,8 +1236,7 @@ fn parse_u32_digits(raw: &str) -> Option<u32> {
     if raw.is_empty() {
         return None;
     }
-
-    raw.as_bytes().iter().try_fold(0_u32, |value, byte| {
+    raw.bytes().try_fold(0_u32, |value, byte| {
         if !byte.is_ascii_digit() {
             return None;
         }

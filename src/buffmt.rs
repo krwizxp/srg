@@ -1,22 +1,19 @@
 use alloc::fmt;
 use core::array::from_fn;
 use std::{io, sync::LazyLock};
-const DECIMAL_BASE_U8: u8 = 10;
+const DECIMAL_BASE_USIZE: usize = 10;
 const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
 const UTF8_MAX_CHAR_LEN: usize = 4;
 pub const DIGITS: [u8; 10] = *b"0123456789";
 pub static TWO_DIGITS: LazyLock<[[u8; 2]; TWO_DIGIT_TABLE_LEN]> = LazyLock::new(|| {
     from_fn(|index| {
-        let value = u8::try_from(index).unwrap_or_default();
-        let tens = DIGITS
-            .get(usize::from(value.div_euclid(DECIMAL_BASE_U8)))
-            .copied()
-            .unwrap_or_default();
-        let ones = DIGITS
-            .get(usize::from(value.rem_euclid(DECIMAL_BASE_U8)))
-            .copied()
-            .unwrap_or_default();
+        let Some(&tens) = DIGITS.get(index.div_euclid(DECIMAL_BASE_USIZE)) else {
+            return [0, 0];
+        };
+        let Some(&ones) = DIGITS.get(index.rem_euclid(DECIMAL_BASE_USIZE)) else {
+            return [0, 0];
+        };
         [tens, ones]
     })
 });
@@ -36,29 +33,19 @@ impl<'a> ByteCursor<'a> {
             return Err(write_zero_err());
         }
         let start = self.pos;
-        let end = checked_cursor_end(start, len)?;
+        let end = start.checked_add(len).ok_or_else(write_zero_err)?;
         self.pos = end;
         self.buf.get_mut(start..end).ok_or_else(write_zero_err)
     }
     pub fn write_byte(&mut self, byte: u8) -> io::Result<()> {
-        if self.remaining() < SINGLE_BYTE_WIDTH {
+        let Some(slot) = self.take(SINGLE_BYTE_WIDTH)?.first_mut() else {
             return Err(write_zero_err());
-        }
-        *(self.buf.get_mut(self.pos).ok_or_else(write_zero_err))? = byte;
-        self.pos = checked_cursor_end(self.pos, SINGLE_BYTE_WIDTH)?;
+        };
+        *slot = byte;
         Ok(())
     }
     pub fn write_bytes(&mut self, bytes: &[u8]) -> io::Result<()> {
-        let len = bytes.len();
-        if self.remaining() < len {
-            return Err(write_zero_err());
-        }
-        let end = checked_cursor_end(self.pos, len)?;
-        self.buf
-            .get_mut(self.pos..end)
-            .ok_or_else(write_zero_err)?
-            .copy_from_slice(bytes);
-        self.pos = end;
+        self.take(bytes.len())?.copy_from_slice(bytes);
         Ok(())
     }
     pub const fn written_len(&self) -> usize {
@@ -95,7 +82,4 @@ pub fn digit_byte(index: usize) -> io::Result<u8> {
 #[cold]
 pub fn write_zero_err() -> io::Error {
     io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer")
-}
-fn checked_cursor_end(start: usize, len: usize) -> io::Result<usize> {
-    start.checked_add(len).ok_or_else(write_zero_err)
 }

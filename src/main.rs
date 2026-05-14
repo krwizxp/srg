@@ -1,28 +1,29 @@
 extern crate alloc;
+#[cfg(target_arch = "x86_64")]
+use self::batch::regenerate_with_count;
 use self::{
-    batch::regenerate_with_count,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
-    output::{
-        format_data_into_buffer, prefix_slice, write_buffer_to_file_guard, write_slice_to_console,
-    },
+    output::{format_data_into_buffer, prefix_slice, write_slice_to_console},
 };
 use core::{
     array::from_fn,
     char::from_u32,
     error::Error,
     fmt::{Arguments, Display},
-    hint::spin_loop,
-    ops::{Mul as _, Sub as _},
+    ops::Mul as _,
     result::Result as StdResult,
     time::Duration,
 };
+#[cfg(target_arch = "x86_64")]
+use core::{hint::spin_loop, ops::Sub as _};
+#[cfg(target_arch = "x86_64")]
+use std::is_x86_feature_detected;
 use std::{
     fs::{self, File},
     io::{
         BufWriter, Error as IoError, ErrorKind, IsTerminal as _, Result as IoResult, Write, stderr,
         stdin, stdout,
     },
-    is_x86_feature_detected,
     path::Path,
     process::ExitCode,
     sync::{LazyLock, Mutex, MutexGuard},
@@ -45,11 +46,12 @@ cfg_select! {
     }
     _ => {}
 }
+#[cfg(target_arch = "x86_64")]
 mod batch;
 mod buffmt;
 mod numeric;
 mod output;
-pub(crate) mod time;
+mod time;
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 compile_error!("SRG currently supports only Windows, Linux, and macOS.");
 cfg_select! {
@@ -82,9 +84,8 @@ cfg_select! {
         );
     }
     _ => {
-        static RNG_SOURCE: LazyLock<RngSource> = LazyLock::new(|| RngSource::None);
         const MENU: &str = concat!(
-            "\n5: 서버 시간 확인, 7: num_64/supp 수동 입력 생성, 기타(1~4, 6 제외): 종료\n",
+            "\n5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 생성, 기타(1~4 제외): 종료\n",
             "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
             "선택해 주세요: ",
         );
@@ -103,6 +104,7 @@ const BYTE_BITS: u8 = 64;
 const EURO_LUCKY_MODULUS: u8 = 12;
 const EURO_MAIN_MODULUS: u8 = 50;
 const GENERIC_INPUT_BUFFER_CAPACITY: usize = 256;
+#[cfg(target_arch = "x86_64")]
 const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
 const INPUT_BYTE_MAX_FOR_EURO_MAIN: u8 = 249;
 const INPUT_BYTE_MAX_FOR_LOTTO: u8 = 224;
@@ -110,6 +112,7 @@ const INPUT_BYTE_MAX_FOR_LOTTO7: u8 = 221;
 const INPUT_BYTE_MAX_FOR_LUCKY_STAR: u8 = 251;
 const INPUT_BYTE_MAX_FOR_PASSWORD: u8 = 187;
 const OUTPUT_FILE_BUFFER_CAPACITY: usize = 0x0010_0000;
+#[cfg(target_arch = "x86_64")]
 const BUFFERS_PER_WORKER: usize = 8;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
@@ -130,10 +133,14 @@ const NMS_COORD_MASK: u64 = 0x0FFF;
 const NMS_GLYPH_COUNT: usize = 12;
 const NMS_GLYPH_PREFIX_COUNT: usize = 4;
 const NMS_PLANET_MAX_VALUE: u64 = 11;
-const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
+#[cfg(target_arch = "x86_64")]
 const TWO_POW_32_F64: f64 = 4_294_967_296.0;
+#[cfg(target_arch = "x86_64")]
 const U64_UNIT_SCALE: f64 = 1.0 / (TWO_POW_32_F64 * TWO_POW_32_F64);
+const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
+#[cfg(target_arch = "x86_64")]
 const BAR_WIDTH: usize = 10;
+#[cfg(target_arch = "x86_64")]
 const BAR_WIDTH_U64: u64 = 10;
 const HANGUL_SHIFTS: [u32; 4] = [48_u32, 32, 16, 0];
 const NMS_GLYPH_NUM_SHIFTS: [u32; 8] = [36_u32, 32, 28, 24, 20, 16, 12, 8];
@@ -145,6 +152,7 @@ const ONE_BASED_OFFSET_U64: u64 = 1;
 const ONE_BASED_OFFSET_USIZE: usize = 1;
 const PASSWORD_BYTE_LEN: usize = 8;
 const PASSWORD_BYTE_LEN_U8: u8 = 8;
+#[cfg(target_arch = "x86_64")]
 const BAR_FULL: [&str; BAR_WIDTH + 1] = [
     "[          ]",
     "[█         ]",
@@ -158,11 +166,14 @@ const BAR_FULL: [&str; BAR_WIDTH + 1] = [
     "[█████████ ]",
     "[██████████]",
 ];
+#[cfg(target_arch = "x86_64")]
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
 static BIN8_TABLE: LazyLock<[[u8; 8]; 256]> = LazyLock::new(|| {
     from_fn(|byte_index| {
-        let byte = u8::try_from(byte_index).unwrap_or_default();
+        let Ok(byte) = u8::try_from(byte_index) else {
+            return [b'0'; 8];
+        };
         from_fn(|bit| {
             let shift = 7_usize.saturating_sub(bit);
             if ((byte >> shift) & 1) == 1 {
@@ -175,16 +186,22 @@ static BIN8_TABLE: LazyLock<[[u8; 8]; 256]> = LazyLock::new(|| {
 });
 static HEX_BYTE_TABLE: LazyLock<[[u8; 2]; 256]> = LazyLock::new(|| {
     from_fn(|value_index| {
-        let value = u8::try_from(value_index).unwrap_or_default();
+        let Ok(value) = u8::try_from(value_index) else {
+            return [0, 0];
+        };
         let hi = usize::from(value >> 4_u8);
         let lo = usize::from(value & low_u8_from_u64(NIBBLE_MASK_U64));
-        [
-            HEX_UPPER.get(hi).copied().unwrap_or_default(),
-            HEX_UPPER.get(lo).copied().unwrap_or_default(),
-        ]
+        let Some(&hi_digit) = HEX_UPPER.get(hi) else {
+            return [0, 0];
+        };
+        let Some(&lo_digit) = HEX_UPPER.get(lo) else {
+            return [0, 0];
+        };
+        [hi_digit, lo_digit]
     })
 });
 type Result<T> = StdResult<T, Box<dyn Error + Send + Sync + 'static>>;
+#[cfg(target_arch = "x86_64")]
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 #[cfg(windows)]
 #[repr(C)]
@@ -231,14 +248,15 @@ unsafe extern "system" {
         file_information: *mut ByHandleFileInformation,
     ) -> i32;
 }
+#[cfg(target_arch = "x86_64")]
 #[derive(Clone, Copy)]
 enum RngSource {
     None,
     RdRand,
     RdSeed,
 }
+#[cfg(target_arch = "x86_64")]
 impl RngSource {
-    #[cfg(target_arch = "x86_64")]
     fn try_hardware_value(self) -> Option<u64> {
         let mut value = 0_u64;
         match self {
@@ -300,11 +318,13 @@ struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
+#[cfg(target_arch = "x86_64")]
 #[derive(Clone, Copy)]
 enum RandomNumberMode {
     Float,
     Integer,
 }
+#[cfg(target_arch = "x86_64")]
 #[derive(Clone, Copy)]
 enum LadderEntryMode {
     Players,
@@ -327,7 +347,16 @@ impl RandomDataBuilder<'_, '_> {
         Ok(self.data)
     }
     fn fill_coords(&mut self) {
+        #[cfg(target_arch = "x86_64")]
         let (upper_32_bits, lower_32_bits) = split_u64_to_u32_pair(self.num);
+        #[cfg(not(target_arch = "x86_64"))]
+        let (upper_32_bits, lower_32_bits) = {
+            let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
+            (
+                u32::from_be_bytes([b0, b1, b2, b3]),
+                u32::from_be_bytes([b4, b5, b6, b7]),
+            )
+        };
         let upper_ratio = f64::from(upper_32_bits).mul(U32_MAX_INV);
         let lower_ratio = f64::from(lower_32_bits).mul(U32_MAX_INV);
         self.data.kor_coords = (
@@ -353,17 +382,14 @@ impl RandomDataBuilder<'_, '_> {
                 if self.supplemental.is_none() {
                     self.supplemental = Some(self.next_supplemental("한글 음절 보완")?);
                 }
-                let Some(supp_value) = self.supplemental.as_ref().map(|supp| supp.value) else {
+                let Some(supplemental) = self.supplemental else {
                     return Err("한글 음절 보완 상태 불일치".into());
                 };
-                let mut candidate_value = None;
-                for supp_shift in HANGUL_SHIFTS {
-                    let value = u32::from(low_u16_from_u64(supp_value >> supp_shift));
-                    if value <= HANGUL_SYLLABLE_MAX {
-                        candidate_value = Some(value);
-                        break;
-                    }
-                }
+                let supp_value = supplemental.value;
+                let candidate_value = HANGUL_SHIFTS
+                    .into_iter()
+                    .map(|supp_shift| u32::from(low_u16_from_u64(supp_value >> supp_shift)))
+                    .find(|value| *value <= HANGUL_SYLLABLE_MAX);
                 if let Some(candidate) = candidate_value {
                     syllable_index = candidate;
                 } else {
@@ -381,10 +407,12 @@ impl RandomDataBuilder<'_, '_> {
         Ok(())
     }
     fn fill_lucky_stars(&mut self) -> Result<()> {
-        let mut lucky_star_source = self
-            .supplemental
-            .as_ref()
-            .map_or_else(|| self.num.reverse_bits(), |supp| supp.value.reverse_bits());
+        let lucky_star_base = if let Some(supp) = self.supplemental.as_ref() {
+            supp.value
+        } else {
+            self.num
+        };
+        let mut lucky_star_source = lucky_star_base.reverse_bits();
         'lucky_star_loop: loop {
             for byte in lucky_star_source.to_be_bytes() {
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
@@ -489,6 +517,26 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<bool> {
+        match command {
+            b'5' => {
+                self.handle_server_time_command(out, err)?;
+                return Ok(true);
+            }
+            b'6' => {
+                validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
+                if let Err(remove_err) = fs::remove_file(FILE_NAME) {
+                    writeln!(err, "{remove_err}")?;
+                } else {
+                    writeln!(out, "파일 '{FILE_NAME}'를 삭제했습니다.")?;
+                }
+                return Ok(true);
+            }
+            b'7' => {
+                self.handle_manual_input_command(out, err)?;
+                return Ok(true);
+            }
+            _ => {}
+        }
         cfg_select! {
             target_arch = "x86_64" => {
                 match command {
@@ -496,27 +544,18 @@ impl MenuApp {
                     b'2' => self.handle_random_number_command(out, err)?,
                     b'3' => self.handle_generate_once_command(out, err)?,
                     b'4' => self.handle_generate_many_command(out, err)?,
-                    b'5' => self.handle_server_time_command(out, err)?,
-                    b'6' => {
-                        validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
-                        if let Err(remove_err) = fs::remove_file(FILE_NAME) {
-                            writeln!(err, "{remove_err}")?;
-                        } else {
-                            writeln!(out, "파일 '{FILE_NAME}'를 삭제했습니다.")?;
-                        }
-                    }
-                    b'7' => self.handle_manual_input_command(out, err)?,
                     _ => return Ok(false),
                 }
                 Ok(true)
             }
             _ => {
                 match command {
-                    b'1' | b'2' | b'3' | b'4' | b'6' => {
-                        print_x86_64_only_feature_disabled(out)?;
+                    b'1' | b'2' | b'3' | b'4' => {
+                        writeln!(
+                            out,
+                            "이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다."
+                        )?;
                     }
-                    b'5' => self.handle_server_time_command(out, err)?,
-                    b'7' => self.handle_manual_input_command(out, err)?,
                     _ => return Ok(false),
                 }
                 Ok(true)
@@ -627,7 +666,13 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
+        #[cfg(target_arch = "x86_64")]
         ensure_file_exists_and_reopen(&self.file_mutex)?;
+        #[cfg(not(target_arch = "x86_64"))]
+        if !Path::new(FILE_NAME).try_exists()? {
+            *lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? =
+                open_or_create_file()?;
+        }
         writeln!(out, "\nnum_64/supp 수동 입력 생성 모드")?;
         self.input_buffer.clear();
         #[cfg(target_arch = "x86_64")]
@@ -669,8 +714,38 @@ impl MenuApp {
                 bits_remaining: BYTE_BITS,
             })
         };
+        #[cfg(target_arch = "x86_64")]
         let data = generate_random_data_from_num(*num_64_slot, &mut next_supp)?;
+        #[cfg(not(target_arch = "x86_64"))]
+        let data = RandomDataBuilder {
+            data: RandomDataSet {
+                num_64: *num_64_slot,
+                ..Default::default()
+            },
+            next_supp: &mut next_supp,
+            num: *num_64_slot,
+            supplemental: None,
+        }
+        .build()?;
+        #[cfg(target_arch = "x86_64")]
         persist_and_print_random_data(&self.file_mutex, &data)?;
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            let mut buffer = [0_u8; BUFFER_SIZE];
+            let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
+            {
+                let mut file_guard =
+                    lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
+                file_guard.write_all(prefix_slice(&buffer, file_len)?)?;
+                file_guard.flush()?;
+            };
+            if *IS_TERMINAL {
+                let console_len = format_data_into_buffer(&data, &mut buffer, true)?;
+                write_slice_to_console(prefix_slice(&buffer, console_len)?)?;
+            } else {
+                write_slice_to_console(prefix_slice(&buffer, file_len)?)?;
+            }
+        }
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]
@@ -787,8 +862,7 @@ impl MenuApp {
                     return Err("서버 주소를 비워둘 수 없습니다.");
                 }
                 let after_scheme = time::address::strip_scheme_prefix(raw_input);
-                let ignored_suffix =
-                    time::address::authority_end_index(after_scheme) < after_scheme.len();
+                let ignored_suffix = after_scheme.contains(['/', '?', '#']);
                 time::address::ParsedServer::try_from(raw_input)
                     .map(|parsed| (ignored_suffix, parsed))
                     .map_err(|_err| "서버 주소가 올바르지 않습니다.")
@@ -879,10 +953,11 @@ impl MenuApp {
                     return Err("시간 계산 오류: 목표 시각 계산 실패");
                 };
                 if current_time > target_time {
-                    target_time = match target_time.checked_add(Duration::from_hours(24)) {
-                        Some(next_day_time) => next_day_time,
-                        None => return Err("시간 계산 오류: 다음날 목표 시각 계산 실패"),
+                    let Some(next_day_time) = target_time.checked_add(Duration::from_hours(24))
+                    else {
+                        return Err("시간 계산 오류: 다음날 목표 시각 계산 실패");
                     };
+                    target_time = next_day_time;
                 }
                 Ok(Some(target_time))
             },
@@ -963,9 +1038,9 @@ fn glyph_from_low_nibble(value: u64) -> Option<char> {
         .get(usize::from(low_u8_from_u64(value & NIBBLE_MASK_U64)))
         .copied()
 }
+#[cfg(target_arch = "x86_64")]
 const fn split_u64_to_u32_pair(value: u64) -> (u32, u32) {
     let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
-
     (
         u32::from_be_bytes([b0, b1, b2, b3]),
         u32::from_be_bytes([b4, b5, b6, b7]),
@@ -980,7 +1055,7 @@ const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
         upper_bound
     }
 }
-pub(crate) fn write_line_ignored(output: &mut dyn Write, args: Arguments<'_>) {
+fn write_line_ignored(output: &mut dyn Write, args: Arguments<'_>) {
     match output.write_fmt(args) {
         Ok(()) | Err(_) => {}
     }
@@ -1041,14 +1116,7 @@ fn run_hw_rng_menu_command(
     }
     action(out)
 }
-#[cfg(not(target_arch = "x86_64"))]
-fn print_x86_64_only_feature_disabled(out: &mut dyn Write) -> Result<()> {
-    writeln!(
-        out,
-        "이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다."
-    )?;
-    Ok(())
-}
+#[cfg(target_arch = "x86_64")]
 fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
     if Path::new(FILE_NAME).try_exists()? {
         return Ok(());
@@ -1117,7 +1185,7 @@ fn boxed_other_with_source(
     context_msg: &'static str,
     err: impl Display,
 ) -> Box<dyn Error + Send + Sync + 'static> {
-    Box::new(IoError::other(format!("{context_msg}: {err}")))
+    IoError::other(format!("{context_msg}: {err}")).into()
 }
 fn open_or_create_file() -> Result<BufWriter<File>> {
     let path = Path::new(FILE_NAME);
@@ -1191,7 +1259,8 @@ fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, context_msg: &'static str) -> Result<M
         .lock()
         .map_err(|err| boxed_other_with_source(context_msg, err))
 }
-pub(crate) fn write_random_data_to_console(data: &RandomDataSet) -> Result<()> {
+#[cfg(target_arch = "x86_64")]
+fn write_random_data_to_console(data: &RandomDataSet) -> Result<()> {
     let mut buffer = [0_u8; BUFFER_SIZE];
     if *IS_TERMINAL {
         let console_len = format_data_into_buffer(data, &mut buffer, true)?;
@@ -1202,7 +1271,8 @@ pub(crate) fn write_random_data_to_console(data: &RandomDataSet) -> Result<()> {
     }
     Ok(())
 }
-pub(crate) fn persist_and_print_random_data(
+#[cfg(target_arch = "x86_64")]
+fn persist_and_print_random_data(
     file_mutex: &Mutex<BufWriter<File>>,
     data: &RandomDataSet,
 ) -> Result<()> {
@@ -1210,11 +1280,12 @@ pub(crate) fn persist_and_print_random_data(
     let file_len = format_data_into_buffer(data, &mut buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        write_buffer_to_file_guard(&mut file_guard, prefix_slice(&buffer, file_len)?)?;
+        output::write_buffer_to_file_guard(&mut file_guard, prefix_slice(&buffer, file_len)?)?;
         file_guard.flush()?;
     };
     write_random_data_to_console(data)
 }
+#[cfg(target_arch = "x86_64")]
 fn generate_random_data_from_num(
     num: u64,
     next_supp: &mut SupplementalProvider<'_>,
@@ -1230,6 +1301,7 @@ fn generate_random_data_from_num(
     }
     .build()
 }
+#[cfg(target_arch = "x86_64")]
 fn generate_random_data() -> Result<RandomDataSet> {
     let num = get_hardware_random()?;
     let mut next_supp = |_reason: &'static str| {
@@ -1240,6 +1312,7 @@ fn generate_random_data() -> Result<RandomDataSet> {
     };
     generate_random_data_from_num(num, &mut next_supp)
 }
+#[cfg(target_arch = "x86_64")]
 fn get_hardware_random() -> Result<u64> {
     match *RNG_SOURCE {
         RngSource::RdSeed => cfg_select! {
@@ -1375,22 +1448,22 @@ fn process_lotto_numbers(
         return false;
     };
     let mask = 1_u64 << number;
-    if (*seen & mask) == 0 {
-        let Some(slot) = numbers.get_mut(*next_idx) else {
-            return false;
-        };
-        *slot = number;
-        *seen |= mask;
-        let Some(next_index) = checked_add_one_usize(*next_idx) else {
-            return false;
-        };
-        *next_idx = next_index;
-        if *next_idx == numbers.len() {
-            numbers.sort_unstable();
-        }
-        return true;
+    if (*seen & mask) != 0 {
+        return false;
     }
-    false
+    let Some(slot) = numbers.get_mut(*next_idx) else {
+        return false;
+    };
+    *slot = number;
+    *seen |= mask;
+    let Some(next_index) = checked_add_one_usize(*next_idx) else {
+        return false;
+    };
+    *next_idx = next_index;
+    if *next_idx == numbers.len() {
+        numbers.sort_unstable();
+    }
+    true
 }
 fn extract_valid_bits_for_nms<const BITS: u8>(
     num: u64,
@@ -1464,8 +1537,8 @@ fn read_u64_hex_input(
     loop {
         let raw = read_line_reuse(prompt, input_buffer, out)?;
         match raw
-            .strip_prefix("0x")
-            .or_else(|| raw.strip_prefix("0X"))
+            .strip_prefix('0')
+            .and_then(|body| body.strip_prefix(['x', 'X']))
             .map_or_else(|| raw.parse::<u64>(), |hex| u64::from_str_radix(hex, 16))
         {
             Ok(value) => return Ok(value),
@@ -1479,11 +1552,13 @@ fn read_u64_hex_input(
         }
     }
 }
+#[cfg(target_arch = "x86_64")]
 fn parse_regular_f64(raw: &str) -> Option<f64> {
     raw.parse::<f64>()
         .ok()
         .filter(|value| value.is_finite() && !value.is_subnormal())
 }
+#[cfg(target_arch = "x86_64")]
 fn read_ladder_entries<'a, const N: usize>(
     prompt: Arguments<'_>,
     input_buffer: &mut String,
@@ -1502,8 +1577,8 @@ fn read_ladder_entries<'a, const N: usize>(
         let mut trimmed_ranges = [(0_usize, 0_usize); N];
         let mut segment_start = 0_usize;
         for (segment_end, separator) in line
-            .char_indices()
-            .filter_map(|(idx, ch)| (ch == ',').then_some((idx, true)))
+            .match_indices(',')
+            .map(|(idx, _)| (idx, true))
             .chain([(line.len(), false)])
         {
             count = checked_add_one_usize(count).ok_or_else(|| {
@@ -1568,6 +1643,7 @@ fn read_ladder_entries<'a, const N: usize>(
     };
     Ok(count)
 }
+#[cfg(target_arch = "x86_64")]
 fn read_parsed_value<T, F>(
     prompt: Arguments<'_>,
     buffer: &mut String,
@@ -1587,6 +1663,7 @@ where
         writeln!(err, "{invalid_message}")?;
     }
 }
+#[cfg(target_arch = "x86_64")]
 fn generate_random_number(
     mode: RandomNumberMode,
     seed_modifier: u64,
@@ -1684,6 +1761,7 @@ fn generate_random_number(
     }
     Ok(())
 }
+#[cfg(target_arch = "x86_64")]
 fn random_bounded(range_size: u64, seed_mod: u64) -> Result<u64> {
     let threshold = range_size
         .wrapping_neg()

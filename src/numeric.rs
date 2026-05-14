@@ -6,6 +6,7 @@ pub const fn low_u8_from_u64(value: u64) -> u8 {
     let [low, ..] = value.to_le_bytes();
     low
 }
+#[cfg(target_arch = "x86_64")]
 pub const fn low_u8_from_u128(value: u128) -> u8 {
     let [low, ..] = value.to_le_bytes();
     low
