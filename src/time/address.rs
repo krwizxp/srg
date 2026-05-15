@@ -1,4 +1,8 @@
-use super::{Result, TimeError, parse_result_with_context, parse_u32_digits};
+use super::{
+    Result, TimeError,
+    util::{parse_result_with_context, parse_u32_digits},
+};
+use core::fmt::Write as _;
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
@@ -9,6 +13,7 @@ const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
 const HTTPS_SCHEME_PREFIX: &str = "https://";
 const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
+const U16_DECIMAL_MAX_LEN: usize = 5;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UrlScheme {
     Http,
@@ -16,13 +21,13 @@ pub enum UrlScheme {
 }
 #[derive(Debug)]
 pub struct ParsedServer {
-    host: Box<str>,
-    http_url: Box<str>,
+    host: String,
+    http_url: String,
     literal_tcp_socket_addr: Option<net::SocketAddr>,
     port: u16,
     scheme: Option<UrlScheme>,
-    secure_url: Box<str>,
-    tcp_host_header: Box<str>,
+    secure_url: String,
+    tcp_host_header: String,
 }
 impl ParsedServer {
     pub fn host(&self) -> &str {
@@ -108,25 +113,45 @@ impl TryFrom<&str> for ParsedServer {
             .ok()
             .map(|ip_addr| net::SocketAddr::new(ip_addr, port));
         let host_for_header = if host_part.contains(':') {
-            format!("[{host_part}]")
+            let mut out = String::new();
+            let capacity = host_part.len().saturating_add(2);
+            out.try_reserve(capacity).map_err(|source| {
+                TimeError::parse(format!("서버 host header 메모리 확보 실패: {source}"))
+            })?;
+            out.push('[');
+            out.push_str(host_part);
+            out.push(']');
+            out
         } else {
-            host_part.to_owned()
+            copy_str(host_part, "서버 host header 메모리 확보 실패")?
         };
-        let plain_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Http);
-        let secure_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Https);
+        let plain_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Http)?;
+        let secure_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Https)?;
         let tcp_host_header = if port == DEFAULT_HTTP_PORT {
             host_for_header
         } else {
-            format!("{host_for_header}:{port}")
+            let mut out = String::new();
+            let capacity = host_for_header
+                .len()
+                .saturating_add(":".len())
+                .saturating_add(U16_DECIMAL_MAX_LEN);
+            out.try_reserve(capacity).map_err(|source| {
+                TimeError::parse(format!("TCP host header 메모리 확보 실패: {source}"))
+            })?;
+            out.push_str(&host_for_header);
+            write!(&mut out, ":{port}")
+                .map_err(|_| TimeError::parse("TCP host header port 작성 실패"))?;
+            out
         };
+        let host_owned = copy_str(host_part, "서버 host 메모리 확보 실패")?;
         Ok(Self {
             scheme,
-            host: host_part.into(),
-            http_url: plain_url.into_boxed_str(),
+            host: host_owned,
+            http_url: plain_url,
             literal_tcp_socket_addr,
             port,
-            secure_url: secure_url.into_boxed_str(),
-            tcp_host_header: tcp_host_header.into_boxed_str(),
+            secure_url,
+            tcp_host_header,
         })
     }
 }
@@ -152,16 +177,40 @@ pub fn strip_scheme_prefix(input: &str) -> &str {
         input
     }
 }
-fn build_url(host_for_header: &str, explicit_port: bool, port: u16, scheme: UrlScheme) -> String {
+fn build_url(
+    host_for_header: &str,
+    explicit_port: bool,
+    port: u16,
+    scheme: UrlScheme,
+) -> Result<String> {
     let scheme_prefix = match scheme {
         UrlScheme::Http => HTTP_SCHEME_PREFIX,
         UrlScheme::Https => HTTPS_SCHEME_PREFIX,
     };
+    let mut out = String::new();
+    let capacity = scheme_prefix
+        .len()
+        .saturating_add(host_for_header.len())
+        .saturating_add(if explicit_port {
+            ":".len().saturating_add(U16_DECIMAL_MAX_LEN)
+        } else {
+            0
+        });
+    out.try_reserve(capacity)
+        .map_err(|source| TimeError::parse(format!("URL 메모리 확보 실패: {source}")))?;
+    out.push_str(scheme_prefix);
+    out.push_str(host_for_header);
     if explicit_port {
-        format!("{scheme_prefix}{host_for_header}:{port}")
-    } else {
-        format!("{scheme_prefix}{host_for_header}")
+        write!(&mut out, ":{port}").map_err(|_| TimeError::parse("URL port 작성 실패"))?;
     }
+    Ok(out)
+}
+fn copy_str(value: &str, context: &'static str) -> Result<String> {
+    let mut out = String::new();
+    out.try_reserve(value.len())
+        .map_err(|source| TimeError::parse(format!("{context}: {source}")))?;
+    out.push_str(value);
+    Ok(out)
 }
 fn parse_port(port_part: &str) -> Result<u16> {
     if port_part.is_empty() {

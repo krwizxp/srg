@@ -1,4 +1,7 @@
-use super::{Result, TimeError, parse_result_with_context, parse_u32_digits};
+use super::{
+    Result, TimeError,
+    util::{parse_result_with_context, parse_u32_digits},
+};
 use core::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 const SECS_PER_DAY_I64: i64 = 86_400;
@@ -304,7 +307,7 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
                 let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
                 clamp_u64_day_count(days_before_epoch)
                     .checked_neg()
-                    .map_or(i64::MIN, |converted| converted)
+                    .unwrap_or(i64::MIN)
             }
         };
         let day_index = match i32::try_from(day_index_i64) {

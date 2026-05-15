@@ -1,27 +1,27 @@
 use self::{
-    address::{ParsedServer, UrlScheme},
-    http_date::{civil_from_days, parse_http_date_to_systemtime},
+    address::ParsedServer,
+    diagnostic::{Result, TimeError, TimeErrorKind},
+    sample::{NetworkContext, NetworkContextRequest, fetch_server_time_sample},
+    util::blend_weighted_nanos,
 };
-use crate::{
-    buffmt::{
-        ByteCursor, copy_two_digits as buffmt_copy_two_digits, digit_byte as buffmt_digit_byte,
-        write_zero_err,
-    },
-    numeric::low_u8_from_u32,
-    write_line_ignored,
-};
-use alloc::{borrow::Cow, fmt, str};
-use core::{fmt::Write as _, ops::Mul as _, result as stdresult, time::Duration};
+use crate::write_line_ignored;
+use alloc::fmt;
+#[cfg(target_os = "windows")]
+use core::result::Result as StdResult;
+use core::{fmt::Write as _, ops::Mul as _, time::Duration};
 use std::{
-    io::{self, BufRead as _, BufReader, Result as IoResult, Write as _},
-    net::{self, TcpStream},
+    io::{self, BufRead as _, Result as IoResult},
     sync::mpsc,
     thread,
-    time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 pub mod address;
+pub mod diagnostic;
+mod display;
 mod http_date;
 mod native_http;
+mod sample;
+mod util;
 cfg_select! {
     target_os = "linux" => {
         mod linux_input;
@@ -75,46 +75,26 @@ cfg_select! {
 }
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
-const TCP_TIMEOUT_SECS: u64 = 5;
-const TCP_TIMEOUT: Duration = Duration::from_secs(TCP_TIMEOUT_SECS);
-const DAY_SECONDS_I64: i64 = 86_400;
-const DAYS_PER_WEEK_I64: i64 = 7;
-const DISPLAY_LINE_BUF_LEN: usize = 80;
+const TCP_TIMEOUT: Duration = Duration::from_secs(5);
 const ENTER_BUFFER_CAPACITY: usize = 8;
 pub const NUM_SAMPLES: usize = 10;
 const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
-const HOUR_SECONDS_I64: i64 = 3_600;
-const HOUR_SECONDS_U64: u64 = 3_600;
 const MAX_CALIBRATION_FAILURES: u32 = 100;
-pub const KST_OFFSET_SECS_U64: u64 = 9 * HOUR_SECONDS_U64;
+const KST_OFFSET: Duration = Duration::from_hours(9);
+pub const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
-const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const COUNTDOWN_DELAY_ERROR: &str = "카운트다운 지연 계산 실패";
 const DISPLAY_STATUS_PREFIX: &str = "\r서버 시간: ";
 const DISPLAY_UPDATE_INTERVAL: Duration = Duration::from_millis(45);
 const FINAL_COUNTDOWN_WINDOW: Duration = Duration::from_secs(10);
-const FOUR_DIGIT_WIDTH: usize = 4;
 const HALF_RTT_DIVISOR: u32 = 2;
 const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
-const MINUTE_SECONDS_I64: i64 = 60;
 const RTT_TRIM_DIVISOR: usize = 5;
-const TCP_HEAD_REQUEST_PREFIX: &[u8] = b"HEAD / HTTP/1.1\r\nHost: ";
-const TCP_HEAD_REQUEST_SUFFIX: &[u8] =
-    b"\r\nConnection: close\r\nUser-Agent: Rust-Time-Sync\r\n\r\n";
-const TCP_LINE_BUF_CAPACITY: usize = 256;
-const THREE_DIGIT_WIDTH: usize = 3;
-const TWO_DIGIT_WIDTH: usize = 2;
-const U32_DEC_BUF_LEN: usize = 10;
-const U32_FOUR_DIGIT_THRESHOLD: u32 = 10_000;
-const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
-const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
-const U32_TWO_DIGIT_THRESHOLD: u32 = 10;
-const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 cfg_select! {
     target_os = "windows" => {
         const TIMERR_NOERROR: u32 = 0;
@@ -128,7 +108,7 @@ cfg_select! {
         }
         impl TryFrom<HighResTimerRequest> for HighResTimerGuard {
             type Error = ();
-            fn try_from(_value: HighResTimerRequest) -> stdresult::Result<Self, Self::Error> {
+            fn try_from(_value: HighResTimerRequest) -> StdResult<Self, Self::Error> {
                 // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
                 // integer input and does not impose additional aliasing or
                 // lifetime requirements.
@@ -149,296 +129,17 @@ cfg_select! {
     }
     _ => {}
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum TimeErrorKind {
-    HeaderNotFound,
-    Io,
-    NativeHttp,
-    Parse,
-    SyncFailed,
-    Time,
-}
-#[derive(Debug)]
-pub struct TimeError {
-    detail: Cow<'static, str>,
-    io_kind: Option<io::ErrorKind>,
-    kind: TimeErrorKind,
-}
-impl TimeError {
-    fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(TimeErrorKind::HeaderNotFound, detail)
-    }
-    pub const fn io_kind(&self) -> Option<io::ErrorKind> {
-        self.io_kind
-    }
-    fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            kind,
-            detail: detail.into(),
-            io_kind: None,
-        }
-    }
-    fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(TimeErrorKind::Parse, detail)
-    }
-}
-impl From<io::Error> for TimeError {
-    fn from(err: io::Error) -> Self {
-        let io_kind = err.kind();
-        Self {
-            kind: TimeErrorKind::Io,
-            detail: owned_detail(err),
-            io_kind: Some(io_kind),
-        }
-    }
-}
-impl From<SystemTimeError> for TimeError {
-    fn from(err: SystemTimeError) -> Self {
-        Self {
-            kind: TimeErrorKind::Time,
-            detail: owned_detail(err),
-            io_kind: None,
-        }
-    }
-}
-impl fmt::Display for TimeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            TimeErrorKind::Io => write!(f, "I/O 오류: {}", self.detail),
-            TimeErrorKind::Time => write!(f, "시스템 시간 오류: {}", self.detail),
-            TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
-            TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
-            TimeErrorKind::NativeHttp => write!(f, "native HTTP 요청 실패: {}", self.detail),
-            TimeErrorKind::SyncFailed => write!(f, "서버 시간 확인 실패: {}", self.detail),
-        }
-    }
-}
-type Result<T> = stdresult::Result<T, TimeError>;
 #[derive(Clone, Copy, Debug)]
 pub struct TimeSample {
     pub response_received_inst: Instant,
     pub rtt: Duration,
     pub server_time: SystemTime,
 }
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ServerTime {
     anchor_instant: Instant,
     anchor_time: SystemTime,
     baseline_rtt: Duration,
-}
-struct DisplayableTime {
-    day_of_month: u32,
-    day_of_week_str: &'static str,
-    hour: u32,
-    millis: u32,
-    minute: u32,
-    month: u32,
-    second: u32,
-    year: i32,
-}
-struct SliceCursor<'a> {
-    inner: ByteCursor<'a>,
-}
-impl SliceCursor<'_> {
-    fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
-        value.checked_add(amount).ok_or_else(write_zero_err)
-    }
-    fn checked_sub_index(value: usize, amount: usize) -> IoResult<usize> {
-        value.checked_sub(amount).ok_or_else(write_zero_err)
-    }
-    fn copy_two_digits(target: &mut [u8], value: usize) -> IoResult<()> {
-        if target.len() != TWO_DIGIT_WIDTH {
-            return Err(write_zero_err());
-        }
-        buffmt_copy_two_digits(target, value)
-    }
-    fn digit_byte(index: usize) -> IoResult<u8> {
-        buffmt_digit_byte(index)
-    }
-    fn write_byte(&mut self, byte: u8) -> IoResult<()> {
-        self.inner.write_byte(byte)
-    }
-    fn write_bytes(&mut self, bytes: &[u8]) -> IoResult<()> {
-        self.inner.write_bytes(bytes)
-    }
-    fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
-        let idx = usize::from(low_u8_from_u32(value));
-        Self::copy_two_digits(self.inner.take(TWO_DIGIT_WIDTH)?, idx)?;
-        Ok(())
-    }
-    fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
-        let hundreds = usize::from(low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
-        let rem = usize::from(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-        let head = self.inner.take(THREE_DIGIT_WIDTH)?;
-        let Some((digit_slot, remaining_digits)) = head.split_first_mut() else {
-            return Err(write_zero_err());
-        };
-        *digit_slot = Self::digit_byte(hundreds)?;
-        Self::copy_two_digits(remaining_digits, rem)?;
-        Ok(())
-    }
-    fn write_u32_dec(&mut self, mut n: u32) -> IoResult<()> {
-        let mut tmp = [0_u8; U32_DEC_BUF_LEN];
-        let mut i = tmp.len();
-        while n >= U32_THREE_DIGIT_THRESHOLD {
-            let rem = usize::from(low_u8_from_u32(n.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            n /= U32_THREE_DIGIT_THRESHOLD;
-            i = Self::checked_sub_index(i, 2)?;
-            let end = Self::checked_add_index(i, 2)?;
-            Self::copy_two_digits(tmp.get_mut(i..end).ok_or_else(write_zero_err)?, rem)?;
-        }
-        if n >= U32_TWO_DIGIT_THRESHOLD {
-            let rem = usize::from(low_u8_from_u32(n));
-            i = Self::checked_sub_index(i, TWO_DIGIT_WIDTH)?;
-            let end = Self::checked_add_index(i, TWO_DIGIT_WIDTH)?;
-            Self::copy_two_digits(tmp.get_mut(i..end).ok_or_else(write_zero_err)?, rem)?;
-        } else {
-            i = Self::checked_sub_index(i, 1)?;
-            let digit = usize::from(low_u8_from_u32(n));
-            *tmp.get_mut(i).ok_or_else(write_zero_err)? = Self::digit_byte(digit)?;
-        }
-        let Some((_, suffix)) = tmp.split_at_checked(i) else {
-            return Err(write_zero_err());
-        };
-        self.write_bytes(suffix)
-    }
-    fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
-        if year >= 0_i32 {
-            let year_value = year.cast_unsigned();
-            if year_value < U32_FOUR_DIGIT_THRESHOLD {
-                let hi = usize::from(low_u8_from_u32(
-                    year_value.div_euclid(U32_THREE_DIGIT_THRESHOLD),
-                ));
-                let lo = usize::from(low_u8_from_u32(
-                    year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
-                ));
-                let head = self.inner.take(FOUR_DIGIT_WIDTH)?;
-                let Some((hi_digits, lo_digits)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-                else {
-                    return Err(write_zero_err());
-                };
-                Self::copy_two_digits(hi_digits, hi)?;
-                Self::copy_two_digits(lo_digits, lo)?;
-                return Ok(());
-            }
-            return self.write_u32_dec(year_value);
-        }
-        self.write_byte(b'-')?;
-        let abs = year.unsigned_abs();
-        if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
-            let hundreds = usize::from(low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let rem = usize::from(low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let head = self.inner.take(THREE_DIGIT_WIDTH)?;
-            let Some((digit_slot, remaining_digits)) = head.split_first_mut() else {
-                return Err(write_zero_err());
-            };
-            *digit_slot = Self::digit_byte(hundreds)?;
-            Self::copy_two_digits(remaining_digits, rem)?;
-            return Ok(());
-        }
-        self.write_u32_dec(abs)
-    }
-}
-impl ServerTime {
-    fn calculate_display_time_at(&self, now: Instant) -> Result<DisplayableTime> {
-        let current_time = self.current_server_time_at(now);
-        let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
-        let total_seconds = parse_result_with_context(
-            i64::try_from(since_epoch.as_secs()),
-            "초 계산 중 범위 오류",
-        )?;
-        let total_seconds_kst = total_seconds
-            .checked_add(KST_OFFSET_SECS)
-            .ok_or_else(|| TimeError::parse("초 계산 중 범위 오류"))?;
-        let millis = since_epoch.subsec_millis();
-        let days_since_epoch = total_seconds_kst.div_euclid(DAY_SECONDS_I64);
-        let day_of_week_num = days_since_epoch
-            .checked_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
-            .ok_or_else(|| TimeError::parse("요일 계산 중 범위 오류"))?
-            .rem_euclid(DAYS_PER_WEEK_I64);
-        let day_of_week_idx =
-            parse_result_with_context(usize::try_from(day_of_week_num), "요일 계산 중 범위 오류")?;
-        let day_of_week_str = DAY_OF_WEEK_KO
-            .get(day_of_week_idx)
-            .copied()
-            .ok_or_else(|| TimeError::parse("요일 계산 중 범위 오류"))?;
-        let sec_of_day = total_seconds_kst.rem_euclid(DAY_SECONDS_I64);
-        let hour = parse_result_with_context(
-            u32::try_from(sec_of_day.div_euclid(HOUR_SECONDS_I64)),
-            "시 계산 중 범위 오류",
-        )?;
-        let minute = parse_result_with_context(
-            u32::try_from(
-                sec_of_day
-                    .rem_euclid(HOUR_SECONDS_I64)
-                    .div_euclid(MINUTE_SECONDS_I64),
-            ),
-            "분 계산 중 범위 오류",
-        )?;
-        let second = parse_result_with_context(
-            u32::try_from(sec_of_day.rem_euclid(MINUTE_SECONDS_I64)),
-            "초 계산 중 범위 오류",
-        )?;
-        let day_index =
-            parse_result_with_context(i32::try_from(days_since_epoch), "일자 계산 중 범위 오류")?;
-        let (year, month, day_of_month) =
-            civil_from_days(day_index).ok_or_else(|| TimeError::parse("일자 계산 중 범위 오류"))?;
-        Ok(DisplayableTime {
-            day_of_month,
-            day_of_week_str,
-            hour,
-            millis,
-            minute,
-            month,
-            second,
-            year,
-        })
-    }
-    fn current_server_time_at(&self, now: Instant) -> SystemTime {
-        let elapsed_since_anchor = now.duration_since(self.anchor_instant);
-        let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
-            return self.anchor_time;
-        };
-        server_time
-    }
-    fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
-        let smoothed_rtt_nanos =
-            blend_weighted_nanos(self.baseline_rtt.as_nanos(), new_rtt.as_nanos(), 3, 10);
-        let smoothed_rtt = Duration::from_nanos_u128(smoothed_rtt_nanos);
-        Self {
-            anchor_time: self.anchor_time,
-            anchor_instant: self.anchor_instant,
-            baseline_rtt: smoothed_rtt,
-        }
-    }
-    fn write_current_display_time_buf_at(
-        &self,
-        cur: &mut SliceCursor<'_>,
-        show_millis: bool,
-        now: Instant,
-    ) -> Result<()> {
-        let dt = self.calculate_display_time_at(now)?;
-        cur.write_year_padded4(dt.year).map_err(TimeError::from)?;
-        cur.write_byte(b'-').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.month).map_err(TimeError::from)?;
-        cur.write_byte(b'-').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.day_of_month)
-            .map_err(TimeError::from)?;
-        cur.write_byte(b'(').map_err(TimeError::from)?;
-        cur.write_bytes(dt.day_of_week_str.as_bytes())
-            .map_err(TimeError::from)?;
-        cur.write_bytes(b") ").map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.hour).map_err(TimeError::from)?;
-        cur.write_byte(b':').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.minute).map_err(TimeError::from)?;
-        cur.write_byte(b':').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.second).map_err(TimeError::from)?;
-        if show_millis {
-            cur.write_byte(b'.').map_err(TimeError::from)?;
-            cur.write_u32_3digits(dt.millis).map_err(TimeError::from)?;
-        }
-        Ok(())
-    }
 }
 #[derive(Clone, Copy, Debug)]
 pub enum TriggerAction {
@@ -469,10 +170,6 @@ pub struct AppState {
     pub server_time: Option<ServerTime>,
     pub target_time: Option<SystemTime>,
     pub trigger_action: Option<TriggerAction>,
-}
-struct NetworkContext {
-    cached_tcp_socket_addr: Option<net::SocketAddr>,
-    tcp_line_buffer: Vec<u8>,
 }
 struct LoopRuntime<'a> {
     err: &'a mut dyn io::Write,
@@ -880,7 +577,9 @@ impl AppState {
         out.write_all("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)\n".as_bytes())?;
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || -> IoResult<()> {
-            let mut line = Vec::with_capacity(ENTER_BUFFER_CAPACITY);
+            let mut line = Vec::new();
+            line.try_reserve(ENTER_BUFFER_CAPACITY)
+                .map_err(io::Error::other)?;
             io::stdin().lock().read_until(b'\n', &mut line)?;
             match tx.send(()) {
                 Ok(()) | Err(_) => {}
@@ -889,13 +588,13 @@ impl AppState {
         });
         let mut activity = Activity::MeasureBaselineRtt;
         let mut last_display_update = Instant::now();
-        let mut message_buffer = String::with_capacity(MESSAGE_BUFFER_CAPACITY);
-        let mut network_context = NetworkContext {
-            cached_tcp_socket_addr: None,
-            tcp_line_buffer: Vec::with_capacity(TCP_LINE_BUF_CAPACITY),
-        };
+        let mut message_buffer = String::new();
+        message_buffer
+            .try_reserve(MESSAGE_BUFFER_CAPACITY)
+            .map_err(io::Error::other)?;
+        let mut network_context = NetworkContext::try_from(NetworkContextRequest)?;
         let mut prepared_input = native_input::PreparedInput::EMPTY;
-        let mut line_buf = [0_u8; DISPLAY_LINE_BUF_LEN];
+        let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
             let activity_poll = match activity {
                 Activity::MeasureBaselineRtt
@@ -921,8 +620,8 @@ impl AppState {
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL
                 && let Some(st) = self.server_time.as_ref()
             {
-                let mut cur = SliceCursor {
-                    inner: ByteCursor::new(&mut line_buf),
+                let mut cur = display::SliceCursor {
+                    inner: crate::buffmt::ByteCursor::new(&mut line_buf),
                 };
                 match (|| -> Result<()> {
                     cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes())
@@ -1025,9 +724,6 @@ impl AppState {
         (Activity::Finished, Some(msg_buf))
     }
 }
-fn owned_detail(err: impl fmt::Display) -> Cow<'static, str> {
-    Cow::Owned(format!("{err}"))
-}
 fn duration_millis_f64(duration: Duration) -> f64 {
     duration.as_secs_f64().mul(MILLIS_PER_SECOND_F64)
 }
@@ -1054,193 +750,10 @@ fn append_fmt(target: &mut String, args: fmt::Arguments<'_>) {
     let result = target.write_fmt(args);
     debug_assert!(result.is_ok(), "writing to String should not fail");
 }
-fn parse_result_with_context<T, E>(
-    result: stdresult::Result<T, E>,
-    context: &'static str,
-) -> Result<T>
-where
-    E: fmt::Display,
-{
-    result.map_err(|err| TimeError::parse(format!("{context}: {err}")))
-}
-pub fn get_validated_input<T, F>(
-    prompt: &str,
-    input_buf: &mut String,
-    out: &mut dyn io::Write,
-    mut validator: F,
-) -> IoResult<T>
-where
-    F: FnMut(&str) -> stdresult::Result<T, &'static str>,
-{
-    loop {
-        out.write_all(prompt.as_bytes())?;
-        out.flush()?;
-        input_buf.clear();
-        let bytes_read = io::stdin().read_line(input_buf)?;
-        if bytes_read == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "표준 입력이 종료되었습니다.",
-            ));
-        }
-        let trimmed = input_buf.trim();
-        match validator(trimmed) {
-            Ok(value) => return Ok(value),
-            Err(err) => {
-                if !err.is_empty() {
-                    writeln!(out, "{err}")?;
-                }
-            }
-        }
-    }
-}
 fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
     let now = Instant::now();
     let Some(retry_at) = now.checked_add(RETRY_DELAY) else {
         return (Activity::Retrying { retry_at: now }, Some(msg));
     };
     (Activity::Retrying { retry_at }, Some(msg))
-}
-fn blend_weighted_nanos(
-    old_value: u128,
-    new_value: u128,
-    new_weight: u32,
-    total_weight: u32,
-) -> u128 {
-    let old_weight = total_weight.saturating_sub(new_weight);
-    let Some(weighted_old) = old_value.checked_mul(u128::from(old_weight)) else {
-        return new_value;
-    };
-    let Some(weighted_new) = new_value.checked_mul(u128::from(new_weight)) else {
-        return new_value;
-    };
-    let Some(weighted_sum) = weighted_old.checked_add(weighted_new) else {
-        return new_value;
-    };
-    let Some(weighted_average) = weighted_sum.checked_div(u128::from(total_weight)) else {
-        return new_value;
-    };
-    weighted_average
-}
-fn find_date_header_value(line: &[u8]) -> Option<&str> {
-    let (prefix, value) = line.split_at_checked(5)?;
-    if prefix.eq_ignore_ascii_case(b"date:") {
-        str::from_utf8(value).map(str::trim_ascii).ok()
-    } else {
-        None
-    }
-}
-fn fetch_server_time_sample_native_http(url_str: &str, context: &str) -> Result<TimeSample> {
-    native_http::NATIVE_HTTP.fetch_head_sample(url_str, context)
-}
-fn fetch_server_time_sample(
-    parsed_address: &ParsedServer,
-    net_ctx: &mut NetworkContext,
-) -> Result<TimeSample> {
-    if parsed_address.scheme() == Some(UrlScheme::Https) {
-        let https_url = parsed_address.url(UrlScheme::Https);
-        return fetch_server_time_sample_native_http(https_url, "HTTPS (explicit)");
-    }
-    let tcp_attempt_result = {
-        let request_start_inst = Instant::now();
-        let literal_socket_addr = parsed_address.literal_tcp_socket_addr();
-        let had_cached_socket = net_ctx.cached_tcp_socket_addr.is_some();
-        let socket_addr = resolve_tcp_socket_addr(parsed_address, net_ctx)?;
-        let stream_result: Result<TcpStream> =
-            match TcpStream::connect_timeout(&socket_addr, TCP_TIMEOUT) {
-                Ok(stream) => Ok(stream),
-                Err(connect_err) if had_cached_socket && literal_socket_addr.is_none() => {
-                    net_ctx.cached_tcp_socket_addr = None;
-                    let refreshed_socket_addr = resolve_tcp_socket_addr(parsed_address, net_ctx)?;
-                    if refreshed_socket_addr == socket_addr {
-                        Err(TimeError::from(connect_err))
-                    } else {
-                        TcpStream::connect_timeout(&refreshed_socket_addr, TCP_TIMEOUT)
-                            .map_err(TimeError::from)
-                    }
-                }
-                Err(connect_err) => {
-                    if literal_socket_addr.is_none() {
-                        net_ctx.cached_tcp_socket_addr = None;
-                    }
-                    Err(TimeError::from(connect_err))
-                }
-            };
-        let mut stream = stream_result?;
-        stream.set_read_timeout(Some(TCP_TIMEOUT))?;
-        stream.set_write_timeout(Some(TCP_TIMEOUT))?;
-        stream.write_all(TCP_HEAD_REQUEST_PREFIX)?;
-        let host_header = parsed_address.tcp_host_header_value();
-        stream.write_all(host_header.as_bytes())?;
-        stream.write_all(TCP_HEAD_REQUEST_SUFFIX)?;
-        let mut stream_reader = BufReader::new(&stream);
-        loop {
-            net_ctx.tcp_line_buffer.clear();
-            let bytes_read = stream_reader.read_until(b'\n', &mut net_ctx.tcp_line_buffer)?;
-            if bytes_read == 0 {
-                break Err(TimeError::header_not_found("Date (TCP)"));
-            }
-            if let Some(date_str) = find_date_header_value(&net_ctx.tcp_line_buffer) {
-                let response_received_inst = Instant::now();
-                let rtt_for_sample = response_received_inst.duration_since(request_start_inst);
-                let server_time = parse_http_date_to_systemtime(date_str)?;
-                break Ok(TimeSample {
-                    response_received_inst,
-                    rtt: rtt_for_sample,
-                    server_time,
-                });
-            }
-            if net_ctx.tcp_line_buffer == b"\r\n" {
-                break Err(TimeError::header_not_found("Date (TCP)"));
-            }
-        }
-    };
-    tcp_attempt_result.or_else(|_| {
-        let mut last_error = None;
-        for (scheme, context_str) in [
-            (UrlScheme::Https, "HTTPS (fallback)"),
-            (UrlScheme::Http, "HTTP (fallback)"),
-        ] {
-            let url = parsed_address.url(scheme);
-            match fetch_server_time_sample_native_http(url, context_str) {
-                Ok(sample) => return Ok(sample),
-                Err(err) => last_error = Some(err),
-            }
-        }
-        Err(last_error.unwrap_or_else(|| {
-            TimeError::new(
-                TimeErrorKind::SyncFailed,
-                "native HTTP 폴백 시도 중 알 수 없는 오류",
-            )
-        }))
-    })
-}
-fn resolve_tcp_socket_addr(
-    parsed_address: &ParsedServer,
-    net_ctx: &mut NetworkContext,
-) -> Result<net::SocketAddr> {
-    if let Some(socket_addr) = parsed_address.literal_tcp_socket_addr() {
-        return Ok(socket_addr);
-    }
-    if let Some(cached_socket_addr) = net_ctx.cached_tcp_socket_addr {
-        return Ok(cached_socket_addr);
-    }
-    let socket_addr =
-        net::ToSocketAddrs::to_socket_addrs(&(parsed_address.host(), parsed_address.port()))?
-            .next()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Host not found"))?;
-    net_ctx.cached_tcp_socket_addr = Some(socket_addr);
-    Ok(socket_addr)
-}
-fn parse_u32_digits(raw: &str) -> Option<u32> {
-    if raw.is_empty() {
-        return None;
-    }
-    raw.bytes().try_fold(0_u32, |value, byte| {
-        if !byte.is_ascii_digit() {
-            return None;
-        }
-        let digit = byte.checked_sub(b'0')?;
-        value.checked_mul(10)?.checked_add(u32::from(digit))
-    })
 }

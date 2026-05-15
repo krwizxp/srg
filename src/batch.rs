@@ -1,7 +1,9 @@
 use crate::{
-    BUFFER_SIZE, BUFFERS_PER_WORKER, DataBuffer, FILE_NAME, IS_TERMINAL, RandomDataSet, Result,
-    boxed_other_with_source, ensure_file_exists_and_reopen, generate_random_data, lock_mutex,
-    output, persist_and_print_random_data, write_random_data_to_console,
+    BUFFER_SIZE, BUFFERS_PER_WORKER, DataBuffer, FILE_NAME, IS_TERMINAL, Result,
+    file_output::{boxed_other_with_source, ensure_file_exists_and_reopen, lock_mutex},
+    output,
+    random_data::{RandomDataSet, generate_random_data},
+    random_output::{persist_and_print_random_data, write_random_data_to_console},
 };
 use core::{
     any::Any,
@@ -32,8 +34,18 @@ struct BufferChannelsBuilder {
 }
 impl BufferChannelsBuilder {
     fn build(self) -> Result<BufferChannels> {
-        let mut return_senders = Vec::with_capacity(self.thread_count);
-        let mut return_receivers = Vec::with_capacity(self.thread_count);
+        let mut return_senders = Vec::new();
+        let mut return_receivers = Vec::new();
+        return_senders
+            .try_reserve(self.thread_count)
+            .map_err(|source| {
+                IoError::other(format!("buffer sender 목록 메모리 확보 실패: {source}"))
+            })?;
+        return_receivers
+            .try_reserve(self.thread_count)
+            .map_err(|source| {
+                IoError::other(format!("buffer receiver 목록 메모리 확보 실패: {source}"))
+            })?;
         for _ in 0..self.thread_count {
             let (tx, rx): (SyncSender<DataBuffer>, Receiver<DataBuffer>) =
                 sync_channel(BUFFERS_PER_WORKER);
@@ -133,7 +145,14 @@ impl<'a> WorkerPool<'a> {
             .pending_count
             .checked_rem(thread_count_u64)
             .ok_or_else(|| IoError::other("작업 분배 나머지 계산 실패"))?;
-        let mut worker_handles = Vec::with_capacity(self.calculated_thread_count);
+        let mut worker_handles = Vec::new();
+        worker_handles
+            .try_reserve(self.calculated_thread_count)
+            .map_err(|source| {
+                IoError::other(format!(
+                    "작업 스레드 handle 목록 메모리 확보 실패: {source}"
+                ))
+            })?;
         for (worker_idx, return_rx) in self.buffer_return_receivers.into_iter().enumerate() {
             let sender_clone = self.sender.clone();
             let processed_ref = self.processed_ref;
@@ -143,7 +162,12 @@ impl<'a> WorkerPool<'a> {
                     return;
                 };
                 let loop_count = base_count.saturating_add(u64::from(worker_idx_u64 < remainder));
-                let mut local_pool = Vec::with_capacity(BUFFERS_PER_WORKER);
+                let mut local_pool = Vec::new();
+                if local_pool.try_reserve(BUFFERS_PER_WORKER).is_err() {
+                    failed_ref.fetch_add(loop_count, Ordering::Relaxed);
+                    processed_ref.fetch_add(loop_count, Ordering::Relaxed);
+                    return;
+                }
                 for _ in 0..BUFFERS_PER_WORKER {
                     match return_rx.try_recv() {
                         Ok(buffer) => local_pool.push(buffer),
@@ -386,7 +410,7 @@ impl BatchRegenerator<'_, '_, '_> {
         Ok(final_data.num_64)
     }
 }
-fn panic_join_error(context: &'static str, panic_payload: &(dyn Any + Send + 'static)) -> IoError {
+fn panic_join_error(context: &str, panic_payload: &(dyn Any + Send)) -> IoError {
     let panic_detail = panic_payload
         .downcast_ref::<String>()
         .map(String::as_str)

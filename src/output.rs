@@ -3,9 +3,10 @@ use crate::{
     BAR_FULL, BAR_WIDTH_U64, INVALID_TIME, IS_TERMINAL, buffmt::DIGITS, numeric::low_u8_from_u128,
 };
 use crate::{
-    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, RandomDataSet, Result,
+    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, Result,
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
+    random_data::RandomDataSet,
 };
 use core::fmt::Write as _;
 #[cfg(target_arch = "x86_64")]
@@ -522,7 +523,7 @@ fn scaled_progress_value(
     total: u64,
     scale: u64,
     zero_total_value: u64,
-    err_msg: &'static str,
+    err_msg: &str,
 ) -> IoResult<u64> {
     if total == 0 {
         return Ok(zero_total_value);

@@ -1,5 +1,5 @@
 use crate::write_line_ignored;
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 use core::{
     ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void},
     mem,
@@ -7,13 +7,6 @@ use core::{
     ptr::{NonNull, null},
 };
 use std::io;
-macro_rules! load_x11_symbol {
-    ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
-        let symbol = $library.symbol_address($symbol_name)?;
-        // SAFETY: the requested symbol name matches the concrete X11/XTest function pointer type.
-        unsafe { mem::transmute::<*mut c_void, $symbol_type>(symbol.as_ptr()) }
-    }};
-}
 const BUTTON_LEFT: c_uint = 1;
 const DL_NOW: c_int = 2;
 const KEY_PRESS: c_int = 1;
@@ -35,6 +28,8 @@ type XOpenDisplay = unsafe extern "C" fn(*const c_char) -> *mut Display;
 type XTestFakeButtonEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
 type XTestFakeKeyEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
 type XKeycode = NonZero<c_uint>;
+type InputError = Cow<'static, str>;
+type InputResult<T> = Result<T, InputError>;
 #[derive(Clone, Copy, Debug)]
 pub(super) enum InputAction {
     F5Press,
@@ -42,6 +37,10 @@ pub(super) enum InputAction {
 }
 pub(super) struct PreparedInput {
     prepared: Option<PreparedX11Input>,
+}
+enum PreparedSendError {
+    Partial(InputError),
+    RetrySafe(InputError),
 }
 struct Library {
     handle: NonNull<c_void>,
@@ -77,7 +76,7 @@ impl Drop for Library {
     }
 }
 impl Library {
-    fn open(candidates: &[&CStr]) -> Result<Self, String> {
+    fn open(candidates: &[&CStr]) -> InputResult<Self> {
         let mut last_error = None;
         for candidate in candidates {
             // SAFETY: candidate values are static NUL-terminated library names.
@@ -87,65 +86,65 @@ impl Library {
             }
             last_error = Some(dl_error_message());
         }
-        Err(last_error.unwrap_or_else(|| String::from("dynamic loader 후보가 없습니다.")))
+        match last_error {
+            Some(err) => Err(err),
+            None => Err(Cow::Borrowed("dynamic loader 후보가 없습니다.")),
+        }
     }
-    fn symbol_address(&self, name: &CStr) -> Result<NonNull<c_void>, String> {
+    fn symbol_address(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
         // SAFETY: self.handle is a live dlopen handle and name is NUL-terminated.
         let symbol = unsafe { dlsym(self.handle.as_ptr(), name.as_ptr()) };
         NonNull::new(symbol).ok_or_else(dl_error_message)
     }
 }
+macro_rules! load_x11_symbol {
+    ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
+        let symbol = $library.symbol_address($symbol_name)?;
+        // SAFETY: the requested X11/XTest symbol name matches this concrete function pointer type.
+        Ok::<$symbol_type, InputError>(unsafe {
+            mem::transmute::<*mut c_void, $symbol_type>(symbol.as_ptr())
+        })
+    }};
+}
 impl X11Api {
-    fn click_left(&self, display: NonNull<Display>) -> Result<(), String> {
-        self.fake_button(display, KEY_PRESS)?;
-        self.fake_button(display, KEY_RELEASE)
-    }
-    fn fake_button(&self, display: NonNull<Display>, state: c_int) -> Result<(), String> {
+    fn fake_button(&self, display: NonNull<Display>, state: c_int) -> InputResult<()> {
         // SAFETY: display is a live X11 Display and the button/state values match XTest's contract.
         let ok = unsafe { (self.test_button)(display.as_ptr(), BUTTON_LEFT, state, 0) };
         if ok == 0 {
-            Err(String::from("XTestFakeButtonEvent 실패"))
+            Err(Cow::Borrowed("XTestFakeButtonEvent 실패"))
         } else {
             Ok(())
         }
     }
-    fn fake_key(&self, display: NonNull<Display>, keycode: c_uint, state: c_int) -> Result<(), String> {
+    fn fake_key(&self, display: NonNull<Display>, keycode: c_uint, state: c_int) -> InputResult<()> {
         // SAFETY: display is a live X11 Display and keycode/state come from X11/XTest APIs.
         let ok = unsafe { (self.test_key)(display.as_ptr(), keycode, state, 0) };
         if ok == 0 {
-            Err(String::from("XTestFakeKeyEvent 실패"))
+            Err(Cow::Borrowed("XTestFakeKeyEvent 실패"))
         } else {
             Ok(())
         }
     }
-    fn flush(&self, display: NonNull<Display>) -> Result<(), String> {
+    fn flush(&self, display: NonNull<Display>) -> InputResult<()> {
         // SAFETY: display is a live X11 Display.
         let ok = unsafe { (self.flush)(display.as_ptr()) };
         if ok == 0 {
-            Err(String::from("XFlush 실패"))
+            Err(Cow::Borrowed("XFlush 실패"))
         } else {
             Ok(())
         }
     }
-    fn lookup_f5_keycode(&self, display: NonNull<Display>) -> Result<XKeycode, String> {
+    fn lookup_f5_keycode(&self, display: NonNull<Display>) -> InputResult<XKeycode> {
         // SAFETY: display is a live X11 Display and XK_F5 is a valid keysym constant.
         let keycode = unsafe { (self.keycode)(display.as_ptr(), XK_F5) };
-        XKeycode::new(keycode).ok_or_else(|| String::from("F5 keycode 조회 실패"))
+        XKeycode::new(keycode).ok_or_else(|| Cow::Borrowed("F5 keycode 조회 실패"))
     }
-    fn open_display(&self) -> Result<NonNull<Display>, String> {
+    fn open_display(&self) -> InputResult<NonNull<Display>> {
         // SAFETY: null asks XOpenDisplay to read DISPLAY from the process environment.
         let display_ptr = unsafe { (self.open_display)(null()) };
         NonNull::new(display_ptr).ok_or_else(|| {
-            String::from("XOpenDisplay 실패: DISPLAY 환경 또는 X11 세션을 확인하세요.")
+            Cow::Borrowed("XOpenDisplay 실패: DISPLAY 환경 또는 X11 세션을 확인하세요.")
         })
-    }
-    fn press_f5_with_keycode(
-        &self,
-        display: NonNull<Display>,
-        keycode: XKeycode,
-    ) -> Result<(), String> {
-        self.fake_key(display, keycode.get(), KEY_PRESS)?;
-        self.fake_key(display, keycode.get(), KEY_RELEASE)
     }
 }
 impl Drop for PreparedX11Input {
@@ -158,7 +157,7 @@ impl Drop for PreparedX11Input {
     }
 }
 impl PreparedX11Input {
-    fn f5_keycode(&mut self) -> Result<XKeycode, String> {
+    fn f5_keycode(&mut self) -> InputResult<XKeycode> {
         if let Some(keycode) = self.f5_keycode {
             return Ok(keycode);
         }
@@ -166,16 +165,16 @@ impl PreparedX11Input {
         self.f5_keycode = Some(keycode);
         Ok(keycode)
     }
-    fn open(preload_action: InputAction) -> Result<Self, String> {
+    fn open(preload_action: InputAction) -> InputResult<Self> {
         let x11 = Library::open(&X11_LIBS).map_err(|source| format!("libX11 로드 실패: {source}"))?;
         let xtst =
             Library::open(&XTST_LIBS).map_err(|source| format!("libXtst 로드 실패: {source}"))?;
-        let close_display = load_x11_symbol!(x11, SYM_X_CLOSE_DISPLAY, XCloseDisplay);
-        let flush = load_x11_symbol!(x11, SYM_X_FLUSH, XFlush);
-        let keycode = load_x11_symbol!(x11, SYM_X_KEYS_PRESS, XKeysymToKeycode);
-        let open_display = load_x11_symbol!(x11, SYM_X_OPEN_DISPLAY, XOpenDisplay);
-        let test_button = load_x11_symbol!(xtst, SYM_X_TEST_BUTTON, XTestFakeButtonEvent);
-        let test_key = load_x11_symbol!(xtst, SYM_X_TEST_KEY, XTestFakeKeyEvent);
+        let close_display = load_x11_symbol!(x11, SYM_X_CLOSE_DISPLAY, XCloseDisplay)?;
+        let flush = load_x11_symbol!(x11, SYM_X_FLUSH, XFlush)?;
+        let keycode = load_x11_symbol!(x11, SYM_X_KEYS_PRESS, XKeysymToKeycode)?;
+        let open_display = load_x11_symbol!(x11, SYM_X_OPEN_DISPLAY, XOpenDisplay)?;
+        let test_button = load_x11_symbol!(xtst, SYM_X_TEST_BUTTON, XTestFakeButtonEvent)?;
+        let test_key = load_x11_symbol!(xtst, SYM_X_TEST_KEY, XTestFakeKeyEvent)?;
         let api = X11Api {
             _x11: x11,
             _xtst: xtst,
@@ -197,15 +196,27 @@ impl PreparedX11Input {
         }
         Ok(prepared)
     }
-    fn send(&mut self, action: InputAction) -> Result<(), String> {
+    fn send(&mut self, action: InputAction) -> Result<(), PreparedSendError> {
         match action {
-            InputAction::MouseClick => self.api.click_left(self.display)?,
+            InputAction::MouseClick => {
+                self.api
+                    .fake_button(self.display, KEY_PRESS)
+                    .map_err(PreparedSendError::RetrySafe)?;
+                self.api
+                    .fake_button(self.display, KEY_RELEASE)
+                    .map_err(PreparedSendError::Partial)?;
+            }
             InputAction::F5Press => {
-                let keycode = self.f5_keycode()?;
-                self.api.press_f5_with_keycode(self.display, keycode)?;
+                let keycode = self.f5_keycode().map_err(PreparedSendError::RetrySafe)?;
+                self.api
+                    .fake_key(self.display, keycode.get(), KEY_PRESS)
+                    .map_err(PreparedSendError::RetrySafe)?;
+                self.api
+                    .fake_key(self.display, keycode.get(), KEY_RELEASE)
+                    .map_err(PreparedSendError::Partial)?;
             }
         }
-        self.api.flush(self.display)
+        self.api.flush(self.display).map_err(PreparedSendError::Partial)
     }
 }
 impl PreparedInput {
@@ -230,14 +241,35 @@ impl PreparedInput {
         if let Some(mut prepared) = self.prepared.take() {
             match prepared.send(action) {
                 Ok(()) => return,
-                Err(source) => write_line_ignored(
-                    err,
-                    format_args!("[경고] Linux native 입력 사전 준비 경로 실패: {source}"),
-                ),
+                Err(PreparedSendError::RetrySafe(prepared_error)) => {
+                    match send_fresh(action) {
+                        Ok(()) => write_line_ignored(
+                            err,
+                            format_args!(
+                                "[경고] Linux native 입력 사전 준비 경로 실패, 즉시 재시도 완료: {prepared_error}"
+                            ),
+                        ),
+                        Err(fresh_error) => write_line_ignored(
+                            err,
+                            format_args!(
+                                "[경고] Linux native 입력 사전 준비 경로 실패: {prepared_error}; 즉시 재시도 실패: {fresh_error}"
+                            ),
+                        ),
+                    }
+                    return;
+                }
+                Err(PreparedSendError::Partial(prepared_error)) => {
+                    write_line_ignored(
+                        err,
+                        format_args!(
+                            "[경고] Linux native 입력 사전 준비 경로 부분 실패, 중복 입력 방지를 위해 재시도 생략: {prepared_error}"
+                        ),
+                    );
+                }
             }
             return;
         }
-        match PreparedX11Input::open(action).and_then(|mut prepared| prepared.send(action)) {
+        match send_fresh(action) {
             Ok(()) => {}
             Err(source) => write_line_ignored(
                 err,
@@ -246,14 +278,22 @@ impl PreparedInput {
         }
     }
 }
-fn dl_error_message() -> String {
+fn send_fresh(action: InputAction) -> InputResult<()> {
+    PreparedX11Input::open(action).and_then(|mut prepared| {
+        prepared.send(action).map_err(|error| match error {
+            PreparedSendError::Partial(source) | PreparedSendError::RetrySafe(source) => source,
+        })
+    })
+}
+fn dl_error_message() -> InputError {
     // SAFETY: dlerror has no preconditions and returns a thread-local C string or null.
     let raw_error = unsafe { dlerror() };
     if raw_error.is_null() {
-        return String::from("알 수 없는 dynamic loader 오류");
+        return Cow::Borrowed("알 수 없는 dynamic loader 오류");
     }
     // SAFETY: dlerror returned a non-null NUL-terminated C string.
     unsafe { CStr::from_ptr(raw_error) }
         .to_string_lossy()
         .into_owned()
+        .into()
 }
