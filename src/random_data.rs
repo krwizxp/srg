@@ -91,7 +91,7 @@ impl RandomBitBuffer {
         self.value
     }
 }
-pub type SupplementalProvider<'a> = dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'a;
+type SupplementalProvider<'a> = dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'a;
 struct RandomDataBuilder<'a, 'b> {
     data: RandomDataSet,
     next_supp: &'a mut SupplementalProvider<'b>,
@@ -254,7 +254,7 @@ impl RandomDataBuilder<'_, '_> {
 }
 pub fn generate_random_data_from_num(
     num: u64,
-    next_supp: &mut SupplementalProvider<'_>,
+    next_supp: &mut (dyn FnMut(&'static str) -> Result<RandomBitBuffer> + '_),
 ) -> Result<RandomDataSet> {
     RandomDataBuilder {
         data: RandomDataSet {

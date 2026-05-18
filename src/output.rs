@@ -58,10 +58,9 @@ const U32_DEC_BUF_LEN: usize = 10;
 const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
-type BufCursor<'a> = ByteCursor<'a>;
 struct OutputFormatter<'a, 'b, 'c> {
     bytes: [u8; 8],
-    cursor: &'a mut BufCursor<'b>,
+    cursor: &'a mut ByteCursor<'b>,
     data: &'c RandomDataSet,
     use_colors: bool,
 }
@@ -74,7 +73,7 @@ impl OutputFormatter<'_, '_, '_> {
     }
     fn write_labeled_line<F>(&mut self, label: &[u8], write_value: F) -> IoResult<()>
     where
-        F: FnOnce(&mut BufCursor<'_>) -> IoResult<()>,
+        F: FnOnce(&mut ByteCursor<'_>) -> IoResult<()>,
     {
         self.cursor.write_bytes(label)?;
         write_value(self.cursor)?;
@@ -287,7 +286,7 @@ pub fn format_data_into_buffer(
     buffer: &mut [u8; BUFFER_SIZE],
     use_colors: bool,
 ) -> Result<usize> {
-    let mut cur = BufCursor::new(buffer.as_mut_slice());
+    let mut cur = ByteCursor::new(buffer.as_mut_slice());
     let mut formatter = OutputFormatter {
         bytes: data.num_64.to_be_bytes(),
         cursor: &mut cur,
@@ -333,7 +332,7 @@ const fn u8_dec_len(n: u8) -> usize {
         1
     }
 }
-fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -> IoResult<()> {
+fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) -> IoResult<()> {
     let mut total = 0_usize;
     for &ch in chars {
         total = checked_add_index(total, ch.len_utf8())?;
@@ -347,7 +346,7 @@ fn buf_write_chars<const N: usize>(cur: &mut BufCursor<'_>, chars: &[char; N]) -
     }
     Ok(())
 }
-fn buf_write_u8_dec(cur: &mut BufCursor<'_>, n: u8) -> IoResult<()> {
+fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) -> IoResult<()> {
     let head = cur.take(u8_dec_len(n))?;
     write_u8_dec_into_slice(head, n)?;
     Ok(())
@@ -374,7 +373,7 @@ fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<usize> {
     Ok(1)
 }
 fn buf_write_u8_array_spaced<const N: usize>(
-    cur: &mut BufCursor<'_>,
+    cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
     let mut total = N.saturating_sub(1);
@@ -399,7 +398,7 @@ fn buf_write_u8_array_spaced<const N: usize>(
     Ok(())
 }
 fn buf_write_hash_hex24_from_bytes(
-    cur: &mut BufCursor<'_>,
+    cur: &mut ByteCursor<'_>,
     b0: u8,
     b1: u8,
     b2: u8,
@@ -413,7 +412,7 @@ fn buf_write_hash_hex24_from_bytes(
     Ok(())
 }
 fn buf_write_m_hash_hex24_from_bytes(
-    cur: &mut BufCursor<'_>,
+    cur: &mut ByteCursor<'_>,
     b0: u8,
     b1: u8,
     b2: u8,
@@ -445,7 +444,7 @@ fn buf_write_hex24_bytes(buf: &mut [u8], b0: u8, b1: u8, b2: u8) -> IoResult<()>
     third_hex.copy_from_slice(hex_byte(usize::from(b2))?);
     Ok(())
 }
-fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoResult<()> {
+fn buf_write_u32_dec(cur: &mut ByteCursor<'_>, mut n: u32) -> IoResult<()> {
     let mut tmp = [0_u8; U32_DEC_BUF_LEN];
     let mut i = tmp.len();
     while n >= u32::from(U8_THREE_DIGIT_THRESHOLD) {
@@ -468,7 +467,7 @@ fn buf_write_u32_dec(cur: &mut BufCursor<'_>, mut n: u32) -> IoResult<()> {
     }
     cur.write_bytes(suffix_slice(&tmp, i)?)
 }
-fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoResult<()> {
+fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
     let mut tmp = [0_u8; U64_DEC_BUF_LEN];
     let mut i = tmp.len();
     while n >= u64::from(U8_THREE_DIGIT_THRESHOLD) {
@@ -491,7 +490,7 @@ fn buf_write_u64_dec(cur: &mut BufCursor<'_>, mut n: u64) -> IoResult<()> {
     }
     cur.write_bytes(suffix_slice(&tmp, i)?)
 }
-fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> {
+fn buf_write_hex_u16_0pad4(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     let head = cur.take(HEX_U16_FULL_WIDTH)?;
     let upper = usize::from(low_u8_from_u32(u32::from(value >> 8_u32)));
     let lower = usize::from(low_u8_from_u32(u32::from(value)));
@@ -502,7 +501,7 @@ fn buf_write_hex_u16_0pad4(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> 
     lower_hex.copy_from_slice(hex_byte(lower)?);
     Ok(())
 }
-fn buf_write_hex_u16_min3(cur: &mut BufCursor<'_>, value: u16) -> IoResult<()> {
+fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     if value < HEX_U16_SHORT_THRESHOLD {
         let head = cur.take(THREE_DIGIT_WIDTH)?;
         let hi = usize::from(low_u8_from_u32(u32::from(value >> 8)));
@@ -600,7 +599,7 @@ pub fn print_progress(
         "진행률 계산 실패",
     )?;
     let percent = low_u8_from_u64(percent_u64.min(PERCENT_SCALE_U64));
-    let mut cur = BufCursor::new(line_buf);
+    let mut cur = ByteCursor::new(line_buf);
     cur.write_byte(b'\r')?;
     cur.write_bytes(bar.as_bytes())?;
     cur.write_byte(b' ')?;
