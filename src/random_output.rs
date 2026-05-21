@@ -6,7 +6,7 @@ use super::{
 };
 use std::{
     fs::File,
-    io::{BufWriter, Write as _},
+    io::{BufWriter, Write as IoWrite},
     sync::Mutex,
 };
 pub fn write_random_data_to_console(data: &RandomDataSet) -> Result<()> {
@@ -28,8 +28,8 @@ pub fn persist_and_print_random_data(
     let file_len = format_data_into_buffer(data, &mut buffer, false)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        file_guard.write_all(prefix_slice(&buffer, file_len)?)?;
-        file_guard.flush()?;
+        IoWrite::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
+        IoWrite::flush(&mut *file_guard)?;
     };
     write_random_data_to_console(data)
 }

@@ -1,7 +1,3 @@
-#[cfg(target_arch = "x86_64")]
-use super::BYTE_BITS;
-#[cfg(target_arch = "x86_64")]
-use super::hardware_rng::get_hardware_random;
 use super::{
     ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, EURO_LUCKY_MODULUS, EURO_MAIN_MODULUS,
     EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT, HANGUL_BASE_CODE_POINT, HANGUL_SHIFTS,
@@ -15,10 +11,16 @@ use super::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_util::{
         checked_add_one_u8, checked_add_one_u64, checked_add_one_usize, galaxy_coord,
-        glyph_from_low_nibble, split_u64_to_u32_pair,
+        glyph_from_low_nibble,
     },
 };
-use core::{char::from_u32, ops::Mul as _};
+cfg_select! {
+    target_arch = "x86_64" => {
+        use super::{BYTE_BITS, hardware_rng::get_hardware_random};
+    }
+    _ => {}
+}
+use core::{char::from_u32, error::Error, ops::Mul as NumericMul};
 use std::io::Error as IoError;
 #[derive(Default)]
 pub struct RandomDataSet {
@@ -66,6 +68,14 @@ pub struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
+impl From<(u64, u8)> for RandomBitBuffer {
+    fn from((value, bits_remaining): (u64, u8)) -> Self {
+        Self {
+            bits_remaining,
+            value,
+        }
+    }
+}
 impl RandomBitBuffer {
     pub const fn bits_remaining(self) -> u8 {
         self.bits_remaining
@@ -81,20 +91,20 @@ impl RandomBitBuffer {
         self.bits_remaining = shift;
         Ok(self.value >> shift)
     }
-    pub const fn new(value: u64, bits_remaining: u8) -> Self {
-        Self {
-            bits_remaining,
-            value,
-        }
-    }
     pub const fn value(self) -> u64 {
         self.value
     }
 }
-type SupplementalProvider<'a> = dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'a;
-struct RandomDataBuilder<'a, 'b> {
+type SupplementalProvider<'provider> =
+    dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider;
+pub struct GenerationRequest<'provider_ref, 'provider_env> {
+    pub next_supp:
+        &'provider_ref mut (dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider_env),
+    pub num: u64,
+}
+struct RandomDataBuilder<'provider_ref, 'provider_env> {
     data: RandomDataSet,
-    next_supp: &'a mut SupplementalProvider<'b>,
+    next_supp: &'provider_ref mut SupplementalProvider<'provider_env>,
     num: u64,
     supplemental: Option<RandomBitBuffer>,
 }
@@ -108,9 +118,11 @@ impl RandomDataBuilder<'_, '_> {
         Ok(self.data)
     }
     fn fill_coords(&mut self) {
-        let (upper_32_bits, lower_32_bits) = split_u64_to_u32_pair(self.num);
-        let upper_ratio = f64::from(upper_32_bits).mul(U32_MAX_INV);
-        let lower_ratio = f64::from(lower_32_bits).mul(U32_MAX_INV);
+        let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
+        let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
+        let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
+        let upper_ratio = NumericMul::mul(f64::from(upper_32_bits), U32_MAX_INV);
+        let lower_ratio = NumericMul::mul(f64::from(lower_32_bits), U32_MAX_INV);
         self.data.kor_coords = (
             5.504_167_f64.mul_add(upper_ratio, 33.112_500),
             7.263_056_f64.mul_add(lower_ratio, 124.609_722),
@@ -159,11 +171,10 @@ impl RandomDataBuilder<'_, '_> {
         Ok(())
     }
     fn fill_lucky_stars(&mut self) -> Result<()> {
-        let lucky_star_base = if let Some(supp) = self.supplemental.as_ref() {
-            supp.value()
-        } else {
-            self.num
-        };
+        let lucky_star_base = self
+            .supplemental
+            .as_ref()
+            .map_or(self.num, |supp| supp.value());
         let mut lucky_star_source = lucky_star_base.reverse_bits();
         'lucky_star_loop: loop {
             for byte in lucky_star_source.to_be_bytes() {
@@ -252,27 +263,34 @@ impl RandomDataBuilder<'_, '_> {
         Ok(supplemental)
     }
 }
-pub fn generate_random_data_from_num(
-    num: u64,
-    next_supp: &mut (dyn FnMut(&'static str) -> Result<RandomBitBuffer> + '_),
-) -> Result<RandomDataSet> {
-    RandomDataBuilder {
-        data: RandomDataSet {
-            num_64: num,
-            ..Default::default()
-        },
-        next_supp,
-        num,
-        supplemental: None,
+impl TryFrom<GenerationRequest<'_, '_>> for RandomDataSet {
+    type Error = Box<dyn Error + Send + Sync>;
+    fn try_from(request: GenerationRequest<'_, '_>) -> Result<Self> {
+        RandomDataBuilder {
+            data: Self {
+                num_64: request.num,
+                ..Default::default()
+            },
+            next_supp: request.next_supp,
+            num: request.num,
+            supplemental: None,
+        }
+        .build()
     }
-    .build()
 }
-#[cfg(target_arch = "x86_64")]
-pub fn generate_random_data() -> Result<RandomDataSet> {
-    let num = get_hardware_random()?;
-    let mut next_supp =
-        |_reason: &'static str| Ok(RandomBitBuffer::new(get_hardware_random()?, BYTE_BITS));
-    generate_random_data_from_num(num, &mut next_supp)
+cfg_select! {
+    target_arch = "x86_64" => {
+        pub fn generate_random_data() -> Result<RandomDataSet> {
+            let num = get_hardware_random()?;
+            let mut next_supp =
+                |_reason: &'static str| Ok((get_hardware_random()?, BYTE_BITS).into());
+            RandomDataSet::try_from(GenerationRequest {
+                next_supp: &mut next_supp,
+                num,
+            })
+        }
+    }
+    _ => {}
 }
 fn fill_data_fields_from_u64(value: u64, data: &mut RandomDataSet) {
     for byte in value.to_be_bytes() {

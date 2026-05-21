@@ -1,4 +1,7 @@
-use super::{HeadResponse, MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, error, find_date_header_value};
+use super::{
+    HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, error,
+    find_date_header_value,
+};
 use alloc::{ffi::CString, string::String, vec::Vec};
 use core::{
     ffi::{CStr, c_char, c_int, c_long, c_void},
@@ -107,7 +110,12 @@ impl EasyHandle {
     }
 }
 impl Client {
-    pub(super) fn fetch_head(&self, url: &str, context: &str) -> Result<HeadResponse> {
+    pub(super) fn fetch_head(
+        &self,
+        url: &str,
+        context: &str,
+        parse_http_date: ParseHttpDate,
+    ) -> Result<HeadResponse> {
         static INIT: OnceLock<CurlCode> = OnceLock::new();
         // SAFETY: curl_global_init may be called once here before any easy handles are used.
         let init_code = *INIT.get_or_init(|| unsafe { curl_global_init(CURL_GLOBAL_DEFAULT) });
@@ -174,23 +182,18 @@ impl Client {
             .rsplit(|byte| *byte == b'\n')
             .find_map(find_date_header_value)
         else {
-            return Err(super::missing_date(context));
+            return Err(super::TimeError::header_not_found(format!(
+                "{context} 응답에서 Date"
+            )));
         };
-        let mut date_header = String::new();
-        date_header.try_reserve(date_header_raw.len()).map_err(|source| {
-            error(
-                context,
-                format!("Date header 메모리 확보 실패: {source}"),
-            )
-        })?;
-        date_header.push_str(date_header_raw);
+        let server_time = parse_http_date(date_header_raw)?;
         let rtt = response_received_inst
             .saturating_duration_since(request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
-            date_header,
             response_received_inst,
             rtt,
+            server_time,
         })
     }
 }
@@ -259,29 +262,21 @@ unsafe extern "C" fn write_vec_callback(
     if len == 0 {
         return 0;
     }
-    // SAFETY: libcurl invokes this callback with a readable payload pointer and
-    // the userdata pointer configured for the active response buffer.
-    let Some((bytes, target)) = (unsafe { callback_payload(ptr, len, userdata) }) else {
+    let Some(payload_head) = NonNull::new(ptr.cast::<u8>()) else {
         return 0;
     };
+    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlBuffer>()) else {
+        return 0;
+    };
+    let payload_ptr = NonNull::slice_from_raw_parts(payload_head, len);
+    // SAFETY: libcurl passes a readable buffer with len bytes for this callback.
+    let bytes = unsafe { payload_ptr.as_ref() };
+    // SAFETY: userdata is the CurlBuffer pointer configured before curl_easy_perform.
+    let target = unsafe { target_ptr.as_mut() };
     if !target.append(bytes) {
         return 0;
-    };
+    }
     len
-}
-unsafe fn callback_payload<'a>(
-    ptr: *mut c_char,
-    len: usize,
-    userdata: *mut c_void,
-) -> Option<(&'a [u8], &'a mut CurlBuffer)> {
-    let bytes_ptr = NonNull::new(ptr.cast::<u8>())?;
-    let mut target_ptr = NonNull::new(userdata.cast::<CurlBuffer>())?;
-    let bytes_ptr = NonNull::slice_from_raw_parts(bytes_ptr, len);
-    // SAFETY: libcurl passes a valid buffer with len bytes for the duration of this callback.
-    let bytes = unsafe { bytes_ptr.as_ref() };
-    // SAFETY: userdata is the target buffer pointer set before curl_easy_perform.
-    let target = unsafe { target_ptr.as_mut() };
-    Some((bytes, target))
 }
 fn tcp_timeout_secs() -> c_long {
     let Ok(seconds) = c_long::try_from(TCP_TIMEOUT.as_secs()) else {

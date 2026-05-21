@@ -1,8 +1,8 @@
 use super::{
     Result, TWO_POW_32_F64, U64_UNIT_SCALE, hardware_rng::get_hardware_random,
-    input::parse_regular_f64, input::read_parsed_value, random_util::split_u64_to_u32_pair,
+    input::parse_regular_f64, input::read_parsed_value,
 };
-use core::ops::{Mul as _, Sub as _};
+use core::ops::{Mul as NumericMul, Sub as NumericSub};
 use std::io::{Error as IoError, Write};
 #[derive(Clone, Copy)]
 pub enum RandomNumberMode {
@@ -92,14 +92,17 @@ pub fn generate_random_number(
                 writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
             };
             let random_u64 = get_hardware_random()? ^ seed_modifier;
-            let (upper_32, lower_32) = split_u64_to_u32_pair(random_u64);
-            let scale = f64::from(upper_32)
-                .mul_add(TWO_POW_32_F64, f64::from(lower_32))
-                .mul(U64_UNIT_SCALE);
+            let [b0, b1, b2, b3, b4, b5, b6, b7] = random_u64.to_be_bytes();
+            let upper_32 = u32::from_be_bytes([b0, b1, b2, b3]);
+            let lower_32 = u32::from_be_bytes([b4, b5, b6, b7]);
+            let scale = NumericMul::mul(
+                f64::from(upper_32).mul_add(TWO_POW_32_F64, f64::from(lower_32)),
+                U64_UNIT_SCALE,
+            );
             let result = if min_value.to_bits() == max_value.to_bits() {
                 min_value
             } else {
-                scale.mul_add(max_value.sub(min_value), min_value)
+                scale.mul_add(NumericSub::sub(max_value, min_value), min_value)
             };
             writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}")?;
         }

@@ -1,5 +1,5 @@
 use crate::write_line_ignored;
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void},
     mem,
@@ -7,6 +7,15 @@ use core::{
     ptr::{NonNull, null},
 };
 use std::io;
+macro_rules! load_x11_symbol {
+    ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
+        let symbol = $library.symbol_address($symbol_name)?;
+        // SAFETY: the requested X11/XTest symbol name matches this concrete function pointer type.
+        Ok::<$symbol_type, InputError>(unsafe {
+            mem::transmute::<*mut c_void, $symbol_type>(symbol.as_ptr())
+        })
+    }};
+}
 const BUTTON_LEFT: c_uint = 1;
 const DL_NOW: c_int = 2;
 const KEY_PRESS: c_int = 1;
@@ -86,25 +95,16 @@ impl Library {
             }
             last_error = Some(dl_error_message());
         }
-        match last_error {
-            Some(err) => Err(err),
-            None => Err(Cow::Borrowed("dynamic loader 후보가 없습니다.")),
-        }
+        let Some(err) = last_error else {
+            return Err(Cow::Borrowed("dynamic loader 후보가 없습니다."));
+        };
+        Err(err)
     }
     fn symbol_address(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
         // SAFETY: self.handle is a live dlopen handle and name is NUL-terminated.
         let symbol = unsafe { dlsym(self.handle.as_ptr(), name.as_ptr()) };
         NonNull::new(symbol).ok_or_else(dl_error_message)
     }
-}
-macro_rules! load_x11_symbol {
-    ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
-        let symbol = $library.symbol_address($symbol_name)?;
-        // SAFETY: the requested X11/XTest symbol name matches this concrete function pointer type.
-        Ok::<$symbol_type, InputError>(unsafe {
-            mem::transmute::<*mut c_void, $symbol_type>(symbol.as_ptr())
-        })
-    }};
 }
 impl X11Api {
     fn fake_button(&self, display: NonNull<Display>, state: c_int) -> InputResult<()> {
@@ -137,14 +137,14 @@ impl X11Api {
     fn lookup_f5_keycode(&self, display: NonNull<Display>) -> InputResult<XKeycode> {
         // SAFETY: display is a live X11 Display and XK_F5 is a valid keysym constant.
         let keycode = unsafe { (self.keycode)(display.as_ptr(), XK_F5) };
-        XKeycode::new(keycode).ok_or_else(|| Cow::Borrowed("F5 keycode 조회 실패"))
+        XKeycode::new(keycode).ok_or(Cow::Borrowed("F5 keycode 조회 실패"))
     }
     fn open_display(&self) -> InputResult<NonNull<Display>> {
         // SAFETY: null asks XOpenDisplay to read DISPLAY from the process environment.
         let display_ptr = unsafe { (self.open_display)(null()) };
-        NonNull::new(display_ptr).ok_or_else(|| {
-            Cow::Borrowed("XOpenDisplay 실패: DISPLAY 환경 또는 X11 세션을 확인하세요.")
-        })
+        NonNull::new(display_ptr).ok_or(Cow::Borrowed(
+            "XOpenDisplay 실패: DISPLAY 환경 또는 X11 세션을 확인하세요.",
+        ))
     }
 }
 impl Drop for PreparedX11Input {
@@ -279,10 +279,9 @@ impl PreparedInput {
     }
 }
 fn send_fresh(action: InputAction) -> InputResult<()> {
-    PreparedX11Input::open(action).and_then(|mut prepared| {
-        prepared.send(action).map_err(|error| match error {
-            PreparedSendError::Partial(source) | PreparedSendError::RetrySafe(source) => source,
-        })
+    let mut prepared = PreparedX11Input::open(action)?;
+    prepared.send(action).map_err(|error| match error {
+        PreparedSendError::Partial(source) | PreparedSendError::RetrySafe(source) => source,
     })
 }
 fn dl_error_message() -> InputError {

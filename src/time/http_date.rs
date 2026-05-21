@@ -202,18 +202,22 @@ fn parse_i32_token(raw: &str, err: &'static str) -> Result<i32> {
 fn parse_u32_token(raw: &str, err: &'static str) -> Result<u32> {
     parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))
 }
-fn next_date_part<'a>(
-    parts: &mut impl Iterator<Item = &'a str>,
+fn next_date_part<'part>(
+    parts: &mut impl Iterator<Item = &'part str>,
     err: &'static str,
-) -> Result<&'a str> {
+) -> Result<&'part str> {
     parts.next().ok_or_else(|| TimeError::parse(err))
 }
-fn strip_date_suffix<'a>(raw: &'a str, suffix: char, err: &'static str) -> Result<&'a str> {
+fn strip_date_suffix<'date>(
+    raw: &'date str,
+    suffix: char,
+    err: &'static str,
+) -> Result<&'date str> {
     raw.strip_suffix(suffix)
         .ok_or_else(|| TimeError::parse(err))
 }
-fn ensure_parts_exhausted<'a>(
-    parts: &mut impl Iterator<Item = &'a str>,
+fn ensure_parts_exhausted<'part>(
+    parts: &mut impl Iterator<Item = &'part str>,
     err: &'static str,
 ) -> Result<()> {
     if parts.next().is_none() {

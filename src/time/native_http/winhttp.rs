@@ -1,13 +1,17 @@
 use super::{
-    HeadResponse, MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, error, find_date_header_value,
-    missing_date,
+    HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, TimeError, error,
+    find_date_header_value,
 };
 use alloc::{string::String, vec::Vec};
 use core::{
     ffi::c_void,
     ptr::{NonNull, null, null_mut},
 };
-use std::{ffi::OsStr, os::windows::ffi::OsStrExt as _, time::Instant};
+use std::{
+    ffi::OsStr,
+    os::windows::ffi::OsStrExt as WindowsOsStrExt,
+    time::{Instant, SystemTime},
+};
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTPS_SCHEME_PREFIX: &str = "https://";
@@ -114,7 +118,12 @@ impl Client {
         let raw_connect = unsafe { WinHttpConnect(session.as_ptr(), host.as_ptr(), port, 0) };
         self.non_null_handle(raw_connect, "WinHttpConnect", context)
     }
-    pub(super) fn fetch_head(&self, url: &str, context: &str) -> Result<HeadResponse> {
+    pub(super) fn fetch_head(
+        &self,
+        url: &str,
+        context: &str,
+        parse_http_date: ParseHttpDate,
+    ) -> Result<HeadResponse> {
         let target = self.request_target(url, context)?;
         let user_agent = wide(concat!("srg/", env!("CARGO_PKG_VERSION")), context)?;
         let host_wide = wide(&target.host, context)?;
@@ -137,14 +146,14 @@ impl Client {
         self.send_head(&request, context)?;
         self.receive_response(&request, context)?;
         let response_received_inst = Instant::now();
-        let date_header = self.query_date_header(&request, context)?;
+        let server_time = self.query_server_time(&request, context, parse_http_date)?;
         let rtt = response_received_inst
             .saturating_duration_since(request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
-            date_header,
             response_received_inst,
             rtt,
+            server_time,
         })
     }
     fn last_error(&self, operation: &str, context: &str) -> super::TimeError {
@@ -198,10 +207,17 @@ impl Client {
             return Err(error(context, "WinHTTP timeout 변환 실패"));
         };
         // SAFETY: session is a valid WinHTTP session handle.
-        unsafe { WinHttpSetTimeouts(session.as_ptr(), timeout, timeout, timeout, timeout) };
+        unsafe {
+            WinHttpSetTimeouts(session.as_ptr(), timeout, timeout, timeout, timeout);
+        }
         Ok(session)
     }
-    fn query_date_header(&self, request: &Handle, context: &str) -> Result<String> {
+    fn query_server_time(
+        &self,
+        request: &Handle,
+        context: &str,
+        parse_http_date: ParseHttpDate,
+    ) -> Result<SystemTime> {
         let mut bytes = 0_u32;
         let mut index = 0_u32;
         // SAFETY: request is valid; this first call probes the required buffer size.
@@ -216,7 +232,9 @@ impl Client {
             )
         };
         if probe_ok != 0_i32 {
-            return Err(missing_date(context));
+            return Err(TimeError::header_not_found(format!(
+                "{context} 응답에서 Date"
+            )));
         }
         let last_error_code = self.last_error_code();
         if last_error_code != ERROR_INSUFFICIENT_BUFFER {
@@ -250,23 +268,26 @@ impl Client {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
         while buffer.pop_if(|value| *value == 0).is_some() {}
-        let raw = String::from_utf16_lossy(&buffer);
-        let Some(date_header_raw) = raw
-            .lines()
-            .rev()
-            .find_map(|line| find_date_header_value(line.as_bytes()))
-        else {
-            return Err(missing_date(context));
-        };
-        let mut date_header = String::new();
-        date_header.try_reserve(date_header_raw.len()).map_err(|source| {
-            error(
-                context,
-                format!("Date header 메모리 확보 실패: {source}"),
-            )
-        })?;
-        date_header.push_str(date_header_raw);
-        Ok(date_header)
+        for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')).rev() {
+            let line = raw_line
+                .strip_suffix(&[u16::from(b'\r')])
+                .unwrap_or(raw_line);
+            let Some((prefix, _value)) = line.split_at_checked(5) else {
+                continue;
+            };
+            if !prefix.iter().zip(b"date:").all(|(&unit, &byte)| {
+                u8::try_from(unit).is_ok_and(|converted| converted.eq_ignore_ascii_case(&byte))
+            }) {
+                continue;
+            }
+            let line_text = String::from_utf16_lossy(line);
+            if let Some(date_header_raw) = find_date_header_value(line_text.as_bytes()) {
+                return parse_http_date(date_header_raw);
+            }
+        }
+        Err(TimeError::header_not_found(format!(
+            "{context} 응답에서 Date"
+        )))
     }
     fn receive_response(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is a valid request handle and no reserved pointer is required.
@@ -376,7 +397,7 @@ fn wide(value: &str, context: &str) -> Result<Vec<u16>> {
     let mut out = Vec::new();
     out.try_reserve(capacity)
         .map_err(|source| error(context, format!("wide 문자열 메모리 확보 실패: {source}")))?;
-    out.extend(OsStr::new(value).encode_wide());
+    out.extend(<OsStr as WindowsOsStrExt>::encode_wide(OsStr::new(value)));
     out.push(0);
     Ok(out)
 }

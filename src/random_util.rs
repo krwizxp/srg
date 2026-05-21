@@ -19,13 +19,6 @@ pub fn glyph_from_low_nibble(value: u64) -> Option<char> {
         .get(usize::from(low_u8_from_u64(value & NIBBLE_MASK_U64)))
         .copied()
 }
-pub const fn split_u64_to_u32_pair(value: u64) -> (u32, u32) {
-    let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
-    (
-        u32::from_be_bytes([b0, b1, b2, b3]),
-        u32::from_be_bytes([b4, b5, b6, b7]),
-    )
-}
 pub const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     let lower_bound = value.wrapping_sub(SUB);
     let upper_bound = value.wrapping_add(ADD);

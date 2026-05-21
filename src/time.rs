@@ -1,20 +1,26 @@
 use self::{
+    activity::{Activity, CountdownDecision},
     address::ParsedServer,
     diagnostic::{Result, TimeError, TimeErrorKind},
     sample::{NetworkContext, NetworkContextRequest, fetch_server_time_sample},
     util::blend_weighted_nanos,
 };
+cfg_select! {
+    target_os = "windows" => {
+        use self::timer_resolution::{HighResTimerGuard, HighResTimerRequest, TARGET_PERIOD_MS};
+    }
+    _ => {}
+}
 use crate::write_line_ignored;
 use alloc::fmt;
-#[cfg(target_os = "windows")]
-use core::result::Result as StdResult;
-use core::{fmt::Write as _, ops::Mul as _, time::Duration};
+use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, time::Duration};
 use std::{
-    io::{self, BufRead as _, Result as IoResult},
+    io::{self, BufRead as IoBufRead, Result as IoResult},
     sync::mpsc,
     thread,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
+mod activity;
 pub mod address;
 pub mod diagnostic;
 mod display;
@@ -22,6 +28,12 @@ mod http_date;
 mod native_http;
 mod sample;
 mod util;
+cfg_select! {
+    target_os = "windows" => {
+        mod timer_resolution;
+    }
+    _ => {}
+}
 cfg_select! {
     target_os = "linux" => {
         mod linux_input;
@@ -95,40 +107,6 @@ const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
-cfg_select! {
-    target_os = "windows" => {
-        const TIMERR_NOERROR: u32 = 0;
-        const TARGET_PERIOD_MS: u32 = 1;
-        pub struct HighResTimerGuard;
-        struct HighResTimerRequest;
-        #[link(name = "winmm")]
-        unsafe extern "system" {
-            fn timeBeginPeriod(u_period: u32) -> u32;
-            fn timeEndPeriod(u_period: u32) -> u32;
-        }
-        impl TryFrom<HighResTimerRequest> for HighResTimerGuard {
-            type Error = ();
-            fn try_from(_value: HighResTimerRequest) -> StdResult<Self, Self::Error> {
-                // SAFETY: `timeBeginPeriod` is a WinMM FFI call with a plain
-                // integer input and does not impose additional aliasing or
-                // lifetime requirements.
-                if unsafe { timeBeginPeriod(TARGET_PERIOD_MS) } == TIMERR_NOERROR {
-                    Ok(Self)
-                } else {
-                    Err(())
-                }
-            }
-        }
-        impl Drop for HighResTimerGuard {
-            fn drop(&mut self) {
-                // SAFETY: This releases the timer period requested when the guard was
-                // created using the same value on the same process.
-                unsafe { timeEndPeriod(TARGET_PERIOD_MS) };
-            }
-        }
-    }
-    _ => {}
-}
 #[derive(Clone, Copy, Debug)]
 pub struct TimeSample {
     pub response_received_inst: Instant,
@@ -154,46 +132,60 @@ impl From<TriggerAction> for native_input::InputAction {
         }
     }
 }
-pub struct AppState {
-    pub baseline_rtt: Option<Duration>,
-    pub baseline_rtt_attempts: usize,
-    pub baseline_rtt_next_sample_at: Instant,
-    pub baseline_rtt_samples: [TimeSample; NUM_SAMPLES],
-    pub baseline_rtt_valid_count: usize,
-    pub calibration_failure_count: u32,
-    #[cfg(target_os = "windows")]
-    pub high_res_timer_guard: Option<HighResTimerGuard>,
+pub struct ServerTimeSession {
     pub host: ParsedServer,
-    pub last_sample: Option<TimeSample>,
-    pub live_rtt: Option<Duration>,
-    pub next_full_sync_at: Instant,
-    pub server_time: Option<ServerTime>,
+    pub now: Instant,
     pub target_time: Option<SystemTime>,
     pub trigger_action: Option<TriggerAction>,
 }
-struct LoopRuntime<'a> {
-    err: &'a mut dyn io::Write,
-    network_context: &'a mut NetworkContext,
-    out: &'a mut dyn io::Write,
-    prepared_input: &'a mut native_input::PreparedInput,
+struct AppState {
+    baseline_rtt: Option<Duration>,
+    baseline_rtt_attempts: usize,
+    baseline_rtt_next_sample_at: Instant,
+    baseline_rtt_samples: [TimeSample; NUM_SAMPLES],
+    baseline_rtt_valid_count: usize,
+    calibration_failure_count: u32,
+    #[cfg(target_os = "windows")]
+    high_res_timer_guard: Option<HighResTimerGuard>,
+    host: ParsedServer,
+    last_sample: Option<TimeSample>,
+    live_rtt: Option<Duration>,
+    next_full_sync_at: Instant,
+    server_time: Option<ServerTime>,
+    target_time: Option<SystemTime>,
+    trigger_action: Option<TriggerAction>,
 }
-#[derive(Clone, Copy, Debug)]
-enum Activity {
-    CalibrateOnTick,
-    FinalCountdown { target_time: SystemTime },
-    Finished,
-    MeasureBaselineRtt,
-    Predicting,
-    Retrying { retry_at: Instant },
+struct LoopRuntime<'runtime> {
+    err: &'runtime mut dyn io::Write,
+    network_context: &'runtime mut NetworkContext,
+    out: &'runtime mut dyn io::Write,
+    prepared_input: &'runtime mut native_input::PreparedInput,
 }
-enum CountdownDecision {
-    TriggerLate,
-    TriggerWithRemaining(Duration),
-    Wait,
-}
-impl Activity {
-    const fn is_final_countdown(&self) -> bool {
-        matches!(self, Self::FinalCountdown { .. })
+impl ServerTimeSession {
+    pub fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
+        let baseline_placeholder = TimeSample {
+            response_received_inst: self.now,
+            rtt: Duration::ZERO,
+            server_time: UNIX_EPOCH,
+        };
+        let mut app_state = AppState {
+            baseline_rtt: None,
+            baseline_rtt_attempts: 0,
+            baseline_rtt_next_sample_at: self.now,
+            baseline_rtt_samples: [baseline_placeholder; NUM_SAMPLES],
+            baseline_rtt_valid_count: 0,
+            calibration_failure_count: 0,
+            #[cfg(target_os = "windows")]
+            high_res_timer_guard: None,
+            host: self.host,
+            last_sample: None,
+            live_rtt: None,
+            next_full_sync_at: self.now,
+            server_time: None,
+            target_time: self.target_time,
+            trigger_action: self.trigger_action,
+        };
+        app_state.run_loop(out, err)
     }
 }
 impl AppState {
@@ -210,11 +202,11 @@ impl AppState {
         self.baseline_rtt_valid_count = 0;
         self.baseline_rtt_next_sample_at = now;
     }
-    fn finish_baseline_rtt_measurement<'a>(
+    fn finish_baseline_rtt_measurement<'message>(
         &mut self,
         sample_count: usize,
-        msg_buf: &'a mut String,
-    ) -> (Activity, Option<&'a str>) {
+        msg_buf: &'message mut String,
+    ) -> (Activity, Option<&'message str>) {
         self.baseline_rtt_attempts = 0;
         self.baseline_rtt_valid_count = 0;
         if sample_count == 0 {
@@ -267,15 +259,12 @@ impl AppState {
         );
         (Activity::CalibrateOnTick, Some(msg_buf))
     }
-    fn handle_calibrate_on_tick<'a>(
+    fn handle_calibrate_on_tick<'message>(
         &mut self,
-        _msg_buf: &'a mut str,
+        _msg_buf: &'message mut str,
         net_ctx: &mut NetworkContext,
-    ) -> (Activity, Option<&'a str>) {
-        let current_sample = if let Ok(sample) = fetch_server_time_sample(&self.host, net_ctx) {
-            self.calibration_failure_count = 0;
-            sample
-        } else {
+    ) -> (Activity, Option<&'message str>) {
+        let Ok(current_sample) = fetch_server_time_sample(&self.host, net_ctx) else {
             self.calibration_failure_count = self.calibration_failure_count.saturating_add(1);
             if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
                 return transition_to_retry(
@@ -284,6 +273,7 @@ impl AppState {
             }
             return (Activity::CalibrateOnTick, None);
         };
+        self.calibration_failure_count = 0;
         if let Some(prev_sample) = self.last_sample
             && let Some(baseline_rtt) = self.baseline_rtt
             && let Ok(prev_dur) = prev_sample.server_time.duration_since(UNIX_EPOCH)
@@ -325,14 +315,14 @@ impl AppState {
         self.last_sample = Some(current_sample);
         (Activity::CalibrateOnTick, None)
     }
-    fn handle_final_countdown<'a>(
+    fn handle_final_countdown<'message>(
         &mut self,
         target_time: SystemTime,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         net_ctx: &mut NetworkContext,
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         let sample = match fetch_server_time_sample(&self.host, net_ctx) {
             Ok(sample_value) => sample_value,
             Err(fetch_err) => {
@@ -395,14 +385,14 @@ impl AppState {
             CountdownDecision::Wait => (Activity::FinalCountdown { target_time }, None),
         }
     }
-    fn handle_final_countdown_fetch_error<'a>(
+    fn handle_final_countdown_fetch_error<'message>(
         &self,
         target_time: SystemTime,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         err: &TimeError,
         prepared_input: &mut native_input::PreparedInput,
         stderr: &mut dyn io::Write,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         if let Some(st) = self.server_time.as_ref() {
             let now = Instant::now();
             let current_server_time = st.current_server_time_at(now);
@@ -449,13 +439,13 @@ impl AppState {
         append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", err);
         (Activity::FinalCountdown { target_time }, Some(msg_buf))
     }
-    fn handle_measure_baseline_rtt<'a>(
+    fn handle_measure_baseline_rtt<'message>(
         &mut self,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         net_ctx: &mut NetworkContext,
         now: Instant,
         out: &mut dyn io::Write,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         if self.baseline_rtt_attempts == 0 {
             self.begin_baseline_rtt_measurement(now, out);
         }
@@ -499,11 +489,11 @@ impl AppState {
         }
         self.finish_baseline_rtt_measurement(self.baseline_rtt_valid_count, msg_buf)
     }
-    fn handle_predicting<'a>(
+    fn handle_predicting<'message>(
         &mut self,
-        _msg_buf: &'a mut String,
+        _msg_buf: &'message mut String,
         now: Instant,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         let Some(server_time) = self.server_time.as_ref() else {
             return (Activity::MeasureBaselineRtt, None);
         };
@@ -531,13 +521,13 @@ impl AppState {
             (Activity::Predicting, None)
         }
     }
-    fn next_activity<'a>(
+    fn next_activity<'message>(
         &mut self,
         activity: &Activity,
-        message_buffer: &'a mut String,
+        message_buffer: &'message mut String,
         now: Instant,
         runtime: &mut LoopRuntime<'_>,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         match *activity {
             Activity::MeasureBaselineRtt => self.handle_measure_baseline_rtt(
                 message_buffer,
@@ -569,18 +559,15 @@ impl AppState {
             }
         }
     }
-    pub(super) fn run_loop(
-        &mut self,
-        out: &mut dyn io::Write,
-        err: &mut dyn io::Write,
-    ) -> Result<()> {
+    fn run_loop(&mut self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         out.write_all("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)\n".as_bytes())?;
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || -> IoResult<()> {
             let mut line = Vec::new();
             line.try_reserve(ENTER_BUFFER_CAPACITY)
                 .map_err(io::Error::other)?;
-            io::stdin().lock().read_until(b'\n', &mut line)?;
+            let mut stdin_lock = io::stdin().lock();
+            IoBufRead::read_until(&mut stdin_lock, b'\n', &mut line)?;
             match tx.send(()) {
                 Ok(()) | Err(_) => {}
             }
@@ -667,13 +654,17 @@ impl AppState {
         }
         Ok(())
     }
-    #[cfg(windows)]
-    fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
-        if next_activity.is_final_countdown() {
-            if self.high_res_timer_guard.is_none() {
-                if let Ok(guard) = HighResTimerGuard::try_from(HighResTimerRequest) {
-                    self.high_res_timer_guard = Some(guard);
-                } else {
+    cfg_select! {
+        windows => {
+            fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
+                if !next_activity.is_final_countdown() {
+                    self.high_res_timer_guard = None;
+                    return;
+                }
+                if self.high_res_timer_guard.is_some() {
+                    return;
+                }
+                let Ok(guard) = HighResTimerGuard::try_from(HighResTimerRequest) else {
                     write_line_ignored(
                         err,
                         format_args!(
@@ -684,11 +675,12 @@ impl AppState {
                             TARGET_PERIOD_MS
                         ),
                     );
-                }
+                    return;
+                };
+                self.high_res_timer_guard = Some(guard);
             }
-        } else {
-            self.high_res_timer_guard = None;
         }
+        _ => {}
     }
     fn sync_prepared_input_state(
         &self,
@@ -710,13 +702,13 @@ impl AppState {
             prepared_input.reset();
         }
     }
-    fn trigger_and_finish<'a>(
+    fn trigger_and_finish<'message>(
         &self,
-        msg_buf: &'a mut String,
+        msg_buf: &'message mut String,
         log_message: fmt::Arguments,
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
-    ) -> (Activity, Option<&'a str>) {
+    ) -> (Activity, Option<&'message str>) {
         if let Some(action) = self.trigger_action.map(native_input::InputAction::from) {
             prepared_input.send(action, err);
         }
@@ -725,7 +717,7 @@ impl AppState {
     }
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
-    duration.as_secs_f64().mul(MILLIS_PER_SECOND_F64)
+    NumericMul::mul(duration.as_secs_f64(), MILLIS_PER_SECOND_F64)
 }
 fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display) {
     append_fmt(target, format_args!("{prefix}{err}"));
@@ -747,8 +739,9 @@ fn decide_countdown_action(
     }
 }
 fn append_fmt(target: &mut String, args: fmt::Arguments<'_>) {
-    let result = target.write_fmt(args);
-    debug_assert!(result.is_ok(), "writing to String should not fail");
+    match FmtWrite::write_fmt(target, args) {
+        Ok(()) | Err(_) => {}
+    }
 }
 fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
     let now = Instant::now();

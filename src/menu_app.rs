@@ -1,23 +1,27 @@
 use crate::{
-    BYTE_BITS, FILE_NAME, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64, KST_SECS_PER_MINUTE_U64,
-    MENU, Result,
-    file_output::{ensure_file_exists_and_reopen, validate_safe_output_file_path},
+    BUFFER_SIZE, BYTE_BITS, FILE_NAME, IS_TERMINAL, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64,
+    KST_SECS_PER_MINUTE_U64, MENU, Result,
+    file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
-    random_data::{RandomBitBuffer, generate_random_data_from_num},
-    random_output::persist_and_print_random_data,
+    output::{format_data_into_buffer, prefix_slice},
+    random_data::{GenerationRequest, RandomBitBuffer, RandomDataSet},
     random_util::checked_add_one_usize,
     time,
 };
-#[cfg(target_arch = "x86_64")]
-use crate::{
-    batch::regenerate_with_count,
-    file_output::boxed_other_with_source,
-    hardware_rng::{RNG_SOURCE, RngSource, get_hardware_random},
-    input::{LadderEntryMode, read_ladder_entries},
-    random_number::{RandomNumberMode, generate_random_number, random_bounded},
-};
-#[cfg(target_arch = "x86_64")]
-use core::array::from_fn;
+cfg_select! {
+    target_arch = "x86_64" => {
+        use crate::{
+            batch::regenerate_with_count,
+            file_output::boxed_other_with_source,
+            hardware_rng::{RNG_SOURCE, RngSource, get_hardware_random},
+            input::{LadderEntryMode, read_ladder_entries},
+            output::write_slice_to_console,
+            random_number::{RandomNumberMode, generate_random_number, random_bounded},
+        };
+        use core::array::from_fn;
+    }
+    _ => {}
+}
 use core::{result::Result as StdResult, time::Duration};
 use std::{
     fs,
@@ -194,7 +198,10 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        ensure_file_exists_and_reopen(&self.file_mutex)?;
+        if !Path::new(FILE_NAME).try_exists()? {
+            *lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? =
+                open_or_create_file()?;
+        }
         writeln!(out, "\nnum_64/supp 수동 입력 생성 모드")?;
         self.input_buffer.clear();
         #[cfg(target_arch = "x86_64")]
@@ -231,10 +238,33 @@ impl MenuApp {
                 out,
                 err,
             )?;
-            Ok(RandomBitBuffer::new(supp, BYTE_BITS))
+            Ok((supp, BYTE_BITS).into())
         };
-        let data = generate_random_data_from_num(*num_64_slot, &mut next_supp)?;
-        persist_and_print_random_data(&self.file_mutex, &data)?;
+        let data = RandomDataSet::try_from(GenerationRequest {
+            next_supp: &mut next_supp,
+            num: *num_64_slot,
+        })?;
+        let mut buffer = [0_u8; BUFFER_SIZE];
+        let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
+        {
+            let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
+            Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
+            Write::flush(&mut *file_guard)?;
+        }
+        let console_len = if *IS_TERMINAL {
+            format_data_into_buffer(&data, &mut buffer, true)?
+        } else {
+            file_len
+        };
+        let console_slice = prefix_slice(&buffer, console_len)?;
+        #[cfg(target_arch = "x86_64")]
+        write_slice_to_console(console_slice)?;
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            let mut stdout_lock = stdout().lock();
+            Write::write_all(&mut stdout_lock, console_slice)?;
+            Write::flush(&mut stdout_lock)?;
+        }
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]
@@ -284,54 +314,20 @@ impl MenuApp {
             let target_time = self.read_target_time(out)?;
             let trigger_action = self.read_trigger_action(out, target_time)?;
             let now = Instant::now();
-            let baseline_placeholder = time::TimeSample {
-                response_received_inst: now,
-                rtt: Duration::ZERO,
-                server_time: UNIX_EPOCH,
-            };
-            let mut app_state = cfg_select! {
-                windows => {
-                    time::AppState {
-                        host,
-                        target_time,
-                        trigger_action,
-                        server_time: None,
-                        baseline_rtt: None,
-                        baseline_rtt_samples: [baseline_placeholder; time::NUM_SAMPLES],
-                        baseline_rtt_attempts: 0,
-                        baseline_rtt_valid_count: 0,
-                        baseline_rtt_next_sample_at: now,
-                        next_full_sync_at: now,
-                        last_sample: None,
-                        live_rtt: None,
-                        calibration_failure_count: 0,
-                        high_res_timer_guard: None,
-                    }
-                }
-                _ => {
-                    time::AppState {
-                        host,
-                        target_time,
-                        trigger_action,
-                        server_time: None,
-                        baseline_rtt: None,
-                        baseline_rtt_samples: [baseline_placeholder; time::NUM_SAMPLES],
-                        baseline_rtt_attempts: 0,
-                        baseline_rtt_valid_count: 0,
-                        baseline_rtt_next_sample_at: now,
-                        next_full_sync_at: now,
-                        last_sample: None,
-                        live_rtt: None,
-                        calibration_failure_count: 0,
-                    }
-                }
-            };
-            app_state.run_loop(out, err)?;
+            time::ServerTimeSession {
+                host,
+                now,
+                target_time,
+                trigger_action,
+            }
+            .run_loop(out, err)?;
             writeln!(out, "\n프로그램을 종료합니다.")?;
             Ok(())
         })();
         if let Err(time_err) = time_run_result
-            && time_err.io_kind() != Some(ErrorKind::UnexpectedEof)
+            && time_err
+                .io_kind()
+                .is_none_or(|kind| kind != ErrorKind::UnexpectedEof)
         {
             writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?;
         }
@@ -458,9 +454,9 @@ impl MenuApp {
         out: &mut dyn Write,
         target_time: Option<SystemTime>,
     ) -> StdResult<Option<time::TriggerAction>, time::diagnostic::TimeError> {
-        if target_time.is_none() {
+        let Some(_) = target_time else {
             return Ok(None);
-        }
+        };
         get_validated_input(
             "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
             &mut self.input_buffer,

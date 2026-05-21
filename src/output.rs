@@ -1,42 +1,25 @@
-#[cfg(target_arch = "x86_64")]
-use crate::{
-    BAR_FULL, BAR_WIDTH_U64, INVALID_TIME, IS_TERMINAL, buffmt::DIGITS, numeric::low_u8_from_u128,
-};
 use crate::{
     BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, Result,
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-use core::fmt::Write as _;
-#[cfg(target_arch = "x86_64")]
-use core::time::Duration;
-#[cfg(target_arch = "x86_64")]
-use std::io::Error as IoError;
-#[cfg(not(target_arch = "x86_64"))]
+use core::fmt::Write as FmtWrite;
 use std::io::Result as IoResult;
-#[cfg(not(target_arch = "x86_64"))]
-use std::io::Write as _;
-use std::io::stdout;
-#[cfg(target_arch = "x86_64")]
-use std::io::{Result as IoResult, Write};
-#[cfg(target_arch = "x86_64")]
-use std::{fs::File, io::BufWriter, sync::MutexGuard};
-#[cfg(target_arch = "x86_64")]
-pub const PROGRESS_LINE_BUF_LEN: usize = 128;
+cfg_select! {
+    target_arch = "x86_64" => {
+        use std::io::{Write as IoWrite, stdout};
+        use std::{fs::File, io::BufWriter, sync::MutexGuard};
+        pub mod progress;
+        pub const PROGRESS_LINE_BUF_LEN: usize = 128;
+    }
+    _ => {}
+}
 const BYTE_GROUP_COUNT: usize = 8;
-#[cfg(target_arch = "x86_64")]
-const DECI_PER_MINUTE: u128 = 600;
-#[cfg(target_arch = "x86_64")]
-const DECI_PER_SECOND: u128 = 10;
-#[cfg(target_arch = "x86_64")]
-const ELAPSED_MILLIS_PER_DECI: u128 = 100;
 const FOUR_DIGIT_WIDTH: usize = 4;
 const HASH_HEX24_LEN: usize = 7;
 const HEX_U16_FULL_WIDTH: usize = FOUR_DIGIT_WIDTH;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
-#[cfg(target_arch = "x86_64")]
-const MAX_TIME_MINUTES: u128 = 99;
 const M_HASH_HEX24_LEN: usize = 8;
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
@@ -44,24 +27,16 @@ const OCTAL_TMP_LEN: usize = 22;
 const PASSWORD_FULL_WIDTH_THRESHOLD: u32 = 1_000_000;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
-#[cfg(target_arch = "x86_64")]
-const PERCENT_WIDTH: usize = 3;
-#[cfg(target_arch = "x86_64")]
-const PERCENT_SCALE_U64: u64 = 100;
-#[cfg(target_arch = "x86_64")]
-const SECONDS_PER_MINUTE_U128: u128 = 60;
 const THREE_DIGIT_WIDTH: usize = 3;
-#[cfg(target_arch = "x86_64")]
-const TIME_BUF_LEN: usize = 7;
 const TWO_DIGIT_WIDTH: usize = 2;
 const U32_DEC_BUF_LEN: usize = 10;
 const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
-struct OutputFormatter<'a, 'b, 'c> {
+struct OutputFormatter<'cursor, 'buffer, 'data> {
     bytes: [u8; 8],
-    cursor: &'a mut ByteCursor<'b>,
-    data: &'c RandomDataSet,
+    cursor: &'cursor mut ByteCursor<'buffer>,
+    data: &'data RandomDataSet,
     use_colors: bool,
 }
 impl OutputFormatter<'_, '_, '_> {
@@ -271,12 +246,14 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_chars(buffer_cur, &data.hangul_syllables)
         })?;
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes())?;
-        writeln!(self.cursor, "{}, {}", data.kor_coords.0, data.kor_coords.1)?;
-        self.cursor.write_bytes("세계 위경도: ".as_bytes())?;
-        writeln!(
+        FmtWrite::write_fmt(
             self.cursor,
-            "{}, {}",
-            data.world_coords.0, data.world_coords.1
+            format_args!("{}, {}\n", data.kor_coords.0, data.kor_coords.1),
+        )?;
+        self.cursor.write_bytes("세계 위경도: ".as_bytes())?;
+        FmtWrite::write_fmt(
+            self.cursor,
+            format_args!("{}, {}\n", data.world_coords.0, data.world_coords.1),
         )?;
         Ok(())
     }
@@ -516,156 +493,19 @@ fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> 
         buf_write_hex_u16_0pad4(cur, value)
     }
 }
-#[cfg(target_arch = "x86_64")]
-fn scaled_progress_value(
-    completed: u64,
-    total: u64,
-    scale: u64,
-    zero_total_value: u64,
-    err_msg: &str,
-) -> IoResult<u64> {
-    if total == 0 {
-        return Ok(zero_total_value);
+cfg_select! {
+    target_arch = "x86_64" => {
+        pub fn write_buffer_to_file_guard(
+            file_guard: &mut MutexGuard<BufWriter<File>>,
+            buffer: &[u8],
+        ) -> IoResult<()> {
+            IoWrite::write_all(&mut **file_guard, buffer)
+        }
+        pub fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
+            let mut stdout_lock = stdout().lock();
+            IoWrite::write_all(&mut stdout_lock, data_slice)?;
+            IoWrite::flush(&mut stdout_lock)
+        }
     }
-    completed
-        .saturating_mul(scale)
-        .checked_div(total)
-        .ok_or_else(|| IoError::other(err_msg))
-}
-#[cfg(target_arch = "x86_64")]
-pub fn write_buffer_to_file_guard(
-    file_guard: &mut MutexGuard<BufWriter<File>>,
-    buffer: &[u8],
-) -> IoResult<()> {
-    file_guard.write_all(buffer)
-}
-pub fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
-    let mut stdout_lock = stdout().lock();
-    stdout_lock.write_all(data_slice)?;
-    stdout_lock.flush()
-}
-#[cfg(target_arch = "x86_64")]
-pub fn print_progress(
-    out: &mut dyn Write,
-    completed: u64,
-    line_buf: &mut [u8; PROGRESS_LINE_BUF_LEN],
-    total: u64,
-    elapsed: Duration,
-    elapsed_buf: &mut [u8],
-    eta_buf: &mut [u8],
-) -> Result<()> {
-    if !*IS_TERMINAL {
-        return Ok(());
-    }
-    let elapsed_millis = elapsed.as_millis();
-    let elapsed_deci = elapsed_millis.div_euclid(ELAPSED_MILLIS_PER_DECI);
-    let eta_deci = if total == 0 || completed >= total {
-        Some(0)
-    } else if completed == 0 {
-        None
-    } else {
-        let remaining = total
-            .checked_sub(completed)
-            .ok_or_else(|| IoError::other("남은 작업 수 계산 실패"))?;
-        let completed_scaled = u128::from(completed)
-            .checked_mul(u128::from(PERCENT_SCALE_U64))
-            .ok_or_else(|| IoError::other("ETA 분모 계산 실패"))?;
-        Some(
-            elapsed_millis
-                .saturating_mul(u128::from(remaining))
-                .checked_div(completed_scaled)
-                .ok_or_else(|| IoError::other("ETA 계산 실패"))?,
-        )
-    };
-    let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf);
-    let eta_len = format_time_into(eta_deci, eta_buf);
-    let filled_u64 = scaled_progress_value(
-        completed,
-        total,
-        BAR_WIDTH_U64,
-        BAR_WIDTH_U64,
-        "진행 막대 계산 실패",
-    )?;
-    let filled = usize::from(low_u8_from_u64(filled_u64.min(BAR_WIDTH_U64)));
-    let bar = BAR_FULL
-        .get(filled)
-        .copied()
-        .ok_or_else(|| IoError::other("진행 막대 인덱스 범위 초과"))?;
-    let percent_u64 = scaled_progress_value(
-        completed,
-        total,
-        PERCENT_SCALE_U64,
-        PERCENT_SCALE_U64,
-        "진행률 계산 실패",
-    )?;
-    let percent = low_u8_from_u64(percent_u64.min(PERCENT_SCALE_U64));
-    let mut cur = ByteCursor::new(line_buf);
-    cur.write_byte(b'\r')?;
-    cur.write_bytes(bar.as_bytes())?;
-    cur.write_byte(b' ')?;
-    let padding = PERCENT_WIDTH.saturating_sub(u8_dec_len(percent));
-    for _ in 0..padding {
-        cur.write_byte(b' ')?;
-    }
-    buf_write_u8_dec(&mut cur, percent)?;
-    cur.write_byte(b'%')?;
-    cur.write_bytes(b" (")?;
-    buf_write_u64_dec(&mut cur, completed)?;
-    cur.write_byte(b'/')?;
-    buf_write_u64_dec(&mut cur, total)?;
-    cur.write_bytes(") | 소요: ".as_bytes())?;
-    cur.write_bytes(prefix_slice(elapsed_buf, elapsed_len)?)?;
-    cur.write_bytes(b" | ETA: ")?;
-    cur.write_bytes(prefix_slice(eta_buf, eta_len)?)?;
-    cur.write_bytes(b" \x1b[K")?;
-    out.write_all(cur.written_slice()?)?;
-    out.flush()?;
-    Ok(())
-}
-#[cfg(target_arch = "x86_64")]
-fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
-    let Some(head) = buf.get_mut(..TIME_BUF_LEN) else {
-        return 0;
-    };
-    let Some(deci) = deci_seconds else {
-        head.copy_from_slice(INVALID_TIME);
-        return TIME_BUF_LEN;
-    };
-    let minutes = usize::from(low_u8_from_u128(
-        (deci.div_euclid(DECI_PER_MINUTE)).min(MAX_TIME_MINUTES),
-    ));
-    let sec_whole = usize::from(low_u8_from_u128(
-        deci.div_euclid(DECI_PER_SECOND)
-            .rem_euclid(SECONDS_PER_MINUTE_U128),
-    ));
-    let tenths = usize::from(low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND)));
-    let Some((minute_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-        return 0;
-    };
-    let Ok(()) = copy_two_digits(minute_digits, minutes) else {
-        return 0;
-    };
-    let Some((separator, remainder)) = rest.split_first_mut() else {
-        return 0;
-    };
-    *separator = b':';
-    let Some((second_digits, tenth_part)) = remainder.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-    else {
-        return 0;
-    };
-    let Ok(()) = copy_two_digits(second_digits, sec_whole) else {
-        return 0;
-    };
-    let Some((decimal_point, tenths_digit)) = tenth_part.split_first_mut() else {
-        return 0;
-    };
-    *decimal_point = b'.';
-    let Some(tenth_slot) = tenths_digit.first_mut() else {
-        return 0;
-    };
-    let Some(digit) = DIGITS.get(tenths).copied() else {
-        return 0;
-    };
-    *tenth_slot = digit;
-    TIME_BUF_LEN
+    _ => {}
 }

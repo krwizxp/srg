@@ -1,37 +1,42 @@
 extern crate alloc;
-#[cfg(target_arch = "x86_64")]
-use self::hardware_rng::{RNG_SOURCE, RngSource};
+use self::file_output::open_or_create_file;
 use self::io_util::write_line_ignored;
 use self::menu_app::MenuApp;
-#[cfg(target_arch = "x86_64")]
-use self::random_data::generate_random_data;
-#[cfg(target_arch = "x86_64")]
-use self::random_output::persist_and_print_random_data;
-use self::{file_output::open_or_create_file, numeric::low_u8_from_u64};
-use core::{array::from_fn, error::Error, result::Result as StdResult};
-#[cfg(target_arch = "x86_64")]
-use std::io::{Write as _, stderr};
+use self::tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER};
+use core::{error::Error, result::Result as StdResult};
 use std::{
-    io::{Error as IoError, IsTerminal as _, stdout},
+    io::{Error as IoError, IsTerminal as TerminalDetect, stdout},
     process::ExitCode,
     sync::{LazyLock, Mutex},
 };
-#[cfg(target_arch = "x86_64")]
-mod batch;
+cfg_select! {
+    target_arch = "x86_64" => {
+        use self::hardware_rng::{RNG_SOURCE, RngSource};
+        use self::random_data::generate_random_data;
+        use self::random_output::persist_and_print_random_data;
+        use std::io::{Write as IoWrite, stderr};
+    }
+    _ => {}
+}
+cfg_select! {
+    target_arch = "x86_64" => {
+        mod batch;
+        mod hardware_rng;
+        mod random_number;
+        mod random_output;
+    }
+    _ => {}
+}
 mod buffmt;
 mod file_output;
-#[cfg(target_arch = "x86_64")]
-mod hardware_rng;
 mod input;
 mod io_util;
 mod menu_app;
 mod numeric;
 mod output;
 mod random_data;
-#[cfg(target_arch = "x86_64")]
-mod random_number;
-mod random_output;
 mod random_util;
+mod tables;
 mod time;
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 compile_error!("SRG currently supports only Windows, Linux, and macOS.");
@@ -54,7 +59,7 @@ cfg_select! {
 static GLYPHS: [char; 16] = [
     '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
 ];
-static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| stdout().is_terminal());
+static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| TerminalDetect::is_terminal(&stdout()));
 const FILE_NAME: &str = "random_data.txt";
 const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
 const ASCII_PRINTABLE_LEN: u8 = 94;
@@ -70,8 +75,6 @@ const INPUT_BYTE_MAX_FOR_LOTTO7: u8 = 221;
 const INPUT_BYTE_MAX_FOR_LUCKY_STAR: u8 = 251;
 const INPUT_BYTE_MAX_FOR_PASSWORD: u8 = 187;
 const OUTPUT_FILE_BUFFER_CAPACITY: usize = 0x0010_0000;
-#[cfg(target_arch = "x86_64")]
-const BUFFERS_PER_WORKER: usize = 8;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
 const HANGUL_BASE_CODE_POINT: u32 = 0xAC00;
@@ -91,15 +94,7 @@ const NMS_COORD_MASK: u64 = 0x0FFF;
 const NMS_GLYPH_COUNT: usize = 12;
 const NMS_GLYPH_PREFIX_COUNT: usize = 4;
 const NMS_PLANET_MAX_VALUE: u64 = 11;
-#[cfg(target_arch = "x86_64")]
-const TWO_POW_32_F64: f64 = 4_294_967_296.0;
-#[cfg(target_arch = "x86_64")]
-const U64_UNIT_SCALE: f64 = 1.0 / (TWO_POW_32_F64 * TWO_POW_32_F64);
 const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
-#[cfg(target_arch = "x86_64")]
-const BAR_WIDTH: usize = 10;
-#[cfg(target_arch = "x86_64")]
-const BAR_WIDTH_U64: u64 = 10;
 const HANGUL_SHIFTS: [u32; 4] = [48_u32, 32, 16, 0];
 const NMS_GLYPH_NUM_SHIFTS: [u32; 8] = [36_u32, 32, 28, 24, 20, 16, 12, 8];
 const NMS_PLANET_MODULUS: u64 = 6;
@@ -122,63 +117,43 @@ const _: () = assert!(
     NMS_GLYPH_NUM_SHIFTS.len() == NMS_GLYPH_COUNT - NMS_GLYPH_PREFIX_COUNT,
     "NMS suffix shift table must match suffix glyph count"
 );
-#[cfg(target_arch = "x86_64")]
-const BAR_FULL: [&str; BAR_WIDTH + 1] = [
-    "[          ]",
-    "[█         ]",
-    "[██        ]",
-    "[███       ]",
-    "[████      ]",
-    "[█████     ]",
-    "[██████    ]",
-    "[███████   ]",
-    "[████████  ]",
-    "[█████████ ]",
-    "[██████████]",
-];
-#[cfg(target_arch = "x86_64")]
-const INVALID_TIME: &[u8; 7] = b"--:--.-";
-const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
-static BIN8_TABLE: LazyLock<[[u8; 8]; 256]> = LazyLock::new(|| {
-    from_fn(|byte_index| {
-        let Ok(byte) = u8::try_from(byte_index) else {
-            return [b'0'; 8];
-        };
-        from_fn(|bit| {
-            let shift = 7_usize.saturating_sub(bit);
-            if ((byte >> shift) & 1) == 1 {
-                b'1'
-            } else {
-                b'0'
-            }
-        })
-    })
-});
-static HEX_BYTE_TABLE: LazyLock<[[u8; 2]; 256]> = LazyLock::new(|| {
-    from_fn(|value_index| {
-        let Ok(value) = u8::try_from(value_index) else {
-            return [0, 0];
-        };
-        let hi = usize::from(value >> 4_u8);
-        let lo = usize::from(value & low_u8_from_u64(NIBBLE_MASK_U64));
-        let Some(&hi_digit) = HEX_UPPER.get(hi) else {
-            return [0, 0];
-        };
-        let Some(&lo_digit) = HEX_UPPER.get(lo) else {
-            return [0, 0];
-        };
-        [hi_digit, lo_digit]
-    })
-});
+cfg_select! {
+    target_arch = "x86_64" => {
+        const BUFFERS_PER_WORKER: usize = 8;
+        const TWO_POW_32_F64: f64 = 4_294_967_296.0;
+        const U64_UNIT_SCALE: f64 = 1.0 / (TWO_POW_32_F64 * TWO_POW_32_F64);
+        const BAR_WIDTH: usize = 10;
+        const BAR_WIDTH_U64: u64 = 10;
+        const BAR_FULL: [&str; BAR_WIDTH + 1] = [
+            "[          ]",
+            "[█         ]",
+            "[██        ]",
+            "[███       ]",
+            "[████      ]",
+            "[█████     ]",
+            "[██████    ]",
+            "[███████   ]",
+            "[████████  ]",
+            "[█████████ ]",
+            "[██████████]",
+        ];
+        const INVALID_TIME: &[u8; 7] = b"--:--.-";
+    }
+    _ => {}
+}
 type Result<T> = StdResult<T, Box<dyn Error + Send + Sync>>;
-#[cfg(target_arch = "x86_64")]
-type DataBuffer = Box<[u8; BUFFER_SIZE]>;
-fn reserved_string(capacity: usize, context: &str) -> Result<String> {
-    let mut value = String::new();
-    value
-        .try_reserve(capacity)
-        .map_err(|source| IoError::other(format!("{context}: {source}")))?;
-    Ok(value)
+cfg_select! {
+    target_arch = "x86_64" => {
+        type DataBuffer = Box<[u8; BUFFER_SIZE]>;
+        fn reserved_string(capacity: usize, context: &str) -> Result<String> {
+            let mut value = String::new();
+            value
+                .try_reserve(capacity)
+                .map_err(|source| IoError::other(format!("{context}: {source}")))?;
+            Ok(value)
+        }
+    }
+    _ => {}
 }
 fn main() -> Result<ExitCode> {
     let file_mutex = Mutex::new(open_or_create_file()?);
@@ -192,7 +167,10 @@ fn main() -> Result<ExitCode> {
         }
         RngSource::RdRand => {
             let mut err = stderr().lock();
-            writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
+            IoWrite::write_fmt(
+                &mut err,
+                format_args!("RDSEED를 미지원하여 RDRAND를 사용합니다.\n"),
+            )?;
             let data = generate_random_data()?;
             let num_64 = data.num_64;
             persist_and_print_random_data(&file_mutex, &data)?;
@@ -200,15 +178,27 @@ fn main() -> Result<ExitCode> {
         }
         RngSource::None => {
             let mut err = stderr().lock();
-            writeln!(
-                err,
-                "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다."
+            IoWrite::write_fmt(
+                &mut err,
+                format_args!(
+                    "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
+                ),
             )?;
             0
         }
     };
-    let input_buffer =
-        reserved_string(GENERIC_INPUT_BUFFER_CAPACITY, "입력 버퍼 메모리 확보 실패")?;
+    let input_buffer = cfg_select! {
+        target_arch = "x86_64" => {
+            reserved_string(GENERIC_INPUT_BUFFER_CAPACITY, "입력 버퍼 메모리 확보 실패")?
+        }
+        _ => {{
+            let mut value = String::new();
+            value
+                .try_reserve(GENERIC_INPUT_BUFFER_CAPACITY)
+                .map_err(|source| IoError::other(format!("입력 버퍼 메모리 확보 실패: {source}")))?;
+            value
+        }}
+    };
     #[cfg(target_arch = "x86_64")]
     let ladder_players_storage = reserved_string(
         GENERIC_INPUT_BUFFER_CAPACITY,

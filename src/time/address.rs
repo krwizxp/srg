@@ -2,7 +2,7 @@ use super::{
     Result, TimeError,
     util::{parse_result_with_context, parse_u32_digits},
 };
-use core::fmt::Write as _;
+use core::fmt::Write as FmtWrite;
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
@@ -78,7 +78,7 @@ impl TryFrom<&str> for ParsedServer {
         if authority.is_empty() || authority.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let default_port = if scheme == Some(UrlScheme::Https) {
+        let default_port = if scheme.is_some_and(|scheme_value| scheme_value == UrlScheme::Https) {
             DEFAULT_HTTPS_PORT
         } else {
             DEFAULT_HTTP_PORT
@@ -139,8 +139,9 @@ impl TryFrom<&str> for ParsedServer {
                 TimeError::parse(format!("TCP host header 메모리 확보 실패: {source}"))
             })?;
             out.push_str(&host_for_header);
-            write!(&mut out, ":{port}")
-                .map_err(|_| TimeError::parse("TCP host header port 작성 실패"))?;
+            FmtWrite::write_fmt(&mut out, format_args!(":{port}")).map_err(|error| {
+                TimeError::parse(format!("TCP host header port 작성 실패: {error}"))
+            })?;
             out
         };
         let host_owned = copy_str(host_part, "서버 host 메모리 확보 실패")?;
@@ -201,7 +202,8 @@ fn build_url(
     out.push_str(scheme_prefix);
     out.push_str(host_for_header);
     if explicit_port {
-        write!(&mut out, ":{port}").map_err(|_| TimeError::parse("URL port 작성 실패"))?;
+        FmtWrite::write_fmt(&mut out, format_args!(":{port}"))
+            .map_err(|error| TimeError::parse(format!("URL port 작성 실패: {error}")))?;
     }
     Ok(out)
 }

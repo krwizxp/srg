@@ -1,8 +1,8 @@
+pub(super) use super::sample::find_date_header_value;
 use super::{
     MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, TimeError, TimeErrorKind, TimeSample,
-    http_date::parse_http_date_to_systemtime, sample::find_date_header_value,
+    http_date::parse_http_date_to_systemtime,
 };
-use alloc::string::String;
 use core::{fmt::Display, time::Duration};
 use std::time::{Instant, SystemTime};
 cfg_select! {
@@ -23,27 +23,24 @@ pub(super) const NATIVE_HTTP: NativeHttp = NativeHttp {
     parse_http_date: parse_http_date_to_systemtime,
 };
 struct HeadResponse {
-    date_header: String,
     response_received_inst: Instant,
     rtt: Duration,
+    server_time: SystemTime,
 }
 pub(super) struct NativeHttp {
     parse_http_date: fn(&str) -> Result<SystemTime>,
 }
+type ParseHttpDate = fn(&str) -> Result<SystemTime>;
 impl NativeHttp {
     pub(super) fn fetch_head_sample(&self, url: &str, context: &str) -> Result<TimeSample> {
-        let response = platform::CLIENT.fetch_head(url, context)?;
-        let server_time = (self.parse_http_date)(&response.date_header)?;
+        let response = platform::CLIENT.fetch_head(url, context, self.parse_http_date)?;
         Ok(TimeSample {
             response_received_inst: response.response_received_inst,
             rtt: response.rtt,
-            server_time,
+            server_time: response.server_time,
         })
     }
 }
 fn error(context: &str, detail: impl Display) -> TimeError {
     TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
-}
-fn missing_date(context: &str) -> TimeError {
-    TimeError::header_not_found(format!("{context} 응답에서 Date"))
 }

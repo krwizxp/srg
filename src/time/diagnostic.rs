@@ -7,7 +7,6 @@ pub(super) enum TimeErrorKind {
     Io,
     NativeHttp,
     Parse,
-    SyncFailed,
     Time,
 }
 #[derive(Debug)]
@@ -61,7 +60,6 @@ impl fmt::Display for TimeError {
             TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
             TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
             TimeErrorKind::NativeHttp => write!(f, "native HTTP 요청 실패: {}", self.detail),
-            TimeErrorKind::SyncFailed => write!(f, "서버 시간 확인 실패: {}", self.detail),
         }
     }
 }

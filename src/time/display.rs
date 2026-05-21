@@ -40,8 +40,8 @@ struct DisplayableTime {
     second: u32,
     year: i32,
 }
-pub(super) struct SliceCursor<'a> {
-    pub inner: ByteCursor<'a>,
+pub(super) struct SliceCursor<'buffer> {
+    pub inner: ByteCursor<'buffer>,
 }
 impl SliceCursor<'_> {
     fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {

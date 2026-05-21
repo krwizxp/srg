@@ -61,11 +61,11 @@ impl BufferChannelsBuilder {
         })
     }
 }
-struct ProgressReporter<'a> {
+struct ProgressReporter<'progress> {
     pending_count: u64,
-    processed_ref: &'a AtomicU64,
+    processed_ref: &'progress AtomicU64,
     requested_count: u64,
-    start_time: &'a Instant,
+    start_time: &'progress Instant,
 }
 struct ProgressBuffers {
     elapsed: [u8; PROGRESS_TIME_BUF_LEN],
@@ -91,7 +91,7 @@ impl ProgressReporter<'_> {
                 break;
             }
             let elapsed = elapsed_since(self.start_time);
-            output::print_progress(
+            output::progress::print(
                 &mut out,
                 processed_now,
                 &mut progress_buffers.line,
@@ -105,9 +105,9 @@ impl ProgressReporter<'_> {
         Ok(())
     }
 }
-struct ProcessCounters<'a> {
-    failed_ref: &'a AtomicU64,
-    processed_ref: &'a AtomicU64,
+struct ProcessCounters<'counters> {
+    failed_ref: &'counters AtomicU64,
+    processed_ref: &'counters AtomicU64,
 }
 impl ProcessCounters<'_> {
     fn finalize(self, multi_thread_count: u64) -> Result<()> {
@@ -123,16 +123,16 @@ impl ProcessCounters<'_> {
         Ok(())
     }
 }
-struct WorkerPool<'a> {
+struct WorkerPool<'scope> {
     buffer_return_receivers: Vec<Receiver<DataBuffer>>,
     calculated_thread_count: usize,
-    failed_ref: &'a AtomicU64,
+    failed_ref: &'scope AtomicU64,
     pending_count: u64,
-    processed_ref: &'a AtomicU64,
+    processed_ref: &'scope AtomicU64,
     sender: SyncSender<GeneratedChunk>,
 }
-impl<'a> WorkerPool<'a> {
-    fn join_all(self, scope_ctx: &'a Scope<'a, '_>) -> Result<()> {
+impl<'scope> WorkerPool<'scope> {
+    fn join_all(self, scope_ctx: &'scope Scope<'scope, '_>) -> Result<()> {
         let thread_count_u64 =
             u64::try_from(self.calculated_thread_count).map_err(|conversion_err| {
                 boxed_other_with_source("스레드 수 변환 실패", conversion_err)
@@ -223,9 +223,9 @@ impl<'a> WorkerPool<'a> {
         Ok(())
     }
 }
-struct WriterTask<'a> {
+struct WriterTask<'writer> {
     buffer_return_senders: Vec<SyncSender<DataBuffer>>,
-    file_mutex: &'a Mutex<BufWriter<File>>,
+    file_mutex: &'writer Mutex<BufWriter<File>>,
     receiver: Receiver<GeneratedChunk>,
 }
 impl WriterTask<'_> {
@@ -286,10 +286,10 @@ impl WriterTask<'_> {
         Ok(())
     }
 }
-struct BatchRegenerator<'a, 'b, 'c> {
-    err: &'c mut dyn Write,
-    file_mutex: &'a Mutex<BufWriter<File>>,
-    out: &'b mut dyn Write,
+struct BatchRegenerator<'file, 'out, 'err> {
+    err: &'err mut dyn Write,
+    file_mutex: &'file Mutex<BufWriter<File>>,
+    out: &'out mut dyn Write,
     requested_count: u64,
     start_time: Instant,
 }
@@ -381,7 +381,7 @@ impl BatchRegenerator<'_, '_, '_> {
     fn write_summary(&mut self, final_data: &RandomDataSet, failed_count: u64) -> Result<u64> {
         let mut progress_buffers = ProgressBuffers::new();
         let elapsed = elapsed_since(&self.start_time);
-        output::print_progress(
+        output::progress::print(
             self.out,
             self.requested_count,
             &mut progress_buffers.line,
