@@ -1,6 +1,6 @@
 [package]
 name = "srg"
-version = "1.5.4"
+version = "1.5.5"
 categories = ["command-line-utilities", "date-and-time", "encoding"]
 edition = "2024"
 rust-version = "1.95"

@@ -11,7 +11,6 @@
   </style>
 
   <defs>
-    <!-- Light mode palettes -->
     <linearGradient id="tile-light" x1="74" y1="86" x2="438" y2="430" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#191C43"/>
       <stop offset="0.54" stop-color="oklch(52.3849% 0.281 280.49)"/>
@@ -39,7 +38,6 @@
       <stop offset="1" stop-color="oklch(70.4516% 0.1751 245.52)" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Dark mode palettes -->
     <linearGradient id="tile-dark" x1="74" y1="86" x2="438" y2="430" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#050A1F"/>
       <stop offset="0.55" stop-color="#382AC8"/>
@@ -67,7 +65,6 @@
       <stop offset="1" stop-color="oklch(73.9192% 0.166 235.34)" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Shared geometry helpers -->
     <clipPath id="tile-clip">
       <rect x="64" y="64" width="384" height="384" rx="120"/>
     </clipPath>
