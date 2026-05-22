@@ -35,6 +35,9 @@ impl<'buffer> ByteCursor<'buffer> {
         self.pos = end;
         self.buf.get_mut(start..end).ok_or_else(write_zero_err)
     }
+    pub fn take_array<const N: usize>(&mut self) -> io::Result<&mut [u8; N]> {
+        self.take(N)?.try_into().map_err(|_source| write_zero_err())
+    }
     pub fn write_byte(&mut self, byte: u8) -> io::Result<()> {
         let Some(slot) = self.take(SINGLE_BYTE_WIDTH)?.first_mut() else {
             return Err(write_zero_err());
@@ -66,10 +69,7 @@ impl fmt::Write for ByteCursor<'_> {
             .map_err(|_write_err| fmt::Error)
     }
 }
-pub fn copy_two_digits(target: &mut [u8], value: usize) -> io::Result<()> {
-    if target.len() != 2 {
-        return Err(write_zero_err());
-    }
+pub fn copy_two_digits(target: &mut [u8; 2], value: usize) -> io::Result<()> {
     target.copy_from_slice(TWO_DIGITS.get(value).ok_or_else(write_zero_err)?);
     Ok(())
 }

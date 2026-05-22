@@ -44,20 +44,24 @@ pub(super) struct SliceCursor<'buffer> {
     pub inner: ByteCursor<'buffer>,
 }
 impl SliceCursor<'_> {
-    fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
-        value.checked_add(amount).ok_or_else(write_zero_err)
-    }
     fn checked_sub_index(value: usize, amount: usize) -> IoResult<usize> {
         value.checked_sub(amount).ok_or_else(write_zero_err)
     }
-    fn copy_two_digits(target: &mut [u8], value: usize) -> IoResult<()> {
-        if target.len() != TWO_DIGIT_WIDTH {
-            return Err(write_zero_err());
-        }
+    fn copy_two_digits(target: &mut [u8; TWO_DIGIT_WIDTH], value: usize) -> IoResult<()> {
         buffmt_copy_two_digits(target, value)
     }
     fn digit_byte(index: usize) -> IoResult<u8> {
         buffmt_digit_byte(index)
+    }
+    fn range_two_digits(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; TWO_DIGIT_WIDTH]> {
+        let end = start
+            .checked_add(TWO_DIGIT_WIDTH)
+            .ok_or_else(write_zero_err)?;
+        slice
+            .get_mut(start..end)
+            .ok_or_else(write_zero_err)?
+            .try_into()
+            .map_err(|_source| write_zero_err())
     }
     fn write_byte(&mut self, byte: u8) -> IoResult<()> {
         self.inner.write_byte(byte)
@@ -67,17 +71,20 @@ impl SliceCursor<'_> {
     }
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
-        Self::copy_two_digits(self.inner.take(TWO_DIGIT_WIDTH)?, idx)?;
+        Self::copy_two_digits(self.inner.take_array::<TWO_DIGIT_WIDTH>()?, idx)?;
         Ok(())
     }
     fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
         let hundreds = usize::from(low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
         let rem = usize::from(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
         let head = self.inner.take(THREE_DIGIT_WIDTH)?;
-        let Some((digit_slot, remaining_digits)) = head.split_first_mut() else {
+        let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
             return Err(write_zero_err());
         };
         *digit_slot = Self::digit_byte(hundreds)?;
+        let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+            return Err(write_zero_err());
+        };
         Self::copy_two_digits(remaining_digits, rem)?;
         Ok(())
     }
@@ -88,14 +95,12 @@ impl SliceCursor<'_> {
             let rem = usize::from(low_u8_from_u32(n.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
             n /= U32_THREE_DIGIT_THRESHOLD;
             i = Self::checked_sub_index(i, 2)?;
-            let end = Self::checked_add_index(i, 2)?;
-            Self::copy_two_digits(tmp.get_mut(i..end).ok_or_else(write_zero_err)?, rem)?;
+            Self::copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
         }
         if n >= U32_TWO_DIGIT_THRESHOLD {
             let rem = usize::from(low_u8_from_u32(n));
             i = Self::checked_sub_index(i, TWO_DIGIT_WIDTH)?;
-            let end = Self::checked_add_index(i, TWO_DIGIT_WIDTH)?;
-            Self::copy_two_digits(tmp.get_mut(i..end).ok_or_else(write_zero_err)?, rem)?;
+            Self::copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
         } else {
             i = Self::checked_sub_index(i, 1)?;
             let digit = usize::from(low_u8_from_u32(n));
@@ -117,8 +122,11 @@ impl SliceCursor<'_> {
                     year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
                 ));
                 let head = self.inner.take(FOUR_DIGIT_WIDTH)?;
-                let Some((hi_digits, lo_digits)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+                let Some((hi_digits, lo_tail)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
                 else {
+                    return Err(write_zero_err());
+                };
+                let Some(lo_digits) = lo_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
                     return Err(write_zero_err());
                 };
                 Self::copy_two_digits(hi_digits, hi)?;
@@ -133,10 +141,13 @@ impl SliceCursor<'_> {
             let hundreds = usize::from(low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
             let rem = usize::from(low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
             let head = self.inner.take(THREE_DIGIT_WIDTH)?;
-            let Some((digit_slot, remaining_digits)) = head.split_first_mut() else {
+            let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
                 return Err(write_zero_err());
             };
             *digit_slot = Self::digit_byte(hundreds)?;
+            let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+                return Err(write_zero_err());
+            };
             Self::copy_two_digits(remaining_digits, rem)?;
             return Ok(());
         }

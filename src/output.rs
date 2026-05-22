@@ -218,8 +218,11 @@ impl OutputFormatter<'_, '_, '_> {
                 return Err(write_zero_err());
             };
             copy_two_digits(hi_digits, hi)?;
-            let Some((mid_digits, lo_digits)) = rest.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+            let Some((mid_digits, lo_tail)) = rest.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
             else {
+                return Err(write_zero_err());
+            };
+            let Some(lo_digits) = lo_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
                 return Err(write_zero_err());
             };
             copy_two_digits(
@@ -297,6 +300,14 @@ fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut 
     let end = start.checked_add(len).ok_or_else(write_zero_err)?;
     slice.get_mut(start..end).ok_or_else(write_zero_err)
 }
+fn range_array_mut<const N: usize>(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; N]> {
+    let end = start.checked_add(N).ok_or_else(write_zero_err)?;
+    slice
+        .get_mut(start..end)
+        .ok_or_else(write_zero_err)?
+        .try_into()
+        .map_err(|_source| write_zero_err())
+}
 fn hex_byte(index: usize) -> IoResult<&'static [u8; 2]> {
     HEX_BYTE_TABLE.get(index).ok_or_else(write_zero_err)
 }
@@ -332,15 +343,21 @@ fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<usize> {
     if n >= U8_THREE_DIGIT_THRESHOLD {
         let hundreds = usize::from(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
         let rem = usize::from(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
-        let Some((digit_slot, remaining_digits)) = target.split_first_mut() else {
+        let Some((digit_slot, remaining_tail)) = target.split_first_mut() else {
             return Err(write_zero_err());
         };
         *digit_slot = digit_byte(hundreds)?;
+        let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+            return Err(write_zero_err());
+        };
         copy_two_digits(remaining_digits, rem)?;
         return Ok(3);
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {
-        copy_two_digits(target, usize::from(n))?;
+        let Some(digits) = target.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+            return Err(write_zero_err());
+        };
+        copy_two_digits(digits, usize::from(n))?;
         return Ok(2);
     }
     let Some(slot) = target.first_mut() else {
@@ -430,12 +447,12 @@ fn buf_write_u32_dec(cur: &mut ByteCursor<'_>, mut n: u32) -> IoResult<()> {
         ));
         n = n.div_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_slice_mut(&mut tmp, i, TWO_DIGIT_WIDTH)?, rem)?;
+        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
     }
     if n >= u32::from(U8_TWO_DIGIT_THRESHOLD) {
         let rem = usize::from(low_u8_from_u32(n));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_slice_mut(&mut tmp, i, TWO_DIGIT_WIDTH)?, rem)?;
+        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
     } else {
         sub_from_index(&mut i, 1)?;
         let digit = low_u8_from_u32(n);
@@ -453,12 +470,12 @@ fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
         ));
         n = n.div_euclid(u64::from(U8_THREE_DIGIT_THRESHOLD));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_slice_mut(&mut tmp, i, TWO_DIGIT_WIDTH)?, rem)?;
+        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
     }
     if n >= u64::from(U8_TWO_DIGIT_THRESHOLD) {
         let rem = usize::from(low_u8_from_u64(n));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_slice_mut(&mut tmp, i, TWO_DIGIT_WIDTH)?, rem)?;
+        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
     } else {
         sub_from_index(&mut i, 1)?;
         let digit = low_u8_from_u64(n);

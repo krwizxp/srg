@@ -36,11 +36,21 @@ pub(super) struct Client {
     user_agent: &'static str,
 }
 struct EasyHandle(NonNull<Curl>);
-struct CurlBuffer {
-    bytes: Vec<u8>,
+struct CurlBodySink {
+    bytes_seen: usize,
     error: Option<String>,
-    label: &'static str,
     limit: usize,
+}
+struct CurlHeaderCapture {
+    bytes_seen: usize,
+    date_header: Option<String>,
+    error: Option<String>,
+    limit: usize,
+    pending_line: Vec<u8>,
+}
+enum CurlWriteTarget<'buffer> {
+    Body(&'buffer mut CurlBodySink),
+    Header(&'buffer mut CurlHeaderCapture),
 }
 #[link(name = "curl")]
 unsafe extern "C" {
@@ -131,20 +141,20 @@ impl Client {
         let url_c = cstring("URL", url, context)?;
         let user_agent = cstring("User-Agent", self.user_agent, context)?;
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
-        let mut body_buffer = CurlBuffer::new("본문", HTTP_HEAD_MAX_BODY_BYTES);
-        let mut header_buffer = CurlBuffer::new("헤더", HTTP_HEAD_MAX_HEADER_BYTES);
-        handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_vec_callback, context)?;
-        handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_vec_callback, context)?;
-        handle.setopt_ptr(
-            CURLOPT_WRITEDATA,
-            (&raw mut body_buffer).cast::<c_void>(),
-            context,
-        )?;
-        handle.setopt_ptr(
-            CURLOPT_HEADERDATA,
-            (&raw mut header_buffer).cast::<c_void>(),
-            context,
-        )?;
+        let mut body_sink = CurlBodySink {
+            bytes_seen: 0,
+            error: None,
+            limit: HTTP_HEAD_MAX_BODY_BYTES,
+        };
+        let mut header_capture = CurlHeaderCapture {
+            bytes_seen: 0,
+            date_header: None,
+            error: None,
+            limit: HTTP_HEAD_MAX_HEADER_BYTES,
+            pending_line: Vec::new(),
+        };
+        handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
+        handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
         handle.setopt_str(CURLOPT_URL, url_c.as_ptr(), context)?;
         handle.setopt_str(CURLOPT_USERAGENT, user_agent.as_ptr(), context)?;
         handle.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
@@ -153,13 +163,31 @@ impl Client {
         handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
         handle.setopt_long(CURLOPT_NOBODY, 1, context)?;
         handle.setopt_long(CURLOPT_FOLLOWLOCATION, 1, context)?;
-        let request_start = Instant::now();
-        let perform_code = handle.perform();
+        let (request_start, perform_code) = {
+            let mut body_target = CurlWriteTarget::Body(&mut body_sink);
+            let mut header_target = CurlWriteTarget::Header(&mut header_capture);
+            handle.setopt_ptr(
+                CURLOPT_WRITEDATA,
+                (&raw mut body_target).cast::<c_void>(),
+                context,
+            )?;
+            handle.setopt_ptr(
+                CURLOPT_HEADERDATA,
+                (&raw mut header_target).cast::<c_void>(),
+                context,
+            )?;
+            let request_start = Instant::now();
+            (request_start, handle.perform())
+        };
         let response_received_inst = Instant::now();
-        if let Some(callback_error) = body_buffer
+        if !header_capture.pending_line.is_empty() {
+            header_capture.capture_pending();
+            header_capture.pending_line.clear();
+        }
+        if let Some(callback_error) = body_sink
             .error
             .take()
-            .or_else(|| header_buffer.error.take())
+            .or_else(|| header_capture.error.take())
         {
             return Err(error(context, callback_error));
         }
@@ -177,11 +205,7 @@ impl Client {
                 );
             return Err(error(context, perform_error));
         }
-        let Some(date_header_raw) = header_buffer
-            .bytes
-            .rsplit(|byte| *byte == b'\n')
-            .find_map(find_date_header_value)
-        else {
+        let Some(date_header_raw) = header_capture.date_header.as_deref() else {
             return Err(super::TimeError::header_not_found(format!(
                 "{context} 응답에서 Date"
             )));
@@ -197,36 +221,66 @@ impl Client {
         })
     }
 }
-impl CurlBuffer {
+impl CurlBodySink {
     fn append(&mut self, bytes: &[u8]) -> bool {
-        let Some(next_len) = self.bytes.len().checked_add(bytes.len()) else {
-            self.error = Some(format!("HTTP HEAD 응답 {} 크기 계산 실패", self.label));
+        let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
+            self.error = Some("HTTP HEAD 응답 본문 크기 계산 실패".to_owned());
             return false;
         };
         if next_len > self.limit {
             self.error = Some(format!(
-                "HTTP HEAD 응답 {} 크기가 허용 한도({} bytes)를 초과했습니다.",
-                self.label, self.limit
+                "HTTP HEAD 응답 본문 크기가 허용 한도({} bytes)를 초과했습니다.",
+                self.limit
             ));
             return false;
         }
-        if let Err(source) = self.bytes.try_reserve(bytes.len()) {
-            self.error = Some(format!(
-                "HTTP HEAD 응답 {} 메모리 확보 실패: {source}",
-                self.label
-            ));
-            return false;
-        }
-        self.bytes.extend_from_slice(bytes);
+        self.bytes_seen = next_len;
         true
     }
-    const fn new(label: &'static str, limit: usize) -> Self {
-        Self {
-            bytes: Vec::new(),
-            error: None,
-            label,
-            limit,
+}
+impl CurlHeaderCapture {
+    fn append(&mut self, bytes: &[u8]) -> bool {
+        let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
+            self.error = Some("HTTP HEAD 응답 헤더 크기 계산 실패".to_owned());
+            return false;
+        };
+        if next_len > self.limit {
+            self.error = Some(format!(
+                "HTTP HEAD 응답 헤더 크기가 허용 한도({} bytes)를 초과했습니다.",
+                self.limit
+            ));
+            return false;
         }
+        self.bytes_seen = next_len;
+        if let Err(source) = self.pending_line.try_reserve(bytes.len()) {
+            self.error = Some(format!("HTTP HEAD 응답 헤더 메모리 확보 실패: {source}"));
+            return false;
+        }
+        for &byte in bytes {
+            self.pending_line.push(byte);
+            if byte == b'\n' {
+                if !self.capture_pending() {
+                    return false;
+                }
+                self.pending_line.clear();
+            }
+        }
+        true
+    }
+    fn capture_pending(&mut self) -> bool {
+        let Some(date_header_raw) = find_date_header_value(&self.pending_line) else {
+            return true;
+        };
+        let mut date_header = String::new();
+        if let Err(source) = date_header.try_reserve(date_header_raw.len()) {
+            self.error = Some(format!(
+                "HTTP HEAD 응답 Date 헤더 메모리 확보 실패: {source}"
+            ));
+            return false;
+        }
+        date_header.push_str(date_header_raw);
+        self.date_header = Some(date_header);
+        true
     }
 }
 fn cstring(label: &str, value: &str, context: &str) -> Result<CString> {
@@ -250,7 +304,7 @@ fn curl_error(context: &str, code: CurlCode) -> String {
     };
     format!("{context} 실패: {message} ({code})")
 }
-unsafe extern "C" fn write_vec_callback(
+unsafe extern "C" fn write_callback(
     ptr: *mut c_char,
     size: usize,
     nmemb: usize,
@@ -265,15 +319,19 @@ unsafe extern "C" fn write_vec_callback(
     let Some(payload_head) = NonNull::new(ptr.cast::<u8>()) else {
         return 0;
     };
-    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlBuffer>()) else {
+    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_>>()) else {
         return 0;
     };
     let payload_ptr = NonNull::slice_from_raw_parts(payload_head, len);
     // SAFETY: libcurl passes a readable buffer with len bytes for this callback.
     let bytes = unsafe { payload_ptr.as_ref() };
-    // SAFETY: userdata is the CurlBuffer pointer configured before curl_easy_perform.
+    // SAFETY: userdata is the CurlWriteTarget pointer configured before curl_easy_perform.
     let target = unsafe { target_ptr.as_mut() };
-    if !target.append(bytes) {
+    let accepted = match *target {
+        CurlWriteTarget::Body(ref mut buffer) => (*buffer).append(bytes),
+        CurlWriteTarget::Header(ref mut capture) => (*capture).append(bytes),
+    };
+    if !accepted {
         return 0;
     }
     len
