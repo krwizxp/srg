@@ -271,7 +271,7 @@ cfg_select! {
     target_arch = "x86_64" => {
         pub fn generate_random_data() -> Result<RandomDataSet> {
             let num = get_hardware_random()?;
-            let mut next_supp = |_reason: &'static str| get_hardware_random();
+            let mut next_supp = |_| get_hardware_random();
             RandomDataBuilder {
                 next_supp: &mut next_supp,
                 num,

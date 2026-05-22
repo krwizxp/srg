@@ -343,16 +343,16 @@ impl MenuApp {
             "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> StdResult<(bool, time::address::ParsedServer), &'static str> {
+            |raw_input| -> StdResult<(bool, time::address::ParsedServer), String> {
                 if raw_input.is_empty() {
-                    return Err("서버 주소를 비워둘 수 없습니다.");
+                    return Err("서버 주소를 비워둘 수 없습니다.".to_owned());
                 }
                 let after_scheme = time::address::strip_scheme_prefix(raw_input);
                 let ignored_suffix = after_scheme.contains(['/', '?', '#']);
                 raw_input
                     .parse::<time::address::ParsedServer>()
                     .map(|parsed| (ignored_suffix, parsed))
-                    .map_err(|_err| "서버 주소가 올바르지 않습니다.")
+                    .map_err(|source| format!("서버 주소가 올바르지 않습니다: {source}"))
             },
         )
         .map_err(time::diagnostic::TimeError::from)?;
@@ -456,9 +456,9 @@ impl MenuApp {
         out: &mut dyn Write,
         target_time: Option<SystemTime>,
     ) -> StdResult<Option<time::TriggerAction>, time::diagnostic::TimeError> {
-        let Some(_) = target_time else {
+        if target_time.is_none() {
             return Ok(None);
-        };
+        }
         get_validated_input(
             "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
             &mut self.input_buffer,

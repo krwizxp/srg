@@ -53,14 +53,15 @@ pub fn read_u64_hex_input(
         }
     }
 }
-pub fn get_validated_input<T, F>(
+pub fn get_validated_input<T, E, F>(
     prompt: &str,
     input_buf: &mut String,
     out: &mut dyn Write,
     mut validator: F,
 ) -> IoResult<T>
 where
-    F: FnMut(&str) -> StdResult<T, &'static str>,
+    E: AsRef<str>,
+    F: FnMut(&str) -> StdResult<T, E>,
 {
     loop {
         out.write_all(prompt.as_bytes())?;
@@ -77,8 +78,9 @@ where
         match validator(trimmed) {
             Ok(value) => return Ok(value),
             Err(err) => {
-                if !err.is_empty() {
-                    writeln!(out, "{err}")?;
+                let err_text = err.as_ref();
+                if !err_text.is_empty() {
+                    writeln!(out, "{err_text}")?;
                 }
             }
         }
