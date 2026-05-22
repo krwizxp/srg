@@ -1,10 +1,10 @@
 use crate::{
-    BUFFER_SIZE, BYTE_BITS, FILE_NAME, IS_TERMINAL, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64,
+    BUFFER_SIZE, FILE_NAME, IS_TERMINAL, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64,
     KST_SECS_PER_MINUTE_U64, MENU, Result,
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
     output::{format_data_into_buffer, prefix_slice},
-    random_data::{GenerationRequest, RandomBitBuffer, RandomDataSet},
+    random_data::RandomDataBuilder,
     random_util::checked_add_one_usize,
     time,
 };
@@ -164,8 +164,8 @@ impl MenuApp {
             )?;
             writeln!(command_out, "사다리타기 결과:")?;
             let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
-            let indices_slice = indices
-                .get_mut(..n)
+            let (indices_slice, _) = indices
+                .split_at_mut_checked(n)
                 .ok_or_else(|| IoError::other("인덱스 배열 슬라이스 범위 초과"))?;
             for index in (1..indices_slice.len()).rev() {
                 seed ^= get_hardware_random()?;
@@ -180,8 +180,8 @@ impl MenuApp {
                 })?;
                 indices_slice.swap(index, swap_index);
             }
-            let players = players_array
-                .get(..n)
+            let (players, _) = players_array
+                .split_at_checked(n)
                 .ok_or_else(|| IoError::other("플레이어 슬라이스 범위 초과"))?;
             for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
                 let result = results_array
@@ -220,7 +220,7 @@ impl MenuApp {
             err,
         )?;
         let mut supp_input_count = 0_usize;
-        let mut next_supp = |reason: &'static str| -> Result<RandomBitBuffer> {
+        let mut next_supp = |reason: &'static str| -> Result<u64> {
             supp_input_count = checked_add_one_usize(supp_input_count)
                 .ok_or_else(|| IoError::other("supp 입력 횟수 계산 실패"))?;
             let supp = read_u64_hex_input(
@@ -238,12 +238,13 @@ impl MenuApp {
                 out,
                 err,
             )?;
-            Ok((supp, BYTE_BITS).into())
+            Ok(supp)
         };
-        let data = RandomDataSet::try_from(GenerationRequest {
+        let data = RandomDataBuilder {
             next_supp: &mut next_supp,
             num: *num_64_slot,
-        })?;
+        }
+        .build()?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
         {
@@ -348,7 +349,8 @@ impl MenuApp {
                 }
                 let after_scheme = time::address::strip_scheme_prefix(raw_input);
                 let ignored_suffix = after_scheme.contains(['/', '?', '#']);
-                time::address::ParsedServer::try_from(raw_input)
+                raw_input
+                    .parse::<time::address::ParsedServer>()
                     .map(|parsed| (ignored_suffix, parsed))
                     .map_err(|_err| "서버 주소가 올바르지 않습니다.")
             },

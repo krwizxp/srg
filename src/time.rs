@@ -2,12 +2,14 @@ use self::{
     activity::{Activity, CountdownDecision},
     address::ParsedServer,
     diagnostic::{Result, TimeError, TimeErrorKind},
-    sample::{NetworkContext, NetworkContextRequest, fetch_server_time_sample},
+    sample::{TCP_LINE_BUFFER_CAPACITY, fetch_server_time_sample},
     util::blend_weighted_nanos,
 };
 cfg_select! {
     target_os = "windows" => {
-        use self::timer_resolution::{HighResTimerGuard, HighResTimerRequest, TARGET_PERIOD_MS};
+        use self::timer_resolution::{
+            HighResTimerGuard, TARGET_PERIOD_MS, TIMERR_NOERROR, time_begin_period,
+        };
     }
     _ => {}
 }
@@ -16,6 +18,7 @@ use alloc::fmt;
 use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, time::Duration};
 use std::{
     io::{self, BufRead as IoBufRead, Result as IoResult},
+    net,
     sync::mpsc,
     thread,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -124,11 +127,11 @@ pub enum TriggerAction {
     F5Press,
     LeftClick,
 }
-impl From<TriggerAction> for native_input::InputAction {
-    fn from(action: TriggerAction) -> Self {
-        match action {
-            TriggerAction::LeftClick => Self::MouseClick,
-            TriggerAction::F5Press => Self::F5Press,
+impl TriggerAction {
+    const fn native_input_action(self) -> native_input::InputAction {
+        match self {
+            Self::LeftClick => native_input::InputAction::MouseClick,
+            Self::F5Press => native_input::InputAction::F5Press,
         }
     }
 }
@@ -160,6 +163,15 @@ struct LoopRuntime<'runtime> {
     network_context: &'runtime mut NetworkContext,
     out: &'runtime mut dyn io::Write,
     prepared_input: &'runtime mut native_input::PreparedInput,
+}
+struct CachedTcpSocketAddr {
+    addr: net::SocketAddr,
+    host: String,
+    port: u16,
+}
+struct NetworkContext {
+    cached_tcp_socket_addr: Option<CachedTcpSocketAddr>,
+    tcp_line_buffer: Vec<u8>,
 }
 impl ServerTimeSession {
     pub fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
@@ -229,7 +241,7 @@ impl AppState {
                 }
             }
         }
-        let Some(rtts) = rtt_nanos.get_mut(..filled) else {
+        let Some((rtts, _)) = rtt_nanos.split_at_mut_checked(filled) else {
             return transition_to_retry("RTT 샘플 범위 계산 실패.");
         };
         rtts.sort_unstable();
@@ -237,7 +249,13 @@ impl AppState {
         let Some(window_end) = filled.checked_sub(trim) else {
             return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
         };
-        let Some(window) = rtts.get(trim..window_end) else {
+        let Some((_, window_tail)) = rtts.split_at_checked(trim) else {
+            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
+        };
+        let Some(sample_window_len) = window_end.checked_sub(trim) else {
+            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
+        };
+        let Some((window, _)) = window_tail.split_at_checked(sample_window_len) else {
             return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
         };
         let sum_nanos: u128 = window.iter().sum();
@@ -579,7 +597,16 @@ impl AppState {
         message_buffer
             .try_reserve(MESSAGE_BUFFER_CAPACITY)
             .map_err(io::Error::other)?;
-        let mut network_context = NetworkContext::try_from(NetworkContextRequest)?;
+        let mut tcp_line_buffer = Vec::new();
+        tcp_line_buffer
+            .try_reserve(TCP_LINE_BUFFER_CAPACITY)
+            .map_err(|source| {
+                TimeError::parse(format!("TCP line buffer 메모리 확보 실패: {source}"))
+            })?;
+        let mut network_context = NetworkContext {
+            cached_tcp_socket_addr: None,
+            tcp_line_buffer,
+        };
         let mut prepared_input = native_input::PreparedInput::EMPTY;
         let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
@@ -593,11 +620,7 @@ impl AppState {
             };
             let pre_wait_now = Instant::now();
             let elapsed = pre_wait_now.duration_since(last_display_update);
-            let remaining_display = if elapsed >= DISPLAY_INTERVAL {
-                Duration::ZERO
-            } else {
-                DISPLAY_INTERVAL.saturating_sub(elapsed)
-            };
+            let remaining_display = DISPLAY_INTERVAL.saturating_sub(elapsed);
             let poll_timeout = activity_poll.min(remaining_display);
             match rx.recv_timeout(poll_timeout) {
                 Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
@@ -664,7 +687,8 @@ impl AppState {
                 if self.high_res_timer_guard.is_some() {
                     return;
                 }
-                let Ok(guard) = HighResTimerGuard::try_from(HighResTimerRequest) else {
+                // SAFETY: `time_begin_period` is a WinMM FFI call with a plain integer input.
+                if unsafe { time_begin_period(TARGET_PERIOD_MS) } != TIMERR_NOERROR {
                     write_line_ignored(
                         err,
                         format_args!(
@@ -676,7 +700,8 @@ impl AppState {
                         ),
                     );
                     return;
-                };
+                }
+                let guard = HighResTimerGuard;
                 self.high_res_timer_guard = Some(guard);
             }
         }
@@ -693,7 +718,7 @@ impl AppState {
             next_activity.is_final_countdown() && !previous_activity.is_final_countdown();
         if entering_final_countdown {
             prepared_input.prepare(
-                self.trigger_action.map(native_input::InputAction::from),
+                self.trigger_action.map(TriggerAction::native_input_action),
                 err,
             );
             return;
@@ -709,7 +734,7 @@ impl AppState {
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
     ) -> (Activity, Option<&'message str>) {
-        if let Some(action) = self.trigger_action.map(native_input::InputAction::from) {
+        if let Some(action) = self.trigger_action.map(TriggerAction::native_input_action) {
             prepared_input.send(action, err);
         }
         append_fmt(msg_buf, log_message);

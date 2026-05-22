@@ -4,6 +4,7 @@ use super::{
 };
 use alloc::{string::String, vec::Vec};
 use core::{
+    cell::RefCell,
     ffi::c_void,
     ptr::{NonNull, null, null_mut},
 };
@@ -21,6 +22,7 @@ const WINHTTP_ACCESS_TYPE_DEFAULT_PROXY: u32 = 0;
 const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
 const WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE: u32 = 155;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
+const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
 pub(super) const CLIENT: Client = Client {
     get_last_error: GetLastError,
     http_scheme_prefix: HTTP_SCHEME_PREFIX,
@@ -38,6 +40,18 @@ struct RequestTarget {
     secure: bool,
 }
 struct Handle(NonNull<c_void>);
+struct CachedConnect {
+    handle: Handle,
+    host: String,
+    port: u16,
+}
+struct SessionCache {
+    connects: Vec<CachedConnect>,
+    session: Handle,
+}
+std::thread_local! {
+    static SESSION_CACHE: RefCell<Option<SessionCache>> = const { RefCell::new(None) };
+}
 #[link(name = "winhttp")]
 unsafe extern "system" {
     fn WinHttpCloseHandle(h_internet: HInternet) -> i32;
@@ -113,6 +127,45 @@ impl Handle {
     }
 }
 impl Client {
+    fn cached_connect<'cache>(
+        &self,
+        cache: &'cache mut SessionCache,
+        host: &str,
+        host_wide: &[u16],
+        port: u16,
+        context: &str,
+    ) -> Result<&'cache Handle> {
+        if let Some(index) = cache
+            .connects
+            .iter()
+            .position(|entry| entry.port == port && entry.host.as_str() == host)
+        {
+            return cache
+                .connects
+                .get(index)
+                .map(|entry| &entry.handle)
+                .ok_or_else(|| error(context, "WinHTTP connect cache 범위 오류"));
+        }
+        let handle = self.connect(&cache.session, host_wide, port, context)?;
+        let mut host_key = String::new();
+        host_key
+            .try_reserve(host.len())
+            .map_err(|source| error(context, format!("WinHTTP connect host key 메모리 확보 실패: {source}")))?;
+        host_key.push_str(host);
+        if cache.connects.len() >= WINHTTP_CONNECT_CACHE_LIMIT {
+            cache.connects.remove(0);
+        }
+        cache
+            .connects
+            .try_reserve(1)
+            .map_err(|source| error(context, format!("WinHTTP connect cache 메모리 확보 실패: {source}")))?;
+        let entry = cache.connects.push_mut(CachedConnect {
+            handle,
+            host: host_key,
+            port,
+        });
+        Ok(&entry.handle)
+    }
     fn connect(&self, session: &Handle, host: &[u16], port: u16, context: &str) -> Result<Handle> {
         // SAFETY: host is NUL-terminated and session is a valid session handle.
         let raw_connect = unsafe { WinHttpConnect(session.as_ptr(), host.as_ptr(), port, 0) };
@@ -129,23 +182,31 @@ impl Client {
         let host_wide = wide(&target.host, context)?;
         let method_wide = wide("HEAD", context)?;
         let path_wide = wide("/", context)?;
-        let session = self.open_session(&user_agent, context)?;
-        let connect = self.connect(&session, &host_wide, target.port, context)?;
         let flags = if target.secure {
             WINHTTP_FLAG_SECURE
         } else {
             0
         };
-        let request = self.open_request(&connect, &method_wide, &path_wide, flags, context)?;
-        if target.secure {
-            match self.set_ignore_revocation_offline(&request) {
-                Ok(()) | Err(_) => {}
-            }
-        }
-        let request_start = Instant::now();
-        self.send_head(&request, context)?;
-        self.receive_response(&request, context)?;
-        let response_received_inst = Instant::now();
+        let (request, request_start, response_received_inst) = self.with_cached_connect(
+            &user_agent,
+            &target.host,
+            &host_wide,
+            target.port,
+            context,
+            |connect| {
+                let request = self.open_request(connect, &method_wide, &path_wide, flags, context)?;
+                if target.secure {
+                    match self.set_ignore_revocation_offline(&request) {
+                        Ok(()) | Err(_) => {}
+                    }
+                }
+                let request_start = Instant::now();
+                self.send_head(&request, context)?;
+                self.receive_response(&request, context)?;
+                let response_received_inst = Instant::now();
+                Ok((request, request_start, response_received_inst))
+            },
+        )?;
         let server_time = self.query_server_time(&request, context, parse_http_date)?;
         let rtt = response_received_inst
             .saturating_duration_since(request_start)
@@ -171,7 +232,7 @@ impl Client {
     }
     fn open_request(
         &self,
-        connect: &Handle,
+        connect: HInternet,
         method: &[u16],
         path: &[u16],
         flags: u32,
@@ -180,7 +241,7 @@ impl Client {
         // SAFETY: method and path are NUL-terminated and connect is valid.
         let raw_request = unsafe {
             WinHttpOpenRequest(
-                connect.as_ptr(),
+                connect,
                 method.as_ptr(),
                 path.as_ptr(),
                 null(),
@@ -397,6 +458,60 @@ impl Client {
             Err(self.last_error("WinHttpSetOption IGNORE_CERT_REVOCATION_OFFLINE", "WinHTTP"))
         } else {
             Ok(())
+        }
+    }
+    fn with_cached_connect<R>(
+        &self,
+        user_agent: &[u16],
+        host: &str,
+        host_wide: &[u16],
+        port: u16,
+        context: &str,
+        action: impl FnOnce(HInternet) -> Result<R>,
+    ) -> Result<R> {
+        let connect_ptr = SESSION_CACHE
+            .try_with(|cell| {
+                let mut session_cache = cell.try_borrow_mut().map_err(|source| {
+                    error(
+                        context,
+                        format!("WinHTTP session cache borrow 실패: {source}"),
+                    )
+                })?;
+                if session_cache.is_none() {
+                    *session_cache = Some(SessionCache {
+                        connects: Vec::new(),
+                        session: self.open_session(user_agent, context)?,
+                    });
+                }
+                let Some(cache) = session_cache.as_mut() else {
+                    return Err(error(context, "WinHTTP session cache가 비어 있습니다."));
+                };
+                let connect = self.cached_connect(cache, host, host_wide, port, context)?;
+                Ok(connect.as_ptr())
+            })
+            .map_err(|source| error(context, format!("WinHTTP session cache 접근 실패: {source}")))??;
+        match action(connect_ptr) {
+            Ok(value) => Ok(value),
+            Err(action_error) => match SESSION_CACHE.try_with(|cell| {
+                let mut session_cache = cell.try_borrow_mut().map_err(|source| {
+                    error(
+                        context,
+                        format!("WinHTTP session cache borrow 실패: {source}"),
+                    )
+                })?;
+                *session_cache = None;
+                Ok::<(), TimeError>(())
+            }) {
+                Ok(Ok(())) => Err(action_error),
+                Ok(Err(cache_error)) => Err(error(
+                    context,
+                    format!("{action_error}; WinHTTP session cache 정리 실패: {cache_error}"),
+                )),
+                Err(access_error) => Err(error(
+                    context,
+                    format!("{action_error}; WinHTTP session cache 접근 실패: {access_error}"),
+                )),
+            },
         }
     }
 }

@@ -2,7 +2,7 @@ use super::{
     Result, TimeError,
     util::{parse_result_with_context, parse_u32_digits},
 };
-use core::fmt::Write as FmtWrite;
+use core::{fmt::Write as FmtWrite, str::FromStr};
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
@@ -52,9 +52,9 @@ impl ParsedServer {
         }
     }
 }
-impl TryFrom<&str> for ParsedServer {
-    type Error = TimeError;
-    fn try_from(host: &str) -> Result<Self> {
+impl FromStr for ParsedServer {
+    type Err = TimeError;
+    fn from_str(host: &str) -> Result<Self> {
         let trimmed_input = host.trim();
         if trimmed_input.is_empty() {
             return Err(TimeError::parse(ERR_EMPTY));
@@ -63,9 +63,8 @@ impl TryFrom<&str> for ParsedServer {
         let scheme = if after_scheme.len() == trimmed_input.len() {
             None
         } else if trimmed_input
-            .as_bytes()
-            .get(..HTTPS_SCHEME_PREFIX_LEN)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX.as_bytes()))
+            .split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
+            .is_some_and(|(prefix, _)| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX))
         {
             Some(UrlScheme::Https)
         } else {
@@ -156,23 +155,14 @@ impl TryFrom<&str> for ParsedServer {
         })
     }
 }
-pub fn strip_scheme_prefix(input: &str) -> &str {
-    let input_bytes = input.as_bytes();
-    if input_bytes
-        .get(..HTTPS_SCHEME_PREFIX_LEN)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX.as_bytes()))
+pub const fn strip_scheme_prefix(input: &str) -> &str {
+    if let Some((prefix, rest)) = input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
+        && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
     {
-        let Some((_, rest)) = input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN) else {
-            return input;
-        };
         rest
-    } else if input_bytes
-        .get(..HTTP_SCHEME_PREFIX_LEN)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX.as_bytes()))
+    } else if let Some((prefix, rest)) = input.split_at_checked(HTTP_SCHEME_PREFIX_LEN)
+        && prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX)
     {
-        let Some((_, rest)) = input.split_at_checked(HTTP_SCHEME_PREFIX_LEN) else {
-            return input;
-        };
         rest
     } else {
         input

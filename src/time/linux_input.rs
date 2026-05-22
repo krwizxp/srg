@@ -149,8 +149,7 @@ impl X11Api {
 }
 impl Drop for PreparedX11Input {
     fn drop(&mut self) {
-        // SAFETY: display was returned by XOpenDisplay and is closed exactly once here,
-        // while the libX11 handle owned by self.api is still alive.
+        // SAFETY: display came from XOpenDisplay and closes once here while self.api keeps libX11 alive.
         unsafe {
             (self.api.close_display)(self.display.as_ptr());
         }

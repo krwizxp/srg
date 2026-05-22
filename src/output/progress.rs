@@ -14,7 +14,7 @@ const PERCENT_WIDTH: usize = 3;
 const SECONDS_PER_MINUTE_U128: u128 = 60;
 const TIME_BUF_LEN: usize = 7;
 fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
-    let Some(head) = buf.get_mut(..TIME_BUF_LEN) else {
+    let Some(head) = buf.first_chunk_mut::<TIME_BUF_LEN>() else {
         return 0;
     };
     let Some(deci) = deci_seconds else {

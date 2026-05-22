@@ -54,14 +54,11 @@ impl SliceCursor<'_> {
         buffmt_digit_byte(index)
     }
     fn range_two_digits(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; TWO_DIGIT_WIDTH]> {
-        let end = start
-            .checked_add(TWO_DIGIT_WIDTH)
+        let (_, tail) = slice
+            .split_at_mut_checked(start)
             .ok_or_else(write_zero_err)?;
-        slice
-            .get_mut(start..end)
-            .ok_or_else(write_zero_err)?
-            .try_into()
-            .map_err(|_source| write_zero_err())
+        tail.first_chunk_mut::<TWO_DIGIT_WIDTH>()
+            .ok_or_else(write_zero_err)
     }
     fn write_byte(&mut self, byte: u8) -> IoResult<()> {
         self.inner.write_byte(byte)
@@ -71,7 +68,11 @@ impl SliceCursor<'_> {
     }
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
-        Self::copy_two_digits(self.inner.take_array::<TWO_DIGIT_WIDTH>()?, idx)?;
+        let digits_slice = self.inner.take(TWO_DIGIT_WIDTH)?;
+        let Some(digits) = digits_slice.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
+            return Err(write_zero_err());
+        };
+        Self::copy_two_digits(digits, idx)?;
         Ok(())
     }
     fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {

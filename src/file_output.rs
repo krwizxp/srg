@@ -56,25 +56,6 @@ cfg_select! {
             file_index_high: u32,
             file_index_low: u32,
         }
-        impl TryFrom<&File> for ByHandleFileInformation {
-            type Error = IoError;
-            fn try_from(file: &File) -> IoResult<Self> {
-                let mut file_information = Self::default();
-                // SAFETY: `GetFileInformationByHandle` only writes to the provided output
-                // struct and uses the raw OS handle borrowed from `file` for the duration
-                // of this call.
-                let result = unsafe {
-                    GetFileInformationByHandle(
-                        WindowsRawHandle::as_raw_handle(file),
-                        &raw mut file_information,
-                    )
-                };
-                if result == 0_i32 {
-                    return Err(IoError::last_os_error());
-                }
-                Ok(file_information)
-            }
-        }
         unsafe extern "system" {
             fn GetFileInformationByHandle(
                 h_file: *mut c_void,
@@ -82,7 +63,18 @@ cfg_select! {
             ) -> i32;
         }
         fn file_has_multiple_links(file: &File) -> IoResult<bool> {
-            Ok(ByHandleFileInformation::try_from(file)?.number_of_links > 1)
+            let mut file_information = ByHandleFileInformation::default();
+            // SAFETY: `GetFileInformationByHandle` only writes to `file_information` and reads the borrowed file handle during the call.
+            let result = unsafe {
+                GetFileInformationByHandle(
+                    WindowsRawHandle::as_raw_handle(file),
+                    &raw mut file_information,
+                )
+            };
+            if result == 0_i32 {
+                return Err(IoError::last_os_error());
+            }
+            Ok(file_information.number_of_links > 1)
         }
     }
     _ => {}

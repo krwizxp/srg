@@ -121,8 +121,7 @@ fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
         );
         return;
     };
-    // SAFETY: `inputs.as_ptr()` stays valid for the whole call.
-    // `cb_size` matches the exact Rust representation passed to `SendInput`.
+    // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
     let sent = unsafe { SendInput(input_count, inputs.as_ptr(), input_size) };
     if sent != input_count {
         write_line_ignored(

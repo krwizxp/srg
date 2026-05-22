@@ -1,5 +1,5 @@
 use super::{
-    ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, EURO_LUCKY_MODULUS, EURO_MAIN_MODULUS,
+    ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, BYTE_BITS, EURO_LUCKY_MODULUS, EURO_MAIN_MODULUS,
     EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT, HANGUL_BASE_CODE_POINT, HANGUL_SHIFTS,
     HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX, HANGUL_SYLLABLE_MODULUS,
     INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO, INPUT_BYTE_MAX_FOR_LOTTO7,
@@ -16,11 +16,11 @@ use super::{
 };
 cfg_select! {
     target_arch = "x86_64" => {
-        use super::{BYTE_BITS, hardware_rng::get_hardware_random};
+        use super::hardware_rng::get_hardware_random;
     }
     _ => {}
 }
-use core::{char::from_u32, error::Error, ops::Mul as NumericMul};
+use core::{char::from_u32, ops::Mul as NumericMul};
 use std::io::Error as IoError;
 #[derive(Default)]
 pub struct RandomDataSet {
@@ -54,27 +54,10 @@ pub struct RandomDataSet {
     pub solar_system_index: u16,
     pub world_coords: (f64, f64),
 }
-impl RandomDataSet {
-    const fn is_complete(&self) -> bool {
-        self.numeric_password_digits >= LOTTO_COUNT_U8
-            && self.lotto_next_idx >= LOTTO_COUNT
-            && self.lotto7_next_idx >= LOTTO7_COUNT
-            && self.password_len >= PASSWORD_BYTE_LEN_U8
-            && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
-    }
-}
 #[derive(Clone, Copy)]
 pub struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
-}
-impl From<(u64, u8)> for RandomBitBuffer {
-    fn from((value, bits_remaining): (u64, u8)) -> Self {
-        Self {
-            bits_remaining,
-            value,
-        }
-    }
 }
 impl RandomBitBuffer {
     pub const fn bits_remaining(self) -> u8 {
@@ -95,28 +78,46 @@ impl RandomBitBuffer {
         self.value
     }
 }
-type SupplementalProvider<'provider> =
-    dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider;
-pub struct GenerationRequest<'provider_ref, 'provider_env> {
-    pub next_supp:
-        &'provider_ref mut (dyn FnMut(&'static str) -> Result<RandomBitBuffer> + 'provider_env),
+pub type SupplementalProvider<'provider> = dyn FnMut(&'static str) -> Result<u64> + 'provider;
+pub struct RandomDataBuilder<'provider_ref, 'provider_env> {
+    pub next_supp: &'provider_ref mut SupplementalProvider<'provider_env>,
     pub num: u64,
 }
-struct RandomDataBuilder<'provider_ref, 'provider_env> {
+struct RandomDataBuildState<'provider_ref, 'provider_env> {
     data: RandomDataSet,
     next_supp: &'provider_ref mut SupplementalProvider<'provider_env>,
     num: u64,
     supplemental: Option<RandomBitBuffer>,
 }
-impl RandomDataBuilder<'_, '_> {
-    fn build(mut self) -> Result<RandomDataSet> {
-        self.fill_required_fields()?;
-        self.fill_lucky_stars()?;
-        self.fill_hangul_syllables()?;
-        self.fill_coords();
-        self.fill_nms_fields()?;
-        Ok(self.data)
+impl RandomDataSet {
+    const fn is_complete(&self) -> bool {
+        self.numeric_password_digits >= LOTTO_COUNT_U8
+            && self.lotto_next_idx >= LOTTO_COUNT
+            && self.lotto7_next_idx >= LOTTO7_COUNT
+            && self.password_len >= PASSWORD_BYTE_LEN_U8
+            && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
     }
+}
+impl RandomDataBuilder<'_, '_> {
+    pub fn build(self) -> Result<RandomDataSet> {
+        let mut state = RandomDataBuildState {
+            data: RandomDataSet {
+                num_64: self.num,
+                ..Default::default()
+            },
+            next_supp: self.next_supp,
+            num: self.num,
+            supplemental: None,
+        };
+        state.fill_required_fields()?;
+        state.fill_lucky_stars()?;
+        state.fill_hangul_syllables()?;
+        state.fill_coords();
+        state.fill_nms_fields()?;
+        Ok(state.data)
+    }
+}
+impl RandomDataBuildState<'_, '_> {
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
@@ -258,36 +259,24 @@ impl RandomDataBuilder<'_, '_> {
         Ok(())
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<RandomBitBuffer> {
-        let supplemental = (self.next_supp)(reason)?;
+        let supplemental = RandomBitBuffer {
+            bits_remaining: BYTE_BITS,
+            value: (self.next_supp)(reason)?,
+        };
         self.supplemental = Some(supplemental);
         Ok(supplemental)
-    }
-}
-impl TryFrom<GenerationRequest<'_, '_>> for RandomDataSet {
-    type Error = Box<dyn Error + Send + Sync>;
-    fn try_from(request: GenerationRequest<'_, '_>) -> Result<Self> {
-        RandomDataBuilder {
-            data: Self {
-                num_64: request.num,
-                ..Default::default()
-            },
-            next_supp: request.next_supp,
-            num: request.num,
-            supplemental: None,
-        }
-        .build()
     }
 }
 cfg_select! {
     target_arch = "x86_64" => {
         pub fn generate_random_data() -> Result<RandomDataSet> {
             let num = get_hardware_random()?;
-            let mut next_supp =
-                |_reason: &'static str| Ok((get_hardware_random()?, BYTE_BITS).into());
-            RandomDataSet::try_from(GenerationRequest {
+            let mut next_supp = |_reason: &'static str| get_hardware_random();
+            RandomDataBuilder {
                 next_supp: &mut next_supp,
                 num,
-            })
+            }
+            .build()
         }
     }
     _ => {}
@@ -435,7 +424,10 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             .as_ref()
             .is_none_or(|supp| supp.bits_remaining() < BITS);
         if need_new {
-            *supplemental = Some(next_supp(reason)?);
+            *supplemental = Some(RandomBitBuffer {
+                bits_remaining: BYTE_BITS,
+                value: next_supp(reason)?,
+            });
         }
         let Some(supp) = supplemental.as_mut() else {
             return Err("보완 난수 상태 불일치".into());

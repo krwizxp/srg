@@ -181,9 +181,7 @@ impl OutputFormatter<'_, '_, '_> {
             .and_then(|value| value.checked_add(BYTE_GROUP_COUNT))
             .ok_or_else(write_zero_err)?;
         let head = self.cursor.take(line_len)?;
-        head.get_mut(..prefix_len)
-            .ok_or_else(write_zero_err)?
-            .copy_from_slice(prefix_bytes);
+        range_slice_mut(head, 0, prefix_len)?.copy_from_slice(prefix_bytes);
         let mut pos = prefix_len;
         for (index, byte) in self.bytes.into_iter().enumerate() {
             let group = render_group(byte)?;
@@ -288,7 +286,10 @@ fn sub_from_index(value: &mut usize, amount: usize) -> IoResult<()> {
     Ok(())
 }
 pub fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
-    slice.get(..len).ok_or_else(write_zero_err)
+    slice
+        .split_at_checked(len)
+        .map(|(prefix, _)| prefix)
+        .ok_or_else(write_zero_err)
 }
 fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
     slice
@@ -297,16 +298,17 @@ fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
         .ok_or_else(write_zero_err)
 }
 fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut [u8]> {
-    let end = start.checked_add(len).ok_or_else(write_zero_err)?;
-    slice.get_mut(start..end).ok_or_else(write_zero_err)
+    let (_, tail) = slice
+        .split_at_mut_checked(start)
+        .ok_or_else(write_zero_err)?;
+    tail.split_at_mut_checked(len)
+        .map(|(range, _)| range)
+        .ok_or_else(write_zero_err)
 }
 fn range_array_mut<const N: usize>(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; N]> {
-    let end = start.checked_add(N).ok_or_else(write_zero_err)?;
-    slice
-        .get_mut(start..end)
-        .ok_or_else(write_zero_err)?
-        .try_into()
-        .map_err(|_source| write_zero_err())
+    range_slice_mut(slice, start, N)?
+        .first_chunk_mut::<N>()
+        .ok_or_else(write_zero_err)
 }
 fn hex_byte(index: usize) -> IoResult<&'static [u8; 2]> {
     HEX_BYTE_TABLE.get(index).ok_or_else(write_zero_err)

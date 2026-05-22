@@ -33,10 +33,12 @@ impl<'buffer> ByteCursor<'buffer> {
         let start = self.pos;
         let end = start.checked_add(len).ok_or_else(write_zero_err)?;
         self.pos = end;
-        self.buf.get_mut(start..end).ok_or_else(write_zero_err)
-    }
-    pub fn take_array<const N: usize>(&mut self) -> io::Result<&mut [u8; N]> {
-        self.take(N)?.try_into().map_err(|_source| write_zero_err())
+        let (_, tail) = self
+            .buf
+            .split_at_mut_checked(start)
+            .ok_or_else(write_zero_err)?;
+        let (taken, _) = tail.split_at_mut_checked(len).ok_or_else(write_zero_err)?;
+        Ok(taken)
     }
     pub fn write_byte(&mut self, byte: u8) -> io::Result<()> {
         let Some(slot) = self.take(SINGLE_BYTE_WIDTH)?.first_mut() else {
@@ -53,7 +55,10 @@ impl<'buffer> ByteCursor<'buffer> {
         self.pos
     }
     pub fn written_slice(&self) -> io::Result<&[u8]> {
-        self.buf.get(..self.pos).ok_or_else(write_zero_err)
+        self.buf
+            .split_at_checked(self.pos)
+            .map(|(written, _)| written)
+            .ok_or_else(write_zero_err)
     }
 }
 impl fmt::Write for ByteCursor<'_> {
@@ -65,8 +70,11 @@ impl fmt::Write for ByteCursor<'_> {
         fmt::write(self, args)
     }
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_bytes(s.as_bytes())
-            .map_err(|_write_err| fmt::Error)
+        if self.write_bytes(s.as_bytes()).is_ok() {
+            Ok(())
+        } else {
+            Err(fmt::Error)
+        }
     }
 }
 pub fn copy_two_digits(target: &mut [u8; 2], value: usize) -> io::Result<()> {

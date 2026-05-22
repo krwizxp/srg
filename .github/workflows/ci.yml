@@ -18,8 +18,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_path: artifacts/srg-linux-x64.tar.gz
+            binary_name: srg-linux-x64
+          - os: macos-latest
+            artifact_path: artifacts/srg-macos.tar.gz
+            binary_name: srg-macos
           - os: windows-latest
             artifact_path: target/release/srg-windows-x64.exe
+            binary_name: srg-windows-x64
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
@@ -36,19 +41,22 @@ jobs:
       - name: Install Linux native dependencies
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: Release Build
         run: cargo build --release --locked
-      - name: Prepare Linux artifact
-        if: matrix.os == 'ubuntu-latest'
+      - name: Prepare Unix artifact
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          mkdir -p artifacts
-          tar -C target/release --transform='s|^srg$|srg-linux-x64|' -czf artifacts/srg-linux-x64.tar.gz srg
+          mkdir -p artifacts package
+          cp target/release/srg "package/${{ matrix.binary_name }}"
+          tar -C package -czf "${{ matrix.artifact_path }}" "${{ matrix.binary_name }}"
       - name: Rename Windows artifact file
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Move-Item target\release\srg.exe target\release\srg-windows-x64.exe -Force
+          Move-Item target\release\srg.exe target\release\${{ matrix.binary_name }}.exe -Force
       - name: Upload Release Binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
