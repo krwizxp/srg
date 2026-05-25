@@ -1928,8 +1928,7 @@
             </p>
             <div class="manual-rng-field">
               <label class="manual-rng-label" for="num64">기본 난수값</label>
-              <input id="num64" type="text" inputmode="numeric" aria-describedby="num64-help"
-                placeholder="예: 123456789 또는 0x1122334455667788">
+              <input id="num64" type="text" aria-describedby="num64-help" placeholder="예: 123456789 또는 0x1122334455667788">
               <span class="manual-rng-meta" id="num64-help"><span class="nowrap">입력 범위: 0 ~
                   18446744073709551615</span><br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
             </div>
@@ -1938,8 +1937,7 @@
               <textarea id="suppValues" aria-describedby="suppValues-help" placeholder="쉼표/공백/줄바꿈 구분
 예) 0x123456789ABCDEF0
 18446744073709551615"></textarea>
-              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가
-                입력합니다.</span>
+              <span class="manual-rng-meta nowrap" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
             </div>
             <div class="manual-rng-actions">
               <button id="runBtn" class="action-btn action-btn--primary" type="button">
@@ -5362,7 +5360,7 @@
       function promptSuppValue(index, reason) {
         for (; ;) {
           const input = window.prompt(
-            `supp 값 #${index} 입력 (${reason})\n최소값 예: 0 또는 0x0\n최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}`,
+            `supp 값 #${index} 입력 (${reason}) - 최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}`,
             "",
           );
           if (input === null) {
