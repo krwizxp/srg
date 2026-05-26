@@ -2221,15 +2221,7 @@
     );
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
-    const getMapPopoverFocusTarget = () => {
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        const anchor = mapAnchors[i];
-        if (anchor instanceof HTMLElement && !anchor.hasAttribute("hidden")) {
-          return anchor;
-        }
-      }
-      return mapPopover;
-    };
+    const getMapPopoverFocusTarget = () => mapAnchors[0];
     const setMapPopoverExpanded = (btn, expanded) => {
       if (btn instanceof HTMLElement) {
         btn.setAttribute("aria-expanded", expanded ? "true" : "false");
@@ -2333,7 +2325,6 @@
       if (prevInvoker && prevInvoker !== btn) {
         setMapPopoverExpanded(prevInvoker, false);
       }
-      return prevInvoker;
     }
     function prepareMapPopoverFromInvoker(btn) {
       setMapPopoverInvoker(btn);
