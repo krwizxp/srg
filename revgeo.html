@@ -2216,7 +2216,6 @@
       return !!l && (l === lowerCountryName || l === lowerAdminCountry);
     }
     const mapPopover = document.getElementById("map-popover");
-    let MAP_POPOVER_OPEN = false;
     const mapAnchors = document.querySelectorAll(
       "#map-popover-links a[data-url-template]",
     );
@@ -2236,6 +2235,7 @@
         btn.setAttribute("aria-expanded", expanded ? "true" : "false");
       }
     };
+    const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let mapHasRound6 = false;
     const RX_MAP_TOKEN = /{lat}|{lon}/g;
     for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
@@ -2366,7 +2366,7 @@
       prepareMapPopoverFromInvoker(btn);
     });
     mapPopover.addEventListener("command", (e) => {
-      if (e.command !== "show-popover" || !MAP_POPOVER_OPEN) return;
+      if (e.command !== "show-popover" || !isMapPopoverOpen()) return;
       const btn = mapButtonFromSource(e.source);
       if (!btn || btn === LAST_MAP_INVOKER) return;
       prepareMapPopoverFromInvoker(btn);
@@ -2374,13 +2374,12 @@
       setMapPopoverExpanded(btn, true);
     });
     function closeMapPopover() {
-      if (!MAP_POPOVER_OPEN) return;
-      MAP_POPOVER_OPEN = false;
+      if (!isMapPopoverOpen()) return;
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      MAP_POPOVER_OPEN = e.newState === "open";
-      if (!MAP_POPOVER_OPEN) {
+      const mapPopoverOpen = e.newState === "open";
+      if (!mapPopoverOpen) {
         setMapPopoverExpanded(LAST_MAP_INVOKER, false);
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
@@ -2404,7 +2403,7 @@
       setMapPopoverExpanded(invoker, true);
       updateMapPopoverFromInvoker(invoker);
       requestAnimationFrame(() => {
-        if (!MAP_POPOVER_OPEN) return;
+        if (!isMapPopoverOpen()) return;
         const active = document.activeElement;
         if (
           active === document.body || active === invoker ||
@@ -2986,7 +2985,7 @@
       cancelPendingFilterDebounce();
       FILTER_CTX.timer = setTimeout(() => {
         FILTER_CTX.timer = null;
-        if (MAP_POPOVER_OPEN) closeMapPopover();
+        if (isMapPopoverOpen()) closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, 120);
@@ -4710,7 +4709,7 @@
       scheduleApplyFilterAll,
     );
     domElements.tbody.addEventListener("click", (e) => {
-      if (!MAP_POPOVER_OPEN) return;
+      if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
@@ -4739,8 +4738,7 @@
         const active = document.activeViewTransition;
         if (active) {
           active.types.add("results");
-          fn();
-          return active;
+          return fn();
         }
         return startViewTransition({ update: fn, types: ["results"] });
       }
@@ -4809,18 +4807,13 @@
       console.error(err);
       setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
     }
+    function watchCommandResult(ret) {
+      ret?.updateCallbackDone?.catch(handleCommandError);
+    }
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      try {
-        const ret = cmd();
-        const then = ret && ret.then;
-        if (typeof then === "function") {
-          then.call(ret, null, handleCommandError);
-        }
-      } catch (err) {
-        handleCommandError(err);
-      }
+      Promise.try(cmd).then(watchCommandResult, handleCommandError);
     });
     function handleFile(file) {
       if (!file) return;
@@ -4869,11 +4862,11 @@
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
     document.addEventListener("scroll", () => {
-      if (MAP_POPOVER_OPEN) closeMapPopover();
+      if (isMapPopoverOpen()) closeMapPopover();
       if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
     }, EVT_CAPTURE_PASSIVE);
     function resetInteractionState({ closePopover = false } = {}) {
-      if (closePopover && MAP_POPOVER_OPEN) closeMapPopover();
+      if (closePopover && isMapPopoverOpen()) closeMapPopover();
     }
     let DEACTIVATE_QUEUED = false;
     let NEED_CLOSE_POPOVER = false;
