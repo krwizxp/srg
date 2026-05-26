@@ -4101,9 +4101,30 @@
     })();
     async function* decodedChunkIterator(stream, signal) {
       const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
-      for await (const chunk of decoded) {
-        signal.throwIfAborted();
-        yield chunk;
+      const reader = decoded.getReader();
+      let finished = false;
+      try {
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            finished = true;
+            signal.throwIfAborted();
+            return;
+          }
+          signal.throwIfAborted();
+          yield chunk;
+        }
+      } finally {
+        if (!finished) {
+          try {
+            await reader.cancel(signal.reason);
+          } catch {
+          }
+        }
+        try {
+          reader.releaseLock();
+        } catch {
+        }
       }
     }
     async function* lineIterator(stream, signal) {
