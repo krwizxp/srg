@@ -651,14 +651,16 @@
         }
       }
 
-      .manual-rng {
-        margin-block-start: 2px;
-        border-radius: 18px;
-        max-inline-size: 100%;
-        min-inline-size: 0;
-        padding: 16px;
+      @scope (.manual-rng) {
+        :scope {
+          margin-block-start: 2px;
+          border-radius: 18px;
+          max-inline-size: 100%;
+          min-inline-size: 0;
+          padding: 16px;
+        }
 
-        summary {
+        :scope summary {
           cursor: pointer;
           font-weight: 700;
           color: var(--accent-ink);
@@ -678,11 +680,11 @@
           }
         }
 
-        &[open] summary::before {
+        :scope[open] summary::before {
           transform: rotate(90deg);
         }
 
-        .manual-rng-body {
+        :scope .manual-rng-body {
           margin-block-start: 10px;
           display: grid;
           align-content: start;
@@ -692,7 +694,7 @@
           min-inline-size: 0;
         }
 
-        &[open] .manual-rng-body {
+        :scope[open] .manual-rng-body {
           max-block-size: min(52dvh, 420px);
           overflow-y: auto;
           padding-inline-end: 4px;
@@ -704,18 +706,18 @@
               var(--accent) 18%) oklch(0% 0 0 / 0);
         }
 
-        .manual-rng-help {
+        :scope .manual-rng-help {
           color: var(--muted);
           font-size: var(--fs-sm);
           line-height: 1.35;
         }
 
-        .manual-rng-field {
+        :scope .manual-rng-field {
           display: grid;
           gap: 6px;
         }
 
-        :is(input[type="text"], textarea) {
+        :scope :is(input[type="text"], textarea) {
           inline-size: 100%;
           padding-block: var(--control-pad-block, 10px);
           padding-inline: var(--control-pad-inline, 12px);
@@ -729,25 +731,25 @@
           }
         }
 
-        input[type="text"] {
+        :scope input[type="text"] {
           min-block-size: var(--control-min-block-size, 44px);
           caret-color: var(--accent-ink);
         }
 
-        .manual-rng-label {
+        :scope .manual-rng-label {
           font-size: var(--fs-sm);
           font-weight: 600;
           color: var(--muted-strong);
         }
 
-        .manual-rng-meta {
+        :scope .manual-rng-meta {
           color: var(--muted);
           font-size: var(--fs-sm);
           line-height: 1.35;
           white-space: pre-wrap;
         }
 
-        .manual-rng-actions {
+        :scope .manual-rng-actions {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
@@ -803,18 +805,18 @@
           }
         }
 
-        textarea {
+        :scope textarea {
           min-block-size: 90px;
           resize: vertical;
           scrollbar-width: thin;
           caret-color: var(--accent-ink);
         }
 
-        :is(input[type="text"], textarea):focus-visible {
+        :scope :is(input[type="text"], textarea):focus-visible {
           box-shadow: inset 0 0 0 2px var(--focus-ring), var(--panel-shadow);
         }
 
-        #output.coords-view {
+        :scope #output.coords-view {
           inline-size: 100%;
           max-inline-size: 100%;
           max-block-size: 260px;
@@ -822,12 +824,12 @@
           white-space: pre;
         }
 
-        section[aria-label="변환 결과"] {
+        :scope section[aria-label="변환 결과"] {
           max-inline-size: 100%;
           min-inline-size: 0;
         }
 
-        #error {
+        :scope #error {
           color: color-mix(in oklch, var(--err) 75%, var(--fg));
         }
       }
@@ -2321,20 +2323,22 @@
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
-    document.addEventListener("command", (e) => {
-      if (e.command !== "show-popover") return;
-      const btn = e.source?.closest?.("button.map-btn");
-      if (!btn) return;
+    function mapButtonFromSource(source) {
+      return source?.closest?.("button.map-btn");
+    }
+    function setMapPopoverInvoker(btn) {
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
       MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
       if (prevInvoker && prevInvoker !== btn) {
         setMapPopoverExpanded(prevInvoker, false);
       }
-      if (!MAP_POPOVER_OPEN || prevInvoker === btn) return;
-      MAP_POPOVER_PREV_FOCUS = btn;
+      return prevInvoker;
+    }
+    function prepareMapPopoverFromInvoker(btn) {
+      setMapPopoverInvoker(btn);
       updateMapPopoverFromInvoker(btn);
-    }, EVT_CAPTURE_PASSIVE);
+    }
     function updateMapPopoverFromInvoker(invoker) {
       const idxStr = invoker.dataset.idx;
       if (!idxStr) return;
@@ -2355,6 +2359,20 @@
         mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
       }
     }
+    mapPopover.addEventListener("beforetoggle", (e) => {
+      if (e.newState !== "open") return;
+      const btn = mapButtonFromSource(e.source);
+      if (!btn) return;
+      prepareMapPopoverFromInvoker(btn);
+    });
+    mapPopover.addEventListener("command", (e) => {
+      if (e.command !== "show-popover" || !MAP_POPOVER_OPEN) return;
+      const btn = mapButtonFromSource(e.source);
+      if (!btn || btn === LAST_MAP_INVOKER) return;
+      prepareMapPopoverFromInvoker(btn);
+      MAP_POPOVER_PREV_FOCUS = btn;
+      setMapPopoverExpanded(btn, true);
+    });
     function closeMapPopover() {
       if (!MAP_POPOVER_OPEN) return;
       MAP_POPOVER_OPEN = false;
@@ -3630,15 +3648,20 @@
                 ) {
                   s = s.slice(0, cut - 1).trim();
                 } else {
-                  let rx = RX_SIGUNGU_STRIP_CACHE.get(dl);
-                  if (!rx) {
-                    if (RX_SIGUNGU_STRIP_CACHE.size > 4096) {
-                      RX_SIGUNGU_STRIP_CACHE.clear();
-                    }
-                    const esc = RegExp.escape(dl);
-                    rx = new RegExp(`(?:^|\\s+)${esc}(?:\\s+|$)`, "g");
-                    RX_SIGUNGU_STRIP_CACHE.set(dl, rx);
+                  if (
+                    RX_SIGUNGU_STRIP_CACHE.size > 4096 &&
+                    !RX_SIGUNGU_STRIP_CACHE.has(dl)
+                  ) {
+                    RX_SIGUNGU_STRIP_CACHE.clear();
                   }
+                  const rx = RX_SIGUNGU_STRIP_CACHE.getOrInsertComputed(
+                    dl,
+                    () =>
+                      new RegExp(
+                        `(?:^|\\s+)${RegExp.escape(dl)}(?:\\s+|$)`,
+                        "g",
+                      ),
+                  );
                   rx.lastIndex = 0;
                   s = s
                     .replace(rx, " ")
@@ -4078,34 +4101,9 @@
     })();
     async function* decodedChunkIterator(stream, signal) {
       const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
-      const asyncIter = decoded[Symbol.asyncIterator];
-      if (typeof asyncIter === "function") {
-        for await (const chunk of decoded) {
-          signal.throwIfAborted();
-          yield chunk;
-        }
-        return;
-      }
-      const reader = decoded.getReader();
-      try {
-        while (true) {
-          const { value: chunk, done } = await reader.read();
-          if (done) {
-            signal.throwIfAborted();
-            return;
-          }
-          signal.throwIfAborted();
-          yield chunk;
-        }
-      } finally {
-        try {
-          await reader.cancel(signal.reason);
-        } catch {
-        }
-        try {
-          reader.releaseLock();
-        } catch {
-        }
+      for await (const chunk of decoded) {
+        signal.throwIfAborted();
+        yield chunk;
       }
     }
     async function* lineIterator(stream, signal) {
