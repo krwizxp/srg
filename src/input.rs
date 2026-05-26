@@ -1,5 +1,5 @@
 use super::Result;
-use core::{fmt::Arguments, result::Result as StdResult};
+use core::{fmt::Arguments, result::Result as CoreResult};
 use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
@@ -61,7 +61,7 @@ pub fn get_validated_input<T, E, F>(
 ) -> IoResult<T>
 where
     E: AsRef<str>,
-    F: FnMut(&str) -> StdResult<T, E>,
+    F: FnMut(&str) -> CoreResult<T, E>,
 {
     loop {
         out.write_all(prompt.as_bytes())?;

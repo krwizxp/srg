@@ -278,9 +278,9 @@
           >.left-pane-scroll {
             display: flex;
             flex-direction: column;
-            flex: 0 0 auto;
+            flex: 1 1 auto;
             gap: 14px;
-            block-size: auto;
+            block-size: 100%;
             min-block-size: 0;
             overflow: visible;
 
@@ -320,21 +320,17 @@
         }
 
         .left-pane-scroll> :has(#coords) {
-          flex: 0 0 auto;
+          flex: 1 1 180px;
           display: flex;
           flex-direction: column;
-          min-block-size: 0;
+          min-block-size: 140px;
           gap: 6px;
           margin-inline-end: calc(-1 * var(--card-pad-inline));
           padding-inline-end: var(--card-pad-inline);
         }
 
-        .left-pane-scroll:has(.manual-rng[open])> :has(#coords) {
-          flex: 0 0 auto;
-        }
-
         .left-pane-scroll:has(.manual-rng[open]) #coords {
-          max-block-size: min(32dvh, 280px);
+          max-block-size: none;
         }
 
         footer {
@@ -689,6 +685,7 @@
         .manual-rng-body {
           margin-block-start: 10px;
           display: grid;
+          align-content: start;
           gap: 10px;
           max-inline-size: 100%;
           min-block-size: 0;
@@ -1973,10 +1970,8 @@
                 <span class="action-btn__label">출력 지우기</span>
               </button>
             </div>
-            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true">
-            </div>
-            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true">
-            </div>
+            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
+            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true"></div>
             <section aria-label="변환 결과">
               <pre id="output" class="coords-view"><span
                 class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
@@ -1984,12 +1979,6 @@
             </section>
           </div>
         </details>
-        <section aria-labelledby="coords-label">
-          <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-          <pre id="coords" class="coords-view"><span
-            class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
-              class="coords-content"></code></pre>
-        </section>
         <div class="row-progress">
           <div class="sp">
             <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
@@ -2010,6 +1999,12 @@
         <footer>
           <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
         </footer>
+        <section aria-labelledby="coords-label">
+          <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
+          <pre id="coords" class="coords-view"><span
+            class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
+              class="coords-content"></code></pre>
+        </section>
       </div>
     </section>
     <section class="card results-card">
@@ -5404,6 +5399,7 @@
         const copyBtn = document.getElementById("copyOutput");
         const output = document.getElementById("output");
         const outputContent = output?.querySelector(".coords-content");
+        const manualBody = runBtn?.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
         if (
@@ -5415,6 +5411,7 @@
           !copyBtn ||
           !output ||
           !outputContent ||
+          !manualBody ||
           !error ||
           !meta
         ) {
@@ -5454,7 +5451,11 @@
             const data = generateRandomDataFromNum(num64, nextSupp);
             lastGeneratedText = formatOutput(data);
             setManualOutputText(lastGeneratedText);
-            meta.textContent = `사전 입력 사용: ${queueIndex}개`;
+            const promptedSuppCount = suppInputCount - queueIndex;
+            meta.textContent =
+              `보조 난수 사용: 총 ${suppInputCount}개 (사전 ${queueIndex}개, 팝업 ${promptedSuppCount}개)`;
+            manualBody.scrollTop = 0;
+            output.scrollTop = 0;
           } catch (err) {
             lastGeneratedText = "";
             setManualOutputText("");

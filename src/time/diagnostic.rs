@@ -1,5 +1,5 @@
 use alloc::{borrow::Cow, fmt};
-use core::result::Result as StdResult;
+use core::result::Result as CoreResult;
 use std::{io, time::SystemTimeError};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TimeErrorKind {
@@ -63,7 +63,7 @@ impl fmt::Display for TimeError {
         }
     }
 }
-pub(super) type Result<T> = StdResult<T, TimeError>;
+pub(super) type Result<T> = CoreResult<T, TimeError>;
 fn owned_detail(err: impl fmt::Display) -> Cow<'static, str> {
     Cow::Owned(err.to_string())
 }

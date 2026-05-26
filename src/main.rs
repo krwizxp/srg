@@ -3,7 +3,7 @@ use self::file_output::open_or_create_file;
 use self::io_util::write_line_ignored;
 use self::menu_app::MenuApp;
 use self::tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER};
-use core::{error::Error, result::Result as StdResult};
+use core::{error::Error, result::Result as CoreResult};
 use std::{
     io::{Error as IoError, IsTerminal as TerminalDetect, stdout},
     process::ExitCode,
@@ -141,7 +141,7 @@ cfg_select! {
     }
     _ => {}
 }
-type Result<T> = StdResult<T, Box<dyn Error + Send + Sync>>;
+type Result<T> = CoreResult<T, Box<dyn Error + Send + Sync>>;
 cfg_select! {
     target_arch = "x86_64" => {
         type DataBuffer = Box<[u8; BUFFER_SIZE]>;

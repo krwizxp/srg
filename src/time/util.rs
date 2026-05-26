@@ -1,6 +1,6 @@
 use super::{Result, TimeError};
 use alloc::fmt;
-use core::result::Result as StdResult;
+use core::result::Result as CoreResult;
 pub(super) fn blend_weighted_nanos(
     old_value: u128,
     new_value: u128,
@@ -22,7 +22,7 @@ pub(super) fn blend_weighted_nanos(
     };
     weighted_average
 }
-pub(super) fn parse_result_with_context<T, E>(result: StdResult<T, E>, context: &str) -> Result<T>
+pub(super) fn parse_result_with_context<T, E>(result: CoreResult<T, E>, context: &str) -> Result<T>
 where
     E: fmt::Display,
 {

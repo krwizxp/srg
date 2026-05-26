@@ -22,7 +22,7 @@ cfg_select! {
     }
     _ => {}
 }
-use core::{result::Result as StdResult, time::Duration};
+use core::{result::Result as CoreResult, time::Duration};
 use std::{
     fs,
     fs::File,
@@ -310,7 +310,7 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let time_run_result = (|| -> StdResult<(), time::diagnostic::TimeError> {
+        let time_run_result = (|| -> CoreResult<(), time::diagnostic::TimeError> {
             let host = self.read_server_host(out, err)?;
             let target_time = self.read_target_time(out)?;
             let trigger_action = self.read_trigger_action(out, target_time)?;
@@ -338,12 +338,12 @@ impl MenuApp {
         &mut self,
         out: &mut dyn Write,
         err_out: &mut dyn Write,
-    ) -> StdResult<time::address::ParsedServer, time::diagnostic::TimeError> {
+    ) -> CoreResult<time::address::ParsedServer, time::diagnostic::TimeError> {
         let (ignored_suffix, parsed_server) = get_validated_input(
             "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> StdResult<(bool, time::address::ParsedServer), String> {
+            |raw_input| -> CoreResult<(bool, time::address::ParsedServer), String> {
                 if raw_input.is_empty() {
                     return Err("서버 주소를 비워둘 수 없습니다.".to_owned());
                 }
@@ -367,14 +367,14 @@ impl MenuApp {
     fn read_target_time(
         &mut self,
         out: &mut dyn Write,
-    ) -> StdResult<Option<SystemTime>, time::diagnostic::TimeError> {
+    ) -> CoreResult<Option<SystemTime>, time::diagnostic::TimeError> {
         const INVALID_TIME_INPUT_ERR: &str =
             "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
         get_validated_input(
             "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> StdResult<Option<SystemTime>, &'static str> {
+            |raw_input| -> CoreResult<Option<SystemTime>, &'static str> {
                 if raw_input.is_empty() {
                     return Ok(None);
                 }
@@ -455,7 +455,7 @@ impl MenuApp {
         &mut self,
         out: &mut dyn Write,
         target_time: Option<SystemTime>,
-    ) -> StdResult<Option<time::TriggerAction>, time::diagnostic::TimeError> {
+    ) -> CoreResult<Option<time::TriggerAction>, time::diagnostic::TimeError> {
         if target_time.is_none() {
             return Ok(None);
         }
@@ -463,7 +463,7 @@ impl MenuApp {
             "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
             &mut self.input_buffer,
             out,
-            |selection| -> StdResult<time::TriggerAction, &'static str> {
+            |selection| -> CoreResult<time::TriggerAction, &'static str> {
                 match selection.as_bytes() {
                     b"1" => Ok(time::TriggerAction::LeftClick),
                     b"2" => Ok(time::TriggerAction::F5Press),
