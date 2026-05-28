@@ -5463,7 +5463,7 @@
             const outputBlocks = mainValues.map((num64) =>
               formatOutput(generateRandomDataFromNum(num64, nextSupp))
             );
-            lastGeneratedText = outputBlocks.join("\n\n");
+            lastGeneratedText = outputBlocks.join("\n");
             setManualOutputText(lastGeneratedText);
             const promptedSuppCount = suppInputCount - queueIndex;
             meta.textContent =
