@@ -1926,8 +1926,10 @@
               기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.
             </p>
             <div class="manual-rng-field">
-              <label class="manual-rng-label" for="num64">기본 난수값</label>
-              <input id="num64" type="text" aria-describedby="num64-help" placeholder="예: 123456789 또는 0x1122334455667788">
+              <label class="manual-rng-label" for="num64">기본 난수값 목록</label>
+              <textarea id="num64" aria-describedby="num64-help" placeholder="쉼표/공백/줄바꿈 구분
+예) 123456789
+0x1122334455667788"></textarea>
               <span class="manual-rng-meta" id="num64-help"><span class="nowrap">입력 범위: 0 ~
                   18446744073709551615</span><br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
             </div>
@@ -5349,11 +5351,18 @@
         );
         return lines.join("\n");
       }
-      function parseSuppTokens(raw) {
+      function parseU64Tokens(raw) {
         return String(raw || "")
           .split(/[\s,]+/g)
           .map((token) => token.trim())
           .filter((token) => token.length > 0);
+      }
+      function parseMainValues(raw) {
+        const tokens = parseU64Tokens(raw);
+        if (tokens.length === 0) {
+          throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
+        }
+        return tokens.map((token) => parseU64(token));
       }
       function promptSuppValue(index, reason) {
         for (; ;) {
@@ -5434,8 +5443,8 @@
           error.textContent = "";
           meta.textContent = "";
           try {
-            const num64 = parseU64(num64Input.value);
-            const suppQueue = parseSuppTokens(suppInput.value);
+            const mainValues = parseMainValues(num64Input.value);
+            const suppQueue = parseU64Tokens(suppInput.value);
             let suppInputCount = 0;
             let queueIndex = 0;
             const nextSupp = (reason) => {
@@ -5451,12 +5460,14 @@
               suppInputCount += 1;
               return { value, bitsRemaining: 64 };
             };
-            const data = generateRandomDataFromNum(num64, nextSupp);
-            lastGeneratedText = formatOutput(data);
+            const outputBlocks = mainValues.map((num64) =>
+              formatOutput(generateRandomDataFromNum(num64, nextSupp))
+            );
+            lastGeneratedText = outputBlocks.join("\n\n");
             setManualOutputText(lastGeneratedText);
             const promptedSuppCount = suppInputCount - queueIndex;
             meta.textContent =
-              `보조 난수 사용: 총 ${suppInputCount}개 (사전 ${queueIndex}개, 팝업 ${promptedSuppCount}개)`;
+              `기본 난수 변환: ${mainValues.length}개. 보조 난수 사용: 총 ${suppInputCount}개 (사전 ${queueIndex}개, 팝업 ${promptedSuppCount}개)`;
             manualBody.scrollTop = 0;
             output.scrollTop = 0;
           } catch (err) {
