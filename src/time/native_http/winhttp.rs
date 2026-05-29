@@ -333,7 +333,7 @@ impl Client {
             let line = raw_line
                 .strip_suffix(&[u16::from(b'\r')])
                 .unwrap_or(raw_line);
-            let Some((prefix, _value)) = line.split_at_checked(5) else {
+            let Some((prefix, _value)) = line.split_first_chunk::<5>() else {
                 continue;
             };
             if !prefix.iter().zip(b"date:").all(|(&unit, &byte)| {
@@ -477,17 +477,16 @@ impl Client {
                         format!("WinHTTP session cache borrow 실패: {source}"),
                     )
                 })?;
-                if session_cache.is_none() {
-                    *session_cache = Some(SessionCache {
+                let cache = if let Some(ref mut cache) = *session_cache {
+                    cache
+                } else {
+                    session_cache.insert(SessionCache {
                         connects: Vec::new(),
                         session: self.open_session(user_agent, context)?,
-                    });
-                }
-                let Some(cache) = session_cache.as_mut() else {
-                    return Err(error(context, "WinHTTP session cache가 비어 있습니다."));
+                    })
                 };
                 let connect = self.cached_connect(cache, host, host_wide, port, context)?;
-                Ok(connect.as_ptr())
+                Ok::<HInternet, TimeError>(connect.as_ptr())
             })
             .map_err(|source| error(context, format!("WinHTTP session cache 접근 실패: {source}")))??;
         match action(connect_ptr) {

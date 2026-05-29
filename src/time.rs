@@ -15,7 +15,7 @@ cfg_select! {
 }
 use crate::write_line_ignored;
 use alloc::fmt;
-use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, time::Duration};
+use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, range::Range, time::Duration};
 use std::{
     io::{self, BufRead as IoBufRead, Result as IoResult},
     net,
@@ -241,7 +241,10 @@ impl AppState {
                 }
             }
         }
-        let Some((rtts, _)) = rtt_nanos.split_at_mut_checked(filled) else {
+        let Some(rtts) = rtt_nanos.get_mut(Range {
+            start: 0,
+            end: filled,
+        }) else {
             return transition_to_retry("RTT 샘플 범위 계산 실패.");
         };
         rtts.sort_unstable();
@@ -249,13 +252,10 @@ impl AppState {
         let Some(window_end) = filled.checked_sub(trim) else {
             return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
         };
-        let Some((_, window_tail)) = rtts.split_at_checked(trim) else {
-            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
-        };
-        let Some(sample_window_len) = window_end.checked_sub(trim) else {
-            return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
-        };
-        let Some((window, _)) = window_tail.split_at_checked(sample_window_len) else {
+        let Some(window) = rtts.get(Range {
+            start: trim,
+            end: window_end,
+        }) else {
             return transition_to_retry("RTT 샘플 윈도우 계산 실패.");
         };
         let sum_nanos: u128 = window.iter().sum();

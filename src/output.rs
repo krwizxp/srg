@@ -4,7 +4,7 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-use core::fmt::Write as FmtWrite;
+use core::{fmt::Write as FmtWrite, range::Range};
 use std::io::Result as IoResult;
 cfg_select! {
     target_arch = "x86_64" => {
@@ -286,23 +286,15 @@ fn sub_from_index(value: &mut usize, amount: usize) -> IoResult<()> {
     Ok(())
 }
 pub fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
-    slice
-        .split_at_checked(len)
-        .map(|(prefix, _)| prefix)
-        .ok_or_else(write_zero_err)
+    slice.get(..len).ok_or_else(write_zero_err)
 }
 fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
-    slice
-        .split_at_checked(start)
-        .map(|(_, suffix)| suffix)
-        .ok_or_else(write_zero_err)
+    slice.get(start..).ok_or_else(write_zero_err)
 }
 fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut [u8]> {
-    let (_, tail) = slice
-        .split_at_mut_checked(start)
-        .ok_or_else(write_zero_err)?;
-    tail.split_at_mut_checked(len)
-        .map(|(range, _)| range)
+    let end = checked_add_index(start, len)?;
+    slice
+        .get_mut(Range { start, end })
         .ok_or_else(write_zero_err)
 }
 fn range_array_mut<const N: usize>(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; N]> {

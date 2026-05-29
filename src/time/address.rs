@@ -63,8 +63,8 @@ impl FromStr for ParsedServer {
         let scheme = if after_scheme.len() == trimmed_input.len() {
             None
         } else if trimmed_input
-            .split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
-            .is_some_and(|(prefix, _)| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX))
+            .get(..HTTPS_SCHEME_PREFIX_LEN)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX))
         {
             Some(UrlScheme::Https)
         } else {
@@ -77,7 +77,7 @@ impl FromStr for ParsedServer {
         if authority.is_empty() || authority.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let default_port = if scheme.is_some_and(|scheme_value| scheme_value == UrlScheme::Https) {
+        let default_port = if scheme == Some(UrlScheme::Https) {
             DEFAULT_HTTPS_PORT
         } else {
             DEFAULT_HTTP_PORT

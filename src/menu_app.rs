@@ -164,8 +164,8 @@ impl MenuApp {
             )?;
             writeln!(command_out, "사다리타기 결과:")?;
             let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
-            let (indices_slice, _) = indices
-                .split_at_mut_checked(n)
+            let indices_slice = indices
+                .get_mut(..n)
                 .ok_or_else(|| IoError::other("인덱스 배열 슬라이스 범위 초과"))?;
             for index in (1..indices_slice.len()).rev() {
                 seed ^= get_hardware_random()?;
@@ -180,8 +180,8 @@ impl MenuApp {
                 })?;
                 indices_slice.swap(index, swap_index);
             }
-            let (players, _) = players_array
-                .split_at_checked(n)
+            let players = players_array
+                .get(..n)
                 .ok_or_else(|| IoError::other("플레이어 슬라이스 범위 초과"))?;
             for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
                 let result = results_array
@@ -326,9 +326,7 @@ impl MenuApp {
             Ok(())
         })();
         if let Err(time_err) = time_run_result
-            && time_err
-                .io_kind()
-                .is_none_or(|kind| kind != ErrorKind::UnexpectedEof)
+            && time_err.io_kind() != Some(ErrorKind::UnexpectedEof)
         {
             writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?;
         }
@@ -378,15 +376,15 @@ impl MenuApp {
                 if raw_input.is_empty() {
                     return Ok(None);
                 }
-                let mut time_parts = raw_input.split(':');
-                let (Some(hour_str), Some(minute_str), Some(second_str), None) = (
-                    time_parts.next(),
-                    time_parts.next(),
-                    time_parts.next(),
-                    time_parts.next(),
-                ) else {
+                let Some((hour_str, minute_second)) = raw_input.split_once(':') else {
                     return Err(INVALID_TIME_INPUT_ERR);
                 };
+                let Some((minute_str, second_str)) = minute_second.split_once(':') else {
+                    return Err(INVALID_TIME_INPUT_ERR);
+                };
+                if second_str.contains(':') {
+                    return Err(INVALID_TIME_INPUT_ERR);
+                }
                 let (Ok(hour), Ok(minute), Ok(second)) = (
                     hour_str.parse::<u32>(),
                     minute_str.parse::<u32>(),
@@ -495,9 +493,8 @@ impl MenuApp {
             let keep_running = match self.execute_command(command, &mut out, &mut err) {
                 Ok(keep_running) => keep_running,
                 Err(command_err)
-                    if command_err
-                        .downcast_ref::<IoError>()
-                        .is_some_and(|io_err| io_err.kind() == ErrorKind::UnexpectedEof) =>
+                    if command_err.downcast_ref::<IoError>().map(IoError::kind)
+                        == Some(ErrorKind::UnexpectedEof) =>
                 {
                     return Ok(ExitCode::SUCCESS);
                 }

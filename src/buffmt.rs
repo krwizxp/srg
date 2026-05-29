@@ -1,4 +1,5 @@
 use alloc::fmt;
+use core::range::Range;
 use std::io;
 const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
@@ -33,12 +34,9 @@ impl<'buffer> ByteCursor<'buffer> {
         let start = self.pos;
         let end = start.checked_add(len).ok_or_else(write_zero_err)?;
         self.pos = end;
-        let (_, tail) = self
-            .buf
-            .split_at_mut_checked(start)
-            .ok_or_else(write_zero_err)?;
-        let (taken, _) = tail.split_at_mut_checked(len).ok_or_else(write_zero_err)?;
-        Ok(taken)
+        self.buf
+            .get_mut(Range { start, end })
+            .ok_or_else(write_zero_err)
     }
     pub fn write_byte(&mut self, byte: u8) -> io::Result<()> {
         let Some(slot) = self.take(SINGLE_BYTE_WIDTH)?.first_mut() else {
@@ -55,10 +53,7 @@ impl<'buffer> ByteCursor<'buffer> {
         self.pos
     }
     pub fn written_slice(&self) -> io::Result<&[u8]> {
-        self.buf
-            .split_at_checked(self.pos)
-            .map(|(written, _)| written)
-            .ok_or_else(write_zero_err)
+        self.buf.get(..self.pos).ok_or_else(write_zero_err)
     }
 }
 impl fmt::Write for ByteCursor<'_> {

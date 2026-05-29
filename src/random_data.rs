@@ -144,11 +144,10 @@ impl RandomDataBuildState<'_, '_> {
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
             while syllable_index > HANGUL_SYLLABLE_MAX {
-                if self.supplemental.is_none() {
-                    self.supplemental = Some(self.next_supplemental("한글 음절 보완")?);
-                }
-                let Some(supplemental) = self.supplemental else {
-                    return Err("한글 음절 보완 상태 불일치".into());
+                let supplemental = if let Some(supplemental) = self.supplemental {
+                    supplemental
+                } else {
+                    self.next_supplemental("한글 음절 보완")?
                 };
                 let supp_value = supplemental.value();
                 let candidate_value = HANGUL_SHIFTS
@@ -158,7 +157,7 @@ impl RandomDataBuildState<'_, '_> {
                 if let Some(candidate) = candidate_value {
                     syllable_index = candidate;
                 } else {
-                    self.supplemental = Some(self.next_supplemental("한글 음절 보완 재시도")?);
+                    self.next_supplemental("한글 음절 보완 재시도")?;
                 }
             }
             let Some(code_point) = HANGUL_BASE_CODE_POINT
@@ -263,8 +262,7 @@ impl RandomDataBuildState<'_, '_> {
             bits_remaining: BYTE_BITS,
             value: (self.next_supp)(reason)?,
         };
-        self.supplemental = Some(supplemental);
-        Ok(supplemental)
+        Ok(*self.supplemental.insert(supplemental))
     }
 }
 cfg_select! {
@@ -422,17 +420,19 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         }
     }
     loop {
-        let need_new = supplemental
+        let supp = if supplemental
             .as_ref()
-            .is_none_or(|supp| supp.bits_remaining() < BITS);
-        if need_new {
-            *supplemental = Some(RandomBitBuffer {
+            .is_none_or(|candidate| candidate.bits_remaining() < BITS)
+        {
+            supplemental.insert(RandomBitBuffer {
                 bits_remaining: BYTE_BITS,
                 value: next_supp(reason)?,
-            });
-        }
-        let Some(supp) = supplemental.as_mut() else {
-            return Err("보완 난수 상태 불일치".into());
+            })
+        } else {
+            let Some(candidate) = supplemental.as_mut() else {
+                return Err("보완 난수 상태 불일치".into());
+            };
+            candidate
         };
         let extracted = supp.consume_bits(BITS, reason)? & mask;
         if extracted <= max_value {

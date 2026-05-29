@@ -381,15 +381,10 @@ pub(super) fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime
         "HTTP Date 파싱 실패: RFC 9110 HTTP-date의 3개 형식",
         "(IMF-fixdate/rfc850/asctime) 중 하나가 아닙니다."
     );
+    let has_comma = raw_date.contains(',');
+    let has_gmt = raw_date.contains("GMT");
     let raw_bytes = raw_date.as_bytes();
-    let has_comma = raw_bytes.contains(&b',');
-    let has_gmt = raw_bytes
-        .array_windows::<3>()
-        .any(|window| window == b"GMT");
-    if raw_bytes
-        .get(IMF_FIXDATE_WEEKDAY_COMMA_INDEX)
-        .is_some_and(|ch| *ch == b',')
-    {
+    if raw_bytes.get(IMF_FIXDATE_WEEKDAY_COMMA_INDEX) == Some(&b',') {
         const ERR_IMF_FORMAT: &str = "HTTP Date 파싱 실패: IMF-fixdate 형식이 아닙니다.";
         const ERR_IMF_NUM: &str = "HTTP Date 파싱 실패: IMF-fixdate 숫자 변환에 실패했습니다.";
         let mut parts = raw_date.split_ascii_whitespace();

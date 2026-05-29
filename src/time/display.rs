@@ -10,7 +10,7 @@ use crate::{
     },
     numeric::low_u8_from_u32,
 };
-use core::time::Duration;
+use core::{range::Range, time::Duration};
 use std::{
     io::Result as IoResult,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -54,10 +54,12 @@ impl SliceCursor<'_> {
         buffmt_digit_byte(index)
     }
     fn range_two_digits(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; TWO_DIGIT_WIDTH]> {
-        let (_, tail) = slice
-            .split_at_mut_checked(start)
+        let end = start
+            .checked_add(TWO_DIGIT_WIDTH)
             .ok_or_else(write_zero_err)?;
-        tail.first_chunk_mut::<TWO_DIGIT_WIDTH>()
+        slice
+            .get_mut(Range { start, end })
+            .and_then(|digits| digits.first_chunk_mut::<TWO_DIGIT_WIDTH>())
             .ok_or_else(write_zero_err)
     }
     fn write_byte(&mut self, byte: u8) -> IoResult<()> {
@@ -107,7 +109,7 @@ impl SliceCursor<'_> {
             let digit = usize::from(low_u8_from_u32(n));
             *tmp.get_mut(i).ok_or_else(write_zero_err)? = Self::digit_byte(digit)?;
         }
-        let Some((_, suffix)) = tmp.split_at_checked(i) else {
+        let Some(suffix) = tmp.get(i..) else {
             return Err(write_zero_err());
         };
         self.write_bytes(suffix)

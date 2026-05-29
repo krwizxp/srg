@@ -16,10 +16,11 @@ const TCP_HEAD_REQUEST_SUFFIX: &[u8] =
 const TCP_MAX_HEADER_BYTES: usize = 64 * 1024;
 const TCP_MAX_HEADER_LINE_BYTES: usize = 8192;
 const TCP_MAX_HEADER_LINE_READ_BYTES: u64 = 8193;
+const DATE_HEADER_PREFIX: &[u8; 5] = b"date:";
 pub(super) const TCP_LINE_BUFFER_CAPACITY: usize = 256;
 pub(super) fn find_date_header_value(line: &[u8]) -> Option<&str> {
-    let (prefix, value) = line.split_at_checked(5)?;
-    if prefix.eq_ignore_ascii_case(b"date:") {
+    let (prefix, value) = line.split_first_chunk::<5>()?;
+    if prefix.eq_ignore_ascii_case(DATE_HEADER_PREFIX) {
         str::from_utf8(value).map(str::trim_ascii).ok()
     } else {
         None
@@ -108,10 +109,7 @@ pub(super) fn fetch_server_time_sample(
         if header_bytes_seen > TCP_MAX_HEADER_BYTES {
             return Err(TimeError::parse("TCP HTTP 헤더가 너무 큽니다."));
         }
-        let line_ended = net_ctx
-            .tcp_line_buffer
-            .last()
-            .is_some_and(|byte| *byte == b'\n');
+        let line_ended = net_ctx.tcp_line_buffer.ends_with(b"\n");
         if net_ctx.tcp_line_buffer.len() > TCP_MAX_HEADER_LINE_BYTES
             || (!line_ended && net_ctx.tcp_line_buffer.len() == TCP_MAX_HEADER_LINE_BYTES)
         {

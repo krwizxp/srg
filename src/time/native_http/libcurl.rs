@@ -180,14 +180,13 @@ impl Client {
                 let mut cached_handle = cell
                     .try_borrow_mut()
                     .map_err(|source| error(context, format!("curl easy handle cache borrow 실패: {source}")))?;
-                if cached_handle.is_none() {
+                let handle = if let Some(ref mut handle) = *cached_handle {
+                    handle
+                } else {
                     // SAFETY: curl_easy_init has no preconditions after global init.
                     let raw_handle = NonNull::new(unsafe { curl_easy_init() })
                         .ok_or_else(|| error(context, "curl_easy_init 실패"))?;
-                    *cached_handle = Some(EasyHandle(raw_handle));
-                }
-                let Some(handle) = cached_handle.as_ref() else {
-                    return Err(error(context, "curl easy handle cache가 비어 있습니다."));
+                    cached_handle.insert(EasyHandle(raw_handle))
                 };
                 handle.reset();
                 handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
@@ -209,7 +208,11 @@ impl Client {
                 let request_start = Instant::now();
                 let perform_code = handle.perform();
                 let response_received_inst = Instant::now();
-                Ok((request_start, response_received_inst, perform_code))
+                Ok::<(Instant, Instant, c_int), TimeError>((
+                    request_start,
+                    response_received_inst,
+                    perform_code,
+                ))
             })
             .map_err(|source| error(context, format!("curl easy handle cache 접근 실패: {source}")))??;
         if !header_capture.pending_line.is_empty() {
@@ -280,9 +283,9 @@ impl CurlHeaderCapture {
             self.error = Some(format!("HTTP HEAD 응답 헤더 메모리 확보 실패: {source}"));
             return false;
         }
-        for &byte in bytes {
-            self.pending_line.push(byte);
-            if byte == b'\n' {
+        for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
+            self.pending_line.extend_from_slice(segment);
+            if segment.ends_with(b"\n") {
                 if !self.capture_pending() {
                     return false;
                 }

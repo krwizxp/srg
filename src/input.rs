@@ -3,6 +3,7 @@ use core::{fmt::Arguments, result::Result as CoreResult};
 use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
+        use core::range::Range;
         use super::random_util::checked_add_one_usize;
         #[derive(Clone, Copy)]
         pub enum LadderEntryMode {
@@ -108,7 +109,7 @@ cfg_select! {
                 let line = read_line_reuse(prompt, input_buffer, out)?;
                 let mut count = 0_usize;
                 let mut players_overflowed = false;
-                let mut trimmed_ranges = [(0_usize, 0_usize); N];
+                let mut trimmed_ranges: [Range<usize>; N] = [Range { start: 0, end: 0 }; N];
                 let mut segment_start = 0_usize;
                 for (segment_end, separator) in line
                     .match_indices(',')
@@ -141,7 +142,10 @@ cfg_select! {
                             let range_end = range_start
                                 .checked_add(trimmed.len())
                                 .ok_or_else(index_err)?;
-                            *slot = (range_start, range_end);
+                            *slot = Range {
+                                start: range_start,
+                                end: range_end,
+                            };
                         }
                     }
                     if separator {
@@ -167,10 +171,8 @@ cfg_select! {
                 }
                 storage.clear();
                 storage.push_str(line);
-                for (entry_index, (range_start, range_end)) in
-                    trimmed_ranges.iter().copied().enumerate().take(count)
-                {
-                    let part = storage.get(range_start..range_end).ok_or_else(index_err)?;
+                for (entry_index, range) in trimmed_ranges.iter().copied().enumerate().take(count) {
+                    let part = storage.get(range).ok_or_else(index_err)?;
                     let slot = entries.get_mut(entry_index).ok_or_else(index_err)?;
                     *slot = part;
                 }
