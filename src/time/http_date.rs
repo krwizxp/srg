@@ -289,11 +289,15 @@ fn parse_http_date_rfc850(raw_date: &str) -> Result<HttpDateComponents> {
     }
     let weekday_name = strip_date_suffix(weekday_token, ',', ERR_FORMAT)?;
     let weekday = parse_http_weekday(weekday_name).ok_or_else(|| TimeError::parse(ERR_FORMAT))?;
-    let mut date_parts = date_token.split('-');
-    let day_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
-    let month_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
-    let year2_token = next_date_part(&mut date_parts, ERR_FORMAT)?;
-    ensure_parts_exhausted(&mut date_parts, ERR_FORMAT)?;
+    let Some((day_token, month_year)) = date_token.split_once('-') else {
+        return Err(TimeError::parse(ERR_FORMAT));
+    };
+    let Some((month_token, year2_token)) = month_year.split_once('-') else {
+        return Err(TimeError::parse(ERR_FORMAT));
+    };
+    if year2_token.contains('-') {
+        return Err(TimeError::parse(ERR_FORMAT));
+    }
     if day_token.len() != TWO_DIGIT_LEN || year2_token.len() != TWO_DIGIT_LEN {
         return Err(TimeError::parse(ERR_FORMAT));
     }

@@ -29,6 +29,37 @@ pub struct ParsedServer {
     secure_url: String,
     tcp_host_header: String,
 }
+#[derive(Clone, Copy)]
+enum PortSource {
+    Default,
+    Explicit,
+}
+impl PortSource {
+    const fn is_explicit(self) -> bool {
+        matches!(self, Self::Explicit)
+    }
+}
+struct AuthorityParts<'input> {
+    host: &'input str,
+    port: u16,
+    port_source: PortSource,
+}
+impl<'input> AuthorityParts<'input> {
+    const fn default_port(host: &'input str, port: u16) -> Self {
+        Self {
+            host,
+            port,
+            port_source: PortSource::Default,
+        }
+    }
+    const fn explicit_port(host: &'input str, port: u16) -> Self {
+        Self {
+            host,
+            port,
+            port_source: PortSource::Explicit,
+        }
+    }
+}
 impl ParsedServer {
     pub fn host(&self) -> &str {
         &self.host
@@ -70,10 +101,9 @@ impl FromStr for ParsedServer {
         } else {
             Some(UrlScheme::Http)
         };
-        let authority = match after_scheme.split_once(['/', '?', '#']) {
-            Some((authority, _)) => authority,
-            None => after_scheme,
-        };
+        let authority = after_scheme
+            .split_once(['/', '?', '#'])
+            .map_or(after_scheme, |(authority, _)| authority);
         if authority.is_empty() || authority.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
@@ -82,28 +112,31 @@ impl FromStr for ParsedServer {
         } else {
             DEFAULT_HTTP_PORT
         };
-        let colon_count = authority.matches(':').count();
-        let (host_part, port, explicit_port) = if let Some(bracketed) = authority.strip_prefix('[')
-        {
+        let authority_parts = if let Some(bracketed) = authority.strip_prefix('[') {
             let (host_part, rem) = bracketed
                 .split_once(']')
                 .ok_or_else(|| TimeError::parse(ERR_HOST))?;
             if rem.is_empty() {
-                (host_part, default_port, false)
+                AuthorityParts::default_port(host_part, default_port)
             } else {
                 let port_part = rem
                     .strip_prefix(':')
                     .ok_or_else(|| TimeError::parse(ERR_HOST))?;
-                (host_part, parse_port(port_part)?, true)
+                AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
             }
-        } else if colon_count == 1 {
+        } else if authority.matches(':').count() == 1 {
             let (host_part, port_part) = authority
                 .rsplit_once(':')
                 .ok_or_else(|| TimeError::parse(ERR_HOST))?;
-            (host_part, parse_port(port_part)?, true)
+            AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
         } else {
-            (authority, default_port, false)
+            AuthorityParts::default_port(authority, default_port)
         };
+        let AuthorityParts {
+            host: host_part,
+            port,
+            port_source,
+        } = authority_parts;
         if host_part.is_empty() {
             return Err(TimeError::parse(ERR_HOST));
         }
@@ -124,8 +157,8 @@ impl FromStr for ParsedServer {
         } else {
             copy_str(host_part, "서버 host header 메모리 확보 실패")?
         };
-        let plain_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Http)?;
-        let secure_url = build_url(&host_for_header, explicit_port, port, UrlScheme::Https)?;
+        let plain_url = build_url(&host_for_header, port_source, port, UrlScheme::Http)?;
+        let secure_url = build_url(&host_for_header, port_source, port, UrlScheme::Https)?;
         let tcp_host_header = if port == DEFAULT_HTTP_PORT {
             host_for_header
         } else {
@@ -170,7 +203,7 @@ pub const fn strip_scheme_prefix(input: &str) -> &str {
 }
 fn build_url(
     host_for_header: &str,
-    explicit_port: bool,
+    port_source: PortSource,
     port: u16,
     scheme: UrlScheme,
 ) -> Result<String> {
@@ -182,7 +215,7 @@ fn build_url(
     let capacity = scheme_prefix
         .len()
         .saturating_add(host_for_header.len())
-        .saturating_add(if explicit_port {
+        .saturating_add(if port_source.is_explicit() {
             ":".len().saturating_add(U16_DECIMAL_MAX_LEN)
         } else {
             0
@@ -191,7 +224,7 @@ fn build_url(
         .map_err(|source| TimeError::parse(format!("URL 메모리 확보 실패: {source}")))?;
     out.push_str(scheme_prefix);
     out.push_str(host_for_header);
-    if explicit_port {
+    if port_source.is_explicit() {
         FmtWrite::write_fmt(&mut out, format_args!(":{port}"))
             .map_err(|error| TimeError::parse(format!("URL port 작성 실패: {error}")))?;
     }

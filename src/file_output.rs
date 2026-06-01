@@ -94,10 +94,10 @@ cfg_select! {
 fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync> {
     IoError::other(message).into()
 }
-pub fn validate_safe_output_file_path(path: &Path, allow_missing: bool) -> Result<()> {
+pub fn validate_safe_output_file_path(path: &Path) -> Result<()> {
     let maybe_metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => Some(metadata),
-        Err(err) if allow_missing && err.kind() == ErrorKind::NotFound => None,
+        Err(err) if err.kind() == ErrorKind::NotFound => None,
         Err(err) => return Err(err.into()),
     };
     let Some(metadata) = maybe_metadata else {
@@ -150,7 +150,7 @@ where
 }
 pub fn open_or_create_file() -> Result<BufWriter<File>> {
     let path = Path::new(FILE_NAME);
-    validate_safe_output_file_path(path, true)?;
+    validate_safe_output_file_path(path)?;
     let mut file = cfg_select! {
         windows => {{
             let mut options = File::options();

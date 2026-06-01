@@ -2,7 +2,8 @@ use crate::{
     BUFFER_SIZE, BUFFERS_PER_WORKER, DataBuffer, FILE_NAME, IS_TERMINAL, Result,
     file_output::{boxed_other_with_source, ensure_file_exists_and_reopen, lock_mutex},
     output,
-    random_data::{RandomDataSet, generate_random_data},
+    random_data::generate_random_data,
+    RandomDataSet,
     random_output::{persist_and_print_random_data, write_random_data_to_console},
 };
 use core::{
@@ -185,7 +186,11 @@ impl<'scope> WorkerPool<'scope> {
                     };
                     let len = if let Ok(data) = generate_random_data()
                         && let Ok(len) =
-                            output::format_data_into_buffer(&data, buffer.as_mut(), false)
+                            output::format_data_into_buffer(
+                                &data,
+                                buffer.as_mut(),
+                                output::OutputTarget::File,
+                            )
                     {
                         len
                     } else {
@@ -255,7 +260,11 @@ impl WriterTask<'_> {
         let final_data = generate_random_data()?;
         let mut final_buffer_file = [0_u8; BUFFER_SIZE];
         let final_bytes_written_file =
-            output::format_data_into_buffer(&final_data, &mut final_buffer_file, false)?;
+            output::format_data_into_buffer(
+                &final_data,
+                &mut final_buffer_file,
+                output::OutputTarget::File,
+            )?;
         {
             let mut final_file_guard =
                 lock_mutex(self.file_mutex, "Mutex 잠금 실패 (쓰기 스레드 종료 처리)")?;

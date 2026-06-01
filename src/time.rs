@@ -13,7 +13,7 @@ cfg_select! {
     }
     _ => {}
 }
-use crate::write_line_ignored;
+use crate::{ServerTimeSession, buffmt::ByteCursor, write_line_ignored};
 use alloc::fmt;
 use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, range::Range, time::Duration};
 use std::{
@@ -111,13 +111,13 @@ const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
 #[derive(Clone, Copy, Debug)]
-pub struct TimeSample {
-    pub response_received_inst: Instant,
-    pub rtt: Duration,
-    pub server_time: SystemTime,
+struct TimeSample {
+    response_received_inst: Instant,
+    rtt: Duration,
+    server_time: SystemTime,
 }
 #[derive(Clone, Copy, Debug)]
-pub struct ServerTime {
+struct ServerTime {
     anchor_instant: Instant,
     anchor_time: SystemTime,
     baseline_rtt: Duration,
@@ -134,12 +134,6 @@ impl TriggerAction {
             Self::F5Press => native_input::InputAction::F5Press,
         }
     }
-}
-pub struct ServerTimeSession {
-    pub host: ParsedServer,
-    pub now: Instant,
-    pub target_time: Option<SystemTime>,
-    pub trigger_action: Option<TriggerAction>,
 }
 struct AppState {
     baseline_rtt: Option<Duration>,
@@ -631,17 +625,17 @@ impl AppState {
                 && let Some(st) = self.server_time.as_ref()
             {
                 let mut cur = display::SliceCursor {
-                    inner: crate::buffmt::ByteCursor::new(&mut line_buf),
+                    inner: ByteCursor::new(line_buf.as_mut_slice()),
                 };
                 match (|| -> Result<()> {
                     cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes())
                         .map_err(TimeError::from)?;
-                    st.write_current_display_time_buf_at(&mut cur, true, now)?;
+                    st.write_current_display_time_buf_at(&mut cur, now)?;
                     cur.write_bytes(b" \r").map_err(TimeError::from)?;
                     Ok(())
                 })() {
                     Ok(()) => {
-                        out.write_all(cur.inner.written_slice()?)?;
+                        out.write_all(cur.written_slice()?)?;
                         out.flush()?;
                     }
                     Err(display_err) => {

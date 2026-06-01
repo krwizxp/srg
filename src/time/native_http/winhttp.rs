@@ -348,11 +348,12 @@ impl Client {
                     format!("Date 헤더 ASCII 버퍼 메모리 확보 실패: {source}"),
                 )
             })?;
-            for &unit in line {
+            line.iter().try_for_each(|&unit| {
                 let byte = u8::try_from(unit)
                     .map_err(|source| error(context, format!("Date 헤더 ASCII 변환 실패: {source}")))?;
                 line_bytes.push(byte);
-            }
+                Ok::<(), TimeError>(())
+            })?;
             if let Some(date_header_raw) = find_date_header_value(&line_bytes) {
                 return parse_http_date(date_header_raw);
             }

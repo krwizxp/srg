@@ -1,8 +1,7 @@
 use crate::{
-    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, Result,
+    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, RandomDataSet, Result,
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
-    random_data::RandomDataSet,
 };
 use core::{fmt::Write as FmtWrite, range::Range};
 use std::io::Result as IoResult;
@@ -33,6 +32,16 @@ const U32_DEC_BUF_LEN: usize = 10;
 const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
+#[derive(Clone, Copy)]
+pub enum OutputTarget {
+    Console,
+    File,
+}
+impl OutputTarget {
+    const fn use_colors(self) -> bool {
+        matches!(self, Self::Console)
+    }
+}
 struct OutputFormatter<'cursor, 'buffer, 'data> {
     bytes: [u8; 8],
     cursor: &'cursor mut ByteCursor<'buffer>,
@@ -262,14 +271,14 @@ impl OutputFormatter<'_, '_, '_> {
 pub fn format_data_into_buffer(
     data: &RandomDataSet,
     buffer: &mut [u8; BUFFER_SIZE],
-    use_colors: bool,
+    target: OutputTarget,
 ) -> Result<usize> {
     let mut cur = ByteCursor::new(buffer.as_mut_slice());
     let mut formatter = OutputFormatter {
         bytes: data.num_64.to_be_bytes(),
         cursor: &mut cur,
         data,
-        use_colors,
+        use_colors: target.use_colors(),
     };
     formatter.write_all()?;
     Ok(cur.written_len())
@@ -315,10 +324,9 @@ const fn u8_dec_len(n: u8) -> usize {
     }
 }
 fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) -> IoResult<()> {
-    let mut total = 0_usize;
-    for &ch in chars {
-        total = checked_add_index(total, ch.len_utf8())?;
-    }
+    let total = chars
+        .iter()
+        .try_fold(0_usize, |total, ch| checked_add_index(total, ch.len_utf8()))?;
     let head = cur.take(total)?;
     let mut pos = 0_usize;
     for &ch in chars {
@@ -364,10 +372,9 @@ fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
-    let mut total = N.saturating_sub(1);
-    for &n in nums {
-        total = checked_add_index(total, u8_dec_len(n))?;
-    }
+    let total = nums.iter().try_fold(N.saturating_sub(1), |total, &n| {
+        checked_add_index(total, u8_dec_len(n))
+    })?;
     let head = cur.take(total)?;
     let mut pos = 0_usize;
     for (index, &n) in nums.iter().enumerate() {

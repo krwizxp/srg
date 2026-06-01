@@ -1,13 +1,14 @@
 extern crate alloc;
 use self::file_output::open_or_create_file;
 use self::io_util::write_line_ignored;
-use self::menu_app::MenuApp;
 use self::tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER};
 use core::{error::Error, result::Result as CoreResult};
 use std::{
-    io::{Error as IoError, IsTerminal as TerminalDetect, stdout},
+    fs::File,
+    io::{BufWriter, Error as IoError, IsTerminal as TerminalDetect, stdout},
     process::ExitCode,
     sync::{LazyLock, Mutex},
+    time::{Instant, SystemTime},
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -144,7 +145,73 @@ cfg_select! {
 type Result<T> = CoreResult<T, Box<dyn Error + Send + Sync>>;
 cfg_select! {
     target_arch = "x86_64" => {
+        struct MenuApp {
+            file_mutex: Mutex<BufWriter<File>>,
+            input_buffer: String,
+            ladder_players_storage: String,
+            ladder_results_storage: String,
+            num_64: u64,
+        }
         type DataBuffer = Box<[u8; BUFFER_SIZE]>;
+    }
+    _ => {}
+}
+cfg_select! {
+    target_arch = "x86_64" => {}
+    _ => {
+        struct MenuApp {
+            file_mutex: Mutex<BufWriter<File>>,
+            input_buffer: String,
+        }
+    }
+}
+#[derive(Default)]
+struct RandomDataSet {
+    euro_lucky_next_idx: usize,
+    euro_main_next_idx: usize,
+    euro_millions_lucky_stars: [u8; EURO_MILLIONS_LUCKY_COUNT],
+    euro_millions_main_numbers: [u8; EURO_MILLIONS_MAIN_COUNT],
+    galaxy_x: u16,
+    galaxy_y: u16,
+    galaxy_z: u16,
+    glyph_string: [char; NMS_GLYPH_COUNT],
+    hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
+    kor_coords: (f64, f64),
+    lotto7_next_idx: usize,
+    lotto7_numbers: [u8; LOTTO7_COUNT],
+    lotto_next_idx: usize,
+    lotto_numbers: [u8; LOTTO_COUNT],
+    nms_portal_xxx: u16,
+    nms_portal_yy: u8,
+    nms_portal_zzz: u16,
+    num_64: u64,
+    numeric_password: u32,
+    numeric_password_digits: u8,
+    password: [u8; PASSWORD_BYTE_LEN],
+    password_len: u8,
+    planet_number: u8,
+    seen_euro_millions_lucky: u64,
+    seen_euro_millions_main: u64,
+    seen_lotto: u64,
+    seen_lotto7: u64,
+    solar_system_index: u16,
+    world_coords: (f64, f64),
+}
+struct RandomDataBuilder<'provider_ref, F>
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
+    next_supp: &'provider_ref mut F,
+    num: u64,
+}
+struct ServerTimeSession {
+    host: time::address::ParsedServer,
+    now: Instant,
+    target_time: Option<SystemTime>,
+    trigger_action: Option<time::TriggerAction>,
+}
+cfg_select! {
+    target_arch = "x86_64" => {
         fn reserved_string(capacity: usize, context: &str) -> Result<String> {
             let mut value = String::new();
             value
@@ -157,40 +224,10 @@ cfg_select! {
 }
 fn main() -> Result<ExitCode> {
     let file_mutex = Mutex::new(open_or_create_file()?);
-    #[cfg(target_arch = "x86_64")]
-    let num_64 = match *RNG_SOURCE {
-        RngSource::RdSeed => {
-            let data = generate_random_data()?;
-            let num_64 = data.num_64;
-            persist_and_print_random_data(&file_mutex, &data)?;
-            num_64
-        }
-        RngSource::RdRand => {
-            let mut err = stderr().lock();
-            IoWrite::write_fmt(
-                &mut err,
-                format_args!("RDSEED를 미지원하여 RDRAND를 사용합니다.\n"),
-            )?;
-            let data = generate_random_data()?;
-            let num_64 = data.num_64;
-            persist_and_print_random_data(&file_mutex, &data)?;
-            num_64
-        }
-        RngSource::None => {
-            let mut err = stderr().lock();
-            IoWrite::write_fmt(
-                &mut err,
-                format_args!(
-                    "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
-                ),
-            )?;
-            0
-        }
-    };
     let input_buffer = cfg_select! {
-        target_arch = "x86_64" => {
+        target_arch = "x86_64" => {{
             reserved_string(GENERIC_INPUT_BUFFER_CAPACITY, "입력 버퍼 메모리 확보 실패")?
-        }
+        }}
         _ => {{
             let mut value = String::new();
             value
@@ -199,25 +236,56 @@ fn main() -> Result<ExitCode> {
             value
         }}
     };
-    #[cfg(target_arch = "x86_64")]
-    let ladder_players_storage = reserved_string(
-        GENERIC_INPUT_BUFFER_CAPACITY,
-        "사다리 참여자 버퍼 메모리 확보 실패",
-    )?;
-    #[cfg(target_arch = "x86_64")]
-    let ladder_results_storage = reserved_string(
-        GENERIC_INPUT_BUFFER_CAPACITY,
-        "사다리 결과 버퍼 메모리 확보 실패",
-    )?;
-    let mut app = MenuApp {
-        file_mutex,
-        input_buffer,
-        #[cfg(target_arch = "x86_64")]
-        ladder_players_storage,
-        #[cfg(target_arch = "x86_64")]
-        ladder_results_storage,
-        #[cfg(target_arch = "x86_64")]
-        num_64,
+    let mut app = cfg_select! {
+        target_arch = "x86_64" => {{
+            let num_64 = match *RNG_SOURCE {
+                RngSource::RdSeed => {
+                    let data = generate_random_data()?;
+                    let num_64 = data.num_64;
+                    persist_and_print_random_data(&file_mutex, &data)?;
+                    num_64
+                }
+                RngSource::RdRand => {
+                    let mut err = stderr().lock();
+                    IoWrite::write_fmt(
+                        &mut err,
+                        format_args!("RDSEED를 미지원하여 RDRAND를 사용합니다.\n"),
+                    )?;
+                    let data = generate_random_data()?;
+                    let num_64 = data.num_64;
+                    persist_and_print_random_data(&file_mutex, &data)?;
+                    num_64
+                }
+                RngSource::None => {
+                    let mut err = stderr().lock();
+                    IoWrite::write_fmt(
+                        &mut err,
+                        format_args!(
+                            "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
+                        ),
+                    )?;
+                    0
+                }
+            };
+            let ladder_players_storage = reserved_string(
+                GENERIC_INPUT_BUFFER_CAPACITY,
+                "사다리 참여자 버퍼 메모리 확보 실패",
+            )?;
+            let ladder_results_storage = reserved_string(
+                GENERIC_INPUT_BUFFER_CAPACITY,
+                "사다리 결과 버퍼 메모리 확보 실패",
+            )?;
+            MenuApp {
+                file_mutex,
+                input_buffer,
+                ladder_players_storage,
+                ladder_results_storage,
+                num_64,
+            }
+        }}
+        _ => {
+            MenuApp { file_mutex, input_buffer }
+        }
     };
     app.run()
 }

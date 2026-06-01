@@ -2,7 +2,7 @@ use super::{
     HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, TimeError, error,
     find_date_header_value,
 };
-use alloc::{ffi::CString, string::String, vec::Vec};
+use alloc::{borrow::Cow, ffi::CString, string::String, vec::Vec};
 use core::{
     cell::RefCell,
     ffi::{CStr, c_char, c_int, c_long, c_void},
@@ -46,13 +46,13 @@ pub(super) struct Client {
 struct EasyHandle(NonNull<Curl>);
 struct CurlBodySink {
     bytes_seen: usize,
-    error: Option<String>,
+    error: Option<Cow<'static, str>>,
     limit: usize,
 }
 struct CurlHeaderCapture {
     bytes_seen: usize,
     date_header: Option<String>,
-    error: Option<String>,
+    error: Option<Cow<'static, str>>,
     limit: usize,
     pending_line: Vec<u8>,
 }
@@ -219,7 +219,12 @@ impl Client {
             header_capture.capture_pending();
             header_capture.pending_line.clear();
         }
-        if let Some(mut callback_error) = body_sink.error.take().or_else(|| header_capture.error.take()) {
+        if let Some(mut callback_error) = body_sink
+            .error
+            .take()
+            .or_else(|| header_capture.error.take())
+            .map(Cow::into_owned)
+        {
             Self::append_clear_reusable_handle_error(context, &mut callback_error);
             return Err(error(context, callback_error));
         }
@@ -251,14 +256,14 @@ impl Client {
 impl CurlBodySink {
     fn append(&mut self, bytes: &[u8]) -> bool {
         let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
-            self.error = Some("HTTP HEAD 응답 본문 크기 계산 실패".to_owned());
+            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 본문 크기 계산 실패"));
             return false;
         };
         if next_len > self.limit {
-            self.error = Some(format!(
+            self.error = Some(Cow::Owned(format!(
                 "HTTP HEAD 응답 본문 크기가 허용 한도({} bytes)를 초과했습니다.",
                 self.limit
-            ));
+            )));
             return false;
         }
         self.bytes_seen = next_len;
@@ -268,19 +273,21 @@ impl CurlBodySink {
 impl CurlHeaderCapture {
     fn append(&mut self, bytes: &[u8]) -> bool {
         let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
-            self.error = Some("HTTP HEAD 응답 헤더 크기 계산 실패".to_owned());
+            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 크기 계산 실패"));
             return false;
         };
         if next_len > self.limit {
-            self.error = Some(format!(
+            self.error = Some(Cow::Owned(format!(
                 "HTTP HEAD 응답 헤더 크기가 허용 한도({} bytes)를 초과했습니다.",
                 self.limit
-            ));
+            )));
             return false;
         }
         self.bytes_seen = next_len;
         if let Err(source) = self.pending_line.try_reserve(bytes.len()) {
-            self.error = Some(format!("HTTP HEAD 응답 헤더 메모리 확보 실패: {source}"));
+            self.error = Some(Cow::Owned(format!(
+                "HTTP HEAD 응답 헤더 메모리 확보 실패: {source}"
+            )));
             return false;
         }
         for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
@@ -300,9 +307,9 @@ impl CurlHeaderCapture {
         };
         let mut date_header = String::new();
         if let Err(source) = date_header.try_reserve(date_header_raw.len()) {
-            self.error = Some(format!(
+            self.error = Some(Cow::Owned(format!(
                 "HTTP HEAD 응답 Date 헤더 메모리 확보 실패: {source}"
-            ));
+            )));
             return false;
         }
         date_header.push_str(date_header_raw);
@@ -322,12 +329,10 @@ fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.
     let raw_ptr = unsafe { curl_easy_strerror(code) };
     let message = if raw_ptr.is_null() {
-        "unknown curl error".to_owned()
+        Cow::Borrowed("unknown curl error")
     } else {
         // SAFETY: libcurl guarantees a valid NUL-terminated string for non-null strerror results.
-        unsafe { CStr::from_ptr(raw_ptr) }
-            .to_string_lossy()
-            .into_owned()
+        unsafe { CStr::from_ptr(raw_ptr) }.to_string_lossy()
     };
     format!("{context} 실패: {message} ({code})")
 }

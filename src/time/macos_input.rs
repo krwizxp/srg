@@ -34,7 +34,7 @@ struct Event {
 enum EventRequest {
     Current,
     Keyboard {
-        key_down: bool,
+        direction: KeyDirection,
         virtual_key: CGKeyCode,
     },
     Mouse {
@@ -42,6 +42,16 @@ enum EventRequest {
         mouse_cursor_position: CGPoint,
         mouse_type: CGEventType,
     },
+}
+#[derive(Clone, Copy)]
+enum KeyDirection {
+    Down,
+    Up,
+}
+impl KeyDirection {
+    const fn is_down(self) -> bool {
+        matches!(self, Self::Down)
+    }
 }
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
@@ -75,11 +85,11 @@ impl Event {
             // SAFETY: null asks CoreGraphics to use the default source.
             EventRequest::Current => unsafe { CGEventCreate(null_mut()) },
             EventRequest::Keyboard {
-                key_down,
+                direction,
                 virtual_key,
             } => {
                 // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
-                unsafe { CGEventCreateKeyboardEvent(null_mut(), virtual_key, key_down) }
+                unsafe { CGEventCreateKeyboardEvent(null_mut(), virtual_key, direction.is_down()) }
             }
             EventRequest::Mouse {
                 mouse_button,
@@ -102,10 +112,14 @@ impl Event {
         };
         Ok(Self { raw })
     }
-    fn keyboard(virtual_key: CGKeyCode, key_down: bool, context: &str) -> Result<Self, String> {
+    fn keyboard(
+        virtual_key: CGKeyCode,
+        direction: KeyDirection,
+        context: &str,
+    ) -> Result<Self, String> {
         Self::create(
             EventRequest::Keyboard {
-                key_down,
+                direction,
                 virtual_key,
             },
             context,
@@ -168,8 +182,8 @@ impl PreparedInput {
                     .post();
                 }
                 InputAction::F5Press => {
-                    Event::keyboard(KEY_CODE_F5, true, "F5 누름")?.post();
-                    Event::keyboard(KEY_CODE_F5, false, "F5 뗌")?.post();
+                    Event::keyboard(KEY_CODE_F5, KeyDirection::Down, "F5 누름")?.post();
+                    Event::keyboard(KEY_CODE_F5, KeyDirection::Up, "F5 뗌")?.post();
                 }
             }
             Ok(())

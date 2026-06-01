@@ -1,10 +1,9 @@
 use crate::{
     BUFFER_SIZE, FILE_NAME, IS_TERMINAL, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64,
-    KST_SECS_PER_MINUTE_U64, MENU, Result,
+    KST_SECS_PER_MINUTE_U64, MENU, MenuApp, RandomDataBuilder, Result, ServerTimeSession,
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
-    output::{format_data_into_buffer, prefix_slice},
-    random_data::RandomDataBuilder,
+    output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_util::checked_add_one_usize,
     time,
 };
@@ -22,25 +21,18 @@ cfg_select! {
     }
     _ => {}
 }
+use alloc::borrow::Cow;
 use core::{result::Result as CoreResult, time::Duration};
 use std::{
     fs,
-    fs::File,
-    io::{BufWriter, Error as IoError, ErrorKind, Write, stderr, stdout},
+    io::{Error as IoError, ErrorKind, Write, stderr, stdout},
     path::Path,
     process::ExitCode,
-    sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-pub struct MenuApp {
-    pub file_mutex: Mutex<BufWriter<File>>,
-    pub input_buffer: String,
-    #[cfg(target_arch = "x86_64")]
-    pub ladder_players_storage: String,
-    #[cfg(target_arch = "x86_64")]
-    pub ladder_results_storage: String,
-    #[cfg(target_arch = "x86_64")]
-    pub num_64: u64,
+struct ServerHostSelection {
+    ignored_suffix: bool,
+    parsed_server: time::address::ParsedServer,
 }
 impl MenuApp {
     fn execute_command(
@@ -55,7 +47,7 @@ impl MenuApp {
                 return Ok(true);
             }
             b'6' => {
-                validate_safe_output_file_path(Path::new(FILE_NAME), true)?;
+                validate_safe_output_file_path(Path::new(FILE_NAME))?;
                 if let Err(remove_err) = fs::remove_file(FILE_NAME) {
                     writeln!(err, "{remove_err}")?;
                 } else {
@@ -204,13 +196,7 @@ impl MenuApp {
         }
         writeln!(out, "\nnum_64/supp 수동 입력 생성 모드")?;
         self.input_buffer.clear();
-        #[cfg(target_arch = "x86_64")]
-        let num_64_slot = &mut self.num_64;
-        #[cfg(not(target_arch = "x86_64"))]
-        let mut manual_num_64 = 0_u64;
-        #[cfg(not(target_arch = "x86_64"))]
-        let num_64_slot = &mut manual_num_64;
-        *num_64_slot = read_u64_hex_input(
+        let manual_num_64 = read_u64_hex_input(
             format_args!(
                 "num_64를 입력해 주세요 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}): ",
                 max_u64 = u64::MAX
@@ -219,6 +205,12 @@ impl MenuApp {
             out,
             err,
         )?;
+        cfg_select! {
+            target_arch = "x86_64" => {
+                self.num_64 = manual_num_64;
+            }
+            _ => {}
+        }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
             supp_input_count = checked_add_one_usize(supp_input_count)
@@ -242,29 +234,31 @@ impl MenuApp {
         };
         let data = RandomDataBuilder {
             next_supp: &mut next_supp,
-            num: *num_64_slot,
+            num: manual_num_64,
         }
         .build()?;
         let mut buffer = [0_u8; BUFFER_SIZE];
-        let file_len = format_data_into_buffer(&data, &mut buffer, false)?;
+        let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
         {
             let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
             Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
             Write::flush(&mut *file_guard)?;
         }
         let console_len = if *IS_TERMINAL {
-            format_data_into_buffer(&data, &mut buffer, true)?
+            format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
         } else {
             file_len
         };
         let console_slice = prefix_slice(&buffer, console_len)?;
-        #[cfg(target_arch = "x86_64")]
-        write_slice_to_console(console_slice)?;
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            let mut stdout_lock = stdout().lock();
-            Write::write_all(&mut stdout_lock, console_slice)?;
-            Write::flush(&mut stdout_lock)?;
+        cfg_select! {
+            target_arch = "x86_64" => {
+                write_slice_to_console(console_slice)?;
+            }
+            _ => {{
+                let mut stdout_lock = stdout().lock();
+                Write::write_all(&mut stdout_lock, console_slice)?;
+                Write::flush(&mut stdout_lock)?;
+            }}
         }
         Ok(())
     }
@@ -315,7 +309,7 @@ impl MenuApp {
             let target_time = self.read_target_time(out)?;
             let trigger_action = self.read_trigger_action(out, target_time)?;
             let now = Instant::now();
-            time::ServerTimeSession {
+            ServerTimeSession {
                 host,
                 now,
                 target_time,
@@ -337,30 +331,35 @@ impl MenuApp {
         out: &mut dyn Write,
         err_out: &mut dyn Write,
     ) -> CoreResult<time::address::ParsedServer, time::diagnostic::TimeError> {
-        let (ignored_suffix, parsed_server) = get_validated_input(
+        let server_input = get_validated_input(
             "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> CoreResult<(bool, time::address::ParsedServer), String> {
+            |raw_input| -> CoreResult<ServerHostSelection, Cow<'static, str>> {
                 if raw_input.is_empty() {
-                    return Err("서버 주소를 비워둘 수 없습니다.".to_owned());
+                    return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
                 }
                 let after_scheme = time::address::strip_scheme_prefix(raw_input);
                 let ignored_suffix = after_scheme.contains(['/', '?', '#']);
                 raw_input
                     .parse::<time::address::ParsedServer>()
-                    .map(|parsed| (ignored_suffix, parsed))
-                    .map_err(|source| format!("서버 주소가 올바르지 않습니다: {source}"))
+                    .map(|parsed_server| ServerHostSelection {
+                        ignored_suffix,
+                        parsed_server,
+                    })
+                    .map_err(|source| {
+                        Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
+                    })
             },
         )
         .map_err(time::diagnostic::TimeError::from)?;
-        if ignored_suffix {
+        if server_input.ignored_suffix {
             writeln!(
                 err_out,
                 "[안내] 서버 주소의 경로/쿼리/프래그먼트는 무시되고 호스트만 사용됩니다."
             )?;
         }
-        Ok(parsed_server)
+        Ok(server_input.parsed_server)
     }
     fn read_target_time(
         &mut self,

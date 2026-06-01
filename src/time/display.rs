@@ -156,6 +156,9 @@ impl SliceCursor<'_> {
         }
         self.write_u32_dec(abs)
     }
+    pub(super) fn written_slice(&self) -> IoResult<&[u8]> {
+        self.inner.written_slice()
+    }
 }
 impl ServerTime {
     fn calculate_display_time_at(&self, now: Instant) -> Result<DisplayableTime> {
@@ -232,7 +235,6 @@ impl ServerTime {
     pub(super) fn write_current_display_time_buf_at(
         &self,
         cur: &mut SliceCursor<'_>,
-        show_millis: bool,
         now: Instant,
     ) -> Result<()> {
         let dt = self.calculate_display_time_at(now)?;
@@ -251,10 +253,8 @@ impl ServerTime {
         cur.write_u32_2digits(dt.minute).map_err(TimeError::from)?;
         cur.write_byte(b':').map_err(TimeError::from)?;
         cur.write_u32_2digits(dt.second).map_err(TimeError::from)?;
-        if show_millis {
-            cur.write_byte(b'.').map_err(TimeError::from)?;
-            cur.write_u32_3digits(dt.millis).map_err(TimeError::from)?;
-        }
+        cur.write_byte(b'.').map_err(TimeError::from)?;
+        cur.write_u32_3digits(dt.millis).map_err(TimeError::from)?;
         Ok(())
     }
 }

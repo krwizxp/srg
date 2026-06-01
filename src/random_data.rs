@@ -4,10 +4,10 @@ use super::{
     HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX, HANGUL_SYLLABLE_MODULUS,
     INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO, INPUT_BYTE_MAX_FOR_LOTTO7,
     INPUT_BYTE_MAX_FOR_LUCKY_STAR, INPUT_BYTE_MAX_FOR_PASSWORD, LOTTO_COUNT, LOTTO_COUNT_U8,
-    LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK, NMS_GLYPH_COUNT,
-    NMS_GLYPH_NUM_SHIFTS, NMS_GLYPH_PREFIX_COUNT, NMS_PLANET_MAX_VALUE, NMS_PLANET_MODULUS,
-    NMS_SOLAR_SYSTEM_MAX_VALUE, NMS_SOLAR_SYSTEM_MODULUS, PASSWORD_BYTE_LEN, PASSWORD_BYTE_LEN_U8,
-    Result, U32_MAX_INV,
+    LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK, NMS_GLYPH_NUM_SHIFTS,
+    NMS_GLYPH_PREFIX_COUNT, NMS_PLANET_MAX_VALUE, NMS_PLANET_MODULUS, NMS_SOLAR_SYSTEM_MAX_VALUE,
+    NMS_SOLAR_SYSTEM_MODULUS, PASSWORD_BYTE_LEN_U8, RandomDataBuilder, RandomDataSet, Result,
+    U32_MAX_INV,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_util::{
         checked_add_one_u8, checked_add_one_u64, checked_add_one_usize, galaxy_coord,
@@ -22,40 +22,8 @@ cfg_select! {
 }
 use core::{char::from_u32, ops::Mul as NumericMul};
 use std::io::Error as IoError;
-#[derive(Default)]
-pub struct RandomDataSet {
-    pub euro_lucky_next_idx: usize,
-    pub euro_main_next_idx: usize,
-    pub euro_millions_lucky_stars: [u8; EURO_MILLIONS_LUCKY_COUNT],
-    pub euro_millions_main_numbers: [u8; EURO_MILLIONS_MAIN_COUNT],
-    pub galaxy_x: u16,
-    pub galaxy_y: u16,
-    pub galaxy_z: u16,
-    pub glyph_string: [char; NMS_GLYPH_COUNT],
-    pub hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
-    pub kor_coords: (f64, f64),
-    pub lotto7_next_idx: usize,
-    pub lotto7_numbers: [u8; LOTTO7_COUNT],
-    pub lotto_next_idx: usize,
-    pub lotto_numbers: [u8; LOTTO_COUNT],
-    pub nms_portal_xxx: u16,
-    pub nms_portal_yy: u8,
-    pub nms_portal_zzz: u16,
-    pub num_64: u64,
-    pub numeric_password: u32,
-    pub numeric_password_digits: u8,
-    pub password: [u8; PASSWORD_BYTE_LEN],
-    pub password_len: u8,
-    pub planet_number: u8,
-    pub seen_euro_millions_lucky: u64,
-    pub seen_euro_millions_main: u64,
-    pub seen_lotto: u64,
-    pub seen_lotto7: u64,
-    pub solar_system_index: u16,
-    pub world_coords: (f64, f64),
-}
 #[derive(Clone, Copy)]
-pub struct RandomBitBuffer {
+struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
@@ -78,14 +46,12 @@ impl RandomBitBuffer {
         self.value
     }
 }
-pub type SupplementalProvider<'provider> = dyn FnMut(&'static str) -> Result<u64> + 'provider;
-pub struct RandomDataBuilder<'provider_ref, 'provider_env> {
-    pub next_supp: &'provider_ref mut SupplementalProvider<'provider_env>,
-    pub num: u64,
-}
-struct RandomDataBuildState<'provider_ref, 'provider_env> {
+struct RandomDataBuildState<'provider_ref, F>
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
     data: RandomDataSet,
-    next_supp: &'provider_ref mut SupplementalProvider<'provider_env>,
+    next_supp: &'provider_ref mut F,
     num: u64,
     supplemental: Option<RandomBitBuffer>,
 }
@@ -98,7 +64,10 @@ impl RandomDataSet {
             && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
     }
 }
-impl RandomDataBuilder<'_, '_> {
+impl<F> RandomDataBuilder<'_, F>
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
     pub fn build(self) -> Result<RandomDataSet> {
         let mut state = RandomDataBuildState {
             data: RandomDataSet {
@@ -117,7 +86,10 @@ impl RandomDataBuilder<'_, '_> {
         Ok(state.data)
     }
 }
-impl RandomDataBuildState<'_, '_> {
+impl<F> RandomDataBuildState<'_, F>
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
@@ -150,10 +122,10 @@ impl RandomDataBuildState<'_, '_> {
                     self.next_supplemental("한글 음절 보완")?
                 };
                 let supp_value = supplemental.value();
-                let candidate_value = HANGUL_SHIFTS
-                    .into_iter()
-                    .map(|supp_shift| u32::from(low_u16_from_u64(supp_value >> supp_shift)))
-                    .find(|value| *value <= HANGUL_SYLLABLE_MAX);
+                let candidate_value = HANGUL_SHIFTS.into_iter().find_map(|supp_shift| {
+                    let candidate = u32::from(low_u16_from_u64(supp_value >> supp_shift));
+                    (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
+                });
                 if let Some(candidate) = candidate_value {
                     syllable_index = candidate;
                 } else {
@@ -403,7 +375,7 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     max_value: u64,
     reason: &'static str,
     supplemental: &mut Option<RandomBitBuffer>,
-    next_supp: &mut SupplementalProvider<'_>,
+    next_supp: &mut impl FnMut(&'static str) -> Result<u64>,
 ) -> Result<u64> {
     let bit_count = BITS.min(64);
     let mask = match bit_count {
@@ -413,11 +385,12 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             .checked_shl(u32::from(bit_count))
             .map_or(0, |shifted| shifted.saturating_sub(1)),
     };
-    for &shift in shifts {
-        let extracted_value = (num >> shift) & mask;
-        if extracted_value <= max_value {
-            return Ok(extracted_value);
-        }
+    if let Some(extracted_value) = shifts
+        .iter()
+        .map(|&shift| (num >> shift) & mask)
+        .find(|&value| value <= max_value)
+    {
+        return Ok(extracted_value);
     }
     loop {
         let supp = if supplemental
