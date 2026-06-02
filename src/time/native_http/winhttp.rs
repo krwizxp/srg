@@ -40,6 +40,11 @@ struct RequestTarget {
     secure: bool,
 }
 struct Handle(NonNull<c_void>);
+struct WinHttpHeadPerform {
+    request: Handle,
+    request_start: Instant,
+    response_received: Instant,
+}
 struct CachedConnect {
     handle: Handle,
     host: String,
@@ -187,7 +192,7 @@ impl Client {
         } else {
             0
         };
-        let (request, request_start, response_received_inst) = self.with_cached_connect(
+        let perform = self.with_cached_connect(
             &user_agent,
             &target.host,
             &host_wide,
@@ -203,16 +208,21 @@ impl Client {
                 let request_start = Instant::now();
                 self.send_head(&request, context)?;
                 self.receive_response(&request, context)?;
-                let response_received_inst = Instant::now();
-                Ok((request, request_start, response_received_inst))
+                let response_received = Instant::now();
+                Ok(WinHttpHeadPerform {
+                    request,
+                    request_start,
+                    response_received,
+                })
             },
         )?;
-        let server_time = self.query_server_time(&request, context, parse_http_date)?;
-        let rtt = response_received_inst
-            .saturating_duration_since(request_start)
+        let server_time = self.query_server_time(&perform.request, context, parse_http_date)?;
+        let rtt = perform
+            .response_received
+            .saturating_duration_since(perform.request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
-            response_received_inst,
+            response_received_inst: perform.response_received,
             rtt,
             server_time,
         })
@@ -372,21 +382,28 @@ impl Client {
         }
     }
     fn request_target(&self, url: &str, context: &str) -> Result<RequestTarget> {
-        let (secure, rest) = if let Some(rest) = url.strip_prefix(self.https_scheme_prefix) {
-            (true, rest)
+        struct RequestScheme<'url> {
+            rest: &'url str,
+            secure: bool,
+        }
+        let scheme = if let Some(rest) = url.strip_prefix(self.https_scheme_prefix) {
+            RequestScheme { rest, secure: true }
         } else if let Some(rest) = url.strip_prefix(self.http_scheme_prefix) {
-            (false, rest)
+            RequestScheme {
+                rest,
+                secure: false,
+            }
         } else {
             return Err(error(context, "지원하지 않는 URL scheme입니다."));
         };
-        let authority = match rest.split_once(['/', '?', '#']) {
+        let authority = match scheme.rest.split_once(['/', '?', '#']) {
             Some((authority, _)) => authority,
-            None => rest,
+            None => scheme.rest,
         };
         if authority.is_empty() {
             return Err(error(context, "URL host가 비어 있습니다."));
         }
-        let default_port = if secure {
+        let default_port = if scheme.secure {
             INTERNET_DEFAULT_HTTPS_PORT
         } else {
             INTERNET_DEFAULT_HTTP_PORT
@@ -408,7 +425,7 @@ impl Client {
             host.push_str(host_text);
             Ok(host)
         };
-        let (host, port) = if let Some(bracketed) = authority.strip_prefix('[') {
+        let target = if let Some(bracketed) = authority.strip_prefix('[') {
             let Some((host, bracket_rest)) = bracketed.split_once(']') else {
                 return Err(error(context, "IPv6 URL host 형식이 올바르지 않습니다."));
             };
@@ -418,20 +435,36 @@ impl Client {
                 parse_port(
                     bracket_rest
                         .strip_prefix(':')
-                    .ok_or_else(|| error(context, "URL port 형식이 올바르지 않습니다."))?,
+                        .ok_or_else(|| error(context, "URL port 형식이 올바르지 않습니다."))?,
                 )?
             };
-            (copy_host(host)?, port)
+            RequestTarget {
+                host: copy_host(host)?,
+                port,
+                secure: scheme.secure,
+            }
         } else if let Some((host, port_text)) = authority.rsplit_once(':') {
             if host.contains(':') {
-                (copy_host(authority)?, default_port)
+                RequestTarget {
+                    host: copy_host(authority)?,
+                    port: default_port,
+                    secure: scheme.secure,
+                }
             } else {
-                (copy_host(host)?, parse_port(port_text)?)
+                RequestTarget {
+                    host: copy_host(host)?,
+                    port: parse_port(port_text)?,
+                    secure: scheme.secure,
+                }
             }
         } else {
-            (copy_host(authority)?, default_port)
+            RequestTarget {
+                host: copy_host(authority)?,
+                port: default_port,
+                secure: scheme.secure,
+            }
         };
-        Ok(RequestTarget { host, port, secure })
+        Ok(target)
     }
     fn send_head(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is valid and no additional request body or headers are needed for HEAD.

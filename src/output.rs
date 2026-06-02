@@ -258,12 +258,18 @@ impl OutputFormatter<'_, '_, '_> {
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes())?;
         FmtWrite::write_fmt(
             self.cursor,
-            format_args!("{}, {}\n", data.kor_coords.0, data.kor_coords.1),
+            format_args!(
+                "{}, {}\n",
+                data.kor_coords.latitude, data.kor_coords.longitude
+            ),
         )?;
         self.cursor.write_bytes("세계 위경도: ".as_bytes())?;
         FmtWrite::write_fmt(
             self.cursor,
-            format_args!("{}, {}\n", data.world_coords.0, data.world_coords.1),
+            format_args!(
+                "{}, {}\n",
+                data.world_coords.latitude, data.world_coords.longitude
+            ),
         )?;
         Ok(())
     }

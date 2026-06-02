@@ -166,6 +166,11 @@ cfg_select! {
     }
 }
 #[derive(Default)]
+struct Coordinates {
+    latitude: f64,
+    longitude: f64,
+}
+#[derive(Default)]
 struct RandomDataSet {
     euro_lucky_next_idx: usize,
     euro_main_next_idx: usize,
@@ -176,7 +181,7 @@ struct RandomDataSet {
     galaxy_z: u16,
     glyph_string: [char; NMS_GLYPH_COUNT],
     hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
-    kor_coords: (f64, f64),
+    kor_coords: Coordinates,
     lotto7_next_idx: usize,
     lotto7_numbers: [u8; LOTTO7_COUNT],
     lotto_next_idx: usize,
@@ -195,7 +200,7 @@ struct RandomDataSet {
     seen_lotto: u64,
     seen_lotto7: u64,
     solar_system_index: u16,
-    world_coords: (f64, f64),
+    world_coords: Coordinates,
 }
 struct RandomDataBuilder<'provider_ref, F>
 where

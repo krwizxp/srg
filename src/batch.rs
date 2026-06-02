@@ -25,7 +25,11 @@ use std::{
 };
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 const PROGRESS_TIME_BUF_LEN: usize = 7;
-type GeneratedChunk = (DataBuffer, usize, usize);
+struct GeneratedChunk {
+    buffer: DataBuffer,
+    len: usize,
+    worker_idx: usize,
+}
 struct BufferChannels {
     return_receivers: Vec<Receiver<DataBuffer>>,
     return_senders: Vec<SyncSender<DataBuffer>>,
@@ -199,22 +203,25 @@ impl<'scope> WorkerPool<'scope> {
                         local_pool.push(buffer);
                         continue;
                     };
-                    match sender_clone.send((buffer, len, worker_idx)) {
-                        Ok(()) => {
-                            processed_ref.fetch_add(1, Ordering::Relaxed);
-                            while local_pool.len() < BUFFERS_PER_WORKER {
-                                match return_rx.try_recv() {
-                                    Ok(buf) => local_pool.push(buf),
-                                    Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
-                                }
+                    if sender_clone
+                        .send(GeneratedChunk {
+                            buffer,
+                            len,
+                            worker_idx,
+                        })
+                        .is_ok()
+                    {
+                        processed_ref.fetch_add(1, Ordering::Relaxed);
+                        while local_pool.len() < BUFFERS_PER_WORKER {
+                            match return_rx.try_recv() {
+                                Ok(buf) => local_pool.push(buf),
+                                Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
                             }
                         }
-                        Err(send_err) => {
-                            failed_ref.fetch_add(1, Ordering::Relaxed);
-                            processed_ref.fetch_add(1, Ordering::Relaxed);
-                            let (_returned_buffer, _len, _worker_idx) = send_err.0;
-                            break;
-                        }
+                    } else {
+                        failed_ref.fetch_add(1, Ordering::Relaxed);
+                        processed_ref.fetch_add(1, Ordering::Relaxed);
+                        break;
                     }
                 }
             }));
@@ -235,28 +242,23 @@ struct WriterTask<'writer> {
 }
 impl WriterTask<'_> {
     fn run(self) -> Result<RandomDataSet> {
-        let mut file_guard = lock_mutex(self.file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
-        while let Ok((data_buffer, data_len, worker_idx)) = self.receiver.recv() {
-            Self::write_chunk_and_return_buffer(
-                &mut file_guard,
-                &self.buffer_return_senders,
-                data_buffer,
-                data_len,
-                worker_idx,
-            )?;
-            while let Ok((more_buffer, more_len, more_worker_idx)) = self.receiver.try_recv() {
+        {
+            let mut file_guard = lock_mutex(self.file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
+            while let Ok(chunk) = self.receiver.recv() {
                 Self::write_chunk_and_return_buffer(
                     &mut file_guard,
                     &self.buffer_return_senders,
-                    more_buffer,
-                    more_len,
-                    more_worker_idx,
+                    chunk,
                 )?;
+                while let Ok(more_chunk) = self.receiver.try_recv() {
+                    Self::write_chunk_and_return_buffer(
+                        &mut file_guard,
+                        &self.buffer_return_senders,
+                        more_chunk,
+                    )?;
+                }
             }
         }
-        drop(file_guard);
-        drop(self.receiver);
-        drop(self.buffer_return_senders);
         let final_data = generate_random_data()?;
         let mut final_buffer_file = [0_u8; BUFFER_SIZE];
         let final_bytes_written_file =
@@ -279,16 +281,19 @@ impl WriterTask<'_> {
     fn write_chunk_and_return_buffer(
         file_guard: &mut MutexGuard<BufWriter<File>>,
         buffer_return_senders: &[SyncSender<DataBuffer>],
-        data_buffer: DataBuffer,
-        data_len: usize,
-        worker_idx: usize,
+        chunk: GeneratedChunk,
     ) -> Result<()> {
+        let GeneratedChunk {
+            buffer,
+            len,
+            worker_idx,
+        } = chunk;
         output::write_buffer_to_file_guard(
             file_guard,
-            output::prefix_slice(&data_buffer[..], data_len)?,
+            output::prefix_slice(&buffer[..], len)?,
         )?;
         if let Some(return_sender) = buffer_return_senders.get(worker_idx) {
-            match return_sender.send(data_buffer) {
+            match return_sender.send(buffer) {
                 Ok(()) | Err(_) => {}
             }
         }
@@ -302,6 +307,10 @@ struct BatchRegenerator<'file, 'out, 'err> {
     requested_count: u64,
     start_time: Instant,
 }
+struct BatchRunResult {
+    failed_count: u64,
+    final_data: RandomDataSet,
+}
 impl BatchRegenerator<'_, '_, '_> {
     fn regenerate(mut self) -> Result<u64> {
         if self.requested_count == 0 {
@@ -310,10 +319,10 @@ impl BatchRegenerator<'_, '_, '_> {
         if self.requested_count == 1 {
             return self.regenerate_single();
         }
-        let (final_data, failed_count) = self.regenerate_multiple()?;
-        self.write_summary(&final_data, failed_count)
+        let run_result = self.regenerate_multiple()?;
+        self.write_summary(&run_result.final_data, run_result.failed_count)
     }
-    fn regenerate_multiple(&self) -> Result<(RandomDataSet, u64)> {
+    fn regenerate_multiple(&self) -> Result<BatchRunResult> {
         ensure_file_exists_and_reopen(self.file_mutex)?;
         let file_mutex = self.file_mutex;
         let requested_count = self.requested_count;
@@ -379,7 +388,10 @@ impl BatchRegenerator<'_, '_, '_> {
                 panic_join_error("쓰기 스레드 패닉 발생", panic_payload.as_ref())
             })?
         })?;
-        Ok((final_data, failed_ref.load(Ordering::Relaxed)))
+        Ok(BatchRunResult {
+            failed_count: failed_ref.load(Ordering::Relaxed),
+            final_data,
+        })
     }
     fn regenerate_single(&self) -> Result<u64> {
         ensure_file_exists_and_reopen(self.file_mutex)?;

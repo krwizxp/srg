@@ -1,4 +1,5 @@
 use crate::write_line_ignored;
+use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
     ptr::{NonNull, null_mut},
@@ -15,6 +16,8 @@ type CGEventTapLocation = u32;
 type CGEventType = u32;
 type CGKeyCode = u16;
 type CGMouseButton = u32;
+type InputError = Cow<'static, str>;
+type InputResult<T> = Result<T, InputError>;
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct CGPoint {
@@ -80,7 +83,7 @@ impl Drop for Event {
     }
 }
 impl Event {
-    fn create(request: EventRequest, context: &str) -> Result<Self, String> {
+    fn create(request: EventRequest, context: &str) -> InputResult<Self> {
         let raw_ptr = match request {
             // SAFETY: null asks CoreGraphics to use the default source.
             EventRequest::Current => unsafe { CGEventCreate(null_mut()) },
@@ -108,7 +111,7 @@ impl Event {
             }
         };
         let Some(raw) = NonNull::new(raw_ptr) else {
-            return Err(format!("{context}: CGEvent 생성 실패"));
+            return Err(Cow::Owned(format!("{context}: CGEvent 생성 실패")));
         };
         Ok(Self { raw })
     }
@@ -116,7 +119,7 @@ impl Event {
         virtual_key: CGKeyCode,
         direction: KeyDirection,
         context: &str,
-    ) -> Result<Self, String> {
+    ) -> InputResult<Self> {
         Self::create(
             EventRequest::Keyboard {
                 direction,
@@ -134,7 +137,7 @@ impl Event {
         mouse_cursor_position: CGPoint,
         mouse_button: CGMouseButton,
         context: &str,
-    ) -> Result<Self, String> {
+    ) -> InputResult<Self> {
         Self::create(
             EventRequest::Mouse {
                 mouse_button,
@@ -161,7 +164,7 @@ impl PreparedInput {
     }
     pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
         *self = Self;
-        let result: Result<(), String> = (|| {
+        let result: InputResult<()> = (|| {
             match action {
                 InputAction::MouseClick => {
                     let current = Event::create(EventRequest::Current, "현재 마우스 위치 조회")?;

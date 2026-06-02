@@ -7,7 +7,7 @@ use core::{
     ptr::{NonNull, null},
 };
 use std::io;
-macro_rules! load_x11_symbol {
+macro_rules! load_x11_fn_symbol {
     ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
         let symbol = $library.symbol_address($symbol_name)?;
         // SAFETY: the requested X11/XTest symbol name matches this concrete function pointer type.
@@ -101,6 +101,10 @@ impl Library {
         Err(err)
     }
     fn symbol_address(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
+        // SAFETY: dlerror has no preconditions; this clears any previous loader error.
+        unsafe {
+            dlerror();
+        }
         // SAFETY: self.handle is a live dlopen handle and name is NUL-terminated.
         let symbol = unsafe { dlsym(self.handle.as_ptr(), name.as_ptr()) };
         NonNull::new(symbol).ok_or_else(dl_error_message)
@@ -168,12 +172,12 @@ impl PreparedX11Input {
         let x11 = Library::open(&X11_LIBS).map_err(|source| format!("libX11 로드 실패: {source}"))?;
         let xtst =
             Library::open(&XTST_LIBS).map_err(|source| format!("libXtst 로드 실패: {source}"))?;
-        let close_display = load_x11_symbol!(x11, SYM_X_CLOSE_DISPLAY, XCloseDisplay)?;
-        let flush = load_x11_symbol!(x11, SYM_X_FLUSH, XFlush)?;
-        let keycode = load_x11_symbol!(x11, SYM_X_KEYS_PRESS, XKeysymToKeycode)?;
-        let open_display = load_x11_symbol!(x11, SYM_X_OPEN_DISPLAY, XOpenDisplay)?;
-        let test_button = load_x11_symbol!(xtst, SYM_X_TEST_BUTTON, XTestFakeButtonEvent)?;
-        let test_key = load_x11_symbol!(xtst, SYM_X_TEST_KEY, XTestFakeKeyEvent)?;
+        let close_display = load_x11_fn_symbol!(x11, SYM_X_CLOSE_DISPLAY, XCloseDisplay)?;
+        let flush = load_x11_fn_symbol!(x11, SYM_X_FLUSH, XFlush)?;
+        let keycode = load_x11_fn_symbol!(x11, SYM_X_KEYS_PRESS, XKeysymToKeycode)?;
+        let open_display = load_x11_fn_symbol!(x11, SYM_X_OPEN_DISPLAY, XOpenDisplay)?;
+        let test_button = load_x11_fn_symbol!(xtst, SYM_X_TEST_BUTTON, XTestFakeButtonEvent)?;
+        let test_key = load_x11_fn_symbol!(xtst, SYM_X_TEST_KEY, XTestFakeKeyEvent)?;
         let api = X11Api {
             _x11: x11,
             _xtst: xtst,

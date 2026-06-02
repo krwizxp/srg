@@ -1,5 +1,5 @@
 use super::{
-    KST_OFFSET_SECS, Result, ServerTime, TimeError,
+    CivilDate, KST_OFFSET_SECS, Result, ServerTime, TimeError,
     http_date::civil_from_days,
     util::{blend_weighted_nanos, parse_result_with_context},
 };
@@ -202,8 +202,11 @@ impl ServerTime {
         )?;
         let day_index =
             parse_result_with_context(i32::try_from(days_since_epoch), "일자 계산 중 범위 오류")?;
-        let (year, month, day_of_month) =
-            civil_from_days(day_index).ok_or_else(|| TimeError::parse("일자 계산 중 범위 오류"))?;
+        let CivilDate {
+            day: day_of_month,
+            month,
+            year,
+        } = civil_from_days(day_index).ok_or_else(|| TimeError::parse("일자 계산 중 범위 오류"))?;
         Ok(DisplayableTime {
             day_of_month,
             day_of_week_str,

@@ -56,6 +56,11 @@ struct CurlHeaderCapture {
     limit: usize,
     pending_line: Vec<u8>,
 }
+struct CurlHeadPerform {
+    code: CurlCode,
+    request_start: Instant,
+    response_received: Instant,
+}
 enum CurlWriteTarget<'buffer> {
     Body(&'buffer mut CurlBodySink),
     Header(&'buffer mut CurlHeaderCapture),
@@ -175,7 +180,7 @@ impl Client {
         if init_code != CURLE_OK {
             return Err(error(context, curl_error("curl_global_init", init_code)));
         }
-        let (request_start, response_received_inst, perform_code) = EASY_HANDLE
+        let perform_result = EASY_HANDLE
             .try_with(|cell| {
                 let mut cached_handle = cell
                     .try_borrow_mut()
@@ -207,12 +212,12 @@ impl Client {
                 handle.setopt_ptr(CURLOPT_HEADERDATA, header_data, context)?;
                 let request_start = Instant::now();
                 let perform_code = handle.perform();
-                let response_received_inst = Instant::now();
-                Ok::<(Instant, Instant, c_int), TimeError>((
+                let response_received = Instant::now();
+                Ok::<CurlHeadPerform, TimeError>(CurlHeadPerform {
+                    code: perform_code,
                     request_start,
-                    response_received_inst,
-                    perform_code,
-                ))
+                    response_received,
+                })
             })
             .map_err(|source| error(context, format!("curl easy handle cache 접근 실패: {source}")))??;
         if !header_capture.pending_line.is_empty() {
@@ -228,16 +233,16 @@ impl Client {
             Self::append_clear_reusable_handle_error(context, &mut callback_error);
             return Err(error(context, callback_error));
         }
-        if perform_code != CURLE_OK {
+        if perform_result.code != CURLE_OK {
             let error_bytes = error_buffer.map(|ch| ch.to_le_bytes()[0]);
             let mut perform_error = CStr::from_bytes_until_nul(&error_bytes)
                 .ok()
                 .filter(|message| !message.to_bytes().is_empty())
                 .map_or_else(
-                    || curl_error("curl_easy_perform", perform_code),
+                    || curl_error("curl_easy_perform", perform_result.code),
                     |message_cstr| {
                         let message = message_cstr.to_string_lossy();
-                        format!("curl_easy_perform 실패: {message} ({perform_code})")
+                        format!("curl_easy_perform 실패: {message} ({})", perform_result.code)
                     },
                 );
             Self::append_clear_reusable_handle_error(context, &mut perform_error);
@@ -247,10 +252,15 @@ impl Client {
             return Err(super::TimeError::header_not_found(format!("{context} 응답에서 Date")));
         };
         let server_time = parse_http_date(date_header_raw)?;
-        let rtt = response_received_inst
-            .saturating_duration_since(request_start)
+        let rtt = perform_result
+            .response_received
+            .saturating_duration_since(perform_result.request_start)
             .max(MIN_TRANSFER_TIME);
-        Ok(HeadResponse { response_received_inst, rtt, server_time })
+        Ok(HeadResponse {
+            response_received_inst: perform_result.response_received,
+            rtt,
+            server_time,
+        })
     }
 }
 impl CurlBodySink {

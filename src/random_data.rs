@@ -1,7 +1,7 @@
 use super::{
-    ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, BYTE_BITS, EURO_LUCKY_MODULUS, EURO_MAIN_MODULUS,
-    EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT, HANGUL_BASE_CODE_POINT, HANGUL_SHIFTS,
-    HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX, HANGUL_SYLLABLE_MODULUS,
+    ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, BYTE_BITS, Coordinates, EURO_LUCKY_MODULUS,
+    EURO_MAIN_MODULUS, EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT, HANGUL_BASE_CODE_POINT,
+    HANGUL_SHIFTS, HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX, HANGUL_SYLLABLE_MODULUS,
     INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO, INPUT_BYTE_MAX_FOR_LOTTO7,
     INPUT_BYTE_MAX_FOR_LUCKY_STAR, INPUT_BYTE_MAX_FOR_PASSWORD, LOTTO_COUNT, LOTTO_COUNT_U8,
     LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK, NMS_GLYPH_NUM_SHIFTS,
@@ -28,10 +28,10 @@ struct RandomBitBuffer {
     value: u64,
 }
 impl RandomBitBuffer {
-    pub const fn bits_remaining(self) -> u8 {
+    const fn bits_remaining(self) -> u8 {
         self.bits_remaining
     }
-    pub fn consume_bits(&mut self, bits: u8, reason: &'static str) -> Result<u64> {
+    fn consume_bits(&mut self, bits: u8, reason: &'static str) -> Result<u64> {
         let Some(shift) = self.bits_remaining.checked_sub(bits) else {
             return Err(format!(
                 "보완 난수 비트 수가 부족합니다. (remaining={}, required={bits}, reason={reason})",
@@ -42,7 +42,7 @@ impl RandomBitBuffer {
         self.bits_remaining = shift;
         Ok(self.value >> shift)
     }
-    pub const fn value(self) -> u64 {
+    const fn value(self) -> u64 {
         self.value
     }
 }
@@ -68,7 +68,7 @@ impl<F> RandomDataBuilder<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    pub fn build(self) -> Result<RandomDataSet> {
+    pub(super) fn build(self) -> Result<RandomDataSet> {
         let mut state = RandomDataBuildState {
             data: RandomDataSet {
                 num_64: self.num,
@@ -96,14 +96,14 @@ where
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
         let upper_ratio = NumericMul::mul(f64::from(upper_32_bits), U32_MAX_INV);
         let lower_ratio = NumericMul::mul(f64::from(lower_32_bits), U32_MAX_INV);
-        self.data.kor_coords = (
-            5.504_167_f64.mul_add(upper_ratio, 33.112_500),
-            7.263_056_f64.mul_add(lower_ratio, 124.609_722),
-        );
-        self.data.world_coords = (
-            180.0_f64.mul_add(upper_ratio, -90.0),
-            360.0_f64.mul_add(lower_ratio, -180.0),
-        );
+        self.data.kor_coords = Coordinates {
+            latitude: 5.504_167_f64.mul_add(upper_ratio, 33.112_500),
+            longitude: 7.263_056_f64.mul_add(lower_ratio, 124.609_722),
+        };
+        self.data.world_coords = Coordinates {
+            latitude: 180.0_f64.mul_add(upper_ratio, -90.0),
+            longitude: 360.0_f64.mul_add(lower_ratio, -180.0),
+        };
         self.data.nms_portal_yy = low_u8_from_u32(upper_32_bits);
         self.data.nms_portal_zzz = low_u16_from_u64((self.num >> 20) & NMS_COORD_MASK);
         self.data.nms_portal_xxx = low_u16_from_u64((self.num >> 8) & NMS_COORD_MASK);
@@ -393,19 +393,12 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         return Ok(extracted_value);
     }
     loop {
-        let supp = if supplemental
-            .as_ref()
-            .is_none_or(|candidate| candidate.bits_remaining() < BITS)
-        {
-            supplemental.insert(RandomBitBuffer {
+        let supp = match *supplemental {
+            Some(ref mut candidate) if candidate.bits_remaining() >= BITS => candidate,
+            None | Some(_) => supplemental.insert(RandomBitBuffer {
                 bits_remaining: BYTE_BITS,
                 value: next_supp(reason)?,
-            })
-        } else {
-            let Some(candidate) = supplemental.as_mut() else {
-                return Err("보완 난수 상태 불일치".into());
-            };
-            candidate
+            }),
         };
         let extracted = supp.consume_bits(BITS, reason)? & mask;
         if extracted <= max_value {

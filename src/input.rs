@@ -103,6 +103,10 @@ cfg_select! {
             mode: LadderEntryMode,
             index_error: &'static str,
         ) -> Result<usize> {
+            struct SegmentBoundary {
+                end: usize,
+                has_separator: bool,
+            }
             let (out, err) = io;
             let index_err = || IoError::other(index_error);
             let count = loop {
@@ -111,10 +115,16 @@ cfg_select! {
                 let mut players_overflowed = false;
                 let mut trimmed_ranges: [Range<usize>; N] = [Range { start: 0, end: 0 }; N];
                 let mut segment_start = 0_usize;
-                for (segment_end, separator) in line
+                for boundary in line
                     .match_indices(',')
-                    .map(|(idx, _)| (idx, true))
-                    .chain([(line.len(), false)])
+                    .map(|(idx, _)| SegmentBoundary {
+                        end: idx,
+                        has_separator: true,
+                    })
+                    .chain([SegmentBoundary {
+                        end: line.len(),
+                        has_separator: false,
+                    }])
                 {
                     count = checked_add_one_usize(count).ok_or_else(|| {
                         IoError::other(match mode {
@@ -130,7 +140,9 @@ cfg_select! {
                         }
                         LadderEntryMode::Results { expected_count } if count > expected_count => break,
                         LadderEntryMode::Players | LadderEntryMode::Results { .. } => {
-                            let part = line.get(segment_start..segment_end).ok_or_else(index_err)?;
+                            let part = line
+                                .get(segment_start..boundary.end)
+                                .ok_or_else(index_err)?;
                             let leading_whitespace =
                                 part.len().saturating_sub(part.trim_start().len());
                             let trimmed = part.trim();
@@ -148,8 +160,9 @@ cfg_select! {
                             };
                         }
                     }
-                    if separator {
-                        segment_start = checked_add_one_usize(segment_end).ok_or_else(index_err)?;
+                    if boundary.has_separator {
+                        segment_start =
+                            checked_add_one_usize(boundary.end).ok_or_else(index_err)?;
                     }
                 }
                 if players_overflowed || count == 0 {

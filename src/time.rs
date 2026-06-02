@@ -92,7 +92,7 @@ const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT: Duration = Duration::from_secs(5);
 const ENTER_BUFFER_CAPACITY: usize = 8;
-pub const NUM_SAMPLES: usize = 10;
+const NUM_SAMPLES: usize = 10;
 const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
 const MAX_CALIBRATION_FAILURES: u32 = 100;
@@ -110,6 +110,16 @@ const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
+#[derive(Clone, Copy, Debug)]
+struct CivilDate {
+    day: u32,
+    month: u32,
+    year: i32,
+}
+struct ActivityTransition<'message> {
+    activity: Activity,
+    message: Option<&'message str>,
+}
 #[derive(Clone, Copy, Debug)]
 struct TimeSample {
     response_received_inst: Instant,
@@ -168,7 +178,7 @@ struct NetworkContext {
     tcp_line_buffer: Vec<u8>,
 }
 impl ServerTimeSession {
-    pub fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
+    pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         let baseline_placeholder = TimeSample {
             response_received_inst: self.now,
             rtt: Duration::ZERO,
@@ -212,7 +222,7 @@ impl AppState {
         &mut self,
         sample_count: usize,
         msg_buf: &'message mut String,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         self.baseline_rtt_attempts = 0;
         self.baseline_rtt_valid_count = 0;
         if sample_count == 0 {
@@ -269,13 +279,16 @@ impl AppState {
                 baseline_rtt.as_millis()
             ),
         );
-        (Activity::CalibrateOnTick, Some(msg_buf))
+        ActivityTransition {
+            activity: Activity::CalibrateOnTick,
+            message: Some(msg_buf),
+        }
     }
     fn handle_calibrate_on_tick<'message>(
         &mut self,
         _msg_buf: &'message mut str,
         net_ctx: &mut NetworkContext,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         let Ok(current_sample) = fetch_server_time_sample(&self.host, net_ctx) else {
             self.calibration_failure_count = self.calibration_failure_count.saturating_add(1);
             if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
@@ -283,7 +296,10 @@ impl AppState {
                     "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
                 );
             }
-            return (Activity::CalibrateOnTick, None);
+            return ActivityTransition {
+                activity: Activity::CalibrateOnTick,
+                message: None,
+            };
         };
         self.calibration_failure_count = 0;
         if let Some(prev_sample) = self.last_sample
@@ -321,11 +337,17 @@ impl AppState {
                     return transition_to_retry("다음 전체 동기화 시각 계산 실패.");
                 };
                 self.next_full_sync_at = next_full_sync_at;
-                return (Activity::Predicting, Some("[성공] 정밀 보정 완료!"));
+                return ActivityTransition {
+                    activity: Activity::Predicting,
+                    message: Some("[성공] 정밀 보정 완료!"),
+                };
             }
         }
         self.last_sample = Some(current_sample);
-        (Activity::CalibrateOnTick, None)
+        ActivityTransition {
+            activity: Activity::CalibrateOnTick,
+            message: None,
+        }
     }
     fn handle_final_countdown<'message>(
         &mut self,
@@ -334,7 +356,7 @@ impl AppState {
         net_ctx: &mut NetworkContext,
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         let sample = match fetch_server_time_sample(&self.host, net_ctx) {
             Ok(sample_value) => sample_value,
             Err(fetch_err) => {
@@ -348,10 +370,10 @@ impl AppState {
             }
         };
         let Some(st) = self.server_time.as_mut() else {
-            return (
-                Activity::MeasureBaselineRtt,
-                Some("[오류] 내부 상태 불일치: server_time 없음"),
-            );
+            return ActivityTransition {
+                activity: Activity::MeasureBaselineRtt,
+                message: Some("[오류] 내부 상태 불일치: server_time 없음"),
+            };
         };
         *st = st.recalibrate_with_rtt(sample.rtt);
         let now = Instant::now();
@@ -368,7 +390,10 @@ impl AppState {
         let effective_rtt = live_rtt.max(sample.rtt);
         let Some(one_way_delay) = effective_one_way_delay(effective_rtt) else {
             msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
-            return (Activity::FinalCountdown { target_time }, Some(msg_buf));
+            return ActivityTransition {
+                activity: Activity::FinalCountdown { target_time },
+                message: Some(msg_buf),
+            };
         };
         match decide_countdown_action(target_time, current_server_time, one_way_delay) {
             CountdownDecision::TriggerWithRemaining(duration_until_target) => {
@@ -394,7 +419,10 @@ impl AppState {
                 prepared_input,
                 err,
             ),
-            CountdownDecision::Wait => (Activity::FinalCountdown { target_time }, None),
+            CountdownDecision::Wait => ActivityTransition {
+                activity: Activity::FinalCountdown { target_time },
+                message: None,
+            },
         }
     }
     fn handle_final_countdown_fetch_error<'message>(
@@ -404,14 +432,17 @@ impl AppState {
         err: &TimeError,
         prepared_input: &mut native_input::PreparedInput,
         stderr: &mut dyn io::Write,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         if let Some(st) = self.server_time.as_ref() {
             let now = Instant::now();
             let current_server_time = st.current_server_time_at(now);
             let effective_rtt = self.live_rtt.unwrap_or(st.baseline_rtt);
             let Some(one_way_delay) = effective_one_way_delay(effective_rtt) else {
                 msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
-                return (Activity::FinalCountdown { target_time }, Some(msg_buf));
+                return ActivityTransition {
+                    activity: Activity::FinalCountdown { target_time },
+                    message: Some(msg_buf),
+                };
             };
             match decide_countdown_action(target_time, current_server_time, one_way_delay) {
                 CountdownDecision::TriggerWithRemaining(duration_until_target) => {
@@ -449,7 +480,10 @@ impl AppState {
             }
         }
         append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", err);
-        (Activity::FinalCountdown { target_time }, Some(msg_buf))
+        ActivityTransition {
+            activity: Activity::FinalCountdown { target_time },
+            message: Some(msg_buf),
+        }
     }
     fn handle_measure_baseline_rtt<'message>(
         &mut self,
@@ -457,12 +491,15 @@ impl AppState {
         net_ctx: &mut NetworkContext,
         now: Instant,
         out: &mut dyn io::Write,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         if self.baseline_rtt_attempts == 0 {
             self.begin_baseline_rtt_measurement(now, out);
         }
         if now < self.baseline_rtt_next_sample_at {
-            return (Activity::MeasureBaselineRtt, None);
+            return ActivityTransition {
+                activity: Activity::MeasureBaselineRtt,
+                message: None,
+            };
         }
         let attempt_index = self.baseline_rtt_attempts;
         let next_sample_base = match fetch_server_time_sample(&self.host, net_ctx) {
@@ -497,7 +534,10 @@ impl AppState {
         };
         self.baseline_rtt_next_sample_at = next_sample_at;
         if self.baseline_rtt_attempts < NUM_SAMPLES {
-            return (Activity::MeasureBaselineRtt, None);
+            return ActivityTransition {
+                activity: Activity::MeasureBaselineRtt,
+                message: None,
+            };
         }
         self.finish_baseline_rtt_measurement(self.baseline_rtt_valid_count, msg_buf)
     }
@@ -505,9 +545,12 @@ impl AppState {
         &mut self,
         _msg_buf: &'message mut String,
         now: Instant,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         let Some(server_time) = self.server_time.as_ref() else {
-            return (Activity::MeasureBaselineRtt, None);
+            return ActivityTransition {
+                activity: Activity::MeasureBaselineRtt,
+                message: None,
+            };
         };
         let estimated_server_time = server_time.current_server_time_at(now);
         if let Some(target_time) = self.target_time.take_if(|target| {
@@ -516,21 +559,24 @@ impl AppState {
                 .is_ok_and(|duration_until_target| duration_until_target <= FINAL_COUNTDOWN_WINDOW)
         }) {
             self.live_rtt = Some(server_time.baseline_rtt);
-            return (
-                Activity::FinalCountdown { target_time },
-                Some("최종 카운트다운 시작!"),
-            );
+            return ActivityTransition {
+                activity: Activity::FinalCountdown { target_time },
+                message: Some("최종 카운트다운 시작!"),
+            };
         }
         if now >= self.next_full_sync_at {
             self.server_time = None;
             self.baseline_rtt = None;
             self.live_rtt = None;
-            (
-                Activity::MeasureBaselineRtt,
-                Some("서버 시간 보정 주기 도래, 재보정 시작."),
-            )
+            ActivityTransition {
+                activity: Activity::MeasureBaselineRtt,
+                message: Some("서버 시간 보정 주기 도래, 재보정 시작."),
+            }
         } else {
-            (Activity::Predicting, None)
+            ActivityTransition {
+                activity: Activity::Predicting,
+                message: None,
+            }
         }
     }
     fn next_activity<'message>(
@@ -539,7 +585,7 @@ impl AppState {
         message_buffer: &'message mut String,
         now: Instant,
         runtime: &mut LoopRuntime<'_>,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         match *activity {
             Activity::MeasureBaselineRtt => self.handle_measure_baseline_rtt(
                 message_buffer,
@@ -558,15 +604,21 @@ impl AppState {
                 runtime.prepared_input,
                 runtime.err,
             ),
-            Activity::Finished => (Activity::Predicting, Some("액션 완료. 예측 모드 전환.")),
+            Activity::Finished => ActivityTransition {
+                activity: Activity::Predicting,
+                message: Some("액션 완료. 예측 모드 전환."),
+            },
             Activity::Retrying { retry_at } => {
                 if now >= retry_at {
-                    (
-                        Activity::MeasureBaselineRtt,
-                        Some("[재시도] 동기화를 다시 시작합니다."),
-                    )
+                    ActivityTransition {
+                        activity: Activity::MeasureBaselineRtt,
+                        message: Some("[재시도] 동기화를 다시 시작합니다."),
+                    }
                 } else {
-                    (Activity::Retrying { retry_at }, None)
+                    ActivityTransition {
+                        activity: Activity::Retrying { retry_at },
+                        message: None,
+                    }
                 }
             }
         }
@@ -648,7 +700,7 @@ impl AppState {
                 last_display_update = now;
             }
             message_buffer.clear();
-            let (next_activity, log_opt_msg) = {
+            let transition = {
                 let mut runtime = LoopRuntime {
                     err,
                     network_context: &mut network_context,
@@ -657,6 +709,7 @@ impl AppState {
                 };
                 self.next_activity(&activity, &mut message_buffer, now, &mut runtime)
             };
+            let next_activity = transition.activity;
             self.sync_prepared_input_state(&activity, &next_activity, &mut prepared_input, err);
             cfg_select! {
                 windows => {
@@ -664,7 +717,7 @@ impl AppState {
                 }
                 _ => {}
             }
-            if let Some(console_msg) = log_opt_msg {
+            if let Some(console_msg) = transition.message {
                 writeln!(out, "\n{console_msg}")?;
             }
             activity = next_activity;
@@ -727,12 +780,15 @@ impl AppState {
         log_message: fmt::Arguments,
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
-    ) -> (Activity, Option<&'message str>) {
+    ) -> ActivityTransition<'message> {
         if let Some(action) = self.trigger_action.map(TriggerAction::native_input_action) {
             prepared_input.send(action, err);
         }
         append_fmt(msg_buf, log_message);
-        (Activity::Finished, Some(msg_buf))
+        ActivityTransition {
+            activity: Activity::Finished,
+            message: Some(msg_buf),
+        }
     }
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
@@ -762,10 +818,16 @@ fn append_fmt(target: &mut String, args: fmt::Arguments<'_>) {
         Ok(()) | Err(_) => {}
     }
 }
-fn transition_to_retry(msg: &str) -> (Activity, Option<&str>) {
+fn transition_to_retry(msg: &str) -> ActivityTransition<'_> {
     let now = Instant::now();
     let Some(retry_at) = now.checked_add(RETRY_DELAY) else {
-        return (Activity::Retrying { retry_at: now }, Some(msg));
+        return ActivityTransition {
+            activity: Activity::Retrying { retry_at: now },
+            message: Some(msg),
+        };
     };
-    (Activity::Retrying { retry_at }, Some(msg))
+    ActivityTransition {
+        activity: Activity::Retrying { retry_at },
+        message: Some(msg),
+    }
 }

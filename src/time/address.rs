@@ -124,10 +124,9 @@ impl FromStr for ParsedServer {
                     .ok_or_else(|| TimeError::parse(ERR_HOST))?;
                 AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
             }
-        } else if authority.matches(':').count() == 1 {
-            let (host_part, port_part) = authority
-                .rsplit_once(':')
-                .ok_or_else(|| TimeError::parse(ERR_HOST))?;
+        } else if let Some((host_part, port_part)) = authority.split_once(':')
+            && !port_part.contains(':')
+        {
             AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
         } else {
             AuthorityParts::default_port(authority, default_port)
