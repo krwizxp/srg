@@ -39,16 +39,21 @@ impl AppError {
             time_source: None,
         }
     }
-    pub fn prepend_context<M>(self, context: M) -> Self
-    where
-        M: Into<Cow<'static, str>>,
-    {
-        Self {
-            io_kind: self.io_kind,
-            message: Cow::Owned(format!("{}: {}", context.into(), self.message)),
-            source: self.source,
-            time_source: self.time_source,
+    cfg_select! {
+        target_arch = "x86_64" => {
+            pub fn prepend_context<M>(self, context: M) -> Self
+            where
+                M: Into<Cow<'static, str>>,
+            {
+                Self {
+                    io_kind: self.io_kind,
+                    message: Cow::Owned(format!("{}: {}", context.into(), self.message)),
+                    source: self.source,
+                    time_source: self.time_source,
+                }
+            }
         }
+        _ => {}
     }
 }
 impl Display for AppError {

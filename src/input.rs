@@ -1,8 +1,9 @@
-use crate::diagnostic::{AppError, Result};
+use crate::diagnostic::Result;
 use core::{fmt::Arguments, result::Result as CoreResult};
 use std::io::{BufRead as _, Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
+        use crate::diagnostic::AppError;
         use core::range::Range;
         use super::random_util::checked_add_one_usize;
     }

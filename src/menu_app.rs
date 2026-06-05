@@ -1,6 +1,6 @@
 use crate::{
     constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL},
-    diagnostic::{AppError, Result},
+    diagnostic::Result,
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
@@ -13,6 +13,7 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             batch::regenerate_with_count,
+            diagnostic::AppError,
             hardware_rng::{
                 HardwareRandomSource, get_hardware_random, hardware_random_source,
                 take_rdseed_fallback_notice,
@@ -293,7 +294,7 @@ impl MenuApp {
                 Write::flush(&mut stdout_lock)?;
             }}
         }
-        write_rdseed_fallback_notice(err)
+        Ok(())
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_random_number_command(
@@ -321,7 +322,7 @@ impl MenuApp {
             }
             _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
         }
-        Ok(())
+        write_rdseed_fallback_notice(err)
     }
     fn handle_server_time_command(
         &mut self,
