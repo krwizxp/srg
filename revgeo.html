@@ -4908,6 +4908,8 @@
   <script>
     "use strict";
     (() => {
+      const fmt =
+        new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
       const U64_MAX = (1n << 64n) - 1n;
       const U64_SIGN_BIT = 1n << 63n;
       const U32_MAX_INV = 1 / 4294967295;
