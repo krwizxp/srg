@@ -1,7 +1,10 @@
 use crate::{
-    BIN8_TABLE, BUFFER_SIZE, HEX_BYTE_TABLE, HEX_UPPER, RandomDataSet, Result,
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
+    constants::BUFFER_SIZE,
+    diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
+    random_data::RandomDataSet,
+    tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER},
 };
 use core::{fmt::Write as FmtWrite, range::Range};
 use std::io::Result as IoResult;
@@ -76,10 +79,10 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            buf_write_u32_dec(
-                buffer_cur,
-                u32::from(u16::from(galaxy_number_byte).wrapping_add(1)),
-            )
+            let galaxy_number = u16::from(galaxy_number_byte)
+                .checked_add(1)
+                .ok_or_else(write_zero_err)?;
+            buf_write_u32_dec(buffer_cur, u32::from(galaxy_number))
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number)?;
@@ -197,7 +200,10 @@ impl OutputFormatter<'_, '_, '_> {
             range_slice_mut(head, pos, group_width)?.copy_from_slice(group);
             add_to_index(&mut pos, group_width)?;
             let slot = head.get_mut(pos).ok_or_else(write_zero_err)?;
-            *slot = if index == BYTE_GROUP_COUNT.saturating_sub(1) {
+            *slot = if BYTE_GROUP_COUNT
+                .checked_sub(1)
+                .is_some_and(|last_index| index == last_index)
+            {
                 b'\n'
             } else {
                 b' '
@@ -378,7 +384,8 @@ fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
-    let total = nums.iter().try_fold(N.saturating_sub(1), |total, &n| {
+    let separator_count = N.saturating_sub(1);
+    let total = nums.iter().try_fold(separator_count, |total, &n| {
         checked_add_index(total, u8_dec_len(n))
     })?;
     let head = cur.take(total)?;

@@ -1,38 +1,76 @@
 use crate::{
-    BUFFER_SIZE, FILE_NAME, IS_TERMINAL, KST_SECS_PER_DAY_U64, KST_SECS_PER_HOUR_U64,
-    KST_SECS_PER_MINUTE_U64, MENU, MenuApp, RandomDataBuilder, Result, ServerTimeSession,
+    constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL},
+    diagnostic::{AppError, Result},
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
+    random_data::build_random_data,
     random_util::checked_add_one_usize,
     time,
+    time::{ParsedServer, ServerTimeSession, TimeError, TriggerAction},
 };
 cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             batch::regenerate_with_count,
-            file_output::boxed_other_with_source,
-            hardware_rng::{RNG_SOURCE, RngSource, get_hardware_random},
+            hardware_rng::{
+                HardwareRandomSource, get_hardware_random, hardware_random_source,
+                take_rdseed_fallback_notice,
+            },
             input::{LadderEntryMode, read_ladder_entries},
             output::write_slice_to_console,
-            random_number::{RandomNumberMode, generate_random_number, random_bounded},
+            random_number::{generate_random_number, random_bounded},
         };
-        use core::array::from_fn;
+        use core::{array::from_fn, num::NonZeroU64};
+        use crate::random_number::RandomNumberMode;
     }
     _ => {}
 }
 use alloc::borrow::Cow;
 use core::{result::Result as CoreResult, time::Duration};
 use std::{
-    fs,
-    io::{Error as IoError, ErrorKind, Write, stderr, stdout},
+    fs::{self, File},
+    io::{BufWriter, ErrorKind, Write, stderr, stdout},
     path::Path,
     process::ExitCode,
+    sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-struct ServerHostSelection {
-    ignored_suffix: bool,
-    parsed_server: time::address::ParsedServer,
+cfg_select! {
+    target_arch = "x86_64" => {
+        const MENU: &str = concat!(
+            "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), ",
+            "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, ",
+            "7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ",
+        );
+    }
+    _ => {
+        const MENU: &str = concat!(
+            "\n5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 생성, 기타(1~4 제외): 종료\n",
+            "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
+            "선택해 주세요: ",
+        );
+    }
+}
+const KST_SECS_PER_HOUR_U64: u64 = 3_600;
+const KST_SECS_PER_MINUTE_U64: u64 = 60;
+const KST_SECS_PER_DAY_U64: u64 = 24 * KST_SECS_PER_HOUR_U64;
+cfg_select! {
+    target_arch = "x86_64" => {
+        pub struct MenuApp {
+            pub file_mutex: Mutex<BufWriter<File>>,
+            pub input_buffer: String,
+            pub ladder_players_storage: String,
+            pub ladder_results_storage: String,
+            pub num_64: u64,
+        }
+    }
+    _ => {
+        pub struct MenuApp {
+            pub file_mutex: Mutex<BufWriter<File>>,
+            pub input_buffer: String,
+        }
+    }
 }
 impl MenuApp {
     fn execute_command(
@@ -92,21 +130,20 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let mut next_num_64 = self.num_64;
+        if !prepare_hw_rng_menu_command(out)? {
+            return Ok(());
+        }
         let input_buffer = &mut self.input_buffer;
-        run_hw_rng_menu_command(out, |command_out| {
-            let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
-            let requested_count = loop {
-                match read_line_reuse(count_prompt, input_buffer, command_out)?.parse::<u64>() {
-                    Ok(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
-                    Ok(count) => break count,
-                    Err(_) => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
-                }
-            };
-            next_num_64 =
-                regenerate_with_count(&self.file_mutex, requested_count, command_out, err)?;
-            Ok(())
-        })?;
+        let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
+        let requested_count = loop {
+            match read_line_reuse(count_prompt, input_buffer, out)?.parse::<u64>() {
+                Ok(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
+                Ok(count) => break count,
+                Err(_) => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
+            }
+        };
+        let next_num_64 = regenerate_with_count(&self.file_mutex, requested_count, out, err)?;
+        write_rdseed_fallback_notice(err)?;
         self.num_64 = next_num_64;
         Ok(())
     }
@@ -116,74 +153,74 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let mut next_num_64 = self.num_64;
-        run_hw_rng_menu_command(out, |command_out| {
-            next_num_64 = regenerate_with_count(&self.file_mutex, 1, command_out, err)?;
-            Ok(())
-        })?;
+        if !prepare_hw_rng_menu_command(out)? {
+            return Ok(());
+        }
+        let next_num_64 = regenerate_with_count(&self.file_mutex, 1, out, err)?;
+        write_rdseed_fallback_notice(err)?;
         self.num_64 = next_num_64;
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
         const MAX_PLAYERS: usize = 512;
+        if !prepare_hw_rng_menu_command(out)? {
+            return Ok(());
+        }
         let mut seed = self.num_64;
         let input_buffer = &mut self.input_buffer;
         let players_storage = &mut self.ladder_players_storage;
         let results_storage = &mut self.ladder_results_storage;
-        run_hw_rng_menu_command(out, |command_out| {
-            players_storage.clear();
-            let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-            let n = read_ladder_entries(
-                format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
-                input_buffer,
-                (command_out, err),
-                players_storage,
-                &mut players_array,
-                LadderEntryMode::Players,
-                "플레이어 배열 인덱스 범위 초과",
-            )?;
-            results_storage.clear();
-            let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-            read_ladder_entries(
-                format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-                input_buffer,
-                (command_out, err),
-                results_storage,
-                &mut results_array,
-                LadderEntryMode::Results { expected_count: n },
-                "결과 배열 인덱스 범위 초과",
-            )?;
-            writeln!(command_out, "사다리타기 결과:")?;
-            let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
-            let indices_slice = indices
-                .get_mut(..n)
-                .ok_or_else(|| IoError::other("인덱스 배열 슬라이스 범위 초과"))?;
-            for index in (1..indices_slice.len()).rev() {
-                seed ^= get_hardware_random()?;
-                let next_index = checked_add_one_usize(index)
-                    .ok_or_else(|| IoError::other("인덱스 상한 계산 실패"))?;
-                let upper_bound = u64::try_from(next_index).map_err(|conversion_err| {
-                    boxed_other_with_source("인덱스 상한 변환 실패", conversion_err)
-                })?;
-                let swap_index_u64 = random_bounded(upper_bound, seed)?;
-                let swap_index = usize::try_from(swap_index_u64).map_err(|conversion_err| {
-                    boxed_other_with_source("인덱스 변환 실패", conversion_err)
-                })?;
-                indices_slice.swap(index, swap_index);
-            }
-            let players = players_array
-                .get(..n)
-                .ok_or_else(|| IoError::other("플레이어 슬라이스 범위 초과"))?;
-            for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
-                let result = results_array
-                    .get(result_index)
-                    .copied()
-                    .ok_or_else(|| IoError::other("결과 인덱스 범위 초과"))?;
-                writeln!(command_out, "{player} -> {result}")?;
-            }
-            Ok(())
-        })
+        players_storage.clear();
+        let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+        let n = read_ladder_entries(
+            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
+            input_buffer,
+            (&mut *out, &mut *err),
+            players_storage,
+            &mut players_array,
+            LadderEntryMode::Players,
+            "플레이어 배열 인덱스 범위 초과",
+        )?;
+        results_storage.clear();
+        let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+        read_ladder_entries(
+            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
+            input_buffer,
+            (&mut *out, &mut *err),
+            results_storage,
+            &mut results_array,
+            LadderEntryMode::Results { expected_count: n },
+            "결과 배열 인덱스 범위 초과",
+        )?;
+        writeln!(out, "사다리타기 결과:")?;
+        let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
+        let indices_slice = indices
+            .get_mut(..n)
+            .ok_or("인덱스 배열 슬라이스 범위 초과")?;
+        for index in (1..indices_slice.len()).rev() {
+            seed ^= get_hardware_random()?;
+            let next_index = checked_add_one_usize(index).ok_or("인덱스 상한 계산 실패")?;
+            let upper_bound_raw = u64::try_from(next_index).map_err(|conversion_err| {
+                AppError::context("인덱스 상한 변환 실패", conversion_err)
+            })?;
+            let upper_bound = NonZeroU64::new(upper_bound_raw).ok_or("인덱스 상한이 0입니다.")?;
+            let swap_index_u64 = random_bounded(upper_bound, seed)?;
+            let swap_index = usize::try_from(swap_index_u64)
+                .map_err(|conversion_err| AppError::context("인덱스 변환 실패", conversion_err))?;
+            indices_slice.swap(index, swap_index);
+        }
+        let players = players_array
+            .get(..n)
+            .ok_or("플레이어 슬라이스 범위 초과")?;
+        for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
+            let result = results_array
+                .get(result_index)
+                .copied()
+                .ok_or("결과 인덱스 범위 초과")?;
+            writeln!(out, "{player} -> {result}")?;
+        }
+        write_rdseed_fallback_notice(err)
     }
     fn handle_manual_input_command(
         &mut self,
@@ -213,8 +250,8 @@ impl MenuApp {
         }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
-            supp_input_count = checked_add_one_usize(supp_input_count)
-                .ok_or_else(|| IoError::other("supp 입력 횟수 계산 실패"))?;
+            supp_input_count =
+                checked_add_one_usize(supp_input_count).ok_or("supp 입력 횟수 계산 실패")?;
             let supp = read_u64_hex_input(
                 format_args!(
                     concat!(
@@ -232,11 +269,7 @@ impl MenuApp {
             )?;
             Ok(supp)
         };
-        let data = RandomDataBuilder {
-            next_supp: &mut next_supp,
-            num: manual_num_64,
-        }
-        .build()?;
+        let data = build_random_data(manual_num_64, &mut next_supp)?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
         {
@@ -260,7 +293,7 @@ impl MenuApp {
                 Write::flush(&mut stdout_lock)?;
             }}
         }
-        Ok(())
+        write_rdseed_fallback_notice(err)
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_random_number_command(
@@ -268,44 +301,35 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
+        if !prepare_hw_rng_menu_command(out)? {
+            return Ok(());
+        }
         let num_64 = self.num_64;
         let input_buffer = &mut self.input_buffer;
-        run_hw_rng_menu_command(out, |command_out| {
-            writeln!(command_out, "\n무작위 숫자 생성 타입 선택:")?;
-            let selection = read_line_reuse(
-                format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
-                input_buffer,
-                command_out,
-            )?;
-            match selection.as_bytes() {
-                b"1" => generate_random_number(
-                    RandomNumberMode::Integer,
-                    num_64,
-                    input_buffer,
-                    command_out,
-                    err,
-                )?,
-                b"2" => {
-                    generate_random_number(
-                        RandomNumberMode::Float,
-                        num_64,
-                        input_buffer,
-                        command_out,
-                        err,
-                    )?;
-                }
-                _ => writeln!(command_out, "무작위 숫자 생성을 취소합니다.")?,
+        writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
+        let selection = read_line_reuse(
+            format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
+            input_buffer,
+            out,
+        )?;
+        match selection.as_bytes() {
+            b"1" => {
+                generate_random_number(RandomNumberMode::Integer, num_64, input_buffer, out, err)?;
             }
-            Ok(())
-        })
+            b"2" => {
+                generate_random_number(RandomNumberMode::Float, num_64, input_buffer, out, err)?;
+            }
+            _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
+        }
+        Ok(())
     }
     fn handle_server_time_command(
         &mut self,
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let time_run_result = (|| -> CoreResult<(), time::diagnostic::TimeError> {
-            let host = self.read_server_host(out, err)?;
+        let time_run_result = (|| -> CoreResult<(), TimeError> {
+            let host = self.read_server_host(out)?;
             let target_time = self.read_target_time(out)?;
             let trigger_action = self.read_trigger_action(out, target_time)?;
             let now = Instant::now();
@@ -326,48 +350,28 @@ impl MenuApp {
         }
         Ok(())
     }
-    fn read_server_host(
-        &mut self,
-        out: &mut dyn Write,
-        err_out: &mut dyn Write,
-    ) -> CoreResult<time::address::ParsedServer, time::diagnostic::TimeError> {
-        let server_input = get_validated_input(
+    fn read_server_host(&mut self, out: &mut dyn Write) -> CoreResult<ParsedServer, TimeError> {
+        Ok(get_validated_input(
             "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> CoreResult<ServerHostSelection, Cow<'static, str>> {
+            |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
                 if raw_input.is_empty() {
                     return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
                 }
-                let after_scheme = time::address::strip_scheme_prefix(raw_input);
-                let ignored_suffix = after_scheme.contains(['/', '?', '#']);
-                raw_input
-                    .parse::<time::address::ParsedServer>()
-                    .map(|parsed_server| ServerHostSelection {
-                        ignored_suffix,
-                        parsed_server,
-                    })
-                    .map_err(|source| {
-                        Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
-                    })
+                raw_input.parse::<ParsedServer>().map_err(|source| {
+                    Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
+                })
             },
-        )
-        .map_err(time::diagnostic::TimeError::from)?;
-        if server_input.ignored_suffix {
-            writeln!(
-                err_out,
-                "[안내] 서버 주소의 경로/쿼리/프래그먼트는 무시되고 호스트만 사용됩니다."
-            )?;
-        }
-        Ok(server_input.parsed_server)
+        )?)
     }
     fn read_target_time(
         &mut self,
         out: &mut dyn Write,
-    ) -> CoreResult<Option<SystemTime>, time::diagnostic::TimeError> {
+    ) -> CoreResult<Option<SystemTime>, TimeError> {
         const INVALID_TIME_INPUT_ERR: &str =
             "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
-        get_validated_input(
+        Ok(get_validated_input(
             "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
             &mut self.input_buffer,
             out,
@@ -445,33 +449,31 @@ impl MenuApp {
                 }
                 Ok(Some(target_time))
             },
-        )
-        .map_err(time::diagnostic::TimeError::from)
+        )?)
     }
     fn read_trigger_action(
         &mut self,
         out: &mut dyn Write,
         target_time: Option<SystemTime>,
-    ) -> CoreResult<Option<time::TriggerAction>, time::diagnostic::TimeError> {
+    ) -> CoreResult<Option<TriggerAction>, TimeError> {
         if target_time.is_none() {
             return Ok(None);
         }
-        get_validated_input(
+        let action = get_validated_input(
             "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
             &mut self.input_buffer,
             out,
-            |selection| -> CoreResult<time::TriggerAction, &'static str> {
+            |selection| -> CoreResult<TriggerAction, &'static str> {
                 match selection.as_bytes() {
-                    b"1" => Ok(time::TriggerAction::LeftClick),
-                    b"2" => Ok(time::TriggerAction::F5Press),
+                    b"1" => Ok(TriggerAction::LeftClick),
+                    b"2" => Ok(TriggerAction::F5Press),
                     _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
                 }
             },
-        )
-        .map(Some)
-        .map_err(time::diagnostic::TimeError::from)
+        )?;
+        Ok(Some(action))
     }
-    pub fn run(&mut self) -> Result<ExitCode> {
+    pub(super) fn run(&mut self) -> Result<ExitCode> {
         let menu_prompt = format_args!("{MENU}");
         loop {
             let command = {
@@ -492,8 +494,7 @@ impl MenuApp {
             let keep_running = match self.execute_command(command, &mut out, &mut err) {
                 Ok(keep_running) => keep_running,
                 Err(command_err)
-                    if command_err.downcast_ref::<IoError>().map(IoError::kind)
-                        == Some(ErrorKind::UnexpectedEof) =>
+                    if command_err.io_error_kind() == Some(ErrorKind::UnexpectedEof) =>
                 {
                     return Ok(ExitCode::SUCCESS);
                 }
@@ -506,16 +507,22 @@ impl MenuApp {
     }
 }
 #[cfg(target_arch = "x86_64")]
-fn run_hw_rng_menu_command(
-    out: &mut dyn Write,
-    action: impl FnOnce(&mut dyn Write) -> Result<()>,
-) -> Result<()> {
-    if matches!(*RNG_SOURCE, RngSource::None) {
-        writeln!(
-            out,
-            "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-        )?;
-        return Ok(());
+fn prepare_hw_rng_menu_command(out: &mut dyn Write) -> Result<bool> {
+    match hardware_random_source() {
+        HardwareRandomSource::None => {
+            writeln!(
+                out,
+                "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
+            )?;
+            Ok(false)
+        }
+        HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
     }
-    action(out)
+}
+#[cfg(target_arch = "x86_64")]
+fn write_rdseed_fallback_notice(err: &mut dyn Write) -> Result<()> {
+    if take_rdseed_fallback_notice() {
+        writeln!(err, "RDSEED 10분 타임아웃으로 RDRAND로 전환했습니다.")?;
+    }
+    Ok(())
 }

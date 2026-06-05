@@ -1,34 +1,18 @@
 use super::{
-    Result, TimeError,
+    HTTP_SCHEME_PREFIX, HTTP_SCHEME_PREFIX_LEN, HTTPS_SCHEME_PREFIX, HTTPS_SCHEME_PREFIX_LEN,
+    ParsedServer, Result, TimeError, UrlScheme,
     util::{parse_result_with_context, parse_u32_digits},
 };
 use core::{fmt::Write as FmtWrite, str::FromStr};
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
+const ERR_PATH: &str = "서버 주소에는 path/query/fragment를 사용할 수 없습니다.";
 const ERR_PORT: &str = "서버 주소 파싱 실패: 포트 번호가 유효하지 않습니다 (1~65535).";
 const DEFAULT_HTTP_PORT: u16 = 80;
 const DEFAULT_HTTPS_PORT: u16 = 443;
-const HTTP_SCHEME_PREFIX: &str = "http://";
-const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
-const HTTPS_SCHEME_PREFIX: &str = "https://";
-const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
+const PORT_SUFFIX_CAPACITY: usize = 1 + U16_DECIMAL_MAX_LEN;
 const U16_DECIMAL_MAX_LEN: usize = 5;
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum UrlScheme {
-    Http,
-    Https,
-}
-#[derive(Debug)]
-pub struct ParsedServer {
-    host: String,
-    http_url: String,
-    literal_tcp_socket_addr: Option<net::SocketAddr>,
-    port: u16,
-    scheme: Option<UrlScheme>,
-    secure_url: String,
-    tcp_host_header: String,
-}
 #[derive(Clone, Copy)]
 enum PortSource {
     Default,
@@ -61,22 +45,22 @@ impl<'input> AuthorityParts<'input> {
     }
 }
 impl ParsedServer {
-    pub fn host(&self) -> &str {
+    pub(super) fn host(&self) -> &str {
         &self.host
     }
-    pub const fn literal_tcp_socket_addr(&self) -> Option<net::SocketAddr> {
+    pub(super) const fn literal_tcp_socket_addr(&self) -> Option<net::SocketAddr> {
         self.literal_tcp_socket_addr
     }
-    pub const fn port(&self) -> u16 {
+    pub(super) const fn port(&self) -> u16 {
         self.port
     }
-    pub const fn scheme(&self) -> Option<UrlScheme> {
+    pub(super) const fn scheme(&self) -> Option<UrlScheme> {
         self.scheme
     }
-    pub fn tcp_host_header_value(&self) -> &str {
+    pub(super) fn tcp_host_header_value(&self) -> &str {
         &self.tcp_host_header
     }
-    pub fn url(&self, scheme: UrlScheme) -> &str {
+    pub(super) fn url(&self, scheme: UrlScheme) -> &str {
         match scheme {
             UrlScheme::Http => &self.http_url,
             UrlScheme::Https => &self.secure_url,
@@ -90,21 +74,22 @@ impl FromStr for ParsedServer {
         if trimmed_input.is_empty() {
             return Err(TimeError::parse(ERR_EMPTY));
         }
-        let after_scheme = strip_scheme_prefix(trimmed_input);
-        let scheme = if after_scheme.len() == trimmed_input.len() {
-            None
-        } else if trimmed_input
-            .get(..HTTPS_SCHEME_PREFIX_LEN)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX))
+        let (scheme, after_scheme) = if let Some((prefix, rest)) =
+            trimmed_input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
+            && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
         {
-            Some(UrlScheme::Https)
+            (Some(UrlScheme::Https), rest)
+        } else if let Some((prefix, rest)) = trimmed_input.split_at_checked(HTTP_SCHEME_PREFIX_LEN)
+            && prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX)
+        {
+            (Some(UrlScheme::Http), rest)
         } else {
-            Some(UrlScheme::Http)
+            (None, trimmed_input)
         };
-        let authority = after_scheme
-            .split_once(['/', '?', '#'])
-            .map_or(after_scheme, |(authority, _)| authority);
-        if authority.is_empty() || authority.contains(|ch: char| ch.is_ascii_whitespace()) {
+        if after_scheme.contains(['/', '?', '#']) {
+            return Err(TimeError::parse(ERR_PATH));
+        }
+        if after_scheme.is_empty() || after_scheme.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
         let default_port = if scheme == Some(UrlScheme::Https) {
@@ -112,7 +97,7 @@ impl FromStr for ParsedServer {
         } else {
             DEFAULT_HTTP_PORT
         };
-        let authority_parts = if let Some(bracketed) = authority.strip_prefix('[') {
+        let authority_parts = if let Some(bracketed) = after_scheme.strip_prefix('[') {
             let (host_part, rem) = bracketed
                 .split_once(']')
                 .ok_or_else(|| TimeError::parse(ERR_HOST))?;
@@ -124,12 +109,12 @@ impl FromStr for ParsedServer {
                     .ok_or_else(|| TimeError::parse(ERR_HOST))?;
                 AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
             }
-        } else if let Some((host_part, port_part)) = authority.split_once(':')
+        } else if let Some((host_part, port_part)) = after_scheme.split_once(':')
             && !port_part.contains(':')
         {
             AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
         } else {
-            AuthorityParts::default_port(authority, default_port)
+            AuthorityParts::default_port(after_scheme, default_port)
         };
         let AuthorityParts {
             host: host_part,
@@ -139,13 +124,9 @@ impl FromStr for ParsedServer {
         if host_part.is_empty() {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let literal_tcp_socket_addr = host_part
-            .parse::<net::IpAddr>()
-            .ok()
-            .map(|ip_addr| net::SocketAddr::new(ip_addr, port));
         let host_for_header = if host_part.contains(':') {
             let mut out = String::new();
-            let capacity = host_part.len().saturating_add(2);
+            let capacity = checked_capacity(host_part.len(), 2, "서버 host header 용량 계산 실패")?;
             out.try_reserve(capacity).map_err(|source| {
                 TimeError::parse(format!("서버 host header 메모리 확보 실패: {source}"))
             })?;
@@ -162,10 +143,11 @@ impl FromStr for ParsedServer {
             host_for_header
         } else {
             let mut out = String::new();
-            let capacity = host_for_header
-                .len()
-                .saturating_add(":".len())
-                .saturating_add(U16_DECIMAL_MAX_LEN);
+            let capacity = checked_capacity(
+                host_for_header.len(),
+                PORT_SUFFIX_CAPACITY,
+                "TCP host header 용량 계산 실패",
+            )?;
             out.try_reserve(capacity).map_err(|source| {
                 TimeError::parse(format!("TCP host header 메모리 확보 실패: {source}"))
             })?;
@@ -180,24 +162,14 @@ impl FromStr for ParsedServer {
             scheme,
             host: host_owned,
             http_url: plain_url,
-            literal_tcp_socket_addr,
+            literal_tcp_socket_addr: host_part
+                .parse::<net::IpAddr>()
+                .ok()
+                .map(|ip_addr| net::SocketAddr::new(ip_addr, port)),
             port,
             secure_url,
             tcp_host_header,
         })
-    }
-}
-pub const fn strip_scheme_prefix(input: &str) -> &str {
-    if let Some((prefix, rest)) = input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
-        && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
-    {
-        rest
-    } else if let Some((prefix, rest)) = input.split_at_checked(HTTP_SCHEME_PREFIX_LEN)
-        && prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX)
-    {
-        rest
-    } else {
-        input
     }
 }
 fn build_url(
@@ -211,14 +183,17 @@ fn build_url(
         UrlScheme::Https => HTTPS_SCHEME_PREFIX,
     };
     let mut out = String::new();
-    let capacity = scheme_prefix
-        .len()
-        .saturating_add(host_for_header.len())
-        .saturating_add(if port_source.is_explicit() {
-            ":".len().saturating_add(U16_DECIMAL_MAX_LEN)
-        } else {
-            0
-        });
+    let explicit_port_len = if port_source.is_explicit() {
+        PORT_SUFFIX_CAPACITY
+    } else {
+        0
+    };
+    let prefix_host_len = checked_capacity(
+        scheme_prefix.len(),
+        host_for_header.len(),
+        "URL 용량 계산 실패",
+    )?;
+    let capacity = checked_capacity(prefix_host_len, explicit_port_len, "URL 용량 계산 실패")?;
     out.try_reserve(capacity)
         .map_err(|source| TimeError::parse(format!("URL 메모리 확보 실패: {source}")))?;
     out.push_str(scheme_prefix);
@@ -235,6 +210,10 @@ fn copy_str(value: &str, context: &'static str) -> Result<String> {
         .map_err(|source| TimeError::parse(format!("{context}: {source}")))?;
     out.push_str(value);
     Ok(out)
+}
+fn checked_capacity(base: usize, additional: usize, context: &'static str) -> Result<usize> {
+    base.checked_add(additional)
+        .ok_or_else(|| TimeError::parse(context))
 }
 fn parse_port(port_part: &str) -> Result<u16> {
     if port_part.is_empty() {

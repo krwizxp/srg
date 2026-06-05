@@ -1,13 +1,32 @@
 use super::{TWO_DIGIT_WIDTH, buf_write_u8_dec, buf_write_u64_dec, prefix_slice, u8_dec_len};
 use crate::{
-    BAR_FULL, BAR_WIDTH_U64, INVALID_TIME, IS_TERMINAL, Result, buffmt::ByteCursor, buffmt::DIGITS,
-    buffmt::copy_two_digits, numeric::low_u8_from_u64, numeric::low_u8_from_u128,
+    buffmt::{ByteCursor, DIGITS, copy_two_digits},
+    constants::IS_TERMINAL,
+    diagnostic::{AppError, Result},
+    numeric::low_u8_from_u64,
+    numeric::low_u8_from_u128,
 };
 use core::time::Duration;
-use std::io::{Error as IoError, Result as IoResult, Write as IoWrite};
+use std::io::Write as IoWrite;
+const BAR_WIDTH: usize = 10;
+const BAR_WIDTH_U64: u64 = 10;
+const BAR_FULL: [&str; BAR_WIDTH + 1] = [
+    "[          ]",
+    "[█         ]",
+    "[██        ]",
+    "[███       ]",
+    "[████      ]",
+    "[█████     ]",
+    "[██████    ]",
+    "[███████   ]",
+    "[████████  ]",
+    "[█████████ ]",
+    "[██████████]",
+];
 const DECI_PER_MINUTE: u128 = 600;
 const DECI_PER_SECOND: u128 = 10;
 const ELAPSED_MILLIS_PER_DECI: u128 = 100;
+const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const MAX_TIME_MINUTES: u128 = 99;
 const PERCENT_SCALE_U64: u64 = 100;
 const PERCENT_WIDTH: usize = 3;
@@ -80,15 +99,17 @@ pub fn print(
     } else {
         let remaining = total
             .checked_sub(completed)
-            .ok_or_else(|| IoError::other("남은 작업 수 계산 실패"))?;
+            .ok_or("남은 작업 수 계산 실패")?;
         let completed_scaled = u128::from(completed)
             .checked_mul(u128::from(PERCENT_SCALE_U64))
-            .ok_or_else(|| IoError::other("ETA 분모 계산 실패"))?;
+            .ok_or("ETA 분모 계산 실패")?;
+        let eta_numerator = elapsed_millis
+            .checked_mul(u128::from(remaining))
+            .ok_or("ETA 분자 계산 실패")?;
         Some(
-            elapsed_millis
-                .saturating_mul(u128::from(remaining))
+            eta_numerator
                 .checked_div(completed_scaled)
-                .ok_or_else(|| IoError::other("ETA 계산 실패"))?,
+                .ok_or("ETA 계산 실패")?,
         )
     };
     let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf);
@@ -104,7 +125,7 @@ pub fn print(
     let bar = BAR_FULL
         .get(filled)
         .copied()
-        .ok_or_else(|| IoError::other("진행 막대 인덱스 범위 초과"))?;
+        .ok_or("진행 막대 인덱스 범위 초과")?;
     let percent_u64 = scaled_progress_value(
         completed,
         total,
@@ -141,13 +162,14 @@ fn scaled_progress_value(
     total: u64,
     scale: u64,
     zero_total_value: u64,
-    err_msg: &str,
-) -> IoResult<u64> {
+    err_msg: &'static str,
+) -> Result<u64> {
     if total == 0 {
         return Ok(zero_total_value);
     }
     completed
-        .saturating_mul(scale)
+        .checked_mul(scale)
+        .ok_or_else(|| AppError::message(err_msg))?
         .checked_div(total)
-        .ok_or_else(|| IoError::other(err_msg))
+        .ok_or_else(|| AppError::message(err_msg))
 }

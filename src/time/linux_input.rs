@@ -1,20 +1,21 @@
-use crate::write_line_ignored;
+use crate::write_line_best_effort;
 use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void},
-    mem,
+    mem::size_of,
     num::NonZero,
     ptr::{NonNull, null},
 };
 use std::io;
-macro_rules! load_x11_fn_symbol {
-    ($library:expr, $symbol_name:expr, $symbol_type:ty) => {{
-        let symbol = $library.symbol_address($symbol_name)?;
-        // SAFETY: the requested X11/XTest symbol name matches this concrete function pointer type.
-        Ok::<$symbol_type, InputError>(unsafe {
-            mem::transmute::<*mut c_void, $symbol_type>(symbol.as_ptr())
-        })
-    }};
+mod sys {
+    use super::{c_char, c_int, c_void};
+    #[link(name = "dl")]
+    unsafe extern "C" {
+        pub(super) fn dlclose(handle: *mut c_void) -> c_int;
+        pub(super) fn dlerror() -> *const c_char;
+        pub(super) fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+        pub(super) fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    }
 }
 const BUTTON_LEFT: c_uint = 1;
 const DL_NOW: c_int = 2;
@@ -54,6 +55,11 @@ enum PreparedSendError {
 struct Library {
     handle: NonNull<c_void>,
 }
+#[repr(C)]
+union DlsymSymbol<F: Copy> {
+    raw: *mut c_void,
+    typed: F,
+}
 struct X11Api {
     _x11: Library,
     _xtst: Library,
@@ -69,18 +75,16 @@ struct PreparedX11Input {
     display: NonNull<Display>,
     f5_keycode: Option<XKeycode>,
 }
-#[link(name = "dl")]
-unsafe extern "C" {
-    fn dlclose(handle: *mut c_void) -> c_int;
-    fn dlerror() -> *const c_char;
-    fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
-    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+#[derive(Clone, Copy)]
+enum XTestInput {
+    Button(c_uint),
+    Key(XKeycode),
 }
 impl Drop for Library {
     fn drop(&mut self) {
         // SAFETY: handle was returned by dlopen and is closed exactly once here.
         unsafe {
-            dlclose(self.handle.as_ptr());
+            sys::dlclose(self.handle.as_ptr());
         }
     }
 }
@@ -89,7 +93,7 @@ impl Library {
         let mut last_error = None;
         for candidate in candidates {
             // SAFETY: candidate values are static NUL-terminated library names.
-            let handle_ptr = unsafe { dlopen(candidate.as_ptr(), DL_NOW) };
+            let handle_ptr = unsafe { sys::dlopen(candidate.as_ptr(), DL_NOW) };
             if let Some(handle) = NonNull::new(handle_ptr) {
                 return Ok(Self { handle });
             }
@@ -103,17 +107,34 @@ impl Library {
     fn symbol_address(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
         // SAFETY: dlerror has no preconditions; this clears any previous loader error.
         unsafe {
-            dlerror();
+            sys::dlerror();
         }
         // SAFETY: self.handle is a live dlopen handle and name is NUL-terminated.
-        let symbol = unsafe { dlsym(self.handle.as_ptr(), name.as_ptr()) };
+        let symbol = unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) };
         NonNull::new(symbol).ok_or_else(dl_error_message)
+    }
+    fn typed_symbol<F: Copy>(&self, name: &CStr) -> InputResult<F> {
+        if size_of::<F>() != size_of::<*mut c_void>() {
+            return Err(Cow::Borrowed(
+                "dynamic loader symbol 크기가 함수 포인터와 다릅니다.",
+            ));
+        }
+        let symbol = self.symbol_address(name)?;
+        // SAFETY: the requested symbol name is paired with its concrete C function
+        // pointer type, the size is checked above, and X11Api keeps the dlopen
+        // handle alive while the function pointer is stored.
+        Ok(unsafe {
+            DlsymSymbol::<F> {
+                raw: symbol.as_ptr(),
+            }
+            .typed
+        })
     }
 }
 impl X11Api {
-    fn fake_button(&self, display: NonNull<Display>, state: c_int) -> InputResult<()> {
+    fn fake_button(&self, display: NonNull<Display>, button: c_uint, state: c_int) -> InputResult<()> {
         // SAFETY: display is a live X11 Display and the button/state values match XTest's contract.
-        let ok = unsafe { (self.test_button)(display.as_ptr(), BUTTON_LEFT, state, 0) };
+        let ok = unsafe { (self.test_button)(display.as_ptr(), button, state, 0) };
         if ok == 0 {
             Err(Cow::Borrowed("XTestFakeButtonEvent 실패"))
         } else {
@@ -151,6 +172,20 @@ impl X11Api {
         ))
     }
 }
+impl XTestInput {
+    fn press(self, api: &X11Api, display: NonNull<Display>) -> InputResult<()> {
+        self.send(api, display, KEY_PRESS)
+    }
+    fn release(self, api: &X11Api, display: NonNull<Display>) -> InputResult<()> {
+        self.send(api, display, KEY_RELEASE)
+    }
+    fn send(self, api: &X11Api, display: NonNull<Display>, state: c_int) -> InputResult<()> {
+        match self {
+            Self::Button(button) => api.fake_button(display, button, state),
+            Self::Key(keycode) => api.fake_key(display, keycode.get(), state),
+        }
+    }
+}
 impl Drop for PreparedX11Input {
     fn drop(&mut self) {
         // SAFETY: display came from XOpenDisplay and closes once here while self.api keeps libX11 alive.
@@ -172,12 +207,12 @@ impl PreparedX11Input {
         let x11 = Library::open(&X11_LIBS).map_err(|source| format!("libX11 로드 실패: {source}"))?;
         let xtst =
             Library::open(&XTST_LIBS).map_err(|source| format!("libXtst 로드 실패: {source}"))?;
-        let close_display = load_x11_fn_symbol!(x11, SYM_X_CLOSE_DISPLAY, XCloseDisplay)?;
-        let flush = load_x11_fn_symbol!(x11, SYM_X_FLUSH, XFlush)?;
-        let keycode = load_x11_fn_symbol!(x11, SYM_X_KEYS_PRESS, XKeysymToKeycode)?;
-        let open_display = load_x11_fn_symbol!(x11, SYM_X_OPEN_DISPLAY, XOpenDisplay)?;
-        let test_button = load_x11_fn_symbol!(xtst, SYM_X_TEST_BUTTON, XTestFakeButtonEvent)?;
-        let test_key = load_x11_fn_symbol!(xtst, SYM_X_TEST_KEY, XTestFakeKeyEvent)?;
+        let close_display = x11.typed_symbol::<XCloseDisplay>(SYM_X_CLOSE_DISPLAY)?;
+        let flush = x11.typed_symbol::<XFlush>(SYM_X_FLUSH)?;
+        let keycode = x11.typed_symbol::<XKeysymToKeycode>(SYM_X_KEYS_PRESS)?;
+        let open_display = x11.typed_symbol::<XOpenDisplay>(SYM_X_OPEN_DISPLAY)?;
+        let test_button = xtst.typed_symbol::<XTestFakeButtonEvent>(SYM_X_TEST_BUTTON)?;
+        let test_key = xtst.typed_symbol::<XTestFakeKeyEvent>(SYM_X_TEST_KEY)?;
         let api = X11Api {
             _x11: x11,
             _xtst: xtst,
@@ -200,24 +235,27 @@ impl PreparedX11Input {
         Ok(prepared)
     }
     fn send(&mut self, action: InputAction) -> Result<(), PreparedSendError> {
-        match action {
-            InputAction::MouseClick => {
-                self.api
-                    .fake_button(self.display, KEY_PRESS)
-                    .map_err(PreparedSendError::RetrySafe)?;
-                self.api
-                    .fake_button(self.display, KEY_RELEASE)
-                    .map_err(PreparedSendError::Partial)?;
-            }
+        let input = match action {
+            InputAction::MouseClick => XTestInput::Button(BUTTON_LEFT),
             InputAction::F5Press => {
-                let keycode = self.f5_keycode().map_err(PreparedSendError::RetrySafe)?;
-                self.api
-                    .fake_key(self.display, keycode.get(), KEY_PRESS)
-                    .map_err(PreparedSendError::RetrySafe)?;
-                self.api
-                    .fake_key(self.display, keycode.get(), KEY_RELEASE)
-                    .map_err(PreparedSendError::Partial)?;
+                XTestInput::Key(self.f5_keycode().map_err(PreparedSendError::RetrySafe)?)
             }
+        };
+        input
+            .press(&self.api, self.display)
+            .map_err(PreparedSendError::RetrySafe)?;
+        if let Err(release_error) = input.release(&self.api, self.display) {
+            let cleanup_error = input
+                .release(&self.api, self.display)
+                .and_then(|()| self.api.flush(self.display))
+                .err();
+            let error_message = cleanup_error.map_or_else(
+                || Cow::Owned(format!("{release_error}; release 재시도 완료")),
+                |retry_error| {
+                    Cow::Owned(format!("{release_error}; release 재시도 실패: {retry_error}"))
+                },
+            );
+            return Err(PreparedSendError::Partial(error_message));
         }
         self.api.flush(self.display).map_err(PreparedSendError::Partial)
     }
@@ -231,7 +269,7 @@ impl PreparedInput {
         };
         match PreparedX11Input::open(input_action) {
             Ok(prepared) => self.prepared = Some(prepared),
-            Err(source) => write_line_ignored(
+            Err(source) => write_line_best_effort(
                 err,
                 format_args!("[경고] Linux native 입력 사전 준비 실패: {source}"),
             ),
@@ -246,13 +284,13 @@ impl PreparedInput {
                 Ok(()) => return,
                 Err(PreparedSendError::RetrySafe(prepared_error)) => {
                     match send_fresh(action) {
-                        Ok(()) => write_line_ignored(
+                        Ok(()) => write_line_best_effort(
                             err,
                             format_args!(
                                 "[경고] Linux native 입력 사전 준비 경로 실패, 즉시 재시도 완료: {prepared_error}"
                             ),
                         ),
-                        Err(fresh_error) => write_line_ignored(
+                        Err(fresh_error) => write_line_best_effort(
                             err,
                             format_args!(
                                 "[경고] Linux native 입력 사전 준비 경로 실패: {prepared_error}; 즉시 재시도 실패: {fresh_error}"
@@ -262,7 +300,7 @@ impl PreparedInput {
                     return;
                 }
                 Err(PreparedSendError::Partial(prepared_error)) => {
-                    write_line_ignored(
+                    write_line_best_effort(
                         err,
                         format_args!(
                             "[경고] Linux native 입력 사전 준비 경로 부분 실패, 중복 입력 방지를 위해 재시도 생략: {prepared_error}"
@@ -274,7 +312,7 @@ impl PreparedInput {
         }
         match send_fresh(action) {
             Ok(()) => {}
-            Err(source) => write_line_ignored(
+            Err(source) => write_line_best_effort(
                 err,
                 format_args!("[경고] Linux native 입력 실패: {source}"),
             ),
@@ -289,7 +327,7 @@ fn send_fresh(action: InputAction) -> InputResult<()> {
 }
 fn dl_error_message() -> InputError {
     // SAFETY: dlerror has no preconditions and returns a thread-local C string or null.
-    let raw_error = unsafe { dlerror() };
+    let raw_error = unsafe { sys::dlerror() };
     if raw_error.is_null() {
         return Cow::Borrowed("알 수 없는 dynamic loader 오류");
     }

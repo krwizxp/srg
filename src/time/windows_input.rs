@@ -1,6 +1,13 @@
-use crate::write_line_ignored;
+use crate::write_line_best_effort;
 use core::mem::size_of;
 use std::io::Write;
+mod sys {
+    use super::Input;
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        pub(super) fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
+    }
+}
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const KEYEVENTF_KEYDOWN: u32 = 0;
@@ -48,10 +55,6 @@ cfg_select! {
     }
     _ => {}
 }
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
-}
 #[derive(Clone, Copy)]
 pub(super) enum InputAction {
     F5Press,
@@ -70,18 +73,20 @@ impl PreparedInput {
         *self = Self;
         match action {
             InputAction::MouseClick => {
+                let release = mouse_input(MOUSEEVENTF_LEFTUP);
                 let inputs = [
                     mouse_input(MOUSEEVENTF_LEFTDOWN),
-                    mouse_input(MOUSEEVENTF_LEFTUP),
+                    release,
                 ];
-                send_input_events(&inputs, err);
+                send_input_events(&inputs, Some(&release), err);
             }
             InputAction::F5Press => {
+                let release = keyboard_input(VK_F5, KEYEVENTF_KEYUP);
                 let inputs = [
                     keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
-                    keyboard_input(VK_F5, KEYEVENTF_KEYUP),
+                    release,
                 ];
-                send_input_events(&inputs, err);
+                send_input_events(&inputs, Some(&release), err);
             }
         }
     }
@@ -109,24 +114,36 @@ fn mouse_input(dw_flags: u32) -> Input {
         },
     }
 }
-fn send_input_events(inputs: &[Input], err: &mut dyn Write) {
+fn send_input_events(inputs: &[Input], release_input: Option<&Input>, err: &mut dyn Write) {
     let Ok(input_count) = u32::try_from(inputs.len()) else {
-        write_line_ignored(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
+        write_line_best_effort(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
         return;
     };
     let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
-        write_line_ignored(
+        write_line_best_effort(
             err,
             format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
         );
         return;
     };
     // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
-    let sent = unsafe { SendInput(input_count, inputs.as_ptr(), input_size) };
+    let sent = unsafe { sys::SendInput(input_count, inputs.as_ptr(), input_size) };
     if sent != input_count {
-        write_line_ignored(
+        write_line_best_effort(
             err,
             format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
         );
+        if sent == 1
+            && let Some(release) = release_input
+        {
+            // SAFETY: `release` is a valid one-element INPUT pointer and `input_size` matches the Rust representation.
+            let release_sent = unsafe { sys::SendInput(1, release, input_size) };
+            if release_sent != 1 {
+                write_line_best_effort(
+                    err,
+                    format_args!("[경고] Windows 입력 release 이벤트 전송 실패"),
+                );
+            }
+        }
     }
 }

@@ -1,7 +1,5 @@
 use self::{
     activity::{Activity, CountdownDecision},
-    address::ParsedServer,
-    diagnostic::{Result, TimeError, TimeErrorKind},
     sample::{TCP_LINE_BUFFER_CAPACITY, fetch_server_time_sample},
     util::blend_weighted_nanos,
 };
@@ -13,19 +11,23 @@ cfg_select! {
     }
     _ => {}
 }
-use crate::{ServerTimeSession, buffmt::ByteCursor, write_line_ignored};
-use alloc::fmt;
-use core::{fmt::Write as FmtWrite, ops::Mul as NumericMul, range::Range, time::Duration};
+use crate::{buffmt::ByteCursor, write_line_best_effort};
+use alloc::{borrow::Cow, fmt};
+use core::{
+    error::Error, fmt::Write as FmtWrite, ops::Mul as NumericMul, range::Range,
+    result::Result as CoreResult, time::Duration,
+};
 use std::{
-    io::{self, BufRead as IoBufRead, Result as IoResult},
+    io::{
+        self, BufRead as IoBufRead, Error as IoError, ErrorKind, Read as IoRead, Result as IoResult,
+    },
     net,
     sync::mpsc,
     thread,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
 mod activity;
-pub mod address;
-pub mod diagnostic;
+mod address;
 mod display;
 mod http_date;
 mod native_http;
@@ -92,10 +94,17 @@ const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT: Duration = Duration::from_secs(5);
 const ENTER_BUFFER_CAPACITY: usize = 8;
+const ENTER_BUFFER_READ_LIMIT: u64 = 9;
+const ENTER_INPUT_TOO_LONG: &str = "서버 시간 종료 입력이 너무 깁니다.";
+const ENTER_THREAD_PANIC: &str = "입력 대기 스레드 패닉 발생";
 const NUM_SAMPLES: usize = 10;
 const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
 const MAX_CALIBRATION_FAILURES: u32 = 100;
+const HTTP_SCHEME_PREFIX: &str = "http://";
+const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
+const HTTPS_SCHEME_PREFIX: &str = "https://";
+const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
 const KST_OFFSET: Duration = Duration::from_hours(9);
 pub const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
@@ -110,6 +119,49 @@ const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
+type BoxError = Box<dyn Error + Send + Sync>;
+type Result<T> = CoreResult<T, TimeError>;
+#[derive(Clone, Copy, Debug)]
+pub enum TriggerAction {
+    F5Press,
+    LeftClick,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TimeErrorKind {
+    HeaderNotFound,
+    Io,
+    NativeHttp,
+    Parse,
+    Time,
+}
+#[derive(Debug)]
+pub struct TimeError {
+    detail: Cow<'static, str>,
+    io_kind: Option<io::ErrorKind>,
+    kind: TimeErrorKind,
+    source: Option<BoxError>,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum UrlScheme {
+    Http,
+    Https,
+}
+#[derive(Debug)]
+pub struct ParsedServer {
+    host: String,
+    http_url: String,
+    literal_tcp_socket_addr: Option<net::SocketAddr>,
+    port: u16,
+    scheme: Option<UrlScheme>,
+    secure_url: String,
+    tcp_host_header: String,
+}
+pub struct ServerTimeSession {
+    pub host: ParsedServer,
+    pub now: Instant,
+    pub target_time: Option<SystemTime>,
+    pub trigger_action: Option<TriggerAction>,
+}
 #[derive(Clone, Copy, Debug)]
 struct CivilDate {
     day: u32,
@@ -132,10 +184,66 @@ struct ServerTime {
     anchor_time: SystemTime,
     baseline_rtt: Duration,
 }
-#[derive(Clone, Copy, Debug)]
-pub enum TriggerAction {
-    F5Press,
-    LeftClick,
+impl TimeError {
+    fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::HeaderNotFound, detail)
+    }
+    pub const fn io_kind(&self) -> Option<io::ErrorKind> {
+        self.io_kind
+    }
+    fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+            io_kind: None,
+            source: None,
+        }
+    }
+    fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(TimeErrorKind::Parse, detail)
+    }
+}
+impl From<io::Error> for TimeError {
+    fn from(err: io::Error) -> Self {
+        let io_kind = err.kind();
+        let detail = owned_time_error_detail(&err);
+        Self {
+            kind: TimeErrorKind::Io,
+            detail,
+            io_kind: Some(io_kind),
+            source: Some(Box::new(err)),
+        }
+    }
+}
+impl From<SystemTimeError> for TimeError {
+    fn from(err: SystemTimeError) -> Self {
+        let detail = owned_time_error_detail(&err);
+        Self {
+            kind: TimeErrorKind::Time,
+            detail,
+            io_kind: None,
+            source: Some(Box::new(err)),
+        }
+    }
+}
+impl fmt::Display for TimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            TimeErrorKind::Io => write!(f, "I/O 오류: {}", self.detail),
+            TimeErrorKind::Time => write!(f, "시스템 시간 오류: {}", self.detail),
+            TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
+            TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
+            TimeErrorKind::NativeHttp => write!(f, "native HTTP 요청 실패: {}", self.detail),
+        }
+    }
+}
+impl Error for TimeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source.as_deref().map(|source| {
+            let source_ref: &(dyn Error + 'static) = source;
+            source_ref
+        })
+    }
 }
 impl TriggerAction {
     const fn native_input_action(self) -> native_input::InputAction {
@@ -175,6 +283,7 @@ struct CachedTcpSocketAddr {
 }
 struct NetworkContext {
     cached_tcp_socket_addr: Option<CachedTcpSocketAddr>,
+    native_http: native_http::NativeHttp,
     tcp_line_buffer: Vec<u8>,
 }
 impl ServerTimeSession {
@@ -207,7 +316,7 @@ impl ServerTimeSession {
 impl AppState {
     fn begin_baseline_rtt_measurement(&mut self, now: Instant, out: &mut dyn io::Write) {
         if self.last_sample.is_none() {
-            write_line_ignored(out, format_args!("1단계: RTT 기준값 측정을 시작합니다..."));
+            write_line_best_effort(out, format_args!("1단계: RTT 기준값 측정을 시작합니다..."));
         }
         let placeholder = TimeSample {
             response_received_inst: now,
@@ -290,7 +399,12 @@ impl AppState {
         net_ctx: &mut NetworkContext,
     ) -> ActivityTransition<'message> {
         let Ok(current_sample) = fetch_server_time_sample(&self.host, net_ctx) else {
-            self.calibration_failure_count = self.calibration_failure_count.saturating_add(1);
+            let Some(next_failure_count) = self.calibration_failure_count.checked_add(1) else {
+                return transition_to_retry(
+                    "정밀 보정 실패 횟수 계산 중 overflow가 발생했습니다. 전체 보정을 다시 시작합니다.",
+                );
+            };
+            self.calibration_failure_count = next_failure_count;
             if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
                 return transition_to_retry(
                     "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
@@ -306,8 +420,7 @@ impl AppState {
             && let Some(baseline_rtt) = self.baseline_rtt
             && let Ok(prev_dur) = prev_sample.server_time.duration_since(UNIX_EPOCH)
             && let Ok(current_dur) = current_sample.server_time.duration_since(UNIX_EPOCH)
-            && prev_dur.as_secs() != current_dur.as_secs()
-            && current_dur.as_secs().wrapping_sub(prev_dur.as_secs()) == 1
+            && current_dur.as_secs().checked_sub(prev_dur.as_secs()) == Some(1)
         {
             let calibrated_server_time = (|| -> Result<ServerTime> {
                 let mut server_time_at_tick = current_sample.server_time;
@@ -626,15 +739,17 @@ impl AppState {
     fn run_loop(&mut self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         out.write_all("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)\n".as_bytes())?;
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || -> IoResult<()> {
+        let input_thread = thread::spawn(move || -> IoResult<()> {
             let mut line = Vec::new();
             line.try_reserve(ENTER_BUFFER_CAPACITY)
                 .map_err(io::Error::other)?;
             let mut stdin_lock = io::stdin().lock();
-            IoBufRead::read_until(&mut stdin_lock, b'\n', &mut line)?;
-            match tx.send(()) {
-                Ok(()) | Err(_) => {}
+            let mut limited_stdin = IoRead::take(&mut stdin_lock, ENTER_BUFFER_READ_LIMIT);
+            IoBufRead::read_until(&mut limited_stdin, b'\n', &mut line)?;
+            if line.len() > ENTER_BUFFER_CAPACITY && !line.ends_with(b"\n") {
+                return Err(IoError::new(ErrorKind::InvalidInput, ENTER_INPUT_TOO_LONG));
             }
+            let _send_result = tx.send(());
             Ok(())
         });
         let mut activity = Activity::MeasureBaselineRtt;
@@ -642,27 +757,26 @@ impl AppState {
         let mut message_buffer = String::new();
         message_buffer
             .try_reserve(MESSAGE_BUFFER_CAPACITY)
-            .map_err(io::Error::other)?;
+            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
         let mut tcp_line_buffer = Vec::new();
         tcp_line_buffer
             .try_reserve(TCP_LINE_BUFFER_CAPACITY)
-            .map_err(|source| {
-                TimeError::parse(format!("TCP line buffer 메모리 확보 실패: {source}"))
-            })?;
+            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
         let mut network_context = NetworkContext {
             cached_tcp_socket_addr: None,
+            native_http: native_http::NativeHttp::default(),
             tcp_line_buffer,
         };
         let mut prepared_input = native_input::PreparedInput::EMPTY;
         let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
             let activity_poll = match activity {
-                Activity::MeasureBaselineRtt
-                | Activity::CalibrateOnTick
-                | Activity::FinalCountdown { .. } => ADAPTIVE_POLL_INTERVAL,
                 Activity::Predicting | Activity::Finished | Activity::Retrying { .. } => {
                     DISPLAY_UPDATE_INTERVAL
                 }
+                Activity::MeasureBaselineRtt
+                | Activity::CalibrateOnTick
+                | Activity::FinalCountdown { .. } => ADAPTIVE_POLL_INTERVAL,
             };
             let pre_wait_now = Instant::now();
             let elapsed = pre_wait_now.duration_since(last_display_update);
@@ -676,26 +790,19 @@ impl AppState {
             if now.duration_since(last_display_update) >= DISPLAY_INTERVAL
                 && let Some(st) = self.server_time.as_ref()
             {
-                let mut cur = display::SliceCursor {
-                    inner: ByteCursor::new(line_buf.as_mut_slice()),
-                };
-                match (|| -> Result<()> {
-                    cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes())
-                        .map_err(TimeError::from)?;
+                if let Err(display_err) = (|| -> Result<()> {
+                    let mut cur = ByteCursor::new(line_buf.as_mut_slice());
+                    cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes())?;
                     st.write_current_display_time_buf_at(&mut cur, now)?;
-                    cur.write_bytes(b" \r").map_err(TimeError::from)?;
+                    cur.write_bytes(b" \r")?;
+                    out.write_all(cur.written_slice()?)?;
+                    out.flush()?;
                     Ok(())
                 })() {
-                    Ok(()) => {
-                        out.write_all(cur.written_slice()?)?;
-                        out.flush()?;
-                    }
-                    Err(display_err) => {
-                        out.write_all(DISPLAY_STATUS_PREFIX.as_bytes())?;
-                        write!(out, "표시 버퍼 오류: {display_err}")?;
-                        out.write_all(b" \r")?;
-                        out.flush()?;
-                    }
+                    out.write_all(DISPLAY_STATUS_PREFIX.as_bytes())?;
+                    write!(out, "표시 버퍼 오류: {display_err}")?;
+                    out.write_all(b" \r")?;
+                    out.flush()?;
                 }
                 last_display_update = now;
             }
@@ -722,6 +829,9 @@ impl AppState {
             }
             activity = next_activity;
         }
+        input_thread
+            .join()
+            .map_err(|_panic_payload| TimeError::parse(ENTER_THREAD_PANIC))??;
         Ok(())
     }
     cfg_select! {
@@ -736,7 +846,7 @@ impl AppState {
                 }
                 // SAFETY: `time_begin_period` is a WinMM FFI call with a plain integer input.
                 if unsafe { time_begin_period(TARGET_PERIOD_MS) } != TIMERR_NOERROR {
-                    write_line_ignored(
+                    write_line_best_effort(
                         err,
                         format_args!(
                             concat!(
@@ -790,6 +900,9 @@ impl AppState {
             message: Some(msg_buf),
         }
     }
+}
+fn owned_time_error_detail(err: impl fmt::Display) -> Cow<'static, str> {
+    Cow::Owned(err.to_string())
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
     NumericMul::mul(duration.as_secs_f64(), MILLIS_PER_SECOND_F64)

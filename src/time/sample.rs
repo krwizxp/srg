@@ -1,13 +1,12 @@
 use super::{
-    CachedTcpSocketAddr, NetworkContext, Result, TCP_TIMEOUT, TimeError, TimeSample,
-    address::{ParsedServer, UrlScheme},
-    http_date::parse_http_date_to_systemtime,
-    native_http,
+    CachedTcpSocketAddr, NetworkContext, ParsedServer, Result, TCP_TIMEOUT, TimeError, TimeSample,
+    UrlScheme, http_date::parse_http_date_to_systemtime,
 };
 use alloc::str;
+use core::result::Result as CoreResult;
 use std::{
     io::{self, BufRead as IoBufRead, BufReader, Read as IoRead, Write as IoWrite},
-    net::{self, TcpStream},
+    net::{TcpStream, ToSocketAddrs as _},
     time::Instant,
 };
 const TCP_HEAD_REQUEST_PREFIX: &[u8] = b"HEAD / HTTP/1.1\r\nHost: ";
@@ -18,13 +17,14 @@ const TCP_MAX_HEADER_LINE_BYTES: usize = 8192;
 const TCP_MAX_HEADER_LINE_READ_BYTES: u64 = 8193;
 const DATE_HEADER_PREFIX: &[u8; 5] = b"date:";
 pub(super) const TCP_LINE_BUFFER_CAPACITY: usize = 256;
-pub(super) fn find_date_header_value(line: &[u8]) -> Option<&str> {
-    let (prefix, value) = line.split_first_chunk::<5>()?;
-    if prefix.eq_ignore_ascii_case(DATE_HEADER_PREFIX) {
-        str::from_utf8(value).map(str::trim_ascii).ok()
-    } else {
-        None
+pub(super) fn find_date_header_value(line: &[u8]) -> CoreResult<Option<&str>, str::Utf8Error> {
+    let Some((prefix, value)) = line.split_first_chunk::<5>() else {
+        return Ok(None);
+    };
+    if !prefix.eq_ignore_ascii_case(DATE_HEADER_PREFIX) {
+        return Ok(None);
     }
+    str::from_utf8(value).map(str::trim_ascii).map(Some)
 }
 fn missing_tcp_date() -> TimeError {
     TimeError::header_not_found("Date (TCP)")
@@ -34,7 +34,8 @@ pub(super) fn fetch_server_time_sample(
     net_ctx: &mut NetworkContext,
 ) -> Result<TimeSample> {
     if matches!(parsed_address.scheme(), Some(UrlScheme::Https)) {
-        return native_http::NATIVE_HTTP
+        return net_ctx
+            .native_http
             .fetch_head_sample(parsed_address.url(UrlScheme::Https), "HTTPS (explicit)");
     }
     let request_start_inst = Instant::now();
@@ -57,9 +58,8 @@ pub(super) fn fetch_server_time_sample(
             net_ctx.cached_tcp_socket_addr = None;
         }
         let mut last_connect_error = None;
-        let socket_addrs =
-            net::ToSocketAddrs::to_socket_addrs(&(parsed_address.host(), parsed_address.port()))?;
-        for socket_addr in socket_addrs {
+        let addrs = (parsed_address.host(), parsed_address.port()).to_socket_addrs()?;
+        for socket_addr in addrs {
             match TcpStream::connect_timeout(&socket_addr, TCP_TIMEOUT) {
                 Ok(stream) => {
                     let mut host = String::new();
@@ -115,7 +115,11 @@ pub(super) fn fetch_server_time_sample(
         {
             return Err(TimeError::parse("TCP HTTP 헤더 line이 너무 깁니다."));
         }
-        if let Some(date_str) = find_date_header_value(&net_ctx.tcp_line_buffer) {
+        let maybe_date_str =
+            find_date_header_value(&net_ctx.tcp_line_buffer).map_err(|source| {
+                TimeError::parse(format!("TCP Date 헤더 UTF-8 변환 실패: {source}"))
+            })?;
+        if let Some(date_str) = maybe_date_str {
             let response_received_inst = Instant::now();
             let rtt_for_sample = response_received_inst.duration_since(request_start_inst);
             let server_time = parse_http_date_to_systemtime(date_str)?;

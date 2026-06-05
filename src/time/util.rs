@@ -7,7 +7,9 @@ pub(super) fn blend_weighted_nanos(
     new_weight: u32,
     total_weight: u32,
 ) -> u128 {
-    let old_weight = total_weight.saturating_sub(new_weight);
+    let Some(old_weight) = total_weight.checked_sub(new_weight) else {
+        return new_value;
+    };
     let Some(weighted_old) = old_value.checked_mul(u128::from(old_weight)) else {
         return new_value;
     };

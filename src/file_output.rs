@@ -1,24 +1,41 @@
-use super::{FILE_NAME, OUTPUT_FILE_BUFFER_CAPACITY, Result, UTF8_BOM};
-use core::{error::Error, fmt::Display};
+use crate::constants::{FILE_NAME, OUTPUT_FILE_BUFFER_CAPACITY, UTF8_BOM};
+use crate::diagnostic::{AppError, Result};
 use std::{
     fs::{self, File},
-    io::{BufWriter, Error as IoError, ErrorKind, Write as IoWrite},
+    io::{BufWriter, ErrorKind, Write as IoWrite},
     path::Path,
     sync::{Mutex, MutexGuard},
 };
 cfg_select! {
     windows => {
         use core::ffi::c_void;
-        use std::io::Result as IoResult;
         use std::os::windows::fs::{
             MetadataExt as WindowsMetadataExt, OpenOptionsExt as WindowsOpenOptionsExt,
         };
-        use std::os::windows::io::AsRawHandle as WindowsRawHandle;
+        use std::{
+            io::{Error as IoError, Result as IoResult},
+            os::windows::io::AsRawHandle as WindowsRawHandle,
+        };
     }
     any(target_os = "linux", target_os = "macos") => {
         use std::os::unix::fs::{
             MetadataExt as UnixMetadataExt, OpenOptionsExt as UnixOpenOptionsExt,
         };
+    }
+    _ => {}
+}
+cfg_select! {
+    windows => {
+        mod sys {
+            use super::{ByHandleFileInformation, c_void};
+            unsafe extern "system" {
+                #[link_name = "GetFileInformationByHandle"]
+                pub(super) fn get_file_information_by_handle(
+                    h_file: *mut c_void,
+                    file_information: *mut ByHandleFileInformation,
+                ) -> i32;
+            }
+        }
     }
     _ => {}
 }
@@ -56,17 +73,16 @@ cfg_select! {
             file_index_high: u32,
             file_index_low: u32,
         }
-        unsafe extern "system" {
-            fn GetFileInformationByHandle(
-                h_file: *mut c_void,
-                file_information: *mut ByHandleFileInformation,
-            ) -> i32;
-        }
+    }
+    _ => {}
+}
+cfg_select! {
+    windows => {
         fn file_has_multiple_links(file: &File) -> IoResult<bool> {
             let mut file_information = ByHandleFileInformation::default();
             // SAFETY: `GetFileInformationByHandle` only writes to `file_information` and reads the borrowed file handle during the call.
             let result = unsafe {
-                GetFileInformationByHandle(
+                sys::get_file_information_by_handle(
                     WindowsRawHandle::as_raw_handle(file),
                     &raw mut file_information,
                 )
@@ -81,7 +97,9 @@ cfg_select! {
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub fn ensure_file_exists_and_reopen(file_mutex: &Mutex<BufWriter<File>>) -> Result<()> {
+        pub fn ensure_file_exists_and_reopen(
+            file_mutex: &Mutex<BufWriter<File>>,
+        ) -> Result<()> {
             if Path::new(FILE_NAME).try_exists()? {
                 return Ok(());
             }
@@ -91,8 +109,8 @@ cfg_select! {
     }
     _ => {}
 }
-fn invalid_output_path_err(message: &'static str) -> Box<dyn Error + Send + Sync> {
-    IoError::other(message).into()
+fn invalid_output_path_err(message: &'static str) -> AppError {
+    AppError::message(message)
 }
 pub fn validate_safe_output_file_path(path: &Path) -> Result<()> {
     let maybe_metadata = match fs::symlink_metadata(path) {
@@ -142,12 +160,6 @@ pub fn validate_safe_output_file_path(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub fn boxed_other_with_source<E>(context_msg: &str, err: E) -> Box<dyn Error + Send + Sync>
-where
-    E: Display,
-{
-    IoError::other(format!("{context_msg}: {err}")).into()
-}
 pub fn open_or_create_file() -> Result<BufWriter<File>> {
     let path = Path::new(FILE_NAME);
     validate_safe_output_file_path(path)?;
@@ -173,7 +185,7 @@ pub fn open_or_create_file() -> Result<BufWriter<File>> {
             ));
         }
         Err(fs::TryLockError::Error(err)) => {
-            return Err(boxed_other_with_source("출력 파일 잠금 실패", err));
+            return Err(AppError::context("출력 파일 잠금 실패", err));
         }
     }
     let metadata = file.metadata()?;
@@ -213,9 +225,9 @@ pub fn open_or_create_file() -> Result<BufWriter<File>> {
 }
 pub fn lock_mutex<'guard, T>(
     mutex: &'guard Mutex<T>,
-    context_msg: &str,
+    context_msg: &'static str,
 ) -> Result<MutexGuard<'guard, T>> {
     mutex
         .lock()
-        .map_err(|err| boxed_other_with_source(context_msg, err))
+        .map_err(|err| AppError::message(format!("{context_msg}: {err}")))
 }

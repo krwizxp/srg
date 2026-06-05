@@ -4,7 +4,6 @@ use super::{
 };
 use alloc::{string::String, vec::Vec};
 use core::{
-    cell::RefCell,
     ffi::c_void,
     ptr::{NonNull, null, null_mut},
 };
@@ -13,6 +12,70 @@ use std::{
     os::windows::ffi::OsStrExt as WindowsOsStrExt,
     time::{Instant, SystemTime},
 };
+mod sys {
+    use super::{HInternet, c_void};
+    #[link(name = "winhttp")]
+    unsafe extern "system" {
+        pub(super) fn WinHttpCloseHandle(h_internet: HInternet) -> i32;
+        pub(super) fn WinHttpConnect(
+            h_session: HInternet,
+            server_name: *const u16,
+            server_port: u16,
+            reserved: u32,
+        ) -> HInternet;
+        pub(super) fn WinHttpOpen(
+            user_agent: *const u16,
+            access_type: u32,
+            proxy_name: *const u16,
+            proxy_bypass: *const u16,
+            flags: u32,
+        ) -> HInternet;
+        pub(super) fn WinHttpOpenRequest(
+            h_connect: HInternet,
+            verb: *const u16,
+            object_name: *const u16,
+            version: *const u16,
+            referrer: *const u16,
+            accept_types: *const *const u16,
+            flags: u32,
+        ) -> HInternet;
+        pub(super) fn WinHttpQueryHeaders(
+            h_request: HInternet,
+            info_level: u32,
+            name: *const u16,
+            buffer: *mut c_void,
+            buffer_length: *mut u32,
+            index: *mut u32,
+        ) -> i32;
+        pub(super) fn WinHttpReceiveResponse(h_request: HInternet, reserved: *mut c_void) -> i32;
+        pub(super) fn WinHttpSendRequest(
+            h_request: HInternet,
+            headers: *const u16,
+            headers_length: u32,
+            optional: *const c_void,
+            optional_length: u32,
+            total_length: u32,
+            context: usize,
+        ) -> i32;
+        pub(super) fn WinHttpSetOption(
+            h_internet: HInternet,
+            option: u32,
+            buffer: *mut c_void,
+            buffer_length: u32,
+        ) -> i32;
+        pub(super) fn WinHttpSetTimeouts(
+            h_internet: HInternet,
+            resolve_timeout: i32,
+            connect_timeout: i32,
+            send_timeout: i32,
+            receive_timeout: i32,
+        ) -> i32;
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        pub(super) fn GetLastError() -> u32;
+    }
+}
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTPS_SCHEME_PREFIX: &str = "https://";
@@ -23,16 +86,12 @@ const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
 const WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE: u32 = 155;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
 const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
-pub(super) const CLIENT: Client = Client {
-    get_last_error: GetLastError,
-    http_scheme_prefix: HTTP_SCHEME_PREFIX,
-    https_scheme_prefix: HTTPS_SCHEME_PREFIX,
-};
 type HInternet = *mut c_void;
 pub(super) struct Client {
-    get_last_error: unsafe extern "system" fn() -> u32,
+    error_code_label: &'static str,
     http_scheme_prefix: &'static str,
     https_scheme_prefix: &'static str,
+    session_cache: Option<SessionCache>,
 }
 struct RequestTarget {
     host: String,
@@ -54,92 +113,34 @@ struct SessionCache {
     connects: Vec<CachedConnect>,
     session: Handle,
 }
-std::thread_local! {
-    static SESSION_CACHE: RefCell<Option<SessionCache>> = const { RefCell::new(None) };
-}
-#[link(name = "winhttp")]
-unsafe extern "system" {
-    fn WinHttpCloseHandle(h_internet: HInternet) -> i32;
-    fn WinHttpConnect(
-        h_session: HInternet,
-        server_name: *const u16,
-        server_port: u16,
-        reserved: u32,
-    ) -> HInternet;
-    fn WinHttpOpen(
-        user_agent: *const u16,
-        access_type: u32,
-        proxy_name: *const u16,
-        proxy_bypass: *const u16,
-        flags: u32,
-    ) -> HInternet;
-    fn WinHttpOpenRequest(
-        h_connect: HInternet,
-        verb: *const u16,
-        object_name: *const u16,
-        version: *const u16,
-        referrer: *const u16,
-        accept_types: *const *const u16,
-        flags: u32,
-    ) -> HInternet;
-    fn WinHttpQueryHeaders(
-        h_request: HInternet,
-        info_level: u32,
-        name: *const u16,
-        buffer: *mut c_void,
-        buffer_length: *mut u32,
-        index: *mut u32,
-    ) -> i32;
-    fn WinHttpReceiveResponse(h_request: HInternet, reserved: *mut c_void) -> i32;
-    fn WinHttpSendRequest(
-        h_request: HInternet,
-        headers: *const u16,
-        headers_length: u32,
-        optional: *const c_void,
-        optional_length: u32,
-        total_length: u32,
-        context: usize,
-    ) -> i32;
-    fn WinHttpSetOption(
-        h_internet: HInternet,
-        option: u32,
-        buffer: *mut c_void,
-        buffer_length: u32,
-    ) -> i32;
-    fn WinHttpSetTimeouts(
-        h_internet: HInternet,
-        resolve_timeout: i32,
-        connect_timeout: i32,
-        send_timeout: i32,
-        receive_timeout: i32,
-    ) -> i32;
-}
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    fn GetLastError() -> u32;
-}
 impl Drop for Handle {
     fn drop(&mut self) {
         // SAFETY: self.0 is a WinHTTP handle returned by WinHTTP and is closed exactly once here.
         unsafe {
-            WinHttpCloseHandle(self.as_ptr());
+            sys::WinHttpCloseHandle(self.0.as_ptr());
         }
     }
 }
-impl Handle {
-    const fn as_ptr(&self) -> HInternet {
-        self.0.as_ptr()
-    }
-}
 impl Client {
-    fn cached_connect<'cache>(
-        &self,
-        cache: &'cache mut SessionCache,
+    fn cached_connect_ptr(
+        &mut self,
+        user_agent: &[u16],
         host: &str,
         host_wide: &[u16],
         port: u16,
         context: &str,
-    ) -> Result<&'cache Handle> {
+    ) -> Result<HInternet> {
+        if self.session_cache.is_none() {
+            self.session_cache = Some(SessionCache {
+                connects: Vec::new(),
+                session: self.open_session(user_agent, context)?,
+            });
+        }
+        let error_code_label = self.error_code_label;
+        let cache = self
+            .session_cache
+            .as_mut()
+            .ok_or_else(|| error(context, "WinHTTP session cache 상태 오류"))?;
         if let Some(index) = cache
             .connects
             .iter()
@@ -149,9 +150,15 @@ impl Client {
                 .connects
                 .get(index)
                 .map(|entry| &entry.handle)
+                .map(|handle| handle.0.as_ptr())
                 .ok_or_else(|| error(context, "WinHTTP connect cache 범위 오류"));
         }
-        let handle = self.connect(&cache.session, host_wide, port, context)?;
+        // SAFETY: host_wide is NUL-terminated and cache.session is a valid session handle.
+        let raw_connect =
+            unsafe { sys::WinHttpConnect(cache.session.0.as_ptr(), host_wide.as_ptr(), port, 0) };
+        let handle = NonNull::new(raw_connect)
+            .map(Handle)
+            .ok_or_else(|| Self::last_error_for(error_code_label, "WinHttpConnect", context))?;
         let mut host_key = String::new();
         host_key
             .try_reserve(host.len())
@@ -169,15 +176,13 @@ impl Client {
             host: host_key,
             port,
         });
-        Ok(&entry.handle)
+        Ok(entry.handle.0.as_ptr())
     }
-    fn connect(&self, session: &Handle, host: &[u16], port: u16, context: &str) -> Result<Handle> {
-        // SAFETY: host is NUL-terminated and session is a valid session handle.
-        let raw_connect = unsafe { WinHttpConnect(session.as_ptr(), host.as_ptr(), port, 0) };
-        self.non_null_handle(raw_connect, "WinHttpConnect", context)
+    fn clear_session_cache(&mut self) {
+        self.session_cache = None;
     }
     pub(super) fn fetch_head(
-        &self,
+        &mut self,
         url: &str,
         context: &str,
         parse_http_date: ParseHttpDate,
@@ -192,48 +197,59 @@ impl Client {
         } else {
             0
         };
-        let perform = self.with_cached_connect(
+        let connect = self.cached_connect_ptr(
             &user_agent,
             &target.host,
             &host_wide,
             target.port,
             context,
-            |connect| {
-                let request = self.open_request(connect, &method_wide, &path_wide, flags, context)?;
-                if target.secure {
-                    match self.set_ignore_revocation_offline(&request) {
-                        Ok(()) | Err(_) => {}
-                    }
-                }
-                let request_start = Instant::now();
-                self.send_head(&request, context)?;
-                self.receive_response(&request, context)?;
-                let response_received = Instant::now();
-                Ok(WinHttpHeadPerform {
-                    request,
-                    request_start,
-                    response_received,
-                })
-            },
         )?;
-        let server_time = self.query_server_time(&perform.request, context, parse_http_date)?;
-        let rtt = perform
+        let perform: Result<WinHttpHeadPerform> = (|| {
+            let request = self.open_request(connect, &method_wide, &path_wide, flags, context)?;
+            if target.secure {
+                match self.set_ignore_revocation_offline(&request) {
+                    Ok(()) | Err(_) => {}
+                }
+            }
+            let request_start = Instant::now();
+            self.send_head(&request, context)?;
+            self.receive_response(&request, context)?;
+            let response_received = Instant::now();
+            Ok(WinHttpHeadPerform {
+                request,
+                request_start,
+                response_received,
+            })
+        })();
+        if perform.is_err() {
+            self.clear_session_cache();
+        }
+        let perform_result = perform?;
+        let server_time = self.query_server_time(&perform_result.request, context, parse_http_date)?;
+        let rtt = perform_result
             .response_received
-            .saturating_duration_since(perform.request_start)
+            .saturating_duration_since(perform_result.request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
-            response_received_inst: perform.response_received,
+            response_received_inst: perform_result.response_received,
             rtt,
             server_time,
         })
     }
     fn last_error(&self, operation: &str, context: &str) -> super::TimeError {
-        let code = self.last_error_code();
-        error(context, format!("{operation} 실패: Windows error {code}"))
+        Self::last_error_for(self.error_code_label, operation, context)
     }
-    fn last_error_code(&self) -> u32 {
+    fn last_error_code() -> u32 {
         // SAFETY: GetLastError has no preconditions.
-        unsafe { (self.get_last_error)() }
+        unsafe { sys::GetLastError() }
+    }
+    fn last_error_for(
+        error_code_label: &'static str,
+        operation: &str,
+        context: &str,
+    ) -> super::TimeError {
+        let code = Self::last_error_code();
+        error(context, format!("{operation} 실패: {error_code_label} {code}"))
     }
     fn non_null_handle(&self, handle: HInternet, operation: &str, context: &str) -> Result<Handle> {
         NonNull::new(handle)
@@ -250,7 +266,7 @@ impl Client {
     ) -> Result<Handle> {
         // SAFETY: method and path are NUL-terminated and connect is valid.
         let raw_request = unsafe {
-            WinHttpOpenRequest(
+            sys::WinHttpOpenRequest(
                 connect,
                 method.as_ptr(),
                 path.as_ptr(),
@@ -265,7 +281,7 @@ impl Client {
     fn open_session(&self, user_agent: &[u16], context: &str) -> Result<Handle> {
         // SAFETY: user_agent is NUL-terminated and optional proxy pointers are intentionally null.
         let raw_session = unsafe {
-            WinHttpOpen(
+            sys::WinHttpOpen(
                 user_agent.as_ptr(),
                 WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                 null(),
@@ -279,7 +295,7 @@ impl Client {
         };
         // SAFETY: session is a valid WinHTTP session handle.
         unsafe {
-            WinHttpSetTimeouts(session.as_ptr(), timeout, timeout, timeout, timeout);
+            sys::WinHttpSetTimeouts(session.0.as_ptr(), timeout, timeout, timeout, timeout);
         }
         Ok(session)
     }
@@ -293,8 +309,8 @@ impl Client {
         let mut index = 0_u32;
         // SAFETY: request is valid; this first call probes the required buffer size.
         let probe_ok = unsafe {
-            WinHttpQueryHeaders(
-                request.as_ptr(),
+            sys::WinHttpQueryHeaders(
+                request.0.as_ptr(),
                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
                 null(),
                 null_mut(),
@@ -307,7 +323,7 @@ impl Client {
                 "{context} 응답에서 Date"
             )));
         }
-        let last_error_code = self.last_error_code();
+        let last_error_code = Self::last_error_code();
         if last_error_code != ERROR_INSUFFICIENT_BUFFER {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
@@ -326,8 +342,8 @@ impl Client {
         index = 0;
         // SAFETY: buffer has the size requested by WinHTTP and request is valid.
         let fetch_ok = unsafe {
-            WinHttpQueryHeaders(
-                request.as_ptr(),
+            sys::WinHttpQueryHeaders(
+                request.0.as_ptr(),
                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
                 null(),
                 buffer.as_mut_ptr().cast::<c_void>(),
@@ -364,8 +380,15 @@ impl Client {
                 line_bytes.push(byte);
                 Ok::<(), TimeError>(())
             })?;
-            if let Some(date_header_raw) = find_date_header_value(&line_bytes) {
-                return parse_http_date(date_header_raw);
+            match find_date_header_value(&line_bytes) {
+                Ok(Some(date_header_raw)) => return parse_http_date(date_header_raw),
+                Ok(None) => {}
+                Err(source) => {
+                    return Err(error(
+                        context,
+                        format!("Date 헤더 UTF-8 변환 실패: {source}"),
+                    ));
+                }
             }
         }
         Err(TimeError::header_not_found(format!(
@@ -374,7 +397,7 @@ impl Client {
     }
     fn receive_response(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is a valid request handle and no reserved pointer is required.
-        let received = unsafe { WinHttpReceiveResponse(request.as_ptr(), null_mut()) };
+        let received = unsafe { sys::WinHttpReceiveResponse(request.0.as_ptr(), null_mut()) };
         if received == 0_i32 {
             Err(self.last_error("WinHttpReceiveResponse", context))
         } else {
@@ -396,10 +419,10 @@ impl Client {
         } else {
             return Err(error(context, "지원하지 않는 URL scheme입니다."));
         };
-        let authority = match scheme.rest.split_once(['/', '?', '#']) {
-            Some((authority, _)) => authority,
-            None => scheme.rest,
-        };
+        let authority = scheme
+            .rest
+            .split_once(['/', '?', '#'])
+            .map_or(scheme.rest, |(authority, _)| authority);
         if authority.is_empty() {
             return Err(error(context, "URL host가 비어 있습니다."));
         }
@@ -468,7 +491,8 @@ impl Client {
     }
     fn send_head(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is valid and no additional request body or headers are needed for HEAD.
-        let sent = unsafe { WinHttpSendRequest(request.as_ptr(), null(), 0, null(), 0, 0, 0) };
+        let sent =
+            unsafe { sys::WinHttpSendRequest(request.0.as_ptr(), null(), 0, null(), 0, 0, 0) };
         if sent == 0_i32 {
             Err(self.last_error("WinHttpSendRequest", context))
         } else {
@@ -481,70 +505,30 @@ impl Client {
             .map_err(|source| error("WinHTTP", format!("옵션 길이 변환 실패: {source}")))?;
         // SAFETY: request is a valid WinHTTP request handle and enabled points to a u32 option value.
         let ok = unsafe {
-            WinHttpSetOption(
-                request.as_ptr(),
+            sys::WinHttpSetOption(
+                request.0.as_ptr(),
                 WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE,
                 (&raw mut enabled).cast::<c_void>(),
                 buffer_length,
             )
         };
         if ok == 0_i32 {
-            Err(self.last_error("WinHttpSetOption IGNORE_CERT_REVOCATION_OFFLINE", "WinHTTP"))
+            Err(self.last_error(
+                "WinHttpSetOption IGNORE_CERT_REVOCATION_OFFLINE",
+                "WinHTTP",
+            ))
         } else {
             Ok(())
         }
     }
-    fn with_cached_connect<R>(
-        &self,
-        user_agent: &[u16],
-        host: &str,
-        host_wide: &[u16],
-        port: u16,
-        context: &str,
-        action: impl FnOnce(HInternet) -> Result<R>,
-    ) -> Result<R> {
-        let connect_ptr = SESSION_CACHE
-            .try_with(|cell| {
-                let mut session_cache = cell.try_borrow_mut().map_err(|source| {
-                    error(
-                        context,
-                        format!("WinHTTP session cache borrow 실패: {source}"),
-                    )
-                })?;
-                let cache = if let Some(ref mut cache) = *session_cache {
-                    cache
-                } else {
-                    session_cache.insert(SessionCache {
-                        connects: Vec::new(),
-                        session: self.open_session(user_agent, context)?,
-                    })
-                };
-                let connect = self.cached_connect(cache, host, host_wide, port, context)?;
-                Ok::<HInternet, TimeError>(connect.as_ptr())
-            })
-            .map_err(|source| error(context, format!("WinHTTP session cache 접근 실패: {source}")))??;
-        match action(connect_ptr) {
-            Ok(value) => Ok(value),
-            Err(action_error) => match SESSION_CACHE.try_with(|cell| {
-                let mut session_cache = cell.try_borrow_mut().map_err(|source| {
-                    error(
-                        context,
-                        format!("WinHTTP session cache borrow 실패: {source}"),
-                    )
-                })?;
-                *session_cache = None;
-                Ok::<(), TimeError>(())
-            }) {
-                Ok(Ok(())) => Err(action_error),
-                Ok(Err(cache_error)) => Err(error(
-                    context,
-                    format!("{action_error}; WinHTTP session cache 정리 실패: {cache_error}"),
-                )),
-                Err(access_error) => Err(error(
-                    context,
-                    format!("{action_error}; WinHTTP session cache 접근 실패: {access_error}"),
-                )),
-            },
+}
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            error_code_label: "Windows error",
+            http_scheme_prefix: HTTP_SCHEME_PREFIX,
+            https_scheme_prefix: HTTPS_SCHEME_PREFIX,
+            session_cache: None,
         }
     }
 }

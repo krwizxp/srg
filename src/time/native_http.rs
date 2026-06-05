@@ -19,9 +19,6 @@ cfg_select! {
         mod unsupported;
     }
 }
-pub(super) const NATIVE_HTTP: NativeHttp = NativeHttp {
-    parse_http_date: parse_http_date_to_systemtime,
-};
 struct HeadResponse {
     response_received_inst: Instant,
     rtt: Duration,
@@ -29,16 +26,27 @@ struct HeadResponse {
 }
 pub(super) struct NativeHttp {
     parse_http_date: fn(&str) -> Result<SystemTime>,
+    platform: platform::Client,
 }
 type ParseHttpDate = fn(&str) -> Result<SystemTime>;
 impl NativeHttp {
-    pub(super) fn fetch_head_sample(&self, url: &str, context: &str) -> Result<TimeSample> {
-        let response = platform::CLIENT.fetch_head(url, context, self.parse_http_date)?;
+    pub(super) fn fetch_head_sample(&mut self, url: &str, context: &str) -> Result<TimeSample> {
+        let response = self
+            .platform
+            .fetch_head(url, context, self.parse_http_date)?;
         Ok(TimeSample {
             response_received_inst: response.response_received_inst,
             rtt: response.rtt,
             server_time: response.server_time,
         })
+    }
+}
+impl Default for NativeHttp {
+    fn default() -> Self {
+        Self {
+            parse_http_date: parse_http_date_to_systemtime,
+            platform: platform::Client::default(),
+        }
     }
 }
 fn error(context: &str, detail: impl Display) -> TimeError {

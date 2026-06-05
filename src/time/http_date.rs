@@ -192,20 +192,20 @@ impl HttpDateComponents {
             )
         };
         let year = {
-            let century_base = (i64::from(current_year)
+            let century_base = i64::from(current_year)
                 .div_euclid(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
                 .checked_mul(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
-                .ok_or_else(|| TimeError::parse(ERR_YEAR)))?;
-            let mut expanded = (century_base
+                .ok_or_else(|| TimeError::parse(ERR_YEAR))?;
+            let mut expanded = century_base
                 .checked_add(i64::from(year_two_digits))
-                .ok_or_else(|| TimeError::parse(ERR_YEAR)))?;
-            let cutoff = (i64::from(current_year)
+                .ok_or_else(|| TimeError::parse(ERR_YEAR))?;
+            let cutoff = i64::from(current_year)
                 .checked_add(RFC850_CENTURY_CUTOFF_OFFSET_I64)
-                .ok_or_else(|| TimeError::parse(ERR_YEAR)))?;
+                .ok_or_else(|| TimeError::parse(ERR_YEAR))?;
             if expanded > cutoff {
-                expanded = (expanded
+                expanded = expanded
                     .checked_sub(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
-                    .ok_or_else(|| TimeError::parse(ERR_YEAR)))?;
+                    .ok_or_else(|| TimeError::parse(ERR_YEAR))?;
             }
             parse_result_with_context(i32::try_from(expanded), ERR_YEAR)?
         };

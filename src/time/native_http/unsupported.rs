@@ -1,9 +1,9 @@
 use super::{HeadResponse, ParseHttpDate, Result, error};
-pub(super) const CLIENT: Client = Client;
+#[derive(Default)]
 pub(super) struct Client;
 impl Client {
     pub(super) fn fetch_head(
-        &self,
+        &mut self,
         _url: &str,
         context: &str,
         _parse_http_date: ParseHttpDate,

@@ -25,7 +25,10 @@ impl<'buffer> ByteCursor<'buffer> {
         Self { buf, pos: 0 }
     }
     pub const fn remaining(&self) -> usize {
-        self.buf.len().saturating_sub(self.pos)
+        match self.buf.len().checked_sub(self.pos) {
+            Some(remaining) => remaining,
+            None => 0,
+        }
     }
     pub fn take(&mut self, len: usize) -> io::Result<&mut [u8]> {
         if self.remaining() < len {

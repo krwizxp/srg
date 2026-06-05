@@ -1,6 +1,6 @@
 [package]
 name = "srg"
-version = "1.5.5"
+version = "1.5.6"
 categories = ["command-line-utilities", "date-and-time", "encoding"]
 edition = "2024"
 rust-version = "1.96"
@@ -21,6 +21,7 @@ correctness = { level = "deny", priority = -1 }
 implicit_return = "allow"
 little_endian_bytes = "allow"
 missing_docs_in_private_items = "allow"
+missing_trait_methods = "allow"
 non_ascii_literal = "allow"
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }

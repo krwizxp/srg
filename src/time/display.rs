@@ -40,10 +40,7 @@ struct DisplayableTime {
     second: u32,
     year: i32,
 }
-pub(super) struct SliceCursor<'buffer> {
-    pub inner: ByteCursor<'buffer>,
-}
-impl SliceCursor<'_> {
+impl ByteCursor<'_> {
     fn checked_sub_index(value: usize, amount: usize) -> IoResult<usize> {
         value.checked_sub(amount).ok_or_else(write_zero_err)
     }
@@ -62,15 +59,9 @@ impl SliceCursor<'_> {
             .and_then(|digits| digits.first_chunk_mut::<TWO_DIGIT_WIDTH>())
             .ok_or_else(write_zero_err)
     }
-    fn write_byte(&mut self, byte: u8) -> IoResult<()> {
-        self.inner.write_byte(byte)
-    }
-    pub(super) fn write_bytes(&mut self, bytes: &[u8]) -> IoResult<()> {
-        self.inner.write_bytes(bytes)
-    }
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
-        let digits_slice = self.inner.take(TWO_DIGIT_WIDTH)?;
+        let digits_slice = self.take(TWO_DIGIT_WIDTH)?;
         let Some(digits) = digits_slice.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
@@ -80,7 +71,7 @@ impl SliceCursor<'_> {
     fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
         let hundreds = usize::from(low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
         let rem = usize::from(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-        let head = self.inner.take(THREE_DIGIT_WIDTH)?;
+        let head = self.take(THREE_DIGIT_WIDTH)?;
         let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
             return Err(write_zero_err());
         };
@@ -124,7 +115,7 @@ impl SliceCursor<'_> {
                 let lo = usize::from(low_u8_from_u32(
                     year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
                 ));
-                let head = self.inner.take(FOUR_DIGIT_WIDTH)?;
+                let head = self.take(FOUR_DIGIT_WIDTH)?;
                 let Some((hi_digits, lo_tail)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
                 else {
                     return Err(write_zero_err());
@@ -143,7 +134,7 @@ impl SliceCursor<'_> {
         if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
             let hundreds = usize::from(low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
             let rem = usize::from(low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let head = self.inner.take(THREE_DIGIT_WIDTH)?;
+            let head = self.take(THREE_DIGIT_WIDTH)?;
             let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
                 return Err(write_zero_err());
             };
@@ -155,9 +146,6 @@ impl SliceCursor<'_> {
             return Ok(());
         }
         self.write_u32_dec(abs)
-    }
-    pub(super) fn written_slice(&self) -> IoResult<&[u8]> {
-        self.inner.written_slice()
     }
 }
 impl ServerTime {
@@ -237,27 +225,25 @@ impl ServerTime {
     }
     pub(super) fn write_current_display_time_buf_at(
         &self,
-        cur: &mut SliceCursor<'_>,
+        cur: &mut ByteCursor<'_>,
         now: Instant,
     ) -> Result<()> {
         let dt = self.calculate_display_time_at(now)?;
-        cur.write_year_padded4(dt.year).map_err(TimeError::from)?;
-        cur.write_byte(b'-').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.month).map_err(TimeError::from)?;
-        cur.write_byte(b'-').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.day_of_month)
-            .map_err(TimeError::from)?;
-        cur.write_byte(b'(').map_err(TimeError::from)?;
-        cur.write_bytes(dt.day_of_week_str.as_bytes())
-            .map_err(TimeError::from)?;
-        cur.write_bytes(b") ").map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.hour).map_err(TimeError::from)?;
-        cur.write_byte(b':').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.minute).map_err(TimeError::from)?;
-        cur.write_byte(b':').map_err(TimeError::from)?;
-        cur.write_u32_2digits(dt.second).map_err(TimeError::from)?;
-        cur.write_byte(b'.').map_err(TimeError::from)?;
-        cur.write_u32_3digits(dt.millis).map_err(TimeError::from)?;
+        cur.write_year_padded4(dt.year)?;
+        cur.write_byte(b'-')?;
+        cur.write_u32_2digits(dt.month)?;
+        cur.write_byte(b'-')?;
+        cur.write_u32_2digits(dt.day_of_month)?;
+        cur.write_byte(b'(')?;
+        cur.write_bytes(dt.day_of_week_str.as_bytes())?;
+        cur.write_bytes(b") ")?;
+        cur.write_u32_2digits(dt.hour)?;
+        cur.write_byte(b':')?;
+        cur.write_u32_2digits(dt.minute)?;
+        cur.write_byte(b':')?;
+        cur.write_u32_2digits(dt.second)?;
+        cur.write_byte(b'.')?;
+        cur.write_u32_3digits(dt.millis)?;
         Ok(())
     }
 }

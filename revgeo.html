@@ -4983,10 +4983,31 @@
           throw new Error("빈 값은 허용되지 않습니다.");
         }
         let value;
-        if (/^0[xX][0-9a-fA-F]+$/.test(input)) {
-          value = BigInt(input);
+        if (/^0[xX]/.test(input)) {
+          const rawDigits = input.slice(2);
+          if (!/^[0-9a-fA-F]+$/.test(rawDigits)) {
+            throw new Error(
+              `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+            );
+          }
+          const digits = rawDigits.replace(/^0+/g, "") || "0";
+          if (digits.length > 16) {
+            throw new Error(
+              `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+            );
+          }
+          value = BigInt(`0x${digits}`);
         } else if (/^\d+$/.test(input)) {
-          value = BigInt(input);
+          const digits = input.replace(/^0+/g, "") || "0";
+          if (
+            digits.length > MAX_U64_DEC.length ||
+            (digits.length === MAX_U64_DEC.length && digits > MAX_U64_DEC)
+          ) {
+            throw new Error(
+              `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+            );
+          }
+          value = BigInt(digits);
         } else {
           throw new Error(
             `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
@@ -5351,18 +5372,43 @@
         );
         return lines.join("\n");
       }
-      function parseU64Tokens(raw) {
-        return String(raw || "")
-          .split(/[\s,]+/g)
-          .map((token) => token.trim())
-          .filter((token) => token.length > 0);
+      const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
+      const MANUAL_YIELD_INTERVAL_MS = 12;
+      const MANUAL_META_UPDATE_INTERVAL_MS = 150;
+      function isU64TokenSeparator(ch) {
+        return ch === "," || /\s/u.test(ch);
       }
-      function parseMainValues(raw) {
-        const tokens = parseU64Tokens(raw);
-        if (tokens.length === 0) {
-          throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
+      function* iterU64Tokens(raw) {
+        const text = String(raw || "");
+        let tokenStart = -1;
+        for (let i = 0; i < text.length; i += 1) {
+          if (isU64TokenSeparator(text[i])) {
+            if (tokenStart >= 0) {
+              yield text.slice(tokenStart, i);
+              tokenStart = -1;
+            }
+          } else if (tokenStart < 0) {
+            tokenStart = i;
+          }
         }
-        return tokens.map((token) => parseU64(token));
+        if (tokenStart >= 0) {
+          yield text.slice(tokenStart);
+        }
+      }
+      function manualPreviewText(parts, omittedCount) {
+        if (parts.length === 0) {
+          return "";
+        }
+        const preview = parts.join("");
+        if (omittedCount <= 0) {
+          return preview;
+        }
+        return `${preview}\n\n... 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
+      }
+      function yieldToBrowser() {
+        return new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
       }
       function promptSuppValue(index, reason) {
         for (; ;) {
@@ -5380,11 +5426,20 @@
           }
         }
       }
-      function downloadRandomDataTxt(text) {
-        const body = text.endsWith("\n") ? text : `${text}\n`;
-        const blob = new Blob(["\uFEFF", body], {
+      function randomDataBlob(chunks, includeBom) {
+        const parts = includeBom ? ["\uFEFF"] : [];
+        for (const chunk of chunks) {
+          parts.push(chunk);
+        }
+        if (chunks.length > 0 && !chunks[chunks.length - 1].endsWith("\n")) {
+          parts.push("\n");
+        }
+        return new Blob(parts, {
           type: "text/plain;charset=utf-8",
         });
+      }
+      function downloadRandomDataTxt(chunks) {
+        const blob = randomDataBlob(chunks, true);
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -5394,13 +5449,23 @@
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 0);
       }
-      async function copyTextToClipboard(text) {
+      async function copyRandomDataChunksToClipboard(chunks) {
         if (!navigator.clipboard || !window.isSecureContext) {
           throw new Error(
             "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
           );
         }
-        await navigator.clipboard.writeText(text);
+        const blob = randomDataBlob(chunks, false);
+        if (
+          typeof ClipboardItem === "function" &&
+          typeof navigator.clipboard.write === "function"
+        ) {
+          await navigator.clipboard.write([new ClipboardItem({
+            "text/plain": blob,
+          })]);
+          return;
+        }
+        await navigator.clipboard.writeText(await blob.text());
       }
       function main() {
         const num64Input = document.getElementById("num64");
@@ -5438,67 +5503,125 @@
             output.removeAttribute("data-has-content");
           }
         };
-        let lastGeneratedText = "";
-        runBtn.addEventListener("click", () => {
+        const setManualBusy = (busy) => {
+          runBtn.disabled = busy;
+          saveBtn.disabled = busy;
+          copyBtn.disabled = busy;
+        };
+        let lastGeneratedChunks = [];
+        let manualGenerationId = 0;
+        runBtn.addEventListener("click", async () => {
+          const generationId = manualGenerationId + 1;
+          manualGenerationId = generationId;
           error.textContent = "";
-          meta.textContent = "";
+          meta.textContent = "기본 난수 변환 준비 중...";
+          lastGeneratedChunks = [];
+          setManualOutputText("");
+          setManualBusy(true);
           try {
-            const mainValues = parseMainValues(num64Input.value);
-            const suppQueue = parseU64Tokens(suppInput.value);
+            const suppTokens = iterU64Tokens(suppInput.value);
+            const previewParts = [];
+            let omittedPreviewCount = 0;
+            let processedCount = 0;
             let suppInputCount = 0;
-            let queueIndex = 0;
+            let queuedSuppCount = 0;
             const nextSupp = (reason) => {
               const suppIndex = suppInputCount + 1;
-              let value;
-              if (queueIndex < suppQueue.length) {
-                const token = suppQueue[queueIndex];
-                queueIndex += 1;
-                value = parseU64(token);
-              } else {
-                value = promptSuppValue(suppIndex, reason);
+              const queued = suppTokens.next();
+              const value = queued.done
+                ? promptSuppValue(suppIndex, reason)
+                : parseU64(queued.value);
+              if (!queued.done) {
+                queuedSuppCount += 1;
               }
               suppInputCount += 1;
               return { value, bitsRemaining: 64 };
             };
-            const outputBlocks = mainValues.map((num64) =>
-              formatOutput(generateRandomDataFromNum(num64, nextSupp))
-            );
-            lastGeneratedText = outputBlocks.join("\n");
-            setManualOutputText(lastGeneratedText);
-            const promptedSuppCount = suppInputCount - queueIndex;
-            meta.textContent =
-              `기본 난수 변환: ${mainValues.length}개. 보조 난수 사용: 총 ${suppInputCount}개 (사전 ${queueIndex}개, 팝업 ${promptedSuppCount}개)`;
+            const updateManualProgress = (finished) => {
+              setManualOutputText(
+                manualPreviewText(previewParts, omittedPreviewCount),
+              );
+              const promptedSuppCount = suppInputCount - queuedSuppCount;
+              const state = finished ? "완료" : "처리 중";
+              meta.textContent =
+                `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 팝업 ${fmt(promptedSuppCount)}개)`;
+            };
+            let lastYieldAt = performance.now();
+            let lastMetaUpdateAt = lastYieldAt;
+            for (const token of iterU64Tokens(num64Input.value)) {
+              if (generationId !== manualGenerationId) {
+                return;
+              }
+              const outputBlock = formatOutput(
+                generateRandomDataFromNum(parseU64(token), nextSupp),
+              );
+              if (processedCount !== 0) {
+                lastGeneratedChunks.push("\n");
+                if (processedCount < MANUAL_PREVIEW_BLOCK_LIMIT) {
+                  previewParts.push("\n");
+                }
+              }
+              lastGeneratedChunks.push(outputBlock);
+              if (processedCount < MANUAL_PREVIEW_BLOCK_LIMIT) {
+                previewParts.push(outputBlock);
+              } else {
+                omittedPreviewCount += 1;
+              }
+              processedCount += 1;
+              const now = performance.now();
+              if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
+                if (now - lastMetaUpdateAt >= MANUAL_META_UPDATE_INTERVAL_MS) {
+                  updateManualProgress(false);
+                  lastMetaUpdateAt = now;
+                }
+                await yieldToBrowser();
+                if (generationId !== manualGenerationId) {
+                  return;
+                }
+                lastYieldAt = performance.now();
+              }
+            }
+            if (processedCount === 0) {
+              throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
+            }
+            updateManualProgress(true);
             manualBody.scrollTop = 0;
             output.scrollTop = 0;
           } catch (err) {
-            lastGeneratedText = "";
-            setManualOutputText("");
-            error.textContent = err instanceof Error
-              ? err.message
-              : String(err);
+            if (generationId === manualGenerationId) {
+              lastGeneratedChunks = [];
+              setManualOutputText("");
+              error.textContent = err instanceof Error
+                ? err.message
+                : String(err);
+            }
+          } finally {
+            if (generationId === manualGenerationId) {
+              setManualBusy(false);
+            }
           }
         });
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
-          if (!lastGeneratedText) {
+          if (lastGeneratedChunks.length === 0) {
             error.textContent =
               "저장할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
-          downloadRandomDataTxt(lastGeneratedText);
+          downloadRandomDataTxt(lastGeneratedChunks);
           meta.textContent =
             (meta.textContent ? `${meta.textContent}\n` : "") +
             "random_data.txt 저장 요청을 완료했습니다.";
         });
         copyBtn.addEventListener("click", async () => {
           error.textContent = "";
-          if (!lastGeneratedText) {
+          if (lastGeneratedChunks.length === 0) {
             error.textContent =
               "복사할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
           try {
-            await copyTextToClipboard(lastGeneratedText);
+            await copyRandomDataChunksToClipboard(lastGeneratedChunks);
             meta.textContent =
               (meta.textContent ? `${meta.textContent}\n` : "") +
               "변환 결과를 클립보드에 복사했습니다.";
@@ -5509,10 +5632,12 @@
           }
         });
         clearBtn.addEventListener("click", () => {
-          lastGeneratedText = "";
+          manualGenerationId += 1;
+          lastGeneratedChunks = [];
           error.textContent = "";
           meta.textContent = "";
           setManualOutputText("");
+          setManualBusy(false);
         });
       }
       main();

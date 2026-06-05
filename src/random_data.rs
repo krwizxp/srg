@@ -1,13 +1,16 @@
-use super::{
-    ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, BYTE_BITS, Coordinates, EURO_LUCKY_MODULUS,
-    EURO_MAIN_MODULUS, EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT, HANGUL_BASE_CODE_POINT,
-    HANGUL_SHIFTS, HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX, HANGUL_SYLLABLE_MODULUS,
-    INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO, INPUT_BYTE_MAX_FOR_LOTTO7,
-    INPUT_BYTE_MAX_FOR_LUCKY_STAR, INPUT_BYTE_MAX_FOR_PASSWORD, LOTTO_COUNT, LOTTO_COUNT_U8,
-    LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK, NMS_GLYPH_NUM_SHIFTS,
-    NMS_GLYPH_PREFIX_COUNT, NMS_PLANET_MAX_VALUE, NMS_PLANET_MODULUS, NMS_SOLAR_SYSTEM_MAX_VALUE,
-    NMS_SOLAR_SYSTEM_MODULUS, PASSWORD_BYTE_LEN_U8, RandomDataBuilder, RandomDataSet, Result,
-    U32_MAX_INV,
+use crate::{
+    constants::{
+        ASCII_PRINTABLE_LEN, ASCII_PRINTABLE_START, BYTE_BITS, EURO_LUCKY_MODULUS,
+        EURO_MAIN_MODULUS, EURO_MILLIONS_LUCKY_COUNT, EURO_MILLIONS_MAIN_COUNT,
+        HANGUL_BASE_CODE_POINT, HANGUL_SHIFTS, HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX,
+        HANGUL_SYLLABLE_MODULUS, INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO,
+        INPUT_BYTE_MAX_FOR_LOTTO7, INPUT_BYTE_MAX_FOR_LUCKY_STAR, INPUT_BYTE_MAX_FOR_PASSWORD,
+        LOTTO_COUNT, LOTTO_COUNT_U8, LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK,
+        NMS_GLYPH_COUNT, NMS_GLYPH_NUM_SHIFTS, NMS_GLYPH_PREFIX_COUNT, NMS_PLANET_MAX_VALUE,
+        NMS_PLANET_MODULUS, NMS_SOLAR_SYSTEM_MAX_VALUE, NMS_SOLAR_SYSTEM_MODULUS,
+        PASSWORD_BYTE_LEN, PASSWORD_BYTE_LEN_U8, U32_MAX_INV,
+    },
+    diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_util::{
         checked_add_one_u8, checked_add_one_u64, checked_add_one_usize, galaxy_coord,
@@ -21,7 +24,44 @@ cfg_select! {
     _ => {}
 }
 use core::{char::from_u32, ops::Mul as NumericMul};
-use std::io::Error as IoError;
+const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
+#[derive(Default)]
+pub struct Coordinates {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+#[derive(Default)]
+pub struct RandomDataSet {
+    pub euro_lucky_next_idx: usize,
+    pub euro_main_next_idx: usize,
+    pub euro_millions_lucky_stars: [u8; EURO_MILLIONS_LUCKY_COUNT],
+    pub euro_millions_main_numbers: [u8; EURO_MILLIONS_MAIN_COUNT],
+    pub galaxy_x: u16,
+    pub galaxy_y: u16,
+    pub galaxy_z: u16,
+    pub glyph_string: [char; NMS_GLYPH_COUNT],
+    pub hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
+    pub kor_coords: Coordinates,
+    pub lotto7_next_idx: usize,
+    pub lotto7_numbers: [u8; LOTTO7_COUNT],
+    pub lotto_next_idx: usize,
+    pub lotto_numbers: [u8; LOTTO_COUNT],
+    pub nms_portal_xxx: u16,
+    pub nms_portal_yy: u8,
+    pub nms_portal_zzz: u16,
+    pub num_64: u64,
+    pub numeric_password: u32,
+    pub numeric_password_digits: u8,
+    pub password: [u8; PASSWORD_BYTE_LEN],
+    pub password_len: u8,
+    pub planet_number: u8,
+    pub seen_euro_millions_lucky: u64,
+    pub seen_euro_millions_main: u64,
+    pub seen_lotto: u64,
+    pub seen_lotto7: u64,
+    pub solar_system_index: u16,
+    pub world_coords: Coordinates,
+}
 #[derive(Clone, Copy)]
 struct RandomBitBuffer {
     bits_remaining: u8,
@@ -64,33 +104,11 @@ impl RandomDataSet {
             && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
     }
 }
-impl<F> RandomDataBuilder<'_, F>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
-    pub(super) fn build(self) -> Result<RandomDataSet> {
-        let mut state = RandomDataBuildState {
-            data: RandomDataSet {
-                num_64: self.num,
-                ..Default::default()
-            },
-            next_supp: self.next_supp,
-            num: self.num,
-            supplemental: None,
-        };
-        state.fill_required_fields()?;
-        state.fill_lucky_stars()?;
-        state.fill_hangul_syllables()?;
-        state.fill_coords();
-        state.fill_nms_fields()?;
-        Ok(state.data)
-    }
-}
 impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    fn fill_coords(&mut self) {
+    fn fill_coords(&mut self) -> Result<()> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -107,15 +125,19 @@ where
         self.data.nms_portal_yy = low_u8_from_u32(upper_32_bits);
         self.data.nms_portal_zzz = low_u16_from_u64((self.num >> 20) & NMS_COORD_MASK);
         self.data.nms_portal_xxx = low_u16_from_u64((self.num >> 8) & NMS_COORD_MASK);
-        self.data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_xxx);
-        self.data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(self.data.nms_portal_yy));
-        self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz);
+        self.data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_xxx)?;
+        self.data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(self.data.nms_portal_yy))?;
+        self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz)?;
+        Ok(())
     }
     fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
-            while syllable_index > HANGUL_SYLLABLE_MAX {
+            for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
+                if syllable_index <= HANGUL_SYLLABLE_MAX {
+                    break;
+                }
                 let supplemental = if let Some(supplemental) = self.supplemental {
                     supplemental
                 } else {
@@ -131,6 +153,9 @@ where
                 } else {
                     self.next_supplemental("한글 음절 보완 재시도")?;
                 }
+            }
+            if syllable_index > HANGUL_SYLLABLE_MAX {
+                return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
             }
             let Some(code_point) = HANGUL_BASE_CODE_POINT
                 .checked_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS))
@@ -148,7 +173,7 @@ where
             .as_ref()
             .map_or(self.num, |supp| supp.value());
         let mut lucky_star_source = lucky_star_base.reverse_bits();
-        'lucky_star_loop: loop {
+        for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
             for byte in lucky_star_source.to_be_bytes() {
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
                     continue;
@@ -161,7 +186,7 @@ where
                     &mut self.data.euro_lucky_next_idx,
                 ) && self.data.euro_lucky_next_idx >= EURO_MILLIONS_LUCKY_COUNT
                 {
-                    break 'lucky_star_loop;
+                    return Ok(());
                 }
             }
             lucky_star_source = self
@@ -169,7 +194,7 @@ where
                 .value()
                 .reverse_bits();
         }
-        Ok(())
+        Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into())
     }
     fn fill_nms_fields(&mut self) -> Result<()> {
         let planet_number_base = extract_valid_bits_for_nms::<4>(
@@ -200,7 +225,7 @@ where
             .glyph_string
             .split_first_chunk_mut::<NMS_GLYPH_PREFIX_COUNT>()
         else {
-            return Err(IoError::other("NMS glyph prefix 길이가 올바르지 않습니다.").into());
+            return Err("NMS glyph prefix 길이가 올바르지 않습니다.".into());
         };
         for (slot, nibble_source) in prefix_glyphs.iter_mut().zip([
             u64::from(self.data.planet_number),
@@ -223,11 +248,14 @@ where
     }
     fn fill_required_fields(&mut self) -> Result<()> {
         fill_data_fields_from_u64(self.num, &mut self.data);
-        while !self.data.is_complete() {
+        for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
+            if self.data.is_complete() {
+                return Ok(());
+            }
             let new_supp = self.next_supplemental("기본 필드 보완")?;
             fill_data_fields_from_u64(new_supp.value(), &mut self.data);
         }
-        Ok(())
+        Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into())
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<RandomBitBuffer> {
         let supplemental = RandomBitBuffer {
@@ -237,18 +265,34 @@ where
         Ok(*self.supplemental.insert(supplemental))
     }
 }
+pub fn build_random_data<F>(num: u64, next_supp: &mut F) -> Result<RandomDataSet>
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
+    let mut state = RandomDataBuildState {
+        data: RandomDataSet {
+            num_64: num,
+            ..Default::default()
+        },
+        next_supp,
+        num,
+        supplemental: None,
+    };
+    state.fill_required_fields()?;
+    state.fill_lucky_stars()?;
+    state.fill_hangul_syllables()?;
+    state.fill_coords()?;
+    state.fill_nms_fields()?;
+    Ok(state.data)
+}
 cfg_select! {
     target_arch = "x86_64" => {
         pub fn generate_random_data() -> Result<RandomDataSet> {
             let num = get_hardware_random()?;
             let mut next_supp = |reason: &'static str| -> Result<u64> {
-                get_hardware_random().map_err(|source| format!("{reason}: {source}").into())
+                get_hardware_random().map_err(|source| source.prepend_context(reason))
             };
-            RandomDataBuilder {
-                next_supp: &mut next_supp,
-                num,
-            }
-            .build()
+            build_random_data(num, &mut next_supp)
         }
     }
     _ => {}
@@ -383,16 +427,16 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
         64 => u64::MAX,
         _ => 1_u64
             .checked_shl(u32::from(bit_count))
-            .map_or(0, |shifted| shifted.saturating_sub(1)),
+            .and_then(|shifted| shifted.checked_sub(1))
+            .unwrap_or_default(),
     };
-    if let Some(extracted_value) = shifts
-        .iter()
-        .map(|&shift| (num >> shift) & mask)
-        .find(|&value| value <= max_value)
-    {
+    if let Some(extracted_value) = shifts.iter().find_map(|&shift| {
+        let value = (num >> shift) & mask;
+        (value <= max_value).then_some(value)
+    }) {
         return Ok(extracted_value);
     }
-    loop {
+    for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
         let supp = match *supplemental {
             Some(ref mut candidate) if candidate.bits_remaining() >= BITS => candidate,
             None | Some(_) => supplemental.insert(RandomBitBuffer {
@@ -405,4 +449,5 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
             return Ok(extracted);
         }
     }
+    Err("NMS 보완 난수 시도 횟수를 초과했습니다.".into())
 }

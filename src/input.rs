@@ -1,10 +1,15 @@
-use super::Result;
+use crate::diagnostic::{AppError, Result};
 use core::{fmt::Arguments, result::Result as CoreResult};
-use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
+use std::io::{BufRead as _, Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
         use core::range::Range;
         use super::random_util::checked_add_one_usize;
+    }
+    _ => {}
+}
+cfg_select! {
+    target_arch = "x86_64" => {
         #[derive(Clone, Copy)]
         pub enum LadderEntryMode {
             Players,
@@ -21,14 +26,42 @@ pub fn read_line_reuse<'buffer>(
     buffer.clear();
     out.write_fmt(prompt)?;
     out.flush()?;
-    let bytes_read = stdin().read_line(buffer)?;
-    if bytes_read == 0 {
-        return Err(IoError::new(
-            ErrorKind::UnexpectedEof,
-            "표준 입력이 종료되었습니다.",
-        ));
-    }
+    read_line_unbounded(buffer)?;
     Ok(buffer.trim())
+}
+fn read_line_unbounded(buffer: &mut String) -> IoResult<()> {
+    let bytes = {
+        let mut stdin_lock = stdin().lock();
+        let mut bytes = Vec::new();
+        loop {
+            let available = stdin_lock.fill_buf()?;
+            if available.is_empty() {
+                if bytes.is_empty() {
+                    return Err(IoError::new(
+                        ErrorKind::UnexpectedEof,
+                        "표준 입력이 종료되었습니다.",
+                    ));
+                }
+                break;
+            }
+            let line_end = available.iter().position(|&byte| byte == b'\n');
+            let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
+            let segment = available
+                .get(..take_len)
+                .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
+            bytes.try_reserve(segment.len()).map_err(IoError::other)?;
+            bytes.extend_from_slice(segment);
+            stdin_lock.consume(take_len);
+            if line_end.is_some() {
+                drop(stdin_lock);
+                break;
+            }
+        }
+        bytes
+    };
+    *buffer =
+        String::from_utf8(bytes).map_err(|source| IoError::new(ErrorKind::InvalidData, source))?;
+    Ok(())
 }
 pub fn read_u64_hex_input(
     prompt: Arguments<'_>,
@@ -68,13 +101,7 @@ where
         out.write_all(prompt.as_bytes())?;
         out.flush()?;
         input_buf.clear();
-        let bytes_read = stdin().read_line(input_buf)?;
-        if bytes_read == 0 {
-            return Err(IoError::new(
-                ErrorKind::UnexpectedEof,
-                "표준 입력이 종료되었습니다.",
-            ));
-        }
+        read_line_unbounded(input_buf)?;
         let trimmed = input_buf.trim();
         match validator(trimmed) {
             Ok(value) => return Ok(value),
@@ -108,7 +135,7 @@ cfg_select! {
                 has_separator: bool,
             }
             let (out, err) = io;
-            let index_err = || IoError::other(index_error);
+            let index_err = || AppError::message(index_error);
             let count = loop {
                 let line = read_line_reuse(prompt, input_buffer, out)?;
                 let mut count = 0_usize;
@@ -127,7 +154,7 @@ cfg_select! {
                     }])
                 {
                     count = checked_add_one_usize(count).ok_or_else(|| {
-                        IoError::other(match mode {
+                        AppError::message(match mode {
                             LadderEntryMode::Players => "플레이어 수 계산 실패",
                             LadderEntryMode::Results { .. } => "결과 수 계산 실패",
                         })
@@ -143,8 +170,10 @@ cfg_select! {
                             let part = line
                                 .get(segment_start..boundary.end)
                                 .ok_or_else(index_err)?;
-                            let leading_whitespace =
-                                part.len().saturating_sub(part.trim_start().len());
+                            let leading_whitespace = part
+                                .len()
+                                .checked_sub(part.trim_start().len())
+                                .ok_or_else(index_err)?;
                             let trimmed = part.trim();
                             let entry_index = count.checked_sub(1).ok_or_else(index_err)?;
                             let slot = trimmed_ranges.get_mut(entry_index).ok_or_else(index_err)?;

@@ -1,9 +1,10 @@
 use super::{
-    BUFFER_SIZE, IS_TERMINAL, Result,
     file_output::lock_mutex,
     output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
-    RandomDataSet,
+    random_data::RandomDataSet,
 };
+use crate::constants::{BUFFER_SIZE, IS_TERMINAL};
+use crate::diagnostic::Result;
 use std::{
     fs::File,
     io::{BufWriter, Write as IoWrite},
