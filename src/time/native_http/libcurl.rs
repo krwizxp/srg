@@ -38,6 +38,7 @@ const CURLOPT_WRITEDATA: CurlOption = 10_001;
 const CURLOPT_WRITEFUNCTION: CurlOption = 20_011;
 const HTTP_HEAD_MAX_BODY_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 1024 * 1024;
+const USER_AGENT_C_BYTES: &[u8] = concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
 static CURL_INIT: LazyLock<CurlCode> = LazyLock::new(|| {
     // SAFETY: LazyLock runs this initializer once before any easy handles are used.
     unsafe { sys::curl_global_init(CURL_GLOBAL_DEFAULT) }
@@ -46,9 +47,9 @@ type Curl = c_void;
 type CurlCode = c_int;
 type CurlOption = c_int;
 type CurlWriteCallback = unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize;
+#[derive(Default)]
 pub(super) struct Client {
     easy_handle: Option<EasyHandle>,
-    user_agent: &'static str,
 }
 struct EasyHandle(NonNull<Curl>);
 struct CurlBodySink {
@@ -146,8 +147,14 @@ impl Client {
         context: &str,
         parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
-        let url_c = cstring("URL", url, context)?;
-        let user_agent = cstring("User-Agent", self.user_agent, context)?;
+        let url_c = CString::new(url).map_err(|source| {
+            error(
+                context,
+                format!("URL에 NUL 문자가 포함되어 있습니다: {source}"),
+            )
+        })?;
+        let user_agent = CStr::from_bytes_with_nul(USER_AGENT_C_BYTES)
+            .map_err(|source| error(context, format!("User-Agent C string 해석 실패: {source}")))?;
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
         let mut body_sink = CurlBodySink { bytes_seen: 0, error: None, limit: HTTP_HEAD_MAX_BODY_BYTES };
         let mut header_capture = CurlHeaderCapture {
@@ -240,14 +247,6 @@ impl Client {
         })
     }
 }
-impl Default for Client {
-    fn default() -> Self {
-        Self {
-            easy_handle: None,
-            user_agent: concat!("srg/", env!("CARGO_PKG_VERSION")),
-        }
-    }
-}
 impl CurlBodySink {
     fn append(&mut self, bytes: &[u8]) -> bool {
         let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
@@ -318,14 +317,6 @@ impl CurlHeaderCapture {
         self.date_header = Some(date_header);
         true
     }
-}
-fn cstring(label: &str, value: &str, context: &str) -> Result<CString> {
-    CString::new(value).map_err(|source| {
-        error(
-            context,
-            format!("{label}에 NUL 문자가 포함되어 있습니다: {source}"),
-        )
-    })
 }
 fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.

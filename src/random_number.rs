@@ -17,6 +17,7 @@ const INTEGER_MODE_TITLE: &str =
     "\n무작위 정수 생성기(지원 범위: -9223372036854775807 ~ 9223372036854775807)";
 const MIN_ALLOWED_INTEGER_VALUE: i64 = i64::MIN + 1;
 const RANDOM_BOUNDED_RETRY_LIMIT: usize = 1024;
+const U64_MODULUS: u128 = 1_u128 << 64;
 #[derive(Clone, Copy)]
 pub enum RandomNumberMode {
     Float,
@@ -131,10 +132,7 @@ pub fn generate_random_number(
 }
 pub fn random_bounded(range_size: NonZeroU64, seed_mod: u64) -> Result<u64> {
     let range_size128 = u128::from(NonZeroU128::from(range_size));
-    let u64_modulus = u128::from(u64::MAX)
-        .checked_add(1)
-        .ok_or("난수 범위 계산 실패")?;
-    let threshold128 = u64_modulus
+    let threshold128 = U64_MODULUS
         .checked_sub(range_size128)
         .and_then(|value| value.checked_rem(range_size128))
         .ok_or("난수 범위 계산 실패")?;

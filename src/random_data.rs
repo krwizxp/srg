@@ -63,7 +63,7 @@ pub struct RandomDataSet {
     pub world_coords: Coordinates,
 }
 #[derive(Clone, Copy)]
-struct RandomBitBuffer {
+pub struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
@@ -86,16 +86,37 @@ impl RandomBitBuffer {
         self.value
     }
 }
-struct RandomDataBuildState<'provider_ref, F>
+pub struct RandomDataBuildState<'provider_ref, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    data: RandomDataSet,
-    next_supp: &'provider_ref mut F,
-    num: u64,
-    supplemental: Option<RandomBitBuffer>,
+    pub data: RandomDataSet,
+    pub next_supp: &'provider_ref mut F,
+    pub num: u64,
+    pub supplemental: Option<RandomBitBuffer>,
 }
 impl RandomDataSet {
+    #[cfg(target_arch = "x86_64")]
+    pub fn build<F>(num: u64, next_supp: &mut F) -> Result<Self>
+    where
+        F: FnMut(&'static str) -> Result<u64>,
+    {
+        let mut state = RandomDataBuildState {
+            data: Self {
+                num_64: num,
+                ..Default::default()
+            },
+            next_supp,
+            num,
+            supplemental: None,
+        };
+        state.fill_required_fields()?;
+        state.fill_lucky_stars()?;
+        state.fill_hangul_syllables()?;
+        state.fill_coords()?;
+        state.fill_nms_fields()?;
+        Ok(state.data)
+    }
     const fn is_complete(&self) -> bool {
         self.numeric_password_digits >= LOTTO_COUNT_U8
             && self.lotto_next_idx >= LOTTO_COUNT
@@ -108,7 +129,7 @@ impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    fn fill_coords(&mut self) -> Result<()> {
+    pub fn fill_coords(&mut self) -> Result<()> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -130,7 +151,7 @@ where
         self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz)?;
         Ok(())
     }
-    fn fill_hangul_syllables(&mut self) -> Result<()> {
+    pub fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
@@ -167,7 +188,7 @@ where
         self.data.hangul_syllables = hangul;
         Ok(())
     }
-    fn fill_lucky_stars(&mut self) -> Result<()> {
+    pub fn fill_lucky_stars(&mut self) -> Result<()> {
         let lucky_star_base = self
             .supplemental
             .as_ref()
@@ -196,7 +217,7 @@ where
         }
         Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into())
     }
-    fn fill_nms_fields(&mut self) -> Result<()> {
+    pub fn fill_nms_fields(&mut self) -> Result<()> {
         let planet_number_base = extract_valid_bits_for_nms::<4>(
             self.num,
             &[52, 4, 0],
@@ -246,7 +267,7 @@ where
         }
         Ok(())
     }
-    fn fill_required_fields(&mut self) -> Result<()> {
+    pub fn fill_required_fields(&mut self) -> Result<()> {
         fill_data_fields_from_u64(self.num, &mut self.data);
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
             if self.data.is_complete() {
@@ -265,26 +286,6 @@ where
         Ok(*self.supplemental.insert(supplemental))
     }
 }
-pub fn build_random_data<F>(num: u64, next_supp: &mut F) -> Result<RandomDataSet>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
-    let mut state = RandomDataBuildState {
-        data: RandomDataSet {
-            num_64: num,
-            ..Default::default()
-        },
-        next_supp,
-        num,
-        supplemental: None,
-    };
-    state.fill_required_fields()?;
-    state.fill_lucky_stars()?;
-    state.fill_hangul_syllables()?;
-    state.fill_coords()?;
-    state.fill_nms_fields()?;
-    Ok(state.data)
-}
 cfg_select! {
     target_arch = "x86_64" => {
         pub fn generate_random_data() -> Result<RandomDataSet> {
@@ -292,7 +293,7 @@ cfg_select! {
             let mut next_supp = |reason: &'static str| -> Result<u64> {
                 get_hardware_random().map_err(|source| source.prepend_context(reason))
             };
-            build_random_data(num, &mut next_supp)
+            RandomDataSet::build(num, &mut next_supp)
         }
     }
     _ => {}

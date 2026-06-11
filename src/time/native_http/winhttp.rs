@@ -86,6 +86,8 @@ const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
 const WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE: u32 = 155;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
 const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
+const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
+const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
 type HInternet = *mut c_void;
 pub(super) struct Client {
     error_code_label: &'static str,
@@ -124,16 +126,16 @@ impl Drop for Handle {
 impl Client {
     fn cached_connect_ptr(
         &mut self,
-        user_agent: &[u16],
         host: &str,
         host_wide: &[u16],
         port: u16,
         context: &str,
     ) -> Result<HInternet> {
         if self.session_cache.is_none() {
+            let user_agent = wide(concat!("srg/", env!("CARGO_PKG_VERSION")), context)?;
             self.session_cache = Some(SessionCache {
                 connects: Vec::new(),
-                session: self.open_session(user_agent, context)?,
+                session: self.open_session(&user_agent, context)?,
             });
         }
         let error_code_label = self.error_code_label;
@@ -188,24 +190,20 @@ impl Client {
         parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
         let target = self.request_target(url, context)?;
-        let user_agent = wide(concat!("srg/", env!("CARGO_PKG_VERSION")), context)?;
         let host_wide = wide(&target.host, context)?;
-        let method_wide = wide("HEAD", context)?;
-        let path_wide = wide("/", context)?;
         let flags = if target.secure {
             WINHTTP_FLAG_SECURE
         } else {
             0
         };
         let connect = self.cached_connect_ptr(
-            &user_agent,
             &target.host,
             &host_wide,
             target.port,
             context,
         )?;
         let perform: Result<WinHttpHeadPerform> = (|| {
-            let request = self.open_request(connect, &method_wide, &path_wide, flags, context)?;
+            let request = self.open_request(connect, &METHOD_HEAD_WIDE, &PATH_ROOT_WIDE, flags, context)?;
             if target.secure {
                 match self.set_ignore_revocation_offline(&request) {
                     Ok(()) | Err(_) => {}

@@ -4,7 +4,7 @@ use crate::{
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
     input::{get_validated_input, read_line_reuse, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
-    random_data::build_random_data,
+    random_data::RandomDataSet,
     random_util::checked_add_one_usize,
     time,
     time::{ParsedServer, ServerTimeSession, TimeError, TriggerAction},
@@ -270,7 +270,28 @@ impl MenuApp {
             )?;
             Ok(supp)
         };
-        let data = build_random_data(manual_num_64, &mut next_supp)?;
+        let data = cfg_select! {
+            target_arch = "x86_64" => {{
+                RandomDataSet::build(manual_num_64, &mut next_supp)?
+            }}
+            _ => {{
+                let mut state = crate::random_data::RandomDataBuildState {
+                    data: RandomDataSet {
+                        num_64: manual_num_64,
+                        ..Default::default()
+                    },
+                    next_supp: &mut next_supp,
+                    num: manual_num_64,
+                    supplemental: None,
+                };
+                state.fill_required_fields()?;
+                state.fill_lucky_stars()?;
+                state.fill_hangul_syllables()?;
+                state.fill_coords()?;
+                state.fill_nms_fields()?;
+                state.data
+            }}
+        };
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
         {

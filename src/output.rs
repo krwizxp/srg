@@ -6,7 +6,7 @@ use crate::{
     random_data::RandomDataSet,
     tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER},
 };
-use core::{fmt::Write as FmtWrite, range::Range};
+use core::{array, fmt::Write as FmtWrite, range::Range};
 use std::io::Result as IoResult;
 cfg_select! {
     target_arch = "x86_64" => {
@@ -195,19 +195,13 @@ impl OutputFormatter<'_, '_, '_> {
         let head = self.cursor.take(line_len)?;
         range_slice_mut(head, 0, prefix_len)?.copy_from_slice(prefix_bytes);
         let mut pos = prefix_len;
+        let last_index = BYTE_GROUP_COUNT.checked_sub(1).ok_or_else(write_zero_err)?;
         for (index, byte) in self.bytes.into_iter().enumerate() {
             let group = render_group(byte)?;
             range_slice_mut(head, pos, group_width)?.copy_from_slice(group);
             add_to_index(&mut pos, group_width)?;
             let slot = head.get_mut(pos).ok_or_else(write_zero_err)?;
-            *slot = if BYTE_GROUP_COUNT
-                .checked_sub(1)
-                .is_some_and(|last_index| index == last_index)
-            {
-                b'\n'
-            } else {
-                b' '
-            };
+            *slot = if index == last_index { b'\n' } else { b' ' };
             add_to_index(&mut pos, 1)?;
         }
         Ok(())
@@ -385,12 +379,13 @@ fn buf_write_u8_array_spaced<const N: usize>(
     nums: &[u8; N],
 ) -> IoResult<()> {
     let separator_count = N.saturating_sub(1);
-    let total = nums.iter().try_fold(separator_count, |total, &n| {
-        checked_add_index(total, u8_dec_len(n))
+    let widths: [usize; N] = array::from_fn(|index| nums.get(index).copied().map_or(0, u8_dec_len));
+    let total = widths.iter().try_fold(separator_count, |total, &width| {
+        checked_add_index(total, width)
     })?;
     let head = cur.take(total)?;
     let mut pos = 0_usize;
-    for (index, &n) in nums.iter().enumerate() {
+    for (index, (&n, &width)) in nums.iter().zip(widths.iter()).enumerate() {
         if index != 0 {
             let Some(slot) = head.get_mut(pos) else {
                 return Err(write_zero_err());
@@ -398,7 +393,6 @@ fn buf_write_u8_array_spaced<const N: usize>(
             *slot = b' ';
             add_to_index(&mut pos, 1)?;
         }
-        let width = u8_dec_len(n);
         let slot = range_slice_mut(head, pos, width)?;
         write_u8_dec_into_slice(slot, n)?;
         add_to_index(&mut pos, width)?;
