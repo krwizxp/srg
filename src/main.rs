@@ -84,7 +84,7 @@ fn main() -> Result<ExitCode> {
                         let mut err = stderr().lock();
                         IoWrite::write_fmt(
                             &mut err,
-                            format_args!("RDSEED 10분 타임아웃으로 RDRAND로 전환했습니다.\n"),
+                            format_args!("RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.\n"),
                         )?;
                     }
                     let num_64 = data.num_64;

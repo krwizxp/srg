@@ -42,12 +42,12 @@ cfg_select! {
         const MENU: &str = concat!(
             "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), ",
             "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, ",
-            "7: num_64/supp 수동 입력 생성, 기타: 종료\n선택해 주세요: ",
+            "7: num_64/supp 수동 입력 변환, 기타: 종료\n선택해 주세요: ",
         );
     }
     _ => {
         const MENU: &str = concat!(
-            "\n5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 생성, 기타(1~4 제외): 종료\n",
+            "\n5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 변환, 기타(1~4 제외): 종료\n",
             "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
             "선택해 주세요: ",
         );
@@ -232,7 +232,7 @@ impl MenuApp {
             *lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? =
                 open_or_create_file()?;
         }
-        writeln!(out, "\nnum_64/supp 수동 입력 생성 모드")?;
+        writeln!(out, "\nnum_64/supp 수동 입력 변환 모드")?;
         self.input_buffer.clear();
         let manual_num_64 = read_u64_hex_input(
             format_args!(
@@ -544,7 +544,7 @@ fn prepare_hw_rng_menu_command(out: &mut dyn Write) -> Result<bool> {
 #[cfg(target_arch = "x86_64")]
 fn write_rdseed_fallback_notice(err: &mut dyn Write) -> Result<()> {
     if take_rdseed_fallback_notice() {
-        writeln!(err, "RDSEED 10분 타임아웃으로 RDRAND로 전환했습니다.")?;
+        writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
     }
     Ok(())
 }

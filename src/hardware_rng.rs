@@ -13,7 +13,7 @@ use std::{
 };
 const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
 const RDSEED_SPIN_BURST_RETRY_COUNT: u16 = 256;
-const RDSEED_TIMEOUT: Duration = Duration::from_mins(10);
+const RDSEED_TIMEOUT: Duration = Duration::from_mins(5);
 const RNG_SOURCE_NONE: u8 = 0;
 const RNG_SOURCE_RDRAND: u8 = 1;
 const RNG_SOURCE_RDSEED: u8 = 2;
@@ -96,7 +96,7 @@ pub fn get_hardware_random() -> Result<u64> {
                 return rdrand_random();
             }
             RNG_SOURCE.store(HardwareRandomSource::None.code(), Ordering::Relaxed);
-            Err("RDSEED 10분 타임아웃, RDRAND 미지원".into())
+            Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
         }
         HardwareRandomSource::RdRand => rdrand_random(),
         HardwareRandomSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
