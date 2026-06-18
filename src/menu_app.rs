@@ -2,7 +2,7 @@ use crate::{
     constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL},
     diagnostic::Result,
     file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
-    input::{get_validated_input, read_line_reuse, read_u64_hex_input},
+    input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_data::RandomDataSet,
     random_util::checked_add_one_usize,
@@ -12,7 +12,7 @@ use crate::{
 cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
-            batch::regenerate_with_count,
+            batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             diagnostic::AppError,
             hardware_rng::{
                 HardwareRandomSource, get_hardware_random, hardware_random_source,
@@ -37,6 +37,9 @@ use std::{
     sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
+#[cfg(target_arch = "x86_64")]
+const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
+const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
         const MENU: &str = concat!(
@@ -137,8 +140,19 @@ impl MenuApp {
         let input_buffer = &mut self.input_buffer;
         let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
         let requested_count = loop {
-            match read_line_reuse(count_prompt, input_buffer, out)?.parse::<u64>() {
+            match read_line_reuse_limited(
+                count_prompt,
+                input_buffer,
+                out,
+                BATCH_COUNT_INPUT_MAX_BYTES,
+            )?
+            .parse::<u64>()
+            {
                 Ok(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
+                Ok(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
+                    err,
+                    "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
+                )?,
                 Ok(count) => break count,
                 Err(_) => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
             }
@@ -329,10 +343,11 @@ impl MenuApp {
         let num_64 = self.num_64;
         let input_buffer = &mut self.input_buffer;
         writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
-        let selection = read_line_reuse(
+        let selection = read_line_reuse_limited(
             format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
             input_buffer,
             out,
+            MENU_SELECTION_INPUT_MAX_BYTES,
         )?;
         match selection.as_bytes() {
             b"1" => {
@@ -500,7 +515,12 @@ impl MenuApp {
         loop {
             let command = {
                 let mut prompt_out = stdout().lock();
-                match read_line_reuse(menu_prompt, &mut self.input_buffer, &mut prompt_out) {
+                match read_line_reuse_limited(
+                    menu_prompt,
+                    &mut self.input_buffer,
+                    &mut prompt_out,
+                    MENU_SELECTION_INPUT_MAX_BYTES,
+                ) {
                     Ok(command_str) if let &[command @ b'1'..=b'7'] = command_str.as_bytes() => {
                         command
                     }

@@ -6,9 +6,12 @@ cfg_select! {
         use crate::diagnostic::AppError;
         use core::range::Range;
         use super::random_util::checked_add_one_usize;
+        const LADDER_INPUT_LINE_MAX_BYTES: usize = 64 * 1024;
     }
     _ => {}
 }
+const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
+const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
         #[derive(Clone, Copy)]
@@ -19,18 +22,19 @@ cfg_select! {
     }
     _ => {}
 }
-pub fn read_line_reuse<'buffer>(
+pub fn read_line_reuse_limited<'buffer>(
     prompt: Arguments<'_>,
     buffer: &'buffer mut String,
     out: &mut dyn Write,
+    max_bytes: usize,
 ) -> IoResult<&'buffer str> {
     buffer.clear();
     out.write_fmt(prompt)?;
     out.flush()?;
-    read_line_unbounded(buffer)?;
+    read_line_limited(buffer, max_bytes)?;
     Ok(buffer.trim())
 }
-fn read_line_unbounded(buffer: &mut String) -> IoResult<()> {
+fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
     let bytes = {
         let mut stdin_lock = stdin().lock();
         let mut bytes = Vec::new();
@@ -50,6 +54,33 @@ fn read_line_unbounded(buffer: &mut String) -> IoResult<()> {
             let segment = available
                 .get(..take_len)
                 .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
+            if bytes
+                .len()
+                .checked_add(segment.len())
+                .is_none_or(|next_len| next_len > max_bytes)
+            {
+                stdin_lock.consume(take_len);
+                if line_end.is_none() {
+                    loop {
+                        let discard_available = stdin_lock.fill_buf()?;
+                        if discard_available.is_empty() {
+                            break;
+                        }
+                        let extra_line_end =
+                            discard_available.iter().position(|&byte| byte == b'\n');
+                        let extra_take_len = extra_line_end
+                            .map_or(discard_available.len(), |index| index.saturating_add(1));
+                        stdin_lock.consume(extra_take_len);
+                        if extra_line_end.is_some() {
+                            break;
+                        }
+                    }
+                }
+                return Err(IoError::new(
+                    ErrorKind::InvalidInput,
+                    format!("입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."),
+                ));
+            }
             bytes.try_reserve(segment.len()).map_err(IoError::other)?;
             bytes.extend_from_slice(segment);
             stdin_lock.consume(take_len);
@@ -71,7 +102,7 @@ pub fn read_u64_hex_input(
     err: &mut dyn Write,
 ) -> Result<u64> {
     loop {
-        let raw = read_line_reuse(prompt, input_buffer, out)?;
+        let raw = read_line_reuse_limited(prompt, input_buffer, out, HEX_INPUT_LINE_MAX_BYTES)?;
         match raw
             .strip_prefix('0')
             .and_then(|body| body.strip_prefix(['x', 'X']))
@@ -102,7 +133,7 @@ where
         out.write_all(prompt.as_bytes())?;
         out.flush()?;
         input_buf.clear();
-        read_line_unbounded(input_buf)?;
+        read_line_limited(input_buf, DEFAULT_INPUT_LINE_MAX_BYTES)?;
         let trimmed = input_buf.trim();
         match validator(trimmed) {
             Ok(value) => return Ok(value),
@@ -138,7 +169,8 @@ cfg_select! {
             let (out, err) = io;
             let index_err = || AppError::message(index_error);
             let count = loop {
-                let line = read_line_reuse(prompt, input_buffer, out)?;
+                let line =
+                    read_line_reuse_limited(prompt, input_buffer, out, LADDER_INPUT_LINE_MAX_BYTES)?;
                 let mut count = 0_usize;
                 let mut players_overflowed = false;
                 let mut trimmed_ranges: [Range<usize>; N] = [Range { start: 0, end: 0 }; N];
@@ -235,7 +267,12 @@ cfg_select! {
             F: FnMut(&str) -> Option<T>,
         {
             loop {
-                let line = read_line_reuse(prompt, buffer, out)?;
+                let line = read_line_reuse_limited(
+                    prompt,
+                    buffer,
+                    out,
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                )?;
                 if let Some(value) = parse(line) {
                     return Ok(value);
                 }

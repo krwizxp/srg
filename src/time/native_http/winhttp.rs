@@ -86,6 +86,7 @@ const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
 const WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE: u32 = 155;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
 const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
+const HTTP_HEAD_MAX_HEADER_BYTES: usize = 64 * 1024;
 const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
 const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
 type HInternet = *mut c_void;
@@ -292,8 +293,11 @@ impl Client {
             return Err(error(context, "WinHTTP timeout 변환 실패"));
         };
         // SAFETY: session is a valid WinHTTP session handle.
-        unsafe {
-            sys::WinHttpSetTimeouts(session.0.as_ptr(), timeout, timeout, timeout, timeout);
+        let timeout_ok = unsafe {
+            sys::WinHttpSetTimeouts(session.0.as_ptr(), timeout, timeout, timeout, timeout)
+        };
+        if timeout_ok == 0_i32 {
+            return Err(self.last_error("WinHttpSetTimeouts", context));
         }
         Ok(session)
     }
@@ -325,8 +329,18 @@ impl Client {
         if last_error_code != ERROR_INSUFFICIENT_BUFFER {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
-        let units = usize::try_from(bytes)
-            .map_err(|source| error(context, format!("응답 헤더 길이 변환 실패: {source}")))?
+        let header_bytes = usize::try_from(bytes)
+            .map_err(|source| error(context, format!("응답 헤더 길이 변환 실패: {source}")))?;
+        if header_bytes > HTTP_HEAD_MAX_HEADER_BYTES {
+            return Err(error(context, format!("응답 헤더가 허용 한도({HTTP_HEAD_MAX_HEADER_BYTES} bytes)를 초과했습니다.")));
+        }
+        if !header_bytes.is_multiple_of(2) {
+            return Err(error(
+                context,
+                "응답 헤더 UTF-16 버퍼 길이가 2바이트 단위가 아닙니다.",
+            ));
+        }
+        let units = header_bytes
             .checked_div(2)
             .ok_or_else(|| error(context, "응답 헤더 길이 계산 실패"))?;
         let mut buffer = Vec::new();
