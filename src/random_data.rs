@@ -129,7 +129,7 @@ impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    fn fill_coords(&mut self) -> Result<()> {
+    pub fn fill_coords(&mut self) -> Result<()> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -151,7 +151,7 @@ where
         self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz)?;
         Ok(())
     }
-    fn fill_hangul_syllables(&mut self) -> Result<()> {
+    pub fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
@@ -188,7 +188,7 @@ where
         self.data.hangul_syllables = hangul;
         Ok(())
     }
-    fn fill_lucky_stars(&mut self) -> Result<()> {
+    pub fn fill_lucky_stars(&mut self) -> Result<()> {
         let lucky_star_base = self
             .supplemental
             .as_ref()
@@ -217,7 +217,7 @@ where
         }
         Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into())
     }
-    fn fill_nms_fields(&mut self) -> Result<()> {
+    pub fn fill_nms_fields(&mut self) -> Result<()> {
         let planet_number_base = extract_valid_bits_for_nms::<4>(
             self.num,
             &[52, 4, 0],
@@ -267,7 +267,7 @@ where
         }
         Ok(())
     }
-    fn fill_required_fields(&mut self) -> Result<()> {
+    pub fn fill_required_fields(&mut self) -> Result<()> {
         fill_data_fields_from_u64(self.num, &mut self.data);
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
             if self.data.is_complete() {
