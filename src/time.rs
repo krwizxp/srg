@@ -15,7 +15,7 @@ use crate::{buffmt::ByteCursor, write_line_best_effort};
 use alloc::{borrow::Cow, fmt, sync::Arc};
 use core::{
     error::Error, fmt::Write as FmtWrite, ops::Mul as NumericMul, range::Range,
-    result::Result as CoreResult, time::Duration,
+    result::Result as CoreResult, str::FromStr, time::Duration,
 };
 use std::{
     io::{
@@ -108,6 +108,9 @@ const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
 const KST_OFFSET: Duration = Duration::from_hours(9);
 pub const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
+const KST_SECONDS_PER_MINUTE_U32: u32 = 60;
+const KST_SECONDS_PER_HOUR_U32: u32 = 60 * KST_SECONDS_PER_MINUTE_U32;
+const KST_SECONDS_PER_DAY_U64: u64 = 86_400;
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const COUNTDOWN_DELAY_ERROR: &str = "카운트다운 지연 계산 실패";
@@ -162,10 +165,13 @@ pub struct ParsedServer {
     secure_url: String,
     tcp_host_header: String,
 }
+pub struct TargetTimeOfDay {
+    seconds_after_midnight: u32,
+}
 pub struct ServerTimeSession {
     pub host: ParsedServer,
     pub now: Instant,
-    pub target_time: Option<SystemTime>,
+    pub target_time: Option<TargetTimeOfDay>,
     pub trigger_action: Option<TriggerAction>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -189,6 +195,50 @@ struct ServerTime {
     anchor_instant: Instant,
     anchor_time: SystemTime,
     baseline_rtt: Duration,
+}
+impl FromStr for TargetTimeOfDay {
+    type Err = &'static str;
+    fn from_str(raw_input: &str) -> CoreResult<Self, Self::Err> {
+        const INVALID_TIME_INPUT_ERR: &str =
+            "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
+        let Some((hour_str, minute_second)) = raw_input.split_once(':') else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        let Some((minute_str, second_str)) = minute_second.split_once(':') else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        if second_str.contains(':') {
+            return Err(INVALID_TIME_INPUT_ERR);
+        }
+        let (Ok(hour), Ok(minute), Ok(second)) = (
+            hour_str.parse::<u32>(),
+            minute_str.parse::<u32>(),
+            second_str.parse::<u32>(),
+        ) else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        if !(hour <= 23 && minute <= 59 && second <= 59) {
+            return Err(INVALID_TIME_INPUT_ERR);
+        }
+        let Some(hour_secs) = hour.checked_mul(KST_SECONDS_PER_HOUR_U32) else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        let Some(minute_secs) = minute.checked_mul(KST_SECONDS_PER_MINUTE_U32) else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        let Some(seconds_after_midnight) = hour_secs
+            .checked_add(minute_secs)
+            .and_then(|value| value.checked_add(second))
+        else {
+            return Err(INVALID_TIME_INPUT_ERR);
+        };
+        if seconds_after_midnight >= 86_400 {
+            return Err(INVALID_TIME_INPUT_ERR);
+        }
+        Ok(Self {
+            seconds_after_midnight,
+        })
+    }
 }
 impl TimeError {
     fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
@@ -275,6 +325,7 @@ struct AppState {
     last_sample: Option<TimeSample>,
     live_rtt: Option<Duration>,
     next_full_sync_at: Instant,
+    pending_target_time: Option<TargetTimeOfDay>,
     server_time: Option<ServerTime>,
     target_time: Option<SystemTime>,
     trigger_action: Option<TriggerAction>,
@@ -304,10 +355,17 @@ struct CachedTcpSocketAddr {
     host: String,
     port: u16,
 }
+struct CachedTcpConnection {
+    host: String,
+    port: u16,
+    reader: io::BufReader<net::TcpStream>,
+}
 struct NetworkContext {
+    cached_tcp_connection: Option<CachedTcpConnection>,
     cached_tcp_socket_addr: Option<CachedTcpSocketAddr>,
     native_http: native_http::NativeHttp,
     tcp_line_buffer: Vec<u8>,
+    tcp_request_buffer: Vec<u8>,
 }
 impl Drop for FinalCountdownSampler {
     fn drop(&mut self) {
@@ -320,10 +378,16 @@ impl NetworkContext {
         tcp_line_buffer
             .try_reserve(TCP_LINE_BUFFER_CAPACITY)
             .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
+        let mut tcp_request_buffer = Vec::new();
+        tcp_request_buffer
+            .try_reserve(TCP_LINE_BUFFER_CAPACITY)
+            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
         Ok(Self {
+            cached_tcp_connection: None,
             cached_tcp_socket_addr: None,
             native_http: native_http::NativeHttp::default(),
             tcp_line_buffer,
+            tcp_request_buffer,
         })
     }
 }
@@ -350,8 +414,9 @@ impl ServerTimeSession {
             last_sample: None,
             live_rtt: None,
             next_full_sync_at: self.now,
+            pending_target_time: self.target_time,
             server_time: None,
-            target_time: self.target_time,
+            target_time: None,
             trigger_action: self.trigger_action,
         };
         app_state.run_loop(out, err)
@@ -437,6 +502,63 @@ impl AppState {
         });
         Ok(())
     }
+    fn confirm_pending_target_time(
+        &mut self,
+        server_time: ServerTime,
+        now: Instant,
+        msg_buf: &mut String,
+    ) -> Result<()> {
+        let Some(target_time_of_day) = self.pending_target_time.as_ref() else {
+            return Ok(());
+        };
+        let current_server_time = server_time.current_server_time_at(now);
+        let since_epoch = current_server_time.duration_since(UNIX_EPOCH)?;
+        let kst_epoch_secs = since_epoch
+            .as_secs()
+            .checked_add(KST_OFFSET_SECS_U64)
+            .ok_or_else(|| TimeError::parse("KST 현재 시각 계산 중 overflow가 발생했습니다."))?;
+        let current_kst_second = u32::try_from(kst_epoch_secs.rem_euclid(KST_SECONDS_PER_DAY_U64))
+            .map_err(|source| TimeError::parse(format!("KST 초 변환 실패: {source}")))?;
+        let current_kst_day = kst_epoch_secs.div_euclid(KST_SECONDS_PER_DAY_U64);
+        let target_day = if target_time_of_day.seconds_after_midnight >= current_kst_second {
+            current_kst_day
+        } else {
+            current_kst_day.checked_add(1).ok_or_else(|| {
+                TimeError::parse("다음날 목표 날짜 계산 중 overflow가 발생했습니다.")
+            })?
+        };
+        let target_kst_epoch_secs = target_day
+            .checked_mul(KST_SECONDS_PER_DAY_U64)
+            .and_then(|day_start| {
+                day_start.checked_add(u64::from(target_time_of_day.seconds_after_midnight))
+            })
+            .ok_or_else(|| TimeError::parse("목표 시각 계산 중 overflow가 발생했습니다."))?;
+        let target_utc_epoch_secs = target_kst_epoch_secs
+            .checked_sub(KST_OFFSET_SECS_U64)
+            .ok_or_else(|| TimeError::parse("목표 UTC 시각 계산 중 underflow가 발생했습니다."))?;
+        let target_system_time = UNIX_EPOCH
+            .checked_add(Duration::from_secs(target_utc_epoch_secs))
+            .ok_or_else(|| TimeError::parse("목표 절대 시각 계산 중 범위 오류가 발생했습니다."))?;
+        let day_index = i32::try_from(target_day)
+            .map_err(|source| TimeError::parse(format!("목표 날짜 변환 실패: {source}")))?;
+        let CivilDate { day, month, year } = http_date::civil_from_days(day_index)
+            .ok_or_else(|| TimeError::parse("목표 날짜 계산 중 범위 오류가 발생했습니다."))?;
+        let seconds = target_time_of_day.seconds_after_midnight;
+        let hour = seconds.div_euclid(KST_SECONDS_PER_HOUR_U32);
+        let minute = seconds
+            .rem_euclid(KST_SECONDS_PER_HOUR_U32)
+            .div_euclid(KST_SECONDS_PER_MINUTE_U32);
+        let second = seconds.rem_euclid(KST_SECONDS_PER_MINUTE_U32);
+        self.pending_target_time = None;
+        self.target_time = Some(target_system_time);
+        append_fmt(
+            msg_buf,
+            format_args!(
+                "\n목표 시각 확정(KST): {year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}"
+            ),
+        );
+        Ok(())
+    }
     fn disable_final_countdown_sampling(&mut self) {
         self.final_countdown_sampler = None;
         self.final_countdown_sampler_unavailable = true;
@@ -514,7 +636,7 @@ impl AppState {
     }
     fn handle_calibrate_on_tick<'message>(
         &mut self,
-        _msg_buf: &'message mut str,
+        msg_buf: &'message mut String,
         net_ctx: &mut NetworkContext,
     ) -> ActivityTransition<'message> {
         let Ok(current_sample) = fetch_server_time_sample(&self.host, net_ctx) else {
@@ -569,6 +691,19 @@ impl AppState {
                     return transition_to_retry("다음 전체 동기화 시각 계산 실패.");
                 };
                 self.next_full_sync_at = next_full_sync_at;
+                if self.pending_target_time.is_some() {
+                    msg_buf.push_str("[성공] 정밀 보정 완료!");
+                    if let Err(target_err) =
+                        self.confirm_pending_target_time(server_time, Instant::now(), msg_buf)
+                    {
+                        append_error_detail(msg_buf, "\n목표 시각 확정 실패: ", target_err);
+                        return transition_to_retry(msg_buf);
+                    }
+                    return ActivityTransition {
+                        activity: Activity::Predicting,
+                        message: Some(msg_buf),
+                    };
+                }
                 return ActivityTransition {
                     activity: Activity::Predicting,
                     message: Some("[성공] 정밀 보정 완료!"),

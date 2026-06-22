@@ -59,8 +59,10 @@ struct CurlBodySink {
 }
 struct CurlHeaderCapture {
     bytes_seen: usize,
+    current_block_date: Option<String>,
     date_header: Option<String>,
     error: Option<Cow<'static, str>>,
+    in_header_block: bool,
     limit: usize,
     pending_line: Vec<u8>,
 }
@@ -159,8 +161,10 @@ impl Client {
         let mut body_sink = CurlBodySink { bytes_seen: 0, error: None, limit: HTTP_HEAD_MAX_BODY_BYTES };
         let mut header_capture = CurlHeaderCapture {
             bytes_seen: 0,
+            current_block_date: None,
             date_header: None,
             error: None,
+            in_header_block: false,
             limit: HTTP_HEAD_MAX_HEADER_BYTES,
             pending_line: Vec::new(),
         };
@@ -296,7 +300,23 @@ impl CurlHeaderCapture {
         true
     }
     fn capture_pending(&mut self) -> bool {
-        let date_header_raw = match find_date_header_value(&self.pending_line) {
+        let line = trim_http_header_line(&self.pending_line);
+        if line.starts_with(b"HTTP/") {
+            self.current_block_date = None;
+            self.in_header_block = true;
+            return true;
+        }
+        if line.is_empty() {
+            if self.in_header_block {
+                self.date_header = self.current_block_date.take();
+                self.in_header_block = false;
+            }
+            return true;
+        }
+        if !self.in_header_block {
+            return true;
+        }
+        let date_header_raw = match find_date_header_value(line) {
             Ok(Some(value)) => value,
             Ok(None) => return true,
             Err(source) => {
@@ -314,9 +334,13 @@ impl CurlHeaderCapture {
             return false;
         }
         date_header.push_str(date_header_raw);
-        self.date_header = Some(date_header);
+        self.current_block_date = Some(date_header);
         true
     }
+}
+fn trim_http_header_line(line: &[u8]) -> &[u8] {
+    let without_lf = line.strip_suffix(b"\n").unwrap_or(line);
+    without_lf.strip_suffix(b"\r").unwrap_or(without_lf)
 }
 fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.

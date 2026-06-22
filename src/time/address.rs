@@ -54,8 +54,11 @@ impl ParsedServer {
     pub(super) const fn port(&self) -> u16 {
         self.port
     }
-    pub(super) const fn scheme(&self) -> Option<UrlScheme> {
-        self.scheme
+    pub(super) const fn scheme(&self) -> UrlScheme {
+        match self.scheme {
+            Some(scheme) => scheme,
+            None => UrlScheme::Https,
+        }
     }
     pub(super) fn tcp_host_header_value(&self) -> &str {
         &self.tcp_host_header
@@ -92,10 +95,10 @@ impl FromStr for ParsedServer {
         if after_scheme.is_empty() || after_scheme.contains(|ch: char| ch.is_ascii_whitespace()) {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let default_port = if scheme == Some(UrlScheme::Https) {
-            DEFAULT_HTTPS_PORT
-        } else {
+        let default_port = if scheme == Some(UrlScheme::Http) {
             DEFAULT_HTTP_PORT
+        } else {
+            DEFAULT_HTTPS_PORT
         };
         let authority_parts = if let Some(bracketed) = after_scheme.strip_prefix('[') {
             let (host_part, rem) = bracketed

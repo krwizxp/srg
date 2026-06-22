@@ -6,8 +6,7 @@ use crate::{
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_data::RandomDataSet,
     random_util::checked_add_one_usize,
-    time,
-    time::{ParsedServer, ServerTimeSession, TimeError, TriggerAction},
+    time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -28,14 +27,14 @@ cfg_select! {
     _ => {}
 }
 use alloc::borrow::Cow;
-use core::{result::Result as CoreResult, time::Duration};
+use core::result::Result as CoreResult;
 use std::{
     fs::{self, File},
     io::{BufWriter, ErrorKind, Write, stderr, stdout},
     path::Path,
     process::ExitCode,
     sync::Mutex,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::Instant,
 };
 #[cfg(target_arch = "x86_64")]
 const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
@@ -56,9 +55,7 @@ cfg_select! {
         );
     }
 }
-const KST_SECS_PER_HOUR_U64: u64 = 3_600;
-const KST_SECS_PER_MINUTE_U64: u64 = 60;
-const KST_SECS_PER_DAY_U64: u64 = 24 * KST_SECS_PER_HOUR_U64;
+
 cfg_select! {
     target_arch = "x86_64" => {
         pub struct MenuApp {
@@ -368,7 +365,8 @@ impl MenuApp {
         let time_run_result = (|| -> CoreResult<(), TimeError> {
             let host = self.read_server_host(out)?;
             let target_time = self.read_target_time(out)?;
-            let trigger_action = self.read_trigger_action(out, target_time)?;
+            let has_target_time = target_time.is_some();
+            let trigger_action = self.read_trigger_action(out, has_target_time)?;
             let now = Instant::now();
             ServerTimeSession {
                 host,
@@ -389,7 +387,7 @@ impl MenuApp {
     }
     fn read_server_host(&mut self, out: &mut dyn Write) -> CoreResult<ParsedServer, TimeError> {
         Ok(get_validated_input(
-            "확인할 서버 주소를 입력하세요 (예: www.example.com): ",
+            "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
             &mut self.input_buffer,
             out,
             |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
@@ -405,95 +403,25 @@ impl MenuApp {
     fn read_target_time(
         &mut self,
         out: &mut dyn Write,
-    ) -> CoreResult<Option<SystemTime>, TimeError> {
-        const INVALID_TIME_INPUT_ERR: &str =
-            "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
+    ) -> CoreResult<Option<TargetTimeOfDay>, TimeError> {
         Ok(get_validated_input(
             "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
             &mut self.input_buffer,
             out,
-            |raw_input| -> CoreResult<Option<SystemTime>, &'static str> {
+            |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
                 if raw_input.is_empty() {
                     return Ok(None);
                 }
-                let Some((hour_str, minute_second)) = raw_input.split_once(':') else {
-                    return Err(INVALID_TIME_INPUT_ERR);
-                };
-                let Some((minute_str, second_str)) = minute_second.split_once(':') else {
-                    return Err(INVALID_TIME_INPUT_ERR);
-                };
-                if second_str.contains(':') {
-                    return Err(INVALID_TIME_INPUT_ERR);
-                }
-                let (Ok(hour), Ok(minute), Ok(second)) = (
-                    hour_str.parse::<u32>(),
-                    minute_str.parse::<u32>(),
-                    second_str.parse::<u32>(),
-                ) else {
-                    return Err(INVALID_TIME_INPUT_ERR);
-                };
-                if !(hour <= 23 && minute <= 59 && second <= 59) {
-                    return Err(INVALID_TIME_INPUT_ERR);
-                }
-                let Ok(now_local) = SystemTime::now().duration_since(UNIX_EPOCH) else {
-                    return Err("시간 계산 오류: 시스템 시간이 UNIX EPOCH보다 이전입니다.");
-                };
-                let Some(shifted_secs) = now_local.as_secs().checked_add(time::KST_OFFSET_SECS_U64)
-                else {
-                    return Err("시간 계산 오류: 현재 시각 계산 실패");
-                };
-                let today_days = shifted_secs.div_euclid(KST_SECS_PER_DAY_U64);
-                let Some(today_start_base) = today_days.checked_mul(KST_SECS_PER_DAY_U64) else {
-                    return Err("시간 계산 오류: 오늘 날짜 경계 계산 실패");
-                };
-                let Some(today_start_secs_utc) =
-                    today_start_base.checked_sub(time::KST_OFFSET_SECS_U64)
-                else {
-                    return Err("시간 계산 오류: 오늘 날짜 경계 계산 실패");
-                };
-                let Some(hour_secs) = u64::from(hour).checked_mul(KST_SECS_PER_HOUR_U64) else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                let Some(minute_secs) = u64::from(minute).checked_mul(KST_SECS_PER_MINUTE_U64)
-                else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                let Some(hour_and_minute_secs) = hour_secs.checked_add(minute_secs) else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                let Some(target_secs_of_day) = hour_and_minute_secs.checked_add(u64::from(second))
-                else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                let Some(target_epoch_secs) = today_start_secs_utc.checked_add(target_secs_of_day)
-                else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                let Some(current_time) = SystemTime::UNIX_EPOCH.checked_add(now_local) else {
-                    return Err("시간 계산 오류: 현재 시각 계산 실패");
-                };
-                let Some(mut target_time) =
-                    UNIX_EPOCH.checked_add(Duration::from_secs(target_epoch_secs))
-                else {
-                    return Err("시간 계산 오류: 목표 시각 계산 실패");
-                };
-                if current_time > target_time {
-                    let Some(next_day_time) = target_time.checked_add(Duration::from_hours(24))
-                    else {
-                        return Err("시간 계산 오류: 다음날 목표 시각 계산 실패");
-                    };
-                    target_time = next_day_time;
-                }
-                Ok(Some(target_time))
+                raw_input.parse::<TargetTimeOfDay>().map(Some)
             },
         )?)
     }
     fn read_trigger_action(
         &mut self,
         out: &mut dyn Write,
-        target_time: Option<SystemTime>,
+        has_target_time: bool,
     ) -> CoreResult<Option<TriggerAction>, TimeError> {
-        if target_time.is_none() {
+        if !has_target_time {
             return Ok(None);
         }
         let action = get_validated_input(
