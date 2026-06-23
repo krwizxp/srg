@@ -6,6 +6,7 @@ use core::{
     num::NonZero,
     ptr::{NonNull, null},
 };
+use super::NativeInputSendStatus;
 use std::io;
 mod sys {
     use super::{c_char, c_int, c_void};
@@ -278,10 +279,14 @@ impl PreparedInput {
     pub(super) fn reset(&mut self) {
         self.prepared = None;
     }
-    pub(super) fn send(&mut self, action: InputAction, err: &mut dyn io::Write) {
+    pub(super) fn send(
+        &mut self,
+        action: InputAction,
+        err: &mut dyn io::Write,
+    ) -> NativeInputSendStatus {
         if let Some(mut prepared) = self.prepared.take() {
             match prepared.send(action) {
-                Ok(()) => return,
+                Ok(()) => return NativeInputSendStatus::Sent,
                 Err(PreparedSendError::RetrySafe(prepared_error)) => {
                     match send_fresh(action) {
                         Ok(()) => write_line_best_effort(
@@ -290,14 +295,26 @@ impl PreparedInput {
                                 "[경고] Linux native 입력 사전 준비 경로 실패, 즉시 재시도 완료: {prepared_error}"
                             ),
                         ),
-                        Err(fresh_error) => write_line_best_effort(
-                            err,
-                            format_args!(
-                                "[경고] Linux native 입력 사전 준비 경로 실패: {prepared_error}; 즉시 재시도 실패: {fresh_error}"
-                            ),
-                        ),
+                        Err(PreparedSendError::RetrySafe(fresh_error)) => {
+                            write_line_best_effort(
+                                err,
+                                format_args!(
+                                    "[경고] Linux native 입력 사전 준비 경로 실패: {prepared_error}; 즉시 재시도 실패: {fresh_error}"
+                                ),
+                            );
+                            return NativeInputSendStatus::FailedBeforeSend;
+                        }
+                        Err(PreparedSendError::Partial(fresh_error)) => {
+                            write_line_best_effort(
+                                err,
+                                format_args!(
+                                    "[경고] Linux native 입력 사전 준비 경로 실패: {prepared_error}; 즉시 재시도 중 부분 실패: {fresh_error}"
+                                ),
+                            );
+                            return NativeInputSendStatus::PartialOrUnknown;
+                        }
                     }
-                    return;
+                    return NativeInputSendStatus::Sent;
                 }
                 Err(PreparedSendError::Partial(prepared_error)) => {
                     write_line_best_effort(
@@ -306,24 +323,32 @@ impl PreparedInput {
                             "[경고] Linux native 입력 사전 준비 경로 부분 실패, 중복 입력 방지를 위해 재시도 생략: {prepared_error}"
                         ),
                     );
+                    return NativeInputSendStatus::PartialOrUnknown;
                 }
             }
-            return;
         }
         match send_fresh(action) {
-            Ok(()) => {}
-            Err(source) => write_line_best_effort(
-                err,
-                format_args!("[경고] Linux native 입력 실패: {source}"),
-            ),
+            Ok(()) => NativeInputSendStatus::Sent,
+            Err(PreparedSendError::RetrySafe(source)) => {
+                write_line_best_effort(
+                    err,
+                    format_args!("[경고] Linux native 입력 실패: {source}"),
+                );
+                NativeInputSendStatus::FailedBeforeSend
+            }
+            Err(PreparedSendError::Partial(source)) => {
+                write_line_best_effort(
+                    err,
+                    format_args!("[경고] Linux native 입력 부분 실패: {source}"),
+                );
+                NativeInputSendStatus::PartialOrUnknown
+            }
         }
     }
 }
-fn send_fresh(action: InputAction) -> InputResult<()> {
-    let mut prepared = PreparedX11Input::open(action)?;
-    prepared.send(action).map_err(|error| match error {
-        PreparedSendError::Partial(source) | PreparedSendError::RetrySafe(source) => source,
-    })
+fn send_fresh(action: InputAction) -> Result<(), PreparedSendError> {
+    let mut prepared = PreparedX11Input::open(action).map_err(PreparedSendError::RetrySafe)?;
+    prepared.send(action)
 }
 fn dl_error_message() -> InputError {
     // SAFETY: dlerror has no preconditions and returns a thread-local C string or null.

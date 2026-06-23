@@ -60,7 +60,9 @@ struct CurlBodySink {
 struct CurlHeaderCapture {
     bytes_seen: usize,
     current_block_date: Option<String>,
+    current_block_date_received_inst: Option<Instant>,
     date_header: Option<String>,
+    date_received_inst: Option<Instant>,
     error: Option<Cow<'static, str>>,
     in_header_block: bool,
     limit: usize,
@@ -149,12 +151,8 @@ impl Client {
         context: &str,
         parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
-        let url_c = CString::new(url).map_err(|source| {
-            error(
-                context,
-                format!("URL에 NUL 문자가 포함되어 있습니다: {source}"),
-            )
-        })?;
+        let url_c = CString::new(url)
+            .map_err(|source| error(context, format!("URL에 NUL 문자가 포함되어 있습니다: {source}")))?;
         let user_agent = CStr::from_bytes_with_nul(USER_AGENT_C_BYTES)
             .map_err(|source| error(context, format!("User-Agent C string 해석 실패: {source}")))?;
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
@@ -162,7 +160,9 @@ impl Client {
         let mut header_capture = CurlHeaderCapture {
             bytes_seen: 0,
             current_block_date: None,
+            current_block_date_received_inst: None,
             date_header: None,
+            date_received_inst: None,
             error: None,
             in_header_block: false,
             limit: HTTP_HEAD_MAX_HEADER_BYTES,
@@ -203,21 +203,13 @@ impl Client {
             let request_start = Instant::now();
             let perform_code = handle.perform();
             let response_received = Instant::now();
-            CurlHeadPerform {
-                code: perform_code,
-                request_start,
-                response_received,
-            }
+            CurlHeadPerform { code: perform_code, request_start, response_received }
         };
         if !header_capture.pending_line.is_empty() {
             header_capture.capture_pending();
             header_capture.pending_line.clear();
         }
-        if let Some(callback_error) = body_sink
-            .error
-            .take()
-            .or_else(|| header_capture.error.take())
-        {
+        if let Some(callback_error) = body_sink.error.take().or_else(|| header_capture.error.take()) {
             self.clear_reusable_handle();
             return Err(error(context, callback_error));
         }
@@ -240,13 +232,13 @@ impl Client {
             return Err(super::TimeError::header_not_found(format!("{context} 응답에서 Date")));
         };
         let server_time = parse_http_date(date_header_raw)?;
-        let rtt = perform_result
-            .response_received
+        let response_received_inst = header_capture.date_received_inst.unwrap_or(perform_result.response_received);
+        let http_elapsed = response_received_inst
             .saturating_duration_since(perform_result.request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
-            response_received_inst: perform_result.response_received,
-            rtt,
+            response_received_inst,
+            rtt: http_elapsed,
             server_time,
         })
     }
@@ -300,15 +292,21 @@ impl CurlHeaderCapture {
         true
     }
     fn capture_pending(&mut self) -> bool {
-        let line = trim_http_header_line(&self.pending_line);
+        let without_lf = self
+            .pending_line
+            .strip_suffix(b"\n")
+            .unwrap_or(&self.pending_line);
+        let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
         if line.starts_with(b"HTTP/") {
             self.current_block_date = None;
+            self.current_block_date_received_inst = None;
             self.in_header_block = true;
             return true;
         }
         if line.is_empty() {
             if self.in_header_block {
                 self.date_header = self.current_block_date.take();
+                self.date_received_inst = self.current_block_date_received_inst.take();
                 self.in_header_block = false;
             }
             return true;
@@ -335,12 +333,9 @@ impl CurlHeaderCapture {
         }
         date_header.push_str(date_header_raw);
         self.current_block_date = Some(date_header);
+        self.current_block_date_received_inst = Some(Instant::now());
         true
     }
-}
-fn trim_http_header_line(line: &[u8]) -> &[u8] {
-    let without_lf = line.strip_suffix(b"\n").unwrap_or(line);
-    without_lf.strip_suffix(b"\r").unwrap_or(without_lf)
 }
 fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.

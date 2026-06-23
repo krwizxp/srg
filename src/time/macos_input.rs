@@ -1,4 +1,5 @@
 use crate::write_line_best_effort;
+use super::NativeInputSendStatus;
 use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
@@ -168,7 +169,11 @@ impl PreparedInput {
     pub(super) const fn reset(&mut self) {
         *self = Self;
     }
-    pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
+    pub(super) fn send(
+        &mut self,
+        action: InputAction,
+        err: &mut dyn Write,
+    ) -> NativeInputSendStatus {
         *self = Self;
         let result: InputResult<()> = (|| {
             match action {
@@ -199,8 +204,15 @@ impl PreparedInput {
             }
             Ok(())
         })();
-        if let Err(source) = result {
-            write_line_best_effort(err, format_args!("[경고] macOS native 입력 실패: {source}"));
+        match result {
+            Ok(()) => NativeInputSendStatus::PartialOrUnknown,
+            Err(source) => {
+                write_line_best_effort(
+                    err,
+                    format_args!("[경고] macOS native 입력 실패: {source}"),
+                );
+                NativeInputSendStatus::FailedBeforeSend
+            }
         }
     }
 }

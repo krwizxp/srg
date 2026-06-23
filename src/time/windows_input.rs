@@ -1,4 +1,5 @@
 use crate::write_line_best_effort;
+use super::NativeInputSendStatus;
 use core::mem::size_of;
 use std::io::Write;
 mod sys {
@@ -69,7 +70,11 @@ impl PreparedInput {
     pub(super) const fn reset(&mut self) {
         *self = Self;
     }
-    pub(super) fn send(&mut self, action: InputAction, err: &mut dyn Write) {
+    pub(super) fn send(
+        &mut self,
+        action: InputAction,
+        err: &mut dyn Write,
+    ) -> NativeInputSendStatus {
         *self = Self;
         match action {
             InputAction::MouseClick => {
@@ -78,7 +83,7 @@ impl PreparedInput {
                     mouse_input(MOUSEEVENTF_LEFTDOWN),
                     release,
                 ];
-                send_input_events(&inputs, Some(&release), err);
+                send_input_events(&inputs, Some(&release), err)
             }
             InputAction::F5Press => {
                 let release = keyboard_input(VK_F5, KEYEVENTF_KEYUP);
@@ -86,7 +91,7 @@ impl PreparedInput {
                     keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
                     release,
                 ];
-                send_input_events(&inputs, Some(&release), err);
+                send_input_events(&inputs, Some(&release), err)
             }
         }
     }
@@ -114,20 +119,27 @@ fn mouse_input(dw_flags: u32) -> Input {
         },
     }
 }
-fn send_input_events(inputs: &[Input], release_input: Option<&Input>, err: &mut dyn Write) {
+fn send_input_events(
+    inputs: &[Input],
+    release_input: Option<&Input>,
+    err: &mut dyn Write,
+) -> NativeInputSendStatus {
     let Ok(input_count) = u32::try_from(inputs.len()) else {
         write_line_best_effort(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
-        return;
+        return NativeInputSendStatus::FailedBeforeSend;
     };
     let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
         write_line_best_effort(
             err,
             format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
         );
-        return;
+        return NativeInputSendStatus::FailedBeforeSend;
     };
     // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
     let sent = unsafe { sys::SendInput(input_count, inputs.as_ptr(), input_size) };
+    if sent == input_count {
+        return NativeInputSendStatus::Sent;
+    }
     if sent != input_count {
         write_line_best_effort(
             err,
@@ -145,5 +157,10 @@ fn send_input_events(inputs: &[Input], release_input: Option<&Input>, err: &mut 
                 );
             }
         }
+    }
+    if sent == 0 {
+        NativeInputSendStatus::FailedBeforeSend
+    } else {
+        NativeInputSendStatus::PartialOrUnknown
     }
 }
