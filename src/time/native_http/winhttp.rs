@@ -1,6 +1,8 @@
 use super::{
     HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, TimeError, error,
-    find_date_header_value,
+};
+use super::super::sample::{
+    find_age_header_value, find_date_header_value, validate_http_age_value,
 };
 use alloc::{string::String, vec::Vec};
 use core::{
@@ -81,9 +83,25 @@ const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTPS_SCHEME_PREFIX: &str = "https://";
 const INTERNET_DEFAULT_HTTP_PORT: u16 = 80;
 const INTERNET_DEFAULT_HTTPS_PORT: u16 = 443;
-const WINHTTP_ACCESS_TYPE_DEFAULT_PROXY: u32 = 0;
+const WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY: u32 = 4;
 const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
-const WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE: u32 = 155;
+const WINHTTP_OPTION_DISABLE_FEATURE: u32 = 63;
+const WINHTTP_OPTION_REDIRECT_POLICY: u32 = 88;
+const WINHTTP_OPTION_SECURE_PROTOCOLS: u32 = 84;
+const WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE: u32 = 91;
+const WINHTTP_OPTION_DISABLE_SECURE_PROTOCOL_FALLBACK: u32 = 144;
+const WINHTTP_OPTION_IPV6_FAST_FALLBACK: u32 = 140;
+const WINHTTP_OPTION_DISABLE_GLOBAL_POOLING: u32 = 195;
+const WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP: u32 = 1;
+const WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2: u32 = 0x0000_0800;
+const WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3: u32 = 0x0000_2000;
+const WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2: u32 =
+    WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+const WINHTTP_DISABLE_AUTHENTICATION: u32 = 0x0000_0004;
+const WINHTTP_DISABLE_COOKIES: u32 = 0x0000_0001;
+const ERROR_INVALID_PARAMETER: u32 = 87;
+const ERROR_WINHTTP_INVALID_OPTION: u32 = 12_009;
+const ERROR_WINHTTP_OPTION_NOT_SETTABLE: u32 = 12_011;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
 const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 64 * 1024;
@@ -205,11 +223,7 @@ impl Client {
         )?;
         let perform: Result<WinHttpHeadPerform> = (|| {
             let request = self.open_request(connect, &METHOD_HEAD_WIDE, &PATH_ROOT_WIDE, flags, context)?;
-            if target.secure {
-                match self.set_ignore_revocation_offline(&request) {
-                    Ok(()) | Err(_) => {}
-                }
-            }
+            self.set_request_options(&request, context)?;
             let request_start = Instant::now();
             self.send_head(&request, context)?;
             self.receive_response(&request, context)?;
@@ -250,6 +264,14 @@ impl Client {
         let code = Self::last_error_code();
         error(context, format!("{operation} 실패: {error_code_label} {code}"))
     }
+    fn line_starts_with_ascii_ignore_case(line: &[u16], prefix: &[u8]) -> bool {
+        if line.len() < prefix.len() {
+            return false;
+        }
+        line.iter()
+            .zip(prefix)
+            .all(|(&unit, &byte)| u8::try_from(unit).is_ok_and(|unit_byte| unit_byte.eq_ignore_ascii_case(&byte)))
+    }
     fn non_null_handle(&self, handle: HInternet, operation: &str, context: &str) -> Result<Handle> {
         NonNull::new(handle)
             .map(Handle)
@@ -282,7 +304,7 @@ impl Client {
         let raw_session = unsafe {
             sys::WinHttpOpen(
                 user_agent.as_ptr(),
-                WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                 null(),
                 null(),
                 0,
@@ -299,14 +321,31 @@ impl Client {
         if timeout_ok == 0_i32 {
             return Err(self.last_error("WinHttpSetTimeouts", context));
         }
+        self.set_secure_protocols(&session, context)?;
+        self.set_optional_dword_option(
+            &session,
+            WINHTTP_OPTION_DISABLE_SECURE_PROTOCOL_FALLBACK,
+            1,
+            "WinHttpSetOption DISABLE_SECURE_PROTOCOL_FALLBACK",
+            context,
+        )?;
+        self.set_dword_option(
+            &session,
+            WINHTTP_OPTION_DISABLE_GLOBAL_POOLING,
+            1,
+            "WinHttpSetOption DISABLE_GLOBAL_POOLING",
+            context,
+        )?;
+        self.set_optional_dword_option(
+            &session,
+            WINHTTP_OPTION_IPV6_FAST_FALLBACK,
+            1,
+            "WinHttpSetOption IPV6_FAST_FALLBACK",
+            context,
+        )?;
         Ok(session)
     }
-    fn query_server_time(
-        &self,
-        request: &Handle,
-        context: &str,
-        parse_http_date: ParseHttpDate,
-    ) -> Result<SystemTime> {
+    fn query_raw_headers(&self, request: &Handle, context: &str) -> Result<Vec<u16>> {
         let mut bytes = 0_u32;
         let mut index = 0_u32;
         // SAFETY: request is valid; this first call probes the required buffer size.
@@ -321,12 +360,9 @@ impl Client {
             )
         };
         if probe_ok != 0_i32 {
-            return Err(TimeError::header_not_found(format!(
-                "{context} 응답에서 Date"
-            )));
+            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
         }
-        let last_error_code = Self::last_error_code();
-        if last_error_code != ERROR_INSUFFICIENT_BUFFER {
+        if Self::last_error_code() != ERROR_INSUFFICIENT_BUFFER {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
         let header_bytes = usize::try_from(bytes)
@@ -367,33 +403,66 @@ impl Client {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
         while buffer.pop_if(|value| *value == 0).is_some() {}
-        for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')).rev() {
+        Ok(buffer)
+    }
+    fn query_server_time(
+        &self,
+        request: &Handle,
+        context: &str,
+        parse_http_date: ParseHttpDate,
+    ) -> Result<SystemTime> {
+        let buffer = self.query_raw_headers(request, context)?;
+        let mut age_seen = false;
+        let mut date_seen = false;
+        let mut parsed_date = None;
+        for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')) {
             let line = raw_line
                 .strip_suffix(&[u16::from(b'\r')])
-                .unwrap_or(raw_line);
-            let Some((prefix, _value)) = line.split_first_chunk::<5>() else {
-                continue;
-            };
-            if !prefix.iter().zip(b"date:").all(|(&unit, &byte)| {
-                u8::try_from(unit).is_ok_and(|converted| converted.eq_ignore_ascii_case(&byte))
-            }) {
+                .map_or(raw_line, |stripped| stripped);
+            if line.is_empty() {
                 continue;
             }
-            let mut line_bytes = Vec::new();
-            line_bytes.try_reserve(line.len()).map_err(|source| {
-                error(
-                    context,
-                    format!("Date 헤더 ASCII 버퍼 메모리 확보 실패: {source}"),
-                )
-            })?;
-            line.iter().try_for_each(|&unit| {
-                let byte = u8::try_from(unit)
-                    .map_err(|source| error(context, format!("Date 헤더 ASCII 변환 실패: {source}")))?;
-                line_bytes.push(byte);
-                Ok::<(), TimeError>(())
-            })?;
-            match find_date_header_value(&line_bytes) {
-                Ok(Some(date_header_raw)) => return parse_http_date(date_header_raw),
+            let is_age_header = Self::line_starts_with_ascii_ignore_case(line, b"age:");
+            let is_date_header = Self::line_starts_with_ascii_ignore_case(line, b"date:");
+            if !(is_age_header || is_date_header) {
+                continue;
+            }
+            let line_bytes = line
+                .iter()
+                .map(|&unit| {
+                    u8::try_from(unit).map_err(|source| {
+                        error(context, format!("응답 헤더 ASCII 변환 실패: {source}"))
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            if is_age_header {
+                match find_age_header_value(&line_bytes) {
+                Ok(Some(age_header_raw)) => {
+                    if age_seen {
+                        return Err(error(context, "Age 헤더가 여러 개입니다."));
+                    }
+                    age_seen = true;
+                    validate_http_age_value(age_header_raw)
+                        .map_err(|message| error(context, message))?;
+                }
+                Ok(None) => {}
+                Err(source) => {
+                    return Err(error(
+                        context,
+                        format!("Age 헤더 UTF-8 변환 실패: {source}"),
+                    ));
+                }
+                }
+            }
+            if is_date_header {
+                match find_date_header_value(&line_bytes) {
+                Ok(Some(date_header_raw)) => {
+                    if date_seen {
+                        return Err(error(context, "Date 헤더가 여러 개입니다."));
+                    }
+                    date_seen = true;
+                    parsed_date = Some(parse_http_date(date_header_raw)?);
+                }
                 Ok(None) => {}
                 Err(source) => {
                     return Err(error(
@@ -401,11 +470,10 @@ impl Client {
                         format!("Date 헤더 UTF-8 변환 실패: {source}"),
                     ));
                 }
+                }
             }
         }
-        Err(TimeError::header_not_found(format!(
-            "{context} 응답에서 Date"
-        )))
+        parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
     }
     fn receive_response(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is a valid request handle and no reserved pointer is required.
@@ -511,27 +579,113 @@ impl Client {
             Ok(())
         }
     }
-    fn set_ignore_revocation_offline(&self, request: &Handle) -> Result<()> {
-        let mut enabled = 1_u32;
+    fn set_dword_option(
+        &self,
+        handle: &Handle,
+        option: u32,
+        value: u32,
+        operation: &str,
+        context: &str,
+    ) -> Result<()> {
+        let mut raw_value = value;
         let buffer_length = u32::try_from(size_of::<u32>())
-            .map_err(|source| error("WinHTTP", format!("옵션 길이 변환 실패: {source}")))?;
-        // SAFETY: request is a valid WinHTTP request handle and enabled points to a u32 option value.
+            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+        // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
         let ok = unsafe {
             sys::WinHttpSetOption(
-                request.0.as_ptr(),
-                WINHTTP_OPTION_IGNORE_CERT_REVOCATION_OFFLINE,
-                (&raw mut enabled).cast::<c_void>(),
+                handle.0.as_ptr(),
+                option,
+                (&raw mut raw_value).cast::<c_void>(),
                 buffer_length,
             )
         };
         if ok == 0_i32 {
-            Err(self.last_error(
-                "WinHttpSetOption IGNORE_CERT_REVOCATION_OFFLINE",
-                "WinHTTP",
-            ))
+            Err(self.last_error(operation, context))
         } else {
             Ok(())
         }
+    }
+    fn set_optional_dword_option(
+        &self,
+        handle: &Handle,
+        option: u32,
+        value: u32,
+        operation: &str,
+        context: &str,
+    ) -> Result<()> {
+        let mut raw_value = value;
+        let buffer_length = u32::try_from(size_of::<u32>())
+            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+        // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
+        let ok = unsafe {
+            sys::WinHttpSetOption(
+                handle.0.as_ptr(),
+                option,
+                (&raw mut raw_value).cast::<c_void>(),
+                buffer_length,
+            )
+        };
+        if ok != 0_i32 {
+            return Ok(());
+        }
+        match Self::last_error_code() {
+            ERROR_WINHTTP_INVALID_OPTION | ERROR_WINHTTP_OPTION_NOT_SETTABLE => Ok(()),
+            _ => Err(self.last_error(operation, context)),
+        }
+    }
+    fn set_request_options(&self, request: &Handle, context: &str) -> Result<()> {
+        self.set_dword_option(
+            request,
+            WINHTTP_OPTION_REDIRECT_POLICY,
+            WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP,
+            "WinHttpSetOption REDIRECT_POLICY",
+            context,
+        )?;
+        self.set_dword_option(
+            request,
+            WINHTTP_OPTION_DISABLE_FEATURE,
+            WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION,
+            "WinHttpSetOption DISABLE_FEATURE",
+            context,
+        )?;
+        self.set_dword_option(
+            request,
+            WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,
+            u32::try_from(HTTP_HEAD_MAX_HEADER_BYTES)
+                .map_err(|source| error(context, format!("WinHTTP 헤더 한도 변환 실패: {source}")))?,
+            "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE",
+            context,
+        )
+    }
+    fn set_secure_protocols(&self, session: &Handle, context: &str) -> Result<()> {
+        let mut raw_value = WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2;
+        let buffer_length = u32::try_from(size_of::<u32>())
+            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+        // SAFETY: session is a valid WinHTTP session handle and raw_value points to a DWORD.
+        let ok = unsafe {
+            sys::WinHttpSetOption(
+                session.0.as_ptr(),
+                WINHTTP_OPTION_SECURE_PROTOCOLS,
+                (&raw mut raw_value).cast::<c_void>(),
+                buffer_length,
+            )
+        };
+        if ok != 0_i32 {
+            return Ok(());
+        }
+        if matches!(
+            Self::last_error_code(),
+            ERROR_INVALID_PARAMETER | ERROR_WINHTTP_INVALID_OPTION
+        ) {
+            return self.set_dword_option(
+                session,
+                WINHTTP_OPTION_SECURE_PROTOCOLS,
+                WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2,
+                "WinHttpSetOption SECURE_PROTOCOLS",
+                context,
+            );
+        }
+        Err(self.last_error("WinHttpSetOption SECURE_PROTOCOLS", context))
     }
 }
 impl Default for Client {

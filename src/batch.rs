@@ -1,7 +1,7 @@
 use crate::{
     constants::{BUFFER_SIZE, BUFFERS_PER_WORKER, FILE_NAME, IS_TERMINAL},
     diagnostic::{AppError, Result},
-    file_output::{ensure_file_exists_and_reopen, lock_mutex},
+    file_output::{ensure_file_exists_and_reopen, ensure_file_guard_current, lock_mutex},
     output::{self, OutputTarget},
     random_data::generate_random_data,
     random_data::RandomDataSet,
@@ -27,6 +27,7 @@ use std::{
 };
 pub const MAX_BATCH_GENERATE_COUNT: u64 = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
+const OUTPUT_FILE_IDENTITY_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const PROGRESS_TIME_BUF_LEN: usize = 7;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 struct GeneratedChunk {
@@ -258,15 +259,34 @@ struct WriterTask<'writer> {
     receiver: Receiver<GeneratedChunk>,
 }
 impl WriterTask<'_> {
+    fn ensure_file_current_if_due(
+        file_guard: &mut MutexGuard<'_, BufWriter<File>>,
+        next_file_check: &mut Instant,
+    ) -> Result<()> {
+        let now = Instant::now();
+        if now < *next_file_check {
+            return Ok(());
+        }
+        ensure_file_guard_current(file_guard)?;
+        *next_file_check = now
+            .checked_add(OUTPUT_FILE_IDENTITY_CHECK_INTERVAL)
+            .ok_or("다음 출력 파일 상태 확인 시각 계산 실패")?;
+        Ok(())
+    }
     fn run(self) -> Result<()> {
         let mut file_guard = lock_mutex(self.file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
+        let mut next_file_check = Instant::now()
+            .checked_add(OUTPUT_FILE_IDENTITY_CHECK_INTERVAL)
+            .ok_or("출력 파일 상태 확인 시각 계산 실패")?;
         while let Ok(chunk) = self.receiver.recv() {
+            Self::ensure_file_current_if_due(&mut file_guard, &mut next_file_check)?;
             Self::write_chunk_and_return_buffer(
                 &mut file_guard,
                 &self.buffer_return_senders,
                 chunk,
             )?;
             while let Ok(more_chunk) = self.receiver.try_recv() {
+                Self::ensure_file_current_if_due(&mut file_guard, &mut next_file_check)?;
                 Self::write_chunk_and_return_buffer(
                     &mut file_guard,
                     &self.buffer_return_senders,
@@ -279,7 +299,7 @@ impl WriterTask<'_> {
         Ok(())
     }
     fn write_chunk_and_return_buffer(
-        file_guard: &mut MutexGuard<BufWriter<File>>,
+        file_guard: &mut MutexGuard<'_, BufWriter<File>>,
         buffer_return_senders: &[SyncSender<DataBuffer>],
         chunk: GeneratedChunk,
     ) -> Result<()> {
@@ -446,6 +466,7 @@ impl BatchRegenerator<'_, '_, '_> {
             output::format_data_into_buffer(final_data, &mut final_buffer_file, OutputTarget::File)?;
         let mut final_file_guard =
             lock_mutex(self.file_mutex, "Mutex 잠금 실패 (대량 생성 최종 기록)")?;
+        ensure_file_guard_current(&mut final_file_guard)?;
         output::write_buffer_to_file_guard(
             &mut final_file_guard,
             output::prefix_slice(&final_buffer_file, final_bytes_written_file)?,
@@ -504,7 +525,7 @@ fn panic_join_error(context: &str, panic_payload: &(dyn Any + Send)) -> AppError
         .downcast_ref::<String>()
         .map(String::as_str)
         .or_else(|| panic_payload.downcast_ref::<&str>().copied())
-        .unwrap_or("non-string panic payload");
+        .map_or("non-string panic payload", |detail| detail);
     AppError::message(format!("{context}: {panic_detail}"))
 }
 fn elapsed_since(start_time: &Instant) -> Duration {

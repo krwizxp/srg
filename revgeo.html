@@ -5458,16 +5458,9 @@
           );
         }
         const blob = randomDataBlob(chunks, false);
-        if (
-          typeof ClipboardItem === "function" &&
-          typeof navigator.clipboard.write === "function"
-        ) {
-          await navigator.clipboard.write([new ClipboardItem({
-            "text/plain": blob,
-          })]);
-          return;
-        }
-        await navigator.clipboard.writeText(await blob.text());
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/plain": blob,
+        })]);
       }
       function main() {
         const num64Input = document.getElementById("num64");

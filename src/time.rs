@@ -1,13 +1,16 @@
 use self::{
     activity::{Activity, CountdownDecision},
-    sample::{TCP_LINE_BUFFER_CAPACITY, fetch_server_time_sample},
+    sample::TCP_LINE_BUFFER_CAPACITY,
     util::blend_weighted_nanos,
+    worker::{spawn_final_countdown_sampler, spawn_sample_worker},
 };
 cfg_select! {
     target_os = "windows" => {
         use self::timer_resolution::{
-            HighResTimerGuard, TARGET_PERIOD_MS, TIMERR_NOERROR, time_begin_period,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, HighResTimerGuard, SYNCHRONIZE_ACCESS,
+            TARGET_PERIOD_MS, TIMER_MODIFY_STATE_ACCESS, TIMERR_NOERROR, sys,
         };
+        use core::ptr::{NonNull, null};
     }
     _ => {}
 }
@@ -26,61 +29,39 @@ use std::{
     thread,
     time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
-mod activity;
-mod address;
-mod display;
-mod http_date;
-mod native_http;
-mod sample;
-mod util;
-cfg_select! {
-    target_os = "windows" => {
-        mod timer_resolution;
-    }
-    _ => {}
-}
 cfg_select! {
     target_os = "linux" => {
-        mod linux_input;
-        mod native_input {
-            pub(super) use super::linux_input::{InputAction, PreparedInput};
-        }
+        use self::linux_input as native_input;
     }
     target_os = "macos" => {
-        mod macos_input;
-        mod native_input {
-            pub(super) use super::macos_input::{InputAction, PreparedInput};
-        }
+        use self::macos_input as native_input;
     }
     target_os = "windows" => {
-        mod windows_input;
-        mod native_input {
-            pub(super) use super::windows_input::{InputAction, PreparedInput};
-        }
+        use self::windows_input as native_input;
     }
     _ => {
         mod native_input {
             use super::NativeInputSendStatus;
             use std::io;
             #[derive(Clone, Copy)]
-            pub(super) enum InputAction {
+            pub enum InputAction {
                 F5Press,
                 MouseClick,
             }
-            pub(super) struct PreparedInput;
+            pub struct PreparedInput;
             impl PreparedInput {
-                pub(super) const EMPTY: Self = Self;
-                pub(super) fn prepare(
+                pub const EMPTY: Self = Self;
+                pub fn prepare(
                     &mut self,
                     _action: Option<InputAction>,
                     _err: &mut dyn io::Write,
                 ) {
                     *self = Self;
                 }
-                pub(super) const fn reset(&mut self) {
+                pub const fn reset(&mut self) {
                     *self = Self;
                 }
-                pub(super) fn send(
+                pub fn send(
                     &mut self,
                     _action: InputAction,
                     _err: &mut dyn io::Write,
@@ -92,6 +73,32 @@ cfg_select! {
         }
     }
 }
+mod activity;
+mod address;
+mod display;
+mod http_date;
+cfg_select! {
+    target_os = "linux" => {
+        mod linux_input;
+    }
+    target_os = "macos" => {
+        mod macos_input;
+    }
+    target_os = "windows" => {
+        mod windows_input;
+    }
+    _ => {}
+}
+mod native_http;
+mod sample;
+mod util;
+mod worker;
+cfg_select! {
+    target_os = "windows" => {
+        mod timer_resolution;
+    }
+    _ => {}
+}
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -100,9 +107,10 @@ const ENTER_BUFFER_READ_LIMIT: u64 = 9;
 const ENTER_INPUT_TOO_LONG: &str = "서버 시간 종료 입력이 너무 깁니다.";
 const ENTER_THREAD_PANIC: &str = "입력 대기 스레드 패닉 발생";
 const NUM_SAMPLES: usize = 10;
+const CALIBRATION_TIMEOUT: Duration = Duration::from_secs(5);
+const CALIBRATION_TIMEOUT_MESSAGE: &str = "정밀 보정 제한 시간 안에 유효한 서버 Date tick을 관측하지 못했습니다. 전체 보정을 다시 시작합니다.";
 const FINAL_COUNTDOWN_RTT_ALPHA_NUM: u32 = 7;
 const FINAL_COUNTDOWN_RTT_ALPHA_DENOM: u32 = 10;
-const MAX_CALIBRATION_FAILURES: u32 = 100;
 const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
 const HTTPS_SCHEME_PREFIX: &str = "https://";
@@ -169,13 +177,12 @@ enum UrlScheme {
     Http,
     Https,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ParsedServer {
     host: String,
-    http_url: String,
     literal_tcp_socket_addr: Option<net::SocketAddr>,
     port: u16,
-    scheme: Option<UrlScheme>,
+    scheme: UrlScheme,
     secure_url: String,
     tcp_host_header: String,
 }
@@ -258,8 +265,8 @@ impl TimeError {
     fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::HeaderNotFound, detail)
     }
-    pub const fn io_kind(&self) -> Option<io::ErrorKind> {
-        self.io_kind
+    pub const fn is_unexpected_eof(&self) -> bool {
+        matches!(self.io_kind, Some(io::ErrorKind::UnexpectedEof))
     }
     fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -276,7 +283,7 @@ impl TimeError {
 impl From<io::Error> for TimeError {
     fn from(err: io::Error) -> Self {
         let io_kind = err.kind();
-        let detail = owned_time_error_detail(&err);
+        let detail = Cow::Owned(err.to_string());
         Self {
             kind: TimeErrorKind::Io,
             detail,
@@ -287,7 +294,7 @@ impl From<io::Error> for TimeError {
 }
 impl From<SystemTimeError> for TimeError {
     fn from(err: SystemTimeError) -> Self {
-        let detail = owned_time_error_detail(&err);
+        let detail = Cow::Owned(err.to_string());
         Self {
             kind: TimeErrorKind::Time,
             detail,
@@ -315,51 +322,116 @@ impl Error for TimeError {
         })
     }
 }
+impl Drop for SampleWorker {
+    fn drop(&mut self) {
+        let _send_result = self.command_sender.send(SampleWorkerCommand::Stop);
+    }
+}
+impl SampleWorker {
+    fn fetch(&mut self, kind: SampleRequestKind) -> Result<PendingSampleRequest> {
+        let Some(generation) = self.generation.checked_add(1) else {
+            return Err(TimeError::parse(
+                "서버 시간 샘플 요청 세대 계산 중 overflow가 발생했습니다.",
+            ));
+        };
+        self.generation = generation;
+        self.command_sender
+            .send(SampleWorkerCommand::Fetch { generation, kind })
+            .map_err(|source| {
+                TimeError::parse(format!("서버 시간 샘플 worker 요청 실패: {source}"))
+            })?;
+        Ok(PendingSampleRequest { generation })
+    }
+}
 struct AppState {
     baseline_rtt: Option<Duration>,
     baseline_rtt_attempts: usize,
     baseline_rtt_next_sample_at: Instant,
     baseline_rtt_samples: [TimeSample; NUM_SAMPLES],
     baseline_rtt_valid_count: usize,
-    calibration_failure_count: u32,
+    calibration_deadline: Option<Instant>,
     final_countdown_next_sample_error_message_at: Option<Instant>,
-    final_countdown_sampler: Option<FinalCountdownSampler>,
-    final_countdown_sampler_unavailable: bool,
+    final_countdown_sampler: FinalCountdownSampler,
     #[cfg(target_os = "windows")]
     high_res_timer_guard: Option<HighResTimerGuard>,
-    host: ParsedServer,
+    host: Arc<ParsedServer>,
     last_sample: Option<TimeSample>,
     live_rtt: Option<Duration>,
     next_full_sync_at: Instant,
+    pending_sample_request: Option<PendingSampleRequest>,
     pending_target_time: Option<TargetTimeOfDay>,
+    sample_worker: SampleWorker,
     server_time: Option<ServerTime>,
     target_time: Option<SystemTime>,
     trigger_action: Option<TriggerAction>,
 }
 struct LoopRuntime<'runtime> {
     err: &'runtime mut dyn io::Write,
-    network_context: &'runtime mut NetworkContext,
     out: &'runtime mut dyn io::Write,
     prepared_input: &'runtime mut native_input::PreparedInput,
 }
-struct FinalCountdownSampler {
-    command_sender: mpsc::Sender<FinalCountdownSamplerCommand>,
+struct SampleWorker {
+    command_sender: mpsc::Sender<SampleWorkerCommand>,
+    generation: u64,
     join_handle: thread::JoinHandle<()>,
-    sample_interval: Duration,
+    response_receiver: mpsc::Receiver<SampleWorkerResponse>,
+}
+struct FinalCountdownSampler {
+    command_sender: Option<mpsc::Sender<FinalCountdownSamplerCommand>>,
+    generation: u64,
+    join_handle: Option<thread::JoinHandle<()>>,
+    sample_interval: Option<Duration>,
     sample_slot: Arc<Mutex<FinalCountdownSampleSlot>>,
+    startup_error: Option<TimeError>,
+    unavailable: bool,
 }
 struct FinalCountdownDeadline {
     one_way_delay: Duration,
     server_time: ServerTime,
+    source: CountdownTriggerSource,
     target_time: SystemTime,
     trigger_instant: Instant,
 }
 struct FinalCountdownSampleSlot {
+    generation: u64,
     latest_result: Option<Result<TimeSample>>,
 }
-enum FinalCountdownSamplerCommand {
-    SetInterval(Duration),
+struct PendingSampleRequest {
+    generation: u64,
+}
+struct SampleWorkerResponse {
+    generation: u64,
+    kind: SampleRequestKind,
+    result: Result<TimeSample>,
+}
+enum SampleRequestKind {
+    Baseline { attempt_index: usize },
+    Calibration,
+}
+enum SampleRequestPoll {
+    Disconnected,
+    Empty,
+    Sample {
+        kind: SampleRequestKind,
+        result: Result<TimeSample>,
+    },
+}
+enum SampleWorkerCommand {
+    Fetch {
+        generation: u64,
+        kind: SampleRequestKind,
+    },
     Stop,
+}
+enum FinalCountdownSamplerCommand {
+    SetInterval { generation: u64, interval: Duration },
+    Shutdown,
+    StartPeriodic { generation: u64, interval: Duration },
+    StopPeriodic,
+}
+enum FinalCountdownSamplerCommandFlow {
+    Continue,
+    Shutdown,
 }
 enum FinalCountdownSamplePoll {
     Disconnected,
@@ -383,9 +455,175 @@ struct NetworkContext {
     tcp_line_buffer: Vec<u8>,
     tcp_request_buffer: Vec<u8>,
 }
+impl FinalCountdownSamplerCommand {
+    fn apply(
+        self,
+        active_generation: &mut Option<u64>,
+        sample_interval: &mut Duration,
+    ) -> FinalCountdownSamplerCommandFlow {
+        match self {
+            Self::SetInterval {
+                generation,
+                interval,
+            } => {
+                if *active_generation == Some(generation) {
+                    *sample_interval = interval;
+                }
+                FinalCountdownSamplerCommandFlow::Continue
+            }
+            Self::Shutdown => FinalCountdownSamplerCommandFlow::Shutdown,
+            Self::StartPeriodic {
+                generation,
+                interval,
+            } => {
+                *active_generation = Some(generation);
+                *sample_interval = interval;
+                FinalCountdownSamplerCommandFlow::Continue
+            }
+            Self::StopPeriodic => {
+                *active_generation = None;
+                FinalCountdownSamplerCommandFlow::Continue
+            }
+        }
+    }
+}
 impl Drop for FinalCountdownSampler {
     fn drop(&mut self) {
-        let _send_result = self.command_sender.send(FinalCountdownSamplerCommand::Stop);
+        if let Some(command_sender) = self.command_sender.as_ref() {
+            let _send_result = command_sender.send(FinalCountdownSamplerCommand::Shutdown);
+        }
+    }
+}
+impl FinalCountdownSampler {
+    fn disable(&mut self) {
+        self.stop_periodic();
+        self.unavailable = true;
+        self.command_sender = None;
+    }
+    fn poll(&mut self) -> FinalCountdownSamplePoll {
+        let sampler_finished = self
+            .join_handle
+            .as_ref()
+            .is_some_and(thread::JoinHandle::is_finished);
+        let mut should_disable = sampler_finished;
+        let mut poisoned = false;
+        let latest_result = match self.sample_slot.try_lock() {
+            Ok(mut slot) => {
+                if slot.generation == self.generation {
+                    slot.latest_result.take()
+                } else {
+                    None
+                }
+            }
+            Err(TryLockError::WouldBlock) => {
+                if sampler_finished {
+                    None
+                } else {
+                    return FinalCountdownSamplePoll::Empty;
+                }
+            }
+            Err(TryLockError::Poisoned(_)) => {
+                should_disable = true;
+                poisoned = true;
+                None
+            }
+        };
+        if should_disable {
+            self.disable();
+        }
+        if poisoned {
+            return FinalCountdownSamplePoll::Sample(Err(TimeError::parse(
+                "카운트다운 샘플 상태 잠금 실패",
+            )));
+        }
+        if let Some(sample_result) = latest_result {
+            return FinalCountdownSamplePoll::Sample(sample_result);
+        }
+        if sampler_finished {
+            return FinalCountdownSamplePoll::Disconnected;
+        }
+        FinalCountdownSamplePoll::Empty
+    }
+    fn set_interval(&mut self, sample_interval: Duration) {
+        if self.sample_interval != Some(sample_interval) {
+            self.sample_interval = Some(sample_interval);
+            let Some(command_sender) = self.command_sender.as_ref() else {
+                self.disable();
+                return;
+            };
+            if command_sender
+                .send(FinalCountdownSamplerCommand::SetInterval {
+                    generation: self.generation,
+                    interval: sample_interval,
+                })
+                .is_err()
+            {
+                self.disable();
+            }
+        }
+    }
+    fn start(&mut self, sample_interval: Duration) -> Result<()> {
+        if self.unavailable {
+            if let Some(startup_error) = self.startup_error.take() {
+                return Err(startup_error);
+            }
+            return Ok(());
+        }
+        if self.sample_interval.is_some() {
+            self.set_interval(sample_interval);
+            return Ok(());
+        }
+        let Some(next_generation) = self.generation.checked_add(1) else {
+            return Err(TimeError::parse(
+                "카운트다운 샘플 세대 계산 중 overflow가 발생했습니다.",
+            ));
+        };
+        self.generation = next_generation;
+        self.sample_interval = Some(sample_interval);
+        {
+            let mut slot = self
+                .sample_slot
+                .lock()
+                .map_err(|_poisoned| TimeError::parse("카운트다운 샘플 상태 잠금 실패"))?;
+            slot.generation = self.generation;
+            slot.latest_result = None;
+        }
+        let Some(command_sender) = self.command_sender.as_ref() else {
+            self.disable();
+            return Err(TimeError::parse("카운트다운 샘플러가 종료되었습니다."));
+        };
+        command_sender
+            .send(FinalCountdownSamplerCommand::StartPeriodic {
+                generation: self.generation,
+                interval: sample_interval,
+            })
+            .map_err(|source| {
+                self.disable();
+                TimeError::parse(format!("카운트다운 샘플러 시작 실패: {source}"))
+            })
+    }
+    fn stop_periodic(&mut self) {
+        if self.sample_interval.is_none() {
+            return;
+        }
+        self.sample_interval = None;
+        let Some(next_generation) = self.generation.checked_add(1) else {
+            self.disable();
+            return;
+        };
+        self.generation = next_generation;
+        if let Ok(mut slot) = self.sample_slot.lock() {
+            slot.generation = self.generation;
+            slot.latest_result = None;
+        }
+        if let Some(command_sender) = self.command_sender.as_ref()
+            && command_sender
+                .send(FinalCountdownSamplerCommand::StopPeriodic)
+                .is_err()
+        {
+            self.unavailable = true;
+            self.command_sender = None;
+        }
     }
 }
 impl NetworkContext {
@@ -408,7 +646,10 @@ impl NetworkContext {
     }
 }
 impl ServerTimeSession {
-    pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
+    pub fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
+        let host = Arc::new(self.host);
+        let sample_worker = spawn_sample_worker(Arc::clone(&host))?;
+        let final_countdown_sampler = spawn_final_countdown_sampler(Arc::clone(&host));
         let baseline_placeholder = TimeSample {
             response_received_inst: self.now,
             rtt: Duration::ZERO,
@@ -420,17 +661,18 @@ impl ServerTimeSession {
             baseline_rtt_next_sample_at: self.now,
             baseline_rtt_samples: [baseline_placeholder; NUM_SAMPLES],
             baseline_rtt_valid_count: 0,
-            calibration_failure_count: 0,
+            calibration_deadline: None,
             final_countdown_next_sample_error_message_at: None,
-            final_countdown_sampler: None,
-            final_countdown_sampler_unavailable: false,
+            final_countdown_sampler,
             #[cfg(target_os = "windows")]
             high_res_timer_guard: None,
-            host: self.host,
+            host,
             last_sample: None,
             live_rtt: None,
             next_full_sync_at: self.now,
+            pending_sample_request: None,
             pending_target_time: self.target_time,
+            sample_worker,
             server_time: None,
             target_time: None,
             trigger_action: self.trigger_action,
@@ -439,6 +681,22 @@ impl ServerTimeSession {
     }
 }
 impl AppState {
+    fn accept_calibration_tick(
+        &mut self,
+        current_sample: TimeSample,
+    ) -> Option<Result<ServerTime>> {
+        let server_time = self.build_calibrated_server_time(current_sample)?;
+        self.server_time = Some(server_time);
+        self.calibration_deadline = None;
+        let Some(next_full_sync_at) = current_sample
+            .response_received_inst
+            .checked_add(FULL_SYNC_INTERVAL)
+        else {
+            return Some(Err(TimeError::parse("다음 전체 동기화 시각 계산 실패.")));
+        };
+        self.next_full_sync_at = next_full_sync_at;
+        Some(Ok(server_time))
+    }
     fn append_final_countdown_sample_error(
         &mut self,
         now: Instant,
@@ -468,76 +726,40 @@ impl AppState {
         self.baseline_rtt_samples = [placeholder; NUM_SAMPLES];
         self.baseline_rtt_valid_count = 0;
         self.baseline_rtt_next_sample_at = now;
+        self.calibration_deadline = None;
     }
     fn begin_final_countdown_sampling(&mut self, initial_sample_interval: Duration) -> Result<()> {
-        if self.final_countdown_sampler.is_some() || self.final_countdown_sampler_unavailable {
-            return Ok(());
+        if self.final_countdown_sampler.unavailable {
+            self.final_countdown_sampler = spawn_final_countdown_sampler(Arc::clone(&self.host));
         }
-        let shared_slot = Arc::new(Mutex::new(FinalCountdownSampleSlot {
-            latest_result: None,
-        }));
-        let worker_slot = Arc::clone(&shared_slot);
-        let (command_sender, command_receiver) = mpsc::channel();
-        let host = self.host.clone();
-        let join_handle = thread::Builder::new()
-            .name(String::from("srg-final-countdown-sampler"))
-            .spawn(move || {
-                let mut sample_interval = initial_sample_interval;
-                let apply_sampler_command =
-                    |command: FinalCountdownSamplerCommand, interval: &mut Duration| -> bool {
-                        match command {
-                            FinalCountdownSamplerCommand::SetInterval(new_interval) => {
-                                *interval = new_interval;
-                                true
-                            }
-                            FinalCountdownSamplerCommand::Stop => false,
-                        }
-                    };
-                let mut network_context = match NetworkContext::new() {
-                    Ok(context) => context,
-                    Err(fetch_err) => {
-                        if let Ok(mut slot) = worker_slot.lock() {
-                            slot.latest_result = Some(Err(fetch_err));
-                        }
-                        return;
-                    }
-                };
-                loop {
-                    loop {
-                        match command_receiver.try_recv() {
-                            Ok(command) => {
-                                if !apply_sampler_command(command, &mut sample_interval) {
-                                    return;
-                                }
-                            }
-                            Err(mpsc::TryRecvError::Disconnected) => return,
-                            Err(mpsc::TryRecvError::Empty) => break,
-                        }
-                    }
-                    let sample_result = fetch_server_time_sample(&host, &mut network_context);
-                    let Ok(mut slot) = worker_slot.lock() else {
-                        return;
-                    };
-                    slot.latest_result = Some(sample_result);
-                    drop(slot);
-                    match command_receiver.recv_timeout(sample_interval) {
-                        Ok(command) => {
-                            if !apply_sampler_command(command, &mut sample_interval) {
-                                return;
-                            }
-                        }
-                        Err(mpsc::RecvTimeoutError::Disconnected) => return,
-                        Err(mpsc::RecvTimeoutError::Timeout) => {}
-                    }
-                }
-            })?;
-        self.final_countdown_sampler = Some(FinalCountdownSampler {
-            command_sender,
-            join_handle,
-            sample_interval: initial_sample_interval,
-            sample_slot: shared_slot,
-        });
-        Ok(())
+        self.final_countdown_sampler.start(initial_sample_interval)
+    }
+    fn build_calibrated_server_time(&self, current_sample: TimeSample) -> Option<ServerTime> {
+        let prev_sample = self.last_sample?;
+        let baseline_rtt = self.baseline_rtt?;
+        let prev_dur = prev_sample.server_time.duration_since(UNIX_EPOCH).ok()?;
+        let current_dur = current_sample.server_time.duration_since(UNIX_EPOCH).ok()?;
+        if current_dur.as_secs().checked_sub(prev_dur.as_secs()) != Some(1) {
+            return None;
+        }
+        let mut server_time_at_tick = current_sample.server_time;
+        let since_epoch = server_time_at_tick.duration_since(UNIX_EPOCH).ok()?;
+        let nanos_to_subtract = since_epoch.subsec_nanos();
+        let nanos_to_subtract_duration = Duration::from_nanos(u64::from(nanos_to_subtract));
+        server_time_at_tick = server_time_at_tick.checked_sub(nanos_to_subtract_duration)?;
+        let one_way_delay = effective_one_way_delay(current_sample.rtt)?;
+        let anchor_instant = current_sample
+            .response_received_inst
+            .checked_sub(one_way_delay)
+            .map_or(current_sample.response_received_inst, |adjusted| adjusted);
+        Some(ServerTime {
+            anchor_time: server_time_at_tick,
+            anchor_instant,
+            baseline_rtt,
+        })
+    }
+    const fn cancel_sample_request(&mut self) {
+        self.pending_sample_request = None;
     }
     fn confirm_pending_target_time(
         &mut self,
@@ -557,18 +779,17 @@ impl AppState {
         let current_kst_second = u32::try_from(kst_epoch_secs.rem_euclid(KST_SECONDS_PER_DAY_U64))
             .map_err(|source| TimeError::parse(format!("KST 초 변환 실패: {source}")))?;
         let current_kst_day = kst_epoch_secs.div_euclid(KST_SECONDS_PER_DAY_U64);
-        let target_day = if target_time_of_day.seconds_after_midnight >= current_kst_second {
-            current_kst_day
-        } else {
+        let target_second = target_time_of_day.seconds_after_midnight;
+        let target_day = if target_second < current_kst_second {
             current_kst_day.checked_add(1).ok_or_else(|| {
                 TimeError::parse("다음날 목표 날짜 계산 중 overflow가 발생했습니다.")
             })?
+        } else {
+            current_kst_day
         };
         let target_kst_epoch_secs = target_day
             .checked_mul(KST_SECONDS_PER_DAY_U64)
-            .and_then(|day_start| {
-                day_start.checked_add(u64::from(target_time_of_day.seconds_after_midnight))
-            })
+            .and_then(|day_start| day_start.checked_add(u64::from(target_second)))
             .ok_or_else(|| TimeError::parse("목표 시각 계산 중 overflow가 발생했습니다."))?;
         let target_utc_epoch_secs = target_kst_epoch_secs
             .checked_sub(KST_OFFSET_SECS_U64)
@@ -580,12 +801,11 @@ impl AppState {
             .map_err(|source| TimeError::parse(format!("목표 날짜 변환 실패: {source}")))?;
         let CivilDate { day, month, year } = http_date::civil_from_days(day_index)
             .ok_or_else(|| TimeError::parse("목표 날짜 계산 중 범위 오류가 발생했습니다."))?;
-        let seconds = target_time_of_day.seconds_after_midnight;
-        let hour = seconds.div_euclid(KST_SECONDS_PER_HOUR_U32);
-        let minute = seconds
+        let hour = target_second.div_euclid(KST_SECONDS_PER_HOUR_U32);
+        let minute = target_second
             .rem_euclid(KST_SECONDS_PER_HOUR_U32)
             .div_euclid(KST_SECONDS_PER_MINUTE_U32);
-        let second = seconds.rem_euclid(KST_SECONDS_PER_MINUTE_U32);
+        let second = target_second.rem_euclid(KST_SECONDS_PER_MINUTE_U32);
         self.pending_target_time = None;
         self.target_time = Some(target_system_time);
         append_fmt(
@@ -597,13 +817,45 @@ impl AppState {
         Ok(())
     }
     fn disable_final_countdown_sampling(&mut self) {
-        self.final_countdown_sampler = None;
-        self.final_countdown_sampler_unavailable = true;
+        self.final_countdown_sampler.disable();
+    }
+    const fn discard_partial_baseline_measurement(&mut self) {
+        self.baseline_rtt_attempts = 0;
+        self.baseline_rtt_valid_count = 0;
+        self.calibration_deadline = None;
+        self.pending_sample_request = None;
     }
     fn end_final_countdown_sampling(&mut self) {
-        self.final_countdown_sampler = None;
+        self.final_countdown_sampler.stop_periodic();
         self.final_countdown_next_sample_error_message_at = None;
-        self.final_countdown_sampler_unavailable = false;
+    }
+    fn ensure_sample_request(&mut self, kind: &SampleRequestKind) -> Result<()> {
+        if self.pending_sample_request.is_some() {
+            return Ok(());
+        }
+        let (request_kind, retry_kind) = match *kind {
+            SampleRequestKind::Baseline { attempt_index } => (
+                SampleRequestKind::Baseline { attempt_index },
+                SampleRequestKind::Baseline { attempt_index },
+            ),
+            SampleRequestKind::Calibration => (
+                SampleRequestKind::Calibration,
+                SampleRequestKind::Calibration,
+            ),
+        };
+        match self.sample_worker.fetch(request_kind) {
+            Ok(request) => {
+                self.pending_sample_request = Some(request);
+                Ok(())
+            }
+            Err(fetch_err) => {
+                if !self.respawn_sample_worker() {
+                    return Err(fetch_err);
+                }
+                self.pending_sample_request = Some(self.sample_worker.fetch(retry_kind)?);
+                Ok(())
+            }
+        }
     }
     fn finish_baseline_rtt_measurement<'message>(
         &mut self,
@@ -658,7 +910,7 @@ impl AppState {
         };
         let baseline_rtt = Duration::from_nanos_u128(avg_nanos);
         self.baseline_rtt = Some(baseline_rtt);
-        self.calibration_failure_count = 0;
+        self.calibration_deadline = None;
         append_fmt(
             msg_buf,
             format_args!(
@@ -674,80 +926,88 @@ impl AppState {
     fn handle_calibrate_on_tick<'message>(
         &mut self,
         msg_buf: &'message mut String,
-        net_ctx: &mut NetworkContext,
     ) -> ActivityTransition<'message> {
-        let Ok(current_sample) = fetch_server_time_sample(&self.host, net_ctx) else {
-            let Some(next_failure_count) = self.calibration_failure_count.checked_add(1) else {
-                return transition_to_retry(
-                    "정밀 보정 실패 횟수 계산 중 overflow가 발생했습니다. 전체 보정을 다시 시작합니다.",
-                );
+        let now = Instant::now();
+        let deadline = if let Some(deadline) = self.calibration_deadline {
+            deadline
+        } else {
+            let Some(deadline) = now.checked_add(CALIBRATION_TIMEOUT) else {
+                return transition_to_retry("정밀 보정 제한 시간 계산 실패.");
             };
-            self.calibration_failure_count = next_failure_count;
-            if self.calibration_failure_count >= MAX_CALIBRATION_FAILURES {
-                return transition_to_retry(
-                    "정밀 보정 중 서버 응답을 지속적으로 받지 못했습니다. 전체 보정을 다시 시작합니다.",
-                );
+            self.calibration_deadline = Some(deadline);
+            deadline
+        };
+        if now >= deadline {
+            return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE);
+        }
+        let sample_result = match self.poll_sample_request() {
+            SampleRequestPoll::Sample {
+                kind: SampleRequestKind::Calibration,
+                result,
+            } => result,
+            SampleRequestPoll::Sample { .. } | SampleRequestPoll::Empty => {
+                if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration)
+                {
+                    append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
+                    return transition_to_retry(msg_buf);
+                }
+                return ActivityTransition {
+                    activity: Activity::CalibrateOnTick,
+                    message: None,
+                };
+            }
+            SampleRequestPoll::Disconnected => {
+                return transition_to_retry("서버 시간 샘플 worker가 종료되었습니다.");
+            }
+        };
+        let completed_at = Instant::now();
+        if completed_at >= deadline {
+            return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE);
+        }
+        let Ok(current_sample) = sample_result else {
+            if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration) {
+                append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
+                return transition_to_retry(msg_buf);
             }
             return ActivityTransition {
                 activity: Activity::CalibrateOnTick,
                 message: None,
             };
         };
-        self.calibration_failure_count = 0;
-        if let Some(prev_sample) = self.last_sample
-            && let Some(baseline_rtt) = self.baseline_rtt
-            && let Ok(prev_dur) = prev_sample.server_time.duration_since(UNIX_EPOCH)
-            && let Ok(current_dur) = current_sample.server_time.duration_since(UNIX_EPOCH)
-            && current_dur.as_secs().checked_sub(prev_dur.as_secs()) == Some(1)
-        {
-            let calibrated_server_time = (|| -> Result<ServerTime> {
-                let mut server_time_at_tick = current_sample.server_time;
-                let since_epoch = server_time_at_tick.duration_since(UNIX_EPOCH)?;
-                let nanos_to_subtract = since_epoch.subsec_nanos();
-                let nanos_to_subtract_duration = Duration::from_nanos(u64::from(nanos_to_subtract));
-                server_time_at_tick = server_time_at_tick
-                    .checked_sub(nanos_to_subtract_duration)
-                    .ok_or_else(|| TimeError::parse("서버 시각 보정 중 범위 오류"))?;
-                let one_way_delay = effective_one_way_delay(current_sample.rtt)
-                    .ok_or_else(|| TimeError::parse("RTT 지연 계산 중 범위 오류"))?;
-                Ok(ServerTime {
-                    anchor_time: server_time_at_tick,
-                    anchor_instant: current_sample
-                        .response_received_inst
-                        .checked_sub(one_way_delay)
-                        .unwrap_or(current_sample.response_received_inst),
-                    baseline_rtt,
-                })
-            })();
-            if let Ok(server_time) = calibrated_server_time {
-                self.server_time = Some(server_time);
-                let Some(next_full_sync_at) = current_sample
-                    .response_received_inst
-                    .checked_add(FULL_SYNC_INTERVAL)
-                else {
-                    return transition_to_retry("다음 전체 동기화 시각 계산 실패.");
-                };
-                self.next_full_sync_at = next_full_sync_at;
-                if self.pending_target_time.is_some() {
-                    msg_buf.push_str("[성공] 정밀 보정 완료!");
-                    if let Err(target_err) =
-                        self.confirm_pending_target_time(server_time, Instant::now(), msg_buf)
-                    {
-                        append_error_detail(msg_buf, "\n목표 시각 확정 실패: ", target_err);
-                        return transition_to_retry(msg_buf);
-                    }
-                    return ActivityTransition {
-                        activity: Activity::Predicting,
-                        message: Some(msg_buf),
-                    };
+        if let Some(server_time_result) = self.accept_calibration_tick(current_sample) {
+            let server_time = match server_time_result {
+                Ok(server_time) => server_time,
+                Err(err) => {
+                    append_error_detail(msg_buf, "", err);
+                    return transition_to_retry(msg_buf);
+                }
+            };
+            if self.pending_target_time.is_some() {
+                msg_buf.push_str("[성공] 정밀 보정 완료!");
+                if let Err(target_err) =
+                    self.confirm_pending_target_time(server_time, Instant::now(), msg_buf)
+                {
+                    append_error_detail(msg_buf, "\n목표 시각 확정 실패: ", target_err);
+                    return transition_to_retry(msg_buf);
                 }
                 return ActivityTransition {
                     activity: Activity::Predicting,
-                    message: Some("[성공] 정밀 보정 완료!"),
+                    message: Some(msg_buf),
                 };
             }
+            return ActivityTransition {
+                activity: Activity::Predicting,
+                message: Some("[성공] 정밀 보정 완료!"),
+            };
         }
         self.last_sample = Some(current_sample);
+        if Instant::now() >= deadline {
+            return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE);
+        }
+        if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration) {
+            append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
+            return transition_to_retry(msg_buf);
+        }
         ActivityTransition {
             activity: Activity::CalibrateOnTick,
             message: None,
@@ -768,7 +1028,7 @@ impl AppState {
         };
         let now = Instant::now();
         let current_server_time = st.current_server_time_at(now);
-        let sample_error_reported = match self.poll_final_countdown_sample() {
+        let sample_error_reported = match self.final_countdown_sampler.poll() {
             FinalCountdownSamplePoll::Sample(Ok(sample)) => {
                 return self.handle_final_countdown_sample(
                     target_time,
@@ -788,7 +1048,7 @@ impl AppState {
             ),
             FinalCountdownSamplePoll::Empty => false,
         };
-        let estimated_rtt = self.live_rtt.unwrap_or(st.baseline_rtt);
+        let estimated_rtt = self.live_rtt.map_or(st.baseline_rtt, |rtt| rtt);
         let Some(estimated_one_way_delay) = effective_one_way_delay(estimated_rtt) else {
             msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
             return ActivityTransition {
@@ -809,6 +1069,7 @@ impl AppState {
             let deadline = FinalCountdownDeadline {
                 one_way_delay: estimated_one_way_delay,
                 server_time: st,
+                source: CountdownTriggerSource::Estimated,
                 target_time,
                 trigger_instant,
             };
@@ -872,7 +1133,7 @@ impl AppState {
         *server_time = server_time.recalibrate_with_rtt(sample_rtt);
         let sample_now = Instant::now();
         let sampled_server_time = server_time.current_server_time_at(sample_now);
-        let old_rtt = self.live_rtt.unwrap_or(sample_rtt);
+        let old_rtt = self.live_rtt.map_or(sample_rtt, |rtt| rtt);
         let new_rtt_nanos = blend_weighted_nanos(
             old_rtt.as_nanos(),
             sample_rtt.as_nanos(),
@@ -902,6 +1163,7 @@ impl AppState {
             let deadline = FinalCountdownDeadline {
                 one_way_delay,
                 server_time: *server_time,
+                source: CountdownTriggerSource::Sampled { rtt: sample_rtt },
                 target_time,
                 trigger_instant,
             };
@@ -927,21 +1189,46 @@ impl AppState {
     fn handle_measure_baseline_rtt<'message>(
         &mut self,
         msg_buf: &'message mut String,
-        net_ctx: &mut NetworkContext,
         now: Instant,
         out: &mut dyn io::Write,
     ) -> ActivityTransition<'message> {
-        if self.baseline_rtt_attempts == 0 {
+        if self.baseline_rtt_attempts == 0
+            && self.baseline_rtt_valid_count == 0
+            && self.pending_sample_request.is_none()
+        {
             self.begin_baseline_rtt_measurement(now, out);
         }
-        if now < self.baseline_rtt_next_sample_at {
-            return ActivityTransition {
-                activity: Activity::MeasureBaselineRtt,
-                message: None,
-            };
-        }
-        let attempt_index = self.baseline_rtt_attempts;
-        let next_sample_base = match fetch_server_time_sample(&self.host, net_ctx) {
+        let had_pending_request = self.pending_sample_request.is_some();
+        let sample_result = match self.poll_sample_request() {
+            SampleRequestPoll::Sample {
+                kind: SampleRequestKind::Baseline { attempt_index },
+                result,
+            } => (attempt_index, result),
+            SampleRequestPoll::Sample { .. } | SampleRequestPoll::Empty => {
+                if had_pending_request || now < self.baseline_rtt_next_sample_at {
+                    return ActivityTransition {
+                        activity: Activity::MeasureBaselineRtt,
+                        message: None,
+                    };
+                }
+                let attempt_index = self.baseline_rtt_attempts;
+                let start_result =
+                    self.ensure_sample_request(&SampleRequestKind::Baseline { attempt_index });
+                if let Err(start_err) = start_result {
+                    append_error_detail(msg_buf, "RTT 샘플 요청 실패: ", start_err);
+                    return transition_to_retry(msg_buf);
+                }
+                return ActivityTransition {
+                    activity: Activity::MeasureBaselineRtt,
+                    message: None,
+                };
+            }
+            SampleRequestPoll::Disconnected => {
+                return transition_to_retry("서버 시간 샘플 worker가 종료되었습니다.");
+            }
+        };
+        let (attempt_index, result) = sample_result;
+        let next_sample_base = match result {
             Ok(sample) => {
                 if sample.rtt > Duration::ZERO {
                     let Some(slot) = self.baseline_rtt_samples.get_mut(attempt_index) else {
@@ -1005,6 +1292,7 @@ impl AppState {
             if self.live_rtt.is_none() {
                 self.live_rtt = Some(server_time.baseline_rtt);
             }
+            self.discard_partial_baseline_measurement();
             return ActivityTransition {
                 activity: Activity::FinalCountdown { target_time },
                 message: Some("최종 카운트다운 시작!"),
@@ -1014,7 +1302,7 @@ impl AppState {
             && warmup_remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW
         {
             let sample_interval = final_countdown_sample_interval(warmup_remaining);
-            if self.final_countdown_sampler.is_some() {
+            if self.final_countdown_sampler.sample_interval.is_some() {
                 self.set_final_countdown_sample_interval(sample_interval);
             } else {
                 match self.begin_final_countdown_sampling(sample_interval) {
@@ -1054,6 +1342,7 @@ impl AppState {
         if self.live_rtt.is_none() {
             self.live_rtt = Some(server_time.baseline_rtt);
         }
+        self.discard_partial_baseline_measurement();
         Some(ActivityTransition {
             activity: Activity::FinalCountdown { target_time },
             message: Some("최종 카운트다운 시작!"),
@@ -1074,15 +1363,10 @@ impl AppState {
             return transition;
         }
         match *activity {
-            Activity::MeasureBaselineRtt => self.handle_measure_baseline_rtt(
-                message_buffer,
-                runtime.network_context,
-                now,
-                runtime.out,
-            ),
-            Activity::CalibrateOnTick => {
-                self.handle_calibrate_on_tick(message_buffer, runtime.network_context)
+            Activity::MeasureBaselineRtt => {
+                self.handle_measure_baseline_rtt(message_buffer, now, runtime.out)
             }
+            Activity::CalibrateOnTick => self.handle_calibrate_on_tick(message_buffer),
             Activity::Predicting => self.handle_predicting(message_buffer, now),
             Activity::FinalCountdown { target_time } => self.handle_final_countdown(
                 target_time,
@@ -1109,40 +1393,67 @@ impl AppState {
             }
         }
     }
-    fn poll_final_countdown_sample(&mut self) -> FinalCountdownSamplePoll {
-        let Some(sampler) = self.final_countdown_sampler.as_ref() else {
-            return FinalCountdownSamplePoll::Empty;
-        };
-        let sampler_finished = sampler.join_handle.is_finished();
-        let sample_slot = Arc::clone(&sampler.sample_slot);
-        let mut slot = match sample_slot.try_lock() {
-            Ok(value) => value,
-            Err(TryLockError::WouldBlock) => {
-                if sampler_finished {
-                    self.disable_final_countdown_sampling();
-                    return FinalCountdownSamplePoll::Disconnected;
+    fn poll_sample_request(&mut self) -> SampleRequestPoll {
+        let Some(pending_generation) = self
+            .pending_sample_request
+            .as_ref()
+            .map(|request| request.generation)
+        else {
+            loop {
+                match self.sample_worker.response_receiver.try_recv() {
+                    Ok(_) => {}
+                    Err(mpsc::TryRecvError::Empty) => return SampleRequestPoll::Empty,
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        return if self.respawn_sample_worker() {
+                            SampleRequestPoll::Empty
+                        } else {
+                            SampleRequestPoll::Disconnected
+                        };
+                    }
                 }
-                return FinalCountdownSamplePoll::Empty;
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                self.disable_final_countdown_sampling();
-                return FinalCountdownSamplePoll::Sample(Err(TimeError::parse(
-                    "카운트다운 샘플 상태 잠금 실패",
-                )));
             }
         };
-        let latest_result = slot.latest_result.take();
-        drop(slot);
-        if sampler_finished {
-            self.disable_final_countdown_sampling();
+        loop {
+            match self.sample_worker.response_receiver.try_recv() {
+                Ok(response) => {
+                    if response.generation == pending_generation {
+                        self.pending_sample_request = None;
+                        return SampleRequestPoll::Sample {
+                            kind: response.kind,
+                            result: response.result,
+                        };
+                    }
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    if self.sample_worker.join_handle.is_finished() {
+                        self.pending_sample_request = None;
+                        return if self.respawn_sample_worker() {
+                            SampleRequestPoll::Empty
+                        } else {
+                            SampleRequestPoll::Disconnected
+                        };
+                    }
+                    return SampleRequestPoll::Empty;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.pending_sample_request = None;
+                    return if self.respawn_sample_worker() {
+                        SampleRequestPoll::Empty
+                    } else {
+                        SampleRequestPoll::Disconnected
+                    };
+                }
+            }
         }
-        if let Some(sample_result) = latest_result {
-            return FinalCountdownSamplePoll::Sample(sample_result);
+    }
+    fn respawn_sample_worker(&mut self) -> bool {
+        match spawn_sample_worker(Arc::clone(&self.host)) {
+            Ok(sample_worker) => {
+                self.sample_worker = sample_worker;
+                true
+            }
+            Err(_) => false,
         }
-        if sampler_finished {
-            return FinalCountdownSamplePoll::Disconnected;
-        }
-        FinalCountdownSamplePoll::Empty
     }
     fn run_loop(&mut self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         out.write_all("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)\n".as_bytes())?;
@@ -1166,7 +1477,6 @@ impl AppState {
         message_buffer
             .try_reserve(MESSAGE_BUFFER_CAPACITY)
             .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
-        let mut network_context = NetworkContext::new()?;
         let mut prepared_input = native_input::PreparedInput::EMPTY;
         let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
@@ -1187,8 +1497,9 @@ impl AppState {
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
             let now = Instant::now();
-            let countdown_activity = activity.is_final_countdown();
-            if !countdown_activity {
+            let timing_sensitive_activity =
+                self.should_prioritize_activity_transition(&activity, now);
+            if !timing_sensitive_activity {
                 self.run_loop_write_display_if_due(
                     &activity,
                     now,
@@ -1201,13 +1512,13 @@ impl AppState {
             let transition = {
                 let mut runtime = LoopRuntime {
                     err,
-                    network_context: &mut network_context,
                     out,
                     prepared_input: &mut prepared_input,
                 };
                 self.next_activity(&activity, &mut message_buffer, now, &mut runtime)
             };
             let next_activity = transition.activity;
+            self.sync_sample_request_state(&next_activity);
             self.sync_prepared_input_state(&activity, &next_activity, &mut prepared_input, err);
             cfg_select! {
                 windows => {
@@ -1222,7 +1533,7 @@ impl AppState {
                 false
             };
             activity = next_activity;
-            if countdown_activity && !transition_had_message {
+            if timing_sensitive_activity && !transition_had_message {
                 self.run_loop_write_display_if_due(
                     &activity,
                     Instant::now(),
@@ -1268,16 +1579,20 @@ impl AppState {
         Ok(())
     }
     fn set_final_countdown_sample_interval(&mut self, sample_interval: Duration) {
-        let Some(sampler) = self.final_countdown_sampler.as_mut() else {
-            return;
-        };
-        if sampler.sample_interval == sample_interval {
-            return;
+        self.final_countdown_sampler.set_interval(sample_interval);
+    }
+    fn should_prioritize_activity_transition(&self, activity: &Activity, now: Instant) -> bool {
+        if activity.is_final_countdown() {
+            return true;
         }
-        sampler.sample_interval = sample_interval;
-        let _send_result = sampler
-            .command_sender
-            .send(FinalCountdownSamplerCommand::SetInterval(sample_interval));
+        let Some(server_time) = self.server_time.as_ref() else {
+            return false;
+        };
+        self.target_time.is_some_and(|target| {
+            target
+                .duration_since(server_time.current_server_time_at(now))
+                .map_or(true, |remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+        })
     }
     fn should_update_display(&self, activity: &Activity, now: Instant) -> bool {
         let Activity::FinalCountdown { target_time } = *activity else {
@@ -1286,7 +1601,7 @@ impl AppState {
         let Some(server_time) = self.server_time else {
             return true;
         };
-        let rtt = self.live_rtt.unwrap_or(server_time.baseline_rtt);
+        let rtt = self.live_rtt.map_or(server_time.baseline_rtt, |rtt| rtt);
         let Some(one_way_delay) = effective_one_way_delay(rtt) else {
             return true;
         };
@@ -1307,8 +1622,31 @@ impl AppState {
                 if self.high_res_timer_guard.is_some() {
                     return;
                 }
-                // SAFETY: `time_begin_period` is a WinMM FFI call with a plain integer input.
-                if unsafe { time_begin_period(TARGET_PERIOD_MS) } != TIMERR_NOERROR {
+                // SAFETY: No security attributes or name are needed. On OS versions without
+                // high-resolution waitable timers this returns null and the code falls back to
+                // WinMM + thread::sleep.
+                let wait_timer_handle = unsafe {
+                    sys::create_waitable_timer_ex_w(
+                        null(),
+                        null(),
+                        CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                        SYNCHRONIZE_ACCESS | TIMER_MODIFY_STATE_ACCESS,
+                    )
+                };
+                let high_res_wait_timer =
+                    NonNull::new(wait_timer_handle).map(HighResTimerGuard::WaitTimer);
+                let acquired_timer_guard = high_res_wait_timer.map_or_else(
+                    || {
+                        // SAFETY: This fallback requests a process-wide WinMM timer period only
+                        // when the modern high-resolution waitable timer path is unavailable. A
+                        // successful request is paired with exactly one `timeEndPeriod` call from
+                        // `Drop`.
+                        let status = unsafe { sys::time_begin_period(TARGET_PERIOD_MS) };
+                        (status == TIMERR_NOERROR).then_some(HighResTimerGuard::PeriodAcquired)
+                    },
+                    Some,
+                );
+                let Some(timer_guard) = acquired_timer_guard else {
                     write_line_best_effort(
                         err,
                         format_args!(
@@ -1320,9 +1658,8 @@ impl AppState {
                         ),
                     );
                     return;
-                }
-                let guard = HighResTimerGuard;
-                self.high_res_timer_guard = Some(guard);
+                };
+                self.high_res_timer_guard = Some(timer_guard);
             }
         }
         _ => {}
@@ -1350,10 +1687,21 @@ impl AppState {
             prepared_input.reset();
         }
     }
+    const fn sync_sample_request_state(&mut self, next_activity: &Activity) {
+        if !matches!(
+            *next_activity,
+            Activity::MeasureBaselineRtt | Activity::CalibrateOnTick
+        ) {
+            self.cancel_sample_request();
+        }
+        if !matches!(*next_activity, Activity::CalibrateOnTick) {
+            self.calibration_deadline = None;
+        }
+    }
     fn trigger_and_finish<'message>(
         &mut self,
         msg_buf: &'message mut String,
-        timing_detail: fmt::Arguments,
+        timing_detail: fmt::Arguments<'_>,
         prepared_input: &mut native_input::PreparedInput,
         err: &mut dyn io::Write,
     ) -> ActivityTransition<'message> {
@@ -1403,11 +1751,12 @@ impl AppState {
                 prepared_input,
                 err,
             ),
-            (CountdownDecision::TriggerLate, CountdownTriggerSource::Estimated) => self
+            (CountdownDecision::TriggerLate(late_by), CountdownTriggerSource::Estimated) => self
                 .trigger_and_finish(
                     msg_buf,
                     format_args!(
-                        "(예측값 기준, 시간 초과) (지연 예측: {:.1}ms)",
+                        "(예측값 기준, 목표 초가 이미 시작되어 즉시 액션을 실행했습니다. ({:.1}ms 지연, 지연 예측: {:.1}ms))",
+                        duration_millis_f64(late_by),
                         duration_millis_f64(one_way_delay),
                     ),
                     prepared_input,
@@ -1427,17 +1776,19 @@ impl AppState {
                 prepared_input,
                 err,
             ),
-            (CountdownDecision::TriggerLate, CountdownTriggerSource::Sampled { rtt }) => self
-                .trigger_and_finish(
+            (CountdownDecision::TriggerLate(late_by), CountdownTriggerSource::Sampled { rtt }) => {
+                self.trigger_and_finish(
                     msg_buf,
                     format_args!(
-                        "(시간 초과) (지연 예측: {:.1}ms, 실측 RTT: {:.1}ms)",
+                        "(목표 초가 이미 시작되어 즉시 액션을 실행했습니다. ({:.1}ms 지연, 지연 예측: {:.1}ms, 실측 RTT: {:.1}ms))",
+                        duration_millis_f64(late_by),
                         duration_millis_f64(one_way_delay),
                         duration_millis_f64(rtt)
                     ),
                     prepared_input,
                     err,
-                ),
+                )
+            }
             (CountdownDecision::Wait, _) => ActivityTransition {
                 activity: Activity::Finished,
                 message: Some("카운트다운 판단 상태 오류"),
@@ -1459,7 +1810,19 @@ impl AppState {
                 .checked_sub(FINAL_COUNTDOWN_SLEEP_MARGIN)
                 && sleep_until > now
             {
-                thread::sleep(sleep_until.duration_since(now));
+                let sleep_duration = sleep_until.duration_since(now);
+                cfg_select! {
+                    target_os = "windows" => {
+                        if let Some(guard) = self.high_res_timer_guard.as_ref() {
+                            guard.sleep(sleep_duration);
+                        } else {
+                            thread::sleep(sleep_duration);
+                        }
+                    }
+                    _ => {
+                        thread::sleep(sleep_duration);
+                    }
+                }
             }
             while Instant::now() < deadline.trigger_instant {
                 spin_loop();
@@ -1473,13 +1836,13 @@ impl AppState {
             deadline.one_way_delay,
         ) {
             CountdownDecision::Wait => {
-                let remaining = deadline
-                    .target_time
-                    .duration_since(trigger_server_time)
-                    .unwrap_or(Duration::ZERO);
+                let remaining = match deadline.target_time.duration_since(trigger_server_time) {
+                    Ok(remaining) => remaining,
+                    Err(_past_target) => Duration::ZERO,
+                };
                 CountdownDecision::TriggerWithRemaining(remaining)
             }
-            CountdownDecision::TriggerLate => CountdownDecision::TriggerLate,
+            CountdownDecision::TriggerLate(late_by) => CountdownDecision::TriggerLate(late_by),
             CountdownDecision::TriggerWithRemaining(remaining) => {
                 CountdownDecision::TriggerWithRemaining(remaining)
             }
@@ -1488,14 +1851,11 @@ impl AppState {
             decision,
             msg_buf,
             deadline.one_way_delay,
-            CountdownTriggerSource::Estimated,
+            deadline.source,
             prepared_input,
             err,
         )
     }
-}
-fn owned_time_error_detail(err: impl fmt::Display) -> Cow<'static, str> {
-    Cow::Owned(err.to_string())
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
     NumericMul::mul(duration.as_secs_f64(), MILLIS_PER_SECOND_F64)
@@ -1527,7 +1887,11 @@ fn trigger_instant_for_target(
         return Some(now);
     };
     let target_instant = server_time.anchor_instant.checked_add(target_delta)?;
-    Some(target_instant.checked_sub(one_way_delay).unwrap_or(now))
+    Some(
+        target_instant
+            .checked_sub(one_way_delay)
+            .map_or(now, |trigger_instant| trigger_instant),
+    )
 }
 fn decide_countdown_action(
     target_time: SystemTime,
@@ -1538,7 +1902,7 @@ fn decide_countdown_action(
         Ok(duration_until_target) if duration_until_target <= one_way_delay => {
             CountdownDecision::TriggerWithRemaining(duration_until_target)
         }
-        Err(_) => CountdownDecision::TriggerLate,
+        Err(late) => CountdownDecision::TriggerLate(late.duration()),
         Ok(_) => CountdownDecision::Wait,
     }
 }

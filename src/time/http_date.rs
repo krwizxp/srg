@@ -170,9 +170,9 @@ impl HttpDateComponents {
                 Err(err) => {
                     let secs_before_epoch = err.duration().as_secs();
                     let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
-                    clamp_u64_day_count(days_before_epoch)
-                        .checked_neg()
-                        .unwrap_or(i64::MIN)
+                    0_i64
+                        .checked_sub(clamp_u64_day_count(days_before_epoch))
+                        .ok_or_else(|| TimeError::parse(ERR_FORMAT))?
                 }
             };
             let day_index = match i32::try_from(day_index_i64) {

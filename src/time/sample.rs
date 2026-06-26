@@ -14,6 +14,8 @@ const TCP_HEAD_REQUEST_SUFFIX: &[u8] = b"\r\nUser-Agent: Rust-Time-Sync\r\n\r\n"
 const TCP_MAX_HEADER_BYTES: usize = 64 * 1024;
 const TCP_MAX_HEADER_LINE_BYTES: usize = 8192;
 const TCP_MAX_HEADER_LINE_READ_BYTES: u64 = 8193;
+const TCP_MAX_INFORMATIONAL_RESPONSES: u8 = 16;
+const AGE_HEADER_PREFIX: &[u8; 4] = b"age:";
 const CONNECTION_HEADER_NAME: &[u8; 10] = b"connection";
 const DATE_HEADER_PREFIX: &[u8; 5] = b"date:";
 const HTTP_STATUS_PREFIX: &[u8; 5] = b"HTTP/";
@@ -32,6 +34,7 @@ struct TcpStatusLine {
     version: HttpVersion,
 }
 struct TcpHeaderBlock {
+    age_result: Option<Result<()>>,
     date_sample: Option<CoreResult<(SystemTime, Instant), TimeError>>,
     has_connection_close: bool,
     has_connection_keep_alive: bool,
@@ -79,6 +82,7 @@ impl TcpHeaderBlock {
 impl TcpResponseReader<'_, '_> {
     fn read_header_block(&mut self) -> CoreResult<TcpHeaderBlock, TcpAttemptError> {
         let mut header_block = TcpHeaderBlock {
+            age_result: None,
             date_sample: None,
             has_connection_close: false,
             has_connection_keep_alive: false,
@@ -91,20 +95,37 @@ impl TcpResponseReader<'_, '_> {
             if self.net_ctx.tcp_line_buffer == b"\r\n" || self.net_ctx.tcp_line_buffer == b"\n" {
                 return Ok(header_block);
             }
-            if header_block.date_sample.is_none() {
-                let maybe_date_str = find_date_header_value(&self.net_ctx.tcp_line_buffer)
-                    .map_err(|source| {
-                        TcpAttemptError::non_retryable(TimeError::parse(format!(
-                            "TCP Date 헤더 UTF-8 변환 실패: {source}"
-                        )))
-                    })?;
-                if let Some(date_str) = maybe_date_str {
-                    let response_received_inst = Instant::now();
-                    header_block.date_sample = Some(
-                        parse_http_date_to_systemtime(date_str)
-                            .map(|server_time| (server_time, response_received_inst)),
-                    );
+            let maybe_date_str =
+                find_date_header_value(&self.net_ctx.tcp_line_buffer).map_err(|source| {
+                    TcpAttemptError::non_retryable(TimeError::parse(format!(
+                        "TCP Date 헤더 UTF-8 변환 실패: {source}"
+                    )))
+                })?;
+            if let Some(date_str) = maybe_date_str {
+                if header_block.date_sample.is_some() {
+                    return Err(TcpAttemptError::non_retryable(TimeError::parse(
+                        "TCP Date 헤더가 여러 개입니다.",
+                    )));
                 }
+                let response_received_inst = Instant::now();
+                header_block.date_sample = Some(
+                    parse_http_date_to_systemtime(date_str)
+                        .map(|server_time| (server_time, response_received_inst)),
+                );
+            }
+            let maybe_age_str =
+                find_age_header_value(&self.net_ctx.tcp_line_buffer).map_err(|source| {
+                    TcpAttemptError::non_retryable(TimeError::parse(format!(
+                        "TCP Age 헤더 UTF-8 변환 실패: {source}"
+                    )))
+                })?;
+            if let Some(age_str) = maybe_age_str {
+                header_block.age_result = Some(if header_block.age_result.is_some() {
+                    Err(TimeError::parse("TCP Age 헤더가 여러 개입니다."))
+                } else {
+                    validate_http_age_value(age_str)
+                        .map_err(|message| TimeError::parse(format!("TCP {message}")))
+                });
             }
             self.update_connection_tokens(&mut header_block);
         }
@@ -139,13 +160,27 @@ impl TcpResponseReader<'_, '_> {
         Ok(bytes_read)
     }
     fn read_response(&mut self) -> CoreResult<TcpResponseSample, TcpAttemptError> {
+        let mut informational_count = 0_u8;
         loop {
             let status = self.read_status_line()?;
             let header_block = self.read_header_block()?;
             if (100..=199).contains(&status.code) {
+                informational_count = informational_count.checked_add(1).ok_or_else(|| {
+                    TcpAttemptError::non_retryable(TimeError::parse(
+                        "TCP HTTP informational 응답이 너무 많습니다.",
+                    ))
+                })?;
+                if informational_count > TCP_MAX_INFORMATIONAL_RESPONSES {
+                    return Err(TcpAttemptError::non_retryable(TimeError::parse(
+                        "TCP HTTP informational 응답이 너무 많습니다.",
+                    )));
+                }
                 continue;
             }
             let reusable = header_block.reusable(&status.version);
+            if let Some(age_result) = header_block.age_result {
+                age_result.map_err(TcpAttemptError::non_retryable)?;
+            }
             let Some(final_date_sample) = header_block.date_sample else {
                 return Err(TcpAttemptError::non_retryable(missing_tcp_date()));
             };
@@ -195,6 +230,14 @@ impl TcpResponseReader<'_, '_> {
                 "TCP HTTP 상태 코드가 올바르지 않습니다.",
             )));
         };
+        if status_tail
+            .get(3)
+            .is_some_and(|byte| !byte.is_ascii_whitespace())
+        {
+            return Err(TcpAttemptError::non_retryable(TimeError::parse(
+                "TCP HTTP 상태 코드가 올바르지 않습니다.",
+            )));
+        }
         let [hundreds, tens, ones] = *status_digits;
         let Some(hundreds_digit) = hundreds.checked_sub(b'0') else {
             return Err(TcpAttemptError::non_retryable(TimeError::parse(
@@ -263,6 +306,15 @@ impl TcpResponseReader<'_, '_> {
         }
     }
 }
+pub(super) fn find_age_header_value(line: &[u8]) -> CoreResult<Option<&str>, str::Utf8Error> {
+    let Some((prefix, value)) = line.split_first_chunk::<4>() else {
+        return Ok(None);
+    };
+    if !prefix.eq_ignore_ascii_case(AGE_HEADER_PREFIX) {
+        return Ok(None);
+    }
+    str::from_utf8(value).map(str::trim_ascii).map(Some)
+}
 pub(super) fn find_date_header_value(line: &[u8]) -> CoreResult<Option<&str>, str::Utf8Error> {
     let Some((prefix, value)) = line.split_first_chunk::<5>() else {
         return Ok(None);
@@ -272,6 +324,20 @@ pub(super) fn find_date_header_value(line: &[u8]) -> CoreResult<Option<&str>, st
     }
     str::from_utf8(value).map(str::trim_ascii).map(Some)
 }
+pub(super) fn validate_http_age_value(value: &str) -> CoreResult<(), &'static str> {
+    let trimmed_value = value.trim_ascii();
+    if trimmed_value.is_empty() {
+        return Err("Age 헤더 값이 비어 있습니다.");
+    }
+    let age_seconds = trimmed_value
+        .parse::<u64>()
+        .map_err(|_source| "Age 헤더 값이 숫자가 아닙니다.")?;
+    if age_seconds == 0 {
+        Ok(())
+    } else {
+        Err("Age 헤더가 0보다 커 캐시된 응답입니다.")
+    }
+}
 fn missing_tcp_date() -> TimeError {
     TimeError::header_not_found("Date (TCP)")
 }
@@ -279,16 +345,16 @@ pub(super) fn fetch_server_time_sample(
     parsed_address: &ParsedServer,
     net_ctx: &mut NetworkContext,
 ) -> Result<TimeSample> {
-    if matches!(parsed_address.scheme(), UrlScheme::Https) {
+    if matches!(parsed_address.scheme, UrlScheme::Https) {
         return net_ctx
             .native_http
-            .fetch_head_sample(parsed_address.url(UrlScheme::Https), "HTTPS");
+            .fetch_head_sample(&parsed_address.secure_url, "HTTPS");
     }
     let cached_connection = if net_ctx
         .cached_tcp_connection
         .as_ref()
         .is_some_and(|cached| {
-            cached.host.as_str() == parsed_address.host() && cached.port == parsed_address.port()
+            cached.host.as_str() == parsed_address.host && cached.port == parsed_address.port
         }) {
         net_ctx.cached_tcp_connection.take()
     } else {
@@ -314,15 +380,14 @@ fn connect_tcp_connection(
     net_ctx: &mut NetworkContext,
 ) -> Result<CachedTcpConnection> {
     let stream = 'connect: {
-        if let Some(cached_socket_addr) = parsed_address.literal_tcp_socket_addr() {
+        if let Some(cached_socket_addr) = parsed_address.literal_tcp_socket_addr {
             break 'connect TcpStream::connect_timeout(&cached_socket_addr, TCP_TIMEOUT)?;
         }
         if let Some(cached_socket_addr) = net_ctx
             .cached_tcp_socket_addr
             .as_ref()
             .filter(|cached| {
-                cached.host.as_str() == parsed_address.host()
-                    && cached.port == parsed_address.port()
+                cached.host.as_str() == parsed_address.host && cached.port == parsed_address.port
             })
             .map(|cached| cached.addr)
         {
@@ -332,20 +397,20 @@ fn connect_tcp_connection(
             net_ctx.cached_tcp_socket_addr = None;
         }
         let mut last_connect_error = None;
-        let addrs = (parsed_address.host(), parsed_address.port()).to_socket_addrs()?;
+        let addrs = (parsed_address.host.as_str(), parsed_address.port).to_socket_addrs()?;
         for socket_addr in addrs {
             match TcpStream::connect_timeout(&socket_addr, TCP_TIMEOUT) {
                 Ok(stream) => {
                     let mut host = String::new();
-                    host.try_reserve(parsed_address.host().len())
+                    host.try_reserve(parsed_address.host.len())
                         .map_err(|source| {
                             TimeError::parse(format!("TCP cache host 메모리 확보 실패: {source}"))
                         })?;
-                    host.push_str(parsed_address.host());
+                    host.push_str(&parsed_address.host);
                     net_ctx.cached_tcp_socket_addr = Some(CachedTcpSocketAddr {
                         addr: socket_addr,
                         host,
-                        port: parsed_address.port(),
+                        port: parsed_address.port,
                     });
                     break 'connect stream;
                 }
@@ -354,21 +419,24 @@ fn connect_tcp_connection(
                 }
             }
         }
-        let host_not_found = || io::Error::new(io::ErrorKind::NotFound, "Host not found");
-        return Err(TimeError::from(
-            last_connect_error.unwrap_or_else(host_not_found),
-        ));
+        if let Some(connect_error) = last_connect_error {
+            return Err(TimeError::from(connect_error));
+        }
+        return Err(TimeError::from(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Host not found",
+        )));
     };
     stream.set_read_timeout(Some(TCP_TIMEOUT))?;
     stream.set_write_timeout(Some(TCP_TIMEOUT))?;
     stream.set_nodelay(true)?;
     let mut host = String::new();
-    host.try_reserve(parsed_address.host().len())
+    host.try_reserve(parsed_address.host.len())
         .map_err(|source| TimeError::parse(format!("TCP cache host 메모리 확보 실패: {source}")))?;
-    host.push_str(parsed_address.host());
+    host.push_str(&parsed_address.host);
     Ok(CachedTcpConnection {
         host,
-        port: parsed_address.port(),
+        port: parsed_address.port,
         reader: BufReader::new(stream),
     })
 }
@@ -378,7 +446,7 @@ fn sample_from_tcp_connection(
     mut connection: CachedTcpConnection,
 ) -> CoreResult<TimeSample, TcpAttemptError> {
     net_ctx.tcp_request_buffer.clear();
-    let host_header = parsed_address.tcp_host_header_value();
+    let host_header = parsed_address.tcp_host_header.as_str();
     let request_len = TCP_HEAD_REQUEST_PREFIX
         .len()
         .checked_add(host_header.len())

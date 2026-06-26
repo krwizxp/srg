@@ -10,7 +10,7 @@ pub(super) enum Activity {
     Retrying { retry_at: Instant },
 }
 pub(super) enum CountdownDecision {
-    TriggerLate,
+    TriggerLate(Duration),
     TriggerWithRemaining(Duration),
     Wait,
 }

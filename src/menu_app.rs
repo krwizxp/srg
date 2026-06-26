@@ -1,7 +1,7 @@
 use crate::{
     constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL},
-    diagnostic::Result,
-    file_output::{lock_mutex, open_or_create_file, validate_safe_output_file_path},
+    diagnostic::{AppError, Result},
+    file_output::validate_safe_output_file_path,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_data::RandomDataSet,
@@ -12,7 +12,7 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
-            diagnostic::AppError,
+            file_output::{ensure_file_guard_current, lock_mutex},
             hardware_rng::{
                 HardwareRandomSource, get_hardware_random, hardware_random_source,
                 take_rdseed_fallback_notice,
@@ -25,6 +25,12 @@ cfg_select! {
         use crate::random_number::RandomNumberMode;
     }
     _ => {}
+}
+cfg_select! {
+    target_arch = "x86_64" => {}
+    _ => {
+        use crate::{file_output::open_or_create_file, random_data::generate_random_data};
+    }
 }
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
@@ -113,11 +119,25 @@ impl MenuApp {
             }
             _ => {
                 match command {
-                    b'1' | b'2' | b'3' | b'4' => {
-                        writeln!(
-                            out,
-                            "이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다."
-                        )?;
+                    b'1' => {
+                        if let Err(disabled_error) = generate_random_data() {
+                            writeln!(out, "1번 메뉴: {disabled_error}")?;
+                        }
+                    }
+                    b'2' => {
+                        if let Err(disabled_error) = generate_random_data() {
+                            writeln!(out, "2번 메뉴: {disabled_error}")?;
+                        }
+                    }
+                    b'3' => {
+                        if let Err(disabled_error) = generate_random_data() {
+                            writeln!(out, "3번 메뉴: {disabled_error}")?;
+                        }
+                    }
+                    b'4' => {
+                        if let Err(disabled_error) = generate_random_data() {
+                            writeln!(out, "4번 메뉴: {disabled_error}")?;
+                        }
                     }
                     _ => return Ok(false),
                 }
@@ -239,10 +259,6 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        if !Path::new(FILE_NAME).try_exists()? {
-            *lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 생성 시)")? =
-                open_or_create_file()?;
-        }
         writeln!(out, "\nnum_64/supp 수동 입력 변환 모드")?;
         self.input_buffer.clear();
         let manual_num_64 = read_u64_hex_input(
@@ -281,34 +297,29 @@ impl MenuApp {
             )?;
             Ok(supp)
         };
-        let data = cfg_select! {
-            target_arch = "x86_64" => {{
-                RandomDataSet::build(manual_num_64, &mut next_supp)?
-            }}
-            _ => {{
-                let mut state = crate::random_data::RandomDataBuildState {
-                    data: RandomDataSet {
-                        num_64: manual_num_64,
-                        ..Default::default()
-                    },
-                    next_supp: &mut next_supp,
-                    num: manual_num_64,
-                    supplemental: None,
-                };
-                state.fill_required_fields()?;
-                state.fill_lucky_stars()?;
-                state.fill_hangul_syllables()?;
-                state.fill_coords()?;
-                state.fill_nms_fields()?;
-                state.data
-            }}
-        };
+        let data = RandomDataSet::build_from(manual_num_64, &mut next_supp)?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
-        {
-            let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-            Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
-            Write::flush(&mut *file_guard)?;
+        cfg_select! {
+            target_arch = "x86_64" => {{
+                let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
+                ensure_file_guard_current(&mut file_guard)?;
+                Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
+                Write::flush(&mut *file_guard)?;
+            }}
+            _ => {{
+                let mut file_guard = self
+                    .file_mutex
+                    .lock()
+                    .map_err(|lock_error| {
+                        AppError::message(format!(
+                            "Mutex 잠금 실패 (단일 쓰기 시): {lock_error}"
+                        ))
+                })?;
+                *file_guard = open_or_create_file()?;
+                Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
+                Write::flush(&mut *file_guard)?;
+            }}
         }
         let console_len = if *IS_TERMINAL {
             format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
@@ -379,7 +390,7 @@ impl MenuApp {
             Ok(())
         })();
         if let Err(time_err) = time_run_result
-            && time_err.io_kind() != Some(ErrorKind::UnexpectedEof)
+            && !time_err.is_unexpected_eof()
         {
             writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?;
         }
@@ -438,7 +449,7 @@ impl MenuApp {
         )?;
         Ok(Some(action))
     }
-    pub(super) fn run(&mut self) -> Result<ExitCode> {
+    pub fn run(&mut self) -> Result<ExitCode> {
         let menu_prompt = format_args!("{MENU}");
         loop {
             let command = {
@@ -463,9 +474,7 @@ impl MenuApp {
             let mut err = stderr();
             let keep_running = match self.execute_command(command, &mut out, &mut err) {
                 Ok(keep_running) => keep_running,
-                Err(command_err)
-                    if command_err.io_error_kind() == Some(ErrorKind::UnexpectedEof) =>
-                {
+                Err(command_err) if command_err.is_unexpected_eof() => {
                     return Ok(ExitCode::SUCCESS);
                 }
                 Err(command_err) => return Err(command_err),

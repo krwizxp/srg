@@ -1,6 +1,6 @@
 [package]
 name = "srg"
-version = "1.5.6"
+version = "1.5.7"
 categories = ["command-line-utilities", "date-and-time", "encoding"]
 edition = "2024"
 rust-version = "1.96"
@@ -11,6 +11,10 @@ description = """\
 Hardware RNG-based random data generator with high-precision server time sync \
 utility\
 """
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_unsafe = "deny"
 
 [lints.clippy]
 big_endian_bytes = "allow"
@@ -28,12 +32,16 @@ pedantic = { level = "warn", priority = -1 }
 perf = { level = "warn", priority = -1 }
 pub_with_shorthand = "allow"
 question_mark_used = "allow"
+expect_used = "deny"
+redundant_clone = "warn"
 restriction = { level = "warn", priority = -1 }
 self_named_module_files = "allow"
 semicolon_outside_block = "allow"
 separated_literal_suffix = "allow"
 style = { level = "warn", priority = -1 }
 suspicious = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
 
 [profile.release]
 codegen-units = 1

@@ -19,11 +19,13 @@ use crate::{
 };
 cfg_select! {
     target_arch = "x86_64" => {
+        use crate::diagnostic::AppError;
         use super::hardware_rng::get_hardware_random;
     }
     _ => {}
 }
 use core::{char::from_u32, ops::Mul as NumericMul};
+use std::io::Error as IoError;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 #[derive(Default)]
 pub struct Coordinates {
@@ -86,18 +88,17 @@ impl RandomBitBuffer {
         self.value
     }
 }
-pub struct RandomDataBuildState<'provider_ref, F>
+struct RandomDataBuildState<'provider_ref, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    pub data: RandomDataSet,
-    pub next_supp: &'provider_ref mut F,
-    pub num: u64,
-    pub supplemental: Option<RandomBitBuffer>,
+    data: RandomDataSet,
+    next_supp: &'provider_ref mut F,
+    num: u64,
+    supplemental: Option<RandomBitBuffer>,
 }
 impl RandomDataSet {
-    #[cfg(target_arch = "x86_64")]
-    pub fn build<F>(num: u64, next_supp: &mut F) -> Result<Self>
+    pub fn build_from<F>(num: u64, next_supp: &mut F) -> Result<Self>
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
@@ -129,7 +130,7 @@ impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    pub fn fill_coords(&mut self) -> Result<()> {
+    fn fill_coords(&mut self) -> Result<()> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -151,7 +152,7 @@ where
         self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz)?;
         Ok(())
     }
-    pub fn fill_hangul_syllables(&mut self) -> Result<()> {
+    fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
@@ -188,7 +189,7 @@ where
         self.data.hangul_syllables = hangul;
         Ok(())
     }
-    pub fn fill_lucky_stars(&mut self) -> Result<()> {
+    fn fill_lucky_stars(&mut self) -> Result<()> {
         let lucky_star_base = self
             .supplemental
             .as_ref()
@@ -217,7 +218,7 @@ where
         }
         Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into())
     }
-    pub fn fill_nms_fields(&mut self) -> Result<()> {
+    fn fill_nms_fields(&mut self) -> Result<()> {
         let planet_number_base = extract_valid_bits_for_nms::<4>(
             self.num,
             &[52, 4, 0],
@@ -267,7 +268,7 @@ where
         }
         Ok(())
     }
-    pub fn fill_required_fields(&mut self) -> Result<()> {
+    fn fill_required_fields(&mut self) -> Result<()> {
         fill_data_fields_from_u64(self.num, &mut self.data);
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
             if self.data.is_complete() {
@@ -291,12 +292,19 @@ cfg_select! {
         pub fn generate_random_data() -> Result<RandomDataSet> {
             let num = get_hardware_random()?;
             let mut next_supp = |reason: &'static str| -> Result<u64> {
-                get_hardware_random().map_err(|source| source.prepend_context(reason))
+                get_hardware_random().map_err(|source| AppError::context(reason, source))
             };
-            RandomDataSet::build(num, &mut next_supp)
+            RandomDataSet::build_from(num, &mut next_supp)
         }
     }
-    _ => {}
+    _ => {
+        pub fn generate_random_data() -> Result<RandomDataSet> {
+            let mut next_supp = |_reason: &'static str| -> Result<u64> {
+                Err("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.".into())
+            };
+            RandomDataSet::build_from(0, &mut next_supp)
+        }
+    }
 }
 fn fill_data_fields_from_u64(value: u64, data: &mut RandomDataSet) {
     for byte in value.to_be_bytes() {
@@ -426,10 +434,14 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     let mask = match bit_count {
         0 => 0,
         64 => u64::MAX,
-        _ => 1_u64
-            .checked_shl(u32::from(bit_count))
-            .and_then(|shifted| shifted.checked_sub(1))
-            .unwrap_or_default(),
+        _ => {
+            let shifted = 1_u64
+                .checked_shl(u32::from(bit_count))
+                .ok_or_else(|| IoError::other("NMS bit mask shift 계산 실패"))?;
+            shifted
+                .checked_sub(1)
+                .ok_or_else(|| IoError::other("NMS bit mask 계산 실패"))?
+        }
     };
     if let Some(extracted_value) = shifts.iter().find_map(|&shift| {
         let value = (num >> shift) & mask;

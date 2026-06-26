@@ -1,4 +1,3 @@
-pub(super) use super::sample::find_date_header_value;
 use super::{
     MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, TimeError, TimeErrorKind, TimeSample,
     http_date::parse_http_date_to_systemtime,

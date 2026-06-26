@@ -1,43 +1,61 @@
 use super::{
     HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, error,
-    find_date_header_value,
+};
+use super::super::sample::{
+    find_age_header_value, find_date_header_value, validate_http_age_value,
 };
 use alloc::{borrow::Cow, ffi::CString, string::String, vec::Vec};
 use core::{
-    ffi::{CStr, c_char, c_int, c_long, c_void},
-    ptr::NonNull,
+    ffi::{CStr, c_char, c_int, c_long, c_uint, c_void},
+    ptr::{NonNull, null},
+    slice,
 };
 use std::{sync::LazyLock, time::Instant};
 mod sys {
-    use super::{Curl, CurlCode, CurlOption, c_char, c_long};
+    use super::{
+        Curl, CurlCode, CurlInfo, CurlOption, CurlVersion, CurlVersionInfoData, c_char, c_long,
+    };
     #[link(name = "curl")]
     unsafe extern "C" {
-        pub(super) fn curl_easy_cleanup(curl: *mut Curl);
-        pub(super) fn curl_easy_init() -> *mut Curl;
-        pub(super) fn curl_easy_perform(curl: *mut Curl) -> CurlCode;
-        pub(super) fn curl_easy_reset(curl: *mut Curl);
-        pub(super) fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
-        pub(super) fn curl_easy_strerror(code: CurlCode) -> *const c_char;
-        pub(super) fn curl_global_init(flags: c_long) -> CurlCode;
+        pub fn curl_easy_cleanup(curl: *mut Curl);
+        pub fn curl_easy_getinfo(curl: *mut Curl, info: CurlInfo, ...) -> CurlCode;
+        pub fn curl_easy_init() -> *mut Curl;
+        pub fn curl_easy_perform(curl: *mut Curl) -> CurlCode;
+        pub fn curl_easy_reset(curl: *mut Curl);
+        pub fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
+        pub fn curl_easy_strerror(code: CurlCode) -> *const c_char;
+        pub fn curl_global_init(flags: c_long) -> CurlCode;
+        pub fn curl_version_info(age: CurlVersion) -> *const CurlVersionInfoData;
     }
 }
 const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
 const CURL_GLOBAL_DEFAULT: c_long = 3;
-const CURLOPT_CONNECTTIMEOUT: CurlOption = 78;
+const CURLINFO_SCHEME: CurlInfo = 0x10_0031;
+const CURL_MIN_PROTOCOLS_STR_VERSION: c_uint = 0x07_55_00;
+const CURLVERSION_NOW: CurlVersion = 11;
+const CURLOPT_CONNECTTIMEOUT_MS: CurlOption = 156;
 const CURLOPT_ERRORBUFFER: CurlOption = 10_010;
 const CURLOPT_FOLLOWLOCATION: CurlOption = 52;
 const CURLOPT_HEADERDATA: CurlOption = 10_029;
 const CURLOPT_HEADERFUNCTION: CurlOption = 20_079;
+const CURLOPT_MAXREDIRS: CurlOption = 68;
 const CURLOPT_NOBODY: CurlOption = 44;
 const CURLOPT_NOSIGNAL: CurlOption = 99;
-const CURLOPT_TIMEOUT: CurlOption = 13;
+const CURLOPT_PROTOCOLS_STR: CurlOption = 10_318;
+const CURLOPT_REDIR_PROTOCOLS_STR: CurlOption = 10_319;
+const CURLOPT_SSLVERSION: CurlOption = 32;
+const CURLOPT_TIMEOUT_MS: CurlOption = 155;
 const CURLOPT_URL: CurlOption = 10_002;
 const CURLOPT_USERAGENT: CurlOption = 10_018;
 const CURLOPT_WRITEDATA: CurlOption = 10_001;
 const CURLOPT_WRITEFUNCTION: CurlOption = 20_011;
+const CURL_SSLVERSION_MAX_DEFAULT: c_long = 1 << 16;
+const CURL_SSLVERSION_TLSV1_2: c_long = 6;
 const HTTP_HEAD_MAX_BODY_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 1024 * 1024;
+const HTTPS_PROTOCOL_C_BYTES: &[u8] = b"https\0";
+const MAX_HTTP_REDIRECTS: c_long = 5;
 const USER_AGENT_C_BYTES: &[u8] = concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
 static CURL_INIT: LazyLock<CurlCode> = LazyLock::new(|| {
     // SAFETY: LazyLock runs this initializer once before any easy handles are used.
@@ -45,22 +63,38 @@ static CURL_INIT: LazyLock<CurlCode> = LazyLock::new(|| {
 });
 type Curl = c_void;
 type CurlCode = c_int;
+type CurlInfo = c_int;
 type CurlOption = c_int;
+type CurlVersion = c_int;
 type CurlWriteCallback = unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize;
+#[repr(C)]
+struct CurlVersionInfoData {
+    age: CurlVersion,
+    version: *const c_char,
+    version_num: c_uint,
+}
 #[derive(Default)]
 pub(super) struct Client {
     easy_handle: Option<EasyHandle>,
 }
 struct EasyHandle(NonNull<Curl>);
+#[derive(Default)]
 struct CurlBodySink {
     bytes_seen: usize,
     error: Option<Cow<'static, str>>,
     limit: usize,
 }
+#[derive(Default)]
 struct CurlHeaderCapture {
+    age_error: Option<Cow<'static, str>>,
     bytes_seen: usize,
+    current_block_age_error: Option<Cow<'static, str>>,
+    current_block_age_seen: bool,
     current_block_date: Option<String>,
+    current_block_date_error: Option<Cow<'static, str>>,
     current_block_date_received_inst: Option<Instant>,
+    current_block_date_seen: bool,
+    date_error: Option<Cow<'static, str>>,
     date_header: Option<String>,
     date_received_inst: Option<Instant>,
     error: Option<Cow<'static, str>>,
@@ -88,6 +122,81 @@ impl Drop for EasyHandle {
 impl EasyHandle {
     const fn as_ptr(&self) -> *mut Curl {
         self.0.as_ptr()
+    }
+    fn configure_head_request(
+        &self,
+        url: &CStr,
+        user_agent: &CStr,
+        error_buffer: &mut [c_char; CURL_ERROR_SIZE],
+        context: &str,
+    ) -> Result<()> {
+        self.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
+        self.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
+        self.setopt_str(CURLOPT_URL, url.as_ptr(), context)?;
+        self.setopt_str(CURLOPT_USERAGENT, user_agent.as_ptr(), context)?;
+        self.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
+        self.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, tcp_timeout_millis(), context)?;
+        self.setopt_long(CURLOPT_TIMEOUT_MS, tcp_timeout_millis(), context)?;
+        self.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
+        self.setopt_long(CURLOPT_NOBODY, 1, context)?;
+        self.setopt_long(CURLOPT_FOLLOWLOCATION, 1, context)?;
+        self.setopt_long(CURLOPT_MAXREDIRS, MAX_HTTP_REDIRECTS, context)?;
+        self.setopt_long(
+            CURLOPT_SSLVERSION,
+            CURL_SSLVERSION_TLSV1_2 | CURL_SSLVERSION_MAX_DEFAULT,
+            context,
+        )?;
+        // SAFETY: curl_global_init has completed and libcurl returns a process-wide immutable
+        // version info pointer. We only read prefix fields present since curl_version_info exists.
+        let version_info =
+            NonNull::new(unsafe { sys::curl_version_info(CURLVERSION_NOW).cast_mut() })
+                .ok_or_else(|| error(context, "curl_version_info 실패"))?;
+        // SAFETY: version_info is non-null and points to libcurl's version info.
+        let version_info_ref = unsafe { version_info.as_ref() };
+        if version_info_ref.version_num < CURL_MIN_PROTOCOLS_STR_VERSION {
+            let version = NonNull::new(version_info_ref.version.cast_mut()).map_or_else(
+                || Cow::Borrowed("unknown"),
+                |version_ptr| {
+                    // SAFETY: libcurl documents version as an ASCII NUL-terminated string.
+                    unsafe { CStr::from_ptr(version_ptr.as_ptr()) }.to_string_lossy()
+                },
+            );
+            return Err(error(
+                context,
+                format!(
+                    "libcurl {version}은 HTTPS protocol 제한 최신 API를 지원하지 않습니다. libcurl 7.85.0 이상이 필요합니다."
+                ),
+            ));
+        }
+        let https_protocol = CStr::from_bytes_with_nul(HTTPS_PROTOCOL_C_BYTES)
+            .map_err(|source| error(context, format!("curl HTTPS protocol 문자열 해석 실패: {source}")))?;
+        self.setopt_str(CURLOPT_PROTOCOLS_STR, https_protocol.as_ptr(), context)?;
+        self.setopt_str(CURLOPT_REDIR_PROTOCOLS_STR, https_protocol.as_ptr(), context)?;
+        Ok(())
+    }
+    fn ensure_https_scheme(&self, context: &str) -> Result<()> {
+        let mut scheme = null::<c_char>();
+        // SAFETY: scheme is a valid output pointer for CURLINFO_SCHEME.
+        let code = unsafe { sys::curl_easy_getinfo(self.as_ptr(), CURLINFO_SCHEME, &raw mut scheme) };
+        if code != CURLE_OK {
+            return Err(error(context, curl_error("curl_easy_getinfo scheme", code)));
+        }
+        let Some(scheme_ptr) = NonNull::new(scheme.cast_mut()) else {
+            return Err(error(context, "curl 최종 scheme이 비어 있습니다."));
+        };
+        // SAFETY: libcurl returns a NUL-terminated scheme string owned by the easy handle.
+        let scheme_bytes = unsafe { CStr::from_ptr(scheme_ptr.as_ptr()) }.to_bytes();
+        if scheme_bytes.eq_ignore_ascii_case(b"https") {
+            Ok(())
+        } else {
+            Err(error(
+                context,
+                format!(
+                    "curl 최종 scheme이 HTTPS가 아닙니다: {}",
+                    String::from_utf8_lossy(scheme_bytes)
+                ),
+            ))
+        }
     }
     fn perform(&self) -> CurlCode {
         // SAFETY: self.0 is configured with callbacks and buffers that live until the call returns.
@@ -149,24 +258,22 @@ impl Client {
         &mut self,
         url: &str,
         context: &str,
-        parse_http_date: ParseHttpDate,
+        uarse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
-        let url_c = CString::new(url)
-            .map_err(|source| error(context, format!("URL에 NUL 문자가 포함되어 있습니다: {source}")))?;
-        let user_agent = CStr::from_bytes_with_nul(USER_AGENT_C_BYTES)
-            .map_err(|source| error(context, format!("User-Agent C string 해석 실패: {source}")))?;
+        let url_c = CString::new(url).map_err(|source| {
+            error(context, format!("URL에 NUL 문자가 포함되어 있습니다: {source}"))
+        })?;
+        let user_agent = CStr::from_bytes_with_nul(USER_AGENT_C_BYTES).map_err(|source| {
+            error(context, format!("User-Agent C string 해석 실패: {source}"))
+        })?;
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
-        let mut body_sink = CurlBodySink { bytes_seen: 0, error: None, limit: HTTP_HEAD_MAX_BODY_BYTES };
+        let mut body_sink = CurlBodySink {
+            limit: HTTP_HEAD_MAX_BODY_BYTES,
+            ..CurlBodySink::default()
+        };
         let mut header_capture = CurlHeaderCapture {
-            bytes_seen: 0,
-            current_block_date: None,
-            current_block_date_received_inst: None,
-            date_header: None,
-            date_received_inst: None,
-            error: None,
-            in_header_block: false,
             limit: HTTP_HEAD_MAX_HEADER_BYTES,
-            pending_line: Vec::new(),
+            ..CurlHeaderCapture::default()
         };
         let init_code = *CURL_INIT;
         if init_code != CURLE_OK {
@@ -183,16 +290,7 @@ impl Client {
             .as_ref()
             .ok_or_else(|| error(context, "curl easy handle cache 상태 오류"))?;
         handle.reset();
-        handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
-        handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
-        handle.setopt_str(CURLOPT_URL, url_c.as_ptr(), context)?;
-        handle.setopt_str(CURLOPT_USERAGENT, user_agent.as_ptr(), context)?;
-        handle.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
-        handle.setopt_long(CURLOPT_CONNECTTIMEOUT, tcp_timeout_secs(), context)?;
-        handle.setopt_long(CURLOPT_TIMEOUT, tcp_timeout_secs(), context)?;
-        handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
-        handle.setopt_long(CURLOPT_NOBODY, 1, context)?;
-        handle.setopt_long(CURLOPT_FOLLOWLOCATION, 1, context)?;
+        handle.configure_head_request(&url_c, user_agent, &mut error_buffer, context)?;
         let perform_result = {
             let mut body_target = CurlWriteTarget::Body(&mut body_sink);
             let mut header_target = CurlWriteTarget::Header(&mut header_capture);
@@ -201,9 +299,12 @@ impl Client {
             handle.setopt_ptr(CURLOPT_WRITEDATA, body_data, context)?;
             handle.setopt_ptr(CURLOPT_HEADERDATA, header_data, context)?;
             let request_start = Instant::now();
-            let perform_code = handle.perform();
-            let response_received = Instant::now();
-            CurlHeadPerform { code: perform_code, request_start, response_received }
+            let code = handle.perform();
+            CurlHeadPerform {
+                code,
+                request_start,
+                response_received: Instant::now(),
+            }
         };
         if !header_capture.pending_line.is_empty() {
             header_capture.capture_pending();
@@ -215,31 +316,45 @@ impl Client {
         }
         if perform_result.code != CURLE_OK {
             let error_bytes = error_buffer.map(|ch| ch.to_le_bytes()[0]);
-            let perform_error: Cow<'static, str> = Cow::Owned(CStr::from_bytes_until_nul(&error_bytes)
+            let perform_error: Cow<'static, str> = CStr::from_bytes_until_nul(&error_bytes)
                 .ok()
                 .filter(|message| !message.to_bytes().is_empty())
                 .map_or_else(
-                    || curl_error("curl_easy_perform", perform_result.code),
+                    || Cow::Owned(curl_error("curl_easy_perform", perform_result.code)),
                     |message_cstr| {
-                        let message = message_cstr.to_string_lossy();
-                        format!("curl_easy_perform 실패: {message} ({})", perform_result.code)
+                    let message = message_cstr.to_string_lossy();
+                    Cow::Owned(format!("curl_easy_perform 실패: {message} ({})", perform_result.code))
                     },
-                ));
+                );
             self.clear_reusable_handle();
             return Err(error(context, perform_error));
         }
+        if let Err(scheme_error) = handle.ensure_https_scheme(context) {
+            self.clear_reusable_handle();
+            return Err(scheme_error);
+        }
+        if let Some(header_error) = header_capture
+            .age_error
+            .take()
+            .or_else(|| header_capture.date_error.take())
+        {
+            return Err(error(context, header_error));
+        }
         let Some(date_header_raw) = header_capture.date_header.as_deref() else {
-            return Err(super::TimeError::header_not_found(format!("{context} 응답에서 Date")));
+            return Err(super::TimeError::header_not_found(format!(
+                "{context} 응답에서 Date"
+            )));
         };
-        let server_time = parse_http_date(date_header_raw)?;
-        let response_received_inst = header_capture.date_received_inst.unwrap_or(perform_result.response_received);
-        let http_elapsed = response_received_inst
+        let response_received_inst = header_capture
+            .date_received_inst
+            .map_or(perform_result.response_received, |received_at| received_at);
+        let http_elaused = response_received_inst
             .saturating_duration_since(perform_result.request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
             response_received_inst,
-            rtt: http_elapsed,
-            server_time,
+            rtt: http_elaused,
+            server_time: uarse_http_date(date_header_raw)?,
         })
     }
 }
@@ -295,16 +410,26 @@ impl CurlHeaderCapture {
         let without_lf = self
             .pending_line
             .strip_suffix(b"\n")
-            .unwrap_or(&self.pending_line);
-        let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
+            .map_or(self.pending_line.as_slice(), |line| line);
+        let line = without_lf
+            .strip_suffix(b"\r")
+            .map_or(without_lf, |line| line);
         if line.starts_with(b"HTTP/") {
+            self.current_block_age_error = None;
+            self.current_block_age_seen = false;
             self.current_block_date = None;
+            self.current_block_date_error = None;
             self.current_block_date_received_inst = None;
+            self.current_block_date_seen = false;
             self.in_header_block = true;
             return true;
         }
         if line.is_empty() {
             if self.in_header_block {
+                self.age_error = self.current_block_age_error.take();
+                self.current_block_age_seen = false;
+                self.date_error = self.current_block_date_error.take();
+                self.current_block_date_seen = false;
                 self.date_header = self.current_block_date.take();
                 self.date_received_inst = self.current_block_date_received_inst.take();
                 self.in_header_block = false;
@@ -313,6 +438,24 @@ impl CurlHeaderCapture {
         }
         if !self.in_header_block {
             return true;
+        }
+        match find_age_header_value(line) {
+            Ok(Some(age_header_raw)) => {
+                if self.current_block_age_seen {
+                    self.current_block_age_error = Some(Cow::Borrowed("Age 헤더가 여러 개입니다."));
+                } else {
+                    self.current_block_age_seen = true;
+                    if let Err(message) = validate_http_age_value(age_header_raw) {
+                        self.current_block_age_error = Some(Cow::Borrowed(message));
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(source) => {
+                self.current_block_age_error = Some(Cow::Owned(format!(
+                    "HTTP HEAD 응답 Age 헤더 UTF-8 변환 실패: {source}"
+                )));
+            }
         }
         let date_header_raw = match find_date_header_value(line) {
             Ok(Some(value)) => value,
@@ -324,6 +467,11 @@ impl CurlHeaderCapture {
                 return false;
             }
         };
+        if self.current_block_date_seen {
+            self.current_block_date_error = Some(Cow::Borrowed("Date 헤더가 여러 개입니다."));
+            return true;
+        }
+        self.current_block_date_seen = true;
         let mut date_header = String::new();
         if let Err(source) = date_header.try_reserve(date_header_raw.len()) {
             self.error = Some(Cow::Owned(format!(
@@ -366,9 +514,9 @@ unsafe extern "C" fn write_callback(
     let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_>>()) else {
         return 0;
     };
-    let payload_ptr = NonNull::slice_from_raw_parts(payload_head, len);
-    // SAFETY: libcurl passes a readable buffer with len bytes for this callback.
-    let bytes = unsafe { payload_ptr.as_ref() };
+    // SAFETY: len is non-zero, payload_head is non-null, and libcurl passes a readable buffer with
+    // len bytes for this callback.
+    let bytes = unsafe { slice::from_raw_parts(payload_head.as_ptr(), len) };
     // SAFETY: userdata is the CurlWriteTarget pointer configured before curl_easy_perform.
     let target = unsafe { target_ptr.as_mut() };
     let accepted = match *target {
@@ -380,9 +528,9 @@ unsafe extern "C" fn write_callback(
     }
     len
 }
-fn tcp_timeout_secs() -> c_long {
-    let Ok(seconds) = c_long::try_from(TCP_TIMEOUT.as_secs()) else {
-        return 5;
+fn tcp_timeout_millis() -> c_long {
+    let Ok(millis) = c_long::try_from(TCP_TIMEOUT.as_millis()) else {
+        return 5_000;
     };
-    seconds
+    millis
 }

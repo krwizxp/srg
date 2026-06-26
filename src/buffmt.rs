@@ -5,7 +5,7 @@ const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
 const UTF8_MAX_CHAR_LEN: usize = 4;
 pub const DIGITS: [u8; 10] = *b"0123456789";
-pub const TWO_DIGITS: [[u8; 2]; TWO_DIGIT_TABLE_LEN] = [
+const TWO_DIGITS: [[u8; 2]; TWO_DIGIT_TABLE_LEN] = [
     *b"00", *b"01", *b"02", *b"03", *b"04", *b"05", *b"06", *b"07", *b"08", *b"09", *b"10", *b"11",
     *b"12", *b"13", *b"14", *b"15", *b"16", *b"17", *b"18", *b"19", *b"20", *b"21", *b"22", *b"23",
     *b"24", *b"25", *b"26", *b"27", *b"28", *b"29", *b"30", *b"31", *b"32", *b"33", *b"34", *b"35",
@@ -51,9 +51,6 @@ impl<'buffer> ByteCursor<'buffer> {
     pub fn write_bytes(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.take(bytes.len())?.copy_from_slice(bytes);
         Ok(())
-    }
-    pub const fn written_len(&self) -> usize {
-        self.pos
     }
     pub fn written_slice(&self) -> io::Result<&[u8]> {
         self.buf.get(..self.pos).ok_or_else(write_zero_err)

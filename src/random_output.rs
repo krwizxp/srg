@@ -1,5 +1,5 @@
 use super::{
-    file_output::lock_mutex,
+    file_output::{ensure_file_guard_current, lock_mutex},
     output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
 };
@@ -29,6 +29,7 @@ pub fn persist_and_print_random_data(
     let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
     {
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
+        ensure_file_guard_current(&mut file_guard)?;
         IoWrite::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
         IoWrite::flush(&mut *file_guard)?;
     };

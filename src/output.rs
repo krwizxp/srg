@@ -287,7 +287,7 @@ pub fn format_data_into_buffer(
         use_colors: target.use_colors(),
     };
     formatter.write_all()?;
-    Ok(cur.written_len())
+    Ok(cur.written_slice()?.len())
 }
 fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
     value.checked_add(amount).ok_or_else(write_zero_err)
@@ -521,7 +521,7 @@ fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> 
 cfg_select! {
     target_arch = "x86_64" => {
         pub fn write_buffer_to_file_guard(
-            file_guard: &mut MutexGuard<BufWriter<File>>,
+            file_guard: &mut MutexGuard<'_, BufWriter<File>>,
             buffer: &[u8],
         ) -> IoResult<()> {
             IoWrite::write_all(&mut **file_guard, buffer)

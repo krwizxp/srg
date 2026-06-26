@@ -17,7 +17,13 @@ impl AppError {
         E: Error + Send + Sync + 'static,
     {
         let source_ref: &dyn Error = &source;
-        let io_kind = source_ref.downcast_ref::<IoError>().map(IoError::kind);
+        let app_error_kind = source_ref
+            .downcast_ref::<Self>()
+            .and_then(|app_error| app_error.io_kind);
+        let io_kind = source_ref
+            .downcast_ref::<IoError>()
+            .map(IoError::kind)
+            .or(app_error_kind);
         Self {
             io_kind,
             message: context.into(),
@@ -25,8 +31,8 @@ impl AppError {
             time_source: None,
         }
     }
-    pub const fn io_error_kind(&self) -> Option<ErrorKind> {
-        self.io_kind
+    pub const fn is_unexpected_eof(&self) -> bool {
+        matches!(self.io_kind, Some(ErrorKind::UnexpectedEof))
     }
     pub fn message<M>(message: M) -> Self
     where
@@ -38,22 +44,6 @@ impl AppError {
             source: None,
             time_source: None,
         }
-    }
-    cfg_select! {
-        target_arch = "x86_64" => {
-            pub fn prepend_context<M>(self, context: M) -> Self
-            where
-                M: Into<Cow<'static, str>>,
-            {
-                Self {
-                    io_kind: self.io_kind,
-                    message: Cow::Owned(format!("{}: {}", context.into(), self.message)),
-                    source: self.source,
-                    time_source: self.time_source,
-                }
-            }
-        }
-        _ => {}
     }
 }
 impl Display for AppError {
@@ -115,7 +105,9 @@ impl From<fmt::Error> for AppError {
 }
 impl From<TimeError> for AppError {
     fn from(source: TimeError) -> Self {
-        let io_kind = source.io_kind();
+        let io_kind = source
+            .is_unexpected_eof()
+            .then_some(ErrorKind::UnexpectedEof);
         Self {
             io_kind,
             message: Cow::Borrowed("시간 처리 오류"),

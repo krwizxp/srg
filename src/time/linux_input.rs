@@ -1,7 +1,7 @@
 use crate::write_line_best_effort;
 use alloc::borrow::Cow;
 use core::{
-    ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void},
+    ffi::{CStr, c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     mem::size_of,
     num::NonZero,
     ptr::{NonNull, null},
@@ -34,11 +34,11 @@ const SYM_X_TEST_KEY: &CStr = c"XTestFakeKeyEvent";
 type Display = c_void;
 type XCloseDisplay = unsafe extern "C" fn(*mut Display) -> c_int;
 type XFlush = unsafe extern "C" fn(*mut Display) -> c_int;
-type XKeysymToKeycode = unsafe extern "C" fn(*mut Display, c_ulong) -> c_uint;
+type XKeysymToKeycode = unsafe extern "C" fn(*mut Display, c_ulong) -> c_uchar;
 type XOpenDisplay = unsafe extern "C" fn(*const c_char) -> *mut Display;
 type XTestFakeButtonEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
 type XTestFakeKeyEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
-type XKeycode = NonZero<c_uint>;
+type XKeycode = NonZero<c_uchar>;
 type InputError = Cow<'static, str>;
 type InputResult<T> = Result<T, InputError>;
 #[derive(Clone, Copy, Debug)]
@@ -183,7 +183,10 @@ impl XTestInput {
     fn send(self, api: &X11Api, display: NonNull<Display>, state: c_int) -> InputResult<()> {
         match self {
             Self::Button(button) => api.fake_button(display, button, state),
-            Self::Key(keycode) => api.fake_key(display, keycode.get(), state),
+            Self::Key(keycode) => {
+                let expanded_keycode = NonZero::<c_uint>::from(keycode).get();
+                api.fake_key(display, expanded_keycode, state)
+            }
         }
     }
 }
