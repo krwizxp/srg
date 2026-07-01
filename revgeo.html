@@ -1032,8 +1032,8 @@
           position: relative;
           overflow: hidden;
           contain: paint;
-          background: light-dark(oklch(from var(--fg) l c h / 0.62),
-              oklch(from var(--fg) l c h / 0.55));
+          background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h),
+              oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
 
           &::after {
             content: "";
@@ -1043,7 +1043,8 @@
             transform: translateX(var(--shimmer-from));
             background: linear-gradient(in oklch var(--inline-angle),
                 oklch(0% 0 0 / 0),
-                oklch(from var(--accent) l calc(c * 0.5) h / 0.18),
+                light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h),
+                  oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)),
                 oklch(0% 0 0 / 0));
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
