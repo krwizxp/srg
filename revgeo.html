@@ -97,7 +97,9 @@
         --inline-angle: 90deg;
         --shimmer-from: -120%;
         --shimmer-to: 120%;
-        --focus-ring: color-mix(in oklch, var(--accent) 62%, var(--fg));
+        --shimmer-opacity: 0.78;
+        --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h),
+            oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
         --fs-sm: clamp(13px, 0.9vw, 14px);
         --results-pane-mobile-height: 70dvh;
         font-family:
@@ -123,6 +125,7 @@
 
         &[data-theme="dark"] {
           color-scheme: dark;
+          --shimmer-opacity: 0.55;
         }
       }
 
@@ -348,7 +351,7 @@
 
           .row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
             gap: 10px;
           }
         }
@@ -560,7 +563,7 @@
         position: relative;
         overflow: hidden;
         contain: paint;
-        background: color-mix(in oklch, var(--fg) 12%, var(--surface-panel));
+        background: oklch(from var(--fg) l c h / 0.12);
         block-size: 8px;
         transition: --pct 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 
@@ -580,8 +583,10 @@
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: var(--inline-origin-x) 50%;
           background: linear-gradient(in oklch var(--inline-angle),
-              color-mix(in oklch, var(--accent) 85%, var(--fg)),
-              color-mix(in oklch, var(--accent) 78%, var(--fg)));
+              light-dark(oklch(from var(--accent) calc(l - 0.05) calc(c * 0.86) h),
+                oklch(from var(--accent) calc(l + 0.05) calc(c * 0.86) h)),
+              light-dark(oklch(from var(--accent) calc(l - 0.09) calc(c * 0.78) h),
+                oklch(from var(--accent) calc(l + 0.08) calc(c * 0.78) h)));
           position: relative;
         }
 
@@ -596,7 +601,7 @@
                 oklch(0% 0 0 / 0) 0%,
                 color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%,
                 oklch(0% 0 0 / 0) 100%);
-            opacity: light-dark(0.78, 0.55);
+            opacity: var(--shimmer-opacity);
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
             pointer-events: none;
@@ -626,23 +631,19 @@
         }
 
         &.err {
-          color: color-mix(in oklch, var(--err) 45%, var(--fg));
-          border-inline-start-color: color-mix(in oklch,
-              var(--err) 70%,
-              var(--line-soft));
-          background: color-mix(in oklch,
-              var(--err) 10%,
-              var(--surface-panel));
+          color: light-dark(oklch(from var(--err) calc(l - 0.18) calc(c * 0.82) h),
+              oklch(from var(--err) calc(l + 0.12) calc(c * 0.72) h));
+          border-inline-start-color: light-dark(oklch(from var(--err) calc(l + 0.1) calc(c * 0.74) h),
+              oklch(from var(--err) calc(l - 0.06) calc(c * 0.82) h));
+          background: oklch(from var(--err) l calc(c * 0.45) h / 0.1);
         }
 
         &.warn {
-          color: color-mix(in oklch, var(--warn) 35%, var(--fg));
-          border-inline-start-color: color-mix(in oklch,
-              var(--warn) 50%,
-              var(--fg));
-          background: color-mix(in oklch,
-              var(--warn) 10%,
-              var(--surface-panel));
+          color: light-dark(oklch(from var(--warn) calc(l - 0.22) calc(c * 0.8) h),
+              oklch(from var(--warn) calc(l + 0.1) calc(c * 0.7) h));
+          border-inline-start-color: light-dark(oklch(from var(--warn) calc(l - 0.04) calc(c * 0.82) h),
+              oklch(from var(--warn) l calc(c * 0.78) h));
+          background: oklch(from var(--warn) l calc(c * 0.42) h / 0.1);
         }
 
         &.stopped {
@@ -831,7 +832,8 @@
         }
 
         :scope #error {
-          color: color-mix(in oklch, var(--err) 75%, var(--fg));
+          color: light-dark(oklch(from var(--err) calc(l - 0.1) calc(c * 0.95) h),
+              oklch(from var(--err) calc(l + 0.08) calc(c * 0.85) h));
         }
       }
 
@@ -989,8 +991,8 @@
                   var(--card-surface));
               border-radius: 16px;
               box-shadow:
-                0 1px 2px color-mix(in oklch, var(--fg) 12%, oklch(0% 0 0 / 0)),
-                0 1px 1px color-mix(in oklch, var(--fg) 8%, oklch(0% 0 0 / 0));
+                0 1px 2px oklch(from var(--fg) l c h / 0.12),
+                0 1px 1px oklch(from var(--fg) l c h / 0.08);
               animation: row-fade-in 1s both;
               animation-timeline: view();
               animation-range: entry 0% cover 25%;
@@ -1030,8 +1032,8 @@
           position: relative;
           overflow: hidden;
           contain: paint;
-          background: light-dark(color-mix(in oklch, var(--fg) 62%, var(--surface-panel)),
-              color-mix(in oklch, var(--fg) 55%, var(--surface-panel)));
+          background: light-dark(oklch(from var(--fg) l c h / 0.62),
+              oklch(from var(--fg) l c h / 0.55));
 
           &::after {
             content: "";
@@ -1041,7 +1043,7 @@
             transform: translateX(var(--shimmer-from));
             background: linear-gradient(in oklch var(--inline-angle),
                 oklch(0% 0 0 / 0),
-                color-mix(in oklch, var(--accent) 18%, var(--surface-panel)),
+                oklch(from var(--accent) l calc(c * 0.5) h / 0.18),
                 oklch(0% 0 0 / 0));
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
@@ -1182,7 +1184,7 @@
 
         &:focus-visible {
           box-shadow:
-            0 12px 20px -16px color-mix(in oklch, var(--fg) 18%, oklch(0% 0 0 / 0)),
+            0 12px 20px -16px oklch(from var(--fg) l c h / 0.18),
             inset 0 0 0 2px var(--focus-ring);
         }
 
@@ -1221,7 +1223,8 @@
 
             @media (any-hover: hover) {
               &:hover {
-                color: color-mix(in oklch, var(--accent) 55%, var(--fg));
+                color: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.8) h),
+                    oklch(from var(--accent) calc(l + 0.12) calc(c * 0.75) h));
                 text-decoration: underline;
                 text-underline-offset: 3px;
               }
@@ -1246,8 +1249,8 @@
       --line-soft: oklch(94.4327% 0.01086 256.7);
       --accent: oklch(62.9919% 0.2104 261.11);
       --accent-ink: oklch(62.9919% 0.2104 261.11);
-      --accent-border: oklch(91.3301% 0.0447 258.35);
-      --accent-wash: oklch(96.7779% 0.0164 257.2);
+      --accent-border: oklch(from var(--accent) calc(l + 0.28) calc(c * 0.21) h);
+      --accent-wash: oklch(from var(--accent) calc(l + 0.34) calc(c * 0.08) h);
       --warn: oklch(73.5214% 0.1698 78.98);
       --err: oklch(60.0856% 0.2631 15.86);
       --panel-shadow: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
@@ -1272,8 +1275,8 @@
         --line-soft: oklch(25.767% 0.05772 259.88);
         --accent: oklch(65.3229% 0.1969 258.23);
         --accent-ink: oklch(71.8796% 0.1599 251.87);
-        --accent-border: oklch(30.3242% 0.1475 260.4);
-        --accent-wash: oklch(65.3229% 0.1969 258.23 / 0.12);
+        --accent-border: oklch(from var(--accent) calc(l - 0.35) calc(c * 0.75) h);
+        --accent-wash: oklch(from var(--accent) l c h / 0.12);
         --warn: oklch(80.9396% 0.1868 79.23);
         --err: oklch(71.6163% 0.2181 13.83);
         --panel-shadow: 0 10px 24px oklch(0% 0 0 / 0.18);
@@ -1542,8 +1545,8 @@
       border-color: var(--action-border);
       box-shadow:
         inset 0 1px 0 oklch(100% 0 0 / 0.24),
-        light-dark(0 14px 24px -18px oklch(62.9919% 0.2104 261.11 / 0.58),
-          0 16px 28px -18px oklch(70.4516% 0.1751 245.52 / 0.44));
+        0 14px 24px -18px light-dark(oklch(62.9919% 0.2104 261.11 / 0.58),
+          oklch(70.4516% 0.1751 245.52 / 0.44));
     }
 
     :is(#pause,
@@ -1568,18 +1571,18 @@
 
     #stop.action-btn--danger {
       --action-bg: light-dark(oklch(96.941% 0.0187 12.42),
-          color-mix(in oklch, var(--err) 18%, var(--surface-panel)));
+          oklch(from var(--err) l calc(c * 0.55) h / 0.18));
       --action-hover-bg: light-dark(oklch(94.1918% 0.0371 7.52),
-          color-mix(in oklch, var(--err) 24%, var(--surface-panel)));
+          oklch(from var(--err) l calc(c * 0.65) h / 0.24));
       --action-border: light-dark(oklch(90.8442% 0.0603 7.08),
-          color-mix(in oklch, var(--err) 44%, var(--surface-panel)));
+          oklch(from var(--err) l calc(c * 0.85) h / 0.44));
       --action-color: light-dark(oklch(58.5838% 0.2568 17.58),
-          color-mix(in oklch, var(--err) 78%, oklch(100% 0 0)));
+          oklch(from var(--err) calc(l + 0.06) calc(c * 0.78) h));
       background: var(--action-bg);
       color: var(--action-color);
       border-color: var(--action-border);
-      box-shadow: light-dark(0 12px 22px -20px oklch(58.5838% 0.2568 17.58 / 0.42),
-          0 16px 26px -20px oklch(71.6163% 0.2181 13.83 / 0.34));
+      box-shadow: 0 12px 22px -20px light-dark(oklch(58.5838% 0.2568 17.58 / 0.42),
+          oklch(71.6163% 0.2181 13.83 / 0.34));
     }
 
     .action-btn--compact {
@@ -1800,6 +1803,22 @@
             #filter-clear {
               grid-column: 6 / span 3;
               justify-self: stretch;
+            }
+          }
+        }
+      }
+    }
+
+    @media (max-width: 360px) {
+      .results-card {
+        search {
+          .filters {
+            #filter-fulladdr {
+              grid-column: 1 / span 4;
+            }
+
+            #filter-clear {
+              grid-column: 5 / span 4;
             }
           }
         }
