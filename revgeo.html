@@ -11,8 +11,8 @@
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
-  <link rel="icon" id="app-favicon" href="icon.svg?v=4&theme=light" type="image/svg+xml" sizes="any">
-  <link rel="manifest" href="site.webmanifest?v=4">
+  <link rel="icon" id="app-favicon" href="./icon.svg?v=4&theme=light" type="image/svg+xml" sizes="any">
+  <link rel="manifest" href="./site.webmanifest?v=4">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" crossorigin
@@ -27,16 +27,16 @@
         document.documentElement.dataset.theme = theme;
         const favicon = document.getElementById("app-favicon");
         if (favicon instanceof HTMLLinkElement) {
-          favicon.href = `icon.svg?v=4&theme=${theme}`;
+          favicon.href = `./icon.svg?v=4&theme=${theme}`;
         }
       };
       try {
         const storedTheme = localStorage.getItem("srg-theme");
-        const validStoredTheme =
+        applyInitialTheme(
           storedTheme === "light" || storedTheme === "dark"
             ? storedTheme
-            : null;
-        applyInitialTheme(validStoredTheme || getSystemTheme());
+            : getSystemTheme(),
+        );
       } catch {
         applyInitialTheme(getSystemTheme());
       }
@@ -74,7 +74,6 @@
       :is(input, select, textarea) {
         @media (pointer: coarse) {
           font-size: 16px !important;
-          letter-spacing: -0.03em;
         }
       }
 
@@ -100,7 +99,7 @@
         --shimmer-opacity: 0.78;
         --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h),
             oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
-        --fs-sm: clamp(13px, 0.9vw, 14px);
+        --fs-sm: 14px;
         --results-pane-mobile-height: 70dvh;
         font-family:
           "Pretendard", -apple-system, BlinkMacSystemFont, system-ui,
@@ -133,7 +132,7 @@
         color: var(--fg);
         padding-inline: max(20px, var(--safe-inline-start)) max(20px, var(--safe-inline-end));
         font-variant-numeric: tabular-nums;
-        font-size: clamp(14px, 1.5vw, 15px);
+        font-size: 15px;
         line-height: 1.6;
 
         &::selection {
@@ -143,9 +142,6 @@
           color: var(--fg);
         }
 
-        @container (inline-size <=800px) {
-          padding-inline: max(12px, var(--safe-inline-start)) max(12px, var(--safe-inline-end));
-        }
       }
     }
 
@@ -312,17 +308,6 @@
         container-type: inline-size;
         min-block-size: 0;
 
-        .card-header {
-          display: flex;
-          align-items: baseline;
-          gap: 12px;
-          flex-wrap: wrap;
-
-          h2 {
-            font-size: clamp(18px, 1.6vw, 22px);
-          }
-        }
-
         .left-pane-scroll> :has(#coords) {
           flex: 1 1 180px;
           display: flex;
@@ -338,7 +323,7 @@
         }
 
         footer {
-          text-align: center;
+          text-align: start;
           font-size: var(--fs-sm);
           color: var(--muted);
           line-height: 1.3;
@@ -353,6 +338,12 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
             gap: 10px;
+          }
+
+          @media (380px <=width <=700px) {
+            .row {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
           }
         }
 
@@ -391,9 +382,6 @@
           }
 
           &:is(:hover, :focus-within) {
-            border-color: var(--accent-border);
-            background: var(--accent-wash);
-
             .drop-icon {
               color: var(--accent-ink);
             }
@@ -431,19 +419,15 @@
 
         :where(.coords-view,
           .manual-rng > summary,
-          button,
           .filters input[type="search"],
           .filters select,
-          .manual-rng input[type="text"],
           .manual-rng textarea) {
           border-radius: 12px;
           transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        :where(button,
-          .filters input[type="search"],
+        :where(.filters input[type="search"],
           .filters select,
-          .manual-rng input[type="text"],
           .manual-rng textarea) {
           color: var(--fg);
         }
@@ -452,7 +436,7 @@
           font: inherit;
           min-block-size: 100px;
           line-height: 1.5;
-          font-size: clamp(12px, 3.5cqi, 14px);
+          font-size: 14px;
 
           :is(.coords-placeholder, .coords-content) {
             display: block;
@@ -481,37 +465,28 @@
         :where(button,
           .filters input[type="search"],
           .filters select,
-          .manual-rng input[type="text"],
-          .manual-rng textarea,
-          .map-popover a):focus-visible {
+          .manual-rng textarea):focus-visible {
           outline: 2px solid var(--focus-ring);
           outline-offset: -2px;
-          border-color: var(--focus-ring);
-          box-shadow: none;
         }
 
         :where(.coords-view, .manual-rng > summary):focus-visible {
           outline: 2px solid var(--focus-ring);
           outline-offset: -2px;
-          box-shadow: none;
         }
 
         .drop-zone:has(input[type="file"]:focus-visible) {
           outline: 2px solid var(--focus-ring);
           outline-offset: -2px;
-          border-color: var(--focus-ring);
-          box-shadow: none;
         }
 
         button {
           cursor: pointer;
           display: inline-flex;
-          align-items: center;
           justify-content: center;
           min-inline-size: 0;
           white-space: nowrap;
           padding-block: 12px;
-          padding-inline: 8px;
 
           &:disabled {
             opacity: 0.4;
@@ -522,10 +497,6 @@
           &:is(#parse, #start):focus-visible {
             outline: 2px solid color-mix(in oklch, var(--tone-base) 90%, var(--accent));
             outline-offset: -2px;
-            border-color: color-mix(in oklch,
-                var(--tone-base) 90%,
-                var(--accent));
-            box-shadow: none;
           }
         }
       }
@@ -719,7 +690,7 @@
           gap: 6px;
         }
 
-        :scope :is(input[type="text"], textarea) {
+        :scope textarea {
           inline-size: 100%;
           padding-block: var(--control-pad-block, 10px);
           padding-inline: var(--control-pad-inline, 12px);
@@ -731,11 +702,6 @@
             color: var(--muted-strong);
             opacity: 1;
           }
-        }
-
-        :scope input[type="text"] {
-          min-block-size: var(--control-min-block-size, 44px);
-          caret-color: var(--accent-ink);
         }
 
         :scope .manual-rng-label {
@@ -758,7 +724,6 @@
 
           .action-btn {
             min-inline-size: 124px;
-            padding-inline: 14px;
           }
 
           #copyOutput {
@@ -774,7 +739,6 @@
               min-inline-size: 0;
               inline-size: 100%;
               block-size: 52px;
-              min-block-size: 52px;
               justify-content: center;
               white-space: normal;
             }
@@ -792,17 +756,9 @@
               font-size: 11px;
               line-height: 0.98;
 
-              >span:first-child {
-                letter-spacing: -0.045em;
-              }
-
               >span:last-child {
                 font-size: 12px;
               }
-            }
-
-            #copyOutput {
-              min-inline-size: 0;
             }
           }
         }
@@ -812,10 +768,6 @@
           resize: vertical;
           scrollbar-width: thin;
           caret-color: var(--accent-ink);
-        }
-
-        :scope :is(input[type="text"], textarea):focus-visible {
-          box-shadow: inset 0 0 0 2px var(--focus-ring), var(--panel-shadow);
         }
 
         :scope #output.coords-view {
@@ -870,7 +822,6 @@
 
         #filter-clear {
           flex: 0 0 auto;
-          padding-inline: 12px;
         }
 
         @container page (inline-size >=1550px) {
@@ -928,7 +879,6 @@
             &:nth-child(3) {
               color: var(--accent-ink);
               font-weight: 500;
-              letter-spacing: -0.03em;
             }
           }
 
@@ -1010,7 +960,6 @@
                   font-weight: 600;
                   color: var(--muted);
                   text-transform: uppercase;
-                  letter-spacing: 0.05em;
                 }
               }
             }
@@ -1140,7 +1089,6 @@
     @layer utilities {
       .caps {
         text-transform: uppercase;
-        letter-spacing: 0.06em;
         font-size: var(--fs-sm);
         font-weight: 700;
         color: var(--muted);
@@ -1150,6 +1098,8 @@
         position: absolute;
         inline-size: 1px;
         block-size: 1px;
+        overflow: hidden;
+        white-space: nowrap;
         clip-path: inset(50%);
       }
 
@@ -1158,15 +1108,7 @@
       }
 
       .map-btn {
-        inline-size: 38px;
-        block-size: 38px;
-        min-inline-size: 38px;
-        min-block-size: 38px;
-        padding: 0;
-        border-radius: 12px;
-        color: var(--accent-ink);
         justify-self: center;
-        box-shadow: none;
       }
 
       td[data-label="지도링크"] {
@@ -1180,14 +1122,7 @@
         border-radius: 14px;
         border: 0;
         max-inline-size: min(360px, 92vw);
-        appearance: none;
         transition: opacity 0s linear 16ms;
-
-        &:focus-visible {
-          box-shadow:
-            0 12px 20px -16px oklch(from var(--fg) l c h / 0.18),
-            inset 0 0 0 2px var(--focus-ring);
-        }
 
         @starting-style {
           opacity: 0;
@@ -1254,7 +1189,6 @@
       --accent-wash: oklch(from var(--accent) calc(l + 0.34) calc(c * 0.08) h);
       --warn: oklch(73.5214% 0.1698 78.98);
       --err: oklch(60.0856% 0.2631 15.86);
-      --panel-shadow: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
       --header-bg: oklch(100% 0 0 / 0.96);
       --header-border: oklch(95.654% 0.00797 253.85);
       --shadow: 0 16px 36px oklch(20.7682% 0.03982 265.75 / 0.05);
@@ -1280,7 +1214,6 @@
         --accent-wash: oklch(from var(--accent) l c h / 0.12);
         --warn: oklch(80.9396% 0.1868 79.23);
         --err: oklch(71.6163% 0.2181 13.83);
-        --panel-shadow: 0 10px 24px oklch(0% 0 0 / 0.18);
         --header-bg: oklch(13.4824% 0.03772 255.32 / 0.96);
         --header-border: oklch(46.12% 0.0851 264.23 / 0.22);
         --toggle-bg: oklch(18.8135% 0.03978 261.32 / 0.88);
@@ -1298,7 +1231,7 @@
     }
 
     body {
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       padding-block-start: calc(var(--site-header-height) + var(--site-header-gap));
       padding-block-end: max(var(--page-pad-block-end),
           env(safe-area-inset-bottom));
@@ -1313,6 +1246,9 @@
     }
 
     #app {
+      scroll-margin-block-start:
+        calc(var(--site-header-height) + var(--site-header-gap));
+
       >* {
         min-block-size: 0;
       }
@@ -1364,10 +1300,9 @@
       strong {
         min-inline-size: 0;
         color: var(--brand-text);
-        font-size: clamp(24px, 2.2vw, 30px);
+        font-size: 24px;
         line-height: 1;
         font-weight: 800;
-        letter-spacing: -0.04em;
       }
     }
 
@@ -1375,6 +1310,12 @@
     .map-popover {
       background: var(--card-surface);
       box-shadow: var(--shadow);
+    }
+
+    .map-popover:focus-visible {
+      box-shadow:
+        0 12px 20px -16px oklch(from var(--fg) l c h / 0.18),
+        inset 0 0 0 2px var(--focus-ring);
     }
 
     .card {
@@ -1416,7 +1357,6 @@
     .manual-rng,
     .filters input[type="search"],
     .filters select,
-    .manual-rng input[type="text"],
     .manual-rng textarea,
     button {
       border: 1px solid var(--line-soft);
@@ -1429,9 +1369,13 @@
     .manual-rng,
     .filters input[type="search"],
     .filters select,
-    .manual-rng input[type="text"],
     .manual-rng textarea {
       background: var(--panel-bg);
+    }
+
+    .drop-zone:is(:hover, :focus-within) {
+      border-color: var(--accent-border);
+      background: var(--accent-wash);
     }
 
     button {
@@ -1443,10 +1387,10 @@
         inline-size: 46px;
         block-size: 46px;
         padding: 0;
-        border-radius: 14px !important;
-        border: 1px solid var(--toggle-border) !important;
-        background: var(--toggle-bg) !important;
-        color: var(--toggle-text) !important;
+        border-radius: 14px;
+        border: 1px solid var(--toggle-border);
+        background: var(--toggle-bg);
+        color: var(--toggle-text);
         box-shadow: var(--shadow-soft);
         font-size: 1.35rem;
         line-height: 1;
@@ -1457,7 +1401,7 @@
           background-color 0.2s ease;
 
         &:hover {
-          border-color: var(--accent) !important;
+          border-color: var(--accent);
           transform: translateY(-1px);
         }
       }
@@ -1477,8 +1421,7 @@
       background: var(--action-bg);
       color: var(--action-color);
       box-shadow: var(--shadow-soft);
-      font-size: clamp(13px, 0.92rem, 14px);
-      letter-spacing: -0.03em;
+      font-size: 14px;
       line-height: 1.05;
       position: relative;
       overflow: hidden;
@@ -1590,25 +1533,13 @@
       padding-inline: 14px;
     }
 
-    .action-btn--icononly {
-      inline-size: 42px;
-      block-size: 42px;
-      min-inline-size: 42px;
-      min-block-size: 42px;
-      padding: 0;
-      gap: 0;
-
-      .action-btn__icon {
-        inline-size: 18px;
-        block-size: 18px;
-      }
-    }
-
     .map-btn.action-btn--icononly {
       inline-size: 38px;
       block-size: 38px;
       min-inline-size: 38px;
       min-block-size: 38px;
+      padding: 0;
+      gap: 0;
       border-radius: 12px;
       box-shadow: none;
 
@@ -1620,7 +1551,6 @@
 
     #export.action-btn {
       gap: 5px;
-      min-block-size: 46px;
       padding-block: 8px;
     }
 
@@ -1636,7 +1566,7 @@
     }
 
     @media (any-hover: hover) {
-      :is(#parse, #start, #export, #runBtn).action-btn--primary:not( :disabled):hover {
+      :is(#parse, #start, #export, #runBtn).action-btn--primary:not(:disabled):hover {
         background: var(--action-hover-bg);
       }
 
@@ -1730,9 +1660,13 @@
 
     @media (max-width: 940px) {
 
-      html,
-      body {
+      html {
         overflow: auto;
+      }
+
+      body {
+        overflow: visible;
+        overscroll-behavior: auto;
       }
 
       main {
@@ -1742,6 +1676,11 @@
       #app {
         >section.card {
           block-size: auto;
+
+          &:has(>.left-pane-scroll) {
+            overflow: visible;
+            overscroll-behavior: auto;
+          }
         }
       }
 
@@ -1854,7 +1793,7 @@
         &.theme-toggle {
           inline-size: 42px;
           block-size: 42px;
-          border-radius: 12px !important;
+          border-radius: 12px;
           font-size: 1.2rem;
         }
       }
@@ -1869,7 +1808,7 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a class="site-brand" href="" aria-label="SRG 역지오코딩 홈">
+      <a class="site-brand" href="#app" aria-label="SRG 역지오코딩 상단으로 이동">
         <img class="brand-mark" src="./icon.svg?v=4&theme=light" alt="">
         <strong>SRG 역지오코딩</strong>
       </a>
@@ -1889,74 +1828,71 @@
           <h1 class="sr-only">좌표 추출 및 조회</h1>
         </header>
         <h2 class="sr-only">파일 업로드 및 실행</h2>
-        <div>
-          <fieldset class="row">
-            <legend class="sr-only">
-              random_data.txt 파일 업로드 및 조회 제어
-            </legend>
-            <label class="drop-zone">
-              <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+        <fieldset class="row">
+          <legend class="sr-only">
+            random_data.txt 파일 업로드 및 조회 제어
+          </legend>
+          <label class="drop-zone">
+            <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+            </svg>
+            <span class="drop-text">
+              <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong>
+                업로드</span>
+              <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
+            </span>
+            <input type="file" id="file" accept=".txt,text/plain">
+          </label>
+          <div class="row">
+            <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app" command="--parse">
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="3.25"></circle>
+                <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5">
+                </path>
               </svg>
-              <span class="drop-text">
-                <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong>
-                  업로드</span>
-                <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
-              </span>
-              <input type="file" id="file" accept=".txt">
-            </label>
-            <div class="row">
-              <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app"
-                command="--parse">
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3.25"></circle>
-                  <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5">
-                  </path>
-                </svg>
-                <span class="action-btn__label">좌표 추출</span>
-              </button>
-              <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start"
-                disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8.5 7.5 16 12l-7.5 4.5z"></path>
-                </svg>
-                <span class="action-btn__label">조회 시작</span>
-              </button>
-              <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause"
-                disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9 7.5v9M15 7.5v9"></path>
-                </svg>
-                <span class="action-btn__label">일시정지</span>
-              </button>
-              <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume"
-                disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7 12h9"></path>
-                  <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
-                </svg>
-                <span class="action-btn__label">재개</span>
-              </button>
-              <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop"
-                disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="8" y="8" width="8" height="8" rx="1.5"></rect>
-                </svg>
-                <span class="action-btn__label">중지</span>
-              </button>
-              <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app"
-                command="--export" disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4.5v10"></path>
-                  <path d="m8 10.75 4 4 4-4"></path>
-                  <path d="M5.5 18.5h13"></path>
-                </svg>
-                <span class="action-btn__label action-btn__label--stacked"><span>CSV</span><span>내보내기</span></span>
-              </button>
-            </div>
-          </fieldset>
-        </div>
+              <span class="action-btn__label">좌표 추출</span>
+            </button>
+            <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start"
+              disabled>
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8.5 7.5 16 12l-7.5 4.5z"></path>
+              </svg>
+              <span class="action-btn__label">조회 시작</span>
+            </button>
+            <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause"
+              disabled>
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 7.5v9M15 7.5v9"></path>
+              </svg>
+              <span class="action-btn__label">일시정지</span>
+            </button>
+            <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume"
+              disabled>
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 12h9"></path>
+                <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
+              </svg>
+              <span class="action-btn__label">재개</span>
+            </button>
+            <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop"
+              disabled>
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="8" y="8" width="8" height="8" rx="1.5"></rect>
+              </svg>
+              <span class="action-btn__label">중지</span>
+            </button>
+            <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app" command="--export"
+              disabled>
+              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4.5v10"></path>
+                <path d="m8 10.75 4 4 4-4"></path>
+                <path d="M5.5 18.5h13"></path>
+              </svg>
+              <span class="action-btn__label action-btn__label--stacked"><span>CSV</span><span>내보내기</span></span>
+            </button>
+          </div>
+        </fieldset>
         <details class="manual-rng">
           <summary>직접 입력 난수 변환</summary>
           <div class="manual-rng-body">
@@ -1986,7 +1922,7 @@
                 </svg>
                 <span class="action-btn__label">변환 실행</span>
               </button>
-              <button id="saveOutput" class="action-btn action-btn--soft" type="button">
+              <button id="saveOutput" class="action-btn action-btn--soft" type="button" disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4.5v10"></path>
                   <path d="m8 10.75 4 4 4-4"></path>
@@ -1996,7 +1932,7 @@
                   class="action-btn__label action-btn__label--savefile"><span>random_data.txt</span><span>저장</span></span>
               </button>
               <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사"
-                aria-label="클립보드 복사">
+                aria-label="클립보드 복사" disabled>
                 <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="9" y="9" width="10" height="10" rx="2"></rect>
                   <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
@@ -2050,7 +1986,7 @@
       </div>
     </section>
     <section class="card results-card">
-      <header class="card-header card-intro">
+      <header class="card-intro">
         <div class="card-label geo">
           <span class="dot"></span>
           <span>주소 조회 결과</span>
@@ -2116,12 +2052,11 @@
         </table>
       </div>
       <p class="result-attribution">
-        &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank"
-          rel="noopener noreferrer">OpenStreetMap contributors</a>
+        &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap
+          contributors</a>
         / data under <a href="https://opendatacommons.org/licenses/odbl/" target="_blank"
           rel="noopener noreferrer">ODbL</a>
-        / reverse geocoding by <a href="https://nominatim.org/" target="_blank"
-          rel="noopener noreferrer">Nominatim</a>
+        / reverse geocoding by <a href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">Nominatim</a>
       </p>
     </section>
   </main>
@@ -2263,9 +2198,6 @@
     };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
-    const EVT_ONCE = { once: true };
-    const FETCH_HEADERS = { Accept: "application/json" };
-    const FETCH_REFERRER_POLICY = "strict-origin-when-cross-origin";
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
     const REVERSE_CACHE_VARIANT =
@@ -2291,14 +2223,13 @@
     );
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
-    const getMapPopoverFocusTarget = () => mapAnchors[0];
     const setMapPopoverExpanded = (btn, expanded) => {
       if (btn instanceof HTMLElement) {
         btn.setAttribute("aria-expanded", expanded ? "true" : "false");
       }
     };
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
-    let mapHasRound6 = false;
+    let hasRound6MapLink = false;
     const RX_MAP_TOKEN = /{lat}|{lon}/g;
     for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
       const a = mapAnchors[i];
@@ -2315,7 +2246,7 @@
       }
       if (last < template.length) parts.push(template.slice(last));
       const round6 = key === "Naver";
-      if (round6) mapHasRound6 = true;
+      if (round6) hasRound6MapLink = true;
       let build;
       if (parts.length === 4) {
         const p0 = parts[0];
@@ -2323,11 +2254,11 @@
         const p2 = parts[2];
         const t3 = parts[3];
         build = round6
-          ? (lat, lon, lat6, lon6) =>
+          ? (_lat, _lon, lat6, lon6) =>
             p0 + (t1 === 0 ? lat6 : lon6) + p2 + (t3 === 0 ? lat6 : lon6)
           : (lat, lon) =>
             p0 + (t1 === 0 ? lat : lon) + p2 + (t3 === 0 ? lat : lon);
-      } else if (parts.length === 8) {
+      } else {
         const p0 = parts[0];
         const t1 = parts[1];
         const p2 = parts[2];
@@ -2337,7 +2268,7 @@
         const p6 = parts[6];
         const t7 = parts[7];
         build = round6
-          ? (lat, lon, lat6, lon6) =>
+          ? (_lat, _lon, lat6, lon6) =>
             p0 +
             (t1 === 0 ? lat6 : lon6) +
             p2 +
@@ -2355,49 +2286,26 @@
             (t5 === 0 ? lat : lon) +
             p6 +
             (t7 === 0 ? lat : lon);
-      } else {
-        build = round6
-          ? (lat, lon, lat6, lon6) => {
-            lat = lat6;
-            lon = lon6;
-            let out = "";
-            for (let i = 0; i < parts.length; i++) {
-              const p = parts[i];
-              out += p === 0 ? lat : p === 1 ? lon : p;
-            }
-            return out;
-          }
-          : (lat, lon) => {
-            let out = "";
-            for (let i = 0; i < parts.length; i++) {
-              const p = parts[i];
-              out += p === 0 ? lat : p === 1 ? lon : p;
-            }
-            return out;
-          };
       }
       MAP_LINKS[i] = {
         key,
         build,
       };
     }
-    const MAP_HAS_ROUND6 = mapHasRound6;
+    const MAP_HAS_ROUND6 = hasRound6MapLink;
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
     function mapButtonFromSource(source) {
       return source?.closest?.("button.map-btn");
     }
-    function setMapPopoverInvoker(btn) {
+    function prepareMapPopoverFromInvoker(btn) {
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
       MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
       if (prevInvoker && prevInvoker !== btn) {
         setMapPopoverExpanded(prevInvoker, false);
       }
-    }
-    function prepareMapPopoverFromInvoker(btn) {
-      setMapPopoverInvoker(btn);
       updateMapPopoverFromInvoker(btn);
     }
     function updateMapPopoverFromInvoker(invoker) {
@@ -2439,8 +2347,7 @@
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      const mapPopoverOpen = e.newState === "open";
-      if (!mapPopoverOpen) {
+      if (e.newState !== "open") {
         setMapPopoverExpanded(LAST_MAP_INVOKER, false);
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
@@ -2471,7 +2378,7 @@
           active === mapPopover
         ) {
           if (MAP_POPOVER_OPEN_WITH_KEYBOARD) {
-            getMapPopoverFocusTarget()?.focus({ preventScroll: true });
+            mapAnchors[0]?.focus({ preventScroll: true });
           } else {
             mapPopover.focus({ preventScroll: true });
           }
@@ -2482,7 +2389,6 @@
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
-    const COORD_INV_POW = 1 / COORD_POW;
     const fmtCoord6 = (v) => {
       if (typeof v === "string") {
         const s0 = v;
@@ -2490,8 +2396,7 @@
         const dot = s0.indexOf(".");
         if (dot === -1) return s0;
         if (s0.indexOf("e") === -1 && s0.indexOf("E") === -1) {
-          const fracLen = s0.length - dot - 1;
-          if (fracLen <= COORD_DECIMALS) {
+          if (s0.length - dot - 1 <= COORD_DECIMALS) {
             let end = s0.length;
             while (end && s0.charCodeAt(end - 1) === 48) end--;
             if (end && s0.charCodeAt(end - 1) === 46) end--;
@@ -2501,7 +2406,7 @@
       }
       const n = (typeof v === "number") ? v : Number(v);
       if (!Number.isFinite(n)) return String(v ?? "");
-      let s = (Math.round(n * COORD_POW) * COORD_INV_POW).toFixed(
+      let s = (Math.round(n * COORD_POW) * (1 / COORD_POW)).toFixed(
         COORD_DECIMALS,
       );
       let end = s.length;
@@ -2533,6 +2438,11 @@
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       coordsContent: document.querySelector("#coords .coords-content"),
+      parseBtn: document.getElementById("parse"),
+      startBtn: document.getElementById("start"),
+      pauseBtn: document.getElementById("pause"),
+      resumeBtn: document.getElementById("resume"),
+      stopBtn: document.getElementById("stop"),
       filterQ: document.getElementById("filter-q"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
@@ -2551,26 +2461,10 @@
       }
       requestScrollShadowSync(domElements.coords);
     };
-    const parseBtn = document.getElementById("parse");
-    const startBtn = document.getElementById("start");
-    const pauseBtn = document.getElementById("pause");
-    const resumeBtn = document.getElementById("resume");
-    const stopBtn = document.getElementById("stop");
     const root = document.documentElement;
     const PERF_MODE_ATTR = "data-perf-mode";
-    const DROP_ZONE_FILE_LABELS = document.querySelectorAll(
-      ".drop-text .desktop-msg, .drop-text .mobile-msg",
-    );
     const THEME_STORAGE_KEY = "srg-theme";
-    const ICON_VERSION = "4";
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const buildThemeIconHref = (theme) =>
-      `./icon.svg?v=${ICON_VERSION}&theme=${theme}`;
-    const syncThemeIcons = (theme) => {
-      const iconHref = buildThemeIconHref(theme);
-      domElements.brandMark.src = iconHref;
-      domElements.favicon.href = iconHref;
-    };
     const getStoredTheme = () => {
       try {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -2581,7 +2475,9 @@
     };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
-      syncThemeIcons(theme);
+      const iconHref = `./icon.svg?v=4&theme=${theme}`;
+      domElements.brandMark.src = iconHref;
+      domElements.favicon.href = iconHref;
       const label = theme === "dark" ? "라이트 모드" : "다크 모드";
       domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
@@ -2642,7 +2538,10 @@
       clearScrollShadowState(el);
       requestScrollShadowSync(el);
     }
-    for (const el of [domElements.tableWrap, domElements.coords]) {
+    for (const el of [
+      domElements.tableWrap,
+      domElements.coords,
+    ]) {
       clearScrollShadowState(el);
       el.addEventListener(
         "scroll",
@@ -2653,7 +2552,9 @@
     const shadowResizeObserver = new ResizeObserver(() => {
       syncTableShadowOffset();
       requestScrollShadowSync(domElements.tableWrap);
-      requestScrollShadowSync(domElements.coords);
+      if (domElements.coords.hasAttribute("data-has-content")) {
+        requestScrollShadowSync(domElements.coords);
+      }
     });
     shadowResizeObserver.observe(tbl);
     shadowResizeObserver.observe(domElements.tbody);
@@ -2716,8 +2617,7 @@
       let q1 = "";
       let qTokens = null;
       if (q) {
-        const pipe = q.indexOf("|");
-        if (pipe !== -1) {
+        if (q.includes("|")) {
           qMode = 2;
           let toks = null;
           let start = 0;
@@ -2812,23 +2712,20 @@
       let qTest = null;
       if (qMode) {
         if (!qTokens) {
-          const needle = q1;
-          qTest = (r) => getQSearch(r).indexOf(needle) !== -1;
+          qTest = (r) => getQSearch(r).indexOf(q1) !== -1;
         } else if (qMode === 2) {
-          const needles = qTokens;
           qTest = (r) => {
             const hay = getQSearch(r);
-            for (let i = 0; i < needles.length; i++) {
-              if (hay.indexOf(needles[i]) !== -1) return true;
+            for (let i = 0; i < qTokens.length; i++) {
+              if (hay.indexOf(qTokens[i]) !== -1) return true;
             }
             return false;
           };
         } else {
-          const needles = qTokens;
           qTest = (r) => {
             const hay = getQSearch(r);
-            for (let i = 0; i < needles.length; i++) {
-              if (hay.indexOf(needles[i]) === -1) return false;
+            for (let i = 0; i < qTokens.length; i++) {
+              if (hay.indexOf(qTokens[i]) === -1) return false;
             }
             return true;
           };
@@ -3002,7 +2899,6 @@
           job.raf = 0;
           const rows = job.rows;
           const records = job.records;
-          const fNow = job.f;
           const len = job.len;
           let i = job.i;
           let anyVisible = job.anyVisible;
@@ -3012,7 +2908,7 @@
           while (i < len) {
             const tr = rows[i];
             const wasHidden = tr.hidden;
-            if (!setHidden(tr, wasHidden, fNow, records[i])) {
+            if (!setHidden(tr, wasHidden, job.f, records[i])) {
               anyVisible = true;
             }
             i++;
@@ -3405,7 +3301,6 @@
           let emd6 = "";
           let emd7 = "";
           let emd8 = "";
-          let emd9 = "";
           let emdCount = 0;
           for (let i = 0; i < 10; i++) {
             let n;
@@ -3523,9 +3418,6 @@
               case 8:
                 emd8 = n;
                 break;
-              case 9:
-                emd9 = n;
-                break;
             }
             emdOut = emdOut
               ? emdOut + " " + n
@@ -3593,7 +3485,6 @@
             sigungu = primaryName || gcCity || gcCounty || "";
           }
           eupmyeon = "";
-          const level10Local = level10;
           const quarter = gcQuarter;
           const hamlet = gcHamlet;
           const township = gcTownship;
@@ -3604,7 +3495,7 @@
             cand !== districtLike
           ) eupmyeon = cand;
           else {
-            cand = level10Local;
+            cand = level10;
             if (
               cand && cand !== sido && cand !== cityLike &&
               cand !== districtLike
@@ -3690,12 +3581,6 @@
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
-          if (
-            eupmyeon && isCityOrCounty && eupmyeon === primaryName &&
-            eupmyeon === sigungu
-          ) {
-            eupmyeon = "";
-          }
           if (!eupmyeon && districtLike && districtLike !== sido) {
             eupmyeon = districtLike;
             if (sigungu) {
@@ -3704,8 +3589,7 @@
               if (s === dl) {
                 s = "";
               } else {
-                const dlLen = dl.length;
-                const cut = s.length - dlLen;
+                const cut = s.length - dl.length;
                 if (
                   cut > 0 && s.endsWith(dl) && s.charCodeAt(cut - 1) === 32
                 ) {
@@ -3807,14 +3691,13 @@
           p0,
           p1,
         );
-        const tagName = firstGeocodeText(
+        let tag = firstGeocodeText(
           gc.name,
           firstLabelPart,
           gc.street,
           gc.city,
         );
         const tagType = geocodeText(gc.type);
-        let tag = tagName;
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
         const addr = {
           sido,
@@ -3906,28 +3789,28 @@
       const isBusy = AppState.isBusy;
       if (UI_CACHE.parseDisabled !== isBusy) {
         UI_CACHE.parseDisabled = isBusy;
-        parseBtn.disabled = isBusy;
+        domElements.parseBtn.disabled = isBusy;
       }
       const startDisabled = isBusy || AppState.records.length === 0;
       if (UI_CACHE.startDisabled !== startDisabled) {
         UI_CACHE.startDisabled = startDisabled;
-        startBtn.disabled = startDisabled;
+        domElements.startBtn.disabled = startDisabled;
       }
       const pauseDisabled = s !== "running";
       if (UI_CACHE.pauseDisabled !== pauseDisabled) {
         UI_CACHE.pauseDisabled = pauseDisabled;
-        pauseBtn.disabled = pauseDisabled;
+        domElements.pauseBtn.disabled = pauseDisabled;
       }
       const resumeDisabled = s !== "paused";
       if (UI_CACHE.resumeDisabled !== resumeDisabled) {
         UI_CACHE.resumeDisabled = resumeDisabled;
-        resumeBtn.disabled = resumeDisabled;
+        domElements.resumeBtn.disabled = resumeDisabled;
       }
       const stopDisabled = !(AppState.isRunning || s === "parsing") ||
         s === "stopping";
       if (UI_CACHE.stopDisabled !== stopDisabled) {
         UI_CACHE.stopDisabled = stopDisabled;
-        stopBtn.disabled = stopDisabled;
+        domElements.stopBtn.disabled = stopDisabled;
       }
       const progActive = s === "running" || s === "pausing";
       if (UI_CACHE.progActive !== progActive) {
@@ -3943,17 +3826,16 @@
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     const RX_STATUS_PROGRESS = /^처리 중… \(([\d,]+)\/([\d,]+)\)$/;
     let statusLiveTimer = 0;
-    const FILTER_CONTROL_ELEMENTS = [
-      domElements.filterQ,
-      domElements.filterKind,
-      domElements.filterSido,
-      domElements.filterSigungu,
-      domElements.filterEmd,
-      domElements.filterTag,
-      domElements.filterFullAddr,
-    ];
     function resetFilterControls() {
-      for (const el of FILTER_CONTROL_ELEMENTS) {
+      for (const el of [
+        domElements.filterQ,
+        domElements.filterKind,
+        domElements.filterSido,
+        domElements.filterSigungu,
+        domElements.filterEmd,
+        domElements.filterTag,
+        domElements.filterFullAddr,
+      ]) {
         el.value = "";
       }
     }
@@ -4030,11 +3912,10 @@
       domElements.emptyHint.textContent = EMPTY_HINT_TEXT[kind] ||
         EMPTY_HINT_TEXT.init;
     }
-    function hasIdentifyingRequestOrigin() {
-      return location.protocol === "https:" || location.protocol === "http:";
-    }
     function ensureNominatimRequestOrigin() {
-      if (hasIdentifyingRequestOrigin()) return true;
+      if (location.protocol === "https:" || location.protocol === "http:") {
+        return true;
+      }
       setStatusMessage(
         "Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.",
         "warn",
@@ -4103,7 +3984,7 @@
       if (RENDER_CACHE.pct !== pct) {
         RENDER_CACHE.pct = pct;
         domElements.prog.value = pct;
-        domElements.progShell.style.setProperty("--pct", pct);
+        domElements.progShell.style.setProperty("--pct", String(pct));
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       }
       const exportDisabled = processed === 0;
@@ -4136,7 +4017,7 @@
         wrap.scrollTop = 0;
         wrap.scrollLeft = 0;
       }
-      resetInteractionState({ closePopover: true });
+      resetInteractionState();
       domElements.tbody.replaceChildren();
       wrap.classList.remove("filter-empty", "has-results");
       RENDER_CACHE.hasResults = false;
@@ -4154,13 +4035,12 @@
         return Promise.resolve();
       }
       return new Promise((resolve) => {
-        const timeoutSignal = AbortSignal.timeout(ms);
-        const waitSignal = AbortSignal.any([signal, timeoutSignal]);
+        const waitSignal = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
         if (waitSignal.aborted) {
           resolve();
           return;
         }
-        waitSignal.addEventListener("abort", resolve, EVT_ONCE);
+        waitSignal.addEventListener("abort", resolve, { once: true });
       }).then(() => {
         signal.throwIfAborted();
       });
@@ -4188,8 +4068,9 @@
         });
     })();
     async function* decodedChunkIterator(stream, signal) {
-      const decoded = stream.pipeThrough(new TextDecoderStream(), { signal });
-      const reader = decoded.getReader();
+      const reader = stream
+        .pipeThrough(new TextDecoderStream(), { signal })
+        .getReader();
       let finished = false;
       try {
         while (true) {
@@ -4327,8 +4208,9 @@
         REVERSE_PARSED_CACHE_KEYS.length - REVERSE_PARSED_CACHE_HEAD >
         REVERSE_PARSED_CACHE_MAX
       ) {
-        const dropKey = REVERSE_PARSED_CACHE_KEYS[REVERSE_PARSED_CACHE_HEAD++];
-        REVERSE_PARSED_CACHE.delete(dropKey);
+        REVERSE_PARSED_CACHE.delete(
+          REVERSE_PARSED_CACHE_KEYS[REVERSE_PARSED_CACHE_HEAD++],
+        );
         if (
           REVERSE_PARSED_CACHE_HEAD > 1024 &&
           REVERSE_PARSED_CACHE_HEAD * 2 > REVERSE_PARSED_CACHE_KEYS.length
@@ -4586,11 +4468,7 @@
     }
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
-      const timeoutMs = CONFIG.REQUEST_TIMEOUT_MS;
       const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
-      const headers = FETCH_HEADERS;
-      const signalAny = AbortSignal.any;
-      const signalTimeout = AbortSignal.timeout;
       const anySignals = [userSignal, null];
       let attempt = 0;
       while (++attempt <= maxRetry) {
@@ -4604,12 +4482,12 @@
           }
         }
         LAST_REVERSE_FETCH_AT = now;
-        anySignals[1] = signalTimeout(timeoutMs);
+        anySignals[1] = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
         try {
           const res = await fetch(url, {
-            headers,
-            referrerPolicy: FETCH_REFERRER_POLICY,
-            signal: signalAny(anySignals),
+            headers: { Accept: "application/json" },
+            referrerPolicy: "strict-origin-when-cross-origin",
+            signal: AbortSignal.any(anySignals),
           });
           if (res.ok) {
             return res.json();
@@ -4640,15 +4518,10 @@
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
-      const skeletonTemplate = SKELETON_TEMPLATE;
-      const rowTemplate = ROW_TEMPLATE;
-      const fmtInt = fmt;
       let hasResultsClass = RENDER_CACHE.hasResults ??
         wrap.classList.contains("has-results");
       let lastStatusUpdate = 0;
       let lastYield = performance.now();
-      const reverseCache = REVERSE_PARSED_CACHE;
-      const baseHref = BASE_URL_HREF;
       let pendingFrag = null;
       let pendingCount = 0;
       const flushPending = () => {
@@ -4675,7 +4548,7 @@
           if (!AppState.isRunning) break;
           const r = records[i];
           const cacheKey = r.cacheKey;
-          let parsed = reverseCache.get(cacheKey);
+          let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
           if (!parsed) {
             parsed = await readPersistentReverseCache(cacheKey);
             if (parsed) putReverseMemoryCache(cacheKey, parsed);
@@ -4691,18 +4564,16 @@
             AppState.controller = controller;
             AppState.inFlight = true;
           }
-          const tr = (parsed ? rowTemplate : skeletonTemplate).cloneNode(
+          const tr = (parsed ? ROW_TEMPLATE : SKELETON_TEMPLATE).cloneNode(
             true,
           );
           tr.cells[IDX_COL_INDEX].textContent = "" + i1;
-          const mapBtn = tr.cells[MAPS_COL_INDEX].lastElementChild;
-          mapBtn.dataset.idx = "" + i;
+          tr.cells[MAPS_COL_INDEX].lastElementChild.dataset.idx = "" + i;
           const f0 = filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP;
           if (f0.active) {
             tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
           }
-          const isFirstRow = !hasResultsClass;
-          if (isFirstRow) {
+          if (!hasResultsClass) {
             hasResultsClass = true;
             wrap.classList.add("has-results");
             RENDER_CACHE.hasResults = true;
@@ -4732,11 +4603,12 @@
                 i1 === total
               ) {
                 lastStatusUpdate = now;
-                setStatusMessage(`처리 중… (${fmtInt(i1)}/${totalDisp})`);
+                setStatusMessage(`처리 중… (${fmt(i1)}/${totalDisp})`);
               }
             }
             if (!parsed) {
-              const url = baseHref + "&lat=" + r.latStr + "&lon=" + r.lonStr;
+              const url = BASE_URL_HREF + "&lat=" + r.latStr + "&lon=" +
+                r.lonStr;
               parsed = AddressFormatter.parse(
                 await fetchReverseWithRetry(
                   url,
@@ -4808,7 +4680,7 @@
             );
             if (!AppState.isStopping) {
               setStatusMessage(
-                `에러 발생: (${fmtInt(i1)}/${totalDisp}) ${msg}`,
+                `에러 발생: (${fmt(i1)}/${totalDisp}) ${msg}`,
                 "error",
               );
             }
@@ -4831,7 +4703,7 @@
           }
           AppState.resumeHandler = null;
           setControlsIdle(
-            `오류로 중단됨: (${fmtInt(i1)}/${totalDisp}) ${getErrorMessage(err)
+            `오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(err)
             }`,
             "error",
           );
@@ -4913,10 +4785,7 @@
         if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
-        const mapProviderCount = MAP_PROVIDER_COUNT;
-        const mapLinks = MAP_LINKS;
         const escCell = csvEsc;
-        const hasRound6 = MAP_HAS_ROUND6;
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
         const parts = [CSV_HEADER_BYTES];
@@ -4961,14 +4830,14 @@
           line += "," + escCell(CSV_GEOCODER_TEXT);
           let lat6 = null;
           let lon6 = null;
-          if (hasRound6) {
+          if (MAP_HAS_ROUND6) {
             lat6 = r.lat6;
             if (lat6 == null) r.lat6 = lat6 = fmtCoord6(lat);
             lon6 = r.lon6;
             if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
           }
-          for (let k = 0; k < mapProviderCount; k++) {
-            line += ',"' + mapLinks[k].build(lat, lon, lat6, lon6) + '"';
+          for (let k = 0; k < MAP_PROVIDER_COUNT; k++) {
+            line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
           }
           chunkLines.push(line);
           chunkChars += line.length + 1;
@@ -4986,7 +4855,9 @@
         a.href = url;
         a.download = `${(AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "")
           }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`;
+        document.body.appendChild(a);
         a.click();
+        a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
@@ -5169,13 +5040,12 @@
       console.error(err);
       setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
     }
-    function watchCommandResult(ret) {
-      ret?.updateCallbackDone?.catch(handleCommandError);
-    }
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      Promise.try(cmd).then(watchCommandResult, handleCommandError);
+      Promise.try(cmd).then((ret) => {
+        ret?.updateCallbackDone?.catch(handleCommandError);
+      }, handleCommandError);
     });
     function handleFile(file) {
       if (!file) return;
@@ -5203,7 +5073,9 @@
       setStatusMessage(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
-      for (const el of DROP_ZONE_FILE_LABELS) {
+      for (const el of document.querySelectorAll(
+        ".drop-text .desktop-msg, .drop-text .mobile-msg",
+      )) {
         const strong = document.createElement("strong");
         strong.textContent = file.name;
         el.replaceChildren("선택된 파일: ", strong);
@@ -5225,19 +5097,16 @@
       if (isMapPopoverOpen()) closeMapPopover();
       if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
     }, EVT_CAPTURE_PASSIVE);
-    function resetInteractionState({ closePopover = false } = {}) {
-      if (closePopover && isMapPopoverOpen()) closeMapPopover();
+    function resetInteractionState() {
+      if (isMapPopoverOpen()) closeMapPopover();
     }
     let DEACTIVATE_QUEUED = false;
-    let NEED_CLOSE_POPOVER = false;
-    function requestDeactivate({ closePopover = false } = {}) {
-      NEED_CLOSE_POPOVER ||= closePopover;
+    function requestDeactivate() {
       if (DEACTIVATE_QUEUED) return;
       DEACTIVATE_QUEUED = true;
       queueMicrotask(() => {
         DEACTIVATE_QUEUED = false;
-        resetInteractionState({ closePopover: NEED_CLOSE_POPOVER });
-        NEED_CLOSE_POPOVER = false;
+        resetInteractionState();
       });
     }
     function syncTableShadowOffset() {
@@ -5253,13 +5122,10 @@
       }
       wrap.style.setProperty("--table-head-offset", `${offset}px`);
     }
-    window.addEventListener("blur", () => requestDeactivate());
-    window.addEventListener("pagehide", () => {
-      resetInteractionState({ closePopover: true });
-    });
+    window.addEventListener("pagehide", resetInteractionState);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
-        requestDeactivate({ closePopover: true });
+        requestDeactivate();
       }
     });
     const syncViewportShadows = () => {
@@ -5311,8 +5177,6 @@
           seen_lotto7: 0n,
           seen_euro_millions_main: 0n,
           seen_euro_millions_lucky: 0n,
-          kor_coords: [0, 0],
-          world_coords: [0, 0],
           lotto_next_idx: 0,
           lotto7_next_idx: 0,
           euro_main_next_idx: 0,
@@ -5320,21 +5184,12 @@
           numeric_password: 0,
           glyph_string: new Array(12).fill("\0"),
           password: new Array(8).fill("\0"),
-          hangul_syllables: new Array(4).fill("\0"),
-          solar_system_index: 0,
-          nms_portal_zzz: 0,
-          nms_portal_xxx: 0,
-          galaxy_x: 0,
-          galaxy_y: 0,
-          galaxy_z: 0,
           lotto7_numbers: new Array(7).fill(0),
           lotto_numbers: new Array(6).fill(0),
           euro_millions_main_numbers: new Array(5).fill(0),
           euro_millions_lucky_stars: new Array(2).fill(0),
           numeric_password_digits: 0,
           password_len: 0,
-          planet_number: 0,
-          nms_portal_yy: 0,
         };
       }
       function isComplete(data) {
@@ -5382,11 +5237,6 @@
             `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
           );
         }
-        if (value < 0n || value > U64_MAX) {
-          throw new Error(
-            `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-          );
-        }
         return value;
       }
       function u64ToBytesBe(v) {
@@ -5398,7 +5248,7 @@
         return bytes;
       }
       function reverseBitsU64(v) {
-        let x = v & U64_MAX;
+        let x = v;
         let out = 0n;
         for (let i = 0; i < 64; i += 1) {
           out = (out << 1n) | (x & 1n);
@@ -5414,12 +5264,11 @@
         const mask = 1n << BigInt(number);
         if ((seen & mask) === 0n) {
           numbers[nextIdx] = number;
-          const updatedSeen = seen | mask;
           const updatedIdx = nextIdx + 1;
           if (updatedIdx === numbers.length) {
             numbers.sort((a, b) => a - b);
           }
-          return { inserted: true, seen: updatedSeen, nextIdx: updatedIdx };
+          return { inserted: true, seen: seen | mask, nextIdx: updatedIdx };
         }
         return { inserted: false, seen, nextIdx };
       }
@@ -5494,23 +5343,15 @@
             continue;
           }
           if (data.password_len < 8) {
-            const charCode = (byte % 94) + 33;
-            data.password[data.password_len] = String.fromCodePoint(charCode);
+            data.password[data.password_len] = String.fromCodePoint(
+              (byte % 94) + 33,
+            );
             data.password_len += 1;
             if (isComplete(data)) {
               return;
             }
           }
         }
-      }
-      function bitmaskConst(bits) {
-        if (bits <= 0) {
-          return 0n;
-        }
-        if (bits >= 64) {
-          return U64_MAX;
-        }
-        return (1n << BigInt(bits)) - 1n;
       }
       function extractValidBitsForNms(
         bits,
@@ -5521,7 +5362,7 @@
         supplementalRef,
         nextSupp,
       ) {
-        const mask = bitmaskConst(bits);
+        const mask = (1n << BigInt(bits)) - 1n;
         const maxBig = BigInt(maxValue);
         for (const shift of shifts) {
           const v = (num >> BigInt(shift)) & mask;
@@ -5530,10 +5371,10 @@
           }
         }
         for (; ;) {
-          const hasSupp = supplementalRef.current !== null;
-          const needNew = !hasSupp ||
-            supplementalRef.current.bitsRemaining < bits;
-          if (needNew) {
+          if (
+            supplementalRef.current === null ||
+            supplementalRef.current.bitsRemaining < bits
+          ) {
             supplementalRef.current = nextSupp(reason);
           }
           const supp = supplementalRef.current;
@@ -5660,8 +5501,7 @@
           } else {
             nibbleSource = num >> BigInt(36 - (i - 4) * 4);
           }
-          const nibble = Number(nibbleSource & 0xfn);
-          data.glyph_string[i] = GLYPHS[nibble];
+          data.glyph_string[i] = GLYPHS[Number(nibbleSource & 0xfn)];
         }
         return data;
       }
@@ -5682,13 +5522,7 @@
         if (v < 0x1000) {
           return v.toString(16).toUpperCase().padStart(3, "0");
         }
-        return v.toString(16).toUpperCase().padStart(4, "0");
-      }
-      function formatU32Dec0Pad6(n) {
-        if (n >= 1_000_000) {
-          return String(n);
-        }
-        return String(n).padStart(6, "0");
+        return v.toString(16).toUpperCase();
       }
       function formatOutput(data) {
         const v = data.num_64;
@@ -5711,7 +5545,7 @@
         );
         lines.push(`바이트 배열: ${bytes.join(" ")}`);
         lines.push(
-          `6자리 숫자 비밀번호: ${formatU32Dec0Pad6(data.numeric_password)}`,
+          `6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}`,
         );
         lines.push(`8자리 비밀번호: ${data.password.join("")}`);
         lines.push(`로또 번호: ${data.lotto_numbers.join(" ")}`);
@@ -5727,7 +5561,7 @@
         lines.push(
           `세계 위경도: ${data.world_coords[0]}, ${data.world_coords[1]}`,
         );
-        lines.push(`NMS 은하 번호: ${((b0 + 1) & 0xffff).toString(10)}`);
+        lines.push(`NMS 은하 번호: ${(b0 + 1).toString(10)}`);
         lines.push(
           `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
           } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
@@ -5744,14 +5578,13 @@
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
-      function isU64TokenSeparator(ch) {
-        return ch === "," || /\s/u.test(ch);
-      }
+      const RX_U64_WS = /\s/u;
       function* iterU64Tokens(raw) {
         const text = String(raw || "");
         let tokenStart = -1;
         for (let i = 0; i < text.length; i += 1) {
-          if (isU64TokenSeparator(text[i])) {
+          const ch = text[i];
+          if (ch === "," || RX_U64_WS.test(ch)) {
             if (tokenStart >= 0) {
               yield text.slice(tokenStart, i);
               tokenStart = -1;
@@ -5773,11 +5606,6 @@
           return preview;
         }
         return `${preview}\n\n... 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
-      }
-      function yieldToBrowser() {
-        return new Promise((resolve) => {
-          setTimeout(resolve, 0);
-        });
       }
       function promptSuppValue(index, reason) {
         for (; ;) {
@@ -5816,7 +5644,7 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 0);
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
       }
       async function copyRandomDataChunksToClipboard(chunks) {
         if (!navigator.clipboard || !window.isSecureContext) {
@@ -5856,22 +5684,69 @@
         ) {
           return;
         }
+        let manualShadowFrame = 0;
+        const requestManualOutputShadowSync = () => {
+          if (manualShadowFrame) return;
+          manualShadowFrame = requestAnimationFrame(() => {
+            manualShadowFrame = 0;
+            const maxScrollTop = Math.max(
+              0,
+              output.scrollHeight - output.clientHeight,
+            );
+            const atTop = output.scrollTop <= 1;
+            const atBottom = maxScrollTop <= 1 ||
+              output.scrollTop >= maxScrollTop - 1;
+            const ramp = 200;
+            const hasOverflow = maxScrollTop > 1;
+            const floor = 0.16;
+            const topOpacity =
+              !hasOverflow || atTop
+                ? "0"
+                : (
+                  floor +
+                  (1 - floor) * Math.min(1, output.scrollTop / ramp)
+                ).toFixed(3);
+            const bottomOpacity = !hasOverflow || atBottom
+              ? "0"
+              : (
+                floor +
+                (1 - floor) *
+                Math.min(1, (maxScrollTop - output.scrollTop) / ramp)
+              ).toFixed(3);
+            output.style.setProperty("--top-shadow-opacity", topOpacity);
+            output.style.setProperty("--bottom-shadow-opacity", bottomOpacity);
+          });
+        };
+        output.addEventListener("scroll", requestManualOutputShadowSync, {
+          passive: true,
+        });
+        const manualOutputResizeObserver =
+          new ResizeObserver(requestManualOutputShadowSync);
+        manualOutputResizeObserver.observe(output);
+        window.addEventListener("resize", requestManualOutputShadowSync, {
+          passive: true,
+        });
         const setManualOutputText = (text) => {
           const value = String(text ?? "");
           outputContent.textContent = value;
           if (value.length > 0) {
             output.setAttribute("data-has-content", "");
+            requestManualOutputShadowSync();
           } else {
             output.removeAttribute("data-has-content");
+            output.style.setProperty("--top-shadow-opacity", "0");
+            output.style.setProperty("--bottom-shadow-opacity", "0");
           }
         };
-        const setManualBusy = (busy) => {
-          runBtn.disabled = busy;
-          saveBtn.disabled = busy;
-          copyBtn.disabled = busy;
-        };
         let lastGeneratedChunks = [];
+        const setManualBusy = (busy) => {
+          const hasOutput = lastGeneratedChunks.length > 0;
+          runBtn.disabled = busy;
+          saveBtn.disabled = busy || !hasOutput;
+          copyBtn.disabled = busy || !hasOutput;
+        };
         let manualGenerationId = 0;
+        setManualBusy(false);
         runBtn.addEventListener("click", async () => {
           const generationId = manualGenerationId + 1;
           manualGenerationId = generationId;
@@ -5888,10 +5763,9 @@
             let suppInputCount = 0;
             let queuedSuppCount = 0;
             const nextSupp = (reason) => {
-              const suppIndex = suppInputCount + 1;
               const queued = suppTokens.next();
               const value = queued.done
-                ? promptSuppValue(suppIndex, reason)
+                ? promptSuppValue(suppInputCount + 1, reason)
                 : parseU64(queued.value);
               if (!queued.done) {
                 queuedSuppCount += 1;
@@ -5903,10 +5777,8 @@
               setManualOutputText(
                 manualPreviewText(previewParts, omittedPreviewCount),
               );
-              const promptedSuppCount = suppInputCount - queuedSuppCount;
-              const state = finished ? "완료" : "처리 중";
               meta.textContent =
-                `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 팝업 ${fmt(promptedSuppCount)}개)`;
+                `기본 난수 변환 ${finished ? "완료" : "처리 중"}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 팝업 ${fmt(suppInputCount - queuedSuppCount)}개)`;
             };
             let lastYieldAt = performance.now();
             let lastMetaUpdateAt = lastYieldAt;
@@ -5936,7 +5808,9 @@
                   updateManualProgress(false);
                   lastMetaUpdateAt = now;
                 }
-                await yieldToBrowser();
+                await new Promise((resolve) => {
+                  setTimeout(resolve, 0);
+                });
                 if (generationId !== manualGenerationId) {
                   return;
                 }
@@ -5966,8 +5840,6 @@
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
           if (lastGeneratedChunks.length === 0) {
-            error.textContent =
-              "저장할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
           downloadRandomDataTxt(lastGeneratedChunks);
@@ -5978,8 +5850,6 @@
         copyBtn.addEventListener("click", async () => {
           error.textContent = "";
           if (lastGeneratedChunks.length === 0) {
-            error.textContent =
-              "복사할 변환 결과가 없습니다. 먼저 변환 실행을 해주세요.";
             return;
           }
           try {
