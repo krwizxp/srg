@@ -32,11 +32,14 @@
       };
       try {
         const storedTheme = localStorage.getItem("srg-theme");
-        applyInitialTheme(
-          storedTheme === "light" || storedTheme === "dark"
-            ? storedTheme
-            : getSystemTheme(),
-        );
+        if (storedTheme === "light" || storedTheme === "dark") {
+          applyInitialTheme(storedTheme);
+        } else {
+          if (storedTheme !== null) {
+            localStorage.removeItem("srg-theme");
+          }
+          applyInitialTheme(getSystemTheme());
+        }
       } catch {
         applyInitialTheme(getSystemTheme());
       }
@@ -1949,7 +1952,7 @@
               </button>
             </div>
             <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
-            <div id="error" class="manual-rng-meta" role="alert" aria-live="assertive" aria-atomic="true"></div>
+            <div id="error" class="manual-rng-meta" role="alert" aria-atomic="true"></div>
             <section aria-label="변환 결과">
               <pre id="output" class="coords-view"><span
                 class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
@@ -2389,18 +2392,21 @@
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
+    const normalizeCoordText = (s) => s === "-0" ? "0" : s;
     const fmtCoord6 = (v) => {
       if (typeof v === "string") {
         const s0 = v;
         if (!s0) return "";
         const dot = s0.indexOf(".");
-        if (dot === -1) return s0;
+        if (dot === -1) return normalizeCoordText(s0);
         if (s0.indexOf("e") === -1 && s0.indexOf("E") === -1) {
           if (s0.length - dot - 1 <= COORD_DECIMALS) {
             let end = s0.length;
             while (end && s0.charCodeAt(end - 1) === 48) end--;
             if (end && s0.charCodeAt(end - 1) === 46) end--;
-            return end === s0.length ? s0 : s0.slice(0, end);
+            return normalizeCoordText(
+              end === s0.length ? s0 : s0.slice(0, end),
+            );
           }
         }
       }
@@ -2412,7 +2418,7 @@
       let end = s.length;
       while (end && s.charCodeAt(end - 1) === 48) end--;
       if (end && s.charCodeAt(end - 1) === 46) end--;
-      return end === s.length ? s : s.slice(0, end);
+      return normalizeCoordText(end === s.length ? s : s.slice(0, end));
     };
     const tbl = document.getElementById("tbl");
     const domElements = {
@@ -2468,10 +2474,11 @@
     const getStoredTheme = () => {
       try {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
-        return stored === "light" || stored === "dark" ? stored : null;
+        if (stored === "light" || stored === "dark") return stored;
+        if (stored !== null) localStorage.removeItem(THEME_STORAGE_KEY);
       } catch {
-        return null;
       }
+      return null;
     };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
@@ -5751,7 +5758,7 @@
           const generationId = manualGenerationId + 1;
           manualGenerationId = generationId;
           error.textContent = "";
-          meta.textContent = "기본 난수 변환 준비 중...";
+          meta.textContent = "기본 난수 변환 준비 중…";
           lastGeneratedChunks = [];
           setManualOutputText("");
           setManualBusy(true);
