@@ -22,7 +22,7 @@ cfg_select! {
             os::windows::io::AsRawHandle as WindowsRawHandle,
         };
     }
-    any(target_os = "linux", target_os = "macos") => {
+    target_family = "unix" => {
         use std::os::unix::fs::{
             MetadataExt as UnixMetadataExt, OpenOptionsExt as UnixOpenOptionsExt,
         };
@@ -55,7 +55,15 @@ cfg_select! {
     target_os = "linux" => {
         const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
     }
-    target_os = "macos" => {
+    target_os = "android" => {
+        const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
+    }
+    any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ) => {
         const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
     }
     windows => {
@@ -64,6 +72,10 @@ cfg_select! {
         const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
         const FILE_STANDARD_INFO_CLASS: i32 = 1;
     }
+    target_family = "unix" => {
+        const OPEN_NOFOLLOW_FLAG: i32 = 0;
+    }
+    _ => {}
 }
 cfg_select! {
     windows => {
@@ -120,7 +132,7 @@ cfg_select! {
             },
         }
     }
-    all(target_arch = "x86_64", any(target_os = "linux", target_os = "macos")) => {
+    all(target_arch = "x86_64", target_family = "unix") => {
         #[derive(Eq, PartialEq)]
         struct FileIdentity {
             device: u64,
@@ -183,7 +195,7 @@ cfg_select! {
                     };
                     current_identity.as_ref() != Some(&open_file_identity(file_guard.get_ref())?)
                 }}
-                any(target_os = "linux", target_os = "macos") => {{
+                target_family = "unix" => {{
                     validate_safe_output_file_path(path)?;
                     let mut options = File::options();
                     options.read(true);
@@ -270,7 +282,7 @@ cfg_select! {
             })
         }
     }
-    all(target_arch = "x86_64", any(target_os = "linux", target_os = "macos")) => {
+    all(target_arch = "x86_64", target_family = "unix") => {
         fn open_file_identity(file: &File) -> Result<FileIdentity> {
             let metadata = file.metadata()?;
             if !metadata.is_file() {
@@ -331,9 +343,10 @@ pub fn validate_safe_output_file_path(path: &Path) -> Result<()> {
             WindowsOpenOptionsExt::custom_flags(&mut options, FILE_FLAG_OPEN_REPARSE_POINT_FLAG);
             file_has_multiple_links(&options.open(path)?)?
         }}
-        _ => {
+        target_family = "unix" => {
             UnixMetadataExt::nlink(&metadata) > 1
         }
+        _ => false
     };
     if has_multiple_links {
         return Err(invalid_output_path_err(
@@ -352,10 +365,15 @@ pub fn open_or_create_file() -> Result<BufWriter<File>> {
             WindowsOpenOptionsExt::custom_flags(&mut options, FILE_FLAG_OPEN_REPARSE_POINT_FLAG);
             options.open(path)?
         }}
-        _ => {{
+        target_family = "unix" => {{
             let mut options = File::options();
             options.read(true).append(true).create(true);
             UnixOpenOptionsExt::custom_flags(&mut options, OPEN_NOFOLLOW_FLAG);
+            options.open(path)?
+        }}
+        _ => {{
+            let mut options = File::options();
+            options.read(true).append(true).create(true);
             options.open(path)?
         }}
     };
@@ -390,9 +408,10 @@ pub fn open_or_create_file() -> Result<BufWriter<File>> {
         windows => {
             file_has_multiple_links(&file)?
         }
-        _ => {
+        target_family = "unix" => {
             UnixMetadataExt::nlink(&metadata) > 1
         }
+        _ => false
     };
     if has_multiple_links {
         return Err(invalid_output_path_err(

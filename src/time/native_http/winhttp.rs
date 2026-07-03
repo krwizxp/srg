@@ -437,39 +437,39 @@ impl Client {
                 .collect::<Result<Vec<_>>>()?;
             if is_age_header {
                 match find_age_header_value(&line_bytes) {
-                Ok(Some(age_header_raw)) => {
-                    if age_seen {
-                        return Err(error(context, "Age 헤더가 여러 개입니다."));
+                    Ok(Some(age_header_raw)) => {
+                        if age_seen {
+                            return Err(error(context, "Age 헤더가 여러 개입니다."));
+                        }
+                        age_seen = true;
+                        validate_http_age_value(age_header_raw)
+                            .map_err(|message| error(context, message))?;
                     }
-                    age_seen = true;
-                    validate_http_age_value(age_header_raw)
-                        .map_err(|message| error(context, message))?;
-                }
-                Ok(None) => {}
-                Err(source) => {
-                    return Err(error(
-                        context,
-                        format!("Age 헤더 UTF-8 변환 실패: {source}"),
-                    ));
-                }
+                    Ok(None) => {}
+                    Err(source) => {
+                        return Err(error(
+                            context,
+                            format!("Age 헤더 UTF-8 변환 실패: {source}"),
+                        ));
+                    }
                 }
             }
             if is_date_header {
                 match find_date_header_value(&line_bytes) {
-                Ok(Some(date_header_raw)) => {
-                    if date_seen {
-                        return Err(error(context, "Date 헤더가 여러 개입니다."));
+                    Ok(Some(date_header_raw)) => {
+                        if date_seen {
+                            return Err(error(context, "Date 헤더가 여러 개입니다."));
+                        }
+                        date_seen = true;
+                        parsed_date = Some(parse_http_date(date_header_raw)?);
                     }
-                    date_seen = true;
-                    parsed_date = Some(parse_http_date(date_header_raw)?);
-                }
-                Ok(None) => {}
-                Err(source) => {
-                    return Err(error(
-                        context,
-                        format!("Date 헤더 UTF-8 변환 실패: {source}"),
-                    ));
-                }
+                    Ok(None) => {}
+                    Err(source) => {
+                        return Err(error(
+                            context,
+                            format!("Date 헤더 UTF-8 변환 실패: {source}"),
+                        ));
+                    }
                 }
             }
         }

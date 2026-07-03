@@ -162,29 +162,20 @@ cfg_select! {
             mode: LadderEntryMode,
             index_error: &'static str,
         ) -> Result<usize> {
-            struct SegmentBoundary {
-                end: usize,
-                has_separator: bool,
-            }
             let (out, err) = io;
             let index_err = || AppError::message(index_error);
             let count = loop {
                 let line =
                     read_line_reuse_limited(prompt, input_buffer, out, LADDER_INPUT_LINE_MAX_BYTES)?;
                 let mut count = 0_usize;
+                let mut has_empty_entry = false;
                 let mut players_overflowed = false;
                 let mut trimmed_ranges: [Range<usize>; N] = [Range { start: 0, end: 0 }; N];
                 let mut segment_start = 0_usize;
-                for boundary in line
+                for (boundary_end, has_separator) in line
                     .match_indices(',')
-                    .map(|(idx, _)| SegmentBoundary {
-                        end: idx,
-                        has_separator: true,
-                    })
-                    .chain([SegmentBoundary {
-                        end: line.len(),
-                        has_separator: false,
-                    }])
+                    .map(|(idx, _)| (idx, true))
+                    .chain([(line.len(), false)])
                 {
                     count = checked_add_one_usize(count).ok_or_else(|| {
                         AppError::message(match mode {
@@ -201,13 +192,17 @@ cfg_select! {
                         LadderEntryMode::Results { expected_count } if count > expected_count => break,
                         LadderEntryMode::Players | LadderEntryMode::Results { .. } => {
                             let part = line
-                                .get(segment_start..boundary.end)
+                                .get(segment_start..boundary_end)
                                 .ok_or_else(index_err)?;
                             let leading_whitespace = part
                                 .len()
                                 .checked_sub(part.trim_start().len())
                                 .ok_or_else(index_err)?;
                             let trimmed = part.trim();
+                            if trimmed.is_empty() {
+                                has_empty_entry = true;
+                                break;
+                            }
                             let entry_index = count.checked_sub(1).ok_or_else(index_err)?;
                             let slot = trimmed_ranges.get_mut(entry_index).ok_or_else(index_err)?;
                             let range_start = segment_start
@@ -222,12 +217,20 @@ cfg_select! {
                             };
                         }
                     }
-                    if boundary.has_separator {
+                    if has_separator {
                         segment_start =
-                            checked_add_one_usize(boundary.end).ok_or_else(index_err)?;
+                            checked_add_one_usize(boundary_end).ok_or_else(index_err)?;
                     }
                 }
                 if players_overflowed || count == 0 {
+                    continue;
+                }
+                if has_empty_entry {
+                    let message = match mode {
+                        LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
+                        LadderEntryMode::Results { .. } => "결과값은 비워둘 수 없습니다.",
+                    };
+                    writeln!(err, "{message}")?;
                     continue;
                 }
                 match mode {

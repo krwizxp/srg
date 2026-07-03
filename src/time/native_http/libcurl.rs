@@ -258,7 +258,7 @@ impl Client {
         &mut self,
         url: &str,
         context: &str,
-        uarse_http_date: ParseHttpDate,
+        parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
         let url_c = CString::new(url).map_err(|source| {
             error(context, format!("URL에 NUL 문자가 포함되어 있습니다: {source}"))
@@ -348,13 +348,13 @@ impl Client {
         let response_received_inst = header_capture
             .date_received_inst
             .map_or(perform_result.response_received, |received_at| received_at);
-        let http_elaused = response_received_inst
+        let http_elapsed = response_received_inst
             .saturating_duration_since(perform_result.request_start)
             .max(MIN_TRANSFER_TIME);
         Ok(HeadResponse {
             response_received_inst,
-            rtt: http_elaused,
-            server_time: uarse_http_date(date_header_raw)?,
+            rtt: http_elapsed,
+            server_time: parse_http_date(date_header_raw)?,
         })
     }
 }

@@ -1,6 +1,6 @@
 use crate::write_line_best_effort;
 use super::NativeInputSendStatus;
-use core::mem::size_of;
+use core::mem::{align_of, size_of};
 use std::io::Write;
 mod sys {
     use super::Input;
@@ -49,10 +49,20 @@ struct Input {
 }
 cfg_select! {
     target_pointer_width = "64" => {
+        const _: () = assert!(size_of::<MouseInput>() == 32, "Windows MOUSEINPUT x64 size mismatch");
+        const _: () = assert!(align_of::<MouseInput>() == 8, "Windows MOUSEINPUT x64 align mismatch");
+        const _: () = assert!(size_of::<KeybdInput>() == 24, "Windows KEYBDINPUT x64 size mismatch");
+        const _: () = assert!(align_of::<KeybdInput>() == 8, "Windows KEYBDINPUT x64 align mismatch");
         const _: () = assert!(size_of::<Input>() == 40, "Windows INPUT x64 size mismatch");
+        const _: () = assert!(align_of::<Input>() == 8, "Windows INPUT x64 align mismatch");
     }
     target_pointer_width = "32" => {
+        const _: () = assert!(size_of::<MouseInput>() == 24, "Windows MOUSEINPUT x86 size mismatch");
+        const _: () = assert!(align_of::<MouseInput>() == 4, "Windows MOUSEINPUT x86 align mismatch");
+        const _: () = assert!(size_of::<KeybdInput>() == 16, "Windows KEYBDINPUT x86 size mismatch");
+        const _: () = assert!(align_of::<KeybdInput>() == 4, "Windows KEYBDINPUT x86 align mismatch");
         const _: () = assert!(size_of::<Input>() == 28, "Windows INPUT x86 size mismatch");
+        const _: () = assert!(align_of::<Input>() == 4, "Windows INPUT x86 align mismatch");
     }
     _ => {}
 }
@@ -140,22 +150,20 @@ fn send_input_events(
     if sent == input_count {
         return NativeInputSendStatus::Sent;
     }
-    if sent != input_count {
-        write_line_best_effort(
-            err,
-            format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
-        );
-        if sent == 1
-            && let Some(release) = release_input
-        {
-            // SAFETY: `release` is a valid one-element INPUT pointer and `input_size` matches the Rust representation.
-            let release_sent = unsafe { sys::SendInput(1, release, input_size) };
-            if release_sent != 1 {
-                write_line_best_effort(
-                    err,
-                    format_args!("[경고] Windows 입력 release 이벤트 전송 실패"),
-                );
-            }
+    write_line_best_effort(
+        err,
+        format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
+    );
+    if sent == 1
+        && let Some(release) = release_input
+    {
+        // SAFETY: `release` is a valid one-element INPUT pointer and `input_size` matches the Rust representation.
+        let release_sent = unsafe { sys::SendInput(1, release, input_size) };
+        if release_sent != 1 {
+            write_line_best_effort(
+                err,
+                format_args!("[경고] Windows 입력 release 이벤트 전송 실패"),
+            );
         }
     }
     if sent == 0 {

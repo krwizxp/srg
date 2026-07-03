@@ -15,17 +15,17 @@ on:
           - random-float
           - time-sync-observe
       count:
-        description: Record count for generate-multiple
+        description: Record count for generate-multiple (1-100000)
         required: true
         default: "10"
         type: string
       players:
-        description: Comma-separated player names for ladder
+        description: Single-line comma-separated player names for ladder (2-512, no empty entries)
         required: true
         default: Alice,Bob
         type: string
       results:
-        description: Comma-separated ladder results
+        description: Single-line comma-separated ladder results (same count as players)
         required: true
         default: Win,Lose
         type: string
@@ -40,12 +40,12 @@ on:
         default: "100"
         type: string
       float_min:
-        description: Minimum float for random-float
+        description: Minimum finite non-subnormal float for random-float
         required: true
         default: "0"
         type: string
       float_max:
-        description: Maximum float for random-float
+        description: Maximum finite non-subnormal float for random-float
         required: true
         default: "1"
         type: string
@@ -55,12 +55,12 @@ on:
         default: www.google.com
         type: string
       observe_seconds:
-        description: Seconds to observe server time before stopping
+        description: Seconds to observe server time before stopping (1-60)
         required: true
         default: "10"
         type: string
       artifact_name:
-        description: Filename prefix for uploaded artifacts
+        description: Filename prefix for uploaded artifacts (sanitized, first 80 chars)
         required: true
         default: srg-result
         type: string
@@ -68,7 +68,7 @@ permissions:
   contents: read
 jobs:
   run:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -76,14 +76,16 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: stable
+      - name: Install Linux native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Build release binary
         run: cargo build --release --locked
       - name: Run selected SRG action
         id: run_srg
-        shell: pwsh
+        shell: bash
         env:
           SRG_ACTION: ${{ inputs.action }}
           SRG_ARTIFACT_NAME: ${{ inputs.artifact_name }}
@@ -96,11 +98,12 @@ jobs:
           SRG_FLOAT_MAX: ${{ inputs.float_max }}
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
-        run: .\.github\scripts\run-srg.ps1
+        run: bash ./.github/scripts/run-srg.sh
       - name: Upload console log artifact
         if: ${{ always() && steps.run_srg.outputs.log_artifact_path != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
+          name: ${{ steps.run_srg.outputs.artifact_name_prefix }}-console-log
           path: ${{ steps.run_srg.outputs.log_artifact_path }}
           archive: false
           if-no-files-found: error
@@ -109,6 +112,7 @@ jobs:
         if: ${{ always() && steps.run_srg.outputs.data_artifact_path != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
+          name: ${{ steps.run_srg.outputs.artifact_name_prefix }}-random-data
           path: ${{ steps.run_srg.outputs.data_artifact_path }}
           archive: false
           if-no-files-found: error

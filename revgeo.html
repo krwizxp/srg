@@ -74,12 +74,6 @@
         font: inherit;
       }
 
-      :is(input, select, textarea) {
-        @media (pointer: coarse) {
-          font-size: 16px !important;
-        }
-      }
-
       body {
         word-break: keep-all;
         min-block-size: 100dvh;
@@ -158,7 +152,7 @@
         min-block-size: 0;
         block-size: calc(100dvh - var(--site-header-height) - var(--site-header-gap) - var(--page-pad-block-end));
 
-        @container (inline-size <=900px) {
+        @container (inline-size <= 900px) {
           grid-template-columns: 1fr;
           block-size: auto;
         }
@@ -184,72 +178,66 @@
         --coords-pad-block: 12px;
         --coords-pad-inline: 12px;
 
-        &[data-has-content] {
+        &[data-has-content]::before,
+        &[data-has-content]::after {
+          content: "";
+          display: block;
+          position: sticky;
+          inset-inline: 0;
+          block-size: var(--scroll-shadow-size);
+          pointer-events: none;
+          z-index: 5;
+        }
 
-          &::before,
-          &::after {
-            content: "";
-            display: block;
-            position: sticky;
-            inset-inline: 0;
-            block-size: var(--scroll-shadow-size);
-            pointer-events: none;
-            z-index: 5;
-          }
+        &[data-has-content]::before {
+          inset-block-start: 0;
+          margin-block-start: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(180deg,
+              var(--scroll-shadow-color),
+              oklch(0% 0 0 / 0));
+          opacity: var(--top-shadow-opacity);
+        }
 
-          &::before {
-            inset-block-start: 0;
-            margin-block-start: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(180deg,
-                var(--scroll-shadow-color),
-                oklch(0% 0 0 / 0));
-            opacity: var(--top-shadow-opacity);
-          }
-
-          &::after {
-            inset-block-end: 0;
-            margin-block-end: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(0deg,
-                var(--scroll-shadow-color),
-                oklch(0% 0 0 / 0));
-            opacity: var(--bottom-shadow-opacity);
-          }
+        &[data-has-content]::after {
+          inset-block-end: 0;
+          margin-block-end: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(0deg,
+              var(--scroll-shadow-color),
+              oklch(0% 0 0 / 0));
+          opacity: var(--bottom-shadow-opacity);
         }
       }
 
       .table-wrap {
         --table-head-offset: 0px;
 
-        &.has-results {
+        &.has-results::before,
+        &.has-results::after {
+          content: "";
+          display: block;
+          position: sticky;
+          inset-inline: 0;
+          block-size: var(--scroll-shadow-size);
+          pointer-events: none;
+          z-index: 11;
+        }
 
-          &::before,
-          &::after {
-            content: "";
-            display: block;
-            position: sticky;
-            inset-inline: 0;
-            block-size: var(--scroll-shadow-size);
-            pointer-events: none;
-            z-index: 11;
-          }
+        &.has-results::before {
+          inset-block-start: var(--table-head-offset);
+          margin-block-end: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(180deg,
+              var(--scroll-shadow-color),
+              oklch(0% 0 0 / 0));
+          opacity: var(--top-shadow-opacity);
+        }
 
-          &::before {
-            inset-block-start: var(--table-head-offset);
-            margin-block-end: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(180deg,
-                var(--scroll-shadow-color),
-                oklch(0% 0 0 / 0));
-            opacity: var(--top-shadow-opacity);
-          }
-
-          &::after {
-            inset-block-end: 0;
-            margin-block-start: calc(-1 * var(--scroll-shadow-size));
-            background: linear-gradient(0deg,
-                var(--scroll-shadow-color),
-                oklch(0% 0 0 / 0));
-            opacity: var(--bottom-shadow-opacity);
-          }
+        &.has-results::after {
+          inset-block-end: 0;
+          margin-block-start: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(0deg,
+              var(--scroll-shadow-color),
+              oklch(0% 0 0 / 0));
+          opacity: var(--bottom-shadow-opacity);
         }
       }
 
@@ -269,28 +257,24 @@
         }
       }
 
-      #app {
-        >section.card {
-          &:has(>.left-pane-scroll) {
-            overflow-x: hidden;
-            overflow-y: auto;
-            overscroll-behavior: contain;
-            scrollbar-width: thin;
-          }
+      #app>section.card:has(>.left-pane-scroll) {
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+      }
 
-          >.left-pane-scroll {
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 auto;
-            gap: 14px;
-            block-size: 100%;
-            min-block-size: 0;
-            overflow: visible;
+      #app>section.card>.left-pane-scroll {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        gap: 14px;
+        block-size: 100%;
+        min-block-size: 0;
+        overflow: visible;
 
-            >* {
-              flex-shrink: 0;
-            }
-          }
+        >* {
+          flex-shrink: 0;
         }
       }
 
@@ -343,7 +327,7 @@
             gap: 10px;
           }
 
-          @media (380px <=width <=700px) {
+          @media (380px <= width <= 700px) {
             .row {
               grid-template-columns: repeat(3, minmax(0, 1fr));
             }
@@ -384,10 +368,8 @@
             color: var(--accent-ink);
           }
 
-          &:is(:hover, :focus-within) {
-            .drop-icon {
-              color: var(--accent-ink);
-            }
+          &:is(:hover, :focus-within) .drop-icon {
+            color: var(--accent-ink);
           }
 
           .mobile-msg {
@@ -395,7 +377,7 @@
           }
 
           @media (pointer: coarse) {
-            @container page (inline-size <=800px) {
+        @container page (inline-size <= 800px) {
               padding-block: 16px;
 
               .desktop-msg {
@@ -460,7 +442,7 @@
             display: none;
           }
 
-          @container page (inline-size <=900px) {
+          @container page (inline-size <= 900px) {
             max-block-size: 30dvh;
           }
         }
@@ -564,22 +546,20 @@
           position: relative;
         }
 
-        &.active {
-          .progress-fill::after {
-            content: "";
-            position: absolute;
-            inset-block: 0;
-            inset-inline: 0;
-            transform: translateX(var(--shimmer-from));
-            background: linear-gradient(in oklch var(--inline-angle),
-                oklch(0% 0 0 / 0) 0%,
-                color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%,
-                oklch(0% 0 0 / 0) 100%);
-            opacity: var(--shimmer-opacity);
-            animation: skeleton-shimmer-x 1.5s linear infinite;
-            will-change: transform;
-            pointer-events: none;
-          }
+        &.active .progress-fill::after {
+          content: "";
+          position: absolute;
+          inset-block: 0;
+          inset-inline: 0;
+          transform: translateX(var(--shimmer-from));
+          background: linear-gradient(in oklch var(--inline-angle),
+              oklch(0% 0 0 / 0) 0%,
+              color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%,
+              oklch(0% 0 0 / 0) 100%);
+          opacity: var(--shimmer-opacity);
+          animation: skeleton-shimmer-x 1.5s linear infinite;
+          will-change: transform;
+          pointer-events: none;
         }
       }
 
@@ -634,6 +614,8 @@
           max-inline-size: 100%;
           min-inline-size: 0;
           padding: 16px;
+          container-type: inline-size;
+          container-name: manual-rng;
         }
 
         :scope summary {
@@ -733,7 +715,7 @@
             min-inline-size: 148px;
           }
 
-          @container (inline-size <=420px) {
+          @container manual-rng (inline-size <= 420px) {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             align-items: stretch;
@@ -849,72 +831,66 @@
         inline-size: 100%;
         border-spacing: 0;
 
-        thead {
-          th {
-            position: sticky;
-            inset-block-start: 0;
-            z-index: 10;
-            background: light-dark(oklch(98.3678% 0.00398 258.32),
-                oklch(17.4973% 0.03507 259.82));
-            text-align: start;
-            font-weight: 600;
-            color: var(--muted-strong);
-            white-space: nowrap;
+        thead th {
+          position: sticky;
+          inset-block-start: 0;
+          z-index: 10;
+          background: light-dark(oklch(98.3678% 0.00398 258.32),
+              oklch(17.4973% 0.03507 259.82));
+          text-align: start;
+          font-weight: 600;
+          color: var(--muted-strong);
+          white-space: nowrap;
 
-            &:nth-child(-n+2) {
-              text-align: center;
-            }
+          &:nth-child(-n+2) {
+            text-align: center;
+          }
 
-            &:nth-child(8) {
-              inline-size: 100%;
-            }
+          &:nth-child(8) {
+            inline-size: 100%;
           }
         }
 
-        tbody {
-          td {
-            vertical-align: top;
+        tbody td {
+          vertical-align: top;
 
-            &:nth-child(-n+2) {
-              color: var(--muted);
-            }
+          &:nth-child(-n+2) {
+            color: var(--muted);
+          }
 
-            &:nth-child(3) {
-              color: var(--accent-ink);
-              font-weight: 500;
+          &:nth-child(3) {
+            color: var(--accent-ink);
+            font-weight: 500;
+          }
+        }
+
+        tbody tr {
+          content-visibility: auto;
+          contain-intrinsic-block-size: auto 73px;
+
+          @media (any-hover: hover) {
+            &:hover {
+              background: color-mix(in oklch,
+                  var(--accent) 4%,
+                  var(--surface-panel));
             }
           }
 
-          tr {
-            content-visibility: auto;
-            contain-intrinsic-block-size: auto 73px;
-
-            @media (any-hover: hover) {
-              &:hover {
-                background: color-mix(in oklch,
-                    var(--accent) 4%,
-                    var(--surface-panel));
-              }
-            }
-
-            &[hidden="until-found"] {
-              display: block;
-              content-visibility: hidden;
-              block-size: 0;
-              overflow: hidden;
-            }
+          &[hidden="until-found"] {
+            display: block;
+            content-visibility: hidden;
+            block-size: 0;
+            overflow: hidden;
           }
         }
 
         @container (inline-size > 900px) {
-          tbody {
-            td:nth-child(-n+2) {
-              text-align: center;
-            }
+          tbody td:nth-child(-n+2) {
+            text-align: center;
           }
         }
 
-        @container (inline-size <=900px) {
+        @container (inline-size <= 900px) {
           display: block;
           min-inline-size: 0;
 
@@ -968,10 +944,10 @@
             }
 
             :root[data-perf-mode="1"] & tr {
-              animation: none !important;
+              animation: none;
 
               &:hover {
-                background: oklch(0% 0 0 / 0) !important;
+                background: oklch(0% 0 0 / 0);
               }
             }
           }
@@ -1006,44 +982,37 @@
     }
 
     @layer transitions {
-      .card {
-        &:has(#tbl) {
-          .table-wrap {
-            view-transition-name: results-card;
-          }
-        }
+      .card:has(#tbl) .table-wrap {
+        view-transition-name: results-card;
       }
 
-      html:active-view-transition-type(results) {
+      html:active-view-transition-type(results)::view-transition-old(root),
+      html:active-view-transition-type(results)::view-transition-new(root) {
+        animation: none;
+      }
 
-        &::view-transition-old(root),
-        &::view-transition-new(root) {
-          animation: none;
-        }
+      html:active-view-transition-type(results)::view-transition-group(results-card) {
+        animation-duration: 0.5s;
+        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
 
-        &::view-transition-group(results-card) {
-          animation-duration: 0.5s;
-          animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+      html:active-view-transition-type(results)::view-transition-old(results-card),
+      html:active-view-transition-type(results)::view-transition-new(results-card) {
+        position: absolute;
+        inset-block: 0;
+        inset-inline: 0;
+        mix-blend-mode: plus-lighter;
+        backface-visibility: hidden;
+      }
 
-        &::view-transition-old(results-card),
-        &::view-transition-new(results-card) {
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          mix-blend-mode: plus-lighter;
-          backface-visibility: hidden;
-        }
+      html:active-view-transition-type(results)::view-transition-old(results-card) {
+        animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out-blur;
+        transform-origin: 50% 100%;
+      }
 
-        &::view-transition-old(results-card) {
-          animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out-blur;
-          transform-origin: 50% 100%;
-        }
-
-        &::view-transition-new(results-card) {
-          animation: 500ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-spring;
-          transform-origin: 50% 0%;
-        }
+      html:active-view-transition-type(results)::view-transition-new(results-card) {
+        animation: 500ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-spring;
+        transform-origin: 50% 0%;
       }
 
       @keyframes vt-fade-out-blur {
@@ -1079,16 +1048,6 @@
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-
-      *,
-      *::before,
-      *::after {
-        animation: none !important;
-        transition: none !important;
-      }
-    }
-
     @layer utilities {
       .caps {
         text-transform: uppercase;
@@ -1114,10 +1073,8 @@
         justify-self: center;
       }
 
-      td[data-label="지도링크"] {
-        .map-btn:disabled {
-          display: none;
-        }
+      td[data-label="지도링크"] .map-btn:disabled {
+        display: none;
       }
 
       .map-popover {
@@ -1321,37 +1278,35 @@
         inset 0 0 0 2px var(--focus-ring);
     }
 
-    .card {
-      .card-intro {
-        display: grid;
-        gap: 12px;
-        padding-block-end: 2px;
-      }
+    .card .card-intro {
+      display: grid;
+      gap: 12px;
+      padding-block-end: 2px;
+    }
 
-      .card-label {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.98rem;
-        font-weight: 700;
-        line-height: 1.2;
+    .card .card-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
 
-        .dot {
-          inline-size: 8px;
-          block-size: 8px;
-          border-radius: 999px;
-          background: currentColor;
-          flex: 0 0 auto;
-        }
+    .card .card-label .dot {
+      inline-size: 8px;
+      block-size: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      flex: 0 0 auto;
+    }
 
-        &.geo {
-          color: var(--accent);
-        }
+    .card .card-label.geo {
+      color: var(--accent);
+    }
 
-        &.reverse {
-          color: oklch(74.1537% 0.204 163.16);
-        }
-      }
+    .card .card-label.reverse {
+      color: oklch(74.1537% 0.204 163.16);
     }
 
     .drop-zone,
@@ -1624,22 +1579,16 @@
           text-align: center;
         }
 
-        &.has-results {
-          .empty-hint {
-            display: none;
-          }
+        &.has-results .empty-hint {
+          display: none;
         }
 
-        &.filter-empty {
-          .filter-empty-hint {
-            display: grid;
-          }
+        &.filter-empty .filter-empty-hint {
+          display: grid;
         }
 
-        &:not(.filter-empty) {
-          .filter-empty-hint {
-            display: none;
-          }
+        &:not(.filter-empty) .filter-empty-hint {
+          display: none;
         }
       }
 
@@ -1676,95 +1625,79 @@
         block-size: auto;
       }
 
-      #app {
-        >section.card {
-          block-size: auto;
-
-          &:has(>.left-pane-scroll) {
-            overflow: visible;
-            overscroll-behavior: auto;
-          }
-        }
+      #app>section.card {
+        block-size: auto;
       }
 
-      .results-card {
-        .table-wrap {
-          &.has-results {
-            block-size: var(--results-pane-mobile-height);
-            flex: 0 0 var(--results-pane-mobile-height);
-            overscroll-behavior: contain;
-          }
+      #app>section.card:has(>.left-pane-scroll) {
+        overflow: visible;
+        overscroll-behavior: auto;
+      }
 
-          &:not(.has-results) {
-            min-block-size: 220px;
-          }
-        }
+      .results-card .table-wrap.has-results {
+        block-size: var(--results-pane-mobile-height);
+        flex: 0 0 var(--results-pane-mobile-height);
+        overscroll-behavior: contain;
+      }
+
+      .results-card .table-wrap:not(.has-results) {
+        min-block-size: 220px;
       }
     }
 
     @media (max-width: 900px) {
-      .results-card {
-        search {
-          .filters {
-            display: grid;
-            grid-template-columns: repeat(8, minmax(0, 1fr));
-            align-items: stretch;
+      .results-card search .filters {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        align-items: stretch;
 
-            :is(input[type="search"], select, #filter-clear) {
-              min-inline-size: 0;
-              inline-size: 100%;
-            }
+        :is(input[type="search"], select, #filter-clear) {
+          min-inline-size: 0;
+          inline-size: 100%;
+        }
 
-            #filter-q {
-              grid-column: 1 / span 5;
-            }
+        #filter-q {
+          grid-column: 1 / span 5;
+        }
 
-            #filter-kind {
-              grid-column: 6 / span 3;
-            }
+        #filter-kind {
+          grid-column: 6 / span 3;
+        }
 
-            #filter-sido {
-              grid-column: 1 / span 4;
-            }
+        #filter-sido {
+          grid-column: 1 / span 4;
+        }
 
-            #filter-sigungu {
-              grid-column: 5 / span 4;
-            }
+        #filter-sigungu {
+          grid-column: 5 / span 4;
+        }
 
-            #filter-emd {
-              grid-column: 1 / span 4;
-            }
+        #filter-emd {
+          grid-column: 1 / span 4;
+        }
 
-            #filter-tag {
-              grid-column: 5 / span 4;
-            }
+        #filter-tag {
+          grid-column: 5 / span 4;
+        }
 
-            #filter-fulladdr {
-              grid-column: 1 / span 5;
-            }
+        #filter-fulladdr {
+          grid-column: 1 / span 5;
+        }
 
-            #filter-clear {
-              grid-column: 6 / span 3;
-              justify-self: stretch;
-            }
-          }
+        #filter-clear {
+          grid-column: 6 / span 3;
+          justify-self: stretch;
         }
       }
     }
 
     @media (max-width: 360px) {
-      .results-card {
-        search {
-          .filters {
-            #filter-fulladdr {
-              grid-column: 1 / span 4;
-            }
+      .results-card search .filters #filter-fulladdr {
+        grid-column: 1 / span 4;
+      }
 
-            #filter-clear {
-              grid-column: 5 / span 4;
-            }
-          }
-        }
+      .results-card search .filters #filter-clear {
+        grid-column: 5 / span 4;
       }
     }
 
@@ -1775,34 +1708,50 @@
         --page-pad-block-end: 12px;
       }
 
-      .site-header {
-        .header-inner {
-          inline-size: min(1600px, calc(100% - 28px));
-        }
+      .site-header .header-inner {
+        inline-size: min(1600px, calc(100% - 28px));
       }
 
-      .site-brand {
-        .brand-mark {
-          inline-size: 32px;
-          block-size: 32px;
-        }
-
-        strong {
-          font-size: 1.55rem;
-        }
+      .site-brand .brand-mark {
+        inline-size: 32px;
+        block-size: 32px;
       }
 
-      button {
-        &.theme-toggle {
-          inline-size: 42px;
-          block-size: 42px;
-          border-radius: 12px;
-          font-size: 1.2rem;
-        }
+      .site-brand strong {
+        font-size: 1.55rem;
+      }
+
+      button.theme-toggle {
+        inline-size: 42px;
+        block-size: 42px;
+        border-radius: 12px;
+        font-size: 1.2rem;
       }
 
       .manual-rng {
         padding: 14px;
+      }
+    }
+
+    @media (pointer: coarse), (width <= 700px) {
+      :is(input, select, textarea),
+      .filters input[type="search"],
+      .filters select,
+      .manual-rng textarea {
+        font-size: 16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      :root:root:root,
+      :root:root:root::before,
+      :root:root:root::after,
+      :root:root:root *,
+      :root:root:root *::before,
+      :root:root:root *::after {
+        animation: none;
+        transition: none;
       }
     }
   </style>
@@ -1951,7 +1900,7 @@
                 <span class="action-btn__label">출력 지우기</span>
               </button>
             </div>
-            <div id="meta" class="manual-rng-meta" role="status" aria-live="polite" aria-atomic="true"></div>
+            <div id="meta" class="manual-rng-meta" role="status" aria-atomic="true"></div>
             <div id="error" class="manual-rng-meta" role="alert" aria-atomic="true"></div>
             <section aria-label="변환 결과">
               <pre id="output" class="coords-view"><span
@@ -1975,7 +1924,7 @@
               id="cnt-remain">0</strong>건 미처리</output>
         </div>
         <output id="status" class="status"></output>
-        <div id="status-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        <div id="status-live" class="sr-only" role="status" aria-atomic="true">
         </div>
         <footer>
           <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
@@ -2105,7 +2054,8 @@
       <td data-label="지도링크">
         <div class="skeleton-bar"></div>
         <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
-          aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
+          aria-controls="map-popover" aria-expanded="false" popovertarget="map-popover" popovertargetaction="show"
+          disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
             </path>
@@ -2128,7 +2078,8 @@
       <td data-label="전체주소"></td>
       <td data-label="지도링크">
         <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
-          aria-controls="map-popover" aria-expanded="false" commandfor="map-popover" command="show-popover" disabled>
+          aria-controls="map-popover" aria-expanded="false" popovertarget="map-popover" popovertargetaction="show"
+          disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
             </path>
@@ -2201,8 +2152,15 @@
     };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
-    const BASE_URL_HREF =
-      `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
+    const BASE_URL_HREF = (() => {
+      const url = new URL("https://nominatim.openstreetmap.org/reverse");
+      url.searchParams.set("format", "geocodejson");
+      url.searchParams.set("zoom", String(CONFIG.REVERSE_ZOOM));
+      url.searchParams.set("accept-language", "ko");
+      return url.href;
+    })();
+    const buildReverseUrl = (lat, lon) =>
+      `${BASE_URL_HREF}&lat=${lat}&lon=${lon}`;
     const REVERSE_CACHE_VARIANT =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
     const REVERSE_CACHE_STORAGE_PREFIX = "srg-revgeo-cache:";
@@ -2336,14 +2294,6 @@
       const btn = mapButtonFromSource(e.source);
       if (!btn) return;
       prepareMapPopoverFromInvoker(btn);
-    });
-    mapPopover.addEventListener("command", (e) => {
-      if (e.command !== "show-popover" || !isMapPopoverOpen()) return;
-      const btn = mapButtonFromSource(e.source);
-      if (!btn || btn === LAST_MAP_INVOKER) return;
-      prepareMapPopoverFromInvoker(btn);
-      MAP_POPOVER_PREV_FOCUS = btn;
-      setMapPopoverExpanded(btn, true);
     });
     function closeMapPopover() {
       if (!isMapPopoverOpen()) return;
@@ -4614,8 +4564,7 @@
               }
             }
             if (!parsed) {
-              const url = BASE_URL_HREF + "&lat=" + r.latStr + "&lon=" +
-                r.lonStr;
+              const url = buildReverseUrl(r.latStr, r.lonStr);
               parsed = AddressFormatter.parse(
                 await fetchReverseWithRetry(
                   url,
@@ -4912,7 +4861,7 @@
           disp.push(`${r.latStr}, ${r.lonStr}`);
         }
         if (records.length > MAX_DISP) {
-          disp.push(`... 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
+          disp.push(`… 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
         setCoordsText(disp.join("\n"));
         setStatusMessage(
@@ -5008,7 +4957,7 @@
         AppState.setStatus("pausing");
         if (AppState.inFlight) {
           setStatusMessage(
-            "일시정지 요청됨. 현재 작업을 마치고 멈춥니다...",
+            "일시정지 요청됨. 현재 작업을 마치고 멈춥니다…",
             "warn",
           );
         }
@@ -5157,6 +5106,7 @@
       const HANGUL_SHIFTS = [48n, 32n, 16n, 0n];
       const HANGUL_SYLLABLE_MAX = 55859;
       const HANGUL_SYLLABLE_MODULUS = 11172;
+      const SUPPLEMENTAL_RETRY_LIMIT = 1024;
       const GLYPHS = [
         "🌅",
         "🐦",
@@ -5377,7 +5327,7 @@
             return Number(v);
           }
         }
-        for (; ;) {
+        for (let attempt = 0; attempt < SUPPLEMENTAL_RETRY_LIMIT; attempt++) {
           if (
             supplementalRef.current === null ||
             supplementalRef.current.bitsRemaining < bits
@@ -5392,6 +5342,7 @@
             return Number(extracted);
           }
         }
+        throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
       }
       function galaxyCoord(value, sub, add) {
         const a = (value - sub + 0x10000) & 0xffff;
@@ -5402,15 +5353,27 @@
         const data = createDataSet(num);
         fillDataFieldsFromU64(num, data);
         const supplementalRef = { current: null };
-        while (!isComplete(data)) {
+        for (
+          let attempt = 0;
+          !isComplete(data) && attempt < SUPPLEMENTAL_RETRY_LIMIT;
+          attempt++
+        ) {
           const newSupp = nextSupp("기본 필드 보완");
           fillDataFieldsFromU64(newSupp.value, data);
           supplementalRef.current = newSupp;
         }
+        if (!isComplete(data)) {
+          throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
+        }
         let luckyStarSource = supplementalRef.current !== null
           ? reverseBitsU64(supplementalRef.current.value)
           : reverseBitsU64(num);
-        luckyStarLoop: for (; ;) {
+        let luckyStarComplete = false;
+        luckyStarLoop: for (
+          let attempt = 0;
+          attempt < SUPPLEMENTAL_RETRY_LIMIT;
+          attempt++
+        ) {
           for (const byte of u64ToBytesBe(luckyStarSource)) {
             if (byte > 251) {
               continue;
@@ -5426,18 +5389,30 @@
               data.seen_euro_millions_lucky = res.seen;
               data.euro_lucky_next_idx = res.nextIdx;
               if (data.euro_lucky_next_idx >= 2) {
+                luckyStarComplete = true;
                 break luckyStarLoop;
               }
             }
+          }
+          if (attempt + 1 >= SUPPLEMENTAL_RETRY_LIMIT) {
+            break;
           }
           const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
           luckyStarSource = reverseBitsU64(newSupp.value);
           supplementalRef.current = newSupp;
         }
+        if (!luckyStarComplete) {
+          throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
+        }
         const hangul = new Array(HANGUL_SHIFTS.length).fill("\0");
         for (let i = 0; i < HANGUL_SHIFTS.length; i += 1) {
           let index = Number((num >> HANGUL_SHIFTS[i]) & 0xffffn);
-          while (index > HANGUL_SYLLABLE_MAX) {
+          for (
+            let attempt = 0;
+            index > HANGUL_SYLLABLE_MAX &&
+            attempt < SUPPLEMENTAL_RETRY_LIMIT;
+            attempt++
+          ) {
             if (supplementalRef.current === null) {
               supplementalRef.current = nextSupp("한글 음절 보완");
             }
@@ -5449,9 +5424,15 @@
                 break;
               }
             }
-            if (index > HANGUL_SYLLABLE_MAX) {
+            if (
+              index > HANGUL_SYLLABLE_MAX &&
+              attempt + 1 < SUPPLEMENTAL_RETRY_LIMIT
+            ) {
               supplementalRef.current = nextSupp("한글 음절 보완 재시도");
             }
+          }
+          if (index > HANGUL_SYLLABLE_MAX) {
+            throw new Error("한글 음절 보완 난수 시도 횟수를 초과했습니다.");
           }
           hangul[i] = String.fromCodePoint(
             HANGUL_BASE_CODE_POINT + (index % HANGUL_SYLLABLE_MODULUS),
@@ -5585,6 +5566,7 @@
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
+      const MANUAL_EVT_PASSIVE = { passive: true };
       const RX_U64_WS = /\s/u;
       function* iterU64Tokens(raw) {
         const text = String(raw || "");
@@ -5612,7 +5594,7 @@
         if (omittedCount <= 0) {
           return preview;
         }
-        return `${preview}\n\n... 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
+        return `${preview}\n\n… 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
       }
       function promptSuppValue(index, reason) {
         for (; ;) {
@@ -5724,15 +5706,19 @@
             output.style.setProperty("--bottom-shadow-opacity", bottomOpacity);
           });
         };
-        output.addEventListener("scroll", requestManualOutputShadowSync, {
-          passive: true,
-        });
+        output.addEventListener(
+          "scroll",
+          requestManualOutputShadowSync,
+          MANUAL_EVT_PASSIVE,
+        );
         const manualOutputResizeObserver =
           new ResizeObserver(requestManualOutputShadowSync);
         manualOutputResizeObserver.observe(output);
-        window.addEventListener("resize", requestManualOutputShadowSync, {
-          passive: true,
-        });
+        window.addEventListener(
+          "resize",
+          requestManualOutputShadowSync,
+          MANUAL_EVT_PASSIVE,
+        );
         const setManualOutputText = (text) => {
           const value = String(text ?? "");
           outputContent.textContent = value;
@@ -5833,6 +5819,7 @@
           } catch (err) {
             if (generationId === manualGenerationId) {
               lastGeneratedChunks = [];
+              meta.textContent = "";
               setManualOutputText("");
               error.textContent = err instanceof Error
                 ? err.message

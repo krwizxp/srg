@@ -61,7 +61,6 @@ cfg_select! {
         );
     }
 }
-
 cfg_select! {
     target_arch = "x86_64" => {
         pub struct MenuApp {

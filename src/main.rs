@@ -4,7 +4,9 @@ use self::file_output::open_or_create_file;
 use self::menu_app::MenuApp;
 use core::fmt;
 use std::{
-    io::{self},
+    env,
+    ffi::OsStr,
+    io::{self, Write as _},
     process::ExitCode,
     sync::Mutex,
 };
@@ -15,7 +17,7 @@ cfg_select! {
         };
         use self::random_data::generate_random_data;
         use self::random_output::persist_and_print_random_data;
-        use std::io::{Write as IoWrite, stderr};
+        use std::io::stderr;
     }
     _ => {
         use self::diagnostic::AppError;
@@ -31,6 +33,7 @@ cfg_select! {
     _ => {}
 }
 mod buffmt;
+mod build_info;
 mod constants;
 mod diagnostic;
 mod file_output;
@@ -62,6 +65,31 @@ fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) 
     }
 }
 fn main() -> Result<ExitCode> {
+    let mut args = env::args_os().skip(1);
+    if let Some(first) = args.next() {
+        if first == OsStr::new("--version") {
+            let verbose = match args.next() {
+                None => false,
+                Some(flag) if flag == OsStr::new("--verbose") && args.next().is_none() => true,
+                Some(flag) => {
+                    return Err(
+                        format!("알 수 없는 --version 옵션: {}", flag.to_string_lossy()).into(),
+                    );
+                }
+            };
+            let mut out = io::stdout().lock();
+            writeln!(out, "{} {}", build_info::APP_NAME, build_info::APP_VERSION)?;
+            if verbose {
+                writeln!(out, "target: {}", build_info::BUILD_TARGET)?;
+                writeln!(out, "profile: {}", build_info::BUILD_PROFILE)?;
+                writeln!(out, "rustc: {}", build_info::BUILD_RUSTC)?;
+                writeln!(out, "git: {}", build_info::BUILD_GIT_SHA)?;
+                writeln!(out, "rng backend: {}", build_info::RNG_BACKEND)?;
+            }
+            return Ok(ExitCode::SUCCESS);
+        }
+        return Err(format!("알 수 없는 옵션: {}", first.to_string_lossy()).into());
+    }
     let file_mutex = Mutex::new(open_or_create_file()?);
     let input_buffer = cfg_select! {
         target_arch = "x86_64" => {{
@@ -82,8 +110,7 @@ fn main() -> Result<ExitCode> {
                     let data = generate_random_data()?;
                     if take_rdseed_fallback_notice() {
                         let mut err = stderr().lock();
-                        IoWrite::write_fmt(
-                            &mut err,
+                        err.write_fmt(
                             format_args!("RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.\n"),
                         )?;
                     }
@@ -93,10 +120,7 @@ fn main() -> Result<ExitCode> {
                 }
                 HardwareRandomSource::RdRand => {
                     let mut err = stderr().lock();
-                    IoWrite::write_fmt(
-                        &mut err,
-                        format_args!("RDSEED를 미지원하여 RDRAND를 사용합니다.\n"),
-                    )?;
+                    err.write_fmt(format_args!("RDSEED를 미지원하여 RDRAND를 사용합니다.\n"))?;
                     let data = generate_random_data()?;
                     let num_64 = data.num_64;
                     persist_and_print_random_data(&file_mutex, &data)?;
@@ -104,8 +128,7 @@ fn main() -> Result<ExitCode> {
                 }
                 HardwareRandomSource::None => {
                     let mut err = stderr().lock();
-                    IoWrite::write_fmt(
-                        &mut err,
+                    err.write_fmt(
                         format_args!(
                             "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
                         ),

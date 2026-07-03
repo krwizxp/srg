@@ -121,6 +121,7 @@ const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
 const KST_SECONDS_PER_MINUTE_U32: u32 = 60;
 const KST_SECONDS_PER_HOUR_U32: u32 = 60 * KST_SECONDS_PER_MINUTE_U32;
 const KST_SECONDS_PER_DAY_U64: u64 = 86_400;
+const CLOCK_COMPONENT_LEN: usize = 2;
 const DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const COUNTDOWN_DELAY_ERROR: &str = "카운트다운 지연 계산 실패";
@@ -231,13 +232,21 @@ impl FromStr for TargetTimeOfDay {
         if second_str.contains(':') {
             return Err(INVALID_TIME_INPUT_ERR);
         }
-        let (Ok(hour), Ok(minute), Ok(second)) = (
-            hour_str.parse::<u32>(),
-            minute_str.parse::<u32>(),
-            second_str.parse::<u32>(),
-        ) else {
-            return Err(INVALID_TIME_INPUT_ERR);
+        let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
+            if component.len() != CLOCK_COMPONENT_LEN
+                || !component.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return Err(INVALID_TIME_INPUT_ERR);
+            }
+            component
+                .parse::<u32>()
+                .map_err(|_source| INVALID_TIME_INPUT_ERR)
         };
+        let (hour, minute, second) = (
+            parse_component(hour_str)?,
+            parse_component(minute_str)?,
+            parse_component(second_str)?,
+        );
         if !(hour <= 23 && minute <= 59 && second <= 59) {
             return Err(INVALID_TIME_INPUT_ERR);
         }
@@ -716,7 +725,7 @@ impl AppState {
     }
     fn begin_baseline_rtt_measurement(&mut self, now: Instant, out: &mut dyn io::Write) {
         if self.last_sample.is_none() {
-            write_line_best_effort(out, format_args!("1단계: RTT 기준값 측정을 시작합니다..."));
+            write_line_best_effort(out, format_args!("1단계: RTT 기준값 측정을 시작합니다…"));
         }
         let placeholder = TimeSample {
             response_received_inst: now,
@@ -1456,7 +1465,7 @@ impl AppState {
         }
     }
     fn run_loop(&mut self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
-        out.write_all("\n서버 시간 확인을 시작합니다... (Enter를 누르면 종료)\n".as_bytes())?;
+        out.write_all("\n서버 시간 확인을 시작합니다… (Enter를 누르면 종료)\n".as_bytes())?;
         let (tx, rx) = mpsc::channel();
         let input_thread = thread::spawn(move || -> IoResult<()> {
             let mut line = Vec::new();

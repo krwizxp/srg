@@ -36,6 +36,7 @@ impl PortSource {
     }
 }
 struct AuthorityParts<'input> {
+    bracketed: bool,
     host: &'input str,
     port: u16,
     port_source: PortSource,
@@ -47,15 +48,17 @@ struct HostPortFormat {
     reserve_context: &'static str,
 }
 impl<'input> AuthorityParts<'input> {
-    const fn default_port(host: &'input str, port: u16) -> Self {
+    const fn default_port(host: &'input str, port: u16, bracketed: bool) -> Self {
         Self {
+            bracketed,
             host,
             port,
             port_source: PortSource::Default,
         }
     }
-    const fn explicit_port(host: &'input str, port: u16) -> Self {
+    const fn explicit_port(host: &'input str, port: u16, bracketed: bool) -> Self {
         Self {
+            bracketed,
             host,
             port,
             port_source: PortSource::Explicit,
@@ -96,20 +99,21 @@ impl FromStr for ParsedServer {
                 .split_once(']')
                 .ok_or_else(|| TimeError::parse(ERR_HOST))?;
             if rem.is_empty() {
-                AuthorityParts::default_port(host_part, default_port)
+                AuthorityParts::default_port(host_part, default_port, true)
             } else {
                 let port_part = rem
                     .strip_prefix(':')
                     .ok_or_else(|| TimeError::parse(ERR_HOST))?;
-                AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
+                AuthorityParts::explicit_port(host_part, parse_port(port_part)?, true)
             }
         } else if let Some((host_part, port_part)) = after_scheme.split_once(':')
             && !port_part.contains(':')
         {
-            AuthorityParts::explicit_port(host_part, parse_port(port_part)?)
+            AuthorityParts::explicit_port(host_part, parse_port(port_part)?, false)
         } else {
-            AuthorityParts::default_port(after_scheme, default_port)
+            AuthorityParts::default_port(after_scheme, default_port, false)
         };
+        let bracketed = authority_parts.bracketed;
         let host_part = authority_parts.host;
         let port = authority_parts.port;
         let port_source = authority_parts.port_source;
@@ -117,6 +121,9 @@ impl FromStr for ParsedServer {
             return Err(TimeError::parse(ERR_HOST));
         }
         let literal_ip_addr = host_part.parse::<net::IpAddr>().ok();
+        if bracketed && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_))) {
+            return Err(TimeError::parse(ERR_HOST));
+        }
         if host_part.contains(':') && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_))) {
             return Err(TimeError::parse(ERR_HOST));
         }

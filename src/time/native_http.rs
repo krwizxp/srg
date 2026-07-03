@@ -1,9 +1,14 @@
 use super::{
-    MIN_TRANSFER_TIME, Result, TCP_TIMEOUT, TimeError, TimeErrorKind, TimeSample,
-    http_date::parse_http_date_to_systemtime,
+    Result, TimeError, TimeErrorKind, TimeSample, http_date::parse_http_date_to_systemtime,
 };
 use core::{fmt::Display, time::Duration};
 use std::time::{Instant, SystemTime};
+cfg_select! {
+    any(target_os = "linux", target_os = "macos", target_os = "windows") => {
+        use super::{MIN_TRANSFER_TIME, TCP_TIMEOUT};
+    }
+    _ => {}
+}
 cfg_select! {
     any(target_os = "linux", target_os = "macos") => {
         use self::libcurl as platform;
