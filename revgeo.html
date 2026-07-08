@@ -152,7 +152,7 @@
         min-block-size: 0;
         block-size: calc(100dvh - var(--site-header-height) - var(--site-header-gap) - var(--page-pad-block-end));
 
-        @container (inline-size <= 900px) {
+        @container (inline-size <=900px) {
           grid-template-columns: 1fr;
           block-size: auto;
         }
@@ -327,7 +327,7 @@
             gap: 10px;
           }
 
-          @media (380px <= width <= 700px) {
+          @media (380px <=width <=700px) {
             .row {
               grid-template-columns: repeat(3, minmax(0, 1fr));
             }
@@ -377,7 +377,7 @@
           }
 
           @media (pointer: coarse) {
-        @container page (inline-size <= 800px) {
+            @container page (inline-size <=800px) {
               padding-block: 16px;
 
               .desktop-msg {
@@ -442,7 +442,7 @@
             display: none;
           }
 
-          @container page (inline-size <= 900px) {
+          @container page (inline-size <=900px) {
             max-block-size: 30dvh;
           }
         }
@@ -715,7 +715,7 @@
             min-inline-size: 148px;
           }
 
-          @container manual-rng (inline-size <= 420px) {
+          @container manual-rng (inline-size <=420px) {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             align-items: stretch;
@@ -890,7 +890,7 @@
           }
         }
 
-        @container (inline-size <= 900px) {
+        @container (inline-size <=900px) {
           display: block;
           min-inline-size: 0;
 
@@ -1733,7 +1733,9 @@
       }
     }
 
-    @media (pointer: coarse), (width <= 700px) {
+    @media (pointer: coarse),
+    (width <=700px) {
+
       :is(input, select, textarea),
       .filters input[type="search"],
       .filters select,
@@ -2144,11 +2146,12 @@
       BULK_CONFIRM_THRESHOLD: 1_000,
       BULK_HARD_LIMIT: 5_000,
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
-      REVERSE_CACHE_DB_VERSION: 1,
+      REVERSE_CACHE_DB_VERSION: 2,
       REVERSE_CACHE_STORE: "nominatim-reverse",
       REVERSE_CACHE_PARSER_VERSION: 1,
       REVERSE_CACHE_MAX: 10_000,
       REVERSE_CACHE_STORAGE_MAX: 2_000,
+      REVERSE_CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
     };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
@@ -2163,8 +2166,11 @@
       `${BASE_URL_HREF}&lat=${lat}&lon=${lon}`;
     const REVERSE_CACHE_VARIANT =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
-    const REVERSE_CACHE_STORAGE_PREFIX = "srg-revgeo-cache:";
-    const REVERSE_CACHE_STORAGE_INDEX_KEY = "srg-revgeo-cache:index";
+    const REVERSE_CACHE_KEY_PREFIX = "sha256:";
+    const REVERSE_CACHE_STORAGE_PREFIX = "srg-revgeo-cache:v2:";
+    const REVERSE_CACHE_STORAGE_INDEX_KEY = "srg-revgeo-cache:v2:index";
+    const REVERSE_CACHE_LEGACY_STORAGE_PREFIX = "srg-revgeo-cache:";
+    const REVERSE_CACHE_KEY_ENCODER = new TextEncoder();
     const OSM_ATTRIBUTION_TEXT = "\u00A9 OpenStreetMap contributors";
     const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
     const ODBL_LICENSE_TEXT = "Open Database License (ODbL)";
@@ -4158,6 +4164,7 @@
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
     let REVERSE_CACHE_PRUNE_PROMISE = null;
+    const REVERSE_PERSISTENT_CACHE_KEY_CACHE = new Map();
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
       REVERSE_PARSED_CACHE_KEYS.push(cacheKey);
@@ -4182,7 +4189,71 @@
       REVERSE_PARSED_CACHE_KEYS.length = 0;
       REVERSE_PARSED_CACHE_HEAD = 0;
     }
+    function isReversePersistentCacheKey(key) {
+      return typeof key === "string" && key.startsWith(REVERSE_CACHE_KEY_PREFIX);
+    }
+    function isFreshReverseCacheRow(row, now = Date.now()) {
+      return !!(
+        row &&
+        row.variant === REVERSE_CACHE_VARIANT &&
+        row.parserVersion === CONFIG.REVERSE_CACHE_PARSER_VERSION &&
+        typeof row.savedAt === "number" &&
+        now - row.savedAt <= CONFIG.REVERSE_CACHE_TTL_MS
+      );
+    }
+    async function toPersistentReverseCacheKey(cacheKey) {
+      const cached = REVERSE_PERSISTENT_CACHE_KEY_CACHE.get(cacheKey);
+      if (cached) return cached;
+      const subtle = window.crypto?.subtle;
+      if (!subtle) return null;
+      const keyPromise = subtle
+        .digest(
+          "SHA-256",
+          REVERSE_CACHE_KEY_ENCODER.encode(
+            REVERSE_CACHE_VARIANT + ":" + cacheKey,
+          ),
+        )
+        .then((digest) => {
+          let hex = "";
+          const bytes = new Uint8Array(digest);
+          for (let i = 0; i < bytes.length; i++) {
+            hex += bytes[i].toString(16).padStart(2, "0");
+          }
+          return REVERSE_CACHE_KEY_PREFIX + hex;
+        })
+        .catch(() => null);
+      REVERSE_PERSISTENT_CACHE_KEY_CACHE.set(cacheKey, keyPromise);
+      const persistentKey = await keyPromise;
+      if (!persistentKey) REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(cacheKey);
+      return persistentKey;
+    }
     let REVERSE_CACHE_STORAGE_AVAILABLE = null;
+    let REVERSE_CACHE_STORAGE_LEGACY_CLEANED = false;
+    function cleanupLegacyReverseCacheStorage(store) {
+      const legacyIndex = (() => {
+        try {
+          const raw = store.getItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + "index");
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+      for (const key of legacyIndex) {
+        store.removeItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + key);
+      }
+      store.removeItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + "index");
+      for (let i = store.length - 1; i >= 0; i--) {
+        const key = store.key(i);
+        if (
+          key &&
+          key.startsWith(REVERSE_CACHE_LEGACY_STORAGE_PREFIX) &&
+          !key.startsWith(REVERSE_CACHE_STORAGE_PREFIX)
+        ) {
+          store.removeItem(key);
+        }
+      }
+    }
     function getReverseCacheStorage() {
       if (REVERSE_CACHE_STORAGE_AVAILABLE === false) return null;
       try {
@@ -4191,6 +4262,10 @@
         store.setItem(testKey, "1");
         store.removeItem(testKey);
         REVERSE_CACHE_STORAGE_AVAILABLE = true;
+        if (!REVERSE_CACHE_STORAGE_LEGACY_CLEANED) {
+          cleanupLegacyReverseCacheStorage(store);
+          REVERSE_CACHE_STORAGE_LEGACY_CLEANED = true;
+        }
         return store;
       } catch {
         REVERSE_CACHE_STORAGE_AVAILABLE = false;
@@ -4201,7 +4276,7 @@
       try {
         const raw = store.getItem(REVERSE_CACHE_STORAGE_INDEX_KEY);
         const keys = raw ? JSON.parse(raw) : [];
-        return Array.isArray(keys) ? keys : [];
+        return Array.isArray(keys) ? keys.filter(isReversePersistentCacheKey) : [];
       } catch {
         return [];
       }
@@ -4213,8 +4288,26 @@
       }
     }
     function pruneReverseCacheStorage(store, keep = CONFIG.REVERSE_CACHE_STORAGE_MAX) {
-      const keys = readReverseCacheStorageIndex(store);
-      if (keys.length <= keep) return keys;
+      const now = Date.now();
+      const keys = [];
+      for (const key of readReverseCacheStorageIndex(store)) {
+        const itemKey = REVERSE_CACHE_STORAGE_PREFIX + key;
+        try {
+          const raw = store.getItem(itemKey);
+          const row = raw ? JSON.parse(raw) : null;
+          if (isFreshReverseCacheRow(row, now)) {
+            keys.push(key);
+          } else {
+            store.removeItem(itemKey);
+          }
+        } catch {
+          store.removeItem(itemKey);
+        }
+      }
+      if (keys.length <= keep) {
+        writeReverseCacheStorageIndex(store, keys);
+        return keys;
+      }
       const removeCount = keys.length - keep;
       for (let i = 0; i < removeCount; i++) {
         store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + keys[i]);
@@ -4230,11 +4323,7 @@
         const raw = store.getItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
         if (!raw) return null;
         const row = JSON.parse(raw);
-        if (
-          row &&
-          row.variant === REVERSE_CACHE_VARIANT &&
-          row.parserVersion === CONFIG.REVERSE_CACHE_PARSER_VERSION
-        ) {
+        if (isFreshReverseCacheRow(row)) {
           return row.parsed || null;
         }
         store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
@@ -4253,9 +4342,7 @@
         parsed,
       });
       const itemKey = REVERSE_CACHE_STORAGE_PREFIX + cacheKey;
-      let keys = readReverseCacheStorageIndex(store).filter((key) =>
-        key !== cacheKey
-      );
+      let keys = pruneReverseCacheStorage(store).filter((key) => key !== cacheKey);
       keys.push(cacheKey);
       try {
         store.setItem(itemKey, row);
@@ -4281,6 +4368,7 @@
       writeReverseCacheStorageIndex(store, keys);
     }
     function openReverseCacheDb() {
+      getReverseCacheStorage();
       if (!("indexedDB" in window)) return Promise.resolve(null);
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
       REVERSE_CACHE_DB_PROMISE = new Promise((resolve) => {
@@ -4295,7 +4383,7 @@
           resolve(null);
           return;
         }
-        req.onupgradeneeded = () => {
+        req.onupgradeneeded = (event) => {
           const db = req.result;
           let store;
           if (!db.objectStoreNames.contains(CONFIG.REVERSE_CACHE_STORE)) {
@@ -4304,6 +4392,12 @@
             });
           } else {
             store = req.transaction.objectStore(CONFIG.REVERSE_CACHE_STORE);
+          }
+          if (event.oldVersion < 2) {
+            try {
+              store.clear();
+            } catch {
+            }
           }
           if (!store.indexNames.contains("savedAt")) {
             store.createIndex("savedAt", "savedAt");
@@ -4321,10 +4415,13 @@
       return REVERSE_CACHE_DB_PROMISE;
     }
     async function readPersistentReverseCache(cacheKey) {
+      const persistentKey = await toPersistentReverseCacheKey(cacheKey);
+      if (!persistentKey) return null;
       const db = await openReverseCacheDb();
-      if (!db) return readReverseCacheStorage(cacheKey);
-      return new Promise((resolve) => {
+      if (!db) return readReverseCacheStorage(persistentKey);
+      const result = await new Promise((resolve) => {
         let settled = false;
+        let stale = false;
         const done = (value = null) => {
           if (settled) return;
           settled = true;
@@ -4334,31 +4431,55 @@
         let req;
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readonly");
-          req = tx.objectStore(CONFIG.REVERSE_CACHE_STORE).get(cacheKey);
+          req = tx.objectStore(CONFIG.REVERSE_CACHE_STORE).get(persistentKey);
         } catch {
           done(null);
           return;
         }
         req.onsuccess = () => {
           const row = req.result;
-          if (
-            row &&
-            row.variant === REVERSE_CACHE_VARIANT &&
-            row.parserVersion === CONFIG.REVERSE_CACHE_PARSER_VERSION
-          ) {
+          if (isFreshReverseCacheRow(row)) {
             done(row.parsed || null);
           } else {
+            stale = !!row;
             done(null);
           }
         };
         req.onerror = () => done(null);
         tx.onabort = () => done(null);
+        tx.oncomplete = () => {
+          if (stale) deletePersistentReverseCacheKey(persistentKey);
+        };
+      });
+      return result;
+    }
+    async function deletePersistentReverseCacheKey(persistentKey) {
+      const db = await openReverseCacheDb();
+      if (!db) {
+        const store = getReverseCacheStorage();
+        if (store) store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + persistentKey);
+        return;
+      }
+      await new Promise((resolve) => {
+        let tx;
+        try {
+          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+          tx.objectStore(CONFIG.REVERSE_CACHE_STORE).delete(persistentKey);
+        } catch {
+          resolve();
+          return;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+        tx.onabort = resolve;
       });
     }
     async function writePersistentReverseCache(cacheKey, parsed) {
+      const persistentKey = await toPersistentReverseCacheKey(cacheKey);
+      if (!persistentKey) return;
       const db = await openReverseCacheDb();
       if (!db) {
-        writeReverseCacheStorage(cacheKey, parsed);
+        writeReverseCacheStorage(persistentKey, parsed);
         return;
       }
       await new Promise((resolve) => {
@@ -4366,7 +4487,7 @@
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
           tx.objectStore(CONFIG.REVERSE_CACHE_STORE).put({
-            key: cacheKey,
+            key: persistentKey,
             variant: REVERSE_CACHE_VARIANT,
             parserVersion: CONFIG.REVERSE_CACHE_PARSER_VERSION,
             savedAt: Date.now(),
@@ -4404,24 +4525,49 @@
           resolve();
           return;
         }
-        const countReq = store.count();
-        countReq.onsuccess = () => {
-          const excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
-          if (excess <= 0) return;
-          let removed = 0;
-          const cursorReq = store.index("savedAt").openCursor();
-          cursorReq.onsuccess = () => {
-            const cursor = cursorReq.result;
-            if (!cursor || removed >= excess) return;
-            cursor.delete();
-            removed++;
-            cursor.continue();
-          };
+        const startedAt = Date.now();
+        const pruneExpired = store.index("savedAt").openCursor();
+        pruneExpired.onsuccess = () => {
+          const cursor = pruneExpired.result;
+          if (!cursor) {
+            pruneExcessReverseCacheRows(store, startedAt);
+            return;
+          }
+          if (
+            isReversePersistentCacheKey(cursor.value?.key) &&
+            isFreshReverseCacheRow(cursor.value, startedAt)
+          ) {
+            pruneExcessReverseCacheRows(store, startedAt);
+            return;
+          }
+          cursor.delete();
+          cursor.continue();
         };
         tx.oncomplete = resolve;
         tx.onerror = resolve;
         tx.onabort = resolve;
       });
+    }
+    function pruneExcessReverseCacheRows(store, now) {
+      const countReq = store.count();
+      countReq.onsuccess = () => {
+        let excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
+        if (excess <= 0) return;
+        const cursorReq = store.index("savedAt").openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor || excess <= 0) return;
+          const row = cursor.value;
+          cursor.delete();
+          if (
+            isReversePersistentCacheKey(row?.key) &&
+            isFreshReverseCacheRow(row, now)
+          ) {
+            excess--;
+          }
+          cursor.continue();
+        };
+      };
     }
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
