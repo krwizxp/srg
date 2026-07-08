@@ -3,7 +3,7 @@ use super::NativeInputSendStatus;
 use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
-    mem::{align_of, size_of},
+    mem::{align_of, offset_of, size_of},
     ptr::{NonNull, null_mut},
 };
 use std::io::Write;
@@ -52,6 +52,8 @@ struct CGPoint {
 }
 const _: () = assert!(size_of::<CGPoint>() == 16, "CoreGraphics CGPoint size mismatch");
 const _: () = assert!(align_of::<CGPoint>() == 8, "CoreGraphics CGPoint align mismatch");
+const _: () = assert!(offset_of!(CGPoint, x) == 0, "CoreGraphics CGPoint x offset mismatch");
+const _: () = assert!(offset_of!(CGPoint, y) == 8, "CoreGraphics CGPoint y offset mismatch");
 #[derive(Clone, Copy)]
 pub(super) enum InputAction {
     F5Press,

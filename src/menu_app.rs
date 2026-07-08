@@ -1,7 +1,7 @@
 use crate::{
-    constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL},
-    diagnostic::{AppError, Result},
-    file_output::validate_safe_output_file_path,
+    constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL, UTF8_BOM},
+    diagnostic::Result,
+    file_output::lock_mutex,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_data::RandomDataSet,
@@ -12,12 +12,9 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
-            file_output::{ensure_file_guard_current, lock_mutex},
-            hardware_rng::{
-                HardwareRandomSource, get_hardware_random, hardware_random_source,
-                take_rdseed_fallback_notice,
-            },
-            input::{LadderEntryMode, read_ladder_entries},
+            diagnostic::AppError,
+            hardware_rng::{HardwareRandomSource, HardwareRng},
+            input::{LadderEntryMode, parse_u64_digits, read_ladder_entries},
             output::write_slice_to_console,
             random_number::{generate_random_number, random_bounded},
         };
@@ -29,33 +26,36 @@ cfg_select! {
 cfg_select! {
     target_arch = "x86_64" => {}
     _ => {
-        use crate::{file_output::open_or_create_file, random_data::generate_random_data};
+        use crate::random_data::generate_random_data;
     }
 }
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
 use std::{
-    fs::{self, File},
-    io::{BufWriter, ErrorKind, Write, stderr, stdout},
-    path::Path,
+    fs::File,
+    io::{BufWriter, ErrorKind, Seek as _, SeekFrom, Write, stderr, stdout},
     process::ExitCode,
     sync::Mutex,
     time::Instant,
 };
-#[cfg(target_arch = "x86_64")]
-const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
+cfg_select! {
+    target_arch = "x86_64" => {
+        const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
+    }
+    _ => {}
+}
 const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
         const MENU: &str = concat!(
             "\n1: 사다리타기 실행, 2: 무작위 숫자 생성, 3: 데이터 생성(1회), ",
-            "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 삭제, ",
+            "4: 데이터 생성(여러 회), 5: 서버 시간 확인, 6: 파일 초기화, ",
             "7: num_64/supp 수동 입력 변환, 기타: 종료\n선택해 주세요: ",
         );
     }
     _ => {
         const MENU: &str = concat!(
-            "\n5: 서버 시간 확인, 6: 파일 삭제, 7: num_64/supp 수동 입력 변환, 기타(1~4 제외): 종료\n",
+            "\n5: 서버 시간 확인, 6: 파일 초기화, 7: num_64/supp 수동 입력 변환, 기타(1~4 제외): 종료\n",
             "(참고: 이 플랫폼에서는 하드웨어 RNG 관련 기능이 비활성화됩니다)\n",
             "선택해 주세요: ",
         );
@@ -69,6 +69,7 @@ cfg_select! {
             pub ladder_players_storage: String,
             pub ladder_results_storage: String,
             pub num_64: u64,
+            pub rng: HardwareRng,
         }
     }
     _ => {
@@ -91,12 +92,15 @@ impl MenuApp {
                 return Ok(true);
             }
             b'6' => {
-                validate_safe_output_file_path(Path::new(FILE_NAME))?;
-                if let Err(remove_err) = fs::remove_file(FILE_NAME) {
-                    writeln!(err, "{remove_err}")?;
-                } else {
-                    writeln!(out, "파일 '{FILE_NAME}'를 삭제했습니다.")?;
-                }
+                let mut file_guard =
+                    lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 초기화 시)")?;
+                Write::flush(&mut *file_guard)?;
+                file_guard.get_ref().set_len(0)?;
+                file_guard.seek(SeekFrom::Start(0))?;
+                Write::write_all(&mut *file_guard, UTF8_BOM)?;
+                Write::flush(&mut *file_guard)?;
+                drop(file_guard);
+                writeln!(out, "파일 '{FILE_NAME}'를 초기화했습니다.")?;
                 return Ok(true);
             }
             b'7' => {
@@ -144,114 +148,119 @@ impl MenuApp {
             }
         }
     }
-    #[cfg(target_arch = "x86_64")]
-    fn handle_generate_many_command(
-        &mut self,
-        out: &mut dyn Write,
-        err: &mut dyn Write,
-    ) -> Result<()> {
-        if !prepare_hw_rng_menu_command(out)? {
-            return Ok(());
-        }
-        let input_buffer = &mut self.input_buffer;
-        let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
-        let requested_count = loop {
-            match read_line_reuse_limited(
-                count_prompt,
-                input_buffer,
-                out,
-                BATCH_COUNT_INPUT_MAX_BYTES,
-            )?
-            .parse::<u64>()
-            {
-                Ok(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
-                Ok(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
-                    err,
-                    "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
-                )?,
-                Ok(count) => break count,
-                Err(_) => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
+    cfg_select! {
+        target_arch = "x86_64" => {
+            fn handle_generate_many_command(
+                &mut self,
+                out: &mut dyn Write,
+                err: &mut dyn Write,
+            ) -> Result<()> {
+                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                    return Ok(());
+                }
+                let input_buffer = &mut self.input_buffer;
+                let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
+                let requested_count = loop {
+                    match parse_u64_digits(read_line_reuse_limited(
+                        count_prompt,
+                        input_buffer,
+                        out,
+                        BATCH_COUNT_INPUT_MAX_BYTES,
+                    )?, 10) {
+                        Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
+                        Some(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
+                            err,
+                            "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
+                        )?,
+                        Some(count) => break count,
+                        None => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
+                    }
+                };
+                let next_num_64 =
+                    regenerate_with_count(&self.file_mutex, &mut self.rng, requested_count, out, err)?;
+                write_rdseed_fallback_notice(&mut self.rng, err)?;
+                self.num_64 = next_num_64;
+                Ok(())
             }
-        };
-        let next_num_64 = regenerate_with_count(&self.file_mutex, requested_count, out, err)?;
-        write_rdseed_fallback_notice(err)?;
-        self.num_64 = next_num_64;
-        Ok(())
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn handle_generate_once_command(
-        &mut self,
-        out: &mut dyn Write,
-        err: &mut dyn Write,
-    ) -> Result<()> {
-        if !prepare_hw_rng_menu_command(out)? {
-            return Ok(());
+
+            fn handle_generate_once_command(
+                &mut self,
+                out: &mut dyn Write,
+                err: &mut dyn Write,
+            ) -> Result<()> {
+                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                    return Ok(());
+                }
+                let next_num_64 = regenerate_with_count(&self.file_mutex, &mut self.rng, 1, out, err)?;
+                write_rdseed_fallback_notice(&mut self.rng, err)?;
+                self.num_64 = next_num_64;
+                Ok(())
+            }
+
+            fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
+                const MAX_PLAYERS: usize = 512;
+                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                    return Ok(());
+                }
+                let mut seed = self.num_64;
+                let input_buffer = &mut self.input_buffer;
+                let players_storage = &mut self.ladder_players_storage;
+                let results_storage = &mut self.ladder_results_storage;
+                players_storage.clear();
+                let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+                let n = read_ladder_entries(
+                    format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
+                    input_buffer,
+                    (&mut *out, &mut *err),
+                    players_storage,
+                    &mut players_array,
+                    LadderEntryMode::Players,
+                    "플레이어 배열 인덱스 범위 초과",
+                )?;
+                results_storage.clear();
+                let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+                read_ladder_entries(
+                    format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
+                    input_buffer,
+                    (&mut *out, &mut *err),
+                    results_storage,
+                    &mut results_array,
+                    LadderEntryMode::Results { expected_count: n },
+                    "결과 배열 인덱스 범위 초과",
+                )?;
+                writeln!(out, "사다리타기 결과:")?;
+                let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
+                let indices_slice = indices
+                    .get_mut(..n)
+                    .ok_or("인덱스 배열 슬라이스 범위 초과")?;
+                for index in (1..indices_slice.len()).rev() {
+                    seed ^= self.rng.next_u64()?;
+                    let next_index = checked_add_one_usize(index).ok_or("인덱스 상한 계산 실패")?;
+                    let upper_bound_raw = u64::try_from(next_index).map_err(|conversion_err| {
+                        AppError::context("인덱스 상한 변환 실패", conversion_err)
+                    })?;
+                    let upper_bound =
+                        NonZeroU64::new(upper_bound_raw).ok_or("인덱스 상한이 0입니다.")?;
+                    let swap_index_u64 = random_bounded(upper_bound, seed, &mut self.rng)?;
+                    let swap_index = usize::try_from(swap_index_u64).map_err(|conversion_err| {
+                        AppError::context("인덱스 변환 실패", conversion_err)
+                    })?;
+                    indices_slice.swap(index, swap_index);
+                }
+                let players = players_array
+                    .get(..n)
+                    .ok_or("플레이어 슬라이스 범위 초과")?;
+                for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
+                    let result = results_array
+                        .get(result_index)
+                        .copied()
+                        .ok_or("결과 인덱스 범위 초과")?;
+                    writeln!(out, "{player} -> {result}")?;
+                }
+                write_rdseed_fallback_notice(&mut self.rng, err)
+            }
         }
-        let next_num_64 = regenerate_with_count(&self.file_mutex, 1, out, err)?;
-        write_rdseed_fallback_notice(err)?;
-        self.num_64 = next_num_64;
-        Ok(())
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
-        const MAX_PLAYERS: usize = 512;
-        if !prepare_hw_rng_menu_command(out)? {
-            return Ok(());
-        }
-        let mut seed = self.num_64;
-        let input_buffer = &mut self.input_buffer;
-        let players_storage = &mut self.ladder_players_storage;
-        let results_storage = &mut self.ladder_results_storage;
-        players_storage.clear();
-        let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-        let n = read_ladder_entries(
-            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
-            input_buffer,
-            (&mut *out, &mut *err),
-            players_storage,
-            &mut players_array,
-            LadderEntryMode::Players,
-            "플레이어 배열 인덱스 범위 초과",
-        )?;
-        results_storage.clear();
-        let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
-        read_ladder_entries(
-            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-            input_buffer,
-            (&mut *out, &mut *err),
-            results_storage,
-            &mut results_array,
-            LadderEntryMode::Results { expected_count: n },
-            "결과 배열 인덱스 범위 초과",
-        )?;
-        writeln!(out, "사다리타기 결과:")?;
-        let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
-        let indices_slice = indices
-            .get_mut(..n)
-            .ok_or("인덱스 배열 슬라이스 범위 초과")?;
-        for index in (1..indices_slice.len()).rev() {
-            seed ^= get_hardware_random()?;
-            let next_index = checked_add_one_usize(index).ok_or("인덱스 상한 계산 실패")?;
-            let upper_bound_raw = u64::try_from(next_index).map_err(|conversion_err| {
-                AppError::context("인덱스 상한 변환 실패", conversion_err)
-            })?;
-            let upper_bound = NonZeroU64::new(upper_bound_raw).ok_or("인덱스 상한이 0입니다.")?;
-            let swap_index_u64 = random_bounded(upper_bound, seed)?;
-            let swap_index = usize::try_from(swap_index_u64)
-                .map_err(|conversion_err| AppError::context("인덱스 변환 실패", conversion_err))?;
-            indices_slice.swap(index, swap_index);
-        }
-        let players = players_array
-            .get(..n)
-            .ok_or("플레이어 슬라이스 범위 초과")?;
-        for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
-            let result = results_array
-                .get(result_index)
-                .copied()
-                .ok_or("결과 인덱스 범위 초과")?;
-            writeln!(out, "{player} -> {result}")?;
-        }
-        write_rdseed_fallback_notice(err)
+        _ => {}
     }
     fn handle_manual_input_command(
         &mut self,
@@ -299,27 +308,10 @@ impl MenuApp {
         let data = RandomDataSet::build_from(manual_num_64, &mut next_supp)?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
-        cfg_select! {
-            target_arch = "x86_64" => {{
-                let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-                ensure_file_guard_current(&mut file_guard)?;
-                Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
-                Write::flush(&mut *file_guard)?;
-            }}
-            _ => {{
-                let mut file_guard = self
-                    .file_mutex
-                    .lock()
-                    .map_err(|lock_error| {
-                        AppError::message(format!(
-                            "Mutex 잠금 실패 (단일 쓰기 시): {lock_error}"
-                        ))
-                })?;
-                *file_guard = open_or_create_file()?;
-                Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
-                Write::flush(&mut *file_guard)?;
-            }}
-        }
+        let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
+        Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
+        Write::flush(&mut *file_guard)?;
+        drop(file_guard);
         let console_len = if *IS_TERMINAL {
             format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
         } else {
@@ -338,34 +330,52 @@ impl MenuApp {
         }
         Ok(())
     }
-    #[cfg(target_arch = "x86_64")]
-    fn handle_random_number_command(
-        &mut self,
-        out: &mut dyn Write,
-        err: &mut dyn Write,
-    ) -> Result<()> {
-        if !prepare_hw_rng_menu_command(out)? {
-            return Ok(());
-        }
-        let num_64 = self.num_64;
-        let input_buffer = &mut self.input_buffer;
-        writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
-        let selection = read_line_reuse_limited(
-            format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
-            input_buffer,
-            out,
-            MENU_SELECTION_INPUT_MAX_BYTES,
-        )?;
-        match selection.as_bytes() {
-            b"1" => {
-                generate_random_number(RandomNumberMode::Integer, num_64, input_buffer, out, err)?;
+    cfg_select! {
+        target_arch = "x86_64" => {
+            fn handle_random_number_command(
+                &mut self,
+                out: &mut dyn Write,
+                err: &mut dyn Write,
+            ) -> Result<()> {
+                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                    return Ok(());
+                }
+                let num_64 = self.num_64;
+                let input_buffer = &mut self.input_buffer;
+                writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
+                let selection = read_line_reuse_limited(
+                    format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
+                    input_buffer,
+                    out,
+                    MENU_SELECTION_INPUT_MAX_BYTES,
+                )?;
+                match selection.as_bytes() {
+                    b"1" => {
+                        generate_random_number(
+                            RandomNumberMode::Integer,
+                            num_64,
+                            input_buffer,
+                            out,
+                            err,
+                            &mut self.rng,
+                        )?;
+                    }
+                    b"2" => {
+                        generate_random_number(
+                            RandomNumberMode::Float,
+                            num_64,
+                            input_buffer,
+                            out,
+                            err,
+                            &mut self.rng,
+                        )?;
+                    }
+                    _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
+                }
+                write_rdseed_fallback_notice(&mut self.rng, err)
             }
-            b"2" => {
-                generate_random_number(RandomNumberMode::Float, num_64, input_buffer, out, err)?;
-            }
-            _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
         }
-        write_rdseed_fallback_notice(err)
+        _ => {}
     }
     fn handle_server_time_command(
         &mut self,
@@ -484,23 +494,27 @@ impl MenuApp {
         }
     }
 }
-#[cfg(target_arch = "x86_64")]
-fn prepare_hw_rng_menu_command(out: &mut dyn Write) -> Result<bool> {
-    match hardware_random_source() {
-        HardwareRandomSource::None => {
-            writeln!(
-                out,
-                "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-            )?;
-            Ok(false)
+cfg_select! {
+    target_arch = "x86_64" => {
+        fn prepare_hw_rng_menu_command(rng: &mut HardwareRng, out: &mut dyn Write) -> Result<bool> {
+            match rng.source() {
+                HardwareRandomSource::None => {
+                    writeln!(
+                        out,
+                        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
+                    )?;
+                    Ok(false)
+                }
+                HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
+            }
         }
-        HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
+
+        fn write_rdseed_fallback_notice(rng: &mut HardwareRng, err: &mut dyn Write) -> Result<()> {
+            if rng.take_rdseed_fallback_notice() {
+                writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
+            }
+            Ok(())
+        }
     }
-}
-#[cfg(target_arch = "x86_64")]
-fn write_rdseed_fallback_notice(err: &mut dyn Write) -> Result<()> {
-    if take_rdseed_fallback_notice() {
-        writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
-    }
-    Ok(())
+    _ => {}
 }

@@ -3,7 +3,7 @@ use super::{
     ParsedServer, Result, TimeError, UrlScheme,
     util::{parse_result_with_context, parse_u32_digits},
 };
-use core::{fmt::Write as FmtWrite, str::FromStr};
+use core::str::{self, FromStr};
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
@@ -188,8 +188,34 @@ fn build_host_port_text(
     out.push_str(format.prefix);
     out.push_str(host_for_header);
     if include_port {
-        FmtWrite::write_fmt(&mut out, format_args!(":{port}"))
-            .map_err(|error| TimeError::parse(format!("{}: {error}", format.port_context)))?;
+        out.push(':');
+        let mut digits = [0_u8; U16_DECIMAL_MAX_LEN];
+        let mut index = digits.len();
+        let mut value = port;
+        loop {
+            let digit = u8::try_from(value.rem_euclid(10))
+                .map_err(|source| TimeError::parse_with_source(format.port_context, source))?;
+            index = index
+                .checked_sub(1)
+                .ok_or_else(|| TimeError::parse(format.port_context))?;
+            let byte = b'0'
+                .checked_add(digit)
+                .ok_or_else(|| TimeError::parse(format.port_context))?;
+            let Some(slot) = digits.get_mut(index) else {
+                return Err(TimeError::parse(format.port_context));
+            };
+            *slot = byte;
+            value = value.div_euclid(10);
+            if value == 0 {
+                break;
+            }
+        }
+        let Some(port_digits) = digits.get(index..) else {
+            return Err(TimeError::parse(format.port_context));
+        };
+        let port_text = str::from_utf8(port_digits)
+            .map_err(|source| TimeError::parse_with_source(format.port_context, source))?;
+        out.push_str(port_text);
     }
     Ok(out)
 }
@@ -198,8 +224,8 @@ fn checked_capacity(base: usize, additional: usize, context: &'static str) -> Re
         .ok_or_else(|| TimeError::parse(context))
 }
 fn reserve_string(out: &mut String, capacity: usize, context: &'static str) -> Result<()> {
-    out.try_reserve(capacity)
-        .map_err(|source| TimeError::parse(format!("{context}: {source}")))
+    out.try_reserve_exact(capacity)
+        .map_err(|source| TimeError::parse_with_source(context, source))
 }
 fn parse_port(port_part: &str) -> Result<u16> {
     if port_part.is_empty() {

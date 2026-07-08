@@ -4,10 +4,7 @@ use super::{
     util::{blend_weighted_nanos, parse_result_with_context},
 };
 use crate::{
-    buffmt::{
-        ByteCursor, copy_two_digits as buffmt_copy_two_digits, digit_byte as buffmt_digit_byte,
-        write_zero_err,
-    },
+    buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
     numeric::low_u8_from_u32,
 };
 use core::{range::Range, time::Duration};
@@ -44,12 +41,6 @@ impl ByteCursor<'_> {
     fn checked_sub_index(value: usize, amount: usize) -> IoResult<usize> {
         value.checked_sub(amount).ok_or_else(write_zero_err)
     }
-    fn copy_two_digits(target: &mut [u8; TWO_DIGIT_WIDTH], value: usize) -> IoResult<()> {
-        buffmt_copy_two_digits(target, value)
-    }
-    fn digit_byte(index: usize) -> IoResult<u8> {
-        buffmt_digit_byte(index)
-    }
     fn range_two_digits(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; TWO_DIGIT_WIDTH]> {
         let end = start
             .checked_add(TWO_DIGIT_WIDTH)
@@ -65,7 +56,7 @@ impl ByteCursor<'_> {
         let Some(digits) = digits_slice.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        Self::copy_two_digits(digits, idx)?;
+        copy_two_digits(digits, idx)?;
         Ok(())
     }
     fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
@@ -75,11 +66,11 @@ impl ByteCursor<'_> {
         let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
             return Err(write_zero_err());
         };
-        *digit_slot = Self::digit_byte(hundreds)?;
+        *digit_slot = digit_byte(hundreds)?;
         let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        Self::copy_two_digits(remaining_digits, rem)?;
+        copy_two_digits(remaining_digits, rem)?;
         Ok(())
     }
     fn write_u32_dec(&mut self, mut n: u32) -> IoResult<()> {
@@ -89,16 +80,16 @@ impl ByteCursor<'_> {
             let rem = usize::from(low_u8_from_u32(n.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
             n /= U32_THREE_DIGIT_THRESHOLD;
             i = Self::checked_sub_index(i, 2)?;
-            Self::copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
+            copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
         }
         if n >= U32_TWO_DIGIT_THRESHOLD {
             let rem = usize::from(low_u8_from_u32(n));
             i = Self::checked_sub_index(i, TWO_DIGIT_WIDTH)?;
-            Self::copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
+            copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
         } else {
             i = Self::checked_sub_index(i, 1)?;
             let digit = usize::from(low_u8_from_u32(n));
-            *tmp.get_mut(i).ok_or_else(write_zero_err)? = Self::digit_byte(digit)?;
+            *tmp.get_mut(i).ok_or_else(write_zero_err)? = digit_byte(digit)?;
         }
         let Some(suffix) = tmp.get(i..) else {
             return Err(write_zero_err());
@@ -123,8 +114,8 @@ impl ByteCursor<'_> {
                 let Some(lo_digits) = lo_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
                     return Err(write_zero_err());
                 };
-                Self::copy_two_digits(hi_digits, hi)?;
-                Self::copy_two_digits(lo_digits, lo)?;
+                copy_two_digits(hi_digits, hi)?;
+                copy_two_digits(lo_digits, lo)?;
                 return Ok(());
             }
             return self.write_u32_dec(year_value);
@@ -138,11 +129,11 @@ impl ByteCursor<'_> {
             let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
                 return Err(write_zero_err());
             };
-            *digit_slot = Self::digit_byte(hundreds)?;
+            *digit_slot = digit_byte(hundreds)?;
             let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
                 return Err(write_zero_err());
             };
-            Self::copy_two_digits(remaining_digits, rem)?;
+            copy_two_digits(remaining_digits, rem)?;
             return Ok(());
         }
         self.write_u32_dec(abs)
@@ -207,7 +198,7 @@ impl ServerTime {
         })
     }
     pub(super) fn current_server_time_at(&self, now: Instant) -> SystemTime {
-        let elapsed_since_anchor = now.duration_since(self.anchor_instant);
+        let elapsed_since_anchor = now.saturating_duration_since(self.anchor_instant);
         let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
             return self.anchor_time;
         };

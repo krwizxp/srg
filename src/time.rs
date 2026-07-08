@@ -15,10 +15,16 @@ cfg_select! {
     _ => {}
 }
 use crate::{buffmt::ByteCursor, write_line_best_effort};
-use alloc::{borrow::Cow, fmt, sync::Arc};
+use alloc::{borrow::Cow, sync::Arc};
 use core::{
-    error::Error, fmt::Write as FmtWrite, hint::spin_loop, ops::Mul as NumericMul, range::Range,
-    result::Result as CoreResult, str::FromStr, time::Duration,
+    error::Error,
+    fmt::{self, Write as FmtWrite},
+    hint::spin_loop,
+    ops::Mul as NumericMul,
+    range::Range,
+    result::Result as CoreResult,
+    str::FromStr,
+    time::Duration,
 };
 use std::{
     io::{
@@ -103,7 +109,7 @@ const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
 const TCP_TIMEOUT: Duration = Duration::from_secs(5);
 const ENTER_BUFFER_CAPACITY: usize = 8;
-const ENTER_BUFFER_READ_LIMIT: u64 = 9;
+const ENTER_BUFFER_READ_LIMIT_BYTES: usize = ENTER_BUFFER_CAPACITY + 1;
 const ENTER_INPUT_TOO_LONG: &str = "서버 시간 종료 입력이 너무 깁니다.";
 const ENTER_THREAD_PANIC: &str = "입력 대기 스레드 패닉 발생";
 const NUM_SAMPLES: usize = 10;
@@ -233,14 +239,21 @@ impl FromStr for TargetTimeOfDay {
             return Err(INVALID_TIME_INPUT_ERR);
         }
         let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
-            if component.len() != CLOCK_COMPONENT_LEN
-                || !component.bytes().all(|byte| byte.is_ascii_digit())
-            {
+            if component.len() != CLOCK_COMPONENT_LEN {
                 return Err(INVALID_TIME_INPUT_ERR);
             }
-            component
-                .parse::<u32>()
-                .map_err(|_source| INVALID_TIME_INPUT_ERR)
+            let mut value = 0_u32;
+            for byte in component.bytes() {
+                if !byte.is_ascii_digit() {
+                    return Err(INVALID_TIME_INPUT_ERR);
+                }
+                let digit = u32::from(byte.wrapping_sub(b'0'));
+                value = value
+                    .checked_mul(10)
+                    .and_then(|current| current.checked_add(digit))
+                    .ok_or(INVALID_TIME_INPUT_ERR)?;
+            }
+            Ok(value)
         };
         let (hour, minute, second) = (
             parse_component(hour_str)?,
@@ -285,17 +298,37 @@ impl TimeError {
             source: None,
         }
     }
+    fn new_with_source<E>(
+        kind: TimeErrorKind,
+        detail: impl Into<Cow<'static, str>>,
+        source: E,
+    ) -> Self
+    where
+        E: Error + Send + Sync + 'static,
+    {
+        Self {
+            kind,
+            detail: detail.into(),
+            io_kind: None,
+            source: Some(Box::new(source)),
+        }
+    }
     fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::Parse, detail)
+    }
+    fn parse_with_source<E>(detail: impl Into<Cow<'static, str>>, source: E) -> Self
+    where
+        E: Error + Send + Sync + 'static,
+    {
+        Self::new_with_source(TimeErrorKind::Parse, detail, source)
     }
 }
 impl From<io::Error> for TimeError {
     fn from(err: io::Error) -> Self {
         let io_kind = err.kind();
-        let detail = Cow::Owned(err.to_string());
         Self {
             kind: TimeErrorKind::Io,
-            detail,
+            detail: Cow::Borrowed(""),
             io_kind: Some(io_kind),
             source: Some(Box::new(err)),
         }
@@ -303,10 +336,9 @@ impl From<io::Error> for TimeError {
 }
 impl From<SystemTimeError> for TimeError {
     fn from(err: SystemTimeError) -> Self {
-        let detail = Cow::Owned(err.to_string());
         Self {
             kind: TimeErrorKind::Time,
-            detail,
+            detail: Cow::Borrowed(""),
             io_kind: None,
             source: Some(Box::new(err)),
         }
@@ -315,11 +347,23 @@ impl From<SystemTimeError> for TimeError {
 impl fmt::Display for TimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            TimeErrorKind::Io => write!(f, "I/O 오류: {}", self.detail),
-            TimeErrorKind::Time => write!(f, "시스템 시간 오류: {}", self.detail),
-            TimeErrorKind::Parse => write!(f, "파싱 오류: {}", self.detail),
+            TimeErrorKind::Io => match self.source.as_ref() {
+                Some(source) => write!(f, "I/O 오류: {source}"),
+                None => write!(f, "I/O 오류: {}", self.detail),
+            },
+            TimeErrorKind::Time => match self.source.as_ref() {
+                Some(source) => write!(f, "시스템 시간 오류: {source}"),
+                None => write!(f, "시스템 시간 오류: {}", self.detail),
+            },
+            TimeErrorKind::Parse => match self.source.as_ref() {
+                Some(source) => write!(f, "파싱 오류: {}: {source}", self.detail),
+                None => write!(f, "파싱 오류: {}", self.detail),
+            },
             TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
-            TimeErrorKind::NativeHttp => write!(f, "native HTTP 요청 실패: {}", self.detail),
+            TimeErrorKind::NativeHttp => match self.source.as_ref() {
+                Some(source) => write!(f, "native HTTP 요청 실패: {}: {source}", self.detail),
+                None => write!(f, "native HTTP 요청 실패: {}", self.detail),
+            },
         }
     }
 }
@@ -347,7 +391,7 @@ impl SampleWorker {
         self.command_sender
             .send(SampleWorkerCommand::Fetch { generation, kind })
             .map_err(|source| {
-                TimeError::parse(format!("서버 시간 샘플 worker 요청 실패: {source}"))
+                TimeError::parse_with_source("서버 시간 샘플 worker 요청 실패", source)
             })?;
         Ok(PendingSampleRequest { generation })
     }
@@ -413,6 +457,7 @@ struct SampleWorkerResponse {
     kind: SampleRequestKind,
     result: Result<TimeSample>,
 }
+#[derive(Clone, Copy)]
 enum SampleRequestKind {
     Baseline { attempt_index: usize },
     Calibration,
@@ -449,17 +494,14 @@ enum FinalCountdownSamplePoll {
 }
 struct CachedTcpSocketAddr {
     addr: net::SocketAddr,
-    host: String,
-    port: u16,
 }
 struct CachedTcpConnection {
-    host: String,
-    port: u16,
     reader: io::BufReader<net::TcpStream>,
 }
 struct NetworkContext {
     cached_tcp_connection: Option<CachedTcpConnection>,
     cached_tcp_socket_addr: Option<CachedTcpSocketAddr>,
+    host: Arc<ParsedServer>,
     native_http: native_http::NativeHttp,
     tcp_line_buffer: Vec<u8>,
     tcp_request_buffer: Vec<u8>,
@@ -608,14 +650,13 @@ impl FinalCountdownSampler {
             })
             .map_err(|source| {
                 self.disable();
-                TimeError::parse(format!("카운트다운 샘플러 시작 실패: {source}"))
+                TimeError::parse_with_source("카운트다운 샘플러 시작 실패", source)
             })
     }
     fn stop_periodic(&mut self) {
-        if self.sample_interval.is_none() {
+        if self.sample_interval.take().is_none() {
             return;
         }
-        self.sample_interval = None;
         let Some(next_generation) = self.generation.checked_add(1) else {
             self.disable();
             return;
@@ -636,18 +677,19 @@ impl FinalCountdownSampler {
     }
 }
 impl NetworkContext {
-    fn new() -> Result<Self> {
+    fn new(host: Arc<ParsedServer>) -> Result<Self> {
         let mut tcp_line_buffer = Vec::new();
         tcp_line_buffer
-            .try_reserve(TCP_LINE_BUFFER_CAPACITY)
-            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
+            .try_reserve_exact(TCP_LINE_BUFFER_CAPACITY)
+            .map_err(|source| TimeError::parse_with_source("buffer 메모리 확보 실패", source))?;
         let mut tcp_request_buffer = Vec::new();
         tcp_request_buffer
-            .try_reserve(TCP_LINE_BUFFER_CAPACITY)
-            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
+            .try_reserve_exact(TCP_LINE_BUFFER_CAPACITY)
+            .map_err(|source| TimeError::parse_with_source("buffer 메모리 확보 실패", source))?;
         Ok(Self {
             cached_tcp_connection: None,
             cached_tcp_socket_addr: None,
+            host,
             native_http: native_http::NativeHttp::default(),
             tcp_line_buffer,
             tcp_request_buffer,
@@ -760,7 +802,7 @@ impl AppState {
         let anchor_instant = current_sample
             .response_received_inst
             .checked_sub(one_way_delay)
-            .map_or(current_sample.response_received_inst, |adjusted| adjusted);
+            .unwrap_or(current_sample.response_received_inst);
         Some(ServerTime {
             anchor_time: server_time_at_tick,
             anchor_instant,
@@ -786,7 +828,7 @@ impl AppState {
             .checked_add(KST_OFFSET_SECS_U64)
             .ok_or_else(|| TimeError::parse("KST 현재 시각 계산 중 overflow가 발생했습니다."))?;
         let current_kst_second = u32::try_from(kst_epoch_secs.rem_euclid(KST_SECONDS_PER_DAY_U64))
-            .map_err(|source| TimeError::parse(format!("KST 초 변환 실패: {source}")))?;
+            .map_err(|source| TimeError::parse_with_source("KST 초 변환 실패", source))?;
         let current_kst_day = kst_epoch_secs.div_euclid(KST_SECONDS_PER_DAY_U64);
         let target_second = target_time_of_day.seconds_after_midnight;
         let target_day = if target_second < current_kst_second {
@@ -807,7 +849,7 @@ impl AppState {
             .checked_add(Duration::from_secs(target_utc_epoch_secs))
             .ok_or_else(|| TimeError::parse("목표 절대 시각 계산 중 범위 오류가 발생했습니다."))?;
         let day_index = i32::try_from(target_day)
-            .map_err(|source| TimeError::parse(format!("목표 날짜 변환 실패: {source}")))?;
+            .map_err(|source| TimeError::parse_with_source("목표 날짜 변환 실패", source))?;
         let CivilDate { day, month, year } = http_date::civil_from_days(day_index)
             .ok_or_else(|| TimeError::parse("목표 날짜 계산 중 범위 오류가 발생했습니다."))?;
         let hour = target_second.div_euclid(KST_SECONDS_PER_HOUR_U32);
@@ -838,21 +880,11 @@ impl AppState {
         self.final_countdown_sampler.stop_periodic();
         self.final_countdown_next_sample_error_message_at = None;
     }
-    fn ensure_sample_request(&mut self, kind: &SampleRequestKind) -> Result<()> {
+    fn ensure_sample_request(&mut self, kind: SampleRequestKind) -> Result<()> {
         if self.pending_sample_request.is_some() {
             return Ok(());
         }
-        let (request_kind, retry_kind) = match *kind {
-            SampleRequestKind::Baseline { attempt_index } => (
-                SampleRequestKind::Baseline { attempt_index },
-                SampleRequestKind::Baseline { attempt_index },
-            ),
-            SampleRequestKind::Calibration => (
-                SampleRequestKind::Calibration,
-                SampleRequestKind::Calibration,
-            ),
-        };
-        match self.sample_worker.fetch(request_kind) {
+        match self.sample_worker.fetch(kind) {
             Ok(request) => {
                 self.pending_sample_request = Some(request);
                 Ok(())
@@ -861,7 +893,7 @@ impl AppState {
                 if !self.respawn_sample_worker() {
                     return Err(fetch_err);
                 }
-                self.pending_sample_request = Some(self.sample_worker.fetch(retry_kind)?);
+                self.pending_sample_request = Some(self.sample_worker.fetch(kind)?);
                 Ok(())
             }
         }
@@ -955,8 +987,7 @@ impl AppState {
                 result,
             } => result,
             SampleRequestPoll::Sample { .. } | SampleRequestPoll::Empty => {
-                if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration)
-                {
+                if let Err(start_err) = self.ensure_sample_request(SampleRequestKind::Calibration) {
                     append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
                     return transition_to_retry(msg_buf);
                 }
@@ -974,7 +1005,7 @@ impl AppState {
             return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE);
         }
         let Ok(current_sample) = sample_result else {
-            if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration) {
+            if let Err(start_err) = self.ensure_sample_request(SampleRequestKind::Calibration) {
                 append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
                 return transition_to_retry(msg_buf);
             }
@@ -1013,7 +1044,7 @@ impl AppState {
         if Instant::now() >= deadline {
             return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE);
         }
-        if let Err(start_err) = self.ensure_sample_request(&SampleRequestKind::Calibration) {
+        if let Err(start_err) = self.ensure_sample_request(SampleRequestKind::Calibration) {
             append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
             return transition_to_retry(msg_buf);
         }
@@ -1057,7 +1088,7 @@ impl AppState {
             ),
             FinalCountdownSamplePoll::Empty => false,
         };
-        let estimated_rtt = self.live_rtt.map_or(st.baseline_rtt, |rtt| rtt);
+        let estimated_rtt = self.live_rtt.unwrap_or(st.baseline_rtt);
         let Some(estimated_one_way_delay) = effective_one_way_delay(estimated_rtt) else {
             msg_buf.push_str(COUNTDOWN_DELAY_ERROR);
             return ActivityTransition {
@@ -1142,7 +1173,7 @@ impl AppState {
         *server_time = server_time.recalibrate_with_rtt(sample_rtt);
         let sample_now = Instant::now();
         let sampled_server_time = server_time.current_server_time_at(sample_now);
-        let old_rtt = self.live_rtt.map_or(sample_rtt, |rtt| rtt);
+        let old_rtt = self.live_rtt.unwrap_or(sample_rtt);
         let new_rtt_nanos = blend_weighted_nanos(
             old_rtt.as_nanos(),
             sample_rtt.as_nanos(),
@@ -1222,7 +1253,7 @@ impl AppState {
                 }
                 let attempt_index = self.baseline_rtt_attempts;
                 let start_result =
-                    self.ensure_sample_request(&SampleRequestKind::Baseline { attempt_index });
+                    self.ensure_sample_request(SampleRequestKind::Baseline { attempt_index });
                 if let Err(start_err) = start_result {
                     append_error_detail(msg_buf, "RTT 샘플 요청 실패: ", start_err);
                     return transition_to_retry(msg_buf);
@@ -1296,7 +1327,8 @@ impl AppState {
         if let Some(target_time) = self.target_time.take_if(|target| {
             target
                 .duration_since(estimated_server_time)
-                .map_or(true, |remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+                .ok()
+                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
         }) {
             if self.live_rtt.is_none() {
                 self.live_rtt = Some(server_time.baseline_rtt);
@@ -1346,7 +1378,8 @@ impl AppState {
         let target_time = self.target_time.take_if(|target| {
             target
                 .duration_since(estimated_server_time)
-                .map_or(true, |remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+                .ok()
+                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
         })?;
         if self.live_rtt.is_none() {
             self.live_rtt = Some(server_time.baseline_rtt);
@@ -1469,10 +1502,12 @@ impl AppState {
         let (tx, rx) = mpsc::channel();
         let input_thread = thread::spawn(move || -> IoResult<()> {
             let mut line = Vec::new();
-            line.try_reserve(ENTER_BUFFER_CAPACITY)
+            line.try_reserve_exact(ENTER_BUFFER_READ_LIMIT_BYTES)
                 .map_err(io::Error::other)?;
             let mut stdin_lock = io::stdin().lock();
-            let mut limited_stdin = IoRead::take(&mut stdin_lock, ENTER_BUFFER_READ_LIMIT);
+            let read_limit =
+                u64::try_from(ENTER_BUFFER_READ_LIMIT_BYTES).map_err(IoError::other)?;
+            let mut limited_stdin = IoRead::take(&mut stdin_lock, read_limit);
             IoBufRead::read_until(&mut limited_stdin, b'\n', &mut line)?;
             if line.len() > ENTER_BUFFER_CAPACITY && !line.ends_with(b"\n") {
                 return Err(IoError::new(ErrorKind::InvalidInput, ENTER_INPUT_TOO_LONG));
@@ -1484,8 +1519,8 @@ impl AppState {
         let mut last_display_update = Instant::now();
         let mut message_buffer = String::new();
         message_buffer
-            .try_reserve(MESSAGE_BUFFER_CAPACITY)
-            .map_err(|source| TimeError::parse(format!("buffer 메모리 확보 실패: {source}")))?;
+            .try_reserve_exact(MESSAGE_BUFFER_CAPACITY)
+            .map_err(|source| TimeError::parse_with_source("buffer 메모리 확보 실패", source))?;
         let mut prepared_input = native_input::PreparedInput::EMPTY;
         let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
@@ -1498,7 +1533,7 @@ impl AppState {
                 | Activity::FinalCountdown { .. } => ADAPTIVE_POLL_INTERVAL,
             };
             let pre_wait_now = Instant::now();
-            let elapsed = pre_wait_now.duration_since(last_display_update);
+            let elapsed = pre_wait_now.saturating_duration_since(last_display_update);
             let remaining_display = DISPLAY_INTERVAL.saturating_sub(elapsed);
             let poll_timeout = activity_poll.min(remaining_display);
             match rx.recv_timeout(poll_timeout) {
@@ -1565,7 +1600,7 @@ impl AppState {
         output: &mut dyn io::Write,
         buffer: &mut [u8],
     ) -> Result<()> {
-        if now.duration_since(*last_update) >= DISPLAY_INTERVAL
+        if now.saturating_duration_since(*last_update) >= DISPLAY_INTERVAL
             && self.should_update_display(display_activity, now)
             && let Some(st) = self.server_time.as_ref()
         {
@@ -1600,7 +1635,8 @@ impl AppState {
         self.target_time.is_some_and(|target| {
             target
                 .duration_since(server_time.current_server_time_at(now))
-                .map_or(true, |remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+                .ok()
+                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
         })
     }
     fn should_update_display(&self, activity: &Activity, now: Instant) -> bool {
@@ -1610,7 +1646,7 @@ impl AppState {
         let Some(server_time) = self.server_time else {
             return true;
         };
-        let rtt = self.live_rtt.map_or(server_time.baseline_rtt, |rtt| rtt);
+        let rtt = self.live_rtt.unwrap_or(server_time.baseline_rtt);
         let Some(one_way_delay) = effective_one_way_delay(rtt) else {
             return true;
         };
@@ -1896,11 +1932,7 @@ fn trigger_instant_for_target(
         return Some(now);
     };
     let target_instant = server_time.anchor_instant.checked_add(target_delta)?;
-    Some(
-        target_instant
-            .checked_sub(one_way_delay)
-            .map_or(now, |trigger_instant| trigger_instant),
-    )
+    Some(target_instant.checked_sub(one_way_delay).unwrap_or(now))
 }
 fn decide_countdown_action(
     target_time: SystemTime,

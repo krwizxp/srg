@@ -1,4 +1,5 @@
 use crate::diagnostic::Result;
+use alloc::sync::Arc;
 use core::{
     arch::x86_64::{_rdrand64_step, _rdseed64_step},
     hint::spin_loop,
@@ -7,12 +8,11 @@ use core::{
 };
 use std::{
     is_x86_feature_detected,
-    sync::{LazyLock, Mutex},
+    sync::LazyLock,
     thread::yield_now,
     time::Instant,
 };
 const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
-const HARDWARE_RANDOM_REPETITION_LIMIT: u8 = 8;
 const RDSEED_SPIN_BURST_RETRY_COUNT: u16 = 256;
 const RDSEED_TIMEOUT: Duration = Duration::from_mins(5);
 const RNG_SOURCE_NONE: u8 = 0;
@@ -33,26 +33,40 @@ static RNG_SUPPORT: LazyLock<HardwareRandomSupport> = LazyLock::new(|| {
         rdrand,
     }
 });
-static RNG_SOURCE: LazyLock<AtomicU8> = LazyLock::new(|| {
-    AtomicU8::new(RNG_SUPPORT.initial_source.code())
-});
-static RNG_HEALTH: LazyLock<Mutex<HardwareRandomHealth>> = LazyLock::new(|| {
-    Mutex::new(HardwareRandomHealth::default())
-});
-static RDSEED_FALLBACK_NOTICE_PENDING: AtomicBool = AtomicBool::new(false);
 struct HardwareRandomSupport {
     initial_source: HardwareRandomSource,
     rdrand: bool,
 }
-#[derive(Default)]
-struct HardwareRandomHealth {
-    rdrand: SourceHealth,
-    rdseed: SourceHealth,
+struct HardwareRandomState {
+    fallback_notice_pending: AtomicBool,
+    source: AtomicU8,
 }
-#[derive(Default)]
-struct SourceHealth {
-    last_value: Option<u64>,
-    repetition_count: u8,
+pub struct HardwareRng {
+    source: HardwareRandomSource,
+    state: Arc<HardwareRandomState>,
+}
+impl Default for HardwareRng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl HardwareRandomState {
+    fn mark_rdseed_fallback_notice_pending(&self) {
+        self.fallback_notice_pending.store(true, Ordering::Relaxed);
+    }
+    fn source(&self) -> HardwareRandomSource {
+        match self.source.load(Ordering::Relaxed) {
+            RNG_SOURCE_RDRAND => HardwareRandomSource::RdRand,
+            RNG_SOURCE_RDSEED => HardwareRandomSource::RdSeed,
+            _ => HardwareRandomSource::None,
+        }
+    }
+    fn store_source(&self, source: HardwareRandomSource) {
+        self.source.store(source.code(), Ordering::Relaxed);
+    }
+    fn take_rdseed_fallback_notice(&self) -> bool {
+        self.fallback_notice_pending.swap(false, Ordering::Relaxed)
+    }
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum HardwareRandomSource {
@@ -68,115 +82,93 @@ impl HardwareRandomSource {
             Self::RdSeed => RNG_SOURCE_RDSEED,
         }
     }
-    const fn label(self) -> &'static str {
-        match self {
-            Self::None => "NONE",
-            Self::RdRand => "RDRAND",
-            Self::RdSeed => "RDSEED",
+}
+impl HardwareRng {
+    pub fn new() -> Self {
+        let source = RNG_SUPPORT.initial_source;
+        Self::with_state(Arc::new(HardwareRandomState {
+            fallback_notice_pending: AtomicBool::new(false),
+            source: AtomicU8::new(source.code()),
+        }), source)
+    }
+    pub fn next_u64(&mut self) -> Result<u64> {
+        match self.source {
+            HardwareRandomSource::RdSeed => self.rdseed_random(),
+            HardwareRandomSource::RdRand => Self::rdrand_random(),
+            HardwareRandomSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
         }
     }
-    fn try_hardware_value(self) -> Option<u64> {
+    fn rdrand_random() -> Result<u64> {
         let mut value = 0_u64;
-        match self {
-            Self::RdSeed => {
+        for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
+            // SAFETY: callers only use this after confirming `rdrand` support.
+            if unsafe { _rdrand64_step(&mut value) } == 1_i32 {
+                return Ok(value);
+            }
+            spin_loop();
+        }
+        Err("RDRAND 실패".into())
+    }
+    fn rdseed_random(&mut self) -> Result<u64> {
+        let mut value = 0_u64;
+        for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
+            // SAFETY: callers only use this after confirming `rdseed` support.
+            if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+                return Ok(value);
+            }
+            spin_loop();
+        }
+        self.sync_source_from_shared();
+        match self.source {
+            HardwareRandomSource::RdSeed => {}
+            HardwareRandomSource::RdRand => return Self::rdrand_random(),
+            HardwareRandomSource::None => return Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
+        }
+        let deadline = Instant::now()
+            .checked_add(RDSEED_TIMEOUT)
+            .ok_or("RDSEED timeout 계산 실패")?;
+        while Instant::now() < deadline {
+            for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
                 // SAFETY: callers only use this after confirming `rdseed` support.
-                (unsafe { _rdseed64_step(&mut value) } == 1_i32).then_some(value)
-            }
-            Self::RdRand => {
-                // SAFETY: callers only use this after confirming `rdrand` support.
-                (unsafe { _rdrand64_step(&mut value) } == 1_i32).then_some(value)
-            }
-            Self::None => None,
-        }
-    }
-}
-impl HardwareRandomHealth {
-    fn check(&mut self, source: HardwareRandomSource, value: u64) -> Result<u64> {
-        let Some(health) = self.source_health_mut(source) else {
-            return Err("하드웨어 RNG source 상태가 올바르지 않습니다.".into());
-        };
-        if health.last_value == Some(value) {
-            health.repetition_count = health.repetition_count.saturating_add(1);
-        } else {
-            health.last_value = Some(value);
-            health.repetition_count = 1;
-        }
-        if health.repetition_count >= HARDWARE_RANDOM_REPETITION_LIMIT {
-            return Err(format!(
-                "{} 반복값 이상 감지: 동일한 64비트 값이 {}회 연속 반환되었습니다.",
-                source.label(),
-                health.repetition_count,
-            )
-            .into());
-        }
-        Ok(value)
-    }
-    const fn source_health_mut(
-        &mut self,
-        source: HardwareRandomSource,
-    ) -> Option<&mut SourceHealth> {
-        match source {
-            HardwareRandomSource::RdRand => Some(&mut self.rdrand),
-            HardwareRandomSource::RdSeed => Some(&mut self.rdseed),
-            HardwareRandomSource::None => None,
-        }
-    }
-}
-fn health_checked_value(source: HardwareRandomSource, value: u64) -> Result<u64> {
-    let mut health = RNG_HEALTH
-        .lock()
-        .map_err(|_lock_error| "하드웨어 RNG health check 상태 잠금 실패")?;
-    health.check(source, value)
-}
-pub fn get_hardware_random() -> Result<u64> {
-    match hardware_random_source() {
-        HardwareRandomSource::RdSeed => {
-            let deadline = Instant::now()
-                .checked_add(RDSEED_TIMEOUT)
-                .ok_or("RDSEED timeout 계산 실패")?;
-            while Instant::now() < deadline {
-                for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
-                    if let Some(value) = HardwareRandomSource::RdSeed.try_hardware_value() {
-                        return health_checked_value(HardwareRandomSource::RdSeed, value);
-                    }
-                    spin_loop();
+                if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+                    return Ok(value);
                 }
-                match hardware_random_source() {
-                    HardwareRandomSource::RdSeed => yield_now(),
-                    HardwareRandomSource::RdRand => return rdrand_random(),
-                    HardwareRandomSource::None => {
-                        return Err("RDSEED/RDRAND 사용 불가 상태입니다.".into());
-                    }
+                spin_loop();
+            }
+            self.sync_source_from_shared();
+            match self.source {
+                HardwareRandomSource::RdSeed => yield_now(),
+                HardwareRandomSource::RdRand => return Self::rdrand_random(),
+                HardwareRandomSource::None => {
+                    return Err("RDSEED/RDRAND 사용 불가 상태입니다.".into());
                 }
             }
-            if RNG_SUPPORT.rdrand {
-                RNG_SOURCE.store(HardwareRandomSource::RdRand.code(), Ordering::Relaxed);
-                RDSEED_FALLBACK_NOTICE_PENDING.store(true, Ordering::Relaxed);
-                return rdrand_random();
-            }
-            RNG_SOURCE.store(HardwareRandomSource::None.code(), Ordering::Relaxed);
-            Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
         }
-        HardwareRandomSource::RdRand => rdrand_random(),
-        HardwareRandomSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
-    }
-}
-pub fn hardware_random_source() -> HardwareRandomSource {
-    match RNG_SOURCE.load(Ordering::Relaxed) {
-        RNG_SOURCE_RDRAND => HardwareRandomSource::RdRand,
-        RNG_SOURCE_RDSEED => HardwareRandomSource::RdSeed,
-        _ => HardwareRandomSource::None,
-    }
-}
-pub fn take_rdseed_fallback_notice() -> bool {
-    RDSEED_FALLBACK_NOTICE_PENDING.swap(false, Ordering::Relaxed)
-}
-fn rdrand_random() -> Result<u64> {
-    for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
-        if let Some(value) = HardwareRandomSource::RdRand.try_hardware_value() {
-            return health_checked_value(HardwareRandomSource::RdRand, value);
+        if RNG_SUPPORT.rdrand {
+            self.source = HardwareRandomSource::RdRand;
+            self.state.store_source(HardwareRandomSource::RdRand);
+            self.state.mark_rdseed_fallback_notice_pending();
+            return Self::rdrand_random();
         }
-        spin_loop();
+        self.source = HardwareRandomSource::None;
+        self.state.store_source(HardwareRandomSource::None);
+        Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
     }
-    Err("RDRAND 실패".into())
+    pub fn shared_source_rng(&self) -> Self {
+        Self::with_state(Arc::clone(&self.state), self.state.source())
+    }
+    pub fn source(&mut self) -> HardwareRandomSource {
+        self.sync_source_from_shared();
+        self.source
+    }
+    pub(crate) fn sync_source_from_shared(&mut self) {
+        self.source = self.state.source();
+    }
+    pub fn take_rdseed_fallback_notice(&mut self) -> bool {
+        self.sync_source_from_shared();
+        self.state.take_rdseed_fallback_notice()
+    }
+    const fn with_state(state: Arc<HardwareRandomState>, source: HardwareRandomSource) -> Self {
+        Self { source, state }
+    }
 }

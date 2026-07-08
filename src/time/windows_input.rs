@@ -1,6 +1,6 @@
 use crate::write_line_best_effort;
 use super::NativeInputSendStatus;
-use core::mem::{align_of, size_of};
+use core::mem::{align_of, offset_of, size_of};
 use std::io::Write;
 mod sys {
     use super::Input;
@@ -51,18 +51,44 @@ cfg_select! {
     target_pointer_width = "64" => {
         const _: () = assert!(size_of::<MouseInput>() == 32, "Windows MOUSEINPUT x64 size mismatch");
         const _: () = assert!(align_of::<MouseInput>() == 8, "Windows MOUSEINPUT x64 align mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dx) == 0, "Windows MOUSEINPUT x64 dx offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dy) == 4, "Windows MOUSEINPUT x64 dy offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, mouse_data) == 8, "Windows MOUSEINPUT x64 data offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dw_flags) == 12, "Windows MOUSEINPUT x64 flags offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, time) == 16, "Windows MOUSEINPUT x64 time offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dw_extra_info) == 24, "Windows MOUSEINPUT x64 extra offset mismatch");
         const _: () = assert!(size_of::<KeybdInput>() == 24, "Windows KEYBDINPUT x64 size mismatch");
         const _: () = assert!(align_of::<KeybdInput>() == 8, "Windows KEYBDINPUT x64 align mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, w_vk) == 0, "Windows KEYBDINPUT x64 vk offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, w_scan) == 2, "Windows KEYBDINPUT x64 scan offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, dw_flags) == 4, "Windows KEYBDINPUT x64 flags offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, time) == 8, "Windows KEYBDINPUT x64 time offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, dw_extra_info) == 16, "Windows KEYBDINPUT x64 extra offset mismatch");
         const _: () = assert!(size_of::<Input>() == 40, "Windows INPUT x64 size mismatch");
         const _: () = assert!(align_of::<Input>() == 8, "Windows INPUT x64 align mismatch");
+        const _: () = assert!(offset_of!(Input, r#type) == 0, "Windows INPUT x64 type offset mismatch");
+        const _: () = assert!(offset_of!(Input, union) == 8, "Windows INPUT x64 union offset mismatch");
     }
     target_pointer_width = "32" => {
         const _: () = assert!(size_of::<MouseInput>() == 24, "Windows MOUSEINPUT x86 size mismatch");
         const _: () = assert!(align_of::<MouseInput>() == 4, "Windows MOUSEINPUT x86 align mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dx) == 0, "Windows MOUSEINPUT x86 dx offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dy) == 4, "Windows MOUSEINPUT x86 dy offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, mouse_data) == 8, "Windows MOUSEINPUT x86 data offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dw_flags) == 12, "Windows MOUSEINPUT x86 flags offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, time) == 16, "Windows MOUSEINPUT x86 time offset mismatch");
+        const _: () = assert!(offset_of!(MouseInput, dw_extra_info) == 20, "Windows MOUSEINPUT x86 extra offset mismatch");
         const _: () = assert!(size_of::<KeybdInput>() == 16, "Windows KEYBDINPUT x86 size mismatch");
         const _: () = assert!(align_of::<KeybdInput>() == 4, "Windows KEYBDINPUT x86 align mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, w_vk) == 0, "Windows KEYBDINPUT x86 vk offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, w_scan) == 2, "Windows KEYBDINPUT x86 scan offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, dw_flags) == 4, "Windows KEYBDINPUT x86 flags offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, time) == 8, "Windows KEYBDINPUT x86 time offset mismatch");
+        const _: () = assert!(offset_of!(KeybdInput, dw_extra_info) == 12, "Windows KEYBDINPUT x86 extra offset mismatch");
         const _: () = assert!(size_of::<Input>() == 28, "Windows INPUT x86 size mismatch");
         const _: () = assert!(align_of::<Input>() == 4, "Windows INPUT x86 align mismatch");
+        const _: () = assert!(offset_of!(Input, r#type) == 0, "Windows INPUT x86 type offset mismatch");
+        const _: () = assert!(offset_of!(Input, union) == 4, "Windows INPUT x86 union offset mismatch");
     }
     _ => {}
 }
@@ -93,7 +119,7 @@ impl PreparedInput {
                     mouse_input(MOUSEEVENTF_LEFTDOWN),
                     release,
                 ];
-                send_input_events(&inputs, Some(&release), err)
+                send_input_events(&inputs, &release, err)
             }
             InputAction::F5Press => {
                 let release = keyboard_input(VK_F5, KEYEVENTF_KEYUP);
@@ -101,7 +127,7 @@ impl PreparedInput {
                     keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
                     release,
                 ];
-                send_input_events(&inputs, Some(&release), err)
+                send_input_events(&inputs, &release, err)
             }
         }
     }
@@ -131,7 +157,7 @@ fn mouse_input(dw_flags: u32) -> Input {
 }
 fn send_input_events(
     inputs: &[Input],
-    release_input: Option<&Input>,
+    release_input: &Input,
     err: &mut dyn Write,
 ) -> NativeInputSendStatus {
     let Ok(input_count) = u32::try_from(inputs.len()) else {
@@ -154,11 +180,9 @@ fn send_input_events(
         err,
         format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
     );
-    if sent == 1
-        && let Some(release) = release_input
-    {
+    if sent == 1 {
         // SAFETY: `release` is a valid one-element INPUT pointer and `input_size` matches the Rust representation.
-        let release_sent = unsafe { sys::SendInput(1, release, input_size) };
+        let release_sent = unsafe { sys::SendInput(1, release_input, input_size) };
         if release_sent != 1 {
             write_line_best_effort(
                 err,

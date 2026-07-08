@@ -2,7 +2,7 @@ use crate::write_line_best_effort;
 use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
-    mem::size_of,
+    mem::{align_of, size_of},
     num::NonZero,
     ptr::{NonNull, null},
 };
@@ -39,11 +39,17 @@ type XOpenDisplay = unsafe extern "C" fn(*const c_char) -> *mut Display;
 type XTestFakeButtonEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
 type XTestFakeKeyEvent = unsafe extern "C" fn(*mut Display, c_uint, c_int, c_ulong) -> c_int;
 const _: () = assert!(size_of::<XCloseDisplay>() == size_of::<*mut c_void>(), "XCloseDisplay pointer size mismatch");
+const _: () = assert!(align_of::<XCloseDisplay>() == align_of::<*mut c_void>(), "XCloseDisplay pointer align mismatch");
 const _: () = assert!(size_of::<XFlush>() == size_of::<*mut c_void>(), "XFlush pointer size mismatch");
+const _: () = assert!(align_of::<XFlush>() == align_of::<*mut c_void>(), "XFlush pointer align mismatch");
 const _: () = assert!(size_of::<XKeysymToKeycode>() == size_of::<*mut c_void>(), "XKeysymToKeycode pointer size mismatch");
+const _: () = assert!(align_of::<XKeysymToKeycode>() == align_of::<*mut c_void>(), "XKeysymToKeycode pointer align mismatch");
 const _: () = assert!(size_of::<XOpenDisplay>() == size_of::<*mut c_void>(), "XOpenDisplay pointer size mismatch");
+const _: () = assert!(align_of::<XOpenDisplay>() == align_of::<*mut c_void>(), "XOpenDisplay pointer align mismatch");
 const _: () = assert!(size_of::<XTestFakeButtonEvent>() == size_of::<*mut c_void>(), "XTestFakeButtonEvent pointer size mismatch");
+const _: () = assert!(align_of::<XTestFakeButtonEvent>() == align_of::<*mut c_void>(), "XTestFakeButtonEvent pointer align mismatch");
 const _: () = assert!(size_of::<XTestFakeKeyEvent>() == size_of::<*mut c_void>(), "XTestFakeKeyEvent pointer size mismatch");
+const _: () = assert!(align_of::<XTestFakeKeyEvent>() == align_of::<*mut c_void>(), "XTestFakeKeyEvent pointer align mismatch");
 type XKeycode = NonZero<c_uchar>;
 type InputError = Cow<'static, str>;
 type InputResult<T> = Result<T, InputError>;

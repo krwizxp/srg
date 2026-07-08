@@ -1,13 +1,15 @@
 use super::{
     HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, TimeError, error,
+    error_with_source,
 };
-use super::super::sample::{
-    find_age_header_value, find_date_header_value, validate_http_age_value,
-};
+use super::super::{sample::validate_http_age_value, util::parse_u32_digits};
 use alloc::{string::String, vec::Vec};
 use core::{
+    array::from_fn,
     ffi::c_void,
+    mem,
     ptr::{NonNull, null, null_mut},
+    str,
 };
 use std::{
     ffi::OsStr,
@@ -79,6 +81,8 @@ mod sys {
     }
 }
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
+const AGE_HEADER_PREFIX: &[u8] = b"age:";
+const DATE_HEADER_PREFIX: &[u8] = b"date:";
 const HTTP_SCHEME_PREFIX: &str = "http://";
 const HTTPS_SCHEME_PREFIX: &str = "https://";
 const INTERNET_DEFAULT_HTTP_PORT: u16 = 80;
@@ -105,11 +109,14 @@ const ERROR_WINHTTP_OPTION_NOT_SETTABLE: u32 = 12_011;
 const WINHTTP_QUERY_RAW_HEADERS_CRLF: u32 = 22;
 const WINHTTP_CONNECT_CACHE_LIMIT: usize = 4;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 64 * 1024;
+const HTTP_HEADER_LINE_STACK_BYTES: usize = 256;
 const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
 const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
 type HInternet = *mut c_void;
 pub(super) struct Client {
     error_code_label: &'static str,
+    header_buffer: Vec<u16>,
+    header_line_buffer: Vec<u8>,
     http_scheme_prefix: &'static str,
     https_scheme_prefix: &'static str,
     session_cache: Option<SessionCache>,
@@ -130,8 +137,13 @@ struct CachedConnect {
     host: String,
     port: u16,
 }
+struct ConnectCache {
+    entries: [Option<CachedConnect>; WINHTTP_CONNECT_CACHE_LIMIT],
+    len: usize,
+    start: usize,
+}
 struct SessionCache {
-    connects: Vec<CachedConnect>,
+    connects: ConnectCache,
     session: Handle,
 }
 impl Drop for Handle {
@@ -142,7 +154,47 @@ impl Drop for Handle {
         }
     }
 }
+impl ConnectCache {
+    fn find(&self, host: &str, port: u16) -> Option<&CachedConnect> {
+        self.entries
+            .iter()
+            .filter_map(Option::as_ref)
+            .find(|entry| entry.port == port && entry.host.as_str() == host)
+    }
+    fn push_back(&mut self, entry: CachedConnect) -> Option<()> {
+        let slot = if self.len < WINHTTP_CONNECT_CACHE_LIMIT {
+            let slot = self.len;
+            self.len = self.len.checked_add(1)?;
+            slot
+        } else {
+            let slot = self.start;
+            let next_start = self.start.checked_add(1)?;
+            self.start = if next_start == WINHTTP_CONNECT_CACHE_LIMIT {
+                0
+            } else {
+                next_start
+            };
+            slot
+        };
+        let target = self.entries.get_mut(slot)?;
+        *target = Some(entry);
+        Some(())
+    }
+}
 impl Client {
+    fn ascii_header_value<'line>(
+        line: &'line [u8],
+        prefix_len: usize,
+        context: &str,
+        header_name: &str,
+    ) -> Result<&'line str> {
+        let Some(value) = line.get(prefix_len..) else {
+            return Err(error(context, format!("{header_name} 헤더 prefix 길이 오류")));
+        };
+        str::from_utf8(value)
+            .map(str::trim_ascii)
+            .map_err(|source| error_with_source(context, format!("{header_name} 헤더 UTF-8 변환 실패"), source))
+    }
     fn cached_connect_ptr(
         &mut self,
         host: &str,
@@ -153,7 +205,11 @@ impl Client {
         if self.session_cache.is_none() {
             let user_agent = wide(concat!("srg/", env!("CARGO_PKG_VERSION")), context)?;
             self.session_cache = Some(SessionCache {
-                connects: Vec::new(),
+                connects: ConnectCache {
+                    entries: from_fn(|_| None),
+                    len: 0,
+                    start: 0,
+                },
                 session: self.open_session(&user_agent, context)?,
             });
         }
@@ -162,17 +218,8 @@ impl Client {
             .session_cache
             .as_mut()
             .ok_or_else(|| error(context, "WinHTTP session cache 상태 오류"))?;
-        if let Some(index) = cache
-            .connects
-            .iter()
-            .position(|entry| entry.port == port && entry.host.as_str() == host)
-        {
-            return cache
-                .connects
-                .get(index)
-                .map(|entry| &entry.handle)
-                .map(|handle| handle.0.as_ptr())
-                .ok_or_else(|| error(context, "WinHTTP connect cache 범위 오류"));
+        if let Some(entry) = cache.connects.find(host, port) {
+            return Ok(entry.handle.0.as_ptr());
         }
         // SAFETY: host_wide is NUL-terminated and cache.session is a valid session handle.
         let raw_connect =
@@ -181,23 +228,20 @@ impl Client {
             .map(Handle)
             .ok_or_else(|| Self::last_error_for(error_code_label, "WinHttpConnect", context))?;
         let mut host_key = String::new();
-        host_key
-            .try_reserve(host.len())
-            .map_err(|source| error(context, format!("WinHTTP connect host key 메모리 확보 실패: {source}")))?;
+        host_key.try_reserve_exact(host.len()).map_err(|source| {
+            error_with_source(context, "WinHTTP connect host key 메모리 확보 실패", source)
+        })?;
         host_key.push_str(host);
-        if cache.connects.len() >= WINHTTP_CONNECT_CACHE_LIMIT {
-            cache.connects.remove(0);
-        }
+        let connect = handle.0.as_ptr();
         cache
             .connects
-            .try_reserve(1)
-            .map_err(|source| error(context, format!("WinHTTP connect cache 메모리 확보 실패: {source}")))?;
-        let entry = cache.connects.push_mut(CachedConnect {
-            handle,
-            host: host_key,
-            port,
-        });
-        Ok(entry.handle.0.as_ptr())
+            .push_back(CachedConnect {
+                handle,
+                host: host_key,
+                port,
+            })
+            .ok_or_else(|| error(context, "WinHTTP connect cache 상태 오류"))?;
+        Ok(connect)
     }
     fn clear_session_cache(&mut self) {
         self.session_cache = None;
@@ -221,7 +265,7 @@ impl Client {
             target.port,
             context,
         )?;
-        let perform: Result<WinHttpHeadPerform> = (|| {
+        let perform_result = (|| -> Result<WinHttpHeadPerform> {
             let request = self.open_request(connect, &METHOD_HEAD_WIDE, &PATH_ROOT_WIDE, flags, context)?;
             self.set_request_options(&request, context)?;
             let request_start = Instant::now();
@@ -233,11 +277,8 @@ impl Client {
                 request_start,
                 response_received,
             })
-        })();
-        if perform.is_err() {
-            self.clear_session_cache();
-        }
-        let perform_result = perform?;
+        })()
+        .inspect_err(|_| self.clear_session_cache())?;
         let server_time = self.query_server_time(&perform_result.request, context, parse_http_date)?;
         let rtt = perform_result
             .response_received
@@ -345,7 +386,7 @@ impl Client {
         )?;
         Ok(session)
     }
-    fn query_raw_headers(&self, request: &Handle, context: &str) -> Result<Vec<u16>> {
+    fn query_raw_headers(&mut self, request: &Handle, context: &str) -> Result<()> {
         let mut bytes = 0_u32;
         let mut index = 0_u32;
         // SAFETY: request is valid; this first call probes the required buffer size.
@@ -366,7 +407,7 @@ impl Client {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
         let header_bytes = usize::try_from(bytes)
-            .map_err(|source| error(context, format!("응답 헤더 길이 변환 실패: {source}")))?;
+            .map_err(|source| error_with_source(context, "응답 헤더 길이 변환 실패", source))?;
         if header_bytes > HTTP_HEAD_MAX_HEADER_BYTES {
             return Err(error(context, format!("응답 헤더가 허용 한도({HTTP_HEAD_MAX_HEADER_BYTES} bytes)를 초과했습니다.")));
         }
@@ -379,13 +420,13 @@ impl Client {
         let units = header_bytes
             .checked_div(2)
             .ok_or_else(|| error(context, "응답 헤더 길이 계산 실패"))?;
-        let mut buffer = Vec::new();
-        buffer.try_reserve(units).map_err(|source| {
-            error(
-                context,
-                format!("응답 헤더 버퍼 메모리 확보 실패: {source}"),
-            )
-        })?;
+        let buffer = &mut self.header_buffer;
+        buffer.clear();
+        if buffer.capacity() < units {
+            buffer.try_reserve_exact(units).map_err(|source| {
+                error_with_source(context, "응답 헤더 버퍼 메모리 확보 실패", source)
+            })?;
+        }
         buffer.resize(units, 0_u16);
         index = 0;
         // SAFETY: buffer has the size requested by WinHTTP and request is valid.
@@ -403,77 +444,97 @@ impl Client {
             return Err(self.last_error("WinHttpQueryHeaders", context));
         }
         while buffer.pop_if(|value| *value == 0).is_some() {}
-        Ok(buffer)
+        Ok(())
     }
     fn query_server_time(
-        &self,
+        &mut self,
         request: &Handle,
         context: &str,
         parse_http_date: ParseHttpDate,
     ) -> Result<SystemTime> {
-        let buffer = self.query_raw_headers(request, context)?;
-        let mut age_seen = false;
-        let mut date_seen = false;
-        let mut parsed_date = None;
-        for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')) {
-            let line = raw_line
-                .strip_suffix(&[u16::from(b'\r')])
-                .map_or(raw_line, |stripped| stripped);
-            if line.is_empty() {
-                continue;
-            }
-            let is_age_header = Self::line_starts_with_ascii_ignore_case(line, b"age:");
-            let is_date_header = Self::line_starts_with_ascii_ignore_case(line, b"date:");
-            if !(is_age_header || is_date_header) {
-                continue;
-            }
-            let line_bytes = line
-                .iter()
-                .map(|&unit| {
-                    u8::try_from(unit).map_err(|source| {
-                        error(context, format!("응답 헤더 ASCII 변환 실패: {source}"))
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?;
-            if is_age_header {
-                match find_age_header_value(&line_bytes) {
-                    Ok(Some(age_header_raw)) => {
-                        if age_seen {
-                            return Err(error(context, "Age 헤더가 여러 개입니다."));
-                        }
-                        age_seen = true;
-                        validate_http_age_value(age_header_raw)
-                            .map_err(|message| error(context, message))?;
+        self.query_raw_headers(request, context)?;
+        let buffer = mem::take(&mut self.header_buffer);
+        let mut line_bytes = mem::take(&mut self.header_line_buffer);
+        let result = (|| {
+            let mut age_seen = false;
+            let mut date_seen = false;
+            let mut line_stack = [0_u8; HTTP_HEADER_LINE_STACK_BYTES];
+            let mut parsed_date = None;
+            for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')) {
+                let line = raw_line
+                    .strip_suffix(&[u16::from(b'\r')])
+                    .unwrap_or(raw_line);
+                if line.is_empty() {
+                    continue;
+                }
+                let is_age_header =
+                    Self::line_starts_with_ascii_ignore_case(line, AGE_HEADER_PREFIX);
+                let is_date_header =
+                    Self::line_starts_with_ascii_ignore_case(line, DATE_HEADER_PREFIX);
+                if !(is_age_header || is_date_header) {
+                    continue;
+                }
+                let line_ascii = if line.len() <= line_stack.len() {
+                    let stack_line = line_stack
+                        .get_mut(..line.len())
+                        .ok_or_else(|| error(context, "응답 헤더 stack buffer 범위 오류"))?;
+                    for (&unit, byte) in line.iter().zip(stack_line.iter_mut()) {
+                        *byte = u8::try_from(unit).map_err(|source| {
+                            error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
+                        })?;
                     }
-                    Ok(None) => {}
-                    Err(source) => {
-                        return Err(error(
-                            context,
-                            format!("Age 헤더 UTF-8 변환 실패: {source}"),
-                        ));
+                    stack_line
+                } else {
+                    line_bytes.clear();
+                    if line_bytes.capacity() < line.len() {
+                        line_bytes.try_reserve_exact(line.len()).map_err(|source| {
+                            error_with_source(
+                                context,
+                                "응답 헤더 ASCII buffer 메모리 확보 실패",
+                                source,
+                            )
+                        })?;
                     }
+                    for &unit in line {
+                        line_bytes.push(u8::try_from(unit).map_err(|source| {
+                            error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
+                        })?);
+                    }
+                    line_bytes.as_slice()
+                };
+                if is_age_header {
+                    let age_header_raw = Self::ascii_header_value(
+                        line_ascii,
+                        AGE_HEADER_PREFIX.len(),
+                        context,
+                        "Age",
+                    )?;
+                    if age_seen {
+                        return Err(error(context, "Age 헤더가 여러 개입니다."));
+                    }
+                    age_seen = true;
+                    validate_http_age_value(age_header_raw)
+                        .map_err(|message| error(context, message))?;
+                }
+                if is_date_header {
+                    let date_header_raw = Self::ascii_header_value(
+                        line_ascii,
+                        DATE_HEADER_PREFIX.len(),
+                        context,
+                        "Date",
+                    )?;
+                    if date_seen {
+                        return Err(error(context, "Date 헤더가 여러 개입니다."));
+                    }
+                    date_seen = true;
+                    parsed_date = Some(parse_http_date(date_header_raw)?);
                 }
             }
-            if is_date_header {
-                match find_date_header_value(&line_bytes) {
-                    Ok(Some(date_header_raw)) => {
-                        if date_seen {
-                            return Err(error(context, "Date 헤더가 여러 개입니다."));
-                        }
-                        date_seen = true;
-                        parsed_date = Some(parse_http_date(date_header_raw)?);
-                    }
-                    Ok(None) => {}
-                    Err(source) => {
-                        return Err(error(
-                            context,
-                            format!("Date 헤더 UTF-8 변환 실패: {source}"),
-                        ));
-                    }
-                }
-            }
-        }
-        parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
+            parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
+        })();
+        self.header_buffer = buffer;
+        self.header_line_buffer = line_bytes;
+        result
     }
     fn receive_response(&self, request: &Handle, context: &str) -> Result<()> {
         // SAFETY: request is a valid request handle and no reserved pointer is required.
@@ -512,9 +573,10 @@ impl Client {
             INTERNET_DEFAULT_HTTP_PORT
         };
         let parse_port = |port_text: &str| {
-            let port = port_text
-                .parse::<u16>()
-                .map_err(|source| error(context, format!("URL port 파싱 실패: {source}")))?;
+            let port_num = parse_u32_digits(port_text)
+                .ok_or_else(|| error(context, "URL port 형식이 올바르지 않습니다."))?;
+            let port = u16::try_from(port_num)
+                .map_err(|source| error_with_source(context, "URL port 파싱 실패", source))?;
             if port == 0 {
                 Err(error(context, "URL port는 1 이상이어야 합니다."))
             } else {
@@ -523,8 +585,8 @@ impl Client {
         };
         let copy_host = |host_text: &str| -> Result<String> {
             let mut host = String::new();
-            host.try_reserve(host_text.len())
-                .map_err(|source| error(context, format!("URL host 메모리 확보 실패: {source}")))?;
+            host.try_reserve_exact(host_text.len())
+                .map_err(|source| error_with_source(context, "URL host 메모리 확보 실패", source))?;
             host.push_str(host_text);
             Ok(host)
         };
@@ -589,7 +651,7 @@ impl Client {
     ) -> Result<()> {
         let mut raw_value = value;
         let buffer_length = u32::try_from(size_of::<u32>())
-            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+            .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
         let ok = unsafe {
             sys::WinHttpSetOption(
@@ -615,7 +677,7 @@ impl Client {
     ) -> Result<()> {
         let mut raw_value = value;
         let buffer_length = u32::try_from(size_of::<u32>())
-            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+            .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
         let ok = unsafe {
             sys::WinHttpSetOption(
@@ -652,7 +714,7 @@ impl Client {
             request,
             WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,
             u32::try_from(HTTP_HEAD_MAX_HEADER_BYTES)
-                .map_err(|source| error(context, format!("WinHTTP 헤더 한도 변환 실패: {source}")))?,
+                .map_err(|source| error_with_source(context, "WinHTTP 헤더 한도 변환 실패", source))?,
             "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE",
             context,
         )
@@ -660,7 +722,7 @@ impl Client {
     fn set_secure_protocols(&self, session: &Handle, context: &str) -> Result<()> {
         let mut raw_value = WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2;
         let buffer_length = u32::try_from(size_of::<u32>())
-            .map_err(|source| error(context, format!("옵션 길이 변환 실패: {source}")))?;
+            .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: session is a valid WinHTTP session handle and raw_value points to a DWORD.
         let ok = unsafe {
             sys::WinHttpSetOption(
@@ -692,6 +754,8 @@ impl Default for Client {
     fn default() -> Self {
         Self {
             error_code_label: "Windows error",
+            header_buffer: Vec::new(),
+            header_line_buffer: Vec::new(),
             http_scheme_prefix: HTTP_SCHEME_PREFIX,
             https_scheme_prefix: HTTPS_SCHEME_PREFIX,
             session_cache: None,
@@ -704,8 +768,8 @@ fn wide(value: &str, context: &str) -> Result<Vec<u16>> {
         .checked_add(1)
         .ok_or_else(|| error(context, "wide 문자열 용량 계산 실패"))?;
     let mut out = Vec::new();
-    out.try_reserve(capacity)
-        .map_err(|source| error(context, format!("wide 문자열 메모리 확보 실패: {source}")))?;
+    out.try_reserve_exact(capacity)
+        .map_err(|source| error_with_source(context, "wide 문자열 메모리 확보 실패", source))?;
     out.extend(<OsStr as WindowsOsStrExt>::encode_wide(OsStr::new(value)));
     out.push(0);
     Ok(out)

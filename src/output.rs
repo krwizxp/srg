@@ -6,7 +6,7 @@ use crate::{
     random_data::RandomDataSet,
     tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER},
 };
-use core::{array, fmt::Write as FmtWrite, range::Range};
+use core::{fmt::Write as FmtWrite, range::Range};
 use std::io::Result as IoResult;
 cfg_select! {
     target_arch = "x86_64" => {
@@ -347,7 +347,7 @@ fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) -> IoResult<()> {
     write_u8_dec_into_slice(head, n)?;
     Ok(())
 }
-fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<usize> {
+fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<()> {
     if n >= U8_THREE_DIGIT_THRESHOLD {
         let hundreds = usize::from(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
         let rem = usize::from(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
@@ -359,33 +359,32 @@ fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<usize> {
             return Err(write_zero_err());
         };
         copy_two_digits(remaining_digits, rem)?;
-        return Ok(3);
+        return Ok(());
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {
         let Some(digits) = target.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
         copy_two_digits(digits, usize::from(n))?;
-        return Ok(2);
+        return Ok(());
     }
     let Some(slot) = target.first_mut() else {
         return Err(write_zero_err());
     };
     *slot = digit_byte(usize::from(n))?;
-    Ok(1)
+    Ok(())
 }
 fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
     let separator_count = N.saturating_sub(1);
-    let widths: [usize; N] = array::from_fn(|index| nums.get(index).copied().map_or(0, u8_dec_len));
-    let total = widths.iter().try_fold(separator_count, |total, &width| {
-        checked_add_index(total, width)
+    let total = nums.iter().try_fold(separator_count, |total, &n| {
+        checked_add_index(total, u8_dec_len(n))
     })?;
     let head = cur.take(total)?;
     let mut pos = 0_usize;
-    for (index, (&n, &width)) in nums.iter().zip(widths.iter()).enumerate() {
+    for (index, &n) in nums.iter().enumerate() {
         if index != 0 {
             let Some(slot) = head.get_mut(pos) else {
                 return Err(write_zero_err());
@@ -393,6 +392,7 @@ fn buf_write_u8_array_spaced<const N: usize>(
             *slot = b' ';
             add_to_index(&mut pos, 1)?;
         }
+        let width = u8_dec_len(n);
         let slot = range_slice_mut(head, pos, width)?;
         write_u8_dec_into_slice(slot, n)?;
         add_to_index(&mut pos, width)?;

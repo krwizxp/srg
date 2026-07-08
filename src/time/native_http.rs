@@ -1,6 +1,8 @@
 use super::{
     Result, TimeError, TimeErrorKind, TimeSample, http_date::parse_http_date_to_systemtime,
 };
+#[cfg(target_os = "windows")]
+use core::error::Error;
 use core::{fmt::Display, time::Duration};
 use std::time::{Instant, SystemTime};
 cfg_select! {
@@ -55,4 +57,15 @@ impl Default for NativeHttp {
 }
 fn error(context: &str, detail: impl Display) -> TimeError {
     TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
+}
+#[cfg(target_os = "windows")]
+fn error_with_source<E>(context: &str, detail: impl Display, source: E) -> TimeError
+where
+    E: Error + Send + Sync + 'static,
+{
+    TimeError::new_with_source(
+        TimeErrorKind::NativeHttp,
+        format!("{context}: {detail}"),
+        source,
+    )
 }

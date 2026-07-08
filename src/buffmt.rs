@@ -1,5 +1,4 @@
-use alloc::fmt;
-use core::range::Range;
+use core::{fmt, range::Range};
 use std::io;
 const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
@@ -24,18 +23,12 @@ impl<'buffer> ByteCursor<'buffer> {
     pub const fn new(buf: &'buffer mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
-    pub const fn remaining(&self) -> usize {
-        match self.buf.len().checked_sub(self.pos) {
-            Some(remaining) => remaining,
-            None => 0,
-        }
-    }
     pub fn take(&mut self, len: usize) -> io::Result<&mut [u8]> {
-        if self.remaining() < len {
-            return Err(write_zero_err());
-        }
         let start = self.pos;
         let end = start.checked_add(len).ok_or_else(write_zero_err)?;
+        if end > self.buf.len() {
+            return Err(write_zero_err());
+        }
         self.pos = end;
         self.buf
             .get_mut(Range { start, end })

@@ -20,12 +20,11 @@ use crate::{
 cfg_select! {
     target_arch = "x86_64" => {
         use crate::diagnostic::AppError;
-        use super::hardware_rng::get_hardware_random;
+        use super::hardware_rng::HardwareRng;
     }
     _ => {}
 }
 use core::{char::from_u32, ops::Mul as NumericMul};
-use std::io::Error as IoError;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 #[derive(Default)]
 pub struct Coordinates {
@@ -289,10 +288,10 @@ where
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub fn generate_random_data() -> Result<RandomDataSet> {
-            let num = get_hardware_random()?;
+        pub fn generate_random_data_with_rng(rng: &mut HardwareRng) -> Result<RandomDataSet> {
+            let num = rng.next_u64()?;
             let mut next_supp = |reason: &'static str| -> Result<u64> {
-                get_hardware_random().map_err(|source| AppError::context(reason, source))
+                rng.next_u64().map_err(|source| AppError::context(reason, source))
             };
             RandomDataSet::build_from(num, &mut next_supp)
         }
@@ -430,19 +429,10 @@ fn extract_valid_bits_for_nms<const BITS: u8>(
     supplemental: &mut Option<RandomBitBuffer>,
     next_supp: &mut impl FnMut(&'static str) -> Result<u64>,
 ) -> Result<u64> {
-    let bit_count = BITS.min(64);
-    let mask = match bit_count {
-        0 => 0,
-        64 => u64::MAX,
-        _ => {
-            let shifted = 1_u64
-                .checked_shl(u32::from(bit_count))
-                .ok_or_else(|| IoError::other("NMS bit mask shift 계산 실패"))?;
-            shifted
-                .checked_sub(1)
-                .ok_or_else(|| IoError::other("NMS bit mask 계산 실패"))?
-        }
-    };
+    let mask = 1_u64
+        .checked_shl(u32::from(BITS))
+        .and_then(|shifted| shifted.checked_sub(1))
+        .ok_or("NMS bit mask 계산 실패")?;
     if let Some(extracted_value) = shifts.iter().find_map(|&shift| {
         let value = (num >> shift) & mask;
         (value <= max_value).then_some(value)

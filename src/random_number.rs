@@ -1,5 +1,5 @@
 use super::{
-    hardware_rng::get_hardware_random,
+    hardware_rng::HardwareRng,
     input::parse_regular_f64, input::read_parsed_value,
 };
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     diagnostic::{AppError, Result},
 };
 use core::{
-    num::{NonZeroU64, NonZeroU128},
+    num::{NonZeroU128, NonZeroU64},
     ops::{Mul as NumericMul, Sub as NumericSub},
 };
 use std::io::Write;
@@ -29,6 +29,7 @@ pub fn generate_random_number(
     input_buffer: &mut String,
     out: &mut dyn Write,
     err: &mut dyn Write,
+    rng: &mut HardwareRng,
 ) -> Result<()> {
     match mode {
         RandomNumberMode::Integer => {
@@ -69,7 +70,7 @@ pub fn generate_random_number(
                 .map_err(|source| AppError::context("난수 범위 변환 실패", source))?;
             let range_size =
                 NonZeroU64::new(range_size_raw).ok_or("난수 범위가 비어 있습니다.")?;
-            let rand_offset = random_bounded(range_size, seed_modifier)?;
+            let rand_offset = random_bounded(range_size, seed_modifier, rng)?;
             let result_i128 = i128::from(min_value)
                 .checked_add(i128::from(rand_offset))
                 .ok_or("난수 결과 계산 실패")?;
@@ -104,7 +105,7 @@ pub fn generate_random_number(
                 }
                 writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
             };
-            let random_u64 = get_hardware_random()? ^ seed_modifier;
+            let random_u64 = rng.next_u64()? ^ seed_modifier;
             let [b0, b1, b2, b3, b4, b5, b6, b7] = random_u64.to_be_bytes();
             let upper_32 = u32::from_be_bytes([b0, b1, b2, b3]);
             let lower_32 = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -130,8 +131,12 @@ pub fn generate_random_number(
     }
     Ok(())
 }
-pub fn random_bounded(range_size: NonZeroU64, seed_mod: u64) -> Result<u64> {
-    let range_size128 = u128::from(NonZeroU128::from(range_size));
+pub fn random_bounded(
+    range_size: NonZeroU64,
+    seed_mod: u64,
+    rng: &mut HardwareRng,
+) -> Result<u64> {
+    let range_size128 = NonZeroU128::from(range_size).get();
     let threshold128 = U64_MODULUS
         .checked_sub(range_size128)
         .and_then(|value| value.checked_rem(range_size128))
@@ -139,7 +144,7 @@ pub fn random_bounded(range_size: NonZeroU64, seed_mod: u64) -> Result<u64> {
     let threshold = u64::try_from(threshold128)
         .map_err(|source| AppError::context("난수 범위 변환 실패", source))?;
     for _ in 0..RANDOM_BOUNDED_RETRY_LIMIT {
-        let product = u128::from(get_hardware_random()? ^ seed_mod)
+        let product = u128::from(rng.next_u64()? ^ seed_mod)
             .checked_mul(range_size128)
             .ok_or("난수 곱셈 계산 실패")?;
         let low_bits = u64::try_from(product & u128::from(u64::MAX))

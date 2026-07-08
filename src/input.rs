@@ -1,5 +1,5 @@
 use crate::diagnostic::Result;
-use core::{fmt::Arguments, result::Result as CoreResult};
+use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{BufRead as _, Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
@@ -35,9 +35,10 @@ pub fn read_line_reuse_limited<'buffer>(
     Ok(buffer.trim())
 }
 fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
-    let bytes = {
+    let mut bytes = mem::take(buffer).into_bytes();
+    bytes.clear();
+    {
         let mut stdin_lock = stdin().lock();
-        let mut bytes = Vec::new();
         loop {
             let available = stdin_lock.fill_buf()?;
             if available.is_empty() {
@@ -50,47 +51,37 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
                 break;
             }
             let line_end = available.iter().position(|&byte| byte == b'\n');
+            let reached_line_end = line_end.is_some();
             let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
             let segment = available
                 .get(..take_len)
                 .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
-            if bytes
-                .len()
-                .checked_add(segment.len())
-                .is_none_or(|next_len| next_len > max_bytes)
-            {
-                stdin_lock.consume(take_len);
-                if line_end.is_none() {
-                    loop {
-                        let discard_available = stdin_lock.fill_buf()?;
-                        if discard_available.is_empty() {
-                            break;
-                        }
-                        let extra_line_end =
-                            discard_available.iter().position(|&byte| byte == b'\n');
-                        let extra_take_len = extra_line_end
-                            .map_or(discard_available.len(), |index| index.saturating_add(1));
-                        stdin_lock.consume(extra_take_len);
-                        if extra_line_end.is_some() {
-                            break;
-                        }
+            let next_len = match bytes.len().checked_add(segment.len()) {
+                Some(next_len) if next_len <= max_bytes => next_len,
+                _ => {
+                    stdin_lock.consume(take_len);
+                    if !reached_line_end {
+                        stdin_lock.skip_until(b'\n')?;
                     }
+                    return Err(IoError::new(
+                        ErrorKind::InvalidInput,
+                        format!(
+                            "입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."
+                        ),
+                    ));
                 }
-                return Err(IoError::new(
-                    ErrorKind::InvalidInput,
-                    format!("입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."),
-                ));
+            };
+            if bytes.capacity() < next_len {
+                bytes.try_reserve(segment.len()).map_err(IoError::other)?;
             }
-            bytes.try_reserve(segment.len()).map_err(IoError::other)?;
             bytes.extend_from_slice(segment);
             stdin_lock.consume(take_len);
-            if line_end.is_some() {
+            if reached_line_end {
                 drop(stdin_lock);
                 break;
             }
         }
-        bytes
-    };
+    }
     *buffer =
         String::from_utf8(bytes).map_err(|source| IoError::new(ErrorKind::InvalidData, source))?;
     Ok(())
@@ -103,21 +94,45 @@ pub fn read_u64_hex_input(
 ) -> Result<u64> {
     loop {
         let raw = read_line_reuse_limited(prompt, input_buffer, out, HEX_INPUT_LINE_MAX_BYTES)?;
-        match raw
+        let parsed_value = raw
             .strip_prefix('0')
             .and_then(|body| body.strip_prefix(['x', 'X']))
-            .map_or_else(|| raw.parse::<u64>(), |hex| u64::from_str_radix(hex, 16))
-        {
-            Ok(value) => return Ok(value),
-            Err(_) => {
-                writeln!(
-                    err,
-                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
-                    max_u64 = u64::MAX
-                )?;
-            }
+            .map_or_else(
+                || parse_u64_digits(raw, 10),
+                |hex| parse_u64_digits(hex, 16),
+            );
+        if let Some(value) = parsed_value {
+            return Ok(value);
         }
+        writeln!(
+            err,
+            "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
+            max_u64 = u64::MAX
+        )?;
     }
+}
+pub fn parse_u64_digits(raw: &str, radix: u32) -> Option<u64> {
+    if raw.is_empty() || !matches!(radix, 10 | 16) {
+        return None;
+    }
+    let digits = if radix == 10 {
+        raw.strip_prefix('+').unwrap_or(raw)
+    } else {
+        raw
+    };
+    if digits.is_empty() {
+        return None;
+    }
+    let radix_value = u64::from(radix);
+    digits.bytes().try_fold(0_u64, |value, byte| {
+        let digit = match byte {
+            b'0'..=b'9' => u64::from(byte.wrapping_sub(b'0')),
+            b'a'..=b'f' if radix_value == 16 => u64::from(byte.wrapping_sub(b'a').wrapping_add(10)),
+            b'A'..=b'F' if radix_value == 16 => u64::from(byte.wrapping_sub(b'A').wrapping_add(10)),
+            _ => return None,
+        };
+        value.checked_mul(radix_value)?.checked_add(digit)
+    })
 }
 pub fn get_validated_input<T, E, F>(
     prompt: &str,

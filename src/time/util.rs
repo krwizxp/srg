@@ -1,6 +1,5 @@
 use super::{Result, TimeError};
-use alloc::fmt;
-use core::result::Result as CoreResult;
+use core::{error::Error, result::Result as CoreResult};
 pub(super) fn blend_weighted_nanos(
     old_value: u128,
     new_value: u128,
@@ -24,11 +23,14 @@ pub(super) fn blend_weighted_nanos(
     };
     weighted_average
 }
-pub(super) fn parse_result_with_context<T, E>(result: CoreResult<T, E>, context: &str) -> Result<T>
+pub(super) fn parse_result_with_context<T, E>(
+    result: CoreResult<T, E>,
+    context: &'static str,
+) -> Result<T>
 where
-    E: fmt::Display,
+    E: Error + Send + Sync + 'static,
 {
-    result.map_err(|err| TimeError::parse(format!("{context}: {err}")))
+    result.map_err(|err| TimeError::parse_with_source(context, err))
 }
 pub(super) fn parse_u32_digits(raw: &str) -> Option<u32> {
     if raw.is_empty() {
@@ -38,7 +40,7 @@ pub(super) fn parse_u32_digits(raw: &str) -> Option<u32> {
         if !byte.is_ascii_digit() {
             return None;
         }
-        let digit = byte.checked_sub(b'0')?;
+        let digit = byte.wrapping_sub(b'0');
         value.checked_mul(10)?.checked_add(u32::from(digit))
     })
 }

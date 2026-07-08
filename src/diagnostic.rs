@@ -64,18 +64,18 @@ impl fmt::Debug for AppError {
 }
 impl Error for AppError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_deref().map_or_else(
-            || {
+        self.source
+            .as_deref()
+            .map(|source| {
+                let source_ref: &(dyn Error + 'static) = source;
+                source_ref
+            })
+            .or_else(|| {
                 self.time_source.as_ref().map(|source| {
                     let source_ref: &(dyn Error + 'static) = source;
                     source_ref
                 })
-            },
-            |source| {
-                let source_ref: &(dyn Error + 'static) = source;
-                Some(source_ref)
-            },
-        )
+            })
     }
 }
 impl From<Cow<'static, str>> for AppError {
