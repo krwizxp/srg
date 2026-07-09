@@ -18,7 +18,7 @@ mod sys {
         pub(super) fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     }
 }
-const BUTTON_LEFT: c_uint = 1;
+const BUTTON_LEFT: c_uchar = 1;
 const DL_NOW: c_int = 2;
 const KEY_PRESS: c_int = 1;
 const KEY_RELEASE: c_int = 0;
@@ -90,7 +90,7 @@ struct PreparedX11Input {
 }
 #[derive(Clone, Copy)]
 enum XTestInput {
-    Button(c_uint),
+    Button(c_uchar),
     Key(XKeycode),
 }
 impl Drop for Library {
@@ -194,7 +194,7 @@ impl XTestInput {
     }
     fn send(self, api: &X11Api, display: NonNull<Display>, state: c_int) -> InputResult<()> {
         match self {
-            Self::Button(button) => api.fake_button(display, button, state),
+            Self::Button(button) => api.fake_button(display, c_uint::from(button), state),
             Self::Key(keycode) => {
                 let expanded_keycode = NonZero::<c_uint>::from(keycode).get();
                 api.fake_key(display, expanded_keycode, state)

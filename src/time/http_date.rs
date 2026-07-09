@@ -2,7 +2,7 @@ use super::{
     CivilDate, Result, TimeError,
     util::{parse_result_with_context, parse_u32_digits},
 };
-use core::time::Duration;
+use core::{str::SplitAsciiWhitespace, time::Duration};
 use std::time::{SystemTime, UNIX_EPOCH};
 const SECS_PER_DAY_I64: i64 = 86_400;
 const SECS_PER_DAY_U64: u64 = 86_400;
@@ -235,10 +235,7 @@ fn strip_date_suffix<'date>(
     raw.strip_suffix(suffix)
         .ok_or_else(|| TimeError::parse(err))
 }
-fn ensure_parts_exhausted<'part>(
-    parts: &mut impl Iterator<Item = &'part str>,
-    err: &'static str,
-) -> Result<()> {
+fn ensure_parts_exhausted(parts: &mut SplitAsciiWhitespace<'_>, err: &'static str) -> Result<()> {
     if parts.next().is_none() {
         Ok(())
     } else {

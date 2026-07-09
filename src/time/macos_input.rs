@@ -64,19 +64,6 @@ struct Event {
     raw: NonNull<c_void>,
 }
 #[derive(Clone, Copy)]
-enum EventRequest {
-    Current,
-    Keyboard {
-        direction: KeyDirection,
-        virtual_key: CGKeyCode,
-    },
-    Mouse {
-        mouse_button: CGMouseButton,
-        mouse_cursor_position: CGPoint,
-        mouse_type: CGEventType,
-    },
-}
-#[derive(Clone, Copy)]
 enum KeyDirection {
     Down,
     Up,
@@ -95,33 +82,7 @@ impl Drop for Event {
     }
 }
 impl Event {
-    fn create(request: EventRequest, context: &str) -> InputResult<Self> {
-        let raw_ptr = match request {
-            // SAFETY: null asks CoreGraphics to use the default source.
-            EventRequest::Current => unsafe { sys::CGEventCreate(null_mut()) },
-            EventRequest::Keyboard {
-                direction,
-                virtual_key,
-            } => {
-                // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
-                unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, direction.is_down()) }
-            }
-            EventRequest::Mouse {
-                mouse_button,
-                mouse_cursor_position,
-                mouse_type,
-            } => {
-                // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
-                unsafe {
-                    sys::CGEventCreateMouseEvent(
-                        null_mut(),
-                        mouse_type,
-                        mouse_cursor_position,
-                        mouse_button,
-                    )
-                }
-            }
-        };
+    fn from_raw(raw_ptr: CGEventRef, context: &str) -> InputResult<Self> {
         let Some(raw) = NonNull::new(raw_ptr) else {
             return Err(Cow::Owned(format!("{context}: CGEvent 생성 실패")));
         };
@@ -132,13 +93,10 @@ impl Event {
         direction: KeyDirection,
         context: &str,
     ) -> InputResult<Self> {
-        Self::create(
-            EventRequest::Keyboard {
-                direction,
-                virtual_key,
-            },
-            context,
-        )
+        // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
+        let raw_ptr =
+            unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, direction.is_down()) };
+        Self::from_raw(raw_ptr, context)
     }
     fn location(&self) -> CGPoint {
         // SAFETY: raw is a live CGEventRef retained by self.
@@ -150,14 +108,16 @@ impl Event {
         mouse_button: CGMouseButton,
         context: &str,
     ) -> InputResult<Self> {
-        Self::create(
-            EventRequest::Mouse {
-                mouse_button,
-                mouse_cursor_position,
+        // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
+        let raw_ptr = unsafe {
+            sys::CGEventCreateMouseEvent(
+                null_mut(),
                 mouse_type,
-            },
-            context,
-        )
+                mouse_cursor_position,
+                mouse_button,
+            )
+        };
+        Self::from_raw(raw_ptr, context)
     }
     fn post(&self) {
         // SAFETY: raw is a live CGEventRef retained by self.
@@ -183,7 +143,9 @@ impl PreparedInput {
         let result: InputResult<()> = (|| {
             match action {
                 InputAction::MouseClick => {
-                    let current = Event::create(EventRequest::Current, "현재 마우스 위치 조회")?;
+                    // SAFETY: null asks CoreGraphics to use the default source.
+                    let current =
+                        Event::from_raw(unsafe { sys::CGEventCreate(null_mut()) }, "현재 마우스 위치 조회")?;
                     let point = current.location();
                     let mouse_down = Event::mouse(
                         EVENT_LEFT_MOUSE_DOWN,

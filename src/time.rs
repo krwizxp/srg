@@ -175,7 +175,7 @@ enum CountdownTriggerSource {
 #[derive(Debug)]
 pub(super) struct TimeError {
     detail: Cow<'static, str>,
-    io_kind: Option<io::ErrorKind>,
+    io_kind: Option<ErrorKind>,
     kind: TimeErrorKind,
     source: Option<BoxError>,
 }
@@ -304,7 +304,7 @@ impl TimeError {
         Self::new(TimeErrorKind::HeaderNotFound, detail)
     }
     pub(super) const fn is_unexpected_eof(&self) -> bool {
-        matches!(self.io_kind, Some(io::ErrorKind::UnexpectedEof))
+        matches!(self.io_kind, Some(ErrorKind::UnexpectedEof))
     }
     fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
         Self {

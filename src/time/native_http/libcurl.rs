@@ -439,7 +439,7 @@ impl Client {
             return Err(error(context, header_error));
         }
         let Some(date_header_raw) = header_capture.date_header.as_deref() else {
-            return Err(super::TimeError::header_not_found(format!("{context} 응답에서 Date")));
+            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
         };
         let response_received_inst = header_capture.date_received_inst.unwrap_or(perform_result.response_received);
         let http_elapsed = response_received_inst

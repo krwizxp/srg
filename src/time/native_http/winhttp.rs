@@ -290,7 +290,7 @@ impl Client {
             server_time,
         })
     }
-    fn last_error(&self, operation: &str, context: &str) -> super::TimeError {
+    fn last_error(&self, operation: &str, context: &str) -> TimeError {
         Self::last_error_for(self.error_code_label, operation, context)
     }
     fn last_error_code() -> u32 {
@@ -301,7 +301,7 @@ impl Client {
         error_code_label: &'static str,
         operation: &str,
         context: &str,
-    ) -> super::TimeError {
+    ) -> TimeError {
         let code = Self::last_error_code();
         error(context, format!("{operation} 실패: {error_code_label} {code}"))
     }

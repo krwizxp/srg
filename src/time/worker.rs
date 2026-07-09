@@ -4,7 +4,7 @@ use super::{
     Result, SampleWorker, SampleWorkerCommand, SampleWorkerResponse, TimeError,
     sample::fetch_server_time_sample,
 };
-use alloc::{string::String, sync::Arc};
+use alloc::sync::Arc;
 use std::{
     sync::{Mutex, mpsc},
     thread,
