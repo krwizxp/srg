@@ -50,24 +50,24 @@ cfg_select! {
             use super::NativeInputSendStatus;
             use std::io;
             #[derive(Clone, Copy)]
-            pub enum InputAction {
+            enum InputAction {
                 F5Press,
                 MouseClick,
             }
-            pub struct PreparedInput;
+            struct PreparedInput;
             impl PreparedInput {
-                pub const EMPTY: Self = Self;
-                pub fn prepare(
+                const EMPTY: Self = Self;
+                fn prepare(
                     &mut self,
                     _action: Option<InputAction>,
                     _err: &mut dyn io::Write,
                 ) {
                     *self = Self;
                 }
-                pub const fn reset(&mut self) {
+                const fn reset(&mut self) {
                     *self = Self;
                 }
-                pub fn send(
+                fn send(
                     &mut self,
                     _action: InputAction,
                     _err: &mut dyn io::Write,
@@ -122,7 +122,7 @@ const HTTP_SCHEME_PREFIX_LEN: usize = HTTP_SCHEME_PREFIX.len();
 const HTTPS_SCHEME_PREFIX: &str = "https://";
 const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
 const KST_OFFSET: Duration = Duration::from_hours(9);
-pub const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
+const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
 const KST_SECONDS_PER_MINUTE_U32: u32 = 60;
 const KST_SECONDS_PER_HOUR_U32: u32 = 60 * KST_SECONDS_PER_MINUTE_U32;
@@ -150,7 +150,7 @@ const RTT_TRIM_DIVISOR: usize = 5;
 type BoxError = Box<dyn Error + Send + Sync>;
 type Result<T> = CoreResult<T, TimeError>;
 #[derive(Clone, Copy, Debug)]
-pub enum TriggerAction {
+pub(super) enum TriggerAction {
     F5Press,
     LeftClick,
 }
@@ -173,7 +173,7 @@ enum CountdownTriggerSource {
     Sampled { rtt: Duration },
 }
 #[derive(Debug)]
-pub struct TimeError {
+pub(super) struct TimeError {
     detail: Cow<'static, str>,
     io_kind: Option<io::ErrorKind>,
     kind: TimeErrorKind,
@@ -185,7 +185,7 @@ enum UrlScheme {
     Https,
 }
 #[derive(Debug)]
-pub struct ParsedServer {
+pub(super) struct ParsedServer {
     host: String,
     literal_tcp_socket_addr: Option<net::SocketAddr>,
     port: u16,
@@ -193,14 +193,30 @@ pub struct ParsedServer {
     secure_url: String,
     tcp_host_header: String,
 }
-pub struct TargetTimeOfDay {
+pub(super) struct TargetTimeOfDay {
     seconds_after_midnight: u32,
 }
-pub struct ServerTimeSession {
+pub(super) struct ServerTimeSession {
+    host: ParsedServer,
+    now: Instant,
+    target_time: Option<TargetTimeOfDay>,
+    trigger_action: Option<TriggerAction>,
+}
+pub(super) struct ServerTimeSessionParts {
     pub host: ParsedServer,
     pub now: Instant,
     pub target_time: Option<TargetTimeOfDay>,
     pub trigger_action: Option<TriggerAction>,
+}
+impl From<ServerTimeSessionParts> for ServerTimeSession {
+    fn from(parts: ServerTimeSessionParts) -> Self {
+        Self {
+            host: parts.host,
+            now: parts.now,
+            target_time: parts.target_time,
+            trigger_action: parts.trigger_action,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug)]
 struct CivilDate {
@@ -287,7 +303,7 @@ impl TimeError {
     fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::HeaderNotFound, detail)
     }
-    pub const fn is_unexpected_eof(&self) -> bool {
+    pub(super) const fn is_unexpected_eof(&self) -> bool {
         matches!(self.io_kind, Some(io::ErrorKind::UnexpectedEof))
     }
     fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
@@ -697,7 +713,7 @@ impl NetworkContext {
     }
 }
 impl ServerTimeSession {
-    pub fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
+    pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         let host = Arc::new(self.host);
         let sample_worker = spawn_sample_worker(Arc::clone(&host))?;
         let final_countdown_sampler = spawn_final_countdown_sampler(Arc::clone(&host));

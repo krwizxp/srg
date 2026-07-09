@@ -317,7 +317,7 @@ fn http_date_components_to_systemtime(components: HttpDateComponents) -> Result<
         .checked_sub(Duration::from_secs(abs_secs))
         .ok_or_else(|| TimeError::parse(ERR_UNIX_TIMESTAMP))
 }
-pub(super) fn parse_http_date_to_systemtime_with_current_year(
+fn parse_http_date_to_systemtime_with_current_year(
     raw_date: &str,
     current_year: i32,
     rfc850_candidate: bool,

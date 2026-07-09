@@ -19,15 +19,15 @@ mod sys {
     };
     #[link(name = "curl")]
     unsafe extern "C" {
-        pub fn curl_easy_cleanup(curl: *mut Curl);
-        pub fn curl_easy_getinfo(curl: *mut Curl, info: CurlInfo, ...) -> CurlCode;
-        pub fn curl_easy_init() -> *mut Curl;
-        pub fn curl_easy_perform(curl: *mut Curl) -> CurlCode;
-        pub fn curl_easy_reset(curl: *mut Curl);
-        pub fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
-        pub fn curl_easy_strerror(code: CurlCode) -> *const c_char;
-        pub fn curl_global_init(flags: c_long) -> CurlCode;
-        pub fn curl_version_info(age: CurlVersion) -> *const CurlVersionInfoData;
+        pub(super) fn curl_easy_cleanup(curl: *mut Curl);
+        pub(super) fn curl_easy_getinfo(curl: *mut Curl, info: CurlInfo, ...) -> CurlCode;
+        pub(super) fn curl_easy_init() -> *mut Curl;
+        pub(super) fn curl_easy_perform(curl: *mut Curl) -> CurlCode;
+        pub(super) fn curl_easy_reset(curl: *mut Curl);
+        pub(super) fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
+        pub(super) fn curl_easy_strerror(code: CurlCode) -> *const c_char;
+        pub(super) fn curl_global_init(flags: c_long) -> CurlCode;
+        pub(super) fn curl_version_info(age: CurlVersion) -> *const CurlVersionInfoData;
     }
 }
 const CURLE_OK: CurlCode = 0;

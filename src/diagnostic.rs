@@ -3,15 +3,15 @@ use alloc::borrow::Cow;
 use core::{error::Error, fmt, fmt::Display, result::Result as CoreResult};
 use std::io::{Error as IoError, ErrorKind};
 type BoxError = Box<dyn Error + Send + Sync>;
-pub type Result<T> = CoreResult<T, AppError>;
-pub struct AppError {
+pub(super) type Result<T> = CoreResult<T, AppError>;
+pub(super) struct AppError {
     io_kind: Option<ErrorKind>,
     message: Cow<'static, str>,
     source: Option<BoxError>,
     time_source: Option<TimeError>,
 }
 impl AppError {
-    pub fn context<M, E>(context: M, source: E) -> Self
+    pub(super) fn context<M, E>(context: M, source: E) -> Self
     where
         M: Into<Cow<'static, str>>,
         E: Error + Send + Sync + 'static,
@@ -31,10 +31,10 @@ impl AppError {
             time_source: None,
         }
     }
-    pub const fn is_unexpected_eof(&self) -> bool {
+    pub(super) const fn is_unexpected_eof(&self) -> bool {
         matches!(self.io_kind, Some(ErrorKind::UnexpectedEof))
     }
-    pub fn message<M>(message: M) -> Self
+    pub(super) fn message<M>(message: M) -> Self
     where
         M: Into<Cow<'static, str>>,
     {

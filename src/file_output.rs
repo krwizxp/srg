@@ -20,14 +20,14 @@ cfg_select! {
             use super::{ByHandleFileInformation, c_void};
             unsafe extern "system" {
                 #[link_name = "GetFileInformationByHandleEx"]
-                pub fn get_file_information_by_handle_ex(
+                pub(super) fn get_file_information_by_handle_ex(
                     h_file: *mut c_void,
                     file_information_class: i32,
                     file_information: *mut c_void,
                     buffer_size: u32,
                 ) -> i32;
                 #[link_name = "GetFileInformationByHandle"]
-                pub fn get_file_information_by_handle(
+                pub(super) fn get_file_information_by_handle(
                     h_file: *mut c_void,
                     file_information: *mut ByHandleFileInformation,
                 ) -> i32;
@@ -92,7 +92,7 @@ cfg_select! {
     }
     _ => {}
 }
-pub struct OutputFile(File);
+pub(super) struct OutputFile(File);
 impl TryFrom<&Path> for OutputFile {
     type Error = AppError;
     fn try_from(path: &Path) -> Result<Self> {
@@ -212,7 +212,7 @@ fn validate_output_file_metadata(metadata: &fs::Metadata) -> Result<()> {
     }
     Ok(())
 }
-pub fn lock_mutex<'guard, T>(
+pub(super) fn lock_mutex<'guard, T>(
     mutex: &'guard Mutex<T>,
     context_msg: &'static str,
 ) -> Result<MutexGuard<'guard, T>> {

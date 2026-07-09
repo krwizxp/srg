@@ -1,5 +1,5 @@
-pub const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
-pub const BIN8_TABLE: [[u8; 8]; 256] = [
+pub(super) const HEX_UPPER: [u8; 16] = *b"0123456789ABCDEF";
+pub(super) const BIN8_TABLE: [[u8; 8]; 256] = [
     bin8(0x00),
     bin8(0x01),
     bin8(0x02),
@@ -257,7 +257,7 @@ pub const BIN8_TABLE: [[u8; 8]; 256] = [
     bin8(0xFE),
     bin8(0xFF),
 ];
-pub const HEX_BYTE_TABLE: [[u8; 2]; 256] = [
+pub(super) const HEX_BYTE_TABLE: [[u8; 2]; 256] = [
     hex_byte(0x00),
     hex_byte(0x01),
     hex_byte(0x02),

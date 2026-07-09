@@ -25,7 +25,7 @@ use std::{
     thread::{available_parallelism, scope, sleep},
     time::Instant,
 };
-pub const MAX_BATCH_GENERATE_COUNT: u64 = 10_000_000;
+pub(super) const MAX_BATCH_GENERATE_COUNT: u64 = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 const PROGRESS_TIME_BUF_LEN: usize = 7;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
@@ -540,7 +540,7 @@ fn panic_join_error(context: &str, panic_payload: &(dyn Any + Send)) -> AppError
     );
     AppError::message(format!("{context}: {panic_detail}"))
 }
-pub fn regenerate_with_count(
+pub(super) fn regenerate_with_count(
     file_mutex: &Mutex<BufWriter<File>>,
     rng: &mut HardwareRng,
     requested_count: u64,

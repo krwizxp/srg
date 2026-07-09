@@ -15,14 +15,14 @@ const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
         #[derive(Clone, Copy)]
-        pub enum LadderEntryMode {
+        pub(super) enum LadderEntryMode {
             Players,
             Results { expected_count: usize },
         }
     }
     _ => {}
 }
-pub fn read_line_reuse_limited<'buffer>(
+pub(super) fn read_line_reuse_limited<'buffer>(
     prompt: Arguments<'_>,
     buffer: &'buffer mut String,
     out: &mut dyn Write,
@@ -86,7 +86,7 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
         String::from_utf8(bytes).map_err(|source| IoError::new(ErrorKind::InvalidData, source))?;
     Ok(())
 }
-pub fn read_u64_hex_input(
+pub(super) fn read_u64_hex_input(
     prompt: Arguments<'_>,
     input_buffer: &mut String,
     out: &mut dyn Write,
@@ -111,7 +111,7 @@ pub fn read_u64_hex_input(
         )?;
     }
 }
-pub fn parse_u64_digits(raw: &str, radix: u32) -> Option<u64> {
+pub(super) fn parse_u64_digits(raw: &str, radix: u32) -> Option<u64> {
     if raw.is_empty() || !matches!(radix, 10 | 16) {
         return None;
     }
@@ -134,7 +134,7 @@ pub fn parse_u64_digits(raw: &str, radix: u32) -> Option<u64> {
         value.checked_mul(radix_value)?.checked_add(digit)
     })
 }
-pub fn get_validated_input<T, E, F>(
+pub(super) fn get_validated_input<T, E, F>(
     prompt: &str,
     input_buf: &mut String,
     out: &mut dyn Write,
@@ -163,12 +163,12 @@ where
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub fn parse_regular_f64(raw: &str) -> Option<f64> {
+        pub(super) fn parse_regular_f64(raw: &str) -> Option<f64> {
             raw.parse::<f64>()
                 .ok()
                 .filter(|value| value.is_finite() && !value.is_subnormal())
         }
-        pub fn read_ladder_entries<'storage, const N: usize>(
+        pub(super) fn read_ladder_entries<'storage, const N: usize>(
             prompt: Arguments<'_>,
             input_buffer: &mut String,
             io: (&mut dyn Write, &mut dyn Write),
@@ -273,7 +273,7 @@ cfg_select! {
             };
             Ok(count)
         }
-        pub fn read_parsed_value<T, F>(
+        pub(super) fn read_parsed_value<T, F>(
             prompt: Arguments<'_>,
             buffer: &mut String,
             out: &mut dyn Write,

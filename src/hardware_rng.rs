@@ -41,7 +41,7 @@ struct HardwareRandomState {
     fallback_notice_pending: AtomicBool,
     source: AtomicU8,
 }
-pub struct HardwareRng {
+pub(super) struct HardwareRng {
     source: HardwareRandomSource,
     state: Arc<HardwareRandomState>,
 }
@@ -69,7 +69,7 @@ impl HardwareRandomState {
     }
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub enum HardwareRandomSource {
+pub(super) enum HardwareRandomSource {
     None,
     RdRand,
     RdSeed,
@@ -84,14 +84,14 @@ impl HardwareRandomSource {
     }
 }
 impl HardwareRng {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         let source = RNG_SUPPORT.initial_source;
         Self::with_state(Arc::new(HardwareRandomState {
             fallback_notice_pending: AtomicBool::new(false),
             source: AtomicU8::new(source.code()),
         }), source)
     }
-    pub fn next_u64(&mut self) -> Result<u64> {
+    pub(super) fn next_u64(&mut self) -> Result<u64> {
         match self.source {
             HardwareRandomSource::RdSeed => self.rdseed_random(),
             HardwareRandomSource::RdRand => Self::rdrand_random(),
@@ -154,17 +154,17 @@ impl HardwareRng {
         self.state.store_source(HardwareRandomSource::None);
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
     }
-    pub fn shared_source_rng(&self) -> Self {
+    pub(super) fn shared_source_rng(&self) -> Self {
         Self::with_state(Arc::clone(&self.state), self.state.source())
     }
-    pub fn source(&mut self) -> HardwareRandomSource {
+    pub(super) fn source(&mut self) -> HardwareRandomSource {
         self.sync_source_from_shared();
         self.source
     }
-    pub(crate) fn sync_source_from_shared(&mut self) {
+    pub(super) fn sync_source_from_shared(&mut self) {
         self.source = self.state.source();
     }
-    pub fn take_rdseed_fallback_notice(&mut self) -> bool {
+    pub(super) fn take_rdseed_fallback_notice(&mut self) -> bool {
         self.sync_source_from_shared();
         self.state.take_rdseed_fallback_notice()
     }

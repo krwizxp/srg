@@ -19,11 +19,11 @@ const MIN_ALLOWED_INTEGER_VALUE: i64 = i64::MIN + 1;
 const RANDOM_BOUNDED_RETRY_LIMIT: usize = 1024;
 const U64_MODULUS: u128 = 1_u128 << 64;
 #[derive(Clone, Copy)]
-pub enum RandomNumberMode {
+pub(super) enum RandomNumberMode {
     Float,
     Integer,
 }
-pub fn generate_random_number(
+pub(super) fn generate_random_number(
     mode: RandomNumberMode,
     seed_modifier: u64,
     input_buffer: &mut String,
@@ -131,7 +131,7 @@ pub fn generate_random_number(
     }
     Ok(())
 }
-pub fn random_bounded(
+pub(super) fn random_bounded(
     range_size: NonZeroU64,
     seed_mod: u64,
     rng: &mut HardwareRng,

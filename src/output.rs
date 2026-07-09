@@ -12,8 +12,8 @@ cfg_select! {
     target_arch = "x86_64" => {
         use std::io::{Write as IoWrite, stdout};
         use std::{fs::File, io::BufWriter, sync::MutexGuard};
-        pub mod progress;
-        pub const PROGRESS_LINE_BUF_LEN: usize = 128;
+        pub(super) mod progress;
+        pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
     }
     _ => {}
 }
@@ -36,7 +36,7 @@ const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
 #[derive(Clone, Copy)]
-pub enum OutputTarget {
+pub(super) enum OutputTarget {
     Console,
     File,
 }
@@ -256,25 +256,23 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_chars(buffer_cur, &data.hangul_syllables)
         })?;
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes())?;
+        let kor_latitude = data.kor_coords.latitude;
+        let kor_longitude = data.kor_coords.longitude;
         FmtWrite::write_fmt(
             self.cursor,
-            format_args!(
-                "{}, {}\n",
-                data.kor_coords.latitude, data.kor_coords.longitude
-            ),
+            format_args!("{kor_latitude}, {kor_longitude}\n"),
         )?;
         self.cursor.write_bytes("세계 위경도: ".as_bytes())?;
+        let world_latitude = data.world_coords.latitude;
+        let world_longitude = data.world_coords.longitude;
         FmtWrite::write_fmt(
             self.cursor,
-            format_args!(
-                "{}, {}\n",
-                data.world_coords.latitude, data.world_coords.longitude
-            ),
+            format_args!("{world_latitude}, {world_longitude}\n"),
         )?;
         Ok(())
     }
 }
-pub fn format_data_into_buffer(
+pub(super) fn format_data_into_buffer(
     data: &RandomDataSet,
     buffer: &mut [u8; BUFFER_SIZE],
     target: OutputTarget,
@@ -300,7 +298,7 @@ fn sub_from_index(value: &mut usize, amount: usize) -> IoResult<()> {
     *value = value.checked_sub(amount).ok_or_else(write_zero_err)?;
     Ok(())
 }
-pub fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
+pub(super) fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
     slice.get(..len).ok_or_else(write_zero_err)
 }
 fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
@@ -520,13 +518,13 @@ fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> 
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub fn write_buffer_to_file_guard(
+        pub(super) fn write_buffer_to_file_guard(
             file_guard: &mut MutexGuard<'_, BufWriter<File>>,
             buffer: &[u8],
         ) -> IoResult<()> {
             IoWrite::write_all(&mut **file_guard, buffer)
         }
-        pub fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
+        pub(super) fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
             let mut stdout_lock = stdout().lock();
             IoWrite::write_all(&mut stdout_lock, data_slice)?;
             IoWrite::flush(&mut stdout_lock)

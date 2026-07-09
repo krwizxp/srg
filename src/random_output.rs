@@ -10,7 +10,7 @@ use std::{
     io::{BufWriter, Write as IoWrite},
     sync::Mutex,
 };
-pub fn write_random_data_to_console(
+pub(super) fn write_random_data_to_console(
     data: &RandomDataSet,
     buffer: &mut [u8; BUFFER_SIZE],
     preformatted_file_len: Option<usize>,
@@ -25,7 +25,7 @@ pub fn write_random_data_to_console(
     write_slice_to_console(prefix_slice(buffer, output_len)?)?;
     Ok(())
 }
-pub fn persist_and_print_random_data(
+pub(super) fn persist_and_print_random_data(
     file_mutex: &Mutex<BufWriter<File>>,
     data: &RandomDataSet,
 ) -> Result<()> {

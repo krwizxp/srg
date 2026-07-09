@@ -6,7 +6,10 @@ use crate::{
     output::{OutputTarget, format_data_into_buffer, prefix_slice},
     random_data::RandomDataSet,
     random_util::checked_add_one_usize,
-    time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
+    time::{
+        ParsedServer, ServerTimeSession, ServerTimeSessionParts, TargetTimeOfDay, TimeError,
+        TriggerAction,
+    },
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -63,7 +66,15 @@ cfg_select! {
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub struct MenuApp {
+        pub(super) struct MenuApp {
+            file_mutex: Mutex<BufWriter<File>>,
+            input_buffer: String,
+            ladder_players_storage: String,
+            ladder_results_storage: String,
+            num_64: u64,
+            rng: HardwareRng,
+        }
+        pub(super) struct MenuAppInit {
             pub file_mutex: Mutex<BufWriter<File>>,
             pub input_buffer: String,
             pub ladder_players_storage: String,
@@ -73,9 +84,39 @@ cfg_select! {
         }
     }
     _ => {
-        pub struct MenuApp {
+        pub(super) struct MenuApp {
+            file_mutex: Mutex<BufWriter<File>>,
+            input_buffer: String,
+        }
+        pub(super) struct MenuAppInit {
             pub file_mutex: Mutex<BufWriter<File>>,
             pub input_buffer: String,
+        }
+    }
+}
+cfg_select! {
+    target_arch = "x86_64" => {
+        impl From<MenuAppInit> for MenuApp {
+            fn from(init: MenuAppInit) -> Self {
+                Self {
+                    file_mutex: init.file_mutex,
+                    input_buffer: init.input_buffer,
+                    ladder_players_storage: init.ladder_players_storage,
+                    ladder_results_storage: init.ladder_results_storage,
+                    num_64: init.num_64,
+                    rng: init.rng,
+                }
+            }
+        }
+    }
+    _ => {
+        impl From<MenuAppInit> for MenuApp {
+            fn from(init: MenuAppInit) -> Self {
+                Self {
+                    file_mutex: init.file_mutex,
+                    input_buffer: init.input_buffer,
+                }
+            }
         }
     }
 }
@@ -388,12 +429,12 @@ impl MenuApp {
             let has_target_time = target_time.is_some();
             let trigger_action = self.read_trigger_action(out, has_target_time)?;
             let now = Instant::now();
-            ServerTimeSession {
+            ServerTimeSession::from(ServerTimeSessionParts {
                 host,
                 now,
                 target_time,
                 trigger_action,
-            }
+            })
             .run_loop(out, err)?;
             writeln!(out, "\n프로그램을 종료합니다.")?;
             Ok(())
@@ -458,7 +499,7 @@ impl MenuApp {
         )?;
         Ok(Some(action))
     }
-    pub fn run(&mut self) -> Result<ExitCode> {
+    pub(super) fn run(&mut self) -> Result<ExitCode> {
         let menu_prompt = format_args!("{MENU}");
         loop {
             let command = {

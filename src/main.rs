@@ -1,6 +1,10 @@
 extern crate alloc;
 use self::diagnostic::{AppError, Result};
-use self::{constants::FILE_NAME, file_output::OutputFile, menu_app::MenuApp};
+use self::{
+    constants::FILE_NAME,
+    file_output::OutputFile,
+    menu_app::{MenuApp, MenuAppInit},
+};
 use core::fmt;
 use std::{
     env,
@@ -135,17 +139,17 @@ fn main() -> Result<ExitCode> {
                 GENERIC_INPUT_BUFFER_CAPACITY,
                 "사다리 결과 버퍼 메모리 확보 실패",
             )?;
-            MenuApp {
+            MenuApp::from(MenuAppInit {
                 file_mutex,
                 input_buffer,
                 ladder_players_storage,
                 ladder_results_storage,
                 num_64,
                 rng,
-            }
+            })
         }}
         _ => {
-            MenuApp { file_mutex, input_buffer }
+            MenuApp::from(MenuAppInit { file_mutex, input_buffer })
         }
     };
     app.run()

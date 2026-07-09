@@ -27,14 +27,12 @@ cfg_select! {
 use core::{char::from_u32, ops::Mul as NumericMul};
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 #[derive(Default)]
-pub struct Coordinates {
+pub(super) struct Coordinates {
     pub latitude: f64,
     pub longitude: f64,
 }
 #[derive(Default)]
-pub struct RandomDataSet {
-    pub euro_lucky_next_idx: usize,
-    pub euro_main_next_idx: usize,
+pub(super) struct RandomDataSet {
     pub euro_millions_lucky_stars: [u8; EURO_MILLIONS_LUCKY_COUNT],
     pub euro_millions_main_numbers: [u8; EURO_MILLIONS_MAIN_COUNT],
     pub galaxy_x: u16,
@@ -43,28 +41,20 @@ pub struct RandomDataSet {
     pub glyph_string: [char; NMS_GLYPH_COUNT],
     pub hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
     pub kor_coords: Coordinates,
-    pub lotto7_next_idx: usize,
     pub lotto7_numbers: [u8; LOTTO7_COUNT],
-    pub lotto_next_idx: usize,
     pub lotto_numbers: [u8; LOTTO_COUNT],
     pub nms_portal_xxx: u16,
     pub nms_portal_yy: u8,
     pub nms_portal_zzz: u16,
     pub num_64: u64,
     pub numeric_password: u32,
-    pub numeric_password_digits: u8,
     pub password: [u8; PASSWORD_BYTE_LEN],
-    pub password_len: u8,
     pub planet_number: u8,
-    pub seen_euro_millions_lucky: u64,
-    pub seen_euro_millions_main: u64,
-    pub seen_lotto: u64,
-    pub seen_lotto7: u64,
     pub solar_system_index: u16,
     pub world_coords: Coordinates,
 }
 #[derive(Clone, Copy)]
-pub struct RandomBitBuffer {
+struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
@@ -92,12 +82,22 @@ where
     F: FnMut(&'static str) -> Result<u64>,
 {
     data: RandomDataSet,
+    euro_lucky_next_idx: usize,
+    euro_main_next_idx: usize,
+    lotto7_next_idx: usize,
+    lotto_next_idx: usize,
     next_supp: &'provider_ref mut F,
     num: u64,
+    numeric_password_digits: u8,
+    password_len: u8,
+    seen_euro_millions_lucky: u64,
+    seen_euro_millions_main: u64,
+    seen_lotto: u64,
+    seen_lotto7: u64,
     supplemental: Option<RandomBitBuffer>,
 }
 impl RandomDataSet {
-    pub fn build_from<F>(num: u64, next_supp: &mut F) -> Result<Self>
+    pub(super) fn build_from<F>(num: u64, next_supp: &mut F) -> Result<Self>
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
@@ -106,8 +106,18 @@ impl RandomDataSet {
                 num_64: num,
                 ..Default::default()
             },
+            euro_lucky_next_idx: 0,
+            euro_main_next_idx: 0,
+            lotto7_next_idx: 0,
+            lotto_next_idx: 0,
             next_supp,
             num,
+            numeric_password_digits: 0,
+            password_len: 0,
+            seen_euro_millions_lucky: 0,
+            seen_euro_millions_main: 0,
+            seen_lotto: 0,
+            seen_lotto7: 0,
             supplemental: None,
         };
         state.fill_required_fields()?;
@@ -116,13 +126,6 @@ impl RandomDataSet {
         state.fill_coords()?;
         state.fill_nms_fields()?;
         Ok(state.data)
-    }
-    const fn is_complete(&self) -> bool {
-        self.numeric_password_digits >= LOTTO_COUNT_U8
-            && self.lotto_next_idx >= LOTTO_COUNT
-            && self.lotto7_next_idx >= LOTTO7_COUNT
-            && self.password_len >= PASSWORD_BYTE_LEN_U8
-            && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
     }
 }
 impl<F> RandomDataBuildState<'_, F>
@@ -203,9 +206,9 @@ where
                     byte,
                     EURO_LUCKY_MODULUS,
                     &mut self.data.euro_millions_lucky_stars,
-                    &mut self.data.seen_euro_millions_lucky,
-                    &mut self.data.euro_lucky_next_idx,
-                ) && self.data.euro_lucky_next_idx >= EURO_MILLIONS_LUCKY_COUNT
+                    &mut self.seen_euro_millions_lucky,
+                    &mut self.euro_lucky_next_idx,
+                ) && self.euro_lucky_next_idx >= EURO_MILLIONS_LUCKY_COUNT
                 {
                     return Ok(());
                 }
@@ -268,15 +271,109 @@ where
         Ok(())
     }
     fn fill_required_fields(&mut self) -> Result<()> {
-        fill_data_fields_from_u64(self.num, &mut self.data);
+        self.fill_required_fields_from_u64(self.num);
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-            if self.data.is_complete() {
+            if self.is_complete() {
                 return Ok(());
             }
             let new_supp = self.next_supplemental("기본 필드 보완")?;
-            fill_data_fields_from_u64(new_supp.value(), &mut self.data);
+            self.fill_required_fields_from_u64(new_supp.value());
         }
         Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into())
+    }
+    fn fill_required_fields_from_u64(&mut self, value: u64) {
+        for byte in value.to_be_bytes() {
+            if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
+                continue;
+            }
+            if self.numeric_password_digits < LOTTO_COUNT_U8 && {
+                let digit = u32::from(byte.rem_euclid(10));
+                let Some(next_password) = self
+                    .data
+                    .numeric_password
+                    .checked_mul(10)
+                    .and_then(|current_password| current_password.checked_add(digit))
+                else {
+                    return;
+                };
+                self.data.numeric_password = next_password;
+                let Some(next_digit_count) = checked_add_one_u8(self.numeric_password_digits)
+                else {
+                    return;
+                };
+                self.numeric_password_digits = next_digit_count;
+                next_digit_count >= LOTTO_COUNT_U8 && self.is_complete()
+            } {
+                return;
+            }
+            let euro_main_added = self.euro_main_next_idx < EURO_MILLIONS_MAIN_COUNT
+                && process_lotto_numbers(
+                    byte,
+                    EURO_MAIN_MODULUS,
+                    &mut self.data.euro_millions_main_numbers,
+                    &mut self.seen_euro_millions_main,
+                    &mut self.euro_main_next_idx,
+                );
+            if euro_main_added
+                && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
+                && self.is_complete()
+            {
+                return;
+            }
+            if byte > INPUT_BYTE_MAX_FOR_LOTTO {
+                continue;
+            }
+            let lotto_added = self.lotto_next_idx < LOTTO_COUNT
+                && process_lotto_numbers(
+                    byte,
+                    LOTTO_MODULUS,
+                    &mut self.data.lotto_numbers,
+                    &mut self.seen_lotto,
+                    &mut self.lotto_next_idx,
+                );
+            if lotto_added && self.lotto_next_idx >= LOTTO_COUNT && self.is_complete() {
+                return;
+            }
+            if byte > INPUT_BYTE_MAX_FOR_LOTTO7 {
+                continue;
+            }
+            let lotto7_number_added = self.lotto7_next_idx < LOTTO7_COUNT
+                && process_lotto_numbers(
+                    byte,
+                    LOTTO7_MODULUS,
+                    &mut self.data.lotto7_numbers,
+                    &mut self.seen_lotto7,
+                    &mut self.lotto7_next_idx,
+                );
+            if lotto7_number_added && self.lotto7_next_idx >= LOTTO7_COUNT && self.is_complete() {
+                return;
+            }
+            if byte > INPUT_BYTE_MAX_FOR_PASSWORD {
+                continue;
+            }
+            if self.password_len < PASSWORD_BYTE_LEN_U8
+                && let Some(password_byte) = byte
+                    .rem_euclid(ASCII_PRINTABLE_LEN)
+                    .checked_add(ASCII_PRINTABLE_START)
+                && let Some(slot) = self.data.password.get_mut(usize::from(self.password_len))
+            {
+                *slot = password_byte;
+                let Some(next_password_len) = checked_add_one_u8(self.password_len) else {
+                    return;
+                };
+                self.password_len = next_password_len;
+                if next_password_len >= PASSWORD_BYTE_LEN_U8 && self.is_complete() {
+                    return;
+                }
+            }
+        }
+    }
+    const fn is_complete(&self) -> bool {
+        self.numeric_password_digits >= LOTTO_COUNT_U8
+            && self.lotto_next_idx >= LOTTO_COUNT
+            && self.lotto7_next_idx >= LOTTO7_COUNT
+            && self.password_len >= PASSWORD_BYTE_LEN_U8
+            && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<RandomBitBuffer> {
         let supplemental = RandomBitBuffer {
@@ -288,7 +385,7 @@ where
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        pub fn generate_random_data_with_rng(rng: &mut HardwareRng) -> Result<RandomDataSet> {
+        pub(super) fn generate_random_data_with_rng(rng: &mut HardwareRng) -> Result<RandomDataSet> {
             let num = rng.next_u64()?;
             let mut next_supp = |reason: &'static str| -> Result<u64> {
                 rng.next_u64().map_err(|source| AppError::context(reason, source))
@@ -297,96 +394,11 @@ cfg_select! {
         }
     }
     _ => {
-        pub fn generate_random_data() -> Result<RandomDataSet> {
+        pub(super) fn generate_random_data() -> Result<RandomDataSet> {
             let mut next_supp = |_reason: &'static str| -> Result<u64> {
                 Err("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.".into())
             };
             RandomDataSet::build_from(0, &mut next_supp)
-        }
-    }
-}
-fn fill_data_fields_from_u64(value: u64, data: &mut RandomDataSet) {
-    for byte in value.to_be_bytes() {
-        if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
-            continue;
-        }
-        if data.numeric_password_digits < LOTTO_COUNT_U8 && {
-            let digit = u32::from(byte.rem_euclid(10));
-            let Some(next_password) = data
-                .numeric_password
-                .checked_mul(10)
-                .and_then(|current_password| current_password.checked_add(digit))
-            else {
-                return;
-            };
-            data.numeric_password = next_password;
-            let Some(next_digit_count) = checked_add_one_u8(data.numeric_password_digits) else {
-                return;
-            };
-            data.numeric_password_digits = next_digit_count;
-            next_digit_count >= LOTTO_COUNT_U8 && data.is_complete()
-        } {
-            return;
-        }
-        let euro_main_added = data.euro_main_next_idx < EURO_MILLIONS_MAIN_COUNT
-            && process_lotto_numbers(
-                byte,
-                EURO_MAIN_MODULUS,
-                &mut data.euro_millions_main_numbers,
-                &mut data.seen_euro_millions_main,
-                &mut data.euro_main_next_idx,
-            );
-        if euro_main_added
-            && data.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
-            && data.is_complete()
-        {
-            return;
-        }
-        if byte > INPUT_BYTE_MAX_FOR_LOTTO {
-            continue;
-        }
-        let lotto_added = data.lotto_next_idx < LOTTO_COUNT
-            && process_lotto_numbers(
-                byte,
-                LOTTO_MODULUS,
-                &mut data.lotto_numbers,
-                &mut data.seen_lotto,
-                &mut data.lotto_next_idx,
-            );
-        if lotto_added && data.lotto_next_idx >= LOTTO_COUNT && data.is_complete() {
-            return;
-        }
-        if byte > INPUT_BYTE_MAX_FOR_LOTTO7 {
-            continue;
-        }
-        let lotto7_number_added = data.lotto7_next_idx < LOTTO7_COUNT
-            && process_lotto_numbers(
-                byte,
-                LOTTO7_MODULUS,
-                &mut data.lotto7_numbers,
-                &mut data.seen_lotto7,
-                &mut data.lotto7_next_idx,
-            );
-        if lotto7_number_added && data.lotto7_next_idx >= LOTTO7_COUNT && data.is_complete() {
-            return;
-        }
-        if byte > INPUT_BYTE_MAX_FOR_PASSWORD {
-            continue;
-        }
-        if data.password_len < PASSWORD_BYTE_LEN_U8
-            && let Some(password_byte) = byte
-                .rem_euclid(ASCII_PRINTABLE_LEN)
-                .checked_add(ASCII_PRINTABLE_START)
-            && let Some(slot) = data.password.get_mut(usize::from(data.password_len))
-        {
-            *slot = password_byte;
-            let Some(next_password_len) = checked_add_one_u8(data.password_len) else {
-                return;
-            };
-            data.password_len = next_password_len;
-            if next_password_len >= PASSWORD_BYTE_LEN_U8 && data.is_complete() {
-                return;
-            }
         }
     }
 }

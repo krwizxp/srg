@@ -78,7 +78,7 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
     *tenth_slot = digit;
     TIME_BUF_LEN
 }
-pub fn print(
+pub(crate) fn print(
     out: &mut dyn IoWrite,
     completed: u64,
     line_buf: &mut [u8; super::PROGRESS_LINE_BUF_LEN],
