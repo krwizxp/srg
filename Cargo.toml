@@ -2,7 +2,7 @@
 name = "srg"
 version = "1.5.8"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.97"
 description = """\
 Hardware RNG-based random data generator with high-precision server time sync \
 utility\
@@ -16,7 +16,7 @@ categories = ["command-line-utilities", "date-and-time", "encoding"]
 absolute_paths_not_starting_with_crate = "deny"
 ambiguous_negative_literals = "deny"
 closure_returning_async_block = "deny"
-dead_code_pub_in_binary = "warn"
+dead_code_pub_in_binary = "deny"
 deprecated_in_future = "deny"
 deprecated_safe_2024 = "deny"
 deref_into_dyn_supertrait = "deny"

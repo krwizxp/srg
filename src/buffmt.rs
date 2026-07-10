@@ -2,7 +2,6 @@ use core::{fmt, range::Range};
 use std::io;
 const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
-const UTF8_MAX_CHAR_LEN: usize = 4;
 pub(super) const DIGITS: [u8; 10] = *b"0123456789";
 const TWO_DIGITS: [[u8; 2]; TWO_DIGIT_TABLE_LEN] = [
     *b"00", *b"01", *b"02", *b"03", *b"04", *b"05", *b"06", *b"07", *b"08", *b"09", *b"10", *b"11",
@@ -51,7 +50,7 @@ impl<'buffer> ByteCursor<'buffer> {
 }
 impl fmt::Write for ByteCursor<'_> {
     fn write_char(&mut self, c: char) -> fmt::Result {
-        let mut encoded = [0_u8; UTF8_MAX_CHAR_LEN];
+        let mut encoded = [0_u8; char::MAX_LEN_UTF8];
         self.write_str(c.encode_utf8(&mut encoded))
     }
     fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {

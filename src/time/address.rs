@@ -84,10 +84,13 @@ impl FromStr for ParsedServer {
         } else {
             (UrlScheme::Https, trimmed_input)
         };
-        if after_scheme.contains(['/', '?', '#']) {
+        if after_scheme.contains(['/', '\\', '?', '#']) {
             return Err(TimeError::parse(ERR_PATH));
         }
-        if after_scheme.is_empty() || after_scheme.contains(|ch: char| ch.is_ascii_whitespace()) {
+        if after_scheme.is_empty()
+            || after_scheme.contains(['@', '%'])
+            || after_scheme.contains(|ch: char| ch.is_control() || ch.is_whitespace())
+        {
             return Err(TimeError::parse(ERR_HOST));
         }
         let default_port = match scheme {

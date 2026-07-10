@@ -2,22 +2,14 @@ use crate::write_line_best_effort;
 use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
+    marker::{PhantomData, PhantomPinned},
     mem::{align_of, size_of},
     num::NonZero,
     ptr::{NonNull, null},
 };
 use super::NativeInputSendStatus;
 use std::io;
-mod sys {
-    use super::{c_char, c_int, c_void};
-    #[link(name = "dl")]
-    unsafe extern "C" {
-        pub(super) fn dlclose(handle: *mut c_void) -> c_int;
-        pub(super) fn dlerror() -> *const c_char;
-        pub(super) fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
-        pub(super) fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
-    }
-}
+mod sys;
 const BUTTON_LEFT: c_uchar = 1;
 const DL_NOW: c_int = 2;
 const KEY_PRESS: c_int = 1;
@@ -31,7 +23,11 @@ const SYM_X_KEYCODE: &CStr = c"XKeysymToKeycode";
 const SYM_X_OPEN_DISPLAY: &CStr = c"XOpenDisplay";
 const SYM_X_TEST_BUTTON: &CStr = c"XTestFakeButtonEvent";
 const SYM_X_TEST_KEY: &CStr = c"XTestFakeKeyEvent";
-type Display = c_void;
+#[repr(C)]
+struct Display {
+    _data: (),
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
+}
 type XCloseDisplay = unsafe extern "C" fn(*mut Display) -> c_int;
 type XFlush = unsafe extern "C" fn(*mut Display) -> c_int;
 type XKeysymToKeycode = unsafe extern "C" fn(*mut Display, c_ulong) -> c_uchar;
@@ -126,7 +122,10 @@ impl Library {
         let symbol = unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) };
         NonNull::new(symbol).ok_or_else(dl_error_message)
     }
-    fn typed_symbol<F: Copy>(&self, name: &CStr) -> InputResult<F> {
+    fn typed_symbol<F>(&self, name: &CStr) -> InputResult<F>
+    where
+        F: Copy,
+    {
         if size_of::<F>() != size_of::<*mut c_void>() {
             return Err(Cow::Borrowed(
                 "dynamic loader symbol 크기가 함수 포인터와 다릅니다.",

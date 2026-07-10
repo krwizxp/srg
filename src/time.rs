@@ -7,10 +7,10 @@ use self::{
 cfg_select! {
     target_os = "windows" => {
         use self::timer_resolution::{
-            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, HighResTimerGuard, SYNCHRONIZE_ACCESS,
-            TARGET_PERIOD_MS, TIMER_MODIFY_STATE_ACCESS, TIMERR_NOERROR, sys,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, SYNCHRONIZE_ACCESS, TIMER_MODIFY_STATE_ACCESS,
+            sys,
         };
-        use core::ptr::{NonNull, null};
+        use core::{ffi::c_void, ptr::{NonNull, null}};
     }
     _ => {}
 }
@@ -27,9 +27,7 @@ use core::{
     time::Duration,
 };
 use std::{
-    io::{
-        self, BufRead as IoBufRead, Error as IoError, ErrorKind, Read as IoRead, Result as IoResult,
-    },
+    io::{self, BufRead as IoBufRead, Error as IoError, Read as IoRead, Result as IoResult},
     net,
     sync::{Mutex, TryLockError, mpsc},
     thread,
@@ -46,37 +44,7 @@ cfg_select! {
         use self::windows_input as native_input;
     }
     _ => {
-        mod native_input {
-            use super::NativeInputSendStatus;
-            use std::io;
-            #[derive(Clone, Copy)]
-            enum InputAction {
-                F5Press,
-                MouseClick,
-            }
-            struct PreparedInput;
-            impl PreparedInput {
-                const EMPTY: Self = Self;
-                fn prepare(
-                    &mut self,
-                    _action: Option<InputAction>,
-                    _err: &mut dyn io::Write,
-                ) {
-                    *self = Self;
-                }
-                const fn reset(&mut self) {
-                    *self = Self;
-                }
-                fn send(
-                    &mut self,
-                    _action: InputAction,
-                    _err: &mut dyn io::Write,
-                ) -> NativeInputSendStatus {
-                    *self = Self;
-                    NativeInputSendStatus::FailedBeforeSend
-                }
-            }
-        }
+        use self::unsupported_input as native_input;
     }
 }
 mod activity;
@@ -93,7 +61,9 @@ cfg_select! {
     target_os = "windows" => {
         mod windows_input;
     }
-    _ => {}
+    _ => {
+        mod unsupported_input;
+    }
 }
 mod native_http;
 mod sample;
@@ -172,10 +142,14 @@ enum CountdownTriggerSource {
     Estimated,
     Sampled { rtt: Duration },
 }
+#[cfg(target_os = "windows")]
+struct HighResTimerGuard {
+    handle: NonNull<c_void>,
+}
 #[derive(Debug)]
 pub(super) struct TimeError {
     detail: Cow<'static, str>,
-    io_kind: Option<ErrorKind>,
+    io_kind: Option<io::ErrorKind>,
     kind: TimeErrorKind,
     source: Option<BoxError>,
 }
@@ -304,7 +278,7 @@ impl TimeError {
         Self::new(TimeErrorKind::HeaderNotFound, detail)
     }
     pub(super) const fn is_unexpected_eof(&self) -> bool {
-        matches!(self.io_kind, Some(ErrorKind::UnexpectedEof))
+        matches!(self.io_kind, Some(io::ErrorKind::UnexpectedEof))
     }
     fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -1526,7 +1500,10 @@ impl AppState {
             let mut limited_stdin = IoRead::take(&mut stdin_lock, read_limit);
             IoBufRead::read_until(&mut limited_stdin, b'\n', &mut line)?;
             if line.len() > ENTER_BUFFER_CAPACITY && !line.ends_with(b"\n") {
-                return Err(IoError::new(ErrorKind::InvalidInput, ENTER_INPUT_TOO_LONG));
+                return Err(IoError::new(
+                    io::ErrorKind::InvalidInput,
+                    ENTER_INPUT_TOO_LONG,
+                ));
             }
             let _send_result = tx.send(());
             Ok(())
@@ -1683,10 +1660,9 @@ impl AppState {
                 if self.high_res_timer_guard.is_some() {
                     return;
                 }
-                // SAFETY: No security attributes or name are needed. On OS versions without
-                // high-resolution waitable timers this returns null and the code falls back to
-                // WinMM + thread::sleep.
-                let wait_timer_handle = unsafe {
+                // SAFETY: No security attributes or name are needed, and a successful handle is
+                // transferred to the guard.
+                let timer_handle = unsafe {
                     sys::create_waitable_timer_ex_w(
                         null(),
                         null(),
@@ -1694,32 +1670,17 @@ impl AppState {
                         SYNCHRONIZE_ACCESS | TIMER_MODIFY_STATE_ACCESS,
                     )
                 };
-                let high_res_wait_timer =
-                    NonNull::new(wait_timer_handle).map(HighResTimerGuard::WaitTimer);
-                let acquired_timer_guard = high_res_wait_timer.map_or_else(
-                    || {
-                        // SAFETY: This fallback requests a process-wide WinMM timer period only
-                        // when the modern high-resolution waitable timer path is unavailable. A
-                        // successful request is paired with exactly one `timeEndPeriod` call from
-                        // `Drop`.
-                        let status = unsafe { sys::time_begin_period(TARGET_PERIOD_MS) };
-                        (status == TIMERR_NOERROR).then_some(HighResTimerGuard::PeriodAcquired)
-                    },
-                    Some,
-                );
-                let Some(timer_guard) = acquired_timer_guard else {
+                let Some(handle) = NonNull::new(timer_handle) else {
                     write_line_best_effort(
                         err,
-                        format_args!(
-                            concat!(
-                                "[경고] Windows 타이머 해상도 {}ms 요청에 실패했습니다. ",
-                                "카운트다운 정확도가 저하될 수 있습니다."
-                            ),
-                            TARGET_PERIOD_MS
-                        ),
+                        format_args!(concat!(
+                            "[경고] Windows 고해상도 대기 타이머 생성에 실패했습니다. ",
+                            "카운트다운 정확도가 저하될 수 있습니다."
+                        )),
                     );
                     return;
                 };
+                let timer_guard = HighResTimerGuard { handle };
                 self.high_res_timer_guard = Some(timer_guard);
             }
         }

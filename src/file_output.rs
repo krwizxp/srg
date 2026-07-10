@@ -2,7 +2,7 @@ use crate::constants::{OUTPUT_FILE_BUFFER_CAPACITY, UTF8_BOM};
 use crate::diagnostic::{AppError, Result};
 use std::{
     fs::{self, File},
-    io::{BufWriter, ErrorKind, Seek as _, SeekFrom, Write as IoWrite},
+    io::{self, BufWriter, Seek as _, SeekFrom, Write as IoWrite},
     path::Path,
     sync::{Mutex, MutexGuard},
 };
@@ -16,23 +16,7 @@ cfg_select! {
             io::Error as IoError,
             os::windows::io::AsRawHandle as WindowsRawHandle,
         };
-        mod sys {
-            use super::{ByHandleFileInformation, c_void};
-            unsafe extern "system" {
-                #[link_name = "GetFileInformationByHandleEx"]
-                pub(super) fn get_file_information_by_handle_ex(
-                    h_file: *mut c_void,
-                    file_information_class: i32,
-                    file_information: *mut c_void,
-                    buffer_size: u32,
-                ) -> i32;
-                #[link_name = "GetFileInformationByHandle"]
-                pub(super) fn get_file_information_by_handle(
-                    h_file: *mut c_void,
-                    file_information: *mut ByHandleFileInformation,
-                ) -> i32;
-            }
-        }
+        mod sys;
     }
     target_family = "unix" => {
         use std::os::unix::fs::{
@@ -42,6 +26,9 @@ cfg_select! {
     _ => {}
 }
 cfg_select! {
+    all(target_os = "linux", target_arch = "aarch64") => {
+        const OPEN_NOFOLLOW_FLAG: i32 = 0x8000;
+    }
     target_os = "linux" => {
         const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
     }
@@ -98,7 +85,7 @@ impl TryFrom<&Path> for OutputFile {
     fn try_from(path: &Path) -> Result<Self> {
         match fs::symlink_metadata(path) {
             Ok(metadata) => validate_output_file_metadata(&metadata)?,
-            Err(err) if err.kind() == ErrorKind::NotFound => {}
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {}
             Err(err) => return Err(err.into()),
         }
         let mut options = File::options();

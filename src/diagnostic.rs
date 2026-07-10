@@ -1,11 +1,11 @@
 use crate::time::TimeError;
 use alloc::borrow::Cow;
 use core::{error::Error, fmt, fmt::Display, result::Result as CoreResult};
-use std::io::{Error as IoError, ErrorKind};
+use std::io::{self, Error as IoError};
 type BoxError = Box<dyn Error + Send + Sync>;
 pub(super) type Result<T> = CoreResult<T, AppError>;
 pub(super) struct AppError {
-    io_kind: Option<ErrorKind>,
+    io_kind: Option<io::ErrorKind>,
     message: Cow<'static, str>,
     source: Option<BoxError>,
     time_source: Option<TimeError>,
@@ -32,7 +32,7 @@ impl AppError {
         }
     }
     pub(super) const fn is_unexpected_eof(&self) -> bool {
-        matches!(self.io_kind, Some(ErrorKind::UnexpectedEof))
+        matches!(self.io_kind, Some(io::ErrorKind::UnexpectedEof))
     }
     pub(super) fn message<M>(message: M) -> Self
     where
@@ -107,7 +107,7 @@ impl From<TimeError> for AppError {
     fn from(source: TimeError) -> Self {
         let io_kind = source
             .is_unexpected_eof()
-            .then_some(ErrorKind::UnexpectedEof);
+            .then_some(io::ErrorKind::UnexpectedEof);
         Self {
             io_kind,
             message: Cow::Borrowed("시간 처리 오류"),

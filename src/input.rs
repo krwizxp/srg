@@ -1,6 +1,6 @@
 use crate::diagnostic::Result;
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
-use std::io::{BufRead as _, Error as IoError, ErrorKind, Result as IoResult, Write, stdin};
+use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
 cfg_select! {
     target_arch = "x86_64" => {
         use crate::diagnostic::AppError;
@@ -44,7 +44,7 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
             if available.is_empty() {
                 if bytes.is_empty() {
                     return Err(IoError::new(
-                        ErrorKind::UnexpectedEof,
+                        io::ErrorKind::UnexpectedEof,
                         "표준 입력이 종료되었습니다.",
                     ));
                 }
@@ -55,7 +55,7 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
             let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
             let segment = available
                 .get(..take_len)
-                .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
+                .ok_or_else(|| IoError::new(io::ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
             let next_len = match bytes.len().checked_add(segment.len()) {
                 Some(next_len) if next_len <= max_bytes => next_len,
                 _ => {
@@ -64,7 +64,7 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
                         stdin_lock.skip_until(b'\n')?;
                     }
                     return Err(IoError::new(
-                        ErrorKind::InvalidInput,
+                        io::ErrorKind::InvalidInput,
                         format!(
                             "입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."
                         ),
@@ -82,8 +82,8 @@ fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
             }
         }
     }
-    *buffer =
-        String::from_utf8(bytes).map_err(|source| IoError::new(ErrorKind::InvalidData, source))?;
+    *buffer = String::from_utf8(bytes)
+        .map_err(|source| IoError::new(io::ErrorKind::InvalidData, source))?;
     Ok(())
 }
 pub(super) fn read_u64_hex_input(

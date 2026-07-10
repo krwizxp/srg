@@ -54,6 +54,24 @@ cfg_select! {
     }
 }
 const GENERIC_INPUT_BUFFER_CAPACITY: usize = 256;
+const HELP_TEXT: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    " ",
+    env!("CARGO_PKG_VERSION"),
+    "\n난수 데이터 생성 및 서버 시간 동기화 도구\n\n",
+    "사용법:\n  ",
+    env!("CARGO_PKG_NAME"),
+    "\n  ",
+    env!("CARGO_PKG_NAME"),
+    " --version [--verbose]\n\n",
+    "옵션:\n",
+    "  -h, --help               도움말\n",
+    "  --version                버전\n",
+    "  --version --verbose      빌드 메타데이터 포함 버전\n"
+);
+fn unknown_option(label: &str, option: &OsStr) -> AppError {
+    format!("{label}: {}", option.to_string_lossy()).into()
+}
 fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
     match output.write_fmt(args) {
         Ok(()) | Err(_) => {}
@@ -65,15 +83,24 @@ fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) 
 fn main() -> Result<ExitCode> {
     let mut args = env::args_os().skip(1);
     if let Some(first) = args.next() {
+        if first == OsStr::new("-h") || first == OsStr::new("--help") {
+            if let Some(extra) = args.next() {
+                return Err(unknown_option("알 수 없는 도움말 옵션", &extra));
+            }
+            let mut out = io::stdout().lock();
+            out.write_all(HELP_TEXT.as_bytes())?;
+            return Ok(ExitCode::SUCCESS);
+        }
         if first == OsStr::new("--version") {
             let verbose = match args.next() {
                 None => false,
-                Some(flag) if flag == OsStr::new("--verbose") && args.next().is_none() => true,
-                Some(flag) => {
-                    return Err(
-                        format!("알 수 없는 --version 옵션: {}", flag.to_string_lossy()).into(),
-                    );
+                Some(flag) if flag == OsStr::new("--verbose") => {
+                    if let Some(extra) = args.next() {
+                        return Err(unknown_option("알 수 없는 --version 옵션", &extra));
+                    }
+                    true
                 }
+                Some(flag) => return Err(unknown_option("알 수 없는 --version 옵션", &flag)),
             };
             let mut out = io::stdout().lock();
             writeln!(out, "{} {}", build_info::APP_NAME, build_info::APP_VERSION)?;
@@ -87,7 +114,7 @@ fn main() -> Result<ExitCode> {
             }
             return Ok(ExitCode::SUCCESS);
         }
-        return Err(format!("알 수 없는 옵션: {}", first.to_string_lossy()).into());
+        return Err(unknown_option("알 수 없는 옵션", &first));
     }
     let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
     let file_mutex = Mutex::new(BufWriter::from(output_file));

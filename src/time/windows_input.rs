@@ -2,13 +2,7 @@ use crate::write_line_best_effort;
 use super::NativeInputSendStatus;
 use core::mem::{align_of, offset_of, size_of};
 use std::io::Write;
-mod sys {
-    use super::Input;
-    #[link(name = "user32")]
-    unsafe extern "system" {
-        pub(super) fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
-    }
-}
+mod sys;
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const KEYEVENTF_KEYDOWN: u32 = 0;

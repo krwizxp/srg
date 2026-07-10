@@ -24,7 +24,7 @@ cfg_select! {
     }
     _ => {}
 }
-use core::{char::from_u32, ops::Mul as NumericMul};
+use core::ops::Mul as NumericMul;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 #[derive(Default)]
 pub(super) struct Coordinates {
@@ -186,7 +186,7 @@ where
             else {
                 return Err("한글 음절 코드포인트 계산 실패".into());
             };
-            *slot = from_u32(code_point).ok_or("한글 음절 변환 실패")?;
+            *slot = char::from_u32(code_point).ok_or("한글 음절 변환 실패")?;
         }
         self.data.hangul_syllables = hangul;
         Ok(())

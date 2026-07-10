@@ -2145,6 +2145,7 @@
       BIG_MODE_THRESHOLD: 1000,
       BULK_CONFIRM_THRESHOLD: 1_000,
       BULK_HARD_LIMIT: 5_000,
+      INPUT_LINE_HARD_LIMIT: 1_000_000,
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
       REVERSE_CACHE_DB_VERSION: 2,
       REVERSE_CACHE_STORE: "nominatim-reverse",
@@ -2168,8 +2169,9 @@
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
     const REVERSE_CACHE_KEY_PREFIX = "sha256:";
     const REVERSE_CACHE_STORAGE_PREFIX = "srg-revgeo-cache:v2:";
-    const REVERSE_CACHE_STORAGE_INDEX_KEY = "srg-revgeo-cache:v2:index";
+    const REVERSE_CACHE_STORAGE_OLD_INDEX_KEY = "srg-revgeo-cache:v2:index";
     const REVERSE_CACHE_LEGACY_STORAGE_PREFIX = "srg-revgeo-cache:";
+    const REVERSE_CACHE_PRUNE_WRITE_INTERVAL = 128;
     const REVERSE_CACHE_KEY_ENCODER = new TextEncoder();
     const OSM_ATTRIBUTION_TEXT = "\u00A9 OpenStreetMap contributors";
     const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
@@ -4008,6 +4010,26 @@
         signal.throwIfAborted();
       });
     }
+    function abortable(promise, signal) {
+      signal.throwIfAborted();
+      return new Promise((resolve, reject) => {
+        const onAbort = () => {
+          signal.removeEventListener("abort", onAbort);
+          reject(signal.reason);
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+        Promise.resolve(promise).then(
+          (value) => {
+            signal.removeEventListener("abort", onAbort);
+            resolve(value);
+          },
+          (error) => {
+            signal.removeEventListener("abort", onAbort);
+            reject(error);
+          },
+        );
+      });
+    }
     const yieldToMain = (() => {
       const y = window.scheduler?.yield;
       if (typeof y === "function") {
@@ -4059,6 +4081,14 @@
         }
       }
     }
+    class InputLimitError extends Error {}
+    function ensureInputLineLength(length) {
+      if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
+        throw new InputLimitError(
+          `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
+        );
+      }
+    }
     async function* lineIterator(stream, signal) {
       let buffer = "";
       let pendingCR = false;
@@ -4080,10 +4110,12 @@
           while (true) {
             const nl = buffer.indexOf("\n", start);
             if (nl === -1) break;
+            ensureInputLineLength(nl - start);
             yield buffer.substring(start, nl);
             start = nl + 1;
           }
           buffer = buffer.substring(start);
+          ensureInputLineLength(buffer.length);
           continue;
         }
         while (start < buffer.length) {
@@ -4094,6 +4126,7 @@
           else if (cr === -1) pos = nl;
           else pos = nl < cr ? nl : cr;
           if (pos === -1) break;
+          ensureInputLineLength(pos - start);
           yield buffer.substring(start, pos);
           if (buffer[pos] === "\r") {
             if (pos + 1 === buffer.length) {
@@ -4108,9 +4141,13 @@
           }
         }
         buffer = buffer.substring(start);
+        ensureInputLineLength(buffer.length);
       }
       signal.throwIfAborted();
-      if (buffer) yield buffer;
+      if (buffer) {
+        ensureInputLineLength(buffer.length);
+        yield buffer;
+      }
     }
     async function parseFileToRecords(file, signal) {
       const out = [];
@@ -4135,6 +4172,11 @@
           const fLon = +lon;
           if (fLat !== fLat || fLon !== fLon) continue;
           if (fLat < -90 || fLat > 90 || fLon < -180 || fLon > 180) continue;
+          if (out.length >= CONFIG.BULK_HARD_LIMIT) {
+            throw new InputLimitError(
+              `공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
+            );
+          }
           out.push({
             set: m[1] === "대한민국" ? "KR" : "WORLD",
             idx: nextIdx++,
@@ -4164,6 +4206,8 @@
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
     let REVERSE_CACHE_PRUNE_PROMISE = null;
+    let REVERSE_CACHE_REQUIRES_FULL_PRUNE = true;
+    let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
     const REVERSE_PERSISTENT_CACHE_KEY_CACHE = new Map();
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -4188,18 +4232,22 @@
       REVERSE_PARSED_CACHE.clear();
       REVERSE_PARSED_CACHE_KEYS.length = 0;
       REVERSE_PARSED_CACHE_HEAD = 0;
+      REVERSE_PERSISTENT_CACHE_KEY_CACHE.clear();
     }
     function isReversePersistentCacheKey(key) {
       return typeof key === "string" && key.startsWith(REVERSE_CACHE_KEY_PREFIX);
     }
     function isFreshReverseCacheRow(row, now = Date.now()) {
-      return !!(
-        row &&
-        row.variant === REVERSE_CACHE_VARIANT &&
-        row.parserVersion === CONFIG.REVERSE_CACHE_PARSER_VERSION &&
-        typeof row.savedAt === "number" &&
-        now - row.savedAt <= CONFIG.REVERSE_CACHE_TTL_MS
-      );
+      if (
+        !row ||
+        row.variant !== REVERSE_CACHE_VARIANT ||
+        row.parserVersion !== CONFIG.REVERSE_CACHE_PARSER_VERSION ||
+        !Number.isFinite(row.savedAt)
+      ) {
+        return false;
+      }
+      const age = now - row.savedAt;
+      return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
     }
     async function toPersistentReverseCacheKey(cacheKey) {
       const cached = REVERSE_PERSISTENT_CACHE_KEY_CACHE.get(cacheKey);
@@ -4227,8 +4275,16 @@
       if (!persistentKey) REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(cacheKey);
       return persistentKey;
     }
-    let REVERSE_CACHE_STORAGE_AVAILABLE = null;
-    let REVERSE_CACHE_STORAGE_LEGACY_CLEANED = false;
+    let REVERSE_CACHE_STORAGE;
+    let REVERSE_CACHE_STORAGE_KEYS = null;
+    let REVERSE_CACHE_STORAGE_KEY_SET = null;
+    let REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
+    function disableReverseCacheStorage() {
+      REVERSE_CACHE_STORAGE = null;
+      REVERSE_CACHE_STORAGE_KEYS = [];
+      REVERSE_CACHE_STORAGE_KEY_SET = new Set();
+      REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
+    }
     function cleanupLegacyReverseCacheStorage(store) {
       const legacyIndex = (() => {
         try {
@@ -4255,66 +4311,71 @@
       }
     }
     function getReverseCacheStorage() {
-      if (REVERSE_CACHE_STORAGE_AVAILABLE === false) return null;
+      if (REVERSE_CACHE_STORAGE !== undefined) return REVERSE_CACHE_STORAGE;
       try {
         const store = window.localStorage;
         const testKey = REVERSE_CACHE_STORAGE_PREFIX + "test";
         store.setItem(testKey, "1");
         store.removeItem(testKey);
-        REVERSE_CACHE_STORAGE_AVAILABLE = true;
-        if (!REVERSE_CACHE_STORAGE_LEGACY_CLEANED) {
-          cleanupLegacyReverseCacheStorage(store);
-          REVERSE_CACHE_STORAGE_LEGACY_CLEANED = true;
-        }
-        return store;
+        cleanupLegacyReverseCacheStorage(store);
+        store.removeItem(REVERSE_CACHE_STORAGE_OLD_INDEX_KEY);
+        REVERSE_CACHE_STORAGE = store;
       } catch {
-        REVERSE_CACHE_STORAGE_AVAILABLE = false;
-        return null;
+        disableReverseCacheStorage();
       }
-    }
-    function readReverseCacheStorageIndex(store) {
-      try {
-        const raw = store.getItem(REVERSE_CACHE_STORAGE_INDEX_KEY);
-        const keys = raw ? JSON.parse(raw) : [];
-        return Array.isArray(keys) ? keys.filter(isReversePersistentCacheKey) : [];
-      } catch {
-        return [];
-      }
-    }
-    function writeReverseCacheStorageIndex(store, keys) {
-      try {
-        store.setItem(REVERSE_CACHE_STORAGE_INDEX_KEY, JSON.stringify(keys));
-      } catch {
-      }
+      return REVERSE_CACHE_STORAGE;
     }
     function pruneReverseCacheStorage(store, keep = CONFIG.REVERSE_CACHE_STORAGE_MAX) {
       const now = Date.now();
-      const keys = [];
-      for (const key of readReverseCacheStorageIndex(store)) {
-        const itemKey = REVERSE_CACHE_STORAGE_PREFIX + key;
-        try {
-          const raw = store.getItem(itemKey);
-          const row = raw ? JSON.parse(raw) : null;
-          if (isFreshReverseCacheRow(row, now)) {
-            keys.push(key);
-          } else {
+      const entries = [];
+      try {
+        const storageLength = store.length;
+        for (let i = storageLength - 1; i >= 0; i--) {
+          const itemKey = store.key(i);
+          if (!itemKey?.startsWith(REVERSE_CACHE_STORAGE_PREFIX)) continue;
+          const key = itemKey.slice(REVERSE_CACHE_STORAGE_PREFIX.length);
+          if (!isReversePersistentCacheKey(key)) {
+            store.removeItem(itemKey);
+            continue;
+          }
+          try {
+            const raw = store.getItem(itemKey);
+            const row = raw ? JSON.parse(raw) : null;
+            if (isFreshReverseCacheRow(row, now)) {
+              entries.push({ key, savedAt: row.savedAt });
+            } else {
+              store.removeItem(itemKey);
+            }
+          } catch {
             store.removeItem(itemKey);
           }
-        } catch {
-          store.removeItem(itemKey);
         }
-      }
-      if (keys.length <= keep) {
-        writeReverseCacheStorageIndex(store, keys);
+        entries.sort((left, right) =>
+          left.savedAt - right.savedAt || left.key.localeCompare(right.key)
+        );
+        const removeCount = Math.max(0, entries.length - keep);
+        for (let i = 0; i < removeCount; i++) {
+          store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + entries[i].key);
+        }
+        const keys = new Array(entries.length - removeCount);
+        for (let i = removeCount; i < entries.length; i++) {
+          keys[i - removeCount] = entries[i].key;
+        }
+        REVERSE_CACHE_STORAGE_KEYS = keys;
+        REVERSE_CACHE_STORAGE_KEY_SET = new Set(keys);
+        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
         return keys;
+      } catch {
+        disableReverseCacheStorage();
+        return null;
       }
-      const removeCount = keys.length - keep;
-      for (let i = 0; i < removeCount; i++) {
-        store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + keys[i]);
-      }
-      const kept = keys.slice(removeCount);
-      writeReverseCacheStorageIndex(store, kept);
-      return kept;
+    }
+    function removeReverseCacheStorageStateKey(cacheKey) {
+      if (!REVERSE_CACHE_STORAGE_KEY_SET?.delete(cacheKey)) return;
+      const index = REVERSE_CACHE_STORAGE_KEYS.indexOf(cacheKey);
+      if (index < 0) return;
+      REVERSE_CACHE_STORAGE_KEYS.copyWithin(index, index + 1);
+      REVERSE_CACHE_STORAGE_KEYS.length--;
     }
     function readReverseCacheStorage(cacheKey) {
       const store = getReverseCacheStorage();
@@ -4327,8 +4388,14 @@
           return row.parsed || null;
         }
         store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
+        removeReverseCacheStorageStateKey(cacheKey);
       } catch {
-        store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
+        try {
+          store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
+          removeReverseCacheStorageStateKey(cacheKey);
+        } catch {
+          disableReverseCacheStorage();
+        }
       }
       return null;
     }
@@ -4342,36 +4409,63 @@
         parsed,
       });
       const itemKey = REVERSE_CACHE_STORAGE_PREFIX + cacheKey;
-      let keys = pruneReverseCacheStorage(store).filter((key) => key !== cacheKey);
-      keys.push(cacheKey);
+      let keys = REVERSE_CACHE_STORAGE_KEYS;
+      if (
+        !keys ||
+        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE >=
+          REVERSE_CACHE_PRUNE_WRITE_INTERVAL
+      ) {
+        keys = pruneReverseCacheStorage(store);
+        if (!keys) return;
+      }
+      removeReverseCacheStorageStateKey(cacheKey);
       try {
         store.setItem(itemKey, row);
       } catch {
         keys = pruneReverseCacheStorage(
           store,
           Math.floor(CONFIG.REVERSE_CACHE_STORAGE_MAX / 2),
-        ).filter((key) => key !== cacheKey);
-        keys.push(cacheKey);
+        );
+        if (!keys) return;
+        removeReverseCacheStorageStateKey(cacheKey);
         try {
           store.setItem(itemKey, row);
         } catch {
+          disableReverseCacheStorage();
           return;
         }
       }
-      if (keys.length > CONFIG.REVERSE_CACHE_STORAGE_MAX) {
-        const removeCount = keys.length - CONFIG.REVERSE_CACHE_STORAGE_MAX;
-        for (let i = 0; i < removeCount; i++) {
-          store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + keys[i]);
+      try {
+        keys.push(cacheKey);
+        REVERSE_CACHE_STORAGE_KEY_SET.add(cacheKey);
+        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE++;
+        if (keys.length > CONFIG.REVERSE_CACHE_STORAGE_MAX) {
+          const removeCount = keys.length - CONFIG.REVERSE_CACHE_STORAGE_MAX;
+          for (let i = 0; i < removeCount; i++) {
+            store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + keys[i]);
+            REVERSE_CACHE_STORAGE_KEY_SET.delete(keys[i]);
+          }
+          keys.copyWithin(0, removeCount);
+          keys.length -= removeCount;
         }
-        keys = keys.slice(removeCount);
+      } catch {
+        disableReverseCacheStorage();
       }
-      writeReverseCacheStorageIndex(store, keys);
     }
     function openReverseCacheDb() {
       getReverseCacheStorage();
       if (!("indexedDB" in window)) return Promise.resolve(null);
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
       REVERSE_CACHE_DB_PROMISE = new Promise((resolve) => {
+        let settled = false;
+        const finish = (db) => {
+          if (settled) {
+            db?.close();
+            return;
+          }
+          settled = true;
+          resolve(db);
+        };
         let req;
         try {
           req = indexedDB.open(
@@ -4380,7 +4474,7 @@
           );
         } catch (err) {
           console.warn("Reverse geocoding cache is unavailable.", err);
-          resolve(null);
+          finish(null);
           return;
         }
         req.onupgradeneeded = (event) => {
@@ -4403,13 +4497,21 @@
             store.createIndex("savedAt", "savedAt");
           }
         };
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onversionchange = () => {
+            db.close();
+            REVERSE_CACHE_DB_PROMISE = null;
+          };
+          finish(db);
+        };
         req.onerror = () => {
           console.warn("Reverse geocoding cache is unavailable.", req.error);
-          resolve(null);
+          finish(null);
         };
         req.onblocked = () => {
           console.warn("Reverse geocoding cache upgrade is blocked.");
+          finish(null);
         };
       });
       return REVERSE_CACHE_DB_PROMISE;
@@ -4457,7 +4559,14 @@
       const db = await openReverseCacheDb();
       if (!db) {
         const store = getReverseCacheStorage();
-        if (store) store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + persistentKey);
+        if (store) {
+          try {
+            store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + persistentKey);
+            removeReverseCacheStorageStateKey(persistentKey);
+          } catch {
+            disableReverseCacheStorage();
+          }
+        }
         return;
       }
       await new Promise((resolve) => {
@@ -4501,7 +4610,16 @@
         tx.onerror = resolve;
         tx.onabort = resolve;
       });
-      scheduleReverseCachePrune();
+      REVERSE_CACHE_WRITES_SINCE_PRUNE++;
+      if (
+        !REVERSE_CACHE_PRUNE_PROMISE &&
+        (REVERSE_CACHE_REQUIRES_FULL_PRUNE ||
+          REVERSE_CACHE_WRITES_SINCE_PRUNE >=
+            REVERSE_CACHE_PRUNE_WRITE_INTERVAL)
+      ) {
+        REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
+        scheduleReverseCachePrune();
+      }
     }
     function scheduleReverseCachePrune() {
       if (REVERSE_CACHE_PRUNE_PROMISE) return;
@@ -4516,6 +4634,8 @@
       const db = await openReverseCacheDb();
       if (!db) return;
       await new Promise((resolve) => {
+        const fullScan = REVERSE_CACHE_REQUIRES_FULL_PRUNE;
+        let fullScanComplete = false;
         let tx;
         let store;
         try {
@@ -4526,29 +4646,34 @@
           return;
         }
         const startedAt = Date.now();
-        const pruneExpired = store.index("savedAt").openCursor();
+        const pruneExpired = fullScan
+          ? store.openCursor()
+          : store.index("savedAt").openCursor();
         pruneExpired.onsuccess = () => {
           const cursor = pruneExpired.result;
           if (!cursor) {
-            pruneExcessReverseCacheRows(store, startedAt);
+            fullScanComplete = fullScan;
+            pruneExcessReverseCacheRows(store);
             return;
           }
-          if (
-            isReversePersistentCacheKey(cursor.value?.key) &&
-            isFreshReverseCacheRow(cursor.value, startedAt)
-          ) {
-            pruneExcessReverseCacheRows(store, startedAt);
+          const valid = isReversePersistentCacheKey(cursor.value?.key) &&
+            isFreshReverseCacheRow(cursor.value, startedAt);
+          if (!fullScan && valid) {
+            pruneExcessReverseCacheRows(store);
             return;
           }
-          cursor.delete();
+          if (!valid) cursor.delete();
           cursor.continue();
         };
-        tx.oncomplete = resolve;
+        tx.oncomplete = () => {
+          if (fullScanComplete) REVERSE_CACHE_REQUIRES_FULL_PRUNE = false;
+          resolve();
+        };
         tx.onerror = resolve;
         tx.onabort = resolve;
       });
     }
-    function pruneExcessReverseCacheRows(store, now) {
+    function pruneExcessReverseCacheRows(store) {
       const countReq = store.count();
       countReq.onsuccess = () => {
         let excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
@@ -4557,14 +4682,8 @@
         cursorReq.onsuccess = () => {
           const cursor = cursorReq.result;
           if (!cursor || excess <= 0) return;
-          const row = cursor.value;
           cursor.delete();
-          if (
-            isReversePersistentCacheKey(row?.key) &&
-            isFreshReverseCacheRow(row, now)
-          ) {
-            excess--;
-          }
+          excess--;
           cursor.continue();
         };
       };
@@ -4586,30 +4705,33 @@
         }
         LAST_REVERSE_FETCH_AT = now;
         anySignals[1] = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
+        let res;
         try {
-          const res = await fetch(url, {
+          res = await fetch(url, {
             headers: { Accept: "application/json" },
             referrerPolicy: "strict-origin-when-cross-origin",
             signal: AbortSignal.any(anySignals),
           });
-          if (res.ok) {
-            return res.json();
-          }
-          if (res.status !== 429 && res.status < 500) {
-            throw new Error(
-              `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
-            );
-          }
-          if (attempt >= maxRetry) {
-            throw new Error(
-              `HTTP ${res.status}: rate limited or server error`,
-            );
-          }
         } catch (e) {
           userSignal.throwIfAborted();
-          if (attempt >= maxRetry) {
-            throw e;
+          if (attempt >= maxRetry) throw e;
+          await sleep(baseDelayMs * attempt, userSignal);
+          continue;
+        }
+        if (res.ok) {
+          try {
+            return await res.json();
+          } catch (e) {
+            if (attempt >= maxRetry) throw e;
           }
+        } else if (res.status !== 429 && res.status < 500) {
+          throw new Error(
+            `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
+          );
+        } else if (attempt >= maxRetry) {
+          throw new Error(
+            `HTTP ${res.status}: rate limited or server error`,
+          );
         }
         await sleep(baseDelayMs * attempt, userSignal);
       }
@@ -4634,6 +4756,9 @@
         pendingCount = 0;
         requestScrollShadowSync(wrap);
       };
+      const controller = new AbortController();
+      const signal = controller.signal;
+      AppState.controller = controller;
       for (let i = startIndex; i < total; i++) {
         const i1 = i + 1;
         let skeletonTr = null;
@@ -4649,23 +4774,22 @@
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
           if (!AppState.isRunning) break;
+          AppState.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
           if (!parsed) {
-            parsed = await readPersistentReverseCache(cacheKey);
+            parsed = await abortable(
+              readPersistentReverseCache(cacheKey),
+              signal,
+            );
             if (parsed) putReverseMemoryCache(cacheKey, parsed);
           }
+          signal.throwIfAborted();
           if (!AppState.isRunning) break;
           needsFetch = !parsed;
-          let signal = null;
-          let controller = null;
           if (needsFetch) {
-            controller = new AbortController();
-            signal = controller.signal;
             flushPending();
-            AppState.controller = controller;
-            AppState.inFlight = true;
           }
           const tr = (parsed ? ROW_TEMPLATE : SKELETON_TEMPLATE).cloneNode(
             true,
@@ -4718,7 +4842,10 @@
                 ),
               );
               putReverseMemoryCache(cacheKey, parsed);
-              await writePersistentReverseCache(cacheKey, parsed);
+              await abortable(
+                writePersistentReverseCache(cacheKey, parsed),
+                signal,
+              );
             }
             const addr = parsed.addr;
             const kind = parsed.kind;
@@ -4797,6 +4924,7 @@
             }
           }
         } catch (err) {
+          if (AppState.isStopping && err?.name === "AbortError") break;
           console.error(err);
           if (
             skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)
@@ -4811,12 +4939,10 @@
           );
           break;
         } finally {
-          if (needsFetch) {
-            AppState.inFlight = false;
-            AppState.controller = null;
-          }
+          AppState.inFlight = false;
         }
       }
+      AppState.controller = null;
       flushPending();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
@@ -4986,14 +5112,6 @@
           AppState.setRecords([]);
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
-        if (records.length > CONFIG.BULK_HARD_LIMIT) {
-          AppState.setRecords([]);
-          setEmptyHint("file");
-          return setStatusMessage(
-            `공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
-            "warn",
-          );
-        }
         AppState.setRecords(records);
         setEmptyHint("ready");
         const MAX_DISP = 1_000;
@@ -5018,6 +5136,12 @@
       } catch (err) {
         if (err && err.name === "AbortError") {
           setControlsIdle("중지되었습니다.", "stopped");
+          return;
+        }
+        if (err instanceof InputLimitError) {
+          AppState.setRecords([]);
+          setEmptyHint("file");
+          setControlsIdle(err.message, "warn");
           return;
         }
         console.error(err);
@@ -5239,9 +5363,6 @@
     };
     window.addEventListener("resize", syncViewportShadows, EVT_PASSIVE);
     syncViewportShadows();
-  </script>
-  <script>
-    "use strict";
     (() => {
       const fmt =
         new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
@@ -5250,6 +5371,9 @@
       const U32_MAX_INV = 1 / 4294967295;
       const HANGUL_BASE_CODE_POINT = 0xac00;
       const HANGUL_SHIFTS = [48n, 32n, 16n, 0n];
+      const U64_BYTE_SHIFTS = [56n, 48n, 40n, 32n, 24n, 16n, 8n, 0n];
+      const NMS_PLANET_SHIFTS = [52n, 4n, 0n];
+      const NMS_SOLAR_SYSTEM_SHIFTS = [40n];
       const HANGUL_SYLLABLE_MAX = 55859;
       const HANGUL_SYLLABLE_MODULUS = 11172;
       const SUPPLEMENTAL_RETRY_LIMIT = 1024;
@@ -5344,9 +5468,8 @@
       }
       function u64ToBytesBe(v) {
         const bytes = new Array(8);
-        for (let i = 0; i < 8; i += 1) {
-          const shift = BigInt((7 - i) * 8);
-          bytes[i] = Number((v >> shift) & 0xffn);
+        for (let i = 0; i < U64_BYTE_SHIFTS.length; i += 1) {
+          bytes[i] = Number((v >> U64_BYTE_SHIFTS[i]) & 0xffn);
         }
         return bytes;
       }
@@ -5359,21 +5482,20 @@
         }
         return out;
       }
-      function processLottoNumbers(byte, modulus, numbers, seen, nextIdx) {
+      function processLottoNumber(byte, modulus, numbers, seen, nextIdx) {
         if (nextIdx >= numbers.length) {
-          return { inserted: false, seen, nextIdx };
+          return null;
         }
         const number = (byte % modulus) + 1;
         const mask = 1n << BigInt(number);
-        if ((seen & mask) === 0n) {
-          numbers[nextIdx] = number;
-          const updatedIdx = nextIdx + 1;
-          if (updatedIdx === numbers.length) {
-            numbers.sort((a, b) => a - b);
-          }
-          return { inserted: true, seen: seen | mask, nextIdx: updatedIdx };
+        if ((seen & mask) !== 0n) {
+          return null;
         }
-        return { inserted: false, seen, nextIdx };
+        numbers[nextIdx] = number;
+        if (nextIdx + 1 === numbers.length) {
+          numbers.sort((a, b) => a - b);
+        }
+        return seen | mask;
       }
       function fillDataFieldsFromU64(v, data) {
         const bytes = u64ToBytesBe(v);
@@ -5389,16 +5511,16 @@
             }
           }
           if (data.euro_main_next_idx < 5) {
-            const res = processLottoNumbers(
+            const updatedSeen = processLottoNumber(
               byte,
               50,
               data.euro_millions_main_numbers,
               data.seen_euro_millions_main,
               data.euro_main_next_idx,
             );
-            if (res.inserted) {
-              data.seen_euro_millions_main = res.seen;
-              data.euro_main_next_idx = res.nextIdx;
+            if (updatedSeen !== null) {
+              data.seen_euro_millions_main = updatedSeen;
+              data.euro_main_next_idx += 1;
               if (isComplete(data)) {
                 return;
               }
@@ -5408,16 +5530,16 @@
             continue;
           }
           if (data.lotto_next_idx < 6) {
-            const res = processLottoNumbers(
+            const updatedSeen = processLottoNumber(
               byte,
               45,
               data.lotto_numbers,
               data.seen_lotto,
               data.lotto_next_idx,
             );
-            if (res.inserted) {
-              data.seen_lotto = res.seen;
-              data.lotto_next_idx = res.nextIdx;
+            if (updatedSeen !== null) {
+              data.seen_lotto = updatedSeen;
+              data.lotto_next_idx += 1;
               if (isComplete(data)) {
                 return;
               }
@@ -5427,16 +5549,16 @@
             continue;
           }
           if (data.lotto7_next_idx < 7) {
-            const res = processLottoNumbers(
+            const updatedSeen = processLottoNumber(
               byte,
               37,
               data.lotto7_numbers,
               data.seen_lotto7,
               data.lotto7_next_idx,
             );
-            if (res.inserted) {
-              data.seen_lotto7 = res.seen;
-              data.lotto7_next_idx = res.nextIdx;
+            if (updatedSeen !== null) {
+              data.seen_lotto7 = updatedSeen;
+              data.lotto7_next_idx += 1;
               if (isComplete(data)) {
                 return;
               }
@@ -5468,7 +5590,7 @@
         const mask = (1n << BigInt(bits)) - 1n;
         const maxBig = BigInt(maxValue);
         for (const shift of shifts) {
-          const v = (num >> BigInt(shift)) & mask;
+          const v = (num >> shift) & mask;
           if (v <= maxBig) {
             return Number(v);
           }
@@ -5524,16 +5646,16 @@
             if (byte > 251) {
               continue;
             }
-            const res = processLottoNumbers(
+            const updatedSeen = processLottoNumber(
               byte,
               12,
               data.euro_millions_lucky_stars,
               data.seen_euro_millions_lucky,
               data.euro_lucky_next_idx,
             );
-            if (res.inserted) {
-              data.seen_euro_millions_lucky = res.seen;
-              data.euro_lucky_next_idx = res.nextIdx;
+            if (updatedSeen !== null) {
+              data.seen_euro_millions_lucky = updatedSeen;
+              data.euro_lucky_next_idx += 1;
               if (data.euro_lucky_next_idx >= 2) {
                 luckyStarComplete = true;
                 break luckyStarLoop;
@@ -5597,7 +5719,7 @@
         data.planet_number = (extractValidBitsForNms(
           4,
           num,
-          [52, 4, 0],
+          NMS_PLANET_SHIFTS,
           11,
           "NMS 행성 번호 보완",
           supplementalRef,
@@ -5608,7 +5730,7 @@
         data.solar_system_index = (extractValidBitsForNms(
           12,
           num,
-          [40],
+          NMS_SOLAR_SYSTEM_SHIFTS,
           3834,
           "NMS 태양계 번호 보완",
           supplementalRef,
@@ -5712,7 +5834,6 @@
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
-      const MANUAL_EVT_PASSIVE = { passive: true };
       const RX_U64_WS = /\s/u;
       function* iterU64Tokens(raw) {
         const text = String(raw || "");
@@ -5819,43 +5940,12 @@
         ) {
           return;
         }
-        let manualShadowFrame = 0;
-        const requestManualOutputShadowSync = () => {
-          if (manualShadowFrame) return;
-          manualShadowFrame = requestAnimationFrame(() => {
-            manualShadowFrame = 0;
-            const maxScrollTop = Math.max(
-              0,
-              output.scrollHeight - output.clientHeight,
-            );
-            const atTop = output.scrollTop <= 1;
-            const atBottom = maxScrollTop <= 1 ||
-              output.scrollTop >= maxScrollTop - 1;
-            const ramp = 200;
-            const hasOverflow = maxScrollTop > 1;
-            const floor = 0.16;
-            const topOpacity =
-              !hasOverflow || atTop
-                ? "0"
-                : (
-                  floor +
-                  (1 - floor) * Math.min(1, output.scrollTop / ramp)
-                ).toFixed(3);
-            const bottomOpacity = !hasOverflow || atBottom
-              ? "0"
-              : (
-                floor +
-                (1 - floor) *
-                Math.min(1, (maxScrollTop - output.scrollTop) / ramp)
-              ).toFixed(3);
-            output.style.setProperty("--top-shadow-opacity", topOpacity);
-            output.style.setProperty("--bottom-shadow-opacity", bottomOpacity);
-          });
-        };
+        const requestManualOutputShadowSync = () =>
+          requestScrollShadowSync(output);
         output.addEventListener(
           "scroll",
           requestManualOutputShadowSync,
-          MANUAL_EVT_PASSIVE,
+          EVT_PASSIVE,
         );
         const manualOutputResizeObserver =
           new ResizeObserver(requestManualOutputShadowSync);
@@ -5863,7 +5953,7 @@
         window.addEventListener(
           "resize",
           requestManualOutputShadowSync,
-          MANUAL_EVT_PASSIVE,
+          EVT_PASSIVE,
         );
         const setManualOutputText = (text) => {
           const value = String(text ?? "");
@@ -5873,8 +5963,7 @@
             requestManualOutputShadowSync();
           } else {
             output.removeAttribute("data-has-content");
-            output.style.setProperty("--top-shadow-opacity", "0");
-            output.style.setProperty("--bottom-shadow-opacity", "0");
+            clearScrollShadowState(output);
           }
         };
         let lastGeneratedChunks = [];

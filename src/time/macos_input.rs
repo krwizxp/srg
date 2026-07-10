@@ -7,30 +7,7 @@ use core::{
     ptr::{NonNull, null_mut},
 };
 use std::io::Write;
-mod sys {
-    use super::{
-        CGEventRef, CGEventSourceRef, CGEventTapLocation, CGEventType, CGKeyCode, CGMouseButton,
-        CGPoint, c_void,
-    };
-    #[link(name = "ApplicationServices", kind = "framework")]
-    unsafe extern "C" {
-        pub(super) fn CFRelease(cf: *const c_void);
-        pub(super) fn CGEventCreate(source: CGEventSourceRef) -> CGEventRef;
-        pub(super) fn CGEventCreateKeyboardEvent(
-            source: CGEventSourceRef,
-            virtual_key: CGKeyCode,
-            key_down: bool,
-        ) -> CGEventRef;
-        pub(super) fn CGEventCreateMouseEvent(
-            source: CGEventSourceRef,
-            mouse_type: CGEventType,
-            mouse_cursor_position: CGPoint,
-            mouse_button: CGMouseButton,
-        ) -> CGEventRef;
-        pub(super) fn CGEventGetLocation(event: CGEventRef) -> CGPoint;
-        pub(super) fn CGEventPost(tap: CGEventTapLocation, event: CGEventRef);
-    }
-}
+mod sys;
 const EVENT_LEFT_MOUSE_DOWN: CGEventType = 1;
 const EVENT_LEFT_MOUSE_UP: CGEventType = 2;
 const HID_EVENT_TAP: CGEventTapLocation = 0;

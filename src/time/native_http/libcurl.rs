@@ -7,29 +7,14 @@ use super::super::sample::{
 };
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
-    ffi::{CStr, c_char, c_int, c_long, c_uint, c_void},
+    ffi::{CStr, c_char, c_long, c_uint, c_void},
+    marker::{PhantomData, PhantomPinned},
     mem::{self, align_of, offset_of, size_of},
-    ptr::{NonNull, null},
+    ptr::{NonNull, null_mut},
     slice,
 };
 use std::{sync::LazyLock, time::Instant};
-mod sys {
-    use super::{
-        Curl, CurlCode, CurlInfo, CurlOption, CurlVersion, CurlVersionInfoData, c_char, c_long,
-    };
-    #[link(name = "curl")]
-    unsafe extern "C" {
-        pub(super) fn curl_easy_cleanup(curl: *mut Curl);
-        pub(super) fn curl_easy_getinfo(curl: *mut Curl, info: CurlInfo, ...) -> CurlCode;
-        pub(super) fn curl_easy_init() -> *mut Curl;
-        pub(super) fn curl_easy_perform(curl: *mut Curl) -> CurlCode;
-        pub(super) fn curl_easy_reset(curl: *mut Curl);
-        pub(super) fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
-        pub(super) fn curl_easy_strerror(code: CurlCode) -> *const c_char;
-        pub(super) fn curl_global_init(flags: c_long) -> CurlCode;
-        pub(super) fn curl_version_info(age: CurlVersion) -> *const CurlVersionInfoData;
-    }
-}
+mod sys;
 const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
 const CURL_GLOBAL_DEFAULT: c_long = 3;
@@ -74,7 +59,7 @@ static CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION: LazyLock<Option<Cow<'static, str>
     LazyLock::new(|| {
         // SAFETY: callers force this after curl_global_init has completed, and libcurl returns a
         // process-wide immutable version info pointer.
-        NonNull::new(unsafe { sys::curl_version_info(CURLVERSION_NOW).cast_mut() }).map_or(
+        NonNull::new(unsafe { sys::curl_version_info(CURLVERSION_NOW) }).map_or(
             Some(Cow::Borrowed("unknown")),
             |version_info| {
                 // SAFETY: version_info is non-null and points to libcurl's version info.
@@ -82,26 +67,31 @@ static CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION: LazyLock<Option<Cow<'static, str>
                 if version_info_ref.version_num >= CURL_MIN_PROTOCOLS_STR_VERSION {
                     None
                 } else {
-                    Some(NonNull::new(version_info_ref.version.cast_mut()).map_or_else(
-                        || Cow::Borrowed("unknown"),
-                        |version_ptr| {
-                            // SAFETY: libcurl documents version as an ASCII NUL-terminated string.
-                            Cow::Owned(
-                                unsafe { CStr::from_ptr(version_ptr.as_ptr()) }
-                                    .to_string_lossy()
-                                    .into_owned(),
-                            )
-                        },
-                    ))
+                    let version_ptr = version_info_ref.version;
+                    let version = if version_ptr.is_null() {
+                        Cow::Borrowed("unknown")
+                    } else {
+                        // SAFETY: libcurl documents version as an ASCII NUL-terminated string.
+                        Cow::Owned(
+                            unsafe { CStr::from_ptr(version_ptr) }
+                                .to_string_lossy()
+                                .into_owned(),
+                        )
+                    };
+                    Some(version)
                 }
             },
         )
     });
-type Curl = c_void;
-type CurlCode = c_int;
-type CurlInfo = c_int;
-type CurlOption = c_int;
-type CurlVersion = c_int;
+#[repr(C)]
+struct Curl {
+    _data: (),
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
+}
+type CurlCode = c_uint;
+type CurlInfo = c_uint;
+type CurlOption = c_uint;
+type CurlVersion = c_uint;
 type CurlWriteCallback = unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize;
 #[repr(C)]
 struct CurlVersionInfoData {
@@ -235,13 +225,13 @@ impl EasyHandle {
         Ok(())
     }
     fn ensure_https_scheme(&self, context: &str) -> Result<()> {
-        let mut scheme = null::<c_char>();
+        let mut scheme = null_mut::<c_char>();
         // SAFETY: scheme is a valid output pointer for CURLINFO_SCHEME.
         let code = unsafe { sys::curl_easy_getinfo(self.as_ptr(), CURLINFO_SCHEME, &raw mut scheme) };
         if code != CURLE_OK {
             return Err(error(context, curl_error("curl_easy_getinfo scheme", code)));
         }
-        let Some(scheme_ptr) = NonNull::new(scheme.cast_mut()) else {
+        let Some(scheme_ptr) = NonNull::new(scheme) else {
             return Err(error(context, "curl 최종 scheme이 비어 있습니다."));
         };
         // SAFETY: libcurl returns a NUL-terminated scheme string owned by the easy handle.

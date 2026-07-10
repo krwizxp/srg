@@ -16,70 +16,7 @@ use std::{
     os::windows::ffi::OsStrExt as WindowsOsStrExt,
     time::{Instant, SystemTime},
 };
-mod sys {
-    use super::{HInternet, c_void};
-    #[link(name = "winhttp")]
-    unsafe extern "system" {
-        pub(super) fn WinHttpCloseHandle(h_internet: HInternet) -> i32;
-        pub(super) fn WinHttpConnect(
-            h_session: HInternet,
-            server_name: *const u16,
-            server_port: u16,
-            reserved: u32,
-        ) -> HInternet;
-        pub(super) fn WinHttpOpen(
-            user_agent: *const u16,
-            access_type: u32,
-            proxy_name: *const u16,
-            proxy_bypass: *const u16,
-            flags: u32,
-        ) -> HInternet;
-        pub(super) fn WinHttpOpenRequest(
-            h_connect: HInternet,
-            verb: *const u16,
-            object_name: *const u16,
-            version: *const u16,
-            referrer: *const u16,
-            accept_types: *const *const u16,
-            flags: u32,
-        ) -> HInternet;
-        pub(super) fn WinHttpQueryHeaders(
-            h_request: HInternet,
-            info_level: u32,
-            name: *const u16,
-            buffer: *mut c_void,
-            buffer_length: *mut u32,
-            index: *mut u32,
-        ) -> i32;
-        pub(super) fn WinHttpReceiveResponse(h_request: HInternet, reserved: *mut c_void) -> i32;
-        pub(super) fn WinHttpSendRequest(
-            h_request: HInternet,
-            headers: *const u16,
-            headers_length: u32,
-            optional: *const c_void,
-            optional_length: u32,
-            total_length: u32,
-            context: usize,
-        ) -> i32;
-        pub(super) fn WinHttpSetOption(
-            h_internet: HInternet,
-            option: u32,
-            buffer: *mut c_void,
-            buffer_length: u32,
-        ) -> i32;
-        pub(super) fn WinHttpSetTimeouts(
-            h_internet: HInternet,
-            resolve_timeout: i32,
-            connect_timeout: i32,
-            send_timeout: i32,
-            receive_timeout: i32,
-        ) -> i32;
-    }
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        pub(super) fn GetLastError() -> u32;
-    }
-}
+mod sys;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const AGE_HEADER_PREFIX: &[u8] = b"age:";
 const DATE_HEADER_PREFIX: &[u8] = b"date:";
@@ -649,7 +586,7 @@ impl Client {
         operation: &str,
         context: &str,
     ) -> Result<()> {
-        let mut raw_value = value;
+        let raw_value = value;
         let buffer_length = u32::try_from(size_of::<u32>())
             .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
@@ -657,7 +594,7 @@ impl Client {
             sys::WinHttpSetOption(
                 handle.0.as_ptr(),
                 option,
-                (&raw mut raw_value).cast::<c_void>(),
+                (&raw const raw_value).cast::<c_void>(),
                 buffer_length,
             )
         };
@@ -675,7 +612,7 @@ impl Client {
         operation: &str,
         context: &str,
     ) -> Result<()> {
-        let mut raw_value = value;
+        let raw_value = value;
         let buffer_length = u32::try_from(size_of::<u32>())
             .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: handle is a valid WinHTTP handle and raw_value points to a DWORD option value.
@@ -683,7 +620,7 @@ impl Client {
             sys::WinHttpSetOption(
                 handle.0.as_ptr(),
                 option,
-                (&raw mut raw_value).cast::<c_void>(),
+                (&raw const raw_value).cast::<c_void>(),
                 buffer_length,
             )
         };
@@ -720,7 +657,7 @@ impl Client {
         )
     }
     fn set_secure_protocols(&self, session: &Handle, context: &str) -> Result<()> {
-        let mut raw_value = WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2;
+        let raw_value = WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2;
         let buffer_length = u32::try_from(size_of::<u32>())
             .map_err(|source| error_with_source(context, "옵션 길이 변환 실패", source))?;
         // SAFETY: session is a valid WinHTTP session handle and raw_value points to a DWORD.
@@ -728,7 +665,7 @@ impl Client {
             sys::WinHttpSetOption(
                 session.0.as_ptr(),
                 WINHTTP_OPTION_SECURE_PROTOCOLS,
-                (&raw mut raw_value).cast::<c_void>(),
+                (&raw const raw_value).cast::<c_void>(),
                 buffer_length,
             )
         };

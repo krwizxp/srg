@@ -36,7 +36,7 @@ use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
 use std::{
     fs::File,
-    io::{BufWriter, ErrorKind, Seek as _, SeekFrom, Write, stderr, stdout},
+    io::{self, BufWriter, Seek as _, SeekFrom, Write, stderr, stdout},
     process::ExitCode,
     sync::Mutex,
     time::Instant,
@@ -223,7 +223,6 @@ impl MenuApp {
                 self.num_64 = next_num_64;
                 Ok(())
             }
-
             fn handle_generate_once_command(
                 &mut self,
                 out: &mut dyn Write,
@@ -237,7 +236,6 @@ impl MenuApp {
                 self.num_64 = next_num_64;
                 Ok(())
             }
-
             fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
                 const MAX_PLAYERS: usize = 512;
                 if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
@@ -514,7 +512,7 @@ impl MenuApp {
                         command
                     }
                     Ok(_) => 0,
-                    Err(read_err) if read_err.kind() == ErrorKind::UnexpectedEof => {
+                    Err(read_err) if read_err.kind() == io::ErrorKind::UnexpectedEof => {
                         return Ok(ExitCode::SUCCESS);
                     }
                     Err(read_err) => return Err(read_err.into()),
@@ -549,7 +547,6 @@ cfg_select! {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
             }
         }
-
         fn write_rdseed_fallback_notice(rng: &mut HardwareRng, err: &mut dyn Write) -> Result<()> {
             if rng.take_rdseed_fallback_notice() {
                 writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
