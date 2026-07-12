@@ -5,21 +5,17 @@ use crate::{
         HANGUL_BASE_CODE_POINT, HANGUL_SHIFTS, HANGUL_SYLLABLE_COUNT, HANGUL_SYLLABLE_MAX,
         HANGUL_SYLLABLE_MODULUS, INPUT_BYTE_MAX_FOR_EURO_MAIN, INPUT_BYTE_MAX_FOR_LOTTO,
         INPUT_BYTE_MAX_FOR_LOTTO7, INPUT_BYTE_MAX_FOR_LUCKY_STAR, INPUT_BYTE_MAX_FOR_PASSWORD,
-        LOTTO_COUNT, LOTTO_COUNT_U8, LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NMS_COORD_MASK,
-        NMS_GLYPH_COUNT, NMS_GLYPH_NUM_SHIFTS, NMS_GLYPH_PREFIX_COUNT, NMS_PLANET_MAX_VALUE,
-        NMS_PLANET_MODULUS, NMS_SOLAR_SYSTEM_MAX_VALUE, NMS_SOLAR_SYSTEM_MODULUS,
-        PASSWORD_BYTE_LEN, PASSWORD_BYTE_LEN_U8, U32_MAX_INV,
+        LOTTO_COUNT, LOTTO_COUNT_U8, LOTTO_MODULUS, LOTTO7_COUNT, LOTTO7_MODULUS, NIBBLE_MASK_U64,
+        NMS_COORD_MASK, NMS_GLYPH_COUNT, NMS_PLANET_MAX_VALUE, NMS_PLANET_MODULUS,
+        NMS_SOLAR_SYSTEM_MAX_VALUE, NMS_SOLAR_SYSTEM_MODULUS, PASSWORD_BYTE_LEN,
+        PASSWORD_BYTE_LEN_U8, U32_MAX_INV,
     },
-    diagnostic::Result,
+    diagnostic::{AppError, Result},
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
-    random_util::{
-        checked_add_one_u8, checked_add_one_u64, checked_add_one_usize, galaxy_coord,
-        glyph_from_low_nibble,
-    },
+    random_util::galaxy_coord,
 };
 cfg_select! {
     target_arch = "x86_64" => {
-        use crate::diagnostic::AppError;
         use super::hardware_rng::HardwareRng;
     }
     _ => {}
@@ -96,11 +92,12 @@ where
     seen_lotto7: u64,
     supplemental: Option<RandomBitBuffer>,
 }
-impl RandomDataSet {
-    pub(super) fn build_from<F>(num: u64, next_supp: &mut F) -> Result<Self>
-    where
-        F: FnMut(&'static str) -> Result<u64>,
-    {
+impl<'provider_ref, F> TryFrom<(u64, &'provider_ref mut F)> for RandomDataSet
+where
+    F: FnMut(&'static str) -> Result<u64>,
+{
+    type Error = AppError;
+    fn try_from((num, next_supp): (u64, &'provider_ref mut F)) -> Result<Self> {
         let mut state = RandomDataBuildState {
             data: Self {
                 num_64: num,
@@ -123,7 +120,7 @@ impl RandomDataSet {
         state.fill_required_fields()?;
         state.fill_lucky_stars()?;
         state.fill_hangul_syllables()?;
-        state.fill_coords()?;
+        state.fill_coords();
         state.fill_nms_fields()?;
         Ok(state.data)
     }
@@ -132,7 +129,7 @@ impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    fn fill_coords(&mut self) -> Result<()> {
+    fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.num.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -149,16 +146,15 @@ where
         self.data.nms_portal_yy = low_u8_from_u32(upper_32_bits);
         self.data.nms_portal_zzz = low_u16_from_u64((self.num >> 20) & NMS_COORD_MASK);
         self.data.nms_portal_xxx = low_u16_from_u64((self.num >> 8) & NMS_COORD_MASK);
-        self.data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_xxx)?;
-        self.data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(self.data.nms_portal_yy))?;
-        self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz)?;
-        Ok(())
+        self.data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_xxx);
+        self.data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(self.data.nms_portal_yy));
+        self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz);
     }
     fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
         for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
             let mut syllable_index = u32::from(low_u16_from_u64(self.num >> shift));
-            for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
+            for attempts_remaining in (0..SUPPLEMENTAL_RETRY_LIMIT).rev() {
                 if syllable_index <= HANGUL_SYLLABLE_MAX {
                     break;
                 }
@@ -175,6 +171,9 @@ where
                 if let Some(candidate) = candidate_value {
                     syllable_index = candidate;
                 } else {
+                    if attempts_remaining == 0 {
+                        break;
+                    }
                     self.next_supplemental("한글 음절 보완 재시도")?;
                 }
             }
@@ -197,7 +196,7 @@ where
             .as_ref()
             .map_or(self.num, |supp| supp.value());
         let mut lucky_star_source = lucky_star_base.reverse_bits();
-        for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
+        for attempts_remaining in (0..SUPPLEMENTAL_RETRY_LIMIT).rev() {
             for byte in lucky_star_source.to_be_bytes() {
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
                     continue;
@@ -212,6 +211,9 @@ where
                 {
                     return Ok(());
                 }
+            }
+            if attempts_remaining == 0 {
+                break;
             }
             lucky_star_source = self
                 .next_supplemental("유로밀리언 럭키 스타 보완")?
@@ -230,7 +232,7 @@ where
             self.next_supp,
         )?
         .rem_euclid(NMS_PLANET_MODULUS);
-        let planet_number = checked_add_one_u64(planet_number_base, "NMS 행성 번호 계산 실패")?;
+        let planet_number = planet_number_base.saturating_add(1);
         self.data.planet_number = low_u8_from_u64(planet_number);
         let solar_system_index_base = extract_valid_bits_for_nms::<12>(
             self.num,
@@ -241,32 +243,41 @@ where
             self.next_supp,
         )?
         .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS);
-        let solar_system_index =
-            checked_add_one_u64(solar_system_index_base, "NMS 태양계 번호 계산 실패")?;
+        let solar_system_index = solar_system_index_base.saturating_add(1);
         self.data.solar_system_index = low_u16_from_u64(solar_system_index);
-        let Some((prefix_glyphs, suffix_glyphs)) = self
-            .data
-            .glyph_string
-            .split_first_chunk_mut::<NMS_GLYPH_PREFIX_COUNT>()
-        else {
-            return Err("NMS glyph prefix 길이가 올바르지 않습니다.".into());
-        };
-        for (slot, nibble_source) in prefix_glyphs.iter_mut().zip([
+        let glyph_sources = [
             u64::from(self.data.planet_number),
             u64::from(self.data.solar_system_index >> 8_u32),
             u64::from(self.data.solar_system_index >> 4_u32),
             u64::from(self.data.solar_system_index),
-        ]) {
-            let Some(glyph) = glyph_from_low_nibble(nibble_source) else {
-                continue;
+            self.num >> 36_u32,
+            self.num >> 32_u32,
+            self.num >> 28_u32,
+            self.num >> 24_u32,
+            self.num >> 20_u32,
+            self.num >> 16_u32,
+            self.num >> 12_u32,
+            self.num >> 8_u32,
+        ];
+        for (slot, nibble_source) in self.data.glyph_string.iter_mut().zip(glyph_sources) {
+            *slot = match low_u8_from_u64(nibble_source & NIBBLE_MASK_U64) {
+                0x0 => '🌅',
+                0x1 => '🐦',
+                0x2 => '👫',
+                0x3 => '🦕',
+                0x4 => '🌘',
+                0x5 => '🎈',
+                0x6 => '⛵',
+                0x7 => '🕷',
+                0x8 => '🦋',
+                0x9 => '🌀',
+                0xA => '🧊',
+                0xB => '🐟',
+                0xC => '⛺',
+                0xD => '🚀',
+                0xE => '🌳',
+                _ => '🔯',
             };
-            *slot = glyph;
-        }
-        for (slot, shift) in suffix_glyphs.iter_mut().zip(NMS_GLYPH_NUM_SHIFTS) {
-            let Some(glyph) = glyph_from_low_nibble(self.num >> shift) else {
-                continue;
-            };
-            *slot = glyph;
         }
         Ok(())
     }
@@ -288,19 +299,12 @@ where
             }
             if self.numeric_password_digits < LOTTO_COUNT_U8 && {
                 let digit = u32::from(byte.rem_euclid(10));
-                let Some(next_password) = self
+                self.data.numeric_password = self
                     .data
                     .numeric_password
-                    .checked_mul(10)
-                    .and_then(|current_password| current_password.checked_add(digit))
-                else {
-                    return;
-                };
-                self.data.numeric_password = next_password;
-                let Some(next_digit_count) = checked_add_one_u8(self.numeric_password_digits)
-                else {
-                    return;
-                };
+                    .saturating_mul(10)
+                    .saturating_add(digit);
+                let next_digit_count = self.numeric_password_digits.saturating_add(1);
                 self.numeric_password_digits = next_digit_count;
                 next_digit_count >= LOTTO_COUNT_U8 && self.is_complete()
             } {
@@ -352,15 +356,13 @@ where
                 continue;
             }
             if self.password_len < PASSWORD_BYTE_LEN_U8
-                && let Some(password_byte) = byte
-                    .rem_euclid(ASCII_PRINTABLE_LEN)
-                    .checked_add(ASCII_PRINTABLE_START)
                 && let Some(slot) = self.data.password.get_mut(usize::from(self.password_len))
             {
+                let password_byte = byte
+                    .rem_euclid(ASCII_PRINTABLE_LEN)
+                    .saturating_add(ASCII_PRINTABLE_START);
                 *slot = password_byte;
-                let Some(next_password_len) = checked_add_one_u8(self.password_len) else {
-                    return;
-                };
+                let next_password_len = self.password_len.saturating_add(1);
                 self.password_len = next_password_len;
                 if next_password_len >= PASSWORD_BYTE_LEN_U8 && self.is_complete() {
                     return;
@@ -390,17 +392,10 @@ cfg_select! {
             let mut next_supp = |reason: &'static str| -> Result<u64> {
                 rng.next_u64().map_err(|source| AppError::context(reason, source))
             };
-            RandomDataSet::build_from(num, &mut next_supp)
+            RandomDataSet::try_from((num, &mut next_supp))
         }
     }
-    _ => {
-        pub(super) fn generate_random_data() -> Result<RandomDataSet> {
-            let mut next_supp = |_reason: &'static str| -> Result<u64> {
-                Err("이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.".into())
-            };
-            RandomDataSet::build_from(0, &mut next_supp)
-        }
-    }
+    _ => {}
 }
 fn process_lotto_numbers(
     byte: u8,
@@ -412,9 +407,10 @@ fn process_lotto_numbers(
     if *next_idx >= numbers.len() {
         return false;
     }
-    let Some(number) = byte.checked_rem(modulus).and_then(checked_add_one_u8) else {
+    let Some(number_base) = byte.checked_rem(modulus) else {
         return false;
     };
+    let number = number_base.saturating_add(1);
     let mask = 1_u64 << number;
     if (*seen & mask) != 0 {
         return false;
@@ -424,10 +420,7 @@ fn process_lotto_numbers(
     };
     *slot = number;
     *seen |= mask;
-    let Some(next_index) = checked_add_one_usize(*next_idx) else {
-        return false;
-    };
-    *next_idx = next_index;
+    *next_idx = next_idx.saturating_add(1);
     if *next_idx == numbers.len() {
         numbers.sort_unstable();
     }

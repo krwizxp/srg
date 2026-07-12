@@ -1,27 +1,24 @@
 use super::{Result, TimeError};
-use core::{error::Error, result::Result as CoreResult};
-pub(super) fn blend_weighted_nanos(
-    old_value: u128,
-    new_value: u128,
-    new_weight: u32,
-    total_weight: u32,
-) -> u128 {
-    let Some(old_weight) = total_weight.checked_sub(new_weight) else {
-        return new_value;
+use core::{error::Error, result::Result as CoreResult, time::Duration};
+#[derive(Clone, Copy)]
+pub(super) enum NewSampleWeight {
+    SeventyPercent,
+    ThirtyPercent,
+}
+pub(super) const fn blend_rtt(
+    old_value: Duration,
+    new_value: Duration,
+    weight: NewSampleWeight,
+) -> Duration {
+    let (old_weight, new_weight_value) = match weight {
+        NewSampleWeight::SeventyPercent => (3_u128, 7_u128),
+        NewSampleWeight::ThirtyPercent => (7_u128, 3_u128),
     };
-    let Some(weighted_old) = old_value.checked_mul(u128::from(old_weight)) else {
-        return new_value;
-    };
-    let Some(weighted_new) = new_value.checked_mul(u128::from(new_weight)) else {
-        return new_value;
-    };
-    let Some(weighted_sum) = weighted_old.checked_add(weighted_new) else {
-        return new_value;
-    };
-    let Some(weighted_average) = weighted_sum.checked_div(u128::from(total_weight)) else {
-        return new_value;
-    };
-    weighted_average
+    let weighted_sum = old_value
+        .as_nanos()
+        .saturating_mul(old_weight)
+        .saturating_add(new_value.as_nanos().saturating_mul(new_weight_value));
+    Duration::from_nanos_u128(weighted_sum.div_euclid(10))
 }
 pub(super) fn parse_result_with_context<T, E>(
     result: CoreResult<T, E>,

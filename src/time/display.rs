@@ -1,7 +1,7 @@
 use super::{
     CivilDate, KST_OFFSET_SECS, Result, ServerTime, TimeError,
     http_date::civil_from_days,
-    util::{blend_weighted_nanos, parse_result_with_context},
+    util::{NewSampleWeight, blend_rtt, parse_result_with_context},
 };
 use crate::{
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
@@ -204,10 +204,8 @@ impl ServerTime {
         };
         server_time
     }
-    pub(super) fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
-        let smoothed_rtt_nanos =
-            blend_weighted_nanos(self.baseline_rtt.as_nanos(), new_rtt.as_nanos(), 3, 10);
-        let smoothed_rtt = Duration::from_nanos_u128(smoothed_rtt_nanos);
+    pub(super) const fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
+        let smoothed_rtt = blend_rtt(self.baseline_rtt, new_rtt, NewSampleWeight::ThirtyPercent);
         Self {
             anchor_time: self.anchor_time,
             anchor_instant: self.anchor_instant,

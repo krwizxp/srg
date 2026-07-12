@@ -1,4 +1,11 @@
-use super::{c_char, c_int, c_void};
+use super::{PollDescriptorCount, PollFd, c_char, c_int, c_void};
+unsafe extern "C" {
+    pub(super) fn poll(
+        fds: *mut PollFd,
+        nfds: PollDescriptorCount,
+        timeout: c_int,
+    ) -> c_int;
+}
 #[link(name = "dl")]
 unsafe extern "C" {
     pub(super) fn dlclose(handle: *mut c_void) -> c_int;

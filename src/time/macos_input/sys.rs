@@ -22,4 +22,6 @@ unsafe extern "C" {
     ) -> CGEventRef;
     pub(super) fn CGEventGetLocation(event: CGEventRef) -> CGPoint;
     pub(super) fn CGEventPost(tap: CGEventTapLocation, event: CGEventRef);
+    pub(super) fn CGPreflightPostEventAccess() -> bool;
+    pub(super) fn CGRequestPostEventAccess() -> bool;
 }

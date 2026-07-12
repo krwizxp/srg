@@ -1,9 +1,8 @@
 use core::{fmt, range::Range};
 use std::io;
-const SINGLE_BYTE_WIDTH: usize = 1;
 const TWO_DIGIT_TABLE_LEN: usize = 100;
 pub(super) const DIGITS: [u8; 10] = *b"0123456789";
-const TWO_DIGITS: [[u8; 2]; TWO_DIGIT_TABLE_LEN] = [
+pub(super) const TWO_DIGITS: [[u8; 2]; TWO_DIGIT_TABLE_LEN] = [
     *b"00", *b"01", *b"02", *b"03", *b"04", *b"05", *b"06", *b"07", *b"08", *b"09", *b"10", *b"11",
     *b"12", *b"13", *b"14", *b"15", *b"16", *b"17", *b"18", *b"19", *b"20", *b"21", *b"22", *b"23",
     *b"24", *b"25", *b"26", *b"27", *b"28", *b"29", *b"30", *b"31", *b"32", *b"33", *b"34", *b"35",
@@ -25,20 +24,15 @@ impl<'buffer> ByteCursor<'buffer> {
     pub(super) fn take(&mut self, len: usize) -> io::Result<&mut [u8]> {
         let start = self.pos;
         let end = start.checked_add(len).ok_or_else(write_zero_err)?;
-        if end > self.buf.len() {
-            return Err(write_zero_err());
-        }
-        self.pos = end;
-        self.buf
+        let slice = self
+            .buf
             .get_mut(Range { start, end })
-            .ok_or_else(write_zero_err)
+            .ok_or_else(write_zero_err)?;
+        self.pos = end;
+        Ok(slice)
     }
     pub(super) fn write_byte(&mut self, byte: u8) -> io::Result<()> {
-        let Some(slot) = self.take(SINGLE_BYTE_WIDTH)?.first_mut() else {
-            return Err(write_zero_err());
-        };
-        *slot = byte;
-        Ok(())
+        self.write_bytes(&[byte])
     }
     pub(super) fn write_bytes(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.take(bytes.len())?.copy_from_slice(bytes);

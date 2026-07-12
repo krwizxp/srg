@@ -10,9 +10,6 @@ cfg_select! {
     }
     _ => {}
 }
-pub(super) static GLYPHS: [char; 16] = [
-    '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
-];
 pub(super) static IS_TERMINAL: LazyLock<bool> =
     LazyLock::new(|| TerminalDetect::is_terminal(&stdout()));
 pub(super) const FILE_NAME: &str = "random_data.txt";
@@ -43,28 +40,15 @@ pub(super) const LOTTO_COUNT_U8: u8 = 6;
 pub(super) const NIBBLE_MASK_U64: u64 = 0xF;
 pub(super) const NMS_COORD_MASK: u64 = 0x0FFF;
 pub(super) const NMS_GLYPH_COUNT: usize = 12;
-pub(super) const NMS_GLYPH_PREFIX_COUNT: usize = 4;
 pub(super) const NMS_PLANET_MAX_VALUE: u64 = 11;
 pub(super) const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
 pub(super) const HANGUL_SHIFTS: [u32; 4] = [48_u32, 32, 16, 0];
-pub(super) const NMS_GLYPH_NUM_SHIFTS: [u32; 8] = [36_u32, 32, 28, 24, 20, 16, 12, 8];
 pub(super) const NMS_PLANET_MODULUS: u64 = 6;
 pub(super) const NMS_SOLAR_SYSTEM_MAX_VALUE: u64 = 3834;
 pub(super) const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
-pub(super) const ONE_BASED_OFFSET_U8: u8 = 1;
-pub(super) const ONE_BASED_OFFSET_U64: u64 = 1;
-pub(super) const ONE_BASED_OFFSET_USIZE: usize = 1;
 pub(super) const PASSWORD_BYTE_LEN: usize = 8;
 pub(super) const PASSWORD_BYTE_LEN_U8: u8 = 8;
 const _: () = assert!(
     HANGUL_SHIFTS.len() == HANGUL_SYLLABLE_COUNT,
     "Hangul shift table must match syllable count"
-);
-const _: () = assert!(
-    NMS_GLYPH_PREFIX_COUNT <= NMS_GLYPH_COUNT,
-    "NMS glyph prefix must fit in glyph buffer"
-);
-const _: () = assert!(
-    NMS_GLYPH_NUM_SHIFTS.len() == NMS_GLYPH_COUNT - NMS_GLYPH_PREFIX_COUNT,
-    "NMS suffix shift table must match suffix glyph count"
 );

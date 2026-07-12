@@ -1,7 +1,5 @@
-use super::{
-    HeadResponse, MIN_TRANSFER_TIME, ParseHttpDate, Result, TCP_TIMEOUT, error,
-};
-use super::super::{TimeError, TimeErrorKind};
+use super::{HeadResponse, MIN_TRANSFER_TIME, Result, error};
+use super::super::{TimeError, TimeErrorKind, http_date::parse_http_date_to_systemtime};
 use super::super::sample::{
     AGE_HEADER_PREFIX, DATE_HEADER_PREFIX, find_header_value, validate_http_age_value,
 };
@@ -26,11 +24,9 @@ const CURLOPT_ERRORBUFFER: CurlOption = 10_010;
 const CURLOPT_FOLLOWLOCATION: CurlOption = 52;
 const CURLOPT_HEADERDATA: CurlOption = 10_029;
 const CURLOPT_HEADERFUNCTION: CurlOption = 20_079;
-const CURLOPT_MAXREDIRS: CurlOption = 68;
 const CURLOPT_NOBODY: CurlOption = 44;
 const CURLOPT_NOSIGNAL: CurlOption = 99;
 const CURLOPT_PROTOCOLS_STR: CurlOption = 10_318;
-const CURLOPT_REDIR_PROTOCOLS_STR: CurlOption = 10_319;
 const CURLOPT_SSLVERSION: CurlOption = 32;
 const CURLOPT_TIMEOUT_MS: CurlOption = 155;
 const CURLOPT_URL: CurlOption = 10_002;
@@ -43,8 +39,8 @@ const CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX: &str =
     "은 HTTPS protocol 제한 최신 API를 지원하지 않습니다. libcurl 7.85.0 이상이 필요합니다.";
 const HTTP_HEAD_MAX_BODY_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 1024 * 1024;
+const TCP_TIMEOUT_MILLIS: c_long = 5_000;
 const HTTPS_PROTOCOL: &CStr = c"https";
-const MAX_HTTP_REDIRECTS: c_long = 5;
 const USER_AGENT_C_BYTES: &[u8] = concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
 const USER_AGENT: &CStr = {
     // SAFETY: concat! emits exactly one trailing NUL here, and Cargo package versions cannot
@@ -209,19 +205,17 @@ impl EasyHandle {
         self.setopt_str(CURLOPT_URL, url.as_ptr(), context)?;
         self.setopt_str(CURLOPT_USERAGENT, user_agent.as_ptr(), context)?;
         self.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
-        self.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, tcp_timeout_millis(), context)?;
-        self.setopt_long(CURLOPT_TIMEOUT_MS, tcp_timeout_millis(), context)?;
+        self.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
+        self.setopt_long(CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
         self.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
         self.setopt_long(CURLOPT_NOBODY, 1, context)?;
-        self.setopt_long(CURLOPT_FOLLOWLOCATION, 1, context)?;
-        self.setopt_long(CURLOPT_MAXREDIRS, MAX_HTTP_REDIRECTS, context)?;
+        self.setopt_long(CURLOPT_FOLLOWLOCATION, 0, context)?;
         self.setopt_long(
             CURLOPT_SSLVERSION,
             CURL_SSLVERSION_TLSV1_2 | CURL_SSLVERSION_MAX_DEFAULT,
             context,
         )?;
         self.setopt_str(CURLOPT_PROTOCOLS_STR, HTTPS_PROTOCOL.as_ptr(), context)?;
-        self.setopt_str(CURLOPT_REDIR_PROTOCOLS_STR, HTTPS_PROTOCOL.as_ptr(), context)?;
         Ok(())
     }
     fn ensure_https_scheme(&self, context: &str) -> Result<()> {
@@ -308,7 +302,6 @@ impl Client {
         &mut self,
         url: &str,
         context: &str,
-        parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
         let mut url_buffer = mem::take(&mut self.url_buffer);
         let result = (|| {
@@ -335,7 +328,7 @@ impl Client {
                     source,
                 )
             })?;
-            self.fetch_head_curl(url_c, context, parse_http_date)
+            self.fetch_head_curl(url_c, context)
         })();
         self.url_buffer = url_buffer;
         result
@@ -344,7 +337,6 @@ impl Client {
         &mut self,
         url_c: &CStr,
         context: &str,
-        parse_http_date: ParseHttpDate,
     ) -> Result<HeadResponse> {
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
         let mut body_sink = CurlBodySink {
@@ -438,7 +430,7 @@ impl Client {
         Ok(HeadResponse {
             response_received_inst,
             rtt: http_elapsed,
-            server_time: parse_http_date(date_header_raw)?,
+            server_time: parse_http_date_to_systemtime(date_header_raw)?,
         })
     }
 }
@@ -617,10 +609,4 @@ unsafe extern "C" fn write_callback(
         return 0;
     }
     len
-}
-fn tcp_timeout_millis() -> c_long {
-    let Ok(millis) = c_long::try_from(TCP_TIMEOUT.as_millis()) else {
-        return 5_000;
-    };
-    millis
 }

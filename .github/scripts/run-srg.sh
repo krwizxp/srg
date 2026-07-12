@@ -30,6 +30,7 @@ printf 'artifact_name_prefix=%s\n' "$artifact_prefix" >> "$github_output"
 printf 'log_artifact_path=%s\n' "$log_path" >> "$github_output"
 
 error_logged=0
+temporary_paths=()
 
 log_error() {
   local message="$1"
@@ -47,20 +48,28 @@ die() {
   exit 1
 }
 
-trap 'status=$?; if (( status != 0 && error_logged == 0 )); then log_error "Workflow failed with exit code $status."; fi' EXIT
+cleanup_temporary_paths() {
+  if (( ${#temporary_paths[@]} == 0 )); then
+    return
+  fi
+  if ! rm -f -- "${temporary_paths[@]}"; then
+    printf '%s\n' "Failed to remove one or more workflow temporary files." >&2
+  fi
+}
+
+on_exit() {
+  local status=$?
+  cleanup_temporary_paths
+  if (( status != 0 && error_logged == 0 )); then
+    log_error "Workflow failed with exit code $status."
+  fi
+  return "$status"
+}
+
+trap on_exit EXIT
 
 if [[ ! -x "$exe_path" ]]; then
   die "Built SRG binary not found or not executable: $exe_path"
-fi
-
-python_bin=""
-if command -v python3 >/dev/null 2>&1 &&
-  python3 -c 'import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)' >/dev/null 2>&1; then
-  python_bin="python3"
-elif command -v python >/dev/null 2>&1 && python -c 'import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)' >/dev/null 2>&1; then
-  python_bin="python"
-else
-  die "Python 3 is required to validate numeric workflow inputs."
 fi
 
 trim_string() {
@@ -118,7 +127,7 @@ parse_int_range() {
   local invalid_message="$5"
   local output
 
-  if ! output="$("$python_bin" - "$value" "$name" "$min_value" "$max_value" "$invalid_message" 2>&1 <<'PY'
+  if ! output="$(python3 - "$value" "$name" "$min_value" "$max_value" "$invalid_message" 2>&1 <<'PY'
 import sys
 
 raw, name, min_raw, max_raw, invalid_message = sys.argv[1:]
@@ -147,7 +156,7 @@ parse_float() {
   local name="$2"
   local output
 
-  if ! output="$("$python_bin" - "$value" "$name" 2>&1 <<'PY'
+  if ! output="$(python3 - "$value" "$name" 2>&1 <<'PY'
 import math
 import sys
 
@@ -175,7 +184,7 @@ ensure_float_order() {
   local min_value="$1"
   local max_value="$2"
 
-  if ! "$python_bin" - "$min_value" "$max_value" >/dev/null 2>&1 <<'PY'
+  if ! python3 - "$min_value" "$max_value" >/dev/null 2>&1 <<'PY'
 import sys
 
 minimum, maximum = (float(value) for value in sys.argv[1:])
@@ -200,6 +209,25 @@ write_process_log() {
   fi
 }
 
+require_generated_data() {
+  local byte_count
+  if [[ ! -f "$data_path" ]]; then
+    die "srg did not create random_data.txt. See $log_path."
+  fi
+  byte_count="$(wc -c < "$data_path")"
+  if (( byte_count <= 3 )); then
+    die "srg did not write generated data to random_data.txt. See $log_path."
+  fi
+}
+
+require_log_text() {
+  local expected="$1"
+  local description="$2"
+  if ! grep -Fq -- "$expected" "$log_path"; then
+    die "srg did not produce $description. See $log_path."
+  fi
+}
+
 run_srg_with_lines() {
   local stdout_path
   local stderr_path
@@ -207,8 +235,11 @@ run_srg_with_lines() {
   local exit_code=0
 
   stdout_path="$(mktemp)"
+  temporary_paths+=("$stdout_path")
   stderr_path="$(mktemp)"
+  temporary_paths+=("$stderr_path")
   input_path="$(mktemp)"
+  temporary_paths+=("$input_path")
   printf '%s\n' "$@" > "$input_path"
 
   if "$exe_path" < "$input_path" > "$stdout_path" 2> "$stderr_path"; then
@@ -232,7 +263,9 @@ run_time_sync_observe() {
   local exit_code=0
 
   stdout_path="$(mktemp)"
+  temporary_paths+=("$stdout_path")
   stderr_path="$(mktemp)"
+  temporary_paths+=("$stderr_path")
 
   if {
     printf '6\n'
@@ -258,6 +291,7 @@ run_time_sync_observe() {
 case "$action" in
   generate-single)
     run_srg_with_lines "6" "3" "q"
+    require_generated_data
     ;;
   generate-multiple)
     count="$(
@@ -269,6 +303,7 @@ case "$action" in
         "count must be a valid unsigned integer."
     )"
     run_srg_with_lines "6" "4" "$count" "q"
+    require_generated_data
     ;;
   ladder)
     players=()
@@ -282,13 +317,14 @@ case "$action" in
       die "results entry count must match players entry count."
     fi
     run_srg_with_lines "6" "1" "$(join_by_comma "${players[@]}")" "$(join_by_comma "${results[@]}")" "q"
+    require_log_text "사다리타기 결과:" "a ladder result"
     ;;
   random-integer)
     min="$(
       parse_int_range \
         "${SRG_INT_MIN:-}" \
         "int_min" \
-        "-9223372036854775808" \
+        "-9223372036854775807" \
         "9223372036854775807" \
         "int_min must be a valid integer."
     )"
@@ -296,7 +332,7 @@ case "$action" in
       parse_int_range \
         "${SRG_INT_MAX:-}" \
         "int_max" \
-        "-9223372036854775808" \
+        "-9223372036854775807" \
         "9223372036854775807" \
         "int_max must be a valid integer."
     )"
@@ -304,12 +340,14 @@ case "$action" in
       die "int_max must be greater than or equal to int_min."
     fi
     run_srg_with_lines "6" "2" "1" "$min" "$max" "q"
+    require_log_text "무작위 정수(" "a random integer result"
     ;;
   random-float)
     min="$(parse_float "${SRG_FLOAT_MIN:-}" "float_min")"
     max="$(parse_float "${SRG_FLOAT_MAX:-}" "float_max")"
     ensure_float_order "$min" "$max"
     run_srg_with_lines "6" "2" "2" "$min" "$max" "q"
+    require_log_text "무작위 실수(" "a random float result"
     ;;
   time-sync-observe)
     time_host="${SRG_TIME_HOST:-}"
@@ -322,7 +360,11 @@ case "$action" in
         "observe_seconds must be a valid integer."
     )"
     require_non_empty "$time_host" "time_host"
+    if [[ "$time_host" == *$'\r'* || "$time_host" == *$'\n'* ]]; then
+      die "time_host must be a single line."
+    fi
     run_time_sync_observe "$time_host" "$observe_seconds"
+    require_log_text "서버 시간:" "server time output"
     ;;
   *)
     die "Unsupported action: $action"

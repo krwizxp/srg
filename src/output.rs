@@ -7,11 +7,9 @@ use crate::{
     tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER},
 };
 use core::{fmt::Write as FmtWrite, range::Range};
-use std::io::Result as IoResult;
+use std::io::{Result as IoResult, Write as IoWrite, stdout};
 cfg_select! {
     target_arch = "x86_64" => {
-        use std::io::{Write as IoWrite, stdout};
-        use std::{fs::File, io::BufWriter, sync::MutexGuard};
         pub(super) mod progress;
         pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
     }
@@ -79,9 +77,7 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            let galaxy_number = u16::from(galaxy_number_byte)
-                .checked_add(1)
-                .ok_or_else(write_zero_err)?;
+            let galaxy_number = u16::from(galaxy_number_byte).saturating_add(1);
             buf_write_u32_dec(buffer_cur, u32::from(galaxy_number))
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
@@ -195,7 +191,7 @@ impl OutputFormatter<'_, '_, '_> {
         let head = self.cursor.take(line_len)?;
         range_slice_mut(head, 0, prefix_len)?.copy_from_slice(prefix_bytes);
         let mut pos = prefix_len;
-        let last_index = BYTE_GROUP_COUNT.checked_sub(1).ok_or_else(write_zero_err)?;
+        let last_index = BYTE_GROUP_COUNT.saturating_sub(1);
         for (index, byte) in self.bytes.into_iter().enumerate() {
             let group = render_group(byte)?;
             range_slice_mut(head, pos, group_width)?.copy_from_slice(group);
@@ -516,19 +512,8 @@ fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> 
         buf_write_hex_u16_0pad4(cur, value)
     }
 }
-cfg_select! {
-    target_arch = "x86_64" => {
-        pub(super) fn write_buffer_to_file_guard(
-            file_guard: &mut MutexGuard<'_, BufWriter<File>>,
-            buffer: &[u8],
-        ) -> IoResult<()> {
-            IoWrite::write_all(&mut **file_guard, buffer)
-        }
-        pub(super) fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
-            let mut stdout_lock = stdout().lock();
-            IoWrite::write_all(&mut stdout_lock, data_slice)?;
-            IoWrite::flush(&mut stdout_lock)
-        }
-    }
-    _ => {}
+pub(super) fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
+    let mut stdout_lock = stdout().lock();
+    IoWrite::write_all(&mut stdout_lock, data_slice)?;
+    IoWrite::flush(&mut stdout_lock)
 }

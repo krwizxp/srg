@@ -10,6 +10,16 @@ const MOUSEEVENTF_LEFTDOWN: u32 = 0x0002;
 const MOUSEEVENTF_LEFTUP: u32 = 0x0004;
 const KEYEVENTF_KEYUP: u32 = 0x0002;
 const VK_F5: u16 = 0x74;
+const INPUT_EVENT_COUNT: u32 = 2;
+cfg_select! {
+    target_pointer_width = "64" => {
+        const INPUT_SIZE: i32 = 40;
+    }
+    target_pointer_width = "32" => {
+        const INPUT_SIZE: i32 = 28;
+    }
+    _ => {}
+}
 #[repr(C)]
 #[derive(Copy, Clone, Default)]
 struct MouseInput {
@@ -91,36 +101,17 @@ pub(super) enum InputAction {
     F5Press,
     MouseClick,
 }
-pub(super) struct PreparedInput;
-impl PreparedInput {
-    pub(super) const EMPTY: Self = Self;
-    pub(super) fn prepare(&mut self, _action: Option<InputAction>, _err: &mut dyn Write) {
-        *self = Self;
-    }
-    pub(super) const fn reset(&mut self) {
-        *self = Self;
-    }
-    pub(super) fn send(
-        &mut self,
-        action: InputAction,
-        err: &mut dyn Write,
-    ) -> NativeInputSendStatus {
-        *self = Self;
-        match action {
-            InputAction::MouseClick => {
+impl InputAction {
+    pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
+        match self {
+            Self::MouseClick => {
                 let release = mouse_input(MOUSEEVENTF_LEFTUP);
-                let inputs = [
-                    mouse_input(MOUSEEVENTF_LEFTDOWN),
-                    release,
-                ];
+                let inputs = [mouse_input(MOUSEEVENTF_LEFTDOWN), release];
                 send_input_events(&inputs, &release, err)
             }
-            InputAction::F5Press => {
+            Self::F5Press => {
                 let release = keyboard_input(VK_F5, KEYEVENTF_KEYUP);
-                let inputs = [
-                    keyboard_input(VK_F5, KEYEVENTF_KEYDOWN),
-                    release,
-                ];
+                let inputs = [keyboard_input(VK_F5, KEYEVENTF_KEYDOWN), release];
                 send_input_events(&inputs, &release, err)
             }
         }
@@ -150,33 +141,24 @@ fn mouse_input(dw_flags: u32) -> Input {
     }
 }
 fn send_input_events(
-    inputs: &[Input],
+    inputs: &[Input; 2],
     release_input: &Input,
     err: &mut dyn Write,
 ) -> NativeInputSendStatus {
-    let Ok(input_count) = u32::try_from(inputs.len()) else {
-        write_line_best_effort(err, format_args!("[경고] Windows 입력 이벤트 수 변환 실패"));
-        return NativeInputSendStatus::FailedBeforeSend;
-    };
-    let Ok(input_size) = i32::try_from(size_of::<Input>()) else {
-        write_line_best_effort(
-            err,
-            format_args!("[경고] Windows 입력 이벤트 크기 변환 실패"),
-        );
-        return NativeInputSendStatus::FailedBeforeSend;
-    };
     // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
-    let sent = unsafe { sys::SendInput(input_count, inputs.as_ptr(), input_size) };
-    if sent == input_count {
+    let sent = unsafe { sys::SendInput(INPUT_EVENT_COUNT, inputs.as_ptr(), INPUT_SIZE) };
+    if sent == INPUT_EVENT_COUNT {
         return NativeInputSendStatus::Sent;
     }
     write_line_best_effort(
         err,
-        format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {input_count}, 전송 {sent}"),
+        format_args!(
+            "[경고] Windows 입력 이벤트 전송 실패: 요청 {INPUT_EVENT_COUNT}, 전송 {sent}"
+        ),
     );
     if sent == 1 {
-        // SAFETY: `release` is a valid one-element INPUT pointer and `input_size` matches the Rust representation.
-        let release_sent = unsafe { sys::SendInput(1, release_input, input_size) };
+        // SAFETY: `release` is a valid one-element INPUT pointer and `INPUT_SIZE` matches the Rust representation.
+        let release_sent = unsafe { sys::SendInput(1, release_input, INPUT_SIZE) };
         if release_sent != 1 {
             write_line_best_effort(
                 err,

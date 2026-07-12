@@ -15,7 +15,8 @@
   <link rel="manifest" href="./site.webmanifest?v=4">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" crossorigin
+  <link rel="stylesheet" crossorigin="anonymous"
+    integrity="sha384-ei/b2Mz3F5J8nqTvpKS89CkzDCuD7Cc+/F+OsaPUKItzHgLNKnGq3rjtYq/B7RnO"
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <script>
     (() => {
@@ -2110,7 +2111,10 @@
       s = String(s ?? "");
       if (s) {
         const c0 = s.charCodeAt(0);
-        if (c0 === 9 || c0 === 61 || c0 === 43 || c0 === 45 || c0 === 64) {
+        if (
+          c0 === 9 || c0 === 10 || c0 === 13 || c0 === 61 || c0 === 43 ||
+          c0 === 45 || c0 === 64
+        ) {
           s = "'" + s;
         }
       }
@@ -2128,14 +2132,6 @@
       return needsQuote ? `"${s}"` : s;
     };
     const lower = (s) => String(s || "").toLowerCase();
-    const geocodeText = (v) => (typeof v === "string" ? v : "");
-    const firstGeocodeText = (...vals) => {
-      for (let i = 0; i < vals.length; i++) {
-        const v = vals[i];
-        if (typeof v === "string" && v) return v;
-      }
-      return "";
-    };
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -2153,6 +2149,27 @@
       REVERSE_CACHE_MAX: 10_000,
       REVERSE_CACHE_STORAGE_MAX: 2_000,
       REVERSE_CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
+      REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
+      REVERSE_TEXT_HARD_LIMIT: 4_096,
+    };
+    const REVERSE_TEXT_LIMIT_MESSAGE =
+      `역지오코딩 문자열이 허용 길이 ${CONFIG.REVERSE_TEXT_HARD_LIMIT}자를 초과했습니다.`;
+    class InputLimitError extends Error {}
+    const isBoundedReverseText = (v) =>
+      typeof v === "string" && v.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
+    const geocodeText = (v) => {
+      if (typeof v !== "string") return "";
+      if (!isBoundedReverseText(v)) {
+        throw new InputLimitError(REVERSE_TEXT_LIMIT_MESSAGE);
+      }
+      return v;
+    };
+    const firstGeocodeText = (...vals) => {
+      for (let i = 0; i < vals.length; i++) {
+        const v = geocodeText(vals[i]);
+        if (v) return v;
+      }
+      return "";
     };
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
@@ -3618,8 +3635,8 @@
             },
           };
         }
-        const label = String(gc.label || "");
-        const countryCode = String(gc.country_code || "").toLowerCase();
+        const label = geocodeText(gc.label);
+        const countryCode = geocodeText(gc.country_code).toLowerCase();
         let firstLabelPart = "";
         let p0 = "";
         let p1 = "";
@@ -3675,7 +3692,11 @@
         if (countryCode === "kr") kind = "KR";
         else if (countryCode === "kp") kind = "KP";
         else if (countryCode) kind = "WORLD";
-        return { addr, kind };
+        const parsed = { addr, kind };
+        if (!isValidReverseParsed(parsed)) {
+          throw new InputLimitError(REVERSE_TEXT_LIMIT_MESSAGE);
+        }
+        return parsed;
       },
     };
     const AppState = {
@@ -4081,7 +4102,6 @@
         }
       }
     }
-    class InputLimitError extends Error {}
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
         throw new InputLimitError(
@@ -4200,8 +4220,6 @@
       return out;
     }
     const REVERSE_PARSED_CACHE = new Map();
-    const REVERSE_PARSED_CACHE_KEYS = [];
-    let REVERSE_PARSED_CACHE_HEAD = 0;
     const REVERSE_PARSED_CACHE_MAX = 5_000;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
@@ -4210,39 +4228,47 @@
     let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
     const REVERSE_PERSISTENT_CACHE_KEY_CACHE = new Map();
     function putReverseMemoryCache(cacheKey, parsed) {
+      REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
-      REVERSE_PARSED_CACHE_KEYS.push(cacheKey);
-      if (
-        REVERSE_PARSED_CACHE_KEYS.length - REVERSE_PARSED_CACHE_HEAD >
-        REVERSE_PARSED_CACHE_MAX
-      ) {
-        REVERSE_PARSED_CACHE.delete(
-          REVERSE_PARSED_CACHE_KEYS[REVERSE_PARSED_CACHE_HEAD++],
-        );
-        if (
-          REVERSE_PARSED_CACHE_HEAD > 1024 &&
-          REVERSE_PARSED_CACHE_HEAD * 2 > REVERSE_PARSED_CACHE_KEYS.length
-        ) {
-          REVERSE_PARSED_CACHE_KEYS.splice(0, REVERSE_PARSED_CACHE_HEAD);
-          REVERSE_PARSED_CACHE_HEAD = 0;
-        }
+      if (REVERSE_PARSED_CACHE.size > REVERSE_PARSED_CACHE_MAX) {
+        const oldest = REVERSE_PARSED_CACHE.keys().next();
+        if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
     }
     function resetReverseMemoryCache() {
       REVERSE_PARSED_CACHE.clear();
-      REVERSE_PARSED_CACHE_KEYS.length = 0;
-      REVERSE_PARSED_CACHE_HEAD = 0;
       REVERSE_PERSISTENT_CACHE_KEY_CACHE.clear();
     }
     function isReversePersistentCacheKey(key) {
-      return typeof key === "string" && key.startsWith(REVERSE_CACHE_KEY_PREFIX);
+      return typeof key === "string" && /^sha256:[0-9a-f]{64}$/.test(key);
+    }
+    function isValidReverseParsed(parsed) {
+      const addr = parsed?.addr;
+      return !!addr && typeof parsed === "object" &&
+        typeof addr === "object" &&
+        isBoundedReverseText(addr.sido) &&
+        isBoundedReverseText(addr.sigungu) &&
+        isBoundedReverseText(addr.eupmyeon) &&
+        isBoundedReverseText(addr.tag) &&
+        isBoundedReverseText(addr.fullAddr) &&
+        (parsed.kind === undefined || isBoundedReverseText(parsed.kind)) &&
+        (parsed.kindLower === undefined ||
+          isBoundedReverseText(parsed.kindLower)) &&
+        (parsed.nSido === undefined || isBoundedReverseText(parsed.nSido)) &&
+        (parsed.nSigungu === undefined ||
+          isBoundedReverseText(parsed.nSigungu)) &&
+        (parsed.nEmd === undefined || isBoundedReverseText(parsed.nEmd)) &&
+        (parsed.nTag === undefined || isBoundedReverseText(parsed.nTag)) &&
+        (parsed.nFullAddr === undefined ||
+          isBoundedReverseText(parsed.nFullAddr));
     }
     function isFreshReverseCacheRow(row, now = Date.now()) {
       if (
         !row ||
         row.variant !== REVERSE_CACHE_VARIANT ||
         row.parserVersion !== CONFIG.REVERSE_CACHE_PARSER_VERSION ||
-        !Number.isFinite(row.savedAt)
+        !Number.isFinite(row.savedAt) ||
+        !isValidReverseParsed(row.parsed)
       ) {
         return false;
       }
@@ -4271,6 +4297,14 @@
         })
         .catch(() => null);
       REVERSE_PERSISTENT_CACHE_KEY_CACHE.set(cacheKey, keyPromise);
+      if (
+        REVERSE_PERSISTENT_CACHE_KEY_CACHE.size > REVERSE_PARSED_CACHE_MAX
+      ) {
+        const oldest = REVERSE_PERSISTENT_CACHE_KEY_CACHE.keys().next();
+        if (!oldest.done) {
+          REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(oldest.value);
+        }
+      }
       const persistentKey = await keyPromise;
       if (!persistentKey) REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(cacheKey);
       return persistentKey;
@@ -4278,11 +4312,13 @@
     let REVERSE_CACHE_STORAGE;
     let REVERSE_CACHE_STORAGE_KEYS = null;
     let REVERSE_CACHE_STORAGE_KEY_SET = null;
+    let REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = 0;
     let REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
     function disableReverseCacheStorage() {
       REVERSE_CACHE_STORAGE = null;
       REVERSE_CACHE_STORAGE_KEYS = [];
       REVERSE_CACHE_STORAGE_KEY_SET = new Set();
+      REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = 0;
       REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
     }
     function cleanupLegacyReverseCacheStorage(store) {
@@ -4320,6 +4356,7 @@
         cleanupLegacyReverseCacheStorage(store);
         store.removeItem(REVERSE_CACHE_STORAGE_OLD_INDEX_KEY);
         REVERSE_CACHE_STORAGE = store;
+        pruneReverseCacheStorage(store);
       } catch {
         disableReverseCacheStorage();
       }
@@ -4363,6 +4400,10 @@
         }
         REVERSE_CACHE_STORAGE_KEYS = keys;
         REVERSE_CACHE_STORAGE_KEY_SET = new Set(keys);
+        REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = Math.max(
+          0,
+          store.length - keys.length,
+        );
         REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
         return keys;
       } catch {
@@ -4436,6 +4477,13 @@
         }
       }
       try {
+        if (
+          store.length - REVERSE_CACHE_STORAGE_NON_CACHE_COUNT >
+            CONFIG.REVERSE_CACHE_STORAGE_MAX
+        ) {
+          pruneReverseCacheStorage(store);
+          return;
+        }
         keys.push(cacheKey);
         REVERSE_CACHE_STORAGE_KEY_SET.add(cacheKey);
         REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE++;
@@ -4459,12 +4507,10 @@
       REVERSE_CACHE_DB_PROMISE = new Promise((resolve) => {
         let settled = false;
         const finish = (db) => {
-          if (settled) {
-            db?.close();
-            return;
-          }
+          if (settled) return false;
           settled = true;
           resolve(db);
+          return true;
         };
         let req;
         try {
@@ -4503,7 +4549,10 @@
             db.close();
             REVERSE_CACHE_DB_PROMISE = null;
           };
-          finish(db);
+          if (!finish(db)) {
+            REVERSE_CACHE_DB_PROMISE = Promise.resolve(db);
+          }
+          scheduleReverseCachePrune();
         };
         req.onerror = () => {
           console.warn("Reverse geocoding cache is unavailable.", req.error);
@@ -4521,13 +4570,14 @@
       if (!persistentKey) return null;
       const db = await openReverseCacheDb();
       if (!db) return readReverseCacheStorage(persistentKey);
-      const result = await new Promise((resolve) => {
+      let result = null;
+      let stale = false;
+      await new Promise((resolve) => {
         let settled = false;
-        let stale = false;
-        const done = (value = null) => {
+        const done = () => {
           if (settled) return;
           settled = true;
-          resolve(value);
+          resolve();
         };
         let tx;
         let req;
@@ -4541,39 +4591,32 @@
         req.onsuccess = () => {
           const row = req.result;
           if (isFreshReverseCacheRow(row)) {
-            done(row.parsed || null);
+            result = row.parsed || null;
           } else {
             stale = !!row;
-            done(null);
           }
         };
-        req.onerror = () => done(null);
-        tx.onabort = () => done(null);
-        tx.oncomplete = () => {
-          if (stale) deletePersistentReverseCacheKey(persistentKey);
-        };
+        req.onerror = done;
+        tx.onabort = done;
+        tx.oncomplete = done;
       });
+      if (stale) {
+        await deleteStalePersistentReverseCacheKey(db, persistentKey);
+      }
       return result;
     }
-    async function deletePersistentReverseCacheKey(persistentKey) {
-      const db = await openReverseCacheDb();
-      if (!db) {
-        const store = getReverseCacheStorage();
-        if (store) {
-          try {
-            store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + persistentKey);
-            removeReverseCacheStorageStateKey(persistentKey);
-          } catch {
-            disableReverseCacheStorage();
-          }
-        }
-        return;
-      }
+    async function deleteStalePersistentReverseCacheKey(db, persistentKey) {
       await new Promise((resolve) => {
         let tx;
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          tx.objectStore(CONFIG.REVERSE_CACHE_STORE).delete(persistentKey);
+          const store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
+          const req = store.get(persistentKey);
+          req.onsuccess = () => {
+            if (!isFreshReverseCacheRow(req.result)) {
+              store.delete(persistentKey);
+            }
+          };
         } catch {
           resolve();
           return;
@@ -4591,25 +4634,28 @@
         writeReverseCacheStorage(persistentKey, parsed);
         return;
       }
-      await new Promise((resolve) => {
+      const written = await new Promise((resolve) => {
         let tx;
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          tx.objectStore(CONFIG.REVERSE_CACHE_STORE).put({
+          const store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
+          store.put({
             key: persistentKey,
             variant: REVERSE_CACHE_VARIANT,
             parserVersion: CONFIG.REVERSE_CACHE_PARSER_VERSION,
             savedAt: Date.now(),
             parsed,
           });
+          pruneExcessReverseCacheRows(store);
         } catch {
-          resolve();
+          resolve(false);
           return;
         }
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-        tx.onabort = resolve;
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
       });
+      if (!written) return;
       REVERSE_CACHE_WRITES_SINCE_PRUNE++;
       if (
         !REVERSE_CACHE_PRUNE_PROMISE &&
@@ -4688,6 +4734,49 @@
         };
       };
     }
+    void openReverseCacheDb();
+    async function readReverseResponseText(response, signal) {
+      const limit = CONFIG.REVERSE_RESPONSE_MAX_BYTES;
+      const contentLength = Number(response.headers.get("content-length"));
+      if (Number.isFinite(contentLength) && contentLength > limit) {
+        try {
+          await response.body?.cancel();
+        } catch {
+        }
+        throw new Error(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
+      }
+      if (!response.body) return "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      const parts = [];
+      let bytesRead = 0;
+      let finished = false;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          signal.throwIfAborted();
+          if (done) break;
+          bytesRead += value.byteLength;
+          if (bytesRead > limit) {
+            throw new Error(
+              `응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
+            );
+          }
+          parts.push(decoder.decode(value, { stream: true }));
+        }
+        parts.push(decoder.decode());
+        finished = true;
+        return parts.join("");
+      } finally {
+        if (!finished) {
+          try {
+            await reader.cancel(signal.reason);
+          } catch {
+          }
+        }
+        reader.releaseLock();
+      }
+    }
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
       const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
@@ -4705,12 +4794,13 @@
         }
         LAST_REVERSE_FETCH_AT = now;
         anySignals[1] = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
+        const requestSignal = AbortSignal.any(anySignals);
         let res;
         try {
           res = await fetch(url, {
             headers: { Accept: "application/json" },
             referrerPolicy: "strict-origin-when-cross-origin",
-            signal: AbortSignal.any(anySignals),
+            signal: requestSignal,
           });
         } catch (e) {
           userSignal.throwIfAborted();
@@ -4720,18 +4810,25 @@
         }
         if (res.ok) {
           try {
-            return await res.json();
+            return JSON.parse(await readReverseResponseText(res, requestSignal));
           } catch (e) {
+            userSignal.throwIfAborted();
             if (attempt >= maxRetry) throw e;
           }
         } else if (res.status !== 429 && res.status < 500) {
           throw new Error(
-            `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
+            `HTTP ${res.status}: ${(await readReverseResponseText(res, requestSignal)).slice(0, 200)}`,
           );
-        } else if (attempt >= maxRetry) {
-          throw new Error(
-            `HTTP ${res.status}: rate limited or server error`,
-          );
+        } else {
+          try {
+            await res.body?.cancel();
+          } catch {
+          }
+          if (attempt >= maxRetry) {
+            throw new Error(
+              `HTTP ${res.status}: rate limited or server error`,
+            );
+          }
         }
         await sleep(baseDelayMs * attempt, userSignal);
       }
@@ -4890,7 +4987,6 @@
               skeletonTr.remove();
               break;
             }
-            console.error(err);
             const msg = getErrorMessage(err);
             r.set = "에러";
             r.addr = null;
@@ -5448,8 +5544,9 @@
             );
           }
           value = BigInt(`0x${digits}`);
-        } else if (/^\d+$/.test(input)) {
-          const digits = input.replace(/^0+/g, "") || "0";
+        } else if (/^\+?\d+$/.test(input)) {
+          const rawDigits = input.startsWith("+") ? input.slice(1) : input;
+          const digits = rawDigits.replace(/^0+/g, "") || "0";
           if (
             digits.length > MAX_U64_DEC.length ||
             (digits.length === MAX_U64_DEC.length && digits > MAX_U64_DEC)
@@ -5465,6 +5562,119 @@
           );
         }
         return value;
+      }
+      const F64_SCRATCH_VIEW = new DataView(new ArrayBuffer(8));
+      const F64_FRACTION_MASK = (1n << 52n) - 1n;
+      const F64_HIDDEN_BIT = 1n << 52n;
+      const F64_CARRY_BIT = 1n << 53n;
+      const F64_SIGN_BIT = 1n << 63n;
+      function decomposeF64(value) {
+        F64_SCRATCH_VIEW.setFloat64(0, value, false);
+        const bits = F64_SCRATCH_VIEW.getBigUint64(0, false);
+        const exponentBits = Number((bits >> 52n) & 0x7ffn);
+        const fraction = bits & F64_FRACTION_MASK;
+        if (exponentBits === 0x7ff) {
+          throw new RangeError("유한한 f64 좌표값이 필요합니다.");
+        }
+        if (exponentBits === 0) {
+          return {
+            exponent: -1074,
+            significand: (bits & F64_SIGN_BIT) === 0n ? fraction : -fraction,
+          };
+        }
+        const significand = F64_HIDDEN_BIT | fraction;
+        return {
+          exponent: exponentBits - 1023 - 52,
+          significand: (bits & F64_SIGN_BIT) === 0n
+            ? significand
+            : -significand,
+        };
+      }
+      function composeRoundedNormalF64(integer, exponent) {
+        if (integer === 0n) {
+          return 0;
+        }
+        const negative = integer < 0n;
+        const magnitude = negative ? -integer : integer;
+        let shift = magnitude.toString(2).length - 53;
+        let significand;
+        if (shift > 0) {
+          const shiftBits = BigInt(shift);
+          significand = magnitude >> shiftBits;
+          const remainder = magnitude - (significand << shiftBits);
+          const halfway = 1n << (shiftBits - 1n);
+          if (
+            remainder > halfway ||
+            (remainder === halfway && (significand & 1n) !== 0n)
+          ) {
+            significand += 1n;
+          }
+        } else {
+          significand = magnitude << BigInt(-shift);
+        }
+        if (significand === F64_CARRY_BIT) {
+          significand >>= 1n;
+          shift += 1;
+        }
+        const exponentBits = exponent + shift + 52 + 1023;
+        if (exponentBits <= 0 || exponentBits >= 0x7ff) {
+          throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
+        }
+        let bits =
+          (BigInt(exponentBits) << 52n) | (significand - F64_HIDDEN_BIT);
+        if (negative) {
+          bits |= F64_SIGN_BIT;
+        }
+        F64_SCRATCH_VIEW.setBigUint64(0, bits, false);
+        return F64_SCRATCH_VIEW.getFloat64(0, false);
+      }
+      function fusedMultiplyAddF64(left, right, addend) {
+        const leftParts = decomposeF64(left);
+        const rightParts = decomposeF64(right);
+        const addendParts = decomposeF64(addend);
+        const productSignificand =
+          leftParts.significand * rightParts.significand;
+        if (productSignificand === 0n) {
+          return addend;
+        }
+        if (addendParts.significand === 0n) {
+          return left * right;
+        }
+        const productExponent = leftParts.exponent + rightParts.exponent;
+        const commonExponent = Math.min(productExponent, addendParts.exponent);
+        const exact =
+          (productSignificand << BigInt(productExponent - commonExponent)) +
+          (addendParts.significand <<
+            BigInt(addendParts.exponent - commonExponent));
+        return composeRoundedNormalF64(exact, commonExponent);
+      }
+      function formatRustF64(value) {
+        if (Object.is(value, -0)) {
+          return "-0";
+        }
+        const text = String(value);
+        const exponentMarker = text.indexOf("e");
+        if (exponentMarker < 0) {
+          return text;
+        }
+        const exponent = Number(text.slice(exponentMarker + 1));
+        const mantissa = text.slice(0, exponentMarker);
+        const negative = mantissa.startsWith("-");
+        const unsigned = negative ? mantissa.slice(1) : mantissa;
+        const point = unsigned.indexOf(".");
+        const digits = point < 0
+          ? unsigned
+          : unsigned.slice(0, point) + unsigned.slice(point + 1);
+        const decimalIndex = (point < 0 ? unsigned.length : point) + exponent;
+        const sign = negative ? "-" : "";
+        if (decimalIndex <= 0) {
+          return sign + "0." + "0".repeat(-decimalIndex) + digits;
+        }
+        if (decimalIndex >= digits.length) {
+          return sign + digits + "0".repeat(decimalIndex - digits.length);
+        }
+        return sign + digits.slice(0, decimalIndex) + "." +
+          digits.slice(decimalIndex);
       }
       function u64ToBytesBe(v) {
         const bytes = new Array(8);
@@ -5712,10 +5922,13 @@
         const upperRatio = upper32 * U32_MAX_INV;
         const lowerRatio = lower32 * U32_MAX_INV;
         data.kor_coords = [
-          33.1125 + 5.504167 * upperRatio,
-          124.609722 + 7.263056 * lowerRatio,
+          fusedMultiplyAddF64(5.504167, upperRatio, 33.1125),
+          fusedMultiplyAddF64(7.263056, lowerRatio, 124.609722),
         ];
-        data.world_coords = [-90 + 180 * upperRatio, -180 + 360 * lowerRatio];
+        data.world_coords = [
+          fusedMultiplyAddF64(180, upperRatio, -90),
+          fusedMultiplyAddF64(360, lowerRatio, -180),
+        ];
         data.planet_number = (extractValidBitsForNms(
           4,
           num,
@@ -5812,10 +6025,10 @@
         );
         lines.push(`한글 음절 4글자: ${data.hangul_syllables.join("")}`);
         lines.push(
-          `대한민국 위경도: ${data.kor_coords[0]}, ${data.kor_coords[1]}`,
+          `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
         );
         lines.push(
-          `세계 위경도: ${data.world_coords[0]}, ${data.world_coords[1]}`,
+          `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
         );
         lines.push(`NMS 은하 번호: ${(b0 + 1).toString(10)}`);
         lines.push(
@@ -5831,6 +6044,7 @@
         );
         return lines.join("\n");
       }
+      const MANUAL_GENERATION_HARD_LIMIT = 10_000;
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
@@ -6013,6 +6227,11 @@
             for (const token of iterU64Tokens(num64Input.value)) {
               if (generationId !== manualGenerationId) {
                 return;
+              }
+              if (processedCount >= MANUAL_GENERATION_HARD_LIMIT) {
+                throw new InputLimitError(
+                  `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
+                );
               }
               const outputBlock = formatOutput(
                 generateRandomDataFromNum(parseU64(token), nextSupp),

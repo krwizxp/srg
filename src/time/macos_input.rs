@@ -36,7 +36,6 @@ pub(super) enum InputAction {
     F5Press,
     MouseClick,
 }
-pub(super) struct PreparedInput;
 struct Event {
     raw: NonNull<c_void>,
 }
@@ -103,26 +102,23 @@ impl Event {
         }
     }
 }
-impl PreparedInput {
-    pub(super) const EMPTY: Self = Self;
-    pub(super) fn prepare(&mut self, _action: Option<InputAction>, _err: &mut dyn Write) {
-        *self = Self;
-    }
-    pub(super) const fn reset(&mut self) {
-        *self = Self;
-    }
-    pub(super) fn send(
-        &mut self,
-        action: InputAction,
-        err: &mut dyn Write,
-    ) -> NativeInputSendStatus {
-        *self = Self;
+impl InputAction {
+    pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
+        if !post_event_access_granted(false) {
+            write_line_best_effort(
+                err,
+                format_args!("[경고] macOS 입력 제어 권한이 없습니다."),
+            );
+            return NativeInputSendStatus::FailedBeforeSend;
+        }
         let result: InputResult<()> = (|| {
-            match action {
-                InputAction::MouseClick => {
+            match self {
+                Self::MouseClick => {
                     // SAFETY: null asks CoreGraphics to use the default source.
-                    let current =
-                        Event::from_raw(unsafe { sys::CGEventCreate(null_mut()) }, "현재 마우스 위치 조회")?;
+                    let current = Event::from_raw(
+                        unsafe { sys::CGEventCreate(null_mut()) },
+                        "현재 마우스 위치 조회",
+                    )?;
                     let point = current.location();
                     let mouse_down = Event::mouse(
                         EVENT_LEFT_MOUSE_DOWN,
@@ -139,7 +135,7 @@ impl PreparedInput {
                     mouse_down.post();
                     mouse_up.post();
                 }
-                InputAction::F5Press => {
+                Self::F5Press => {
                     let key_down = Event::keyboard(KEY_CODE_F5, KeyDirection::Down, "F5 누름")?;
                     let key_up = Event::keyboard(KEY_CODE_F5, KeyDirection::Up, "F5 뗌")?;
                     key_down.post();
@@ -159,4 +155,15 @@ impl PreparedInput {
             }
         }
     }
+}
+pub(super) fn post_event_access_granted(request_if_missing: bool) -> bool {
+    // SAFETY: CGPreflightPostEventAccess has no preconditions.
+    if unsafe { sys::CGPreflightPostEventAccess() } {
+        return true;
+    }
+    if !request_if_missing {
+        return false;
+    }
+    // SAFETY: CGRequestPostEventAccess has no preconditions.
+    unsafe { sys::CGRequestPostEventAccess() }
 }

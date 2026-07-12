@@ -1,13 +1,11 @@
-use super::{
-    Result, TimeError, TimeErrorKind, TimeSample, http_date::parse_http_date_to_systemtime,
-};
+use super::{Result, TimeError, TimeErrorKind, TimeSample};
 #[cfg(target_os = "windows")]
 use core::error::Error;
 use core::{fmt::Display, time::Duration};
 use std::time::{Instant, SystemTime};
 cfg_select! {
     any(target_os = "linux", target_os = "macos", target_os = "windows") => {
-        use super::{MIN_TRANSFER_TIME, TCP_TIMEOUT};
+        use super::MIN_TRANSFER_TIME;
     }
     _ => {}
 }
@@ -21,8 +19,7 @@ cfg_select! {
         mod winhttp;
     }
     _ => {
-        use self::unsupported as platform;
-        mod unsupported;
+        compile_error!("SRG native HTTP supports only Windows, Linux, and macOS.");
     }
 }
 struct HeadResponse {
@@ -30,29 +27,18 @@ struct HeadResponse {
     rtt: Duration,
     server_time: SystemTime,
 }
+#[derive(Default)]
 pub(super) struct NativeHttp {
-    parse_http_date: fn(&str) -> Result<SystemTime>,
     platform: platform::Client,
 }
-type ParseHttpDate = fn(&str) -> Result<SystemTime>;
 impl NativeHttp {
     pub(super) fn fetch_head_sample(&mut self, url: &str, context: &str) -> Result<TimeSample> {
-        let response = self
-            .platform
-            .fetch_head(url, context, self.parse_http_date)?;
+        let response = self.platform.fetch_head(url, context)?;
         Ok(TimeSample {
             response_received_inst: response.response_received_inst,
             rtt: response.rtt,
             server_time: response.server_time,
         })
-    }
-}
-impl Default for NativeHttp {
-    fn default() -> Self {
-        Self {
-            parse_http_date: parse_http_date_to_systemtime,
-            platform: platform::Client::default(),
-        }
     }
 }
 fn error(context: &str, detail: impl Display) -> TimeError {

@@ -2,9 +2,9 @@ use super::{
     CachedTcpConnection, CachedTcpSocketAddr, NetworkContext, ParsedServer, Result, TCP_TIMEOUT,
     TimeError, TimeSample, UrlScheme, http_date::parse_http_date_to_systemtime,
 };
-use core::{result::Result as CoreResult, str};
+use core::{result::Result as CoreResult, str, time::Duration};
 use std::{
-    io::{self, BufRead as IoBufRead, BufReader, Read as IoRead, Write as IoWrite},
+    io::{self, BufRead as IoBufRead, BufReader, Write as IoWrite},
     net::{TcpStream, ToSocketAddrs as _},
     time::{Instant, SystemTime},
 };
@@ -12,7 +12,6 @@ const TCP_HEAD_REQUEST_PREFIX: &[u8] = b"HEAD / HTTP/1.1\r\nHost: ";
 const TCP_HEAD_REQUEST_SUFFIX: &[u8] = b"\r\nUser-Agent: Rust-Time-Sync\r\n\r\n";
 const TCP_MAX_HEADER_BYTES: usize = 64 * 1024;
 const TCP_MAX_HEADER_LINE_BYTES: usize = 8192;
-const TCP_MAX_HEADER_LINE_READ_BYTES: u64 = 8193;
 const TCP_MAX_INFORMATIONAL_RESPONSES: u8 = 16;
 pub(super) const AGE_HEADER_PREFIX: &[u8; 4] = b"age:";
 const CONNECTION_HEADER_NAME: &[u8; 10] = b"connection";
@@ -49,6 +48,7 @@ struct TcpAttemptError {
     retryable: bool,
 }
 struct TcpResponseReader<'io, 'ctx> {
+    deadline: Instant,
     header_bytes_seen: usize,
     line_buffer: &'ctx mut Vec<u8>,
     reader: &'io mut BufReader<TcpStream>,
@@ -136,12 +136,67 @@ impl TcpResponseReader<'_, '_> {
     }
     fn read_line(&mut self) -> CoreResult<usize, TcpAttemptError> {
         self.line_buffer.clear();
-        let bytes_read = IoBufRead::read_until(
-            &mut IoRead::take(&mut *self.reader, TCP_MAX_HEADER_LINE_READ_BYTES),
-            b'\n',
-            self.line_buffer,
-        )
-        .map_err(|source| TcpAttemptError::retryable(TimeError::from(source)))?;
+        loop {
+            let remaining = self.remaining_timeout()?;
+            self.reader
+                .get_ref()
+                .set_read_timeout(Some(remaining))
+                .map_err(|source| TcpAttemptError::retryable(TimeError::from(source)))?;
+            let available = IoBufRead::fill_buf(&mut *self.reader)
+                .map_err(|source| TcpAttemptError::retryable(TimeError::from(source)))?;
+            if Instant::now() >= self.deadline {
+                return Err(tcp_response_timeout());
+            }
+            if available.is_empty() {
+                break;
+            }
+            let (chunk_len, line_ended) =
+                if let Some(newline_index) = available.iter().position(|&byte| byte == b'\n') {
+                    (
+                        newline_index.checked_add(1).ok_or_else(|| {
+                            TcpAttemptError::non_retryable(TimeError::parse(
+                                "TCP HTTP 헤더 line 길이 계산 실패",
+                            ))
+                        })?,
+                        true,
+                    )
+                } else {
+                    (available.len(), false)
+                };
+            let next_line_len = self
+                .line_buffer
+                .len()
+                .checked_add(chunk_len)
+                .ok_or_else(|| {
+                    TcpAttemptError::non_retryable(TimeError::parse(
+                        "TCP HTTP 헤더 line 길이 계산 실패",
+                    ))
+                })?;
+            if next_line_len > TCP_MAX_HEADER_LINE_BYTES
+                || (next_line_len == TCP_MAX_HEADER_LINE_BYTES && !line_ended)
+            {
+                return Err(TcpAttemptError::non_retryable(TimeError::parse(
+                    "TCP HTTP 헤더 line이 너무 깁니다.",
+                )));
+            }
+            self.line_buffer.try_reserve(chunk_len).map_err(|source| {
+                TcpAttemptError::non_retryable(TimeError::parse_with_source(
+                    "TCP HTTP 헤더 line 메모리 확보 실패",
+                    source,
+                ))
+            })?;
+            self.line_buffer
+                .extend_from_slice(available.get(..chunk_len).ok_or_else(|| {
+                    TcpAttemptError::non_retryable(TimeError::parse(
+                        "TCP HTTP 헤더 line 범위 계산 실패",
+                    ))
+                })?);
+            IoBufRead::consume(&mut *self.reader, chunk_len);
+            if line_ended {
+                break;
+            }
+        }
+        let bytes_read = self.line_buffer.len();
         self.header_bytes_seen =
             self.header_bytes_seen
                 .checked_add(bytes_read)
@@ -151,14 +206,6 @@ impl TcpResponseReader<'_, '_> {
         if self.header_bytes_seen > TCP_MAX_HEADER_BYTES {
             return Err(TcpAttemptError::non_retryable(TimeError::parse(
                 "TCP HTTP 헤더가 너무 큽니다.",
-            )));
-        }
-        let line_ended = self.line_buffer.ends_with(b"\n");
-        if self.line_buffer.len() > TCP_MAX_HEADER_LINE_BYTES
-            || (!line_ended && self.line_buffer.len() == TCP_MAX_HEADER_LINE_BYTES)
-        {
-            return Err(TcpAttemptError::non_retryable(TimeError::parse(
-                "TCP HTTP 헤더 line이 너무 깁니다.",
             )));
         }
         Ok(bytes_read)
@@ -265,6 +312,14 @@ impl TcpResponseReader<'_, '_> {
             })?;
         Ok(TcpStatusLine { code, version })
     }
+    fn remaining_timeout(&self) -> CoreResult<Duration, TcpAttemptError> {
+        let remaining = self.deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            Err(tcp_response_timeout())
+        } else {
+            Ok(remaining)
+        }
+    }
     fn update_connection_tokens(&self, header_block: &mut TcpHeaderBlock) {
         let header_line = trim_http_line_end(self.line_buffer);
         let Some(header_name_end) = header_line.iter().position(|&byte| byte == b':') else {
@@ -329,6 +384,12 @@ pub(super) fn validate_http_age_value(value: &str) -> CoreResult<(), &'static st
 }
 fn missing_tcp_date() -> TimeError {
     TimeError::header_not_found("Date (TCP)")
+}
+fn tcp_response_timeout() -> TcpAttemptError {
+    TcpAttemptError::retryable(TimeError::from(io::Error::new(
+        io::ErrorKind::TimedOut,
+        "TCP HTTP 응답 제한 시간 초과",
+    )))
 }
 pub(super) fn fetch_server_time_sample(net_ctx: &mut NetworkContext) -> Result<TimeSample> {
     let parsed_address = net_ctx.host.as_ref();
@@ -440,9 +501,13 @@ fn sample_from_tcp_connection(
     tcp_request_buffer.extend_from_slice(host_header.as_bytes());
     tcp_request_buffer.extend_from_slice(TCP_HEAD_REQUEST_SUFFIX);
     let request_start_inst = Instant::now();
+    let response_deadline = request_start_inst.checked_add(TCP_TIMEOUT).ok_or_else(|| {
+        TcpAttemptError::non_retryable(TimeError::parse("TCP HTTP 응답 기한 계산 실패"))
+    })?;
     IoWrite::write_all(connection.reader.get_mut(), tcp_request_buffer)
         .map_err(|source| TcpAttemptError::retryable(TimeError::from(source)))?;
     let response = TcpResponseReader {
+        deadline: response_deadline,
         header_bytes_seen: 0,
         line_buffer: tcp_line_buffer,
         reader: &mut connection.reader,

@@ -1,4 +1,4 @@
-use super::{ByHandleFileInformation, c_void};
+use super::c_void;
 unsafe extern "system" {
     #[link_name = "GetFileInformationByHandleEx"]
     pub(super) fn get_file_information_by_handle_ex(
@@ -6,10 +6,5 @@ unsafe extern "system" {
         file_information_class: i32,
         file_information: *mut c_void,
         buffer_size: u32,
-    ) -> i32;
-    #[link_name = "GetFileInformationByHandle"]
-    pub(super) fn get_file_information_by_handle(
-        h_file: *mut c_void,
-        file_information: *mut ByHandleFileInformation,
     ) -> i32;
 }

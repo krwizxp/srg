@@ -3,11 +3,10 @@ use crate::{
     diagnostic::Result,
     file_output::lock_mutex,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
-    output::{OutputTarget, format_data_into_buffer, prefix_slice},
+    output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
-    random_util::checked_add_one_usize,
     time::{
-        ParsedServer, ServerTimeSession, ServerTimeSessionParts, TargetTimeOfDay, TimeError,
+        ParsedServer, ServerTimeRuntime, ServerTimeSession, TargetTimeOfDay, TimeError,
         TriggerAction,
     },
 };
@@ -18,19 +17,12 @@ cfg_select! {
             diagnostic::AppError,
             hardware_rng::{HardwareRandomSource, HardwareRng},
             input::{LadderEntryMode, parse_u64_digits, read_ladder_entries},
-            output::write_slice_to_console,
             random_number::{generate_random_number, random_bounded},
         };
         use core::{array::from_fn, num::NonZeroU64};
         use crate::random_number::RandomNumberMode;
     }
     _ => {}
-}
-cfg_select! {
-    target_arch = "x86_64" => {}
-    _ => {
-        use crate::random_data::generate_random_data;
-    }
 }
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
@@ -67,14 +59,6 @@ cfg_select! {
 cfg_select! {
     target_arch = "x86_64" => {
         pub(super) struct MenuApp {
-            file_mutex: Mutex<BufWriter<File>>,
-            input_buffer: String,
-            ladder_players_storage: String,
-            ladder_results_storage: String,
-            num_64: u64,
-            rng: HardwareRng,
-        }
-        pub(super) struct MenuAppInit {
             pub file_mutex: Mutex<BufWriter<File>>,
             pub input_buffer: String,
             pub ladder_players_storage: String,
@@ -85,38 +69,8 @@ cfg_select! {
     }
     _ => {
         pub(super) struct MenuApp {
-            file_mutex: Mutex<BufWriter<File>>,
-            input_buffer: String,
-        }
-        pub(super) struct MenuAppInit {
             pub file_mutex: Mutex<BufWriter<File>>,
             pub input_buffer: String,
-        }
-    }
-}
-cfg_select! {
-    target_arch = "x86_64" => {
-        impl From<MenuAppInit> for MenuApp {
-            fn from(init: MenuAppInit) -> Self {
-                Self {
-                    file_mutex: init.file_mutex,
-                    input_buffer: init.input_buffer,
-                    ladder_players_storage: init.ladder_players_storage,
-                    ladder_results_storage: init.ladder_results_storage,
-                    num_64: init.num_64,
-                    rng: init.rng,
-                }
-            }
-        }
-    }
-    _ => {
-        impl From<MenuAppInit> for MenuApp {
-            fn from(init: MenuAppInit) -> Self {
-                Self {
-                    file_mutex: init.file_mutex,
-                    input_buffer: init.input_buffer,
-                }
-            }
         }
     }
 }
@@ -126,10 +80,11 @@ impl MenuApp {
         command: u8,
         out: &mut dyn Write,
         err: &mut dyn Write,
+        server_time_runtime: &mut ServerTimeRuntime,
     ) -> Result<bool> {
         match command {
             b'5' => {
-                self.handle_server_time_command(out, err)?;
+                self.handle_server_time_command(out, err, server_time_runtime)?;
                 return Ok(true);
             }
             b'6' => {
@@ -163,26 +118,11 @@ impl MenuApp {
             }
             _ => {
                 match command {
-                    b'1' => {
-                        if let Err(disabled_error) = generate_random_data() {
-                            writeln!(out, "1번 메뉴: {disabled_error}")?;
-                        }
-                    }
-                    b'2' => {
-                        if let Err(disabled_error) = generate_random_data() {
-                            writeln!(out, "2번 메뉴: {disabled_error}")?;
-                        }
-                    }
-                    b'3' => {
-                        if let Err(disabled_error) = generate_random_data() {
-                            writeln!(out, "3번 메뉴: {disabled_error}")?;
-                        }
-                    }
-                    b'4' => {
-                        if let Err(disabled_error) = generate_random_data() {
-                            writeln!(out, "4번 메뉴: {disabled_error}")?;
-                        }
-                    }
+                    b'1'..=b'4' => writeln!(
+                        out,
+                        "{}번 메뉴: 이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.",
+                        char::from(command),
+                    )?,
                     _ => return Ok(false),
                 }
                 Ok(true)
@@ -274,7 +214,7 @@ impl MenuApp {
                     .ok_or("인덱스 배열 슬라이스 범위 초과")?;
                 for index in (1..indices_slice.len()).rev() {
                     seed ^= self.rng.next_u64()?;
-                    let next_index = checked_add_one_usize(index).ok_or("인덱스 상한 계산 실패")?;
+                    let next_index = index.saturating_add(1);
                     let upper_bound_raw = u64::try_from(next_index).map_err(|conversion_err| {
                         AppError::context("인덱스 상한 변환 실패", conversion_err)
                     })?;
@@ -325,8 +265,9 @@ impl MenuApp {
         }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
-            supp_input_count =
-                checked_add_one_usize(supp_input_count).ok_or("supp 입력 횟수 계산 실패")?;
+            supp_input_count = supp_input_count
+                .checked_add(1)
+                .ok_or("supp 입력 횟수 계산 실패")?;
             let supp = read_u64_hex_input(
                 format_args!(
                     concat!(
@@ -344,7 +285,7 @@ impl MenuApp {
             )?;
             Ok(supp)
         };
-        let data = RandomDataSet::build_from(manual_num_64, &mut next_supp)?;
+        let data = RandomDataSet::try_from((manual_num_64, &mut next_supp))?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
         let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
@@ -357,16 +298,7 @@ impl MenuApp {
             file_len
         };
         let console_slice = prefix_slice(&buffer, console_len)?;
-        cfg_select! {
-            target_arch = "x86_64" => {
-                write_slice_to_console(console_slice)?;
-            }
-            _ => {{
-                let mut stdout_lock = stdout().lock();
-                Write::write_all(&mut stdout_lock, console_slice)?;
-                Write::flush(&mut stdout_lock)?;
-            }}
-        }
+        write_slice_to_console(console_slice)?;
         Ok(())
     }
     cfg_select! {
@@ -420,27 +352,29 @@ impl MenuApp {
         &mut self,
         out: &mut dyn Write,
         err: &mut dyn Write,
+        server_time_runtime: &mut ServerTimeRuntime,
     ) -> Result<()> {
         let time_run_result = (|| -> CoreResult<(), TimeError> {
             let host = self.read_server_host(out)?;
-            let target_time = self.read_target_time(out)?;
-            let has_target_time = target_time.is_some();
-            let trigger_action = self.read_trigger_action(out, has_target_time)?;
+            let scheduled_trigger = match self.read_target_time(out)? {
+                Some(target_time) => Some((target_time, self.read_trigger_action(out)?)),
+                None => None,
+            };
             let now = Instant::now();
-            ServerTimeSession::from(ServerTimeSessionParts {
+            ServerTimeSession {
                 host,
                 now,
-                target_time,
-                trigger_action,
-            })
-            .run_loop(out, err)?;
-            writeln!(out, "\n프로그램을 종료합니다.")?;
+                scheduled_trigger,
+            }
+            .run_loop(server_time_runtime, out, err)?;
+            writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
             Ok(())
         })();
-        if let Err(time_err) = time_run_result
-            && !time_err.is_unexpected_eof()
-        {
-            writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?;
+        match time_run_result {
+            Ok(()) => {}
+            Err(time_err) if time_err.is_unexpected_eof() => {}
+            Err(time_err) if time_err.is_io() => return Err(time_err.into()),
+            Err(time_err) => writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?,
         }
         Ok(())
     }
@@ -475,15 +409,8 @@ impl MenuApp {
             },
         )?)
     }
-    fn read_trigger_action(
-        &mut self,
-        out: &mut dyn Write,
-        has_target_time: bool,
-    ) -> CoreResult<Option<TriggerAction>, TimeError> {
-        if !has_target_time {
-            return Ok(None);
-        }
-        let action = get_validated_input(
+    fn read_trigger_action(&mut self, out: &mut dyn Write) -> CoreResult<TriggerAction, TimeError> {
+        Ok(get_validated_input(
             "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
             &mut self.input_buffer,
             out,
@@ -494,11 +421,11 @@ impl MenuApp {
                     _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
                 }
             },
-        )?;
-        Ok(Some(action))
+        )?)
     }
     pub(super) fn run(&mut self) -> Result<ExitCode> {
         let menu_prompt = format_args!("{MENU}");
+        let mut server_time_runtime = ServerTimeRuntime::default();
         loop {
             let command = {
                 let mut prompt_out = stdout().lock();
@@ -520,13 +447,14 @@ impl MenuApp {
             };
             let mut out = stdout();
             let mut err = stderr();
-            let keep_running = match self.execute_command(command, &mut out, &mut err) {
-                Ok(keep_running) => keep_running,
-                Err(command_err) if command_err.is_unexpected_eof() => {
-                    return Ok(ExitCode::SUCCESS);
-                }
-                Err(command_err) => return Err(command_err),
-            };
+            let keep_running =
+                match self.execute_command(command, &mut out, &mut err, &mut server_time_runtime) {
+                    Ok(keep_running) => keep_running,
+                    Err(command_err) if command_err.is_unexpected_eof() => {
+                        return Ok(ExitCode::SUCCESS);
+                    }
+                    Err(command_err) => return Err(command_err),
+                };
             if !keep_running {
                 return Ok(ExitCode::SUCCESS);
             }

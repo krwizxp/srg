@@ -13,14 +13,12 @@ use std::{
 pub(super) fn write_random_data_to_console(
     data: &RandomDataSet,
     buffer: &mut [u8; BUFFER_SIZE],
-    preformatted_file_len: Option<usize>,
+    preformatted_file_len: usize,
 ) -> Result<()> {
     let output_len = if *IS_TERMINAL {
         format_data_into_buffer(data, buffer, OutputTarget::Console)?
-    } else if let Some(file_len) = preformatted_file_len {
-        file_len
     } else {
-        format_data_into_buffer(data, buffer, OutputTarget::File)?
+        preformatted_file_len
     };
     write_slice_to_console(prefix_slice(buffer, output_len)?)?;
     Ok(())
@@ -35,7 +33,7 @@ pub(super) fn persist_and_print_random_data(
         let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
         IoWrite::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
         IoWrite::flush(&mut *file_guard)?;
-    };
-    write_random_data_to_console(data, &mut buffer, Some(file_len))?;
+    }
+    write_random_data_to_console(data, &mut buffer, file_len)?;
     Ok(())
 }

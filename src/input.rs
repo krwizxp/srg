@@ -5,7 +5,6 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::diagnostic::AppError;
         use core::range::Range;
-        use super::random_util::checked_add_one_usize;
         const LADDER_INPUT_LINE_MAX_BYTES: usize = 64 * 1024;
     }
     _ => {}
@@ -192,7 +191,7 @@ cfg_select! {
                     .map(|(idx, _)| (idx, true))
                     .chain([(line.len(), false)])
                 {
-                    count = checked_add_one_usize(count).ok_or_else(|| {
+                    count = count.checked_add(1).ok_or_else(|| {
                         AppError::message(match mode {
                             LadderEntryMode::Players => "플레이어 수 계산 실패",
                             LadderEntryMode::Results { .. } => "결과 수 계산 실패",
@@ -233,8 +232,7 @@ cfg_select! {
                         }
                     }
                     if has_separator {
-                        segment_start =
-                            checked_add_one_usize(boundary_end).ok_or_else(index_err)?;
+                        segment_start = boundary_end.checked_add(1).ok_or_else(index_err)?;
                     }
                 }
                 if players_overflowed || count == 0 {

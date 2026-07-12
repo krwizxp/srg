@@ -1,6 +1,6 @@
-use super::{TWO_DIGIT_WIDTH, buf_write_u8_dec, buf_write_u64_dec, prefix_slice, u8_dec_len};
+use super::{buf_write_u8_dec, buf_write_u64_dec, prefix_slice, u8_dec_len};
 use crate::{
-    buffmt::{ByteCursor, DIGITS, copy_two_digits},
+    buffmt::{ByteCursor, TWO_DIGITS, digit_byte, write_zero_err},
     constants::IS_TERMINAL,
     diagnostic::{AppError, Result},
     numeric::low_u8_from_u64,
@@ -32,13 +32,10 @@ const PERCENT_SCALE_U64: u64 = 100;
 const PERCENT_WIDTH: usize = 3;
 const SECONDS_PER_MINUTE_U128: u128 = 60;
 const TIME_BUF_LEN: usize = 7;
-fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
-    let Some(head) = buf.first_chunk_mut::<TIME_BUF_LEN>() else {
-        return 0;
-    };
+fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) -> Result<usize> {
     let Some(deci) = deci_seconds else {
-        head.copy_from_slice(INVALID_TIME);
-        return TIME_BUF_LEN;
+        *buf = *INVALID_TIME;
+        return Ok(TIME_BUF_LEN);
     };
     let minutes = usize::from(low_u8_from_u128(
         (deci.div_euclid(DECI_PER_MINUTE)).min(MAX_TIME_MINUTES),
@@ -48,35 +45,20 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8]) -> usize {
             .rem_euclid(SECONDS_PER_MINUTE_U128),
     ));
     let tenths = usize::from(low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND)));
-    let Some((minute_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-        return 0;
-    };
-    let Ok(()) = copy_two_digits(minute_digits, minutes) else {
-        return 0;
-    };
-    let Some((separator, remainder)) = rest.split_first_mut() else {
-        return 0;
-    };
-    *separator = b':';
-    let Some((second_digits, tenth_part)) = remainder.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-    else {
-        return 0;
-    };
-    let Ok(()) = copy_two_digits(second_digits, sec_whole) else {
-        return 0;
-    };
-    let Some((decimal_point, tenths_digit)) = tenth_part.split_first_mut() else {
-        return 0;
-    };
-    *decimal_point = b'.';
-    let Some(tenth_slot) = tenths_digit.first_mut() else {
-        return 0;
-    };
-    let Some(digit) = DIGITS.get(tenths).copied() else {
-        return 0;
-    };
-    *tenth_slot = digit;
-    TIME_BUF_LEN
+    let [minute_tens_value, minute_ones_value] =
+        *TWO_DIGITS.get(minutes).ok_or_else(write_zero_err)?;
+    let [second_tens_value, second_ones_value] =
+        *TWO_DIGITS.get(sec_whole).ok_or_else(write_zero_err)?;
+    *buf = [
+        minute_tens_value,
+        minute_ones_value,
+        b':',
+        second_tens_value,
+        second_ones_value,
+        b'.',
+        digit_byte(tenths)?,
+    ];
+    Ok(TIME_BUF_LEN)
 }
 pub(crate) fn print(
     out: &mut dyn IoWrite,
@@ -84,8 +66,8 @@ pub(crate) fn print(
     line_buf: &mut [u8; super::PROGRESS_LINE_BUF_LEN],
     total: u64,
     elapsed: Duration,
-    elapsed_buf: &mut [u8],
-    eta_buf: &mut [u8],
+    elapsed_buf: &mut [u8; TIME_BUF_LEN],
+    eta_buf: &mut [u8; TIME_BUF_LEN],
 ) -> Result<()> {
     if !*IS_TERMINAL {
         return Ok(());
@@ -97,23 +79,17 @@ pub(crate) fn print(
     } else if completed == 0 {
         None
     } else {
-        let remaining = total
-            .checked_sub(completed)
-            .ok_or("남은 작업 수 계산 실패")?;
+        let remaining = total.saturating_sub(completed);
         let completed_scaled = u128::from(completed)
             .checked_mul(u128::from(PERCENT_SCALE_U64))
             .ok_or("ETA 분모 계산 실패")?;
         let eta_numerator = elapsed_millis
             .checked_mul(u128::from(remaining))
             .ok_or("ETA 분자 계산 실패")?;
-        Some(
-            eta_numerator
-                .checked_div(completed_scaled)
-                .ok_or("ETA 계산 실패")?,
-        )
+        Some(eta_numerator.div_euclid(completed_scaled))
     };
-    let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf);
-    let eta_len = format_time_into(eta_deci, eta_buf);
+    let elapsed_len = format_time_into(Some(elapsed_deci), elapsed_buf)?;
+    let eta_len = format_time_into(eta_deci, eta_buf)?;
     let filled_u64 = scaled_progress_value(
         completed,
         total,
@@ -167,9 +143,8 @@ fn scaled_progress_value(
     if total == 0 {
         return Ok(zero_total_value);
     }
-    completed
+    let scaled = completed
         .checked_mul(scale)
-        .ok_or_else(|| AppError::message(err_msg))?
-        .checked_div(total)
-        .ok_or_else(|| AppError::message(err_msg))
+        .ok_or_else(|| AppError::message(err_msg))?;
+    Ok(scaled.div_euclid(total))
 }

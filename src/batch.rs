@@ -78,23 +78,6 @@ impl ProgressReporter<'_> {
         Ok(())
     }
 }
-struct ProcessCounters<'counters> {
-    failed_ref: &'counters AtomicU64,
-    processed_ref: &'counters AtomicU64,
-}
-impl ProcessCounters<'_> {
-    fn finalize(self, pending_count: u64) -> Result<()> {
-        let processed_now = self.processed_ref.load(Ordering::Relaxed);
-        if processed_now < pending_count {
-            let missing = pending_count
-                .checked_sub(processed_now)
-                .ok_or("미처리 작업 수 계산 실패")?;
-            self.failed_ref.fetch_add(missing, Ordering::Relaxed);
-            self.processed_ref.store(pending_count, Ordering::Relaxed);
-        }
-        Ok(())
-    }
-}
 struct WorkerPool<'scope> {
     buffer_return_receivers: Vec<Receiver<DataBuffer>>,
     calculated_thread_count: NonZero<usize>,
@@ -224,14 +207,8 @@ impl WorkerPool<'_> {
             u64::try_from(self.calculated_thread_count.get()).map_err(|conversion_err| {
                 AppError::context("스레드 수 변환 실패", conversion_err)
             })?;
-        let base_count = self
-            .pending_count
-            .checked_div(thread_count_u64)
-            .ok_or("작업 분배 기준 계산 실패")?;
-        let remainder = self
-            .pending_count
-            .checked_rem(thread_count_u64)
-            .ok_or("작업 분배 나머지 계산 실패")?;
+        let base_count = self.pending_count.div_euclid(thread_count_u64);
+        let remainder = self.pending_count.rem_euclid(thread_count_u64);
         scope(|worker_scope| -> Result<()> {
             let mut worker_handles = Vec::new();
             worker_handles
@@ -244,9 +221,8 @@ impl WorkerPool<'_> {
                     u64::try_from(worker_idx).map_err(|source| {
                         AppError::context("worker index 변환 실패", source)
                     })?;
-                let loop_count = base_count
-                    .checked_add(u64::from(worker_idx_u64 < remainder))
-                    .ok_or("worker 작업 수 계산 실패")?;
+                let loop_count =
+                    base_count.saturating_add(u64::from(worker_idx_u64 < remainder));
                 let job = WorkerJob {
                     failed_ref: self.failed_ref,
                     first_error_ref: self.first_error_ref,
@@ -315,14 +291,15 @@ impl WriterTask<'_> {
             len,
             worker_idx,
         } = chunk;
-        output::write_buffer_to_file_guard(
-            file_guard,
+        Write::write_all(
+            &mut **file_guard,
             output::prefix_slice(&buffer[..], len)?,
         )?;
-        if let Some(return_sender) = buffer_return_senders.get(worker_idx) {
-            match return_sender.send(buffer) {
-                Ok(()) | Err(_) => {}
-            }
+        let return_sender = buffer_return_senders
+            .get(worker_idx)
+            .ok_or("worker buffer 반환 채널 인덱스가 범위를 벗어났습니다")?;
+        match return_sender.send(buffer) {
+            Ok(()) | Err(_) => {}
         }
         Ok(())
     }
@@ -357,8 +334,7 @@ impl BatchRegenerator<'_, '_, '_, '_> {
     }
     fn regenerate_multiple(&mut self) -> Result<BatchRunResult> {
         let file_mutex = self.file_mutex;
-        let requested_count = self.requested_count;
-        let start_time = self.start_time;
+        let (requested_count, start_time) = (self.requested_count, self.start_time);
         let max_threads = available_parallelism().map_or(4, NonZero::get);
         let pending_count = requested_count.saturating_sub(1);
         let calculated_thread_count_raw =
@@ -422,7 +398,10 @@ impl BatchRegenerator<'_, '_, '_, '_> {
                 sender,
             }
             .join_all();
-            let finalize_result = ProcessCounters { failed_ref, processed_ref }.finalize(pending_count);
+            let missing =
+                pending_count.saturating_sub(processed_ref.load(Ordering::Relaxed));
+            failed_ref.fetch_add(missing, Ordering::Relaxed);
+            processed_ref.fetch_add(missing, Ordering::Relaxed);
             let progress_result = progress_thread.map_or_else(
                 || Ok(()),
                 |handle| match handle.join() {
@@ -441,7 +420,6 @@ impl BatchRegenerator<'_, '_, '_, '_> {
                 )),
             };
             worker_result?;
-            finalize_result?;
             progress_result?;
             writer_result?;
             Ok(())
@@ -472,8 +450,8 @@ impl BatchRegenerator<'_, '_, '_, '_> {
             output::format_data_into_buffer(final_data, &mut final_buffer_file, OutputTarget::File)?;
         let mut final_file_guard =
             lock_mutex(self.file_mutex, "Mutex 잠금 실패 (대량 생성 최종 기록)")?;
-        output::write_buffer_to_file_guard(
-            &mut final_file_guard,
+        Write::write_all(
+            &mut *final_file_guard,
             output::prefix_slice(&final_buffer_file, final_bytes_written_file)?,
         )?;
         final_file_guard.flush()?;
@@ -514,7 +492,7 @@ impl BatchRegenerator<'_, '_, '_, '_> {
         write_random_data_to_console(
             final_data,
             &mut final_buffer_file,
-            Some(final_bytes_written_file),
+            final_bytes_written_file,
         )?;
         Ok(final_data.num_64)
     }
