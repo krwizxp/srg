@@ -42,7 +42,7 @@ cargo run --release
 srg --version --verbose
 ```
 ## GitHub Actions 실행파일
-`.github/workflows/ci.yml`은 `ubuntu-latest`, `macos-26-intel`, `macos-26`, `windows-latest`에서 `cargo build --release --locked`를 수행하고 결과 실행 파일을 Artifact로 업로드합니다.
+`.github/workflows/ci.yml`은 `ubuntu-latest`, `macos-26-intel`, `macos-26`, `windows-latest`에서 `cargo build --release --locked`를 수행합니다. 실행 파일 Artifact는 Pull Request가 아닌 `main` 브랜치 또는 태그의 신뢰된 실행에서만 업로드합니다.
 - Linux Artifact 이름: `srg-linux-x64`
   - 포함 파일: `srg-linux-x64.tar.gz`
   - 내부 실행 파일: `srg-linux-x64`
@@ -55,6 +55,7 @@ srg --version --verbose
 - Windows Artifact 이름: `srg-windows-x64`
   - 포함 파일: `srg-windows-x64.exe`
 Linux/macOS는 실행 권한 보존을 위해 바이너리를 `tar.gz`로 묶어 업로드합니다. macOS x64 산출물은 하드웨어 RNG 메뉴를 포함하고, macOS arm64 산출물은 비 x86_64 메뉴 구성을 사용합니다. Windows는 빌드 결과를 `srg-windows-x64.exe`로 이름만 바꿔 그대로 업로드합니다.
+실행 파일은 `main` 브랜치 또는 태그의 워크플로 실행에서 생성된 Artifact만 사용하고, Pull Request 실행이나 출처를 확인할 수 없는 산출물은 실행하지 마세요.
 ## GitHub Actions 수동 실행
 `.github/workflows/manual_run.yml`은 GitHub Actions에서 Linux용 `srg`를 수동 실행하고 결과 로그/출력 파일을 Artifact로 받는 워크플로입니다.
 - Runner: `ubuntu-latest`
