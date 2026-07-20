@@ -157,10 +157,6 @@ pub(super) struct ServerTimeSession {
     pub scheduled_trigger: Option<(TargetTimeOfDay, TriggerAction)>,
     pub stop_after: Option<Duration>,
 }
-#[derive(Default)]
-pub(super) struct ServerTimeRuntime {
-    sample_worker: Option<SampleWorker>,
-}
 #[derive(Clone, Copy, Debug)]
 struct CivilDate {
     day: u32,
@@ -298,13 +294,12 @@ impl Error for TimeError {
     }
 }
 impl SampleWorker {
-    fn fetch(&mut self, kind: SampleRequestKind, host: Arc<ParsedServer>) -> Result<Option<u64>> {
+    fn fetch(&mut self, kind: SampleRequestKind) -> Result<Option<u64>> {
         let generation = self.generation.wrapping_add(1);
-        match self.command_sender.try_send(SampleWorkerRequest {
-            generation,
-            host,
-            kind,
-        }) {
+        match self
+            .command_sender
+            .try_send(SampleWorkerRequest { generation, kind })
+        {
             Ok(()) => {
                 self.generation = generation;
                 Ok(Some(generation))
@@ -314,15 +309,6 @@ impl SampleWorker {
                 Err(TimeError::parse("서버 시간 샘플 worker 요청 실패"))
             }
         }
-    }
-}
-impl ServerTimeRuntime {
-    fn sample_worker(&mut self, host: Arc<ParsedServer>) -> Result<&mut SampleWorker> {
-        let worker = match self.sample_worker.take() {
-            Some(worker) => worker,
-            None => spawn_sample_worker(host)?,
-        };
-        Ok(self.sample_worker.insert(worker))
     }
 }
 struct AppState<'worker> {
@@ -394,7 +380,6 @@ enum SampleRequestPoll {
 }
 struct SampleWorkerRequest {
     generation: u64,
-    host: Arc<ParsedServer>,
     kind: SampleRequestKind,
 }
 enum FinalCountdownSamplePoll {
@@ -421,23 +406,12 @@ impl NetworkContext {
             tcp_request_buffer: request,
         }
     }
-    fn reset_host(&mut self, host: Arc<ParsedServer>) {
-        self.cached_tcp_connection = None;
-        self.cached_tcp_socket_addr = None;
-        self.host = host;
-        self.native_http = native_http::Client::default();
-    }
 }
 impl ServerTimeSession {
-    pub(super) fn run_loop(
-        self,
-        runtime: &mut ServerTimeRuntime,
-        out: &mut dyn io::Write,
-        err: &mut dyn io::Write,
-    ) -> Result<()> {
+    pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         let now = Instant::now();
         let host = Arc::new(self.host);
-        let sample_worker = runtime.sample_worker(Arc::clone(&host))?;
+        let mut sample_worker = spawn_sample_worker(Arc::clone(&host))?;
         let (pending_target_time, trigger_action) = self.scheduled_trigger.unzip();
         cfg_select! {
             target_os = "macos" => {
@@ -477,17 +451,12 @@ impl ServerTimeSession {
             live_rtt: None,
             pending_sample_generation: None,
             pending_target_time,
-            sample_worker,
+            sample_worker: &mut sample_worker,
             target_time: None,
             trigger_action,
         };
         let run_result = app_state.run_loop(self.stop_after, out, err);
-        let worker_reusable =
-            run_result.is_ok() && !app_state.sample_worker.join_handle.is_finished();
         drop(app_state);
-        if !worker_reusable {
-            runtime.sample_worker = None;
-        }
         run_result
     }
 }
@@ -659,7 +628,7 @@ impl AppState<'_> {
         if self.pending_sample_generation.is_some() {
             return Ok(());
         }
-        match self.sample_worker.fetch(kind, Arc::clone(&self.host)) {
+        match self.sample_worker.fetch(kind) {
             Ok(request) => {
                 self.pending_sample_generation = request;
                 Ok(())
@@ -1640,15 +1609,7 @@ fn spawn_sample_worker(initial_host: Arc<ParsedServer>) -> Result<SampleWorker> 
         .name(String::from("srg-sample-worker"))
         .spawn(move || {
             let mut network_context = NetworkContext::new(initial_host, network_buffers);
-            while let Ok(SampleWorkerRequest {
-                generation,
-                host: request_host,
-                kind,
-            }) = command_receiver.recv()
-            {
-                if !Arc::ptr_eq(&network_context.host, &request_host) {
-                    network_context.reset_host(request_host);
-                }
+            while let Ok(SampleWorkerRequest { generation, kind }) = command_receiver.recv() {
                 let result = fetch_server_time_sample(&mut network_context);
                 if response_sender
                     .send(SampleWorkerResponse {

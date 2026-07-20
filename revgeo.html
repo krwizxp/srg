@@ -4650,12 +4650,10 @@
         let chunkLines = [];
         let chunkChars = 0;
         const flushChunk = () => {
-          const n = chunkLines.length;
-          if (n === 0) return;
+          if (chunkLines.length === 0) return;
           parts.push(CSV_NL_BYTES, CSV_ENCODER.encode(chunkLines.join("\n")));
           chunkChars = 0;
-          if (n > 20_000) chunkLines = [];
-          else chunkLines.length = 0;
+          chunkLines.length = 0;
         };
         for (let i = 0; i < totalRows; i++) {
           const r = records[i];

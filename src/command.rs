@@ -1,6 +1,6 @@
 use crate::{
     diagnostic::{AppError, Result},
-    time::{ParsedServer, ServerTimeRuntime, ServerTimeSession},
+    time::{ParsedServer, ServerTimeSession},
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -89,13 +89,12 @@ impl CliCommand {
                 Self::write_rdseed_fallback_notice(&rng, &mut err)?;
             }
             Self::TimeObserve { host, seconds } => {
-                let mut runtime = ServerTimeRuntime::default();
                 ServerTimeSession {
                     host,
                     scheduled_trigger: None,
                     stop_after: Some(Duration::from_secs(seconds)),
                 }
-                .run_loop(&mut runtime, &mut out, &mut err)?;
+                .run_loop(&mut out, &mut err)?;
                 writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
             }
         }

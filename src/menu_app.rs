@@ -5,10 +5,7 @@ use crate::{
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
-    time::{
-        ParsedServer, ServerTimeRuntime, ServerTimeSession, TargetTimeOfDay, TimeError,
-        TriggerAction,
-    },
+    time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -68,11 +65,10 @@ impl MenuApp {
         command: u8,
         out: &mut dyn Write,
         err: &mut dyn Write,
-        server_time_runtime: &mut ServerTimeRuntime,
     ) -> Result<bool> {
         match command {
             b'5' => {
-                self.handle_server_time_command(out, err, server_time_runtime)?;
+                self.handle_server_time_command(out, err)?;
                 return Ok(true);
             }
             b'6' => {
@@ -311,7 +307,6 @@ impl MenuApp {
         &mut self,
         out: &mut dyn Write,
         err: &mut dyn Write,
-        server_time_runtime: &mut ServerTimeRuntime,
     ) -> Result<()> {
         let time_run_result = (|| -> CoreResult<(), TimeError> {
             let host = self.read_server_host(out)?;
@@ -324,7 +319,7 @@ impl MenuApp {
                 scheduled_trigger,
                 stop_after: None,
             }
-            .run_loop(server_time_runtime, out, err)?;
+            .run_loop(out, err)?;
             writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
             Ok(())
         })();
@@ -383,7 +378,6 @@ impl MenuApp {
     }
     pub(super) fn run(&mut self) -> Result<ExitCode> {
         let menu_prompt = format_args!("{MENU}");
-        let mut server_time_runtime = ServerTimeRuntime::default();
         loop {
             let command = {
                 let mut prompt_out = stdout().lock();
@@ -405,14 +399,13 @@ impl MenuApp {
             };
             let mut out = stdout();
             let mut err = stderr();
-            let keep_running =
-                match self.execute_command(command, &mut out, &mut err, &mut server_time_runtime) {
-                    Ok(keep_running) => keep_running,
-                    Err(command_err) if is_unexpected_eof(&command_err) => {
-                        return Ok(ExitCode::SUCCESS);
-                    }
-                    Err(command_err) => return Err(command_err),
-                };
+            let keep_running = match self.execute_command(command, &mut out, &mut err) {
+                Ok(keep_running) => keep_running,
+                Err(command_err) if is_unexpected_eof(&command_err) => {
+                    return Ok(ExitCode::SUCCESS);
+                }
+                Err(command_err) => return Err(command_err),
+            };
             if !keep_running {
                 return Ok(ExitCode::SUCCESS);
             }
