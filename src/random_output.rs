@@ -1,15 +1,11 @@
 use super::{
-    file_output::lock_mutex,
+    file_output::OutputFile,
     output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
 };
-use crate::constants::{BUFFER_SIZE, IS_TERMINAL};
 use crate::diagnostic::Result;
-use std::{
-    fs::File,
-    io::{BufWriter, Write as IoWrite},
-    sync::Mutex,
-};
+use crate::{BUFFER_SIZE, IS_TERMINAL};
+use std::io::Write as IoWrite;
 pub(super) fn write_random_data_to_console(
     data: &RandomDataSet,
     buffer: &mut [u8; BUFFER_SIZE],
@@ -24,16 +20,14 @@ pub(super) fn write_random_data_to_console(
     Ok(())
 }
 pub(super) fn persist_and_print_random_data(
-    file_mutex: &Mutex<BufWriter<File>>,
+    output_file: &mut OutputFile,
     data: &RandomDataSet,
 ) -> Result<()> {
     let mut buffer = [0_u8; BUFFER_SIZE];
     let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
-    {
-        let mut file_guard = lock_mutex(file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        IoWrite::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
-        IoWrite::flush(&mut *file_guard)?;
-    }
+    let writer = output_file.writer();
+    IoWrite::write_all(&mut *writer, prefix_slice(&buffer, file_len)?)?;
+    IoWrite::flush(writer)?;
     write_random_data_to_console(data, &mut buffer, file_len)?;
     Ok(())
 }

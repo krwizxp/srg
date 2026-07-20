@@ -1,4 +1,4 @@
-use super::NativeInputSendStatus;
+use super::{NativeInputSendStatus, TriggerAction};
 use crate::write_line_best_effort;
 use alloc::borrow::Cow;
 use core::{
@@ -174,16 +174,11 @@ struct EiApi {
     unref: EiUnref,
 }
 struct EiSession {
-    action: InputAction,
+    action: TriggerAction,
     api: EiApi,
     context: NonNull<Ei>,
     device: Option<DeviceState>,
     sequence: c_uint,
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum InputAction {
-    F5Press,
-    MouseClick,
 }
 struct Library {
     handle: NonNull<c_void>,
@@ -255,9 +250,9 @@ impl Drop for PortalSession {
     }
 }
 impl EiApi {
-    fn bind_action(&self, action: InputAction, seat: NonNull<EiSeat>) {
+    fn bind_action(&self, action: TriggerAction, seat: NonNull<EiSeat>) {
         match action {
-            InputAction::F5Press => {
+            TriggerAction::F5Press => {
                 // SAFETY: seat came from an EI_EVENT_SEAT_ADDED event and the variadic capability list ends with zero.
                 unsafe {
                     (self.seat_bind_capabilities)(
@@ -267,7 +262,7 @@ impl EiApi {
                     );
                 }
             }
-            InputAction::MouseClick => {
+            TriggerAction::LeftClick => {
                 // SAFETY: seat came from an EI_EVENT_SEAT_ADDED event and the variadic capability list ends with zero.
                 unsafe {
                     (self.seat_bind_capabilities)(
@@ -525,13 +520,13 @@ impl EiSession {
             "ei_new_ping 실패",
         )))?;
         match self.action {
-            InputAction::F5Press => {
+            TriggerAction::F5Press => {
                 self.api.keyboard_key(device.raw, true);
                 self.api.frame(self.context, device.raw);
                 self.api.keyboard_key(device.raw, false);
                 self.api.frame(self.context, device.raw);
             }
-            InputAction::MouseClick => {
+            TriggerAction::LeftClick => {
                 self.api.button(device.raw, true);
                 self.api.frame(self.context, device.raw);
                 self.api.button(device.raw, false);
@@ -586,17 +581,17 @@ impl EiSession {
         }
     }
 }
-impl InputAction {
+impl TriggerAction {
     const fn portal_devices(self) -> c_uint {
         match self {
             Self::F5Press => OEFFIS_DEVICE_KEYBOARD,
-            Self::MouseClick => OEFFIS_DEVICE_POINTER,
+            Self::LeftClick => OEFFIS_DEVICE_POINTER,
         }
     }
     const fn required_capability(self) -> c_int {
         match self {
             Self::F5Press => EI_DEVICE_CAP_KEYBOARD,
-            Self::MouseClick => EI_DEVICE_CAP_BUTTON,
+            Self::LeftClick => EI_DEVICE_CAP_BUTTON,
         }
     }
 }
@@ -798,7 +793,7 @@ impl PreparedInput {
     }
     pub(super) fn prepare<F>(
         &mut self,
-        action: Option<InputAction>,
+        action: Option<TriggerAction>,
         err: &mut dyn io::Write,
         mut should_cancel: F,
     ) -> bool

@@ -1,12 +1,12 @@
 use crate::{
-    constants::{BUFFER_SIZE, BUFFERS_PER_WORKER, FILE_NAME, IS_TERMINAL},
     diagnostic::{AppError, Result},
-    file_output::lock_mutex,
+    file_output::OutputFile,
     hardware_rng::HardwareRng,
     output::{self, OutputTarget},
     random_data::generate_random_data_with_rng,
     random_data::RandomDataSet,
     random_output::{persist_and_print_random_data, write_random_data_to_console},
+    BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
 };
 use core::{
     any::Any,
@@ -18,136 +18,129 @@ use std::{
     fs::File,
     io::BufWriter,
     io::{Write, stdout},
-    sync::{
-        Mutex, MutexGuard,
-        mpsc::{Receiver, SyncSender, TryRecvError, sync_channel},
-    },
-    thread::{available_parallelism, scope, sleep},
+    sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel},
+    thread::{ScopedJoinHandle, available_parallelism, scope, sleep},
     time::Instant,
 };
+const BUFFERS_PER_WORKER: usize = 8;
 pub(super) const MAX_BATCH_GENERATE_COUNT: u64 = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
-const PROGRESS_TIME_BUF_LEN: usize = 7;
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
 struct GeneratedChunk {
     buffer: DataBuffer,
     len: usize,
     worker_idx: usize,
 }
-struct ProgressReporter<'progress> {
-    pending_count: u64,
-    processed_ref: &'progress AtomicU64,
-    requested_count: u64,
-    start_time: &'progress Instant,
-}
-struct ProgressBuffers {
-    elapsed: [u8; PROGRESS_TIME_BUF_LEN],
-    eta: [u8; PROGRESS_TIME_BUF_LEN],
-    line: [u8; output::PROGRESS_LINE_BUF_LEN],
-}
-impl ProgressBuffers {
-    const fn new() -> Self {
-        Self {
-            elapsed: [0_u8; PROGRESS_TIME_BUF_LEN],
-            eta: [0_u8; PROGRESS_TIME_BUF_LEN],
-            line: [0_u8; output::PROGRESS_LINE_BUF_LEN],
-        }
-    }
-}
-impl ProgressReporter<'_> {
-    fn run(self) -> Result<()> {
-        let mut progress_buffers = ProgressBuffers::new();
-        let mut out = stdout().lock();
-        loop {
-            let processed_now = self.processed_ref.load(Ordering::Relaxed);
-            if processed_now >= self.pending_count {
-                break;
-            }
-            let elapsed = self.start_time.elapsed();
-            output::progress::print(
-                &mut out,
-                processed_now,
-                &mut progress_buffers.line,
-                self.requested_count,
-                elapsed,
-                &mut progress_buffers.elapsed,
-                &mut progress_buffers.eta,
-            )?;
-            sleep(PROGRESS_UPDATE_INTERVAL);
-        }
-        Ok(())
-    }
+#[derive(Default)]
+enum WorkerOutcome {
+    Failed { count: u64, first_error: AppError },
+    #[default]
+    Success,
 }
 struct WorkerPool<'scope> {
     buffer_return_receivers: Vec<Receiver<DataBuffer>>,
-    calculated_thread_count: NonZero<usize>,
-    failed_ref: &'scope AtomicU64,
-    first_error_ref: &'scope Mutex<Option<AppError>>,
     pending_count: u64,
     processed_ref: &'scope AtomicU64,
     rng: &'scope HardwareRng,
     sender: SyncSender<GeneratedChunk>,
 }
 struct WorkerJob<'scope> {
-    failed_ref: &'scope AtomicU64,
-    first_error_ref: &'scope Mutex<Option<AppError>>,
     loop_count: u64,
     processed_ref: &'scope AtomicU64,
     return_rx: Receiver<DataBuffer>,
-    rng: HardwareRng,
+    rng: &'scope HardwareRng,
     sender: &'scope SyncSender<GeneratedChunk>,
     worker_idx: usize,
 }
+impl WorkerOutcome {
+    fn merge(&mut self, other: Self) {
+        match other {
+            Self::Failed { count, first_error } => match *self {
+                Self::Failed {
+                    count: ref mut total_count,
+                    ..
+                } => *total_count = total_count.wrapping_add(count),
+                Self::Success => *self = Self::Failed { count, first_error },
+            },
+            Self::Success => {}
+        }
+    }
+    fn record_failure(&mut self, count: u64, message: AppError) {
+        match *self {
+            Self::Failed {
+                count: ref mut total_count,
+                ..
+            } => *total_count = total_count.wrapping_add(count),
+            Self::Success => {
+                *self = Self::Failed {
+                    count,
+                    first_error: message,
+                };
+            }
+        }
+    }
+}
 impl WorkerJob<'_> {
     fn record_failure(
-        first_error_ref: &Mutex<Option<AppError>>,
-        failed_ref: &AtomicU64,
-        processed_ref: &AtomicU64,
+        &self,
+        outcome: &mut WorkerOutcome,
         local_pool: &mut Vec<DataBuffer>,
         buffer: DataBuffer,
         message: AppError,
     ) {
-        record_first_error(first_error_ref, message);
-        failed_ref.fetch_add(1, Ordering::Relaxed);
-        processed_ref.fetch_add(1, Ordering::Relaxed);
+        outcome.record_failure(1, message);
+        self.processed_ref.fetch_add(1, Ordering::Relaxed);
         local_pool.push(buffer);
     }
-    fn run(self) {
-        let mut rng = self.rng;
+    fn run(self) -> WorkerOutcome {
+        let rng = self.rng;
+        let mut outcome = WorkerOutcome::default();
         let mut local_pool = Vec::new();
         if let Err(source) = local_pool.try_reserve_exact(BUFFERS_PER_WORKER) {
-            record_first_error(
-                self.first_error_ref,
+            outcome.record_failure(
+                self.loop_count,
                 AppError::context("worker buffer pool 메모리 확보 실패", source),
             );
-            self.failed_ref
-                .fetch_add(self.loop_count, Ordering::Relaxed);
             self.processed_ref
                 .fetch_add(self.loop_count, Ordering::Relaxed);
-            return;
+            return outcome;
         }
         for _ in 0..BUFFERS_PER_WORKER {
             match self.return_rx.try_recv() {
                 Ok(buffer) => local_pool.push(buffer),
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => return,
+                Err(TryRecvError::Disconnected) => {
+                    outcome.record_failure(
+                        self.loop_count,
+                        AppError::message("writer buffer 반환 채널 연결 종료"),
+                    );
+                    self.processed_ref
+                        .fetch_add(self.loop_count, Ordering::Relaxed);
+                    return outcome;
+                }
             }
         }
-        for _ in 0..self.loop_count {
-            let mut buffer = match local_pool.pop() {
-                Some(buf) => buf,
-                None => match self.return_rx.recv() {
-                    Ok(buf) => buf,
-                    Err(_) => break,
-                },
+        for item_index in 0..self.loop_count {
+            let mut buffer = if let Some(buf) = local_pool.pop() {
+                buf
+            } else {
+                let Ok(buf) = self.return_rx.recv() else {
+                    let remaining = self.loop_count.wrapping_sub(item_index);
+                    outcome.record_failure(
+                        remaining,
+                        AppError::message("writer buffer 반환 채널 연결 종료"),
+                    );
+                    self.processed_ref
+                        .fetch_add(remaining, Ordering::Relaxed);
+                    break;
+                };
+                buf
             };
-            let data = match generate_random_data_with_rng(&mut rng) {
+            let data = match generate_random_data_with_rng(rng) {
                 Ok(data) => data,
                 Err(source) => {
-                    Self::record_failure(
-                        self.first_error_ref,
-                        self.failed_ref,
-                        self.processed_ref,
+                    self.record_failure(
+                        &mut outcome,
                         &mut local_pool,
                         buffer,
                         AppError::context("난수 생성 실패", source),
@@ -162,10 +155,8 @@ impl WorkerJob<'_> {
             ) {
                 Ok(len) => len,
                 Err(source) => {
-                    Self::record_failure(
-                        self.first_error_ref,
-                        self.failed_ref,
-                        self.processed_ref,
+                    self.record_failure(
+                        &mut outcome,
                         &mut local_pool,
                         buffer,
                         AppError::context("난수 데이터 포맷 실패", source),
@@ -190,169 +181,92 @@ impl WorkerJob<'_> {
                     }
                 }
             } else {
-                record_first_error(
-                    self.first_error_ref,
+                let remaining = self.loop_count.wrapping_sub(item_index);
+                outcome.record_failure(
+                    remaining,
                     AppError::message("writer channel 전송 실패"),
                 );
-                self.failed_ref.fetch_add(1, Ordering::Relaxed);
-                self.processed_ref.fetch_add(1, Ordering::Relaxed);
+                self.processed_ref
+                    .fetch_add(remaining, Ordering::Relaxed);
                 break;
             }
         }
+        outcome
     }
 }
 impl WorkerPool<'_> {
-    fn join_all(self) -> Result<()> {
-        let thread_count_u64 =
-            u64::try_from(self.calculated_thread_count.get()).map_err(|conversion_err| {
-                AppError::context("스레드 수 변환 실패", conversion_err)
-            })?;
+    fn join_all(self, thread_count: NonZero<usize>) -> Result<WorkerOutcome> {
+        let thread_count_u64 = u64::from_le_bytes(thread_count.get().to_le_bytes());
         let base_count = self.pending_count.div_euclid(thread_count_u64);
         let remainder = self.pending_count.rem_euclid(thread_count_u64);
-        scope(|worker_scope| -> Result<()> {
-            let mut worker_handles = Vec::new();
-            worker_handles
-                .try_reserve_exact(self.calculated_thread_count.get())
-                .map_err(|source| {
-                    AppError::context("작업 스레드 handle 목록 메모리 확보 실패", source)
-                })?;
+        scope(|worker_scope| -> Result<WorkerOutcome> {
+            let mut worker_handles = try_reserved_vec(
+                thread_count.get(),
+                "작업 스레드 handle 목록 메모리 확보 실패",
+            )?;
             for (worker_idx, return_rx) in self.buffer_return_receivers.into_iter().enumerate() {
-                let worker_idx_u64 =
-                    u64::try_from(worker_idx).map_err(|source| {
-                        AppError::context("worker index 변환 실패", source)
-                    })?;
+                let worker_idx_u64 = u64::from_le_bytes(worker_idx.to_le_bytes());
                 let loop_count =
-                    base_count.saturating_add(u64::from(worker_idx_u64 < remainder));
+                    base_count.wrapping_add(u64::from(worker_idx_u64 < remainder));
                 let job = WorkerJob {
-                    failed_ref: self.failed_ref,
-                    first_error_ref: self.first_error_ref,
                     loop_count,
                     processed_ref: self.processed_ref,
                     return_rx,
-                    rng: self.rng.shared_source_rng(),
+                    rng: self.rng,
                     sender: &self.sender,
                     worker_idx,
                 };
                 worker_handles.push(worker_scope.spawn(move || job.run()));
             }
+            let mut worker_outcome = WorkerOutcome::default();
             let mut first_join_error = None;
             for handle in worker_handles {
-                if let Err(panic_payload) = handle.join()
-                    && first_join_error.is_none()
-                {
-                    first_join_error = Some(panic_join_error(
-                        "작업 스레드 패닉 발생",
-                        panic_payload.as_ref(),
-                    ));
+                match handle.join() {
+                    Ok(outcome) => worker_outcome.merge(outcome),
+                    Err(panic_payload) if first_join_error.is_none() => {
+                        first_join_error = Some(panic_join_error(
+                            "작업 스레드 패닉 발생",
+                            panic_payload.as_ref(),
+                        ));
+                    }
+                    Err(_) => {}
                 }
             }
             if let Some(error) = first_join_error {
                 return Err(error);
             }
-            Ok(())
-        })?;
-        drop(self.sender);
-        Ok(())
+            Ok(worker_outcome)
+        })
     }
 }
-struct WriterTask<'writer> {
-    buffer_return_senders: Vec<SyncSender<DataBuffer>>,
-    file_mutex: &'writer Mutex<BufWriter<File>>,
-    receiver: Receiver<GeneratedChunk>,
-}
-impl WriterTask<'_> {
-    fn run(self) -> Result<()> {
-        let mut file_guard = lock_mutex(self.file_mutex, "Mutex 잠금 실패 (쓰기 스레드)")?;
-        while let Ok(chunk) = self.receiver.recv() {
-            Self::write_chunk_and_return_buffer(
-                &mut file_guard,
-                &self.buffer_return_senders,
-                chunk,
-            )?;
-            while let Ok(more_chunk) = self.receiver.try_recv() {
-                Self::write_chunk_and_return_buffer(
-                    &mut file_guard,
-                    &self.buffer_return_senders,
-                    more_chunk,
-                )?;
-            }
-        }
-        file_guard.flush()?;
-        drop(file_guard);
-        Ok(())
-    }
-    fn write_chunk_and_return_buffer(
-        file_guard: &mut MutexGuard<'_, BufWriter<File>>,
-        buffer_return_senders: &[SyncSender<DataBuffer>],
-        chunk: GeneratedChunk,
-    ) -> Result<()> {
-        let GeneratedChunk {
-            buffer,
-            len,
-            worker_idx,
-        } = chunk;
-        Write::write_all(
-            &mut **file_guard,
-            output::prefix_slice(&buffer[..], len)?,
-        )?;
-        let return_sender = buffer_return_senders
-            .get(worker_idx)
-            .ok_or("worker buffer 반환 채널 인덱스가 범위를 벗어났습니다")?;
-        match return_sender.send(buffer) {
-            Ok(()) | Err(_) => {}
-        }
-        Ok(())
-    }
-}
-struct BatchRegenerator<'file, 'out, 'err, 'rng> {
-    err: &'err mut dyn Write,
-    file_mutex: &'file Mutex<BufWriter<File>>,
+struct MultipleBatchRegenerator<'file, 'out, 'rng> {
     out: &'out mut dyn Write,
+    output_file: &'file mut OutputFile,
     requested_count: u64,
-    rng: &'rng mut HardwareRng,
+    rng: &'rng HardwareRng,
     start_time: Instant,
 }
-struct BatchRunResult {
-    failed_count: u64,
-    final_data: RandomDataSet,
-    first_error: Option<AppError>,
-}
-impl BatchRegenerator<'_, '_, '_, '_> {
-    fn regenerate(mut self) -> Result<u64> {
-        if self.requested_count == 0 {
-            return Err("생성 개수는 1 이상이어야 합니다.".into());
-        }
-        if self.requested_count == 1 {
-            return self.regenerate_single();
-        }
-        let run_result = self.regenerate_multiple()?;
-        self.write_summary(
-            &run_result.final_data,
-            run_result.failed_count,
-            run_result.first_error.as_ref(),
-        )
-    }
-    fn regenerate_multiple(&mut self) -> Result<BatchRunResult> {
-        let file_mutex = self.file_mutex;
+impl MultipleBatchRegenerator<'_, '_, '_> {
+    fn regenerate_multiple(&mut self) -> Result<RandomDataSet> {
+        let output_writer = self.output_file.writer();
         let (requested_count, start_time) = (self.requested_count, self.start_time);
-        let max_threads = available_parallelism().map_or(4, NonZero::get);
-        let pending_count = requested_count.saturating_sub(1);
-        let calculated_thread_count_raw =
-            usize::try_from(pending_count).map_or(max_threads, |count| count.min(max_threads));
-        let calculated_thread_count =
-            NonZero::new(calculated_thread_count_raw).ok_or("작업 스레드 수 계산 실패")?;
+        let max_threads = available_parallelism()?;
+        let pending_count = requested_count.wrapping_sub(1);
+        let pending_count_usize = usize::from_le_bytes(pending_count.to_le_bytes());
+        let calculated_thread_count = NonZero::<usize>::MIN
+            .saturating_add(pending_count_usize.wrapping_sub(1))
+            .min(max_threads);
         let in_flight_buffers = calculated_thread_count
             .get()
-            .checked_mul(BUFFERS_PER_WORKER)
-            .ok_or("작업 buffer 채널 용량 계산 실패")?;
-        let mut return_senders = Vec::new();
-        return_senders
-            .try_reserve_exact(calculated_thread_count.get())
-            .map_err(|source| AppError::context("buffer sender 목록 메모리 확보 실패", source))?;
-        let mut return_receivers = Vec::new();
-        return_receivers
-            .try_reserve_exact(calculated_thread_count.get())
-            .map_err(|source| AppError::context("buffer receiver 목록 메모리 확보 실패", source))?;
+            .wrapping_mul(BUFFERS_PER_WORKER);
+        let mut return_senders = try_reserved_vec(
+            calculated_thread_count.get(),
+            "buffer sender 목록 메모리 확보 실패",
+        )?;
+        let mut return_receivers = try_reserved_vec(
+            calculated_thread_count.get(),
+            "buffer receiver 목록 메모리 확보 실패",
+        )?;
         for _ in 0..calculated_thread_count.get() {
             let (tx, rx) = sync_channel(BUFFERS_PER_WORKER);
             for _ in 0..BUFFERS_PER_WORKER {
@@ -364,130 +278,94 @@ impl BatchRegenerator<'_, '_, '_, '_> {
         }
         let (sender, receiver) = sync_channel::<GeneratedChunk>(in_flight_buffers);
         let processed = AtomicU64::new(0);
-        let failed = AtomicU64::new(0);
-        let first_error = Mutex::new(None);
-        let (processed_ref, failed_ref, first_error_ref) = (&processed, &failed, &first_error);
-        scope(|scope_ctx| -> Result<()> {
+        let processed_ref = &processed;
+        let worker_outcome = scope(|scope_ctx| -> Result<WorkerOutcome> {
             let writer_thread = scope_ctx.spawn(move || {
-                WriterTask {
-                    buffer_return_senders: return_senders,
-                    file_mutex,
-                    receiver,
+                while let Ok(chunk) = receiver.recv() {
+                    write_chunk(output_writer, &return_senders, chunk)?;
+                    while let Ok(more_chunk) = receiver.try_recv() {
+                        write_chunk(output_writer, &return_senders, more_chunk)?;
+                    }
                 }
-                .run()
+                output_writer.flush()?;
+                Ok(())
             });
             let progress_thread = (*IS_TERMINAL).then(|| {
                 scope_ctx.spawn(move || {
-                    ProgressReporter {
-                        pending_count,
-                        processed_ref,
-                        requested_count,
-                        start_time: &start_time,
+                    let mut progress_buffers = output::progress::ProgressBuffers::new();
+                    let mut out = stdout().lock();
+                    loop {
+                        let processed_now = processed_ref.load(Ordering::Relaxed);
+                        if processed_now >= pending_count {
+                            break;
+                        }
+                        progress_buffers.print(
+                            &mut out,
+                            processed_now,
+                            requested_count,
+                            start_time.elapsed(),
+                        )?;
+                        sleep(PROGRESS_UPDATE_INTERVAL);
                     }
-                    .run()
+                    Ok(())
                 })
             });
             let worker_result = WorkerPool {
                 buffer_return_receivers: return_receivers,
-                calculated_thread_count,
-                failed_ref,
-                first_error_ref,
                 pending_count,
                 processed_ref,
                 rng: &*self.rng,
                 sender,
             }
-            .join_all();
-            let missing =
-                pending_count.saturating_sub(processed_ref.load(Ordering::Relaxed));
-            failed_ref.fetch_add(missing, Ordering::Relaxed);
-            processed_ref.fetch_add(missing, Ordering::Relaxed);
-            let progress_result = progress_thread.map_or_else(
-                || Ok(()),
-                |handle| match handle.join() {
-                    Ok(result) => result,
-                    Err(panic_payload) => Err(panic_join_error(
-                        "진행률 스레드 패닉 발생",
-                        panic_payload.as_ref(),
-                    )),
-                },
-            );
-            let writer_result = match writer_thread.join() {
-                Ok(result) => result,
-                Err(panic_payload) => Err(panic_join_error(
-                    "쓰기 스레드 패닉 발생",
-                    panic_payload.as_ref(),
-                )),
-            };
-            worker_result?;
+            .join_all(calculated_thread_count);
+            if worker_result.is_err() {
+                processed_ref.store(pending_count, Ordering::Relaxed);
+            }
+            let progress_result = progress_thread.map_or(Ok(()), |handle| {
+                join_task(handle, "진행률 스레드 패닉 발생")
+            });
+            let writer_result = join_task(writer_thread, "쓰기 스레드 패닉 발생");
+            let worker_outcome = worker_result?;
             progress_result?;
             writer_result?;
-            Ok(())
+            Ok(worker_outcome)
         })?;
-        self.rng.sync_source_from_shared();
-        let final_data = generate_random_data_with_rng(self.rng)?;
-        let first_error_text =
-            lock_mutex(&first_error, "Mutex 잠금 실패 (batch 최초 오류)")?.take();
-        Ok(BatchRunResult {
-            failed_count: failed_ref.load(Ordering::Relaxed),
-            final_data,
-            first_error: first_error_text,
-        })
+        if let WorkerOutcome::Failed {
+            count: failed_count,
+            first_error,
+        } = worker_outcome
+        {
+            return Err(AppError::context(
+                format!(
+                    "대량 생성 중 {failed_count}건이 실패했습니다. 성공한 부분 결과만 {FILE_NAME}에 기록되었습니다."
+                ),
+                first_error,
+            ));
+        }
+        generate_random_data_with_rng(self.rng)
     }
-    fn regenerate_single(&mut self) -> Result<u64> {
-        let final_data = generate_random_data_with_rng(self.rng)?;
-        persist_and_print_random_data(self.file_mutex, &final_data)?;
-        Ok(final_data.num_64)
-    }
-    fn write_summary(
-        &mut self,
-        final_data: &RandomDataSet,
-        failed_count: u64,
-        first_error: Option<&AppError>,
-    ) -> Result<u64> {
+    fn write_summary(&mut self, final_data: &RandomDataSet) -> Result<u64> {
         let mut final_buffer_file = [0_u8; BUFFER_SIZE];
         let final_bytes_written_file =
             output::format_data_into_buffer(final_data, &mut final_buffer_file, OutputTarget::File)?;
-        let mut final_file_guard =
-            lock_mutex(self.file_mutex, "Mutex 잠금 실패 (대량 생성 최종 기록)")?;
+        let final_file = self.output_file.writer();
         Write::write_all(
-            &mut *final_file_guard,
+            &mut *final_file,
             output::prefix_slice(&final_buffer_file, final_bytes_written_file)?,
         )?;
-        final_file_guard.flush()?;
-        drop(final_file_guard);
-        let mut progress_buffers = ProgressBuffers::new();
-        let elapsed = self.start_time.elapsed();
-        output::progress::print(
+        final_file.flush()?;
+        let mut progress_buffers = output::progress::ProgressBuffers::new();
+        progress_buffers.print(
             self.out,
             self.requested_count,
-            &mut progress_buffers.line,
             self.requested_count,
-            elapsed,
-            &mut progress_buffers.elapsed,
-            &mut progress_buffers.eta,
+            self.start_time.elapsed(),
         )?;
-        let success_count = self
-            .requested_count
-            .checked_sub(failed_count)
-            .ok_or("성공 건수 계산 실패")?;
-        if failed_count > 0 {
-            writeln!(self.err, "[경고] 생성 중 {failed_count}건 실패했습니다.")?;
-            if let Some(first_error_text) = first_error {
-                writeln!(self.err, "[경고] 최초 실패 원인: {first_error_text}")?;
-            }
-            write!(
-                self.out,
-                "\n총 {requested_count}건 중 {success_count}건 생성 완료 ({FILE_NAME} 에 추가).\n\n",
-                requested_count = self.requested_count,
-            )?;
-        } else {
-            write!(
-                self.out,
-                "\n총 {requested_count}건 생성 완료 ({FILE_NAME} 에 추가).\n\n",
-                requested_count = self.requested_count,
-            )?;
-        }
+        write!(
+            self.out,
+            "\n총 {requested_count}건 생성 완료 ({FILE_NAME} 에 추가).\n\n",
+            requested_count = self.requested_count,
+        )?;
         self.out.flush()?;
         write_random_data_to_console(
             final_data,
@@ -497,14 +375,17 @@ impl BatchRegenerator<'_, '_, '_, '_> {
         Ok(final_data.num_64)
     }
 }
-fn record_first_error(
-    first_error_ref: &Mutex<Option<AppError>>,
-    message: AppError,
-) {
-    if let Ok(mut first_error) = first_error_ref.lock()
-        && first_error.is_none()
-    {
-        *first_error = Some(message);
+fn try_reserved_vec<T>(capacity: usize, context: &'static str) -> Result<Vec<T>> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|source| AppError::context(context, source))?;
+    Ok(values)
+}
+fn join_task(handle: ScopedJoinHandle<'_, Result<()>>, panic_context: &str) -> Result<()> {
+    match handle.join() {
+        Ok(result) => result,
+        Err(panic_payload) => Err(panic_join_error(panic_context, panic_payload.as_ref())),
     }
 }
 fn panic_join_error(context: &str, panic_payload: &(dyn Any + Send)) -> AppError {
@@ -518,25 +399,52 @@ fn panic_join_error(context: &str, panic_payload: &(dyn Any + Send)) -> AppError
     );
     AppError::message(format!("{context}: {panic_detail}"))
 }
+fn write_chunk(
+    file: &mut BufWriter<File>,
+    buffer_return_senders: &[SyncSender<DataBuffer>],
+    chunk: GeneratedChunk,
+) -> Result<()> {
+    let GeneratedChunk {
+        buffer,
+        len,
+        worker_idx,
+    } = chunk;
+    Write::write_all(file, output::prefix_slice(&buffer[..], len)?)?;
+    let return_sender = buffer_return_senders
+        .get(worker_idx)
+        .ok_or("worker buffer 반환 채널 인덱스가 범위를 벗어났습니다")?;
+    match return_sender.send(buffer) {
+        Ok(()) | Err(_) => {}
+    }
+    Ok(())
+}
 pub(super) fn regenerate_with_count(
-    file_mutex: &Mutex<BufWriter<File>>,
-    rng: &mut HardwareRng,
+    output_file: &mut OutputFile,
+    rng: &HardwareRng,
     requested_count: u64,
     out: &mut dyn Write,
-    err: &mut dyn Write,
 ) -> Result<u64> {
     if requested_count > MAX_BATCH_GENERATE_COUNT {
         return Err(AppError::message(format!(
             "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
         )));
     }
-    BatchRegenerator {
-        err,
-        file_mutex,
+    let start_time = Instant::now();
+    if requested_count == 0 {
+        return Err("생성 개수는 1 이상이어야 합니다.".into());
+    }
+    if requested_count == 1 {
+        let final_data = generate_random_data_with_rng(rng)?;
+        persist_and_print_random_data(output_file, &final_data)?;
+        return Ok(final_data.num_64);
+    }
+    let mut regenerator = MultipleBatchRegenerator {
         out,
+        output_file,
         requested_count,
         rng,
-        start_time: Instant::now(),
-    }
-    .regenerate()
+        start_time,
+    };
+    let final_data = regenerator.regenerate_multiple()?;
+    regenerator.write_summary(&final_data)
 }

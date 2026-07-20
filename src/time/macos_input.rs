@@ -1,5 +1,5 @@
 use crate::write_line_best_effort;
-use super::NativeInputSendStatus;
+use super::{NativeInputSendStatus, TriggerAction};
 use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
@@ -31,11 +31,6 @@ const _: () = assert!(size_of::<CGPoint>() == 16, "CoreGraphics CGPoint size mis
 const _: () = assert!(align_of::<CGPoint>() == 8, "CoreGraphics CGPoint align mismatch");
 const _: () = assert!(offset_of!(CGPoint, x) == 0, "CoreGraphics CGPoint x offset mismatch");
 const _: () = assert!(offset_of!(CGPoint, y) == 8, "CoreGraphics CGPoint y offset mismatch");
-#[derive(Clone, Copy)]
-pub(super) enum InputAction {
-    F5Press,
-    MouseClick,
-}
 struct Event {
     raw: NonNull<c_void>,
 }
@@ -102,7 +97,7 @@ impl Event {
         }
     }
 }
-impl InputAction {
+impl TriggerAction {
     pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
         if !post_event_access_granted(false) {
             write_line_best_effort(
@@ -113,7 +108,7 @@ impl InputAction {
         }
         let result: InputResult<()> = (|| {
             match self {
-                Self::MouseClick => {
+            Self::LeftClick => {
                     // SAFETY: null asks CoreGraphics to use the default source.
                     let current = Event::from_raw(
                         unsafe { sys::CGEventCreate(null_mut()) },

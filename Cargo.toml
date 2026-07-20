@@ -2,7 +2,7 @@
 name = "srg"
 version = "1.5.8"
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.97.1"
 description = """\
 Hardware RNG-based random data generator with high-precision server time sync \
 utility\

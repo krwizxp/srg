@@ -7,7 +7,7 @@ use crate::{
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
     numeric::low_u8_from_u32,
 };
-use core::{range::Range, time::Duration};
+use core::time::Duration;
 use std::{
     io::Result as IoResult,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -21,11 +21,9 @@ const HOUR_SECONDS_I64: i64 = 3_600;
 const MINUTE_SECONDS_I64: i64 = 60;
 const THREE_DIGIT_WIDTH: usize = 3;
 const TWO_DIGIT_WIDTH: usize = 2;
-const U32_DEC_BUF_LEN: usize = 10;
 const U32_FOUR_DIGIT_THRESHOLD: u32 = 10_000;
 const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
-const U32_TWO_DIGIT_THRESHOLD: u32 = 10;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 struct DisplayableTime {
     day_of_month: u32,
@@ -38,18 +36,6 @@ struct DisplayableTime {
     year: i32,
 }
 impl ByteCursor<'_> {
-    fn checked_sub_index(value: usize, amount: usize) -> IoResult<usize> {
-        value.checked_sub(amount).ok_or_else(write_zero_err)
-    }
-    fn range_two_digits(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; TWO_DIGIT_WIDTH]> {
-        let end = start
-            .checked_add(TWO_DIGIT_WIDTH)
-            .ok_or_else(write_zero_err)?;
-        slice
-            .get_mut(Range { start, end })
-            .and_then(|digits| digits.first_chunk_mut::<TWO_DIGIT_WIDTH>())
-            .ok_or_else(write_zero_err)
-    }
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
         let digits_slice = self.take(TWO_DIGIT_WIDTH)?;
@@ -72,29 +58,6 @@ impl ByteCursor<'_> {
         };
         copy_two_digits(remaining_digits, rem)?;
         Ok(())
-    }
-    fn write_u32_dec(&mut self, mut n: u32) -> IoResult<()> {
-        let mut tmp = [0_u8; U32_DEC_BUF_LEN];
-        let mut i = tmp.len();
-        while n >= U32_THREE_DIGIT_THRESHOLD {
-            let rem = usize::from(low_u8_from_u32(n.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            n /= U32_THREE_DIGIT_THRESHOLD;
-            i = Self::checked_sub_index(i, 2)?;
-            copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
-        }
-        if n >= U32_TWO_DIGIT_THRESHOLD {
-            let rem = usize::from(low_u8_from_u32(n));
-            i = Self::checked_sub_index(i, TWO_DIGIT_WIDTH)?;
-            copy_two_digits(Self::range_two_digits(&mut tmp, i)?, rem)?;
-        } else {
-            i = Self::checked_sub_index(i, 1)?;
-            let digit = usize::from(low_u8_from_u32(n));
-            *tmp.get_mut(i).ok_or_else(write_zero_err)? = digit_byte(digit)?;
-        }
-        let Some(suffix) = tmp.get(i..) else {
-            return Err(write_zero_err());
-        };
-        self.write_bytes(suffix)
     }
     fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
         if year >= 0_i32 {

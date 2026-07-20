@@ -1,14 +1,15 @@
 extern crate alloc;
+use self::command::CliCommand;
 use self::diagnostic::{AppError, Result};
-use self::{constants::FILE_NAME, file_output::OutputFile, menu_app::MenuApp};
+use self::{file_output::OutputFile, menu_app::MenuApp};
 use core::fmt;
 use std::{
     env,
     ffi::OsStr,
-    io::{self, BufWriter, Write as _},
+    io::{self, IsTerminal as TerminalDetect, Write as _},
     path::Path,
     process::ExitCode,
-    sync::Mutex,
+    sync::LazyLock,
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -25,14 +26,14 @@ cfg_select! {
     target_arch = "x86_64" => {
         mod batch;
         mod hardware_rng;
+        mod ladder;
         mod random_number;
         mod random_output;
     }
     _ => {}
 }
 mod buffmt;
-mod build_info;
-mod constants;
+mod command;
 mod diagnostic;
 mod file_output;
 mod input;
@@ -40,16 +41,13 @@ mod menu_app;
 mod numeric;
 mod output;
 mod random_data;
-mod random_util;
-mod tables;
 mod time;
-cfg_select! {
-    any(target_os = "windows", target_os = "linux", target_os = "macos") => {}
-    _ => {
-        compile_error!("SRG currently supports only Windows, Linux, and macOS.");
-    }
-}
-const GENERIC_INPUT_BUFFER_CAPACITY: usize = 256;
+const BUFFER_SIZE: usize = 1016;
+const FILE_NAME: &str = "random_data.txt";
+static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| TerminalDetect::is_terminal(&io::stdout()));
+const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " ",
@@ -59,11 +57,20 @@ const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     "\n  ",
     env!("CARGO_PKG_NAME"),
-    " --version [--verbose]\n\n",
+    " --version\n  ",
+    env!("CARGO_PKG_NAME"),
+    " generate <count>\n  ",
+    env!("CARGO_PKG_NAME"),
+    " ladder <players-csv> <results-csv>\n  ",
+    env!("CARGO_PKG_NAME"),
+    " random-integer <min> <max>\n  ",
+    env!("CARGO_PKG_NAME"),
+    " random-float <min> <max>\n  ",
+    env!("CARGO_PKG_NAME"),
+    " time-observe <host> <seconds>\n\n",
     "옵션:\n",
     "  -h, --help               도움말\n",
-    "  --version                버전\n",
-    "  --version --verbose      빌드 메타데이터 포함 버전\n"
+    "  --version                버전\n"
 );
 fn unknown_option(label: &str, option: &OsStr) -> AppError {
     format!("{label}: {}", option.to_string_lossy()).into()
@@ -87,61 +94,37 @@ fn main() -> Result<ExitCode> {
             return Ok(ExitCode::SUCCESS);
         }
         if first == OsStr::new("--version") {
-            let verbose = match args.next() {
-                None => false,
-                Some(flag) if flag == OsStr::new("--verbose") => {
-                    if let Some(extra) = args.next() {
-                        return Err(unknown_option("알 수 없는 --version 옵션", &extra));
-                    }
-                    true
-                }
-                Some(flag) => return Err(unknown_option("알 수 없는 --version 옵션", &flag)),
-            };
-            let mut out = io::stdout().lock();
-            writeln!(out, "{} {}", build_info::APP_NAME, build_info::APP_VERSION)?;
-            if verbose {
-                writeln!(out, "target: {}", build_info::BUILD_TARGET)?;
-                writeln!(out, "profile: {}", build_info::BUILD_PROFILE)?;
-                writeln!(out, "rustc: {}", build_info::BUILD_RUSTC)?;
-                writeln!(out, "git: {}", build_info::BUILD_GIT_SHA)?;
-                writeln!(out, "dirty: {}", build_info::BUILD_GIT_DIRTY)?;
-                writeln!(out, "rng backend: {}", build_info::RNG_BACKEND)?;
+            if let Some(extra) = args.next() {
+                return Err(unknown_option("알 수 없는 --version 옵션", &extra));
             }
+            let mut out = io::stdout().lock();
+            writeln!(out, "{APP_NAME} {APP_VERSION}")?;
             return Ok(ExitCode::SUCCESS);
         }
-        return Err(unknown_option("알 수 없는 옵션", &first));
+        return CliCommand::try_from((first, args))?.execute();
     }
-    let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
-    let file_mutex = Mutex::new(BufWriter::from(output_file));
-    let reserved_string = |capacity: usize, context: &'static str| -> Result<String> {
-        let mut value = String::new();
-        value
-            .try_reserve_exact(capacity)
-            .map_err(|source| AppError::context(context, source))?;
-        Ok(value)
-    };
-    let input_buffer =
-        reserved_string(GENERIC_INPUT_BUFFER_CAPACITY, "입력 버퍼 메모리 확보 실패")?;
+    let input_buffer = String::new();
     let mut app = cfg_select! {
         target_arch = "x86_64" => {{
-            let mut rng = HardwareRng::new();
+            let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+            let rng = HardwareRng::new();
             let num_64 = match rng.source() {
                 HardwareRandomSource::RdSeed => {
-                    let data = generate_random_data_with_rng(&mut rng)?;
+                    let data = generate_random_data_with_rng(&rng)?;
                     if rng.take_rdseed_fallback_notice() {
                         let mut err = stderr().lock();
                         err.write_all("RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.\n".as_bytes())?;
                     }
                     let num_64 = data.num_64;
-                    persist_and_print_random_data(&file_mutex, &data)?;
+                    persist_and_print_random_data(&mut output_file, &data)?;
                     num_64
                 }
                 HardwareRandomSource::RdRand => {
                     let mut err = stderr().lock();
                     err.write_all("RDSEED를 미지원하여 RDRAND를 사용합니다.\n".as_bytes())?;
-                    let data = generate_random_data_with_rng(&mut rng)?;
+                    let data = generate_random_data_with_rng(&rng)?;
                     let num_64 = data.num_64;
-                    persist_and_print_random_data(&file_mutex, &data)?;
+                    persist_and_print_random_data(&mut output_file, &data)?;
                     num_64
                 }
                 HardwareRandomSource::None => {
@@ -153,26 +136,19 @@ fn main() -> Result<ExitCode> {
                     0
                 }
             };
-            let ladder_players_storage = reserved_string(
-                GENERIC_INPUT_BUFFER_CAPACITY,
-                "사다리 참여자 버퍼 메모리 확보 실패",
-            )?;
-            let ladder_results_storage = reserved_string(
-                GENERIC_INPUT_BUFFER_CAPACITY,
-                "사다리 결과 버퍼 메모리 확보 실패",
-            )?;
+            let ladder_results_storage = String::new();
             MenuApp {
-                file_mutex,
                 input_buffer,
-                ladder_players_storage,
                 ladder_results_storage,
                 num_64,
+                output_file,
                 rng,
             }
         }}
-        _ => {
-            MenuApp { file_mutex, input_buffer }
-        }
+        _ => {{
+            let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+            MenuApp { input_buffer, output_file }
+        }}
     };
     app.run()
 }

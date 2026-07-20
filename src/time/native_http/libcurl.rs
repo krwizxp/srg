@@ -1,5 +1,5 @@
-use super::{HeadResponse, MIN_TRANSFER_TIME, Result, error};
-use super::super::{TimeError, TimeErrorKind, http_date::parse_http_date_to_systemtime};
+use super::{MIN_TRANSFER_TIME, Result, TimeSample, error};
+use super::super::{ParsedServer, TimeError, http_date::parse_http_date_to_systemtime};
 use super::super::sample::{
     AGE_HEADER_PREFIX, DATE_HEADER_PREFIX, find_header_value, validate_http_age_value,
 };
@@ -7,11 +7,15 @@ use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
-    mem::{self, align_of, offset_of, size_of},
+    mem::{align_of, offset_of, size_of},
     ptr::{NonNull, null_mut},
+    result::Result as CoreResult,
     slice,
 };
-use std::{sync::LazyLock, time::Instant};
+use std::{
+    sync::LazyLock,
+    time::{Instant, SystemTime},
+};
 mod sys;
 const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
@@ -88,7 +92,6 @@ type CurlCode = c_uint;
 type CurlInfo = c_uint;
 type CurlOption = c_uint;
 type CurlVersion = c_uint;
-type CurlWriteCallback = unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize;
 #[repr(C)]
 struct CurlVersionInfoData {
     age: CurlVersion,
@@ -143,9 +146,9 @@ cfg_select! {
     _ => {}
 }
 #[derive(Default)]
-pub(super) struct Client {
+pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
-    url_buffer: Vec<u8>,
+    header_line_buffer: Vec<u8>,
 }
 struct EasyHandle(NonNull<Curl>);
 #[derive(Default)]
@@ -155,31 +158,21 @@ struct CurlBodySink {
     limit: usize,
 }
 #[derive(Default)]
-struct CurlHeaderCapture {
-    age_error: Option<Cow<'static, str>>,
+struct CurlHeaderBlock {
+    age_result: Option<CoreResult<(), Cow<'static, str>>>,
+    date_result: Option<Result<(SystemTime, Instant)>>,
+}
+struct CurlHeaderCapture<'line> {
     bytes_seen: usize,
-    current_block_age_error: Option<Cow<'static, str>>,
-    current_block_age_seen: bool,
-    current_block_date: Option<String>,
-    current_block_date_error: Option<Cow<'static, str>>,
-    current_block_date_received_inst: Option<Instant>,
-    current_block_date_seen: bool,
-    date_error: Option<Cow<'static, str>>,
-    date_header: Option<String>,
-    date_received_inst: Option<Instant>,
+    completed_block: Option<CurlHeaderBlock>,
+    current_block: Option<CurlHeaderBlock>,
     error: Option<Cow<'static, str>>,
-    in_header_block: bool,
     limit: usize,
-    pending_line: Vec<u8>,
+    pending_line: &'line mut Vec<u8>,
 }
-struct CurlHeadPerform {
-    code: CurlCode,
-    request_start: Instant,
-    response_received: Instant,
-}
-enum CurlWriteTarget<'buffer> {
-    Body(&'buffer mut CurlBodySink),
-    Header(&'buffer mut CurlHeaderCapture),
+enum CurlWriteTarget<'target, 'line> {
+    Body(&'target mut CurlBodySink),
+    Header(&'target mut CurlHeaderCapture<'line>),
 }
 impl Drop for EasyHandle {
     fn drop(&mut self) {
@@ -255,7 +248,7 @@ impl EasyHandle {
     fn setopt_callback(
         &self,
         option: CurlOption,
-        value: CurlWriteCallback,
+        value: unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize,
         context: &str,
     ) -> Result<()> {
         // SAFETY: value is a libcurl-compatible callback function pointer.
@@ -295,81 +288,52 @@ impl EasyHandle {
     }
 }
 impl Client {
-    fn clear_reusable_handle(&mut self) {
-        self.easy_handle = None;
-    }
-    pub(super) fn fetch_head(
+    pub(in crate::time) fn fetch_head(
         &mut self,
-        url: &str,
+        server: &ParsedServer,
         context: &str,
-    ) -> Result<HeadResponse> {
-        let mut url_buffer = mem::take(&mut self.url_buffer);
-        let result = (|| {
-            let url_capacity = url
-                .len()
-                .checked_add(1)
-                .ok_or_else(|| error(context, "URL 용량 계산 실패"))?;
-            url_buffer.clear();
-            if url_buffer.capacity() < url_capacity {
-                url_buffer.try_reserve_exact(url_capacity).map_err(|source| {
-                    TimeError::new_with_source(
-                        TimeErrorKind::NativeHttp,
-                        format!("{context}: URL 메모리 확보 실패"),
-                        source,
-                    )
-                })?;
-            }
-            url_buffer.extend_from_slice(url.as_bytes());
-            url_buffer.push(0);
-            let url_c = CStr::from_bytes_with_nul(&url_buffer).map_err(|source| {
-                TimeError::new_with_source(
-                    TimeErrorKind::NativeHttp,
-                    format!("{context}: URL에 NUL 문자가 포함되어 있습니다"),
-                    source,
-                )
-            })?;
-            self.fetch_head_curl(url_c, context)
-        })();
-        self.url_buffer = url_buffer;
-        result
-    }
-    fn fetch_head_curl(
-        &mut self,
-        url_c: &CStr,
-        context: &str,
-    ) -> Result<HeadResponse> {
+    ) -> Result<TimeSample> {
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
         let mut body_sink = CurlBodySink {
             limit: HTTP_HEAD_MAX_BODY_BYTES,
             ..CurlBodySink::default()
         };
+        self.header_line_buffer.clear();
         let mut header_capture = CurlHeaderCapture {
+            bytes_seen: 0,
+            completed_block: None,
+            current_block: None,
+            error: None,
             limit: HTTP_HEAD_MAX_HEADER_BYTES,
-            ..CurlHeaderCapture::default()
+            pending_line: &mut self.header_line_buffer,
         };
         let init_code = *CURL_INIT;
         if init_code != CURLE_OK {
             return Err(error(context, curl_error("curl_global_init", init_code)));
         }
-        if self.easy_handle.is_none() {
-            if let Some(version) = CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION.as_ref() {
-                return Err(error(
-                    context,
-                    format!("libcurl {version}{CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX}"),
-                ));
+        let handle = match &mut self.easy_handle {
+            &mut Some(ref mut handle) => handle,
+            empty @ &mut None => {
+                if let Some(version) = CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION.as_ref() {
+                    return Err(error(
+                        context,
+                        format!("libcurl {version}{CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX}"),
+                    ));
+                }
+                // SAFETY: curl_easy_init has no preconditions after global init.
+                let raw_handle = NonNull::new(unsafe { sys::curl_easy_init() })
+                    .ok_or_else(|| error(context, "curl_easy_init 실패"))?;
+                empty.insert(EasyHandle(raw_handle))
             }
-            // SAFETY: curl_easy_init has no preconditions after global init.
-            let raw_handle = NonNull::new(unsafe { sys::curl_easy_init() })
-                .ok_or_else(|| error(context, "curl_easy_init 실패"))?;
-            self.easy_handle = Some(EasyHandle(raw_handle));
-        }
-        let handle = self
-            .easy_handle
-            .as_ref()
-            .ok_or_else(|| error(context, "curl easy handle cache 상태 오류"))?;
+        };
         handle.reset();
-        handle.configure_head_request(url_c, USER_AGENT, &mut error_buffer, context)?;
-        let perform_result = {
+        handle.configure_head_request(
+            server.request_target.as_c_str(),
+            USER_AGENT,
+            &mut error_buffer,
+            context,
+        )?;
+        let (perform_code, request_start) = {
             let mut body_target = CurlWriteTarget::Body(&mut body_sink);
             let mut header_target = CurlWriteTarget::Header(&mut header_capture);
             let body_data = (&raw mut body_target).cast::<c_void>();
@@ -378,21 +342,17 @@ impl Client {
             handle.setopt_ptr(CURLOPT_HEADERDATA, header_data, context)?;
             let request_start = Instant::now();
             let code = handle.perform();
-            CurlHeadPerform {
-                code,
-                request_start,
-                response_received: Instant::now(),
-            }
+            (code, request_start)
         };
         if !header_capture.pending_line.is_empty() {
             header_capture.capture_pending();
             header_capture.pending_line.clear();
         }
         if let Some(callback_error) = body_sink.error.take().or_else(|| header_capture.error.take()) {
-            self.clear_reusable_handle();
+            self.easy_handle = None;
             return Err(error(context, callback_error));
         }
-        if perform_result.code != CURLE_OK {
+        if perform_code != CURLE_OK {
             let error_bytes = error_buffer.map(|ch| ch.to_le_bytes()[0]);
             let perform_error: Cow<'static, str> =
                 if let Ok(message_cstr) = CStr::from_bytes_until_nul(&error_bytes)
@@ -401,36 +361,35 @@ impl Client {
                     Cow::Owned(format!(
                         "curl_easy_perform 실패: {} ({})",
                         message_cstr.to_string_lossy(),
-                        perform_result.code
+                        perform_code
                     ))
                 } else {
-                    Cow::Owned(curl_error("curl_easy_perform", perform_result.code))
+                    Cow::Owned(curl_error("curl_easy_perform", perform_code))
                 };
-            self.clear_reusable_handle();
+                self.easy_handle = None;
             return Err(error(context, perform_error));
         }
         if let Err(scheme_error) = handle.ensure_https_scheme(context) {
-            self.clear_reusable_handle();
+                self.easy_handle = None;
             return Err(scheme_error);
         }
-        if let Some(header_error) = header_capture
-            .age_error
-            .take()
-            .or_else(|| header_capture.date_error.take())
-        {
-            return Err(error(context, header_error));
-        }
-        let Some(date_header_raw) = header_capture.date_header.as_deref() else {
+        let Some(mut header_block) = header_capture.completed_block.take() else {
             return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
         };
-        let response_received_inst = header_capture.date_received_inst.unwrap_or(perform_result.response_received);
+        if let Some(age_result) = header_block.age_result.take() {
+            age_result.map_err(|header_error| error(context, header_error))?;
+        }
+        let Some(date_result) = header_block.date_result.take() else {
+            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
+        };
+        let (server_time, response_received_inst) = date_result?;
         let http_elapsed = response_received_inst
-            .saturating_duration_since(perform_result.request_start)
+            .saturating_duration_since(request_start)
             .max(MIN_TRANSFER_TIME);
-        Ok(HeadResponse {
+        Ok(TimeSample {
             response_received_inst,
             rtt: http_elapsed,
-            server_time: parse_http_date_to_systemtime(date_header_raw)?,
+            server_time,
         })
     }
 }
@@ -451,7 +410,7 @@ impl CurlBodySink {
         true
     }
 }
-impl CurlHeaderCapture {
+impl CurlHeaderCapture<'_> {
     fn append(&mut self, bytes: &[u8]) -> bool {
         let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
             self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 크기 계산 실패"));
@@ -495,47 +454,35 @@ impl CurlHeaderCapture {
             .unwrap_or(self.pending_line.as_slice());
         let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
         if line.starts_with(b"HTTP/") {
-            self.current_block_age_error = None;
-            self.current_block_age_seen = false;
-            self.current_block_date = None;
-            self.current_block_date_error = None;
-            self.current_block_date_received_inst = None;
-            self.current_block_date_seen = false;
-            self.in_header_block = true;
+            self.current_block = Some(CurlHeaderBlock::default());
             return true;
         }
         if line.is_empty() {
-            if self.in_header_block {
-                self.age_error = self.current_block_age_error.take();
-                self.current_block_age_seen = false;
-                self.date_error = self.current_block_date_error.take();
-                self.current_block_date_seen = false;
-                self.date_header = self.current_block_date.take();
-                self.date_received_inst = self.current_block_date_received_inst.take();
-                self.in_header_block = false;
+            if let Some(block) = self.current_block.take() {
+                self.completed_block = Some(block);
             }
             return true;
         }
-        if !self.in_header_block {
+        let Some(current_block) = self.current_block.as_mut() else {
             return true;
-        }
+        };
         match find_header_value(line, AGE_HEADER_PREFIX) {
             Ok(Some(age_header_raw)) => {
-                if self.current_block_age_seen {
-                    self.current_block_age_error = Some(Cow::Borrowed("Age 헤더가 여러 개입니다."));
+                if current_block.age_result.is_some() {
+                    current_block.age_result =
+                        Some(Err(Cow::Borrowed("Age 헤더가 여러 개입니다.")));
                 } else {
-                    self.current_block_age_seen = true;
-                    if let Err(message) = validate_http_age_value(age_header_raw) {
-                        self.current_block_age_error = Some(Cow::Borrowed(message));
-                    }
+                    current_block.age_result = Some(
+                        validate_http_age_value(age_header_raw).map_err(Cow::Borrowed),
+                    );
                 }
                 return true;
             }
             Ok(None) => {}
             Err(source) => {
-                self.current_block_age_error = Some(Cow::Owned(format!(
-                    "HTTP HEAD 응답 Age 헤더 UTF-8 변환 실패: {source}"
-                )));
+                current_block.age_result = Some(Err(Cow::Owned(format!(
+                    "HTTP HEAD 응답 Age 헤더 UTF-8 변환 실패: {source}",
+                ))));
                 return true;
             }
         }
@@ -549,21 +496,15 @@ impl CurlHeaderCapture {
                 return false;
             }
         };
-        if self.current_block_date_seen {
-            self.current_block_date_error = Some(Cow::Borrowed("Date 헤더가 여러 개입니다."));
+        if current_block.date_result.is_some() {
+            current_block.date_result = Some(Err(TimeError::parse("Date 헤더가 여러 개입니다.")));
             return true;
         }
-        self.current_block_date_seen = true;
-        let mut date_header = String::new();
-        if let Err(source) = date_header.try_reserve_exact(date_header_raw.len()) {
-            self.error = Some(Cow::Owned(format!(
-                "HTTP HEAD 응답 Date 헤더 메모리 확보 실패: {source}"
-            )));
-            return false;
-        }
-        date_header.push_str(date_header_raw);
-        self.current_block_date = Some(date_header);
-        self.current_block_date_received_inst = Some(Instant::now());
+        let response_received_inst = Instant::now();
+        current_block.date_result = Some(
+            parse_http_date_to_systemtime(date_header_raw)
+                .map(|server_time| (server_time, response_received_inst)),
+        );
         true
     }
 }
@@ -593,7 +534,7 @@ unsafe extern "C" fn write_callback(
     let Some(payload_head) = NonNull::new(ptr.cast::<u8>()) else {
         return 0;
     };
-    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_>>()) else {
+    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_, '_>>()) else {
         return 0;
     };
     // SAFETY: len is non-zero, payload_head is non-null, and libcurl passes a readable buffer with

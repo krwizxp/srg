@@ -15,54 +15,40 @@ on:
           - random-float
           - time-sync-observe
       count:
-        description: Record count for generate-multiple (1-100000)
-        required: true
+        description: Record count for generate-multiple (1-10000000)
         default: "10"
         type: string
       players:
         description: Single-line comma-separated player names for ladder (2-512, no empty entries)
-        required: true
         default: Alice,Bob
         type: string
       results:
         description: Single-line comma-separated ladder results (same count as players)
-        required: true
         default: Win,Lose
         type: string
       int_min:
         description: Minimum integer (-9223372036854775807 or greater)
-        required: true
         default: "1"
         type: string
       int_max:
         description: Maximum integer (9223372036854775807 or less)
-        required: true
         default: "100"
         type: string
       float_min:
         description: Minimum finite non-subnormal float for random-float
-        required: true
         default: "0"
         type: string
       float_max:
         description: Maximum finite non-subnormal float for random-float
-        required: true
         default: "1"
         type: string
       time_host:
         description: Host for time-sync-observe
-        required: true
         default: www.google.com
         type: string
       observe_seconds:
         description: Seconds to observe server time before stopping (1-60)
-        required: true
         default: "10"
-        type: string
-      artifact_name:
-        description: Filename prefix for uploaded artifacts (sanitized, first 80 chars)
-        required: true
-        default: srg-result
         type: string
 permissions:
   contents: read
@@ -78,22 +64,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88
         with:
-          toolchain: 1.97.0
-      - name: Remove build host paths from release binary
-        shell: bash
-        run: |
-          sysroot="$(rustc --print sysroot)"
-          printf 'RUSTFLAGS=--remap-path-prefix=%s=/rustc/1.97.0 --remap-path-scope=object\n' "$sysroot" >> "$GITHUB_ENV"
+          toolchain: 1.97.1
       - name: Install Linux native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+        run: sudo apt-get update
+      - name: Install Linux libcurl headers
+        run: sudo apt-get install -y libcurl4-openssl-dev
       - name: Build release binary
         run: cargo build --release --locked
       - name: Run selected SRG action
-        id: run_srg
-        shell: bash
         env:
           SRG_ACTION: ${{ inputs.action }}
-          SRG_ARTIFACT_NAME: ${{ inputs.artifact_name }}
           SRG_COUNT: ${{ inputs.count }}
           SRG_PLAYERS: ${{ inputs.players }}
           SRG_RESULTS: ${{ inputs.results }}
@@ -103,22 +83,20 @@ jobs:
           SRG_FLOAT_MAX: ${{ inputs.float_max }}
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
-        run: bash ./.github/scripts/run-srg.sh
+        run: cargo run --locked --example manual_workflow
       - name: Upload console log artifact
-        if: ${{ always() && steps.run_srg.outputs.log_artifact_path != '' }}
+        if: ${{ always() && hashFiles('artifacts/srg-result-console.log') != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ steps.run_srg.outputs.artifact_name_prefix }}-console-log
-          path: ${{ steps.run_srg.outputs.log_artifact_path }}
-          archive: false
+          name: srg-result-console-log
+          path: artifacts/srg-result-console.log
           if-no-files-found: error
           retention-days: 14
       - name: Upload generated data artifact
-        if: ${{ always() && steps.run_srg.outputs.data_artifact_path != '' }}
+        if: ${{ always() && hashFiles('artifacts/srg-result-random_data.txt') != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ steps.run_srg.outputs.artifact_name_prefix }}-random-data
-          path: ${{ steps.run_srg.outputs.data_artifact_path }}
-          archive: false
+          name: srg-result-random-data
+          path: artifacts/srg-result-random_data.txt
           if-no-files-found: error
           retention-days: 14

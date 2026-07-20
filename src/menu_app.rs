@@ -1,7 +1,7 @@
 use crate::{
-    constants::{BUFFER_SIZE, FILE_NAME, IS_TERMINAL, UTF8_BOM},
-    diagnostic::Result,
-    file_output::lock_mutex,
+    BUFFER_SIZE, FILE_NAME, IS_TERMINAL, UTF8_BOM,
+    diagnostic::{Result, is_unexpected_eof},
+    file_output::OutputFile,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
@@ -14,12 +14,11 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
-            diagnostic::AppError,
             hardware_rng::{HardwareRandomSource, HardwareRng},
             input::{LadderEntryMode, parse_u64_digits, read_ladder_entries},
-            random_number::{generate_random_number, random_bounded},
+            ladder::{MAX_LADDER_ENTRIES, write_ladder_results},
+            random_number::generate_random_number,
         };
-        use core::{array::from_fn, num::NonZeroU64};
         use crate::random_number::RandomNumberMode;
     }
     _ => {}
@@ -27,11 +26,8 @@ cfg_select! {
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
 use std::{
-    fs::File,
-    io::{self, BufWriter, Seek as _, SeekFrom, Write, stderr, stdout},
+    io::{self, Seek as _, SeekFrom, Write, stderr, stdout},
     process::ExitCode,
-    sync::Mutex,
-    time::Instant,
 };
 cfg_select! {
     target_arch = "x86_64" => {
@@ -56,23 +52,15 @@ cfg_select! {
         );
     }
 }
-cfg_select! {
-    target_arch = "x86_64" => {
-        pub(super) struct MenuApp {
-            pub file_mutex: Mutex<BufWriter<File>>,
-            pub input_buffer: String,
-            pub ladder_players_storage: String,
-            pub ladder_results_storage: String,
-            pub num_64: u64,
-            pub rng: HardwareRng,
-        }
-    }
-    _ => {
-        pub(super) struct MenuApp {
-            pub file_mutex: Mutex<BufWriter<File>>,
-            pub input_buffer: String,
-        }
-    }
+pub(super) struct MenuApp {
+    pub input_buffer: String,
+    #[cfg(target_arch = "x86_64")]
+    pub ladder_results_storage: String,
+    #[cfg(target_arch = "x86_64")]
+    pub num_64: u64,
+    pub output_file: OutputFile,
+    #[cfg(target_arch = "x86_64")]
+    pub rng: HardwareRng,
 }
 impl MenuApp {
     fn execute_command(
@@ -88,14 +76,12 @@ impl MenuApp {
                 return Ok(true);
             }
             b'6' => {
-                let mut file_guard =
-                    lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (파일 초기화 시)")?;
-                Write::flush(&mut *file_guard)?;
-                file_guard.get_ref().set_len(0)?;
-                file_guard.seek(SeekFrom::Start(0))?;
-                Write::write_all(&mut *file_guard, UTF8_BOM)?;
-                Write::flush(&mut *file_guard)?;
-                drop(file_guard);
+                let writer = self.output_file.writer();
+                Write::flush(&mut *writer)?;
+                writer.get_ref().set_len(0)?;
+                writer.seek(SeekFrom::Start(0))?;
+                Write::write_all(&mut *writer, UTF8_BOM)?;
+                Write::flush(writer)?;
                 writeln!(out, "파일 '{FILE_NAME}'를 초기화했습니다.")?;
                 return Ok(true);
             }
@@ -136,7 +122,7 @@ impl MenuApp {
                 out: &mut dyn Write,
                 err: &mut dyn Write,
             ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                if !prepare_hw_rng_menu_command(&self.rng, out)? {
                     return Ok(());
                 }
                 let input_buffer = &mut self.input_buffer;
@@ -158,8 +144,8 @@ impl MenuApp {
                     }
                 };
                 let next_num_64 =
-                    regenerate_with_count(&self.file_mutex, &mut self.rng, requested_count, out, err)?;
-                write_rdseed_fallback_notice(&mut self.rng, err)?;
+                    regenerate_with_count(&mut self.output_file, &self.rng, requested_count, out)?;
+                write_rdseed_fallback_notice(&self.rng, err)?;
                 self.num_64 = next_num_64;
                 Ok(())
             }
@@ -168,75 +154,45 @@ impl MenuApp {
                 out: &mut dyn Write,
                 err: &mut dyn Write,
             ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                if !prepare_hw_rng_menu_command(&self.rng, out)? {
                     return Ok(());
                 }
-                let next_num_64 = regenerate_with_count(&self.file_mutex, &mut self.rng, 1, out, err)?;
-                write_rdseed_fallback_notice(&mut self.rng, err)?;
+                let next_num_64 =
+                    regenerate_with_count(&mut self.output_file, &self.rng, 1, out)?;
+                write_rdseed_fallback_notice(&self.rng, err)?;
                 self.num_64 = next_num_64;
                 Ok(())
             }
             fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
-                const MAX_PLAYERS: usize = 512;
-                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                if !prepare_hw_rng_menu_command(&self.rng, out)? {
                     return Ok(());
                 }
-                let mut seed = self.num_64;
-                let input_buffer = &mut self.input_buffer;
-                let players_storage = &mut self.ladder_players_storage;
+                let players_storage = &mut self.input_buffer;
                 let results_storage = &mut self.ladder_results_storage;
-                players_storage.clear();
-                let mut players_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+                let mut players_array: [&str; MAX_LADDER_ENTRIES] = [""; MAX_LADDER_ENTRIES];
                 let n = read_ladder_entries(
                     format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
-                    input_buffer,
                     (&mut *out, &mut *err),
                     players_storage,
                     &mut players_array,
                     LadderEntryMode::Players,
-                    "플레이어 배열 인덱스 범위 초과",
                 )?;
-                results_storage.clear();
-                let mut results_array: [&str; MAX_PLAYERS] = [""; MAX_PLAYERS];
+                let mut results_array: [&str; MAX_LADDER_ENTRIES] = [""; MAX_LADDER_ENTRIES];
                 read_ladder_entries(
                     format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-                    input_buffer,
                     (&mut *out, &mut *err),
                     results_storage,
                     &mut results_array,
                     LadderEntryMode::Results { expected_count: n },
-                    "결과 배열 인덱스 범위 초과",
                 )?;
-                writeln!(out, "사다리타기 결과:")?;
-                let mut indices: [usize; MAX_PLAYERS] = from_fn(|index| index);
-                let indices_slice = indices
-                    .get_mut(..n)
-                    .ok_or("인덱스 배열 슬라이스 범위 초과")?;
-                for index in (1..indices_slice.len()).rev() {
-                    seed ^= self.rng.next_u64()?;
-                    let next_index = index.saturating_add(1);
-                    let upper_bound_raw = u64::try_from(next_index).map_err(|conversion_err| {
-                        AppError::context("인덱스 상한 변환 실패", conversion_err)
-                    })?;
-                    let upper_bound =
-                        NonZeroU64::new(upper_bound_raw).ok_or("인덱스 상한이 0입니다.")?;
-                    let swap_index_u64 = random_bounded(upper_bound, seed, &mut self.rng)?;
-                    let swap_index = usize::try_from(swap_index_u64).map_err(|conversion_err| {
-                        AppError::context("인덱스 변환 실패", conversion_err)
-                    })?;
-                    indices_slice.swap(index, swap_index);
-                }
-                let players = players_array
-                    .get(..n)
-                    .ok_or("플레이어 슬라이스 범위 초과")?;
-                for (player, &result_index) in players.iter().zip(indices_slice.iter()) {
-                    let result = results_array
-                        .get(result_index)
-                        .copied()
-                        .ok_or("결과 인덱스 범위 초과")?;
-                    writeln!(out, "{player} -> {result}")?;
-                }
-                write_rdseed_fallback_notice(&mut self.rng, err)
+                write_ladder_results(
+                    players_array.iter().take(n).copied(),
+                    results_array.iter().take(n).copied(),
+                    self.num_64,
+                    &self.rng,
+                    out,
+                )?;
+                write_rdseed_fallback_notice(&self.rng, err)
             }
         }
         _ => {}
@@ -285,13 +241,16 @@ impl MenuApp {
             )?;
             Ok(supp)
         };
-        let data = RandomDataSet::try_from((manual_num_64, &mut next_supp))?;
+        let data = RandomDataSet {
+            num_64: manual_num_64,
+            ..Default::default()
+        }
+        .populate(&mut next_supp)?;
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
-        let mut file_guard = lock_mutex(&self.file_mutex, "Mutex 잠금 실패 (단일 쓰기 시)")?;
-        Write::write_all(&mut *file_guard, prefix_slice(&buffer, file_len)?)?;
-        Write::flush(&mut *file_guard)?;
-        drop(file_guard);
+        let writer = self.output_file.writer();
+        Write::write_all(&mut *writer, prefix_slice(&buffer, file_len)?)?;
+        Write::flush(writer)?;
         let console_len = if *IS_TERMINAL {
             format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
         } else {
@@ -308,7 +267,7 @@ impl MenuApp {
                 out: &mut dyn Write,
                 err: &mut dyn Write,
             ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&mut self.rng, out)? {
+                if !prepare_hw_rng_menu_command(&self.rng, out)? {
                     return Ok(());
                 }
                 let num_64 = self.num_64;
@@ -328,7 +287,7 @@ impl MenuApp {
                             input_buffer,
                             out,
                             err,
-                            &mut self.rng,
+                            &self.rng,
                         )?;
                     }
                     b"2" => {
@@ -338,12 +297,12 @@ impl MenuApp {
                             input_buffer,
                             out,
                             err,
-                            &mut self.rng,
+                            &self.rng,
                         )?;
                     }
                     _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
                 }
-                write_rdseed_fallback_notice(&mut self.rng, err)
+                write_rdseed_fallback_notice(&self.rng, err)
             }
         }
         _ => {}
@@ -360,11 +319,10 @@ impl MenuApp {
                 Some(target_time) => Some((target_time, self.read_trigger_action(out)?)),
                 None => None,
             };
-            let now = Instant::now();
             ServerTimeSession {
                 host,
-                now,
                 scheduled_trigger,
+                stop_after: None,
             }
             .run_loop(server_time_runtime, out, err)?;
             writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
@@ -372,7 +330,7 @@ impl MenuApp {
         })();
         match time_run_result {
             Ok(()) => {}
-            Err(time_err) if time_err.is_unexpected_eof() => {}
+            Err(time_err) if is_unexpected_eof(&time_err) => {}
             Err(time_err) if time_err.is_io() => return Err(time_err.into()),
             Err(time_err) => writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?,
         }
@@ -450,7 +408,7 @@ impl MenuApp {
             let keep_running =
                 match self.execute_command(command, &mut out, &mut err, &mut server_time_runtime) {
                     Ok(keep_running) => keep_running,
-                    Err(command_err) if command_err.is_unexpected_eof() => {
+                    Err(command_err) if is_unexpected_eof(&command_err) => {
                         return Ok(ExitCode::SUCCESS);
                     }
                     Err(command_err) => return Err(command_err),
@@ -463,7 +421,7 @@ impl MenuApp {
 }
 cfg_select! {
     target_arch = "x86_64" => {
-        fn prepare_hw_rng_menu_command(rng: &mut HardwareRng, out: &mut dyn Write) -> Result<bool> {
+        fn prepare_hw_rng_menu_command(rng: &HardwareRng, out: &mut dyn Write) -> Result<bool> {
             match rng.source() {
                 HardwareRandomSource::None => {
                     writeln!(
@@ -475,7 +433,7 @@ cfg_select! {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
             }
         }
-        fn write_rdseed_fallback_notice(rng: &mut HardwareRng, err: &mut dyn Write) -> Result<()> {
+        fn write_rdseed_fallback_notice(rng: &HardwareRng, err: &mut dyn Write) -> Result<()> {
             if rng.take_rdseed_fallback_notice() {
                 writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
             }

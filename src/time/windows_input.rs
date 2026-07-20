@@ -1,8 +1,7 @@
 use crate::write_line_best_effort;
-use super::NativeInputSendStatus;
+use super::{NativeInputSendStatus, TriggerAction};
 use core::mem::{align_of, offset_of, size_of};
 use std::io::Write;
-mod sys;
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const KEYEVENTF_KEYDOWN: u32 = 0;
@@ -51,6 +50,10 @@ struct Input {
     r#type: u32,
     union: InputUnion,
 }
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn SendInput(c_inputs: u32, p_inputs: *const Input, cb_size: i32) -> u32;
+}
 cfg_select! {
     target_pointer_width = "64" => {
         const _: () = assert!(size_of::<MouseInput>() == 32, "Windows MOUSEINPUT x64 size mismatch");
@@ -96,15 +99,10 @@ cfg_select! {
     }
     _ => {}
 }
-#[derive(Clone, Copy)]
-pub(super) enum InputAction {
-    F5Press,
-    MouseClick,
-}
-impl InputAction {
+impl TriggerAction {
     pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
         match self {
-            Self::MouseClick => {
+            Self::LeftClick => {
                 let release = mouse_input(MOUSEEVENTF_LEFTUP);
                 let inputs = [mouse_input(MOUSEEVENTF_LEFTDOWN), release];
                 send_input_events(&inputs, &release, err)
@@ -146,7 +144,7 @@ fn send_input_events(
     err: &mut dyn Write,
 ) -> NativeInputSendStatus {
     // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
-    let sent = unsafe { sys::SendInput(INPUT_EVENT_COUNT, inputs.as_ptr(), INPUT_SIZE) };
+    let sent = unsafe { SendInput(INPUT_EVENT_COUNT, inputs.as_ptr(), INPUT_SIZE) };
     if sent == INPUT_EVENT_COUNT {
         return NativeInputSendStatus::Sent;
     }
@@ -158,7 +156,7 @@ fn send_input_events(
     );
     if sent == 1 {
         // SAFETY: `release` is a valid one-element INPUT pointer and `INPUT_SIZE` matches the Rust representation.
-        let release_sent = unsafe { sys::SendInput(1, release_input, INPUT_SIZE) };
+        let release_sent = unsafe { SendInput(1, release_input, INPUT_SIZE) };
         if release_sent != 1 {
             write_line_best_effort(
                 err,

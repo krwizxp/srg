@@ -18,7 +18,6 @@ const DECIMAL_BASE_I64: i64 = 10;
 const DECIMAL_BASE_U32: u32 = 10;
 const ERR_ASCTIME_FORMAT: &str = "HTTP Date 파싱 실패: asctime-date 형식이 아닙니다.";
 const ERR_ASCTIME_NUM: &str = "HTTP Date 파싱 실패: asctime-date 숫자 변환에 실패했습니다.";
-const ERR_CURRENT_YEAR: &str = "HTTP Date 파싱 실패: rfc850 기준 연도 계산에 실패했습니다.";
 const ERR_HTTP_DATE_FORMAT: &str = concat!(
     "HTTP Date 파싱 실패: RFC 9110 HTTP-date의 3개 형식",
     "(IMF-fixdate/rfc850/asctime) 중 하나가 아닙니다."
@@ -182,7 +181,11 @@ fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
     }
     let tens = d0.wrapping_sub(b'0');
     let ones = d1.wrapping_sub(b'0');
-    (u32::from(tens).checked_mul(DECIMAL_BASE_U32))?.checked_add(u32::from(ones))
+    Some(
+        u32::from(tens)
+            .wrapping_mul(DECIMAL_BASE_U32)
+            .wrapping_add(u32::from(ones)),
+    )
 }
 fn parse_http_month(month_str: &str) -> Result<u32> {
     const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
@@ -335,25 +338,8 @@ fn parse_http_date_to_systemtime_with_current_year(
 }
 pub(super) fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime> {
     let raw_bytes = raw_date.as_bytes();
-    let mut rfc850_candidate = false;
-    if raw_bytes.get(IMF_FIXDATE_WEEKDAY_COMMA_INDEX) != Some(&b',') {
-        let mut previous_g = false;
-        let mut previous_gm = false;
-        for &byte in raw_bytes {
-            if byte == b',' {
-                rfc850_candidate = true;
-                break;
-            }
-            let is_g = byte == b'G';
-            let is_gm = previous_g && byte == b'M';
-            if previous_gm && byte == b'T' {
-                rfc850_candidate = true;
-                break;
-            }
-            previous_g = is_g;
-            previous_gm = is_gm;
-        }
-    }
+    let rfc850_candidate = raw_bytes.get(IMF_FIXDATE_WEEKDAY_COMMA_INDEX) != Some(&b',')
+        && (raw_date.contains(',') || raw_date.contains("GMT"));
     if !rfc850_candidate {
         return parse_http_date_to_systemtime_with_current_year(raw_date, 0_i32, false);
     }
@@ -362,9 +348,7 @@ pub(super) fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime
         Err(err) => {
             let secs_before_epoch = err.duration().as_secs();
             let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
-            0_i64
-                .checked_sub(clamp_u64_day_count(days_before_epoch))
-                .ok_or_else(|| TimeError::parse(ERR_CURRENT_YEAR))?
+            clamp_u64_day_count(days_before_epoch).saturating_neg()
         }
     };
     let day_index = match i32::try_from(day_index_i64) {

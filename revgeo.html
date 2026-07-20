@@ -27,9 +27,7 @@
       const applyInitialTheme = (theme) => {
         document.documentElement.dataset.theme = theme;
         const favicon = document.getElementById("app-favicon");
-        if (favicon instanceof HTMLLinkElement) {
-          favicon.href = `./icon.svg?v=4&theme=${theme}`;
-        }
+        favicon.href = `./icon.svg?v=4&theme=${theme}`;
       };
       try {
         const storedTheme = localStorage.getItem("srg-theme");
@@ -2143,11 +2141,10 @@
       BULK_HARD_LIMIT: 5_000,
       INPUT_LINE_HARD_LIMIT: 1_000_000,
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
-      REVERSE_CACHE_DB_VERSION: 2,
+      REVERSE_CACHE_DB_VERSION: 3,
       REVERSE_CACHE_STORE: "nominatim-reverse",
       REVERSE_CACHE_PARSER_VERSION: 1,
       REVERSE_CACHE_MAX: 10_000,
-      REVERSE_CACHE_STORAGE_MAX: 2_000,
       REVERSE_CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
       REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
       REVERSE_TEXT_HARD_LIMIT: 4_096,
@@ -2180,16 +2177,8 @@
       url.searchParams.set("accept-language", "ko");
       return url.href;
     })();
-    const buildReverseUrl = (lat, lon) =>
-      `${BASE_URL_HREF}&lat=${lat}&lon=${lon}`;
     const REVERSE_CACHE_VARIANT =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
-    const REVERSE_CACHE_KEY_PREFIX = "sha256:";
-    const REVERSE_CACHE_STORAGE_PREFIX = "srg-revgeo-cache:v2:";
-    const REVERSE_CACHE_STORAGE_OLD_INDEX_KEY = "srg-revgeo-cache:v2:index";
-    const REVERSE_CACHE_LEGACY_STORAGE_PREFIX = "srg-revgeo-cache:";
-    const REVERSE_CACHE_PRUNE_WRITE_INTERVAL = 128;
-    const REVERSE_CACHE_KEY_ENCODER = new TextEncoder();
     const OSM_ATTRIBUTION_TEXT = "\u00A9 OpenStreetMap contributors";
     const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
     const ODBL_LICENSE_TEXT = "Open Database License (ODbL)";
@@ -2210,9 +2199,7 @@
     const MAP_PROVIDER_COUNT = mapAnchors.length;
     const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
     const setMapPopoverExpanded = (btn, expanded) => {
-      if (btn instanceof HTMLElement) {
-        btn.setAttribute("aria-expanded", expanded ? "true" : "false");
-      }
+      btn.setAttribute("aria-expanded", expanded ? "true" : "false");
     };
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let hasRound6MapLink = false;
@@ -2282,26 +2269,11 @@
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
-    function mapButtonFromSource(source) {
-      return source?.closest?.("button.map-btn");
-    }
-    function prepareMapPopoverFromInvoker(btn) {
-      const prevInvoker = LAST_MAP_INVOKER;
-      LAST_MAP_INVOKER = btn;
-      MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
-      if (prevInvoker && prevInvoker !== btn) {
-        setMapPopoverExpanded(prevInvoker, false);
-      }
-      updateMapPopoverFromInvoker(btn);
-    }
     function updateMapPopoverFromInvoker(invoker) {
       const idxStr = invoker.dataset.idx;
-      if (!idxStr) return;
       const r = AppState.records[idxStr | 0];
-      if (!r) return;
       const lat = r.latStr;
       const lon = r.lonStr;
-      if (!lat || !lon) return;
       let lat6 = null;
       let lon6 = null;
       if (MAP_HAS_ROUND6) {
@@ -2316,9 +2288,14 @@
     }
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return;
-      const btn = mapButtonFromSource(e.source);
-      if (!btn) return;
-      prepareMapPopoverFromInvoker(btn);
+      const btn = e.source;
+      const prevInvoker = LAST_MAP_INVOKER;
+      LAST_MAP_INVOKER = btn;
+      MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
+      if (prevInvoker && prevInvoker !== btn) {
+        setMapPopoverExpanded(prevInvoker, false);
+      }
+      updateMapPopoverFromInvoker(btn);
     });
     function closeMapPopover() {
       if (!isMapPopoverOpen()) return;
@@ -2345,7 +2322,6 @@
         ? document.activeElement
         : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
-      if (!invoker || !invoker.isConnected) return;
       setMapPopoverExpanded(invoker, true);
       updateMapPopoverFromInvoker(invoker);
       requestAnimationFrame(() => {
@@ -2356,7 +2332,7 @@
           active === mapPopover
         ) {
           if (MAP_POPOVER_OPEN_WITH_KEYBOARD) {
-            mapAnchors[0]?.focus({ preventScroll: true });
+            mapAnchors[0].focus({ preventScroll: true });
           } else {
             mapPopover.focus({ preventScroll: true });
           }
@@ -2566,7 +2542,6 @@
     };
     const HIDDEN_UNTIL_FOUND = "until-found";
     let FIND_REHIDE_TIMER = null;
-    let FIND_REVEAL_ACTIVE = false;
     const FIND_REVEALED_ROWS = new Set();
     function unhideUntilFoundRows() {
       const rows = domElements.tbody.rows;
@@ -2599,96 +2574,20 @@
       let q1 = "";
       let qTokens = null;
       if (q) {
-        if (q.includes("|")) {
-          qMode = 2;
-          let toks = null;
-          let start = 0;
-          while (true) {
-            const end = q.indexOf("|", start);
-            const seg = (end === -1 ? q.slice(start) : q.slice(start, end))
-              .trim();
-            if (seg) (toks ??= []).push(seg);
-            if (end === -1) break;
-            start = end + 1;
-          }
-          if (!toks) {
-            q = "";
-            qMode = 0;
-          } else if (toks.length === 1) {
-            qMode = 1;
-            q1 = toks[0];
-            qTokens = null;
-          } else {
-            qTokens = toks;
-          }
+        const isOr = q.includes("|");
+        const tokens = new Set();
+        for (const rawToken of isOr ? q.split("|") : q.split(/\s+/u)) {
+          const token = rawToken.trim();
+          if (token) tokens.add(token);
+        }
+        if (tokens.size === 0) {
+          q = "";
+        } else if (tokens.size === 1) {
+          qMode = 1;
+          q1 = tokens.values().next().value;
         } else {
-          qMode = 1;
-          const s = q;
-          const n = s.length;
-          let start = -1;
-          let toks = null;
-          for (let i = 0; i <= n; i++) {
-            const c = i < n ? s.charCodeAt(i) : 32;
-            if (c <= 32) {
-              if (start !== -1) {
-                const t = s.slice(start, i);
-                if (toks) toks.push(t);
-                else q1 = t;
-                start = -1;
-              }
-            } else if (start === -1) {
-              if (!toks && q1) {
-                toks = [q1];
-                q1 = "";
-              }
-              start = i;
-            }
-          }
-          if (toks) {
-            if (toks.length === 1) {
-              q1 = toks[0];
-              qTokens = null;
-            } else {
-              qTokens = toks;
-            }
-          } else if (!q1) {
-            q = "";
-            qMode = 0;
-          }
-        }
-      }
-      if (qTokens && qTokens.length > 1) {
-        let hasDup = false;
-        outer: for (let i = 1; i < qTokens.length; i++) {
-          const t = qTokens[i];
-          for (let j = 0; j < i; j++) {
-            if (qTokens[j] === t) {
-              hasDup = true;
-              break outer;
-            }
-          }
-        }
-        if (hasDup) {
-          const out = [];
-          for (let i = 0; i < qTokens.length; i++) {
-            const t = qTokens[i];
-            let dup = false;
-            for (let j = 0; j < out.length; j++) {
-              if (out[j] === t) {
-                dup = true;
-                break;
-              }
-            }
-            if (!dup) out.push(t);
-          }
-          qTokens = out;
-        }
-        if (qTokens.length === 1) {
-          qMode = 1;
-          q1 = qTokens[0];
-          qTokens = null;
-        } else if (qMode !== 2) {
-          qTokens.sort((a, b) => b.length - a.length);
+          qMode = isOr ? 2 : 1;
+          qTokens = isOr ? tokens : [...tokens].sort((a, b) => b.length - a.length);
         }
       }
       let qTest = null;
@@ -2698,16 +2597,16 @@
         } else if (qMode === 2) {
           qTest = (r) => {
             const hay = getQSearch(r);
-            for (let i = 0; i < qTokens.length; i++) {
-              if (hay.indexOf(qTokens[i]) !== -1) return true;
+            for (const token of qTokens) {
+              if (hay.indexOf(token) !== -1) return true;
             }
             return false;
           };
         } else {
           qTest = (r) => {
             const hay = getQSearch(r);
-            for (let i = 0; i < qTokens.length; i++) {
-              if (hay.indexOf(qTokens[i]) === -1) return false;
+            for (const token of qTokens) {
+              if (hay.indexOf(token) === -1) return false;
             }
             return true;
           };
@@ -2798,8 +2697,7 @@
     }
     let setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
     function clearFindReveals() {
-      if (!FIND_REVEAL_ACTIVE && !FIND_REHIDE_TIMER) return;
-      FIND_REVEAL_ACTIVE = false;
+      if (FIND_REVEALED_ROWS.size === 0 && !FIND_REHIDE_TIMER) return;
       setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
@@ -2949,8 +2847,7 @@
       }
       return CSV_ENCODER.encode(header);
     })();
-    const AddressFormatter = {
-      _getAdminFromGeocoding(gc, countryCode, p0, p1) {
+    function getAdminFromGeocoding(gc, countryCode, p0, p1) {
         let level2 = "";
         let level4 = "";
         let level6 = "";
@@ -3616,9 +3513,9 @@
         if (sido && sigungu && sido === sigungu) {
           sigungu = "";
         }
-        return { sido, sigungu, eupmyeon };
-      },
-      parse(data) {
+      return { sido, sigungu, eupmyeon };
+    }
+    function parseGeocodeAddress(data) {
         const gc = (
           data && typeof data === "object" && Array.isArray(data.features)
             ? (data.features[0] || null)
@@ -3667,7 +3564,7 @@
             }
           }
         }
-        const { sido, sigungu, eupmyeon } = this._getAdminFromGeocoding(
+        const { sido, sigungu, eupmyeon } = getAdminFromGeocoding(
           gc,
           countryCode,
           p0,
@@ -3696,9 +3593,8 @@
         if (!isValidReverseParsed(parsed)) {
           throw new InputLimitError(REVERSE_TEXT_LIMIT_MESSAGE);
         }
-        return parsed;
-      },
-    };
+      return parsed;
+    }
     const AppState = {
       records: [],
       droppedFile: null,
@@ -3723,9 +3619,6 @@
       },
       get isPaused() {
         return this.status === "paused";
-      },
-      get isPausing() {
-        return this.status === "pausing";
       },
       get isStopping() {
         return this.status === "stopping";
@@ -3752,9 +3645,6 @@
         this.bulkAcknowledged =
           newRecords.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
         this.reset(status);
-      },
-      setFile(file) {
-        this.droppedFile = file;
       },
       setStatus(st) {
         this.status = st;
@@ -3812,26 +3702,12 @@
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     const RX_STATUS_PROGRESS = /^처리 중… \(([\d,]+)\/([\d,]+)\)$/;
     let statusLiveTimer = 0;
-    function resetFilterControls() {
-      for (const el of [
-        domElements.filterQ,
-        domElements.filterKind,
-        domElements.filterSido,
-        domElements.filterSigungu,
-        domElements.filterEmd,
-        domElements.filterTag,
-        domElements.filterFullAddr,
-      ]) {
-        el.value = "";
-      }
-    }
-    function setLiveRegionText(el, text) {
+    function setStatusLiveText(text) {
       clearTimeout(statusLiveTimer);
-      if (!el) return;
-      el.textContent = "";
+      domElements.statusLive.textContent = "";
       if (!text) return;
       statusLiveTimer = setTimeout(() => {
-        el.textContent = text;
+        domElements.statusLive.textContent = text;
       }, 24);
     }
     function announceStatusMessage(msg, type = "info") {
@@ -3839,7 +3715,7 @@
       if (!text) {
         SR_STATUS_CACHE.msg = null;
         SR_STATUS_CACHE.progressBucket = -1;
-        setLiveRegionText(domElements.statusLive, "");
+        setStatusLiveText("");
         return;
       }
       let nextAnnouncement = text;
@@ -3871,7 +3747,7 @@
       }
       if (SR_STATUS_CACHE.msg === nextAnnouncement) return;
       SR_STATUS_CACHE.msg = nextAnnouncement;
-      setLiveRegionText(domElements.statusLive, nextAnnouncement);
+      setStatusLiveText(nextAnnouncement);
     }
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
@@ -3888,16 +3764,7 @@
       }
       announceStatusMessage(nextMsg, type);
     }
-    const EMPTY_HINT_TEXT = {
-      init: "random_data.txt 파일을 업로드해 주세요.",
-      file: "파일 업로드 완료! 좌표 추출을 눌러주세요.",
-      parsing: "좌표를 추출 중입니다.",
-      ready: "좌표 추출 완료. 조회 시작을 눌러주세요.",
-    };
-    function setEmptyHint(kind = "init") {
-      domElements.emptyHint.textContent = EMPTY_HINT_TEXT[kind] ||
-        EMPTY_HINT_TEXT.init;
-    }
+    const FILE_READY_HINT = "파일 업로드 완료! 좌표 추출을 눌러주세요.";
     function ensureNominatimRequestOrigin() {
       if (location.protocol === "https:" || location.protocol === "http:") {
         return true;
@@ -4096,10 +3963,7 @@
           } catch {
           }
         }
-        try {
-          reader.releaseLock();
-        } catch {
-        }
+        reader.releaseLock();
       }
     }
     function ensureInputLineLength(length) {
@@ -4171,7 +4035,6 @@
     }
     async function parseFileToRecords(file, signal) {
       const out = [];
-      let nextIdx = 1;
       let lastYield = performance.now();
       let linesSinceYield = 0;
       for await (const line of lineIterator(file.stream(), signal)) {
@@ -4199,7 +4062,6 @@
           }
           out.push({
             set: m[1] === "대한민국" ? "KR" : "WORLD",
-            idx: nextIdx++,
             _f_kind: undefined,
             _f_sido: "",
             _f_sigungu: "",
@@ -4223,10 +4085,6 @@
     const REVERSE_PARSED_CACHE_MAX = 5_000;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
-    let REVERSE_CACHE_PRUNE_PROMISE = null;
-    let REVERSE_CACHE_REQUIRES_FULL_PRUNE = true;
-    let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
-    const REVERSE_PERSISTENT_CACHE_KEY_CACHE = new Map();
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -4234,13 +4092,6 @@
         const oldest = REVERSE_PARSED_CACHE.keys().next();
         if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
-    }
-    function resetReverseMemoryCache() {
-      REVERSE_PARSED_CACHE.clear();
-      REVERSE_PERSISTENT_CACHE_KEY_CACHE.clear();
-    }
-    function isReversePersistentCacheKey(key) {
-      return typeof key === "string" && /^sha256:[0-9a-f]{64}$/.test(key);
     }
     function isValidReverseParsed(parsed) {
       const addr = parsed?.addr;
@@ -4262,9 +4113,10 @@
         (parsed.nFullAddr === undefined ||
           isBoundedReverseText(parsed.nFullAddr));
     }
-    function isFreshReverseCacheRow(row, now = Date.now()) {
+    function isFreshReverseCacheRow(row, expectedKey, now = Date.now()) {
       if (
         !row ||
+        row.key !== expectedKey ||
         row.variant !== REVERSE_CACHE_VARIANT ||
         row.parserVersion !== CONFIG.REVERSE_CACHE_PARSER_VERSION ||
         !Number.isFinite(row.savedAt) ||
@@ -4275,234 +4127,10 @@
       const age = now - row.savedAt;
       return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
     }
-    async function toPersistentReverseCacheKey(cacheKey) {
-      const cached = REVERSE_PERSISTENT_CACHE_KEY_CACHE.get(cacheKey);
-      if (cached) return cached;
-      const subtle = window.crypto?.subtle;
-      if (!subtle) return null;
-      const keyPromise = subtle
-        .digest(
-          "SHA-256",
-          REVERSE_CACHE_KEY_ENCODER.encode(
-            REVERSE_CACHE_VARIANT + ":" + cacheKey,
-          ),
-        )
-        .then((digest) => {
-          let hex = "";
-          const bytes = new Uint8Array(digest);
-          for (let i = 0; i < bytes.length; i++) {
-            hex += bytes[i].toString(16).padStart(2, "0");
-          }
-          return REVERSE_CACHE_KEY_PREFIX + hex;
-        })
-        .catch(() => null);
-      REVERSE_PERSISTENT_CACHE_KEY_CACHE.set(cacheKey, keyPromise);
-      if (
-        REVERSE_PERSISTENT_CACHE_KEY_CACHE.size > REVERSE_PARSED_CACHE_MAX
-      ) {
-        const oldest = REVERSE_PERSISTENT_CACHE_KEY_CACHE.keys().next();
-        if (!oldest.done) {
-          REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(oldest.value);
-        }
-      }
-      const persistentKey = await keyPromise;
-      if (!persistentKey) REVERSE_PERSISTENT_CACHE_KEY_CACHE.delete(cacheKey);
-      return persistentKey;
-    }
-    let REVERSE_CACHE_STORAGE;
-    let REVERSE_CACHE_STORAGE_KEYS = null;
-    let REVERSE_CACHE_STORAGE_KEY_SET = null;
-    let REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = 0;
-    let REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
-    function disableReverseCacheStorage() {
-      REVERSE_CACHE_STORAGE = null;
-      REVERSE_CACHE_STORAGE_KEYS = [];
-      REVERSE_CACHE_STORAGE_KEY_SET = new Set();
-      REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = 0;
-      REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
-    }
-    function cleanupLegacyReverseCacheStorage(store) {
-      const legacyIndex = (() => {
-        try {
-          const raw = store.getItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + "index");
-          const parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      })();
-      for (const key of legacyIndex) {
-        store.removeItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + key);
-      }
-      store.removeItem(REVERSE_CACHE_LEGACY_STORAGE_PREFIX + "index");
-      for (let i = store.length - 1; i >= 0; i--) {
-        const key = store.key(i);
-        if (
-          key &&
-          key.startsWith(REVERSE_CACHE_LEGACY_STORAGE_PREFIX) &&
-          !key.startsWith(REVERSE_CACHE_STORAGE_PREFIX)
-        ) {
-          store.removeItem(key);
-        }
-      }
-    }
-    function getReverseCacheStorage() {
-      if (REVERSE_CACHE_STORAGE !== undefined) return REVERSE_CACHE_STORAGE;
-      try {
-        const store = window.localStorage;
-        const testKey = REVERSE_CACHE_STORAGE_PREFIX + "test";
-        store.setItem(testKey, "1");
-        store.removeItem(testKey);
-        cleanupLegacyReverseCacheStorage(store);
-        store.removeItem(REVERSE_CACHE_STORAGE_OLD_INDEX_KEY);
-        REVERSE_CACHE_STORAGE = store;
-        pruneReverseCacheStorage(store);
-      } catch {
-        disableReverseCacheStorage();
-      }
-      return REVERSE_CACHE_STORAGE;
-    }
-    function pruneReverseCacheStorage(store, keep = CONFIG.REVERSE_CACHE_STORAGE_MAX) {
-      const now = Date.now();
-      const entries = [];
-      try {
-        const storageLength = store.length;
-        for (let i = storageLength - 1; i >= 0; i--) {
-          const itemKey = store.key(i);
-          if (!itemKey?.startsWith(REVERSE_CACHE_STORAGE_PREFIX)) continue;
-          const key = itemKey.slice(REVERSE_CACHE_STORAGE_PREFIX.length);
-          if (!isReversePersistentCacheKey(key)) {
-            store.removeItem(itemKey);
-            continue;
-          }
-          try {
-            const raw = store.getItem(itemKey);
-            const row = raw ? JSON.parse(raw) : null;
-            if (isFreshReverseCacheRow(row, now)) {
-              entries.push({ key, savedAt: row.savedAt });
-            } else {
-              store.removeItem(itemKey);
-            }
-          } catch {
-            store.removeItem(itemKey);
-          }
-        }
-        entries.sort((left, right) =>
-          left.savedAt - right.savedAt || left.key.localeCompare(right.key)
-        );
-        const removeCount = Math.max(0, entries.length - keep);
-        for (let i = 0; i < removeCount; i++) {
-          store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + entries[i].key);
-        }
-        const keys = new Array(entries.length - removeCount);
-        for (let i = removeCount; i < entries.length; i++) {
-          keys[i - removeCount] = entries[i].key;
-        }
-        REVERSE_CACHE_STORAGE_KEYS = keys;
-        REVERSE_CACHE_STORAGE_KEY_SET = new Set(keys);
-        REVERSE_CACHE_STORAGE_NON_CACHE_COUNT = Math.max(
-          0,
-          store.length - keys.length,
-        );
-        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE = 0;
-        return keys;
-      } catch {
-        disableReverseCacheStorage();
-        return null;
-      }
-    }
-    function removeReverseCacheStorageStateKey(cacheKey) {
-      if (!REVERSE_CACHE_STORAGE_KEY_SET?.delete(cacheKey)) return;
-      const index = REVERSE_CACHE_STORAGE_KEYS.indexOf(cacheKey);
-      if (index < 0) return;
-      REVERSE_CACHE_STORAGE_KEYS.copyWithin(index, index + 1);
-      REVERSE_CACHE_STORAGE_KEYS.length--;
-    }
-    function readReverseCacheStorage(cacheKey) {
-      const store = getReverseCacheStorage();
-      if (!store) return null;
-      try {
-        const raw = store.getItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
-        if (!raw) return null;
-        const row = JSON.parse(raw);
-        if (isFreshReverseCacheRow(row)) {
-          return row.parsed || null;
-        }
-        store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
-        removeReverseCacheStorageStateKey(cacheKey);
-      } catch {
-        try {
-          store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + cacheKey);
-          removeReverseCacheStorageStateKey(cacheKey);
-        } catch {
-          disableReverseCacheStorage();
-        }
-      }
-      return null;
-    }
-    function writeReverseCacheStorage(cacheKey, parsed) {
-      const store = getReverseCacheStorage();
-      if (!store) return;
-      const row = JSON.stringify({
-        variant: REVERSE_CACHE_VARIANT,
-        parserVersion: CONFIG.REVERSE_CACHE_PARSER_VERSION,
-        savedAt: Date.now(),
-        parsed,
-      });
-      const itemKey = REVERSE_CACHE_STORAGE_PREFIX + cacheKey;
-      let keys = REVERSE_CACHE_STORAGE_KEYS;
-      if (
-        !keys ||
-        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE >=
-          REVERSE_CACHE_PRUNE_WRITE_INTERVAL
-      ) {
-        keys = pruneReverseCacheStorage(store);
-        if (!keys) return;
-      }
-      removeReverseCacheStorageStateKey(cacheKey);
-      try {
-        store.setItem(itemKey, row);
-      } catch {
-        keys = pruneReverseCacheStorage(
-          store,
-          Math.floor(CONFIG.REVERSE_CACHE_STORAGE_MAX / 2),
-        );
-        if (!keys) return;
-        removeReverseCacheStorageStateKey(cacheKey);
-        try {
-          store.setItem(itemKey, row);
-        } catch {
-          disableReverseCacheStorage();
-          return;
-        }
-      }
-      try {
-        if (
-          store.length - REVERSE_CACHE_STORAGE_NON_CACHE_COUNT >
-            CONFIG.REVERSE_CACHE_STORAGE_MAX
-        ) {
-          pruneReverseCacheStorage(store);
-          return;
-        }
-        keys.push(cacheKey);
-        REVERSE_CACHE_STORAGE_KEY_SET.add(cacheKey);
-        REVERSE_CACHE_STORAGE_WRITES_SINCE_PRUNE++;
-        if (keys.length > CONFIG.REVERSE_CACHE_STORAGE_MAX) {
-          const removeCount = keys.length - CONFIG.REVERSE_CACHE_STORAGE_MAX;
-          for (let i = 0; i < removeCount; i++) {
-            store.removeItem(REVERSE_CACHE_STORAGE_PREFIX + keys[i]);
-            REVERSE_CACHE_STORAGE_KEY_SET.delete(keys[i]);
-          }
-          keys.copyWithin(0, removeCount);
-          keys.length -= removeCount;
-        }
-      } catch {
-        disableReverseCacheStorage();
-      }
+    function persistentReverseCacheKey(cacheKey) {
+      return REVERSE_CACHE_VARIANT + ":" + cacheKey;
     }
     function openReverseCacheDb() {
-      getReverseCacheStorage();
-      if (!("indexedDB" in window)) return Promise.resolve(null);
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
       REVERSE_CACHE_DB_PROMISE = new Promise((resolve) => {
         let settled = false;
@@ -4533,11 +4161,8 @@
           } else {
             store = req.transaction.objectStore(CONFIG.REVERSE_CACHE_STORE);
           }
-          if (event.oldVersion < 2) {
-            try {
-              store.clear();
-            } catch {
-            }
+          if (event.oldVersion < 3) {
+            store.clear();
           }
           if (!store.indexNames.contains("savedAt")) {
             store.createIndex("savedAt", "savedAt");
@@ -4552,7 +4177,6 @@
           if (!finish(db)) {
             REVERSE_CACHE_DB_PROMISE = Promise.resolve(db);
           }
-          scheduleReverseCachePrune();
         };
         req.onerror = () => {
           console.warn("Reverse geocoding cache is unavailable.", req.error);
@@ -4566,12 +4190,10 @@
       return REVERSE_CACHE_DB_PROMISE;
     }
     async function readPersistentReverseCache(cacheKey) {
-      const persistentKey = await toPersistentReverseCacheKey(cacheKey);
-      if (!persistentKey) return null;
+      const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
-      if (!db) return readReverseCacheStorage(persistentKey);
+      if (!db) return null;
       let result = null;
-      let stale = false;
       await new Promise((resolve) => {
         let settled = false;
         const done = () => {
@@ -4582,59 +4204,32 @@
         let tx;
         let req;
         try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readonly");
-          req = tx.objectStore(CONFIG.REVERSE_CACHE_STORE).get(persistentKey);
-        } catch {
-          done(null);
-          return;
-        }
-        req.onsuccess = () => {
-          const row = req.result;
-          if (isFreshReverseCacheRow(row)) {
-            result = row.parsed || null;
-          } else {
-            stale = !!row;
-          }
-        };
-        req.onerror = done;
-        tx.onabort = done;
-        tx.oncomplete = done;
-      });
-      if (stale) {
-        await deleteStalePersistentReverseCacheKey(db, persistentKey);
-      }
-      return result;
-    }
-    async function deleteStalePersistentReverseCacheKey(db, persistentKey) {
-      await new Promise((resolve) => {
-        let tx;
-        try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
           const store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
-          const req = store.get(persistentKey);
+          req = store.get(persistentKey);
           req.onsuccess = () => {
-            if (!isFreshReverseCacheRow(req.result)) {
+            const row = req.result;
+            if (isFreshReverseCacheRow(row, persistentKey)) {
+              result = row.parsed;
+            } else if (row) {
               store.delete(persistentKey);
             }
           };
         } catch {
-          resolve();
+          done();
           return;
         }
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-        tx.onabort = resolve;
+        req.onerror = done;
+        tx.onabort = done;
+        tx.oncomplete = done;
       });
+      return result;
     }
     async function writePersistentReverseCache(cacheKey, parsed) {
-      const persistentKey = await toPersistentReverseCacheKey(cacheKey);
-      if (!persistentKey) return;
+      const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
-      if (!db) {
-        writeReverseCacheStorage(persistentKey, parsed);
-        return;
-      }
-      const written = await new Promise((resolve) => {
+      if (!db) return;
+      await new Promise((resolve) => {
         let tx;
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
@@ -4648,73 +4243,10 @@
           });
           pruneExcessReverseCacheRows(store);
         } catch {
-          resolve(false);
-          return;
-        }
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
-      });
-      if (!written) return;
-      REVERSE_CACHE_WRITES_SINCE_PRUNE++;
-      if (
-        !REVERSE_CACHE_PRUNE_PROMISE &&
-        (REVERSE_CACHE_REQUIRES_FULL_PRUNE ||
-          REVERSE_CACHE_WRITES_SINCE_PRUNE >=
-            REVERSE_CACHE_PRUNE_WRITE_INTERVAL)
-      ) {
-        REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
-        scheduleReverseCachePrune();
-      }
-    }
-    function scheduleReverseCachePrune() {
-      if (REVERSE_CACHE_PRUNE_PROMISE) return;
-      REVERSE_CACHE_PRUNE_PROMISE = (async () => {
-        await yieldToMain();
-        await prunePersistentReverseCache();
-      })().finally(() => {
-        REVERSE_CACHE_PRUNE_PROMISE = null;
-      });
-    }
-    async function prunePersistentReverseCache() {
-      const db = await openReverseCacheDb();
-      if (!db) return;
-      await new Promise((resolve) => {
-        const fullScan = REVERSE_CACHE_REQUIRES_FULL_PRUNE;
-        let fullScanComplete = false;
-        let tx;
-        let store;
-        try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
-        } catch {
           resolve();
           return;
         }
-        const startedAt = Date.now();
-        const pruneExpired = fullScan
-          ? store.openCursor()
-          : store.index("savedAt").openCursor();
-        pruneExpired.onsuccess = () => {
-          const cursor = pruneExpired.result;
-          if (!cursor) {
-            fullScanComplete = fullScan;
-            pruneExcessReverseCacheRows(store);
-            return;
-          }
-          const valid = isReversePersistentCacheKey(cursor.value?.key) &&
-            isFreshReverseCacheRow(cursor.value, startedAt);
-          if (!fullScan && valid) {
-            pruneExcessReverseCacheRows(store);
-            return;
-          }
-          if (!valid) cursor.delete();
-          cursor.continue();
-        };
-        tx.oncomplete = () => {
-          if (fullScanComplete) REVERSE_CACHE_REQUIRES_FULL_PRUNE = false;
-          resolve();
-        };
+        tx.oncomplete = resolve;
         tx.onerror = resolve;
         tx.onabort = resolve;
       });
@@ -4861,7 +4393,7 @@
         let skeletonTr = null;
         let needsFetch = false;
         try {
-          if (AppState.isPausing) {
+          if (AppState.status === "pausing") {
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
             const resumeHandler =
@@ -4875,7 +4407,9 @@
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
-          if (!parsed) {
+          if (parsed) {
+            putReverseMemoryCache(cacheKey, parsed);
+          } else {
             parsed = await abortable(
               readPersistentReverseCache(cacheKey),
               signal,
@@ -4931,8 +4465,9 @@
               }
             }
             if (!parsed) {
-              const url = buildReverseUrl(r.latStr, r.lonStr);
-              parsed = AddressFormatter.parse(
+              const url =
+                `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
+              parsed = parseGeocodeAddress(
                 await fetchReverseWithRetry(
                   url,
                   signal,
@@ -5058,9 +4593,7 @@
       }
     }
     function commitResultRow(tr, r, wrap, f) {
-      if (!tr) return;
       const connected = tr.isConnected;
-      if (!connected && !tr.parentNode) return;
       const cells = tr.cells;
       const latStr = r.latStr;
       const lonStr = r.lonStr;
@@ -5131,7 +4664,7 @@
           const coords = lat + ", " + lon;
           let line = escCell(r.set) +
             "," +
-            escCell(r.idx) +
+            escCell(i + 1) +
             "," +
             escCell(coords) +
             ",";
@@ -5195,7 +4728,7 @@
       setCoordsText("");
       clearTable();
       AppState.setRecords([], "parsing");
-      setEmptyHint("parsing");
+      domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
       setStatusMessage("파일 분석 중…");
       AppState.controller = new AbortController();
       AppState.inFlight = true;
@@ -5209,7 +4742,8 @@
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
-        setEmptyHint("ready");
+        domElements.emptyHint.textContent =
+          "좌표 추출 완료. 조회 시작을 눌러주세요.";
         const MAX_DISP = 1_000;
         const disp = [];
         for (
@@ -5236,7 +4770,7 @@
         }
         if (err instanceof InputLimitError) {
           AppState.setRecords([]);
-          setEmptyHint("file");
+          domElements.emptyHint.textContent = FILE_READY_HINT;
           setControlsIdle(err.message, "warn");
           return;
         }
@@ -5273,7 +4807,6 @@
           ? e.target.closest("tr")
           : null;
         if (!tr) return;
-        FIND_REVEAL_ACTIVE = true;
         setHiddenByFilterActiveFn = setRowHiddenByFilterActive;
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
@@ -5287,11 +4820,7 @@
         domElements.tbody.childElementCount > 0 &&
         !root.hasAttribute(PERF_MODE_ATTR)
       ) {
-        const active = document.activeViewTransition;
-        if (active) {
-          active.types.add("results");
-          return fn();
-        }
+        if (root.matches(":active-view-transition")) return fn();
         return startViewTransition({ update: fn, types: ["results"] });
       }
       return fn();
@@ -5350,7 +4879,17 @@
       },
       "--export": handleExport,
       "--filter-clear": () => {
-        resetFilterControls();
+        for (const el of [
+          domElements.filterQ,
+          domElements.filterKind,
+          domElements.filterSido,
+          domElements.filterSigungu,
+          domElements.filterEmd,
+          domElements.filterTag,
+          domElements.filterFullAddr,
+        ]) {
+          el.value = "";
+        }
         filterDirty = true;
         cancelActiveFilterTask();
         clearFindReveals();
@@ -5389,9 +4928,9 @@
       setCoordsText("");
       clearTable();
       AppState.setRecords([]);
-      resetReverseMemoryCache();
-      AppState.setFile(file);
-      setEmptyHint("file");
+      REVERSE_PARSED_CACHE.clear();
+      AppState.droppedFile = file;
+      domElements.emptyHint.textContent = FILE_READY_HINT;
       setStatusMessage(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
@@ -5417,19 +4956,10 @@
     });
     document.addEventListener("scroll", () => {
       if (isMapPopoverOpen()) closeMapPopover();
-      if (FIND_REVEAL_ACTIVE) bumpFindRehideTimer();
+      if (FIND_REVEALED_ROWS.size !== 0) bumpFindRehideTimer();
     }, EVT_CAPTURE_PASSIVE);
     function resetInteractionState() {
       if (isMapPopoverOpen()) closeMapPopover();
-    }
-    let DEACTIVATE_QUEUED = false;
-    function requestDeactivate() {
-      if (DEACTIVATE_QUEUED) return;
-      DEACTIVATE_QUEUED = true;
-      queueMicrotask(() => {
-        DEACTIVATE_QUEUED = false;
-        resetInteractionState();
-      });
     }
     function syncTableShadowOffset() {
       const wrap = domElements.tableWrap;
@@ -5447,7 +4977,7 @@
     window.addEventListener("pagehide", resetInteractionState);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
-        requestDeactivate();
+        resetInteractionState();
       }
     });
     const syncViewportShadows = () => {
@@ -5463,7 +4993,6 @@
       const fmt =
         new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
       const U64_MAX = (1n << 64n) - 1n;
-      const U64_SIGN_BIT = 1n << 63n;
       const U32_MAX_INV = 1 / 4294967295;
       const HANGUL_BASE_CODE_POINT = 0xac00;
       const HANGUL_SHIFTS = [48n, 32n, 16n, 0n];
@@ -5685,12 +5214,17 @@
       }
       function reverseBitsU64(v) {
         let x = v;
-        let out = 0n;
-        for (let i = 0; i < 64; i += 1) {
-          out = (out << 1n) | (x & 1n);
-          x >>= 1n;
-        }
-        return out;
+        x = ((x >> 1n) & 0x5555_5555_5555_5555n) |
+          ((x & 0x5555_5555_5555_5555n) << 1n);
+        x = ((x >> 2n) & 0x3333_3333_3333_3333n) |
+          ((x & 0x3333_3333_3333_3333n) << 2n);
+        x = ((x >> 4n) & 0x0f0f_0f0f_0f0f_0f0fn) |
+          ((x & 0x0f0f_0f0f_0f0f_0f0fn) << 4n);
+        x = ((x >> 8n) & 0x00ff_00ff_00ff_00ffn) |
+          ((x & 0x00ff_00ff_00ff_00ffn) << 8n);
+        x = ((x >> 16n) & 0x0000_ffff_0000_ffffn) |
+          ((x & 0x0000_ffff_0000_ffffn) << 16n);
+        return (x >> 32n) | ((x & 0xffff_ffffn) << 32n);
       }
       function processLottoNumber(byte, modulus, numbers, seen, nextIdx) {
         if (nextIdx >= numbers.length) {
@@ -5823,9 +5357,7 @@
         throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
       }
       function galaxyCoord(value, sub, add) {
-        const a = (value - sub + 0x10000) & 0xffff;
-        const b = (value + add) & 0xffff;
-        return a < b ? a : b;
+        return value >= sub ? value - sub : value + add;
       }
       function generateRandomDataFromNum(num, nextSupp) {
         const data = createDataSet(num);
@@ -5974,12 +5506,6 @@
         }
         return data;
       }
-      function toSignedI64String(v) {
-        if ((v & U64_SIGN_BIT) !== 0n) {
-          return (v - (1n << 64n)).toString(10);
-        }
-        return v.toString(10);
-      }
       function hexByte(value) {
         return value.toString(16).toUpperCase().padStart(2, "0");
       }
@@ -5996,10 +5522,11 @@
       function formatOutput(data) {
         const v = data.num_64;
         const bytes = u64ToBytesBe(v);
-        const [b0, b1, b2, b3, b4, b5] = bytes;
+        const b0 = bytes[0];
+        const hexBytes = bytes.map(hexByte);
         const lines = [];
         lines.push(
-          `64비트 난수: ${v.toString(10)} (유부호 정수: ${toSignedI64String(v)
+          `64비트 난수: ${v.toString(10)} (유부호 정수: ${BigInt.asIntN(64, v).toString(10)
           })`,
         );
         lines.push(
@@ -6007,10 +5534,10 @@
           }`,
         );
         lines.push(`8진수: ${v.toString(8)}`);
-        lines.push(`16진수: ${bytes.map((b) => hexByte(b)).join(" ")}`);
+        lines.push(`16진수: ${hexBytes.join(" ")}`);
         lines.push(
-          `Hex 코드: #${hexByte(b0)}${hexByte(b1)}${hexByte(b2)} #${hexByte(b3)
-          }${hexByte(b4)}${hexByte(b5)}`,
+          `Hex 코드: #${hexBytes[0]}${hexBytes[1]}${hexBytes[2]} #${hexBytes[3]
+          }${hexBytes[4]}${hexBytes[5]}`,
         );
         lines.push(`바이트 배열: ${bytes.join(" ")}`);
         lines.push(
@@ -6135,25 +5662,10 @@
         const saveBtn = document.getElementById("saveOutput");
         const copyBtn = document.getElementById("copyOutput");
         const output = document.getElementById("output");
-        const outputContent = output?.querySelector(".coords-content");
-        const manualBody = runBtn?.closest(".manual-rng-body");
+        const outputContent = output.querySelector(".coords-content");
+        const manualBody = runBtn.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
-        if (
-          !num64Input ||
-          !suppInput ||
-          !runBtn ||
-          !clearBtn ||
-          !saveBtn ||
-          !copyBtn ||
-          !output ||
-          !outputContent ||
-          !manualBody ||
-          !error ||
-          !meta
-        ) {
-          return;
-        }
         const requestManualOutputShadowSync = () =>
           requestScrollShadowSync(output);
         output.addEventListener(
@@ -6236,15 +5748,12 @@
               const outputBlock = formatOutput(
                 generateRandomDataFromNum(parseU64(token), nextSupp),
               );
-              if (processedCount !== 0) {
-                lastGeneratedChunks.push("\n");
-                if (processedCount < MANUAL_PREVIEW_BLOCK_LIMIT) {
-                  previewParts.push("\n");
-                }
-              }
-              lastGeneratedChunks.push(outputBlock);
+              const outputChunk = processedCount === 0
+                ? outputBlock
+                : `\n${outputBlock}`;
+              lastGeneratedChunks.push(outputChunk);
               if (processedCount < MANUAL_PREVIEW_BLOCK_LIMIT) {
-                previewParts.push(outputBlock);
+                previewParts.push(outputChunk);
               } else {
                 omittedPreviewCount += 1;
               }
@@ -6255,9 +5764,7 @@
                   updateManualProgress(false);
                   lastMetaUpdateAt = now;
                 }
-                await new Promise((resolve) => {
-                  setTimeout(resolve, 0);
-                });
+                await yieldToMain();
                 if (generationId !== manualGenerationId) {
                   return;
                 }
@@ -6287,9 +5794,6 @@
         });
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
-          if (lastGeneratedChunks.length === 0) {
-            return;
-          }
           downloadRandomDataTxt(lastGeneratedChunks);
           meta.textContent =
             (meta.textContent ? `${meta.textContent}\n` : "") +
@@ -6297,9 +5801,6 @@
         });
         copyBtn.addEventListener("click", async () => {
           error.textContent = "";
-          if (lastGeneratedChunks.length === 0) {
-            return;
-          }
           try {
             await copyRandomDataChunksToClipboard(lastGeneratedChunks);
             meta.textContent =

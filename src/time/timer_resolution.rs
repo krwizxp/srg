@@ -14,17 +14,12 @@ const WAIT_OBJECT_0: u32 = 0;
 impl HighResTimerGuard {
     pub(super) fn sleep(&self, duration: Duration) {
         let started_at = Instant::now();
-        let Some(due_time) = duration
-            .as_nanos()
-            .checked_add(99)
-            .map(|rounded_nanos| rounded_nanos.div_euclid(100))
-            .map(|units| units.max(1))
-            .and_then(|units| i64::try_from(units).ok())
-            .and_then(i64::checked_neg)
+        let Ok(due_time_units) = i64::try_from(duration.as_nanos().div_ceil(100).max(1))
         else {
             sleep_remaining(started_at, duration);
             return;
         };
+        let due_time = due_time_units.wrapping_neg();
         // SAFETY: handle is a live waitable timer handle and due_time points to a valid relative
         // due-time value for this call.
         let set_ok = unsafe {

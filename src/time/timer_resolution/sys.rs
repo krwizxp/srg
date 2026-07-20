@@ -1,6 +1,4 @@
 use super::c_void;
-pub(super) type TimerApcRoutine =
-    Option<unsafe extern "system" fn(*const c_void, u32, u32)>;
 unsafe extern "system" {
     #[link_name = "CloseHandle"]
     pub(super) fn close_handle(h_object: *mut c_void) -> i32;
@@ -16,7 +14,7 @@ unsafe extern "system" {
         timer: *mut c_void,
         due_time: *const i64,
         period: i32,
-        completion_routine: TimerApcRoutine,
+        completion_routine: Option<unsafe extern "system" fn(*const c_void, u32, u32)>,
         arg_to_completion_routine: *const c_void,
         wake_context: *const c_void,
         tolerable_delay: u32,

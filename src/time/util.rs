@@ -30,14 +30,8 @@ where
     result.map_err(|err| TimeError::parse_with_source(context, err))
 }
 pub(super) fn parse_u32_digits(raw: &str) -> Option<u32> {
-    if raw.is_empty() {
+    if raw.starts_with('+') {
         return None;
     }
-    raw.bytes().try_fold(0_u32, |value, byte| {
-        if !byte.is_ascii_digit() {
-            return None;
-        }
-        let digit = byte.wrapping_sub(b'0');
-        value.checked_mul(10)?.checked_add(u32::from(digit))
-    })
+    raw.parse::<u32>().ok()
 }

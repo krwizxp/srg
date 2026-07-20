@@ -1,10 +1,9 @@
 use crate::{
+    BUFFER_SIZE,
     buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
-    constants::BUFFER_SIZE,
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
-    tables::{BIN8_TABLE, HEX_BYTE_TABLE, HEX_UPPER},
 };
 use core::{fmt::Write as FmtWrite, range::Range};
 use std::io::{Result as IoResult, Write as IoWrite, stdout};
@@ -29,7 +28,6 @@ const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
 const THREE_DIGIT_WIDTH: usize = 3;
 const TWO_DIGIT_WIDTH: usize = 2;
-const U32_DEC_BUF_LEN: usize = 10;
 const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
@@ -38,11 +36,6 @@ pub(super) enum OutputTarget {
     Console,
     File,
 }
-impl OutputTarget {
-    const fn use_colors(self) -> bool {
-        matches!(self, Self::Console)
-    }
-}
 struct OutputFormatter<'cursor, 'buffer, 'data> {
     bytes: [u8; 8],
     cursor: &'cursor mut ByteCursor<'buffer>,
@@ -50,12 +43,6 @@ struct OutputFormatter<'cursor, 'buffer, 'data> {
     use_colors: bool,
 }
 impl OutputFormatter<'_, '_, '_> {
-    fn write_all(&mut self) -> Result<()> {
-        self.write_number_lines()?;
-        self.write_random_lines()?;
-        self.write_nms_lines()?;
-        Ok(())
-    }
     fn write_labeled_line<F>(&mut self, label: &[u8], write_value: F) -> IoResult<()>
     where
         F: FnOnce(&mut ByteCursor<'_>) -> IoResult<()>,
@@ -78,14 +65,14 @@ impl OutputFormatter<'_, '_, '_> {
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
             let galaxy_number = u16::from(galaxy_number_byte).saturating_add(1);
-            buf_write_u32_dec(buffer_cur, u32::from(galaxy_number))
+            buffer_cur.write_u32_dec(u32::from(galaxy_number))
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number)?;
             buffer_cur.write_byte(b' ')?;
             buf_write_hex_u16_min3(buffer_cur, data.solar_system_index)?;
             buffer_cur.write_byte(b' ')?;
-            buffer_cur.write_bytes(hex_byte(usize::from(data.nms_portal_yy))?)?;
+            buffer_cur.write_bytes(&hex_byte(data.nms_portal_yy))?;
             buffer_cur.write_byte(b' ')?;
             buf_write_hex_u16_min3(buffer_cur, data.nms_portal_zzz)?;
             buffer_cur.write_byte(b' ')?;
@@ -119,11 +106,17 @@ impl OutputFormatter<'_, '_, '_> {
         }
         buf_write_u64_dec(self.cursor, signed_number.unsigned_abs())?;
         self.cursor.write_bytes(b")\n")?;
-        self.write_prefixed_byte_groups("2진수: ", 8, |byte| {
-            BIN8_TABLE
-                .get(usize::from(byte))
-                .map(<[u8; 8]>::as_slice)
-                .ok_or_else(write_zero_err)
+        self.write_prefixed_byte_groups("2진수: ", |byte| {
+            [
+                bit(byte, 0b1000_0000),
+                bit(byte, 0b0100_0000),
+                bit(byte, 0b0010_0000),
+                bit(byte, 0b0001_0000),
+                bit(byte, 0b0000_1000),
+                bit(byte, 0b0000_0100),
+                bit(byte, 0b0000_0010),
+                bit(byte, 0b0000_0001),
+            ]
         })?;
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
             if number64 == 0 {
@@ -141,9 +134,7 @@ impl OutputFormatter<'_, '_, '_> {
             }
             buffer_cur.write_bytes(suffix_slice(&tmp, index)?)
         })?;
-        self.write_prefixed_byte_groups("16진수: ", 2, |byte| {
-            hex_byte(usize::from(byte)).map(<[u8; 2]>::as_slice)
-        })?;
+        self.write_prefixed_byte_groups("16진수: ", hex_byte)?;
         self.write_labeled_line("Hex 코드: ".as_bytes(), |buffer_cur| {
             let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
             if use_colors {
@@ -169,20 +160,16 @@ impl OutputFormatter<'_, '_, '_> {
         })?;
         Ok(())
     }
-    fn write_prefixed_byte_groups<F>(
+    fn write_prefixed_byte_groups<const WIDTH: usize>(
         &mut self,
         prefix: &'static str,
-        group_width: usize,
-        mut render_group: F,
-    ) -> IoResult<()>
-    where
-        F: FnMut(u8) -> IoResult<&'static [u8]>,
-    {
+        mut render_group: impl FnMut(u8) -> [u8; WIDTH],
+    ) -> IoResult<()> {
         let prefix_bytes = prefix.as_bytes();
         let prefix_len = prefix_bytes.len();
         let line_len = prefix_len
             .checked_add(
-                group_width
+                WIDTH
                     .checked_mul(BYTE_GROUP_COUNT)
                     .ok_or_else(write_zero_err)?,
             )
@@ -193,9 +180,9 @@ impl OutputFormatter<'_, '_, '_> {
         let mut pos = prefix_len;
         let last_index = BYTE_GROUP_COUNT.saturating_sub(1);
         for (index, byte) in self.bytes.into_iter().enumerate() {
-            let group = render_group(byte)?;
-            range_slice_mut(head, pos, group_width)?.copy_from_slice(group);
-            add_to_index(&mut pos, group_width)?;
+            let group = render_group(byte);
+            range_slice_mut(head, pos, WIDTH)?.copy_from_slice(&group);
+            add_to_index(&mut pos, WIDTH)?;
             let slot = head.get_mut(pos).ok_or_else(write_zero_err)?;
             *slot = if index == last_index { b'\n' } else { b' ' };
             add_to_index(&mut pos, 1)?;
@@ -208,7 +195,7 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_u8_array_line("바이트 배열: ".as_bytes(), &bytes)?;
         self.write_labeled_line("6자리 숫자 비밀번호: ".as_bytes(), |buffer_cur| {
             if data.numeric_password >= PASSWORD_FULL_WIDTH_THRESHOLD {
-                return buf_write_u32_dec(buffer_cur, data.numeric_password);
+                return buffer_cur.write_u32_dec(data.numeric_password);
             }
             let hi = usize::from(low_u8_from_u32(
                 data.numeric_password.div_euclid(PASSWORD_HIGH_DIVISOR),
@@ -278,9 +265,11 @@ pub(super) fn format_data_into_buffer(
         bytes: data.num_64.to_be_bytes(),
         cursor: &mut cur,
         data,
-        use_colors: target.use_colors(),
+        use_colors: matches!(target, OutputTarget::Console),
     };
-    formatter.write_all()?;
+    formatter.write_number_lines()?;
+    formatter.write_random_lines()?;
+    formatter.write_nms_lines()?;
     Ok(cur.written_slice()?.len())
 }
 fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
@@ -311,9 +300,6 @@ fn range_array_mut<const N: usize>(slice: &mut [u8], start: usize) -> IoResult<&
         .first_chunk_mut::<N>()
         .ok_or_else(write_zero_err)
 }
-fn hex_byte(index: usize) -> IoResult<&'static [u8; 2]> {
-    HEX_BYTE_TABLE.get(index).ok_or_else(write_zero_err)
-}
 const fn u8_dec_len(n: u8) -> usize {
     if n >= U8_THREE_DIGIT_THRESHOLD {
         3
@@ -321,6 +307,19 @@ const fn u8_dec_len(n: u8) -> usize {
         2
     } else {
         1
+    }
+}
+const fn bit(byte: u8, mask: u8) -> u8 {
+    if byte & mask == 0 { b'0' } else { b'1' }
+}
+const fn hex_byte(byte: u8) -> [u8; 2] {
+    [hex_digit(byte >> 4_u8), hex_digit(byte & 0x0F)]
+}
+const fn hex_digit(nibble: u8) -> u8 {
+    if nibble < 10 {
+        b'0'.wrapping_add(nibble)
+    } else {
+        b'A'.wrapping_add(nibble.saturating_sub(10))
     }
 }
 fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) -> IoResult<()> {
@@ -430,38 +429,15 @@ fn buf_write_hex24_bytes(buf: &mut [u8], b0: u8, b1: u8, b2: u8) -> IoResult<()>
     else {
         return Err(write_zero_err());
     };
-    first_hex.copy_from_slice(hex_byte(usize::from(b0))?);
+    first_hex.copy_from_slice(&hex_byte(b0));
     let Some((second_hex, third_hex)) =
         remaining_hex_bytes.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
     else {
         return Err(write_zero_err());
     };
-    second_hex.copy_from_slice(hex_byte(usize::from(b1))?);
-    third_hex.copy_from_slice(hex_byte(usize::from(b2))?);
+    second_hex.copy_from_slice(&hex_byte(b1));
+    third_hex.copy_from_slice(&hex_byte(b2));
     Ok(())
-}
-fn buf_write_u32_dec(cur: &mut ByteCursor<'_>, mut n: u32) -> IoResult<()> {
-    let mut tmp = [0_u8; U32_DEC_BUF_LEN];
-    let mut i = tmp.len();
-    while n >= u32::from(U8_THREE_DIGIT_THRESHOLD) {
-        let rem = usize::from(low_u8_from_u32(
-            n.rem_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
-        ));
-        n = n.div_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD));
-        sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
-    }
-    if n >= u32::from(U8_TWO_DIGIT_THRESHOLD) {
-        let rem = usize::from(low_u8_from_u32(n));
-        sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
-    } else {
-        sub_from_index(&mut i, 1)?;
-        let digit = low_u8_from_u32(n);
-        let slot = tmp.get_mut(i).ok_or_else(write_zero_err)?;
-        *slot = digit_byte(usize::from(digit))?;
-    }
-    cur.write_bytes(suffix_slice(&tmp, i)?)
 }
 fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
     let mut tmp = [0_u8; U64_DEC_BUF_LEN];
@@ -488,25 +464,25 @@ fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
 }
 fn buf_write_hex_u16_0pad4(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     let head = cur.take(HEX_U16_FULL_WIDTH)?;
-    let upper = usize::from(low_u8_from_u32(u32::from(value >> 8_u32)));
-    let lower = usize::from(low_u8_from_u32(u32::from(value)));
+    let upper = low_u8_from_u32(u32::from(value >> 8_u32));
+    let lower = low_u8_from_u32(u32::from(value));
     let Some((upper_hex, lower_hex)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
         return Err(write_zero_err());
     };
-    upper_hex.copy_from_slice(hex_byte(upper)?);
-    lower_hex.copy_from_slice(hex_byte(lower)?);
+    upper_hex.copy_from_slice(&hex_byte(upper));
+    lower_hex.copy_from_slice(&hex_byte(lower));
     Ok(())
 }
 fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     if value < HEX_U16_SHORT_THRESHOLD {
         let head = cur.take(THREE_DIGIT_WIDTH)?;
-        let hi = usize::from(low_u8_from_u32(u32::from(value >> 8)));
-        let lo = usize::from(low_u8_from_u32(u32::from(value)));
+        let hi = low_u8_from_u32(u32::from(value >> 8));
+        let lo = low_u8_from_u32(u32::from(value));
         let Some((prefix, suffix)) = head.split_first_mut() else {
             return Err(write_zero_err());
         };
-        *prefix = HEX_UPPER.get(hi).copied().ok_or_else(write_zero_err)?;
-        suffix.copy_from_slice(hex_byte(lo)?);
+        *prefix = hex_digit(hi);
+        suffix.copy_from_slice(&hex_byte(lo));
         Ok(())
     } else {
         buf_write_hex_u16_0pad4(cur, value)
