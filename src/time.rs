@@ -353,6 +353,11 @@ struct LoopRuntime<'runtime> {
     #[cfg(target_os = "linux")]
     prepared_input: &'runtime mut wayland_input::PreparedInput,
 }
+#[derive(Clone, Copy)]
+enum LoopStop<'receiver> {
+    Deadline(Instant),
+    Receiver(&'receiver mpsc::Receiver<()>),
+}
 struct SampleWorker {
     command_sender: mpsc::SyncSender<SampleWorkerRequest>,
     generation: u64,
@@ -1195,7 +1200,6 @@ impl AppState<'_> {
         out: &mut dyn io::Write,
         err: &mut dyn io::Write,
     ) -> Result<()> {
-        let (tx, rx) = mpsc::channel();
         if let Some(duration) = stop_after {
             let stop_at = Instant::now()
                 .checked_add(duration)
@@ -1203,9 +1207,8 @@ impl AppState<'_> {
             #[cfg(target_os = "linux")]
             let (mut prepared_input, stop_requested) = {
                 let mut prepared_input = wayland_input::PreparedInput::EMPTY;
-                let stop_requested = prepared_input.prepare(self.trigger_action, err, || {
-                    !matches!(rx.try_recv(), Err(mpsc::TryRecvError::Empty))
-                });
+                let stop_requested =
+                    prepared_input.prepare(self.trigger_action, err, || Instant::now() >= stop_at);
                 (prepared_input, stop_requested)
             };
             #[cfg(not(target_os = "linux"))]
@@ -1213,15 +1216,16 @@ impl AppState<'_> {
             if !stop_requested {
                 cfg_select! {
                     target_os = "linux" => {
-                        self.run_loop_active(&rx, Some(stop_at), out, err, &mut prepared_input)?;
+                        self.run_loop_active(LoopStop::Deadline(stop_at), out, err, &mut prepared_input)?;
                     }
                     _ => {
-                        self.run_loop_active(&rx, Some(stop_at), out, err)?;
+                        self.run_loop_active(LoopStop::Deadline(stop_at), out, err)?;
                     }
                 }
             }
             return Ok(());
         }
+        let (tx, rx) = mpsc::channel();
         let input_thread = thread::spawn(move || -> IoResult<()> {
             let mut line = Vec::new();
             line.try_reserve_exact(ENTER_BUFFER_READ_LIMIT_BYTES)
@@ -1257,10 +1261,10 @@ impl AppState<'_> {
         if !stop_requested {
             cfg_select! {
                 target_os = "linux" => {
-                    self.run_loop_active(&rx, None, out, err, &mut prepared_input)?;
+                    self.run_loop_active(LoopStop::Receiver(&rx), out, err, &mut prepared_input)?;
                 }
                 _ => {
-                    self.run_loop_active(&rx, None, out, err)?;
+                    self.run_loop_active(LoopStop::Receiver(&rx), out, err)?;
                 }
             }
         }
@@ -1272,8 +1276,7 @@ impl AppState<'_> {
     }
     fn run_loop_active(
         &mut self,
-        rx: &mpsc::Receiver<()>,
-        stop_at: Option<Instant>,
+        stop: LoopStop<'_>,
         out: &mut dyn io::Write,
         err: &mut dyn io::Write,
         #[cfg(target_os = "linux")] prepared_input: &mut wayland_input::PreparedInput,
@@ -1287,7 +1290,7 @@ impl AppState<'_> {
         let mut line_buf = [0_u8; display::DISPLAY_LINE_BUF_LEN];
         loop {
             let pre_wait_now = Instant::now();
-            if stop_at.is_some_and(|deadline| pre_wait_now >= deadline) {
+            if matches!(stop, LoopStop::Deadline(deadline) if pre_wait_now >= deadline) {
                 break;
             }
             let activity_poll_timeout = activity.poll_interval();
@@ -1298,12 +1301,15 @@ impl AppState<'_> {
             } else {
                 activity_poll_timeout
             };
-            if let Some(deadline) = stop_at {
+            if let LoopStop::Deadline(deadline) = stop {
                 poll_timeout = poll_timeout.min(deadline.saturating_duration_since(pre_wait_now));
             }
-            match rx.recv_timeout(poll_timeout) {
-                Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
+            match stop {
+                LoopStop::Receiver(receiver) => match receiver.recv_timeout(poll_timeout) {
+                    Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                },
+                LoopStop::Deadline(_) => thread::sleep(poll_timeout),
             }
             cfg_select! {
                 target_os = "linux" => {
