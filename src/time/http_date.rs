@@ -73,7 +73,6 @@ struct HttpDateComponents {
 impl HttpDateComponents {
     fn days_since_epoch(self) -> Result<i64> {
         const ERR_DAY: &str = "HTTP Date 파싱 실패: 날짜 값이 유효하지 않습니다.";
-        const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 타임스탬프 계산 중 범위 오류입니다.";
         let leap_year = (self.year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
             && self.year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32)
             || self.year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32;
@@ -95,8 +94,7 @@ impl HttpDateComponents {
         }
         let year = i64::from(self.year);
         let adjusted_year = if self.month <= MARCH_MONTH_THRESHOLD {
-            year.checked_sub(1_i64)
-                .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?
+            year.wrapping_sub(1_i64)
         } else {
             year
         };
@@ -105,51 +103,32 @@ impl HttpDateComponents {
             adjusted_year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
         );
         let shifted_month = if self.month > MARCH_MONTH_THRESHOLD {
-            i64::from(self.month)
-                .checked_sub(MARCH_BASE_MONTH_OFFSET_I64)
-                .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?
+            i64::from(self.month).wrapping_sub(MARCH_BASE_MONTH_OFFSET_I64)
         } else {
-            i64::from(self.month)
-                .checked_add(PRE_MARCH_MONTH_OFFSET_I64)
-                .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?
+            i64::from(self.month).wrapping_add(PRE_MARCH_MONTH_OFFSET_I64)
         };
         let month_term = MONTH_TERM_MULTIPLIER_I64
-            .checked_mul(shifted_month)
-            .and_then(|value| value.checked_add(MONTH_TERM_OFFSET_I64))
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?;
-        let day_offset = i64::from(self.day)
-            .checked_sub(1_i64)
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?;
+            .wrapping_mul(shifted_month)
+            .wrapping_add(MONTH_TERM_OFFSET_I64);
+        let day_offset = i64::from(self.day).wrapping_sub(1_i64);
         let doy = month_term
-            .checked_div(MONTH_TERM_DIVISOR_I64)
-            .and_then(|value| value.checked_add(day_offset))
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?;
+            .div_euclid(MONTH_TERM_DIVISOR_I64)
+            .wrapping_add(day_offset);
         let doe = DAYS_PER_COMMON_YEAR_I64
-            .checked_mul(yoe)
-            .and_then(|value| value.checked_add(yoe.div_euclid(LEAP_YEAR_DIVISOR_I32.into())))
-            .and_then(|value| {
-                value.checked_sub(yoe.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32.into()))
-            })
-            .and_then(|value| value.checked_add(doy))
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))?;
-        era.checked_mul(DAYS_PER_400_YEARS_I64)
-            .and_then(|value| value.checked_add(doe))
-            .and_then(|value| value.checked_sub(DAYS_UNTIL_UNIX_EPOCH_I64))
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))
+            .wrapping_mul(yoe)
+            .wrapping_add(yoe.div_euclid(LEAP_YEAR_DIVISOR_I32.into()))
+            .wrapping_sub(yoe.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32.into()))
+            .wrapping_add(doy);
+        Ok(era
+            .wrapping_mul(DAYS_PER_400_YEARS_I64)
+            .wrapping_add(doe)
+            .wrapping_sub(DAYS_UNTIL_UNIX_EPOCH_I64))
     }
-    fn timestamp_secs(self, days: i64) -> Result<i64> {
-        const ERR_TIMESTAMP: &str = "HTTP Date 변환 실패: 타임스탬프 계산 중 범위 오류입니다.";
-        days.checked_mul(SECS_PER_DAY_I64)
-            .and_then(|value| {
-                let hour_secs = i64::from(self.hour).checked_mul(SECS_PER_HOUR_I64)?;
-                value.checked_add(hour_secs)
-            })
-            .and_then(|value| {
-                let minute_secs = i64::from(self.minute).checked_mul(SECS_PER_MINUTE_I64)?;
-                value.checked_add(minute_secs)
-            })
-            .and_then(|value| value.checked_add(i64::from(self.second)))
-            .ok_or_else(|| TimeError::parse(ERR_TIMESTAMP))
+    fn timestamp_secs(self, days: i64) -> i64 {
+        days.wrapping_mul(SECS_PER_DAY_I64)
+            .wrapping_add(i64::from(self.hour).wrapping_mul(SECS_PER_HOUR_I64))
+            .wrapping_add(i64::from(self.minute).wrapping_mul(SECS_PER_MINUTE_I64))
+            .wrapping_add(i64::from(self.second))
     }
     fn validate_weekday(self, days: i64) -> Result<()> {
         const ERR_WEEKDAY: &str = "HTTP Date 파싱 실패: 요일이 날짜와 일치하지 않습니다.";
@@ -291,17 +270,11 @@ fn parse_with_time(
         year,
     })
 }
-fn clamp_u64_day_count(value: u64) -> i64 {
-    let Ok(converted) = i64::try_from(value) else {
-        return i64::from(i32::MAX);
-    };
-    converted
-}
 fn http_date_components_to_systemtime(components: HttpDateComponents) -> Result<SystemTime> {
     const ERR_UNIX_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     let days = components.days_since_epoch()?;
     components.validate_weekday(days)?;
-    let timestamp_secs = components.timestamp_secs(days)?;
+    let timestamp_secs = components.timestamp_secs(days);
     let secs_i128 = i128::from(timestamp_secs);
     if secs_i128 >= 0 {
         let secs_u64 = parse_result_with_context(u64::try_from(secs_i128), ERR_UNIX_TIMESTAMP)?;
@@ -344,11 +317,14 @@ pub(super) fn parse_http_date_to_systemtime(raw_date: &str) -> Result<SystemTime
         return parse_http_date_to_systemtime_with_current_year(raw_date, 0_i32, false);
     }
     let day_index_i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => clamp_u64_day_count(duration.as_secs().div_euclid(SECS_PER_DAY_U64)),
+        Ok(duration) => duration
+            .as_secs()
+            .div_euclid(SECS_PER_DAY_U64)
+            .cast_signed(),
         Err(err) => {
             let secs_before_epoch = err.duration().as_secs();
             let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
-            clamp_u64_day_count(days_before_epoch).saturating_neg()
+            days_before_epoch.cast_signed().wrapping_neg()
         }
     };
     let day_index = match i32::try_from(day_index_i64) {
@@ -449,18 +425,11 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             let year_two_digits = parse_result_with_context(i32::try_from(year2), ERR_RFC850_YEAR)?;
             let century_base = i64::from(current_year)
                 .div_euclid(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
-                .checked_mul(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
-                .ok_or_else(|| TimeError::parse(ERR_RFC850_YEAR))?;
-            let mut expanded = century_base
-                .checked_add(i64::from(year_two_digits))
-                .ok_or_else(|| TimeError::parse(ERR_RFC850_YEAR))?;
-            let cutoff = i64::from(current_year)
-                .checked_add(RFC850_CENTURY_CUTOFF_OFFSET_I64)
-                .ok_or_else(|| TimeError::parse(ERR_RFC850_YEAR))?;
+                .wrapping_mul(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32));
+            let mut expanded = century_base.wrapping_add(i64::from(year_two_digits));
+            let cutoff = i64::from(current_year).wrapping_add(RFC850_CENTURY_CUTOFF_OFFSET_I64);
             if expanded > cutoff {
-                expanded = expanded
-                    .checked_sub(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))
-                    .ok_or_else(|| TimeError::parse(ERR_RFC850_YEAR))?;
+                expanded = expanded.wrapping_sub(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32));
             }
             let year = parse_result_with_context(i32::try_from(expanded), ERR_RFC850_YEAR)?;
             parse_with_time(day, month, year, weekday, time_token)
@@ -470,38 +439,36 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
     }
 }
 pub(super) fn civil_from_days(z: i32) -> Option<CivilDate> {
-    let shifted_days = i64::from(z).checked_add(DAYS_UNTIL_UNIX_EPOCH_I64)?;
+    let shifted_days = i64::from(z).wrapping_add(DAYS_UNTIL_UNIX_EPOCH_I64);
     let era = shifted_days.div_euclid(DAYS_PER_400_YEARS_I64);
     let doe = shifted_days.rem_euclid(DAYS_PER_400_YEARS_I64);
-    let yoe_after_first = doe.checked_sub(doe.checked_div(DAYS_PER_4_YEARS_I64)?)?;
-    let yoe_after_second = yoe_after_first.checked_add(doe.checked_div(DAYS_PER_100_YEARS_I64)?)?;
-    let yoe_numerator =
-        yoe_after_second.checked_sub(doe.checked_div(DAYS_PER_400_YEARS_I64 - 1_i64)?)?;
-    let yoe = yoe_numerator.checked_div(DAYS_PER_COMMON_YEAR_I64)?;
-    let y = yoe.checked_add(era.checked_mul(i64::from(LEAP_YEAR_ERA_DIVISOR_I32))?)?;
-    let year_days = DAYS_PER_COMMON_YEAR_I64.checked_mul(yoe)?;
-    let leap_days = yoe.checked_div(i64::from(LEAP_YEAR_DIVISOR_I32))?;
-    let skipped_centuries = yoe.checked_div(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))?;
-    let doy = doe.checked_sub(
-        year_days
-            .checked_add(leap_days)?
-            .checked_sub(skipped_centuries)?,
-    )?;
+    let yoe = doe
+        .wrapping_sub(doe.div_euclid(DAYS_PER_4_YEARS_I64))
+        .wrapping_add(doe.div_euclid(DAYS_PER_100_YEARS_I64))
+        .wrapping_sub(doe.div_euclid(DAYS_PER_400_YEARS_I64 - 1_i64))
+        .div_euclid(DAYS_PER_COMMON_YEAR_I64);
+    let y = yoe.wrapping_add(era.wrapping_mul(i64::from(LEAP_YEAR_ERA_DIVISOR_I32)));
+    let doy = doe.wrapping_sub(
+        DAYS_PER_COMMON_YEAR_I64
+            .wrapping_mul(yoe)
+            .wrapping_add(yoe.div_euclid(i64::from(LEAP_YEAR_DIVISOR_I32)))
+            .wrapping_sub(yoe.div_euclid(i64::from(LEAP_YEAR_CENTURY_DIVISOR_I32))),
+    );
     let mp = MONTH_TERM_DIVISOR_I64
-        .checked_mul(doy)?
-        .checked_add(MONTH_TERM_OFFSET_I64)?
-        .checked_div(MONTH_TERM_MULTIPLIER_I64)?;
+        .wrapping_mul(doy)
+        .wrapping_add(MONTH_TERM_OFFSET_I64)
+        .div_euclid(MONTH_TERM_MULTIPLIER_I64);
     let month_term = MONTH_TERM_MULTIPLIER_I64
-        .checked_mul(mp)?
-        .checked_add(MONTH_TERM_OFFSET_I64)?
-        .checked_div(MONTH_TERM_DIVISOR_I64)?;
-    let day = u32::try_from(doy.checked_sub(month_term)?.checked_add(1_i64)?).ok()?;
+        .wrapping_mul(mp)
+        .wrapping_add(MONTH_TERM_OFFSET_I64)
+        .div_euclid(MONTH_TERM_DIVISOR_I64);
+    let day = u32::try_from(doy.wrapping_sub(month_term).wrapping_add(1_i64)).ok()?;
     let month_i64 = if mp < DECIMAL_BASE_I64 {
-        mp.checked_add(MARCH_BASE_MONTH_OFFSET_I64)?
+        mp.wrapping_add(MARCH_BASE_MONTH_OFFSET_I64)
     } else {
-        mp.checked_sub(PRE_MARCH_MONTH_OFFSET_I64)?
+        mp.wrapping_sub(PRE_MARCH_MONTH_OFFSET_I64)
     };
     let month = u32::try_from(month_i64).ok()?;
-    let year = i32::try_from(y.checked_add(i64::from(month <= MARCH_MONTH_THRESHOLD))?).ok()?;
+    let year = i32::try_from(y.wrapping_add(i64::from(month <= MARCH_MONTH_THRESHOLD))).ok()?;
     Some(CivilDate { day, month, year })
 }

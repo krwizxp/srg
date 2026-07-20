@@ -2323,7 +2323,6 @@
         : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
       setMapPopoverExpanded(invoker, true);
-      updateMapPopoverFromInvoker(invoker);
       requestAnimationFrame(() => {
         if (!isMapPopoverOpen()) return;
         const active = document.activeElement;
@@ -2822,7 +2821,7 @@
       cancelPendingFilterDebounce();
       FILTER_CTX.timer = setTimeout(() => {
         FILTER_CTX.timer = null;
-        if (isMapPopoverOpen()) closeMapPopover();
+        closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, 120);
@@ -3870,7 +3869,7 @@
         wrap.scrollTop = 0;
         wrap.scrollLeft = 0;
       }
-      resetInteractionState();
+      closeMapPopover();
       domElements.tbody.replaceChildren();
       wrap.classList.remove("filter-empty", "has-results");
       RENDER_CACHE.hasResults = false;
@@ -4953,12 +4952,9 @@
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
     document.addEventListener("scroll", () => {
-      if (isMapPopoverOpen()) closeMapPopover();
+      closeMapPopover();
       if (FIND_REVEALED_ROWS.size !== 0) bumpFindRehideTimer();
     }, EVT_CAPTURE_PASSIVE);
-    function resetInteractionState() {
-      if (isMapPopoverOpen()) closeMapPopover();
-    }
     function syncTableShadowOffset() {
       const wrap = domElements.tableWrap;
       if (!(wrap instanceof HTMLElement)) return;
@@ -4972,10 +4968,10 @@
       }
       wrap.style.setProperty("--table-head-offset", `${offset}px`);
     }
-    window.addEventListener("pagehide", resetInteractionState);
+    window.addEventListener("pagehide", closeMapPopover);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
-        resetInteractionState();
+        closeMapPopover();
       }
     });
     const syncViewportShadows = () => {
