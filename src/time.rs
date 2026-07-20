@@ -270,25 +270,23 @@ impl From<SystemTimeError> for TimeError {
 }
 impl fmt::Display for TimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            TimeErrorKind::Io => match self.source.as_ref() {
-                Some(source) => write!(f, "I/O 오류: {source}"),
-                None => write!(f, "I/O 오류: {}", self.detail),
-            },
-            TimeErrorKind::Time => match self.source.as_ref() {
-                Some(source) => write!(f, "시스템 시간 오류: {source}"),
-                None => write!(f, "시스템 시간 오류: {}", self.detail),
-            },
-            TimeErrorKind::Parse => match self.source.as_ref() {
-                Some(source) => write!(f, "파싱 오류: {}: {source}", self.detail),
-                None => write!(f, "파싱 오류: {}", self.detail),
-            },
-            TimeErrorKind::HeaderNotFound => write!(f, "{} 헤더를 찾을 수 없음", self.detail),
-            TimeErrorKind::NativeHttp => match self.source.as_ref() {
-                Some(source) => write!(f, "native HTTP 요청 실패: {}: {source}", self.detail),
-                None => write!(f, "native HTTP 요청 실패: {}", self.detail),
-            },
+        let prefix = match self.kind {
+            TimeErrorKind::HeaderNotFound => {
+                return write!(f, "{} 헤더를 찾을 수 없음", self.detail);
+            }
+            TimeErrorKind::Io => "I/O 오류",
+            TimeErrorKind::NativeHttp => "native HTTP 요청 실패",
+            TimeErrorKind::Parse => "파싱 오류",
+            TimeErrorKind::Time => "시스템 시간 오류",
+        };
+        f.write_str(prefix)?;
+        if !self.detail.is_empty() {
+            write!(f, ": {}", self.detail)?;
         }
+        if let Some(source) = self.source.as_ref() {
+            write!(f, ": {source}")?;
+        }
+        Ok(())
     }
 }
 impl Error for TimeError {
