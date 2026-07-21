@@ -127,19 +127,12 @@ impl TcpResponseReader<'_, '_> {
             if available.is_empty() {
                 break;
             }
-            let (chunk_len, line_ended) =
-                if let Some(newline_index) = available.iter().position(|&byte| byte == b'\n') {
-                    (
-                        newline_index.checked_add(1).ok_or_else(|| {
-                            TcpAttemptError::Terminal(TimeError::parse(
-                                "TCP HTTP 헤더 line 길이 계산 실패",
-                            ))
-                        })?,
-                        true,
-                    )
-                } else {
-                    (available.len(), false)
-                };
+            let (chunk_len, line_ended) = available
+                .iter()
+                .position(|&byte| byte == b'\n')
+                .map_or((available.len(), false), |newline_index| {
+                    (newline_index.wrapping_add(1), true)
+                });
             let next_line_len = self
                 .line_buffer
                 .len()
@@ -189,11 +182,7 @@ impl TcpResponseReader<'_, '_> {
             let (status_code, http_version) = self.read_status_line()?;
             let header_block = self.read_header_block()?;
             if (100..=199).contains(&status_code) {
-                informational_count = informational_count.checked_add(1).ok_or_else(|| {
-                    TcpAttemptError::Terminal(TimeError::parse(
-                        "TCP HTTP informational 응답이 너무 많습니다.",
-                    ))
-                })?;
+                informational_count = informational_count.wrapping_add(1);
                 if informational_count > TCP_MAX_INFORMATIONAL_RESPONSES {
                     return Err(TcpAttemptError::Terminal(TimeError::parse(
                         "TCP HTTP informational 응답이 너무 많습니다.",
@@ -283,16 +272,8 @@ impl TcpResponseReader<'_, '_> {
     }
     fn update_connection_tokens(&self, header_block: &mut TcpHeaderBlock) {
         let header_line = trim_http_line_end(self.line_buffer);
-        let Some(header_name_end) = header_line.iter().position(|&byte| byte == b':') else {
-            return;
-        };
-        let Some(header_value_start) = header_name_end.checked_add(1) else {
-            return;
-        };
-        let Some(name) = header_line.get(..header_name_end) else {
-            return;
-        };
-        let Some(header_value) = header_line.get(header_value_start..) else {
+        let mut parts = header_line.splitn(2, |&byte| byte == b':');
+        let (Some(name), Some(header_value)) = (parts.next(), parts.next()) else {
             return;
         };
         if !name.eq_ignore_ascii_case(CONNECTION_HEADER_NAME) {

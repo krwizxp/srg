@@ -1441,9 +1441,6 @@
       --action-border: light-dark(oklch(86.2548% 0.077 288.32),
           oklch(44.3794% 0.2586 262.87));
       --action-color: oklch(100% 0 0);
-      background: var(--action-bg);
-      color: var(--action-color);
-      border-color: var(--action-border);
       box-shadow:
         inset 0 1px 0 oklch(100% 0 0 / 0.24),
         0 14px 24px -18px light-dark(oklch(62.9919% 0.2104 261.11 / 0.58),
@@ -1465,9 +1462,6 @@
           oklch(30.3242% 0.06705 260.4));
       --action-color: light-dark(oklch(20.7682% 0.03982 265.75),
           oklch(94.4326% 0.01785 261.34));
-      background: var(--action-bg);
-      color: var(--action-color);
-      border-color: var(--action-border);
     }
 
     #stop.action-btn--danger {
@@ -1479,9 +1473,6 @@
           oklch(from var(--err) l calc(c * 0.85) h / 0.44));
       --action-color: light-dark(oklch(58.5838% 0.2568 17.58),
           oklch(from var(--err) calc(l + 0.06) calc(c * 0.78) h));
-      background: var(--action-bg);
-      color: var(--action-color);
-      border-color: var(--action-border);
       box-shadow: 0 12px 22px -20px light-dark(oklch(58.5838% 0.2568 17.58 / 0.42),
           oklch(71.6163% 0.2181 13.83 / 0.34));
     }
@@ -1520,26 +1511,6 @@
       font-size: 12px;
       line-height: 0.96;
       text-align: center;
-    }
-
-    @media (any-hover: hover) {
-      :is(#parse, #start, #export, #runBtn).action-btn--primary:not(:disabled):hover {
-        background: var(--action-hover-bg);
-      }
-
-      :is(#pause,
-        #resume,
-        #filter-clear,
-        #saveOutput,
-        #copyOutput,
-        #clearBtn,
-        .map-btn).action-btn--soft:not(:disabled):hover {
-        background: var(--action-hover-bg);
-      }
-
-      #stop.action-btn--danger:not(:disabled):hover {
-        background: var(--action-hover-bg);
-      }
     }
 
     .results-card {
@@ -3169,139 +3140,31 @@
               ) sigungu = p1;
             }
           }
-          let emdOut = "";
-          let emd0 = "";
-          let emd1 = "";
-          let emd2 = "";
-          let emd3 = "";
-          let emd4 = "";
-          let emd5 = "";
-          let emd6 = "";
-          let emd7 = "";
-          let emd8 = "";
-          let emdCount = 0;
+          const emdNames = [];
           for (let i = 0; i < 10; i++) {
-            let n;
+            let name;
             switch (i) {
-              case 0:
-                n = level8;
-                break;
-              case 1:
-                n = level9;
-                break;
-              case 2:
-                n = level10;
-                break;
-              case 3:
-                n = gcTown;
-                break;
-              case 4:
-                n = gcVillage;
-                break;
-              case 5:
-                n = gcLocality;
-                break;
-              case 6:
-                n = gcSuburb;
-                break;
-              case 7:
-                n = primaryName;
-                break;
-              case 8:
-                n = p0;
-                break;
-              case 9:
-                n = p1;
-                break;
+              case 0: name = level8; break;
+              case 1: name = level9; break;
+              case 2: name = level10; break;
+              case 3: name = gcTown; break;
+              case 4: name = gcVillage; break;
+              case 5: name = gcLocality; break;
+              case 6: name = gcSuburb; break;
+              case 7: name = primaryName; break;
+              case 8: name = p0; break;
+              case 9: name = p1; break;
             }
-            if (!n || n === sido || n === sigungu) continue;
-            let dup = false;
-            switch (emdCount) {
-              case 9:
-                if (n === emd8) {
-                  dup = true;
-                  break;
-                }
-              case 8:
-                if (n === emd7) {
-                  dup = true;
-                  break;
-                }
-              case 7:
-                if (n === emd6) {
-                  dup = true;
-                  break;
-                }
-              case 6:
-                if (n === emd5) {
-                  dup = true;
-                  break;
-                }
-              case 5:
-                if (n === emd4) {
-                  dup = true;
-                  break;
-                }
-              case 4:
-                if (n === emd3) {
-                  dup = true;
-                  break;
-                }
-              case 3:
-                if (n === emd2) {
-                  dup = true;
-                  break;
-                }
-              case 2:
-                if (n === emd1) {
-                  dup = true;
-                  break;
-                }
-              case 1:
-                if (n === emd0) dup = true;
-            }
-            const lc = n.charCodeAt(n.length - 1);
+            if (!name || name === sido || name === sigungu) continue;
+            const last = name.charCodeAt(name.length - 1);
             if (
-              dup ||
-              (lc !== CC_EUP && lc !== CC_MYEON && lc !== CC_DONG &&
-                lc !== CC_RI)
-            ) {
-              continue;
-            }
-            switch (emdCount++) {
-              case 0:
-                emd0 = n;
-                break;
-              case 1:
-                emd1 = n;
-                break;
-              case 2:
-                emd2 = n;
-                break;
-              case 3:
-                emd3 = n;
-                break;
-              case 4:
-                emd4 = n;
-                break;
-              case 5:
-                emd5 = n;
-                break;
-              case 6:
-                emd6 = n;
-                break;
-              case 7:
-                emd7 = n;
-                break;
-              case 8:
-                emd8 = n;
-                break;
-            }
-            emdOut = emdOut
-              ? emdOut + " " + n
-              : (typeof n === "string" ? n : String(n));
+              emdNames.includes(name) ||
+              (last !== CC_EUP && last !== CC_MYEON && last !== CC_DONG &&
+                last !== CC_RI)
+            ) continue;
+            emdNames.push(name);
           }
-          eupmyeon = emdOut;
+          eupmyeon = emdNames.join(" ");
         } else {
           const isCityOrCounty = gc.type === "city" || gc.type === "county";
           sido = level4 ||
@@ -3362,100 +3225,26 @@
           if ((!sigungu || sigungu === sido) && isCityOrCounty) {
             sigungu = primaryName || gcCity || gcCounty || "";
           }
-          eupmyeon = "";
           const quarter = gcQuarter;
           const hamlet = gcHamlet;
           const township = gcTownship;
           const residential = gcResidential;
-          let cand = locality;
-          if (
-            cand && cand !== sido && cand !== cityLike &&
-            cand !== districtLike
-          ) eupmyeon = cand;
-          else {
-            cand = level10;
-            if (
-              cand && cand !== sido && cand !== cityLike &&
-              cand !== districtLike
-            ) eupmyeon = cand;
-            else {
-              cand = town;
-              if (
-                cand && cand !== sido && cand !== cityLike &&
-                cand !== districtLike
-              ) eupmyeon = cand;
-              else {
-                cand = village;
-                if (
-                  cand && cand !== sido && cand !== cityLike &&
-                  cand !== districtLike
-                ) eupmyeon = cand;
-                else {
-                  cand = suburb;
-                  if (
-                    cand && cand !== sido && cand !== cityLike &&
-                    cand !== districtLike
-                  ) eupmyeon = cand;
-                  else {
-                    cand = neighbourhood;
-                    if (
-                      cand && cand !== sido && cand !== cityLike &&
-                      cand !== districtLike
-                    ) eupmyeon = cand;
-                    else {
-                      cand = quarter;
-                      if (
-                        cand && cand !== sido && cand !== cityLike &&
-                        cand !== districtLike
-                      ) eupmyeon = cand;
-                      else {
-                        cand = hamlet;
-                        if (
-                          cand && cand !== sido && cand !== cityLike &&
-                          cand !== districtLike
-                        ) eupmyeon = cand;
-                        else {
-                          cand = township;
-                          if (
-                            cand && cand !== sido && cand !== cityLike &&
-                            cand !== districtLike
-                          ) eupmyeon = cand;
-                          else {
-                            cand = residential;
-                            if (
-                              cand && cand !== sido && cand !== cityLike &&
-                              cand !== districtLike
-                            ) eupmyeon = cand;
-                            else {
-                              cand = gcName;
-                              if (
-                                cand && cand !== sido && cand !== cityLike &&
-                                cand !== districtLike
-                              ) eupmyeon = cand;
-                              else {
-                                cand = p0;
-                                if (
-                                  cand && cand !== sido &&
-                                  cand !== cityLike && cand !== districtLike
-                                ) eupmyeon = cand;
-                                else {
-                                  cand = p1;
-                                  if (
-                                    cand && cand !== sido &&
-                                    cand !== cityLike && cand !== districtLike
-                                  ) eupmyeon = cand;
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          eupmyeon =
+            (locality && locality !== sido && locality !== cityLike && locality !== districtLike ? locality : "") ||
+            (level10 && level10 !== sido && level10 !== cityLike && level10 !== districtLike ? level10 : "") ||
+            (town && town !== sido && town !== cityLike && town !== districtLike ? town : "") ||
+            (village && village !== sido && village !== cityLike && village !== districtLike ? village : "") ||
+            (suburb && suburb !== sido && suburb !== cityLike && suburb !== districtLike ? suburb : "") ||
+            (neighbourhood && neighbourhood !== sido && neighbourhood !== cityLike &&
+              neighbourhood !== districtLike ? neighbourhood : "") ||
+            (quarter && quarter !== sido && quarter !== cityLike && quarter !== districtLike ? quarter : "") ||
+            (hamlet && hamlet !== sido && hamlet !== cityLike && hamlet !== districtLike ? hamlet : "") ||
+            (township && township !== sido && township !== cityLike && township !== districtLike ? township : "") ||
+            (residential && residential !== sido && residential !== cityLike &&
+              residential !== districtLike ? residential : "") ||
+            (gcName && gcName !== sido && gcName !== cityLike && gcName !== districtLike ? gcName : "") ||
+            (p0 && p0 !== sido && p0 !== cityLike && p0 !== districtLike ? p0 : "") ||
+            (p1 && p1 !== sido && p1 !== cityLike && p1 !== districtLike ? p1 : "");
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
@@ -3650,54 +3439,27 @@
         updateUIState();
       },
     };
-    const UI_CACHE = {
-      parseDisabled: null,
-      startDisabled: null,
-      pauseDisabled: null,
-      resumeDisabled: null,
-      stopDisabled: null,
-      progActive: null,
-      dropZoneInert: null,
-    };
+    function syncDisabled(element, disabled) {
+      if (element.disabled === disabled) return;
+      element.disabled = disabled;
+    }
     function updateUIState() {
       const s = AppState.status;
       const isBusy = AppState.isBusy;
-      if (UI_CACHE.parseDisabled !== isBusy) {
-        UI_CACHE.parseDisabled = isBusy;
-        domElements.parseBtn.disabled = isBusy;
-      }
-      const startDisabled = isBusy || AppState.records.length === 0;
-      if (UI_CACHE.startDisabled !== startDisabled) {
-        UI_CACHE.startDisabled = startDisabled;
-        domElements.startBtn.disabled = startDisabled;
-      }
-      const pauseDisabled = s !== "running";
-      if (UI_CACHE.pauseDisabled !== pauseDisabled) {
-        UI_CACHE.pauseDisabled = pauseDisabled;
-        domElements.pauseBtn.disabled = pauseDisabled;
-      }
-      const resumeDisabled = s !== "paused";
-      if (UI_CACHE.resumeDisabled !== resumeDisabled) {
-        UI_CACHE.resumeDisabled = resumeDisabled;
-        domElements.resumeBtn.disabled = resumeDisabled;
-      }
+      syncDisabled(domElements.parseBtn, isBusy);
+      syncDisabled(
+        domElements.startBtn,
+        isBusy || AppState.records.length === 0,
+      );
+      syncDisabled(domElements.pauseBtn, s !== "running");
+      syncDisabled(domElements.resumeBtn, s !== "paused");
       const stopDisabled = !(AppState.isRunning || s === "parsing") ||
         s === "stopping";
-      if (UI_CACHE.stopDisabled !== stopDisabled) {
-        UI_CACHE.stopDisabled = stopDisabled;
-        domElements.stopBtn.disabled = stopDisabled;
-      }
+      syncDisabled(domElements.stopBtn, stopDisabled);
       const progActive = s === "running" || s === "pausing";
-      if (UI_CACHE.progActive !== progActive) {
-        UI_CACHE.progActive = progActive;
-        domElements.progShell.classList.toggle("active", progActive);
-      }
-      if (UI_CACHE.dropZoneInert !== isBusy) {
-        UI_CACHE.dropZoneInert = isBusy;
-        domElements.dropZone.toggleAttribute("inert", isBusy);
-      }
+      domElements.progShell.classList.toggle("active", progActive);
+      domElements.dropZone.toggleAttribute("inert", isBusy);
     }
-    const STATUS_CACHE = { msg: null, type: null };
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     const RX_STATUS_PROGRESS = /^처리 중… \(([\d,]+)\/([\d,]+)\)$/;
     let statusLiveTimer = 0;
@@ -3751,16 +3513,12 @@
     function setStatusMessage(msg, type = "info") {
       const el = domElements.status;
       const nextMsg = String(msg ?? "");
-      if (STATUS_CACHE.msg !== nextMsg) {
-        STATUS_CACHE.msg = nextMsg;
+      if (el.textContent !== nextMsg) {
         el.textContent = nextMsg;
       }
-      if (STATUS_CACHE.type !== type) {
-        STATUS_CACHE.type = type;
-        el.classList.toggle("err", type === "error");
-        el.classList.toggle("warn", type === "warn");
-        el.classList.toggle("stopped", type === "stopped");
-      }
+      el.classList.toggle("err", type === "error");
+      el.classList.toggle("warn", type === "warn");
+      el.classList.toggle("stopped", type === "stopped");
       announceStatusMessage(nextMsg, type);
     }
     const FILE_READY_HINT = "파일 업로드 완료! 좌표 추출을 눌러주세요.";
@@ -3888,10 +3646,6 @@
       }
       return new Promise((resolve) => {
         const waitSignal = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
-        if (waitSignal.aborted) {
-          resolve();
-          return;
-        }
         waitSignal.addEventListener("abort", resolve, { once: true });
       }).then(() => {
         signal.throwIfAborted();
@@ -4371,8 +4125,7 @@
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
-      let hasResultsClass = RENDER_CACHE.hasResults ??
-        wrap.classList.contains("has-results");
+      let hasResultsClass = RENDER_CACHE.hasResults;
       let lastStatusUpdate = 0;
       let lastYield = performance.now();
       let pendingFrag = null;
@@ -4395,8 +4148,8 @@
           if (AppState.status === "pausing") {
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-            const resumeHandler =
-              (AppState.resumeHandler ??= Promise.withResolvers());
+            const resumeHandler = Promise.withResolvers();
+            AppState.resumeHandler = resumeHandler;
             scheduleRender();
             await resumeHandler.promise;
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
@@ -4585,11 +4338,7 @@
       setStatusMessage(message, type);
     }
     function getErrorMessage(err) {
-      try {
-        return String(err?.message || err);
-      } catch {
-        return "Unknown error";
-      }
+      return String(err?.message || err);
     }
     function commitResultRow(tr, r, wrap, f) {
       const connected = tr.isConnected;
@@ -4857,7 +4606,7 @@
       "--resume": () => {
         if (!AppState.isPaused) return;
         AppState.setStatus("running");
-        AppState.resumeHandler?.resolve();
+        AppState.resumeHandler.resolve();
         AppState.resumeHandler = null;
       },
       "--stop": () => {
@@ -4867,12 +4616,8 @@
         resetScrollShadowState(domElements.coords);
         AppState.resumeHandler?.resolve();
         AppState.resumeHandler = null;
-        if (AppState.controller) {
-          AppState.controller.abort();
-          setStatusMessage("중지 요청됨. 취소 중…", "warn");
-        } else {
-          setStatusMessage("중지 요청됨. 정리 중…", "warn");
-        }
+        AppState.controller.abort();
+        setStatusMessage("중지 요청됨. 취소 중…", "warn");
       },
       "--export": handleExport,
       "--filter-clear": () => {
@@ -5236,8 +4981,8 @@
         return seen | mask;
       }
       function fillDataFieldsFromU64(v, data) {
-        const bytes = u64ToBytesBe(v);
-        for (const byte of bytes) {
+        for (const shift of U64_BYTE_SHIFTS) {
+          const byte = Number((v >> shift) & 0xffn);
           if (byte > 249) {
             continue;
           }
@@ -5378,7 +5123,8 @@
           attempt < SUPPLEMENTAL_RETRY_LIMIT;
           attempt++
         ) {
-          for (const byte of u64ToBytesBe(luckyStarSource)) {
+          for (const shift of U64_BYTE_SHIFTS) {
+            const byte = Number((luckyStarSource >> shift) & 0xffn);
             if (byte > 251) {
               continue;
             }
@@ -5508,62 +5254,41 @@
       }
       function hexU16Min3(value) {
         const v = value & 0xffff;
-        if (v < 0x1000) {
-          return v.toString(16).toUpperCase().padStart(3, "0");
-        }
-        return v.toString(16).toUpperCase();
+        return v.toString(16).toUpperCase().padStart(3, "0");
       }
       function formatOutput(data) {
         const v = data.num_64;
         const bytes = u64ToBytesBe(v);
         const b0 = bytes[0];
         const hexBytes = bytes.map(hexByte);
-        const lines = [];
-        lines.push(
+        return [
           `64비트 난수: ${v.toString(10)} (유부호 정수: ${BigInt.asIntN(64, v).toString(10)
           })`,
-        );
-        lines.push(
           `2진수: ${bytes.map((b) => b.toString(2).padStart(8, "0")).join(" ")
           }`,
-        );
-        lines.push(`8진수: ${v.toString(8)}`);
-        lines.push(`16진수: ${hexBytes.join(" ")}`);
-        lines.push(
+          `8진수: ${v.toString(8)}`,
+          `16진수: ${hexBytes.join(" ")}`,
           `Hex 코드: #${hexBytes[0]}${hexBytes[1]}${hexBytes[2]} #${hexBytes[3]
           }${hexBytes[4]}${hexBytes[5]}`,
-        );
-        lines.push(`바이트 배열: ${bytes.join(" ")}`);
-        lines.push(
+          `바이트 배열: ${bytes.join(" ")}`,
           `6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}`,
-        );
-        lines.push(`8자리 비밀번호: ${data.password.join("")}`);
-        lines.push(`로또 번호: ${data.lotto_numbers.join(" ")}`);
-        lines.push(`일본 로또 7 번호: ${data.lotto7_numbers.join(" ")}`);
-        lines.push(
+          `8자리 비밀번호: ${data.password.join("")}`,
+          `로또 번호: ${data.lotto_numbers.join(" ")}`,
+          `일본 로또 7 번호: ${data.lotto7_numbers.join(" ")}`,
           `유로밀리언 번호: ${data.euro_millions_main_numbers.join(" ")} + ${data.euro_millions_lucky_stars.join(" ")
           }`,
-        );
-        lines.push(`한글 음절 4글자: ${data.hangul_syllables.join("")}`);
-        lines.push(
+          `한글 음절 4글자: ${data.hangul_syllables.join("")}`,
           `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
-        );
-        lines.push(
           `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
-        );
-        lines.push(`NMS 은하 번호: ${(b0 + 1).toString(10)}`);
-        lines.push(
+          `NMS 은하 번호: ${(b0 + 1).toString(10)}`,
           `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
           } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
           } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")
           })`,
-        );
-        lines.push(
           `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)
           }:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)
           }`,
-        );
-        return lines.join("\n");
+        ].join("\n");
       }
       const MANUAL_GENERATION_HARD_LIMIT = 10_000;
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;

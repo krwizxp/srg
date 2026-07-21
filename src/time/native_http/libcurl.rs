@@ -17,6 +17,20 @@ use std::{
     time::{Instant, SystemTime},
 };
 mod sys;
+macro_rules! curl_setopt {
+    ($handle:expr, $option:expr, $value:expr, $context:expr) => {{
+        // SAFETY: call sites pair each option with a wrapper using its documented libcurl ABI type.
+        let code = unsafe { sys::curl_easy_setopt($handle.as_ptr(), $option, $value) };
+        if code == CURLE_OK {
+            Ok(())
+        } else {
+            Err(error(
+                $context,
+                curl_error("curl_easy_setopt", code),
+            ))
+        }
+    }};
+}
 const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
 const CURL_GLOBAL_DEFAULT: c_long = 3;
@@ -98,53 +112,14 @@ struct CurlVersionInfoData {
     version: *const c_char,
     version_num: c_uint,
 }
-cfg_select! {
-    target_pointer_width = "64" => {
-        const _: () = assert!(
-            size_of::<CurlVersionInfoData>() == 24,
-            "libcurl version info prefix x64 size mismatch"
-        );
-        const _: () = assert!(
-            align_of::<CurlVersionInfoData>() == 8,
-            "libcurl version info prefix x64 align mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, age) == 0,
-            "libcurl version info prefix x64 age offset mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, version) == 8,
-            "libcurl version info prefix x64 version offset mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, version_num) == 16,
-            "libcurl version info prefix x64 version number offset mismatch"
-        );
-    }
-    target_pointer_width = "32" => {
-        const _: () = assert!(
-            size_of::<CurlVersionInfoData>() == 12,
-            "libcurl version info prefix x86 size mismatch"
-        );
-        const _: () = assert!(
-            align_of::<CurlVersionInfoData>() == 4,
-            "libcurl version info prefix x86 align mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, age) == 0,
-            "libcurl version info prefix x86 age offset mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, version) == 4,
-            "libcurl version info prefix x86 version offset mismatch"
-        );
-        const _: () = assert!(
-            offset_of!(CurlVersionInfoData, version_num) == 8,
-            "libcurl version info prefix x86 version number offset mismatch"
-        );
-    }
-    _ => {}
-}
+const _: () = assert!(
+    size_of::<CurlVersionInfoData>() == size_of::<[*const c_char; 3]>()
+        && align_of::<CurlVersionInfoData>() == align_of::<*const c_char>()
+        && offset_of!(CurlVersionInfoData, age) == 0
+        && offset_of!(CurlVersionInfoData, version) == size_of::<*const c_char>()
+        && offset_of!(CurlVersionInfoData, version_num) == size_of::<[*const c_char; 2]>(),
+    "libcurl version info prefix ABI mismatch"
+);
 #[derive(Default)]
 pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
@@ -251,40 +226,16 @@ impl EasyHandle {
         value: unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize,
         context: &str,
     ) -> Result<()> {
-        // SAFETY: value is a libcurl-compatible callback function pointer.
-        let code = unsafe { sys::curl_easy_setopt(self.as_ptr(), option, value) };
-        if code == CURLE_OK {
-            Ok(())
-        } else {
-            Err(error(context, curl_error("curl_easy_setopt", code)))
-        }
+        curl_setopt!(self, option, value, context)
     }
     fn setopt_long(&self, option: CurlOption, value: c_long, context: &str) -> Result<()> {
-        // SAFETY: value is a scalar option value for the given CurlOption.
-        let code = unsafe { sys::curl_easy_setopt(self.as_ptr(), option, value) };
-        if code == CURLE_OK {
-            Ok(())
-        } else {
-            Err(error(context, curl_error("curl_easy_setopt", code)))
-        }
+        curl_setopt!(self, option, value, context)
     }
     fn setopt_ptr<T>(&self, option: CurlOption, value: *mut T, context: &str) -> Result<()> {
-        // SAFETY: value is a pointer option that remains valid for the transfer duration.
-        let code = unsafe { sys::curl_easy_setopt(self.as_ptr(), option, value) };
-        if code == CURLE_OK {
-            Ok(())
-        } else {
-            Err(error(context, curl_error("curl_easy_setopt", code)))
-        }
+        curl_setopt!(self, option, value, context)
     }
     fn setopt_str(&self, option: CurlOption, value: *const c_char, context: &str) -> Result<()> {
-        // SAFETY: value is a valid NUL-terminated string that outlives the setopt call.
-        let code = unsafe { sys::curl_easy_setopt(self.as_ptr(), option, value) };
-        if code == CURLE_OK {
-            Ok(())
-        } else {
-            Err(error(context, curl_error("curl_easy_setopt", code)))
-        }
+        curl_setopt!(self, option, value, context)
     }
 }
 impl Client {

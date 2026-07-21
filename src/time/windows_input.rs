@@ -2,6 +2,16 @@ use crate::write_line_best_effort;
 use super::{NativeInputSendStatus, TriggerAction};
 use core::mem::{align_of, offset_of, size_of};
 use std::io::Write;
+macro_rules! assert_ffi_layout {
+    ($type:ty, $size:expr, $align:expr, $($field:ident: $offset:expr),+ $(,)?) => {
+        const _: () = assert!(
+            size_of::<$type>() == $size
+                && align_of::<$type>() == $align
+                $(&& offset_of!($type, $field) == $offset)+,
+            concat!(stringify!($type), " ABI layout mismatch")
+        );
+    };
+}
 const INPUT_MOUSE: u32 = 0;
 const INPUT_KEYBOARD: u32 = 1;
 const KEYEVENTF_KEYDOWN: u32 = 0;
@@ -56,46 +66,26 @@ unsafe extern "system" {
 }
 cfg_select! {
     target_pointer_width = "64" => {
-        const _: () = assert!(size_of::<MouseInput>() == 32, "Windows MOUSEINPUT x64 size mismatch");
-        const _: () = assert!(align_of::<MouseInput>() == 8, "Windows MOUSEINPUT x64 align mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dx) == 0, "Windows MOUSEINPUT x64 dx offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dy) == 4, "Windows MOUSEINPUT x64 dy offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, mouse_data) == 8, "Windows MOUSEINPUT x64 data offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dw_flags) == 12, "Windows MOUSEINPUT x64 flags offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, time) == 16, "Windows MOUSEINPUT x64 time offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dw_extra_info) == 24, "Windows MOUSEINPUT x64 extra offset mismatch");
-        const _: () = assert!(size_of::<KeybdInput>() == 24, "Windows KEYBDINPUT x64 size mismatch");
-        const _: () = assert!(align_of::<KeybdInput>() == 8, "Windows KEYBDINPUT x64 align mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, w_vk) == 0, "Windows KEYBDINPUT x64 vk offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, w_scan) == 2, "Windows KEYBDINPUT x64 scan offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, dw_flags) == 4, "Windows KEYBDINPUT x64 flags offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, time) == 8, "Windows KEYBDINPUT x64 time offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, dw_extra_info) == 16, "Windows KEYBDINPUT x64 extra offset mismatch");
-        const _: () = assert!(size_of::<Input>() == 40, "Windows INPUT x64 size mismatch");
-        const _: () = assert!(align_of::<Input>() == 8, "Windows INPUT x64 align mismatch");
-        const _: () = assert!(offset_of!(Input, r#type) == 0, "Windows INPUT x64 type offset mismatch");
-        const _: () = assert!(offset_of!(Input, union) == 8, "Windows INPUT x64 union offset mismatch");
+        assert_ffi_layout!(
+            MouseInput, 32, 8,
+            dx: 0, dy: 4, mouse_data: 8, dw_flags: 12, time: 16, dw_extra_info: 24,
+        );
+        assert_ffi_layout!(
+            KeybdInput, 24, 8,
+            w_vk: 0, w_scan: 2, dw_flags: 4, time: 8, dw_extra_info: 16,
+        );
+        assert_ffi_layout!(Input, 40, 8, r#type: 0, union: 8);
     }
     target_pointer_width = "32" => {
-        const _: () = assert!(size_of::<MouseInput>() == 24, "Windows MOUSEINPUT x86 size mismatch");
-        const _: () = assert!(align_of::<MouseInput>() == 4, "Windows MOUSEINPUT x86 align mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dx) == 0, "Windows MOUSEINPUT x86 dx offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dy) == 4, "Windows MOUSEINPUT x86 dy offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, mouse_data) == 8, "Windows MOUSEINPUT x86 data offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dw_flags) == 12, "Windows MOUSEINPUT x86 flags offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, time) == 16, "Windows MOUSEINPUT x86 time offset mismatch");
-        const _: () = assert!(offset_of!(MouseInput, dw_extra_info) == 20, "Windows MOUSEINPUT x86 extra offset mismatch");
-        const _: () = assert!(size_of::<KeybdInput>() == 16, "Windows KEYBDINPUT x86 size mismatch");
-        const _: () = assert!(align_of::<KeybdInput>() == 4, "Windows KEYBDINPUT x86 align mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, w_vk) == 0, "Windows KEYBDINPUT x86 vk offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, w_scan) == 2, "Windows KEYBDINPUT x86 scan offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, dw_flags) == 4, "Windows KEYBDINPUT x86 flags offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, time) == 8, "Windows KEYBDINPUT x86 time offset mismatch");
-        const _: () = assert!(offset_of!(KeybdInput, dw_extra_info) == 12, "Windows KEYBDINPUT x86 extra offset mismatch");
-        const _: () = assert!(size_of::<Input>() == 28, "Windows INPUT x86 size mismatch");
-        const _: () = assert!(align_of::<Input>() == 4, "Windows INPUT x86 align mismatch");
-        const _: () = assert!(offset_of!(Input, r#type) == 0, "Windows INPUT x86 type offset mismatch");
-        const _: () = assert!(offset_of!(Input, union) == 4, "Windows INPUT x86 union offset mismatch");
+        assert_ffi_layout!(
+            MouseInput, 24, 4,
+            dx: 0, dy: 4, mouse_data: 8, dw_flags: 12, time: 16, dw_extra_info: 20,
+        );
+        assert_ffi_layout!(
+            KeybdInput, 16, 4,
+            w_vk: 0, w_scan: 2, dw_flags: 4, time: 8, dw_extra_info: 12,
+        );
+        assert_ffi_layout!(Input, 28, 4, r#type: 0, union: 4);
     }
     _ => {}
 }

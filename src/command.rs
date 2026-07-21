@@ -56,37 +56,36 @@ impl CliCommand {
         match self {
             #[cfg(target_arch = "x86_64")]
             Self::Generate { count } => {
-                let rng = Self::hardware_rng(&mut err)?;
-                let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
-                regenerate_with_count(&mut output_file, &rng, count, &mut out)?;
-                Self::write_rdseed_fallback_notice(&rng, &mut err)?;
+                Self::run_with_rng(&mut err, |rng| {
+                    let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+                    regenerate_with_count(&mut output_file, rng, count, &mut out)?;
+                    Ok(())
+                })?;
             }
             #[cfg(target_arch = "x86_64")]
             Self::Ladder { players, results } => {
-                let rng = Self::hardware_rng(&mut err)?;
-                let seed = rng.next_u64()?;
-                write_ladder_results(
-                    players.split(',').map(str::trim),
-                    results.split(',').map(str::trim),
-                    seed,
-                    &rng,
-                    &mut out,
-                )?;
-                Self::write_rdseed_fallback_notice(&rng, &mut err)?;
+                Self::run_with_rng(&mut err, |rng| {
+                    let seed = rng.next_u64()?;
+                    write_ladder_results(
+                        players.split(',').map(str::trim),
+                        results.split(',').map(str::trim),
+                        seed,
+                        rng,
+                        &mut out,
+                    )
+                })?;
             }
             #[cfg(target_arch = "x86_64")]
             Self::RandomFloat { max, min } => {
-                let rng = Self::hardware_rng(&mut err)?;
-                let seed = rng.next_u64()?;
-                generate_random_float(min, max, seed, &mut out, &rng)?;
-                Self::write_rdseed_fallback_notice(&rng, &mut err)?;
+                Self::run_with_rng(&mut err, |rng| {
+                    generate_random_float(min, max, rng.next_u64()?, &mut out, rng)
+                })?;
             }
             #[cfg(target_arch = "x86_64")]
             Self::RandomInteger { max, min } => {
-                let rng = Self::hardware_rng(&mut err)?;
-                let seed = rng.next_u64()?;
-                generate_random_integer(min, max, seed, &mut out, &rng)?;
-                Self::write_rdseed_fallback_notice(&rng, &mut err)?;
+                Self::run_with_rng(&mut err, |rng| {
+                    generate_random_integer(min, max, rng.next_u64()?, &mut out, rng)
+                })?;
             }
             Self::TimeObserve { host, seconds } => {
                 ServerTimeSession {
@@ -99,18 +98,6 @@ impl CliCommand {
             }
         }
         Ok(ExitCode::SUCCESS)
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn hardware_rng(err: &mut dyn Write) -> Result<HardwareRng> {
-        let rng = HardwareRng::new();
-        match rng.source() {
-            HardwareRandomSource::None => Err("RDSEED·RDRAND를 지원하지 않는 CPU입니다.".into()),
-            HardwareRandomSource::RdRand => {
-                writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
-                Ok(rng)
-            }
-            HardwareRandomSource::RdSeed => Ok(rng),
-        }
     }
     #[cfg(target_arch = "x86_64")]
     fn owned_text(arg: OsString, label: &str) -> Result<String> {
@@ -134,6 +121,25 @@ impl CliCommand {
         })
     }
     #[cfg(target_arch = "x86_64")]
+    fn run_with_rng<T>(
+        err: &mut dyn Write,
+        run: impl FnOnce(&HardwareRng) -> Result<T>,
+    ) -> Result<T> {
+        let rng = HardwareRng::new();
+        let source = rng.source();
+        if source == HardwareRandomSource::None {
+            return Err("RDSEED·RDRAND를 지원하지 않는 CPU입니다.".into());
+        }
+        if source == HardwareRandomSource::RdRand {
+            writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
+        }
+        let result = run(&rng)?;
+        if rng.take_rdseed_fallback_notice() {
+            writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
+        }
+        Ok(result)
+    }
+    #[cfg(target_arch = "x86_64")]
     fn take_two_args<I>(args: &mut I, usage: &str) -> Result<(OsString, OsString)>
     where
         I: Iterator<Item = OsString>,
@@ -142,13 +148,6 @@ impl CliCommand {
             return Err(AppError::message(format!("사용법: srg {usage}")));
         };
         Ok((first, second))
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn write_rdseed_fallback_notice(rng: &HardwareRng, err: &mut dyn Write) -> Result<()> {
-        if rng.take_rdseed_fallback_notice() {
-            writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
-        }
-        Ok(())
     }
 }
 impl<I> TryFrom<(OsString, I)> for CliCommand

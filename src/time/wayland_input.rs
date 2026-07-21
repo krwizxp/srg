@@ -15,6 +15,25 @@ use std::{
     time::Instant,
 };
 mod sys;
+macro_rules! dynamic_api {
+    ($api:ident, $library:expr, $name:literal, {$($field:ident: $field_type:ty = $symbol:expr),+ $(,)?}) => {
+        struct $api {
+            _library: Library,
+            $($field: $field_type,)+
+        }
+        impl DynamicApi for $api {
+            const LIBRARY: &'static CStr = $library;
+            const NAME: &'static str = $name;
+            fn from_library(library: Library) -> InputResult<Self> {
+                $(let $field = library.typed_symbol::<$field_type>($symbol)?;)+
+                Ok(Self {
+                    _library: library,
+                    $($field,)+
+                })
+            }
+        }
+    };
+}
 const BTN_LEFT: c_uint = 0x0110;
 const DELIVERY_TIMEOUT: Duration = Duration::from_secs(2);
 const DL_NOW: c_int = 2;
@@ -86,42 +105,8 @@ struct PollFd {
 const _: () = assert!(size_of::<PollFd>() == 8, "pollfd size mismatch");
 const _: () = assert!(align_of::<PollFd>() == 4, "pollfd align mismatch");
 type PollDescriptorCount = c_ulong;
-type EiConfigureName = unsafe extern "C" fn(*mut Ei, *const c_char);
-type EiDeviceButtonButton = unsafe extern "C" fn(*mut EiDevice, c_uint, bool);
-type EiDeviceClose = unsafe extern "C" fn(*mut EiDevice);
-type EiDeviceFrame = unsafe extern "C" fn(*mut EiDevice, u64);
-type EiDeviceHasCapability = unsafe extern "C" fn(*mut EiDevice, c_int) -> bool;
-type EiDeviceKeyboardKey = unsafe extern "C" fn(*mut EiDevice, c_uint, bool);
-type EiDeviceRef = unsafe extern "C" fn(*mut EiDevice) -> *mut EiDevice;
-type EiDeviceStartEmulating = unsafe extern "C" fn(*mut EiDevice, c_uint);
-type EiDeviceStopEmulating = unsafe extern "C" fn(*mut EiDevice);
-type EiDeviceUnref = unsafe extern "C" fn(*mut EiDevice) -> *mut EiDevice;
-type EiDispatch = unsafe extern "C" fn(*mut Ei);
-type EiEventGetDevice = unsafe extern "C" fn(*mut EiEvent) -> *mut EiDevice;
-type EiEventGetSeat = unsafe extern "C" fn(*mut EiEvent) -> *mut EiSeat;
-type EiEventGetType = unsafe extern "C" fn(*mut EiEvent) -> c_int;
-type EiEventPongGetPing = unsafe extern "C" fn(*mut EiEvent) -> *mut EiPing;
-type EiEventUnref = unsafe extern "C" fn(*mut EiEvent) -> *mut EiEvent;
-type EiGetEvent = unsafe extern "C" fn(*mut Ei) -> *mut EiEvent;
-type EiGetFd = unsafe extern "C" fn(*mut Ei) -> c_int;
-type EiNewPing = unsafe extern "C" fn(*mut Ei) -> *mut EiPing;
-type EiNewSender = unsafe extern "C" fn(*mut c_void) -> *mut Ei;
-type EiNow = unsafe extern "C" fn(*mut Ei) -> u64;
-type EiPingRequest = unsafe extern "C" fn(*mut EiPing);
-type EiPingUnref = unsafe extern "C" fn(*mut EiPing) -> *mut EiPing;
-type EiSeatBindCapabilities = unsafe extern "C" fn(*mut EiSeat, ...);
-type EiSetupBackendFd = unsafe extern "C" fn(*mut Ei, c_int) -> c_int;
-type EiUnref = unsafe extern "C" fn(*mut Ei) -> *mut Ei;
 type InputError = Cow<'static, str>;
 type InputResult<T> = Result<T, InputError>;
-type OeffisCreateSession = unsafe extern "C" fn(*mut Oeffis, c_uint);
-type OeffisDispatch = unsafe extern "C" fn(*mut Oeffis);
-type OeffisGetEisFd = unsafe extern "C" fn(*mut Oeffis) -> c_int;
-type OeffisGetErrorMessage = unsafe extern "C" fn(*mut Oeffis) -> *const c_char;
-type OeffisGetEvent = unsafe extern "C" fn(*mut Oeffis) -> c_int;
-type OeffisGetFd = unsafe extern "C" fn(*mut Oeffis) -> c_int;
-type OeffisNew = unsafe extern "C" fn(*mut c_void) -> *mut Oeffis;
-type OeffisUnref = unsafe extern "C" fn(*mut Oeffis) -> *mut Oeffis;
 trait DynamicApi: Sized {
     const LIBRARY: &'static CStr;
     const NAME: &'static str;
@@ -144,35 +129,34 @@ union DlsymSymbol<F: Copy> {
     raw: *mut c_void,
     typed: F,
 }
-struct EiApi {
-    _library: Library,
-    configure_name: EiConfigureName,
-    device_button_button: EiDeviceButtonButton,
-    device_close: EiDeviceClose,
-    device_frame: EiDeviceFrame,
-    device_has_capability: EiDeviceHasCapability,
-    device_keyboard_key: EiDeviceKeyboardKey,
-    device_ref: EiDeviceRef,
-    device_start_emulating: EiDeviceStartEmulating,
-    device_stop_emulating: EiDeviceStopEmulating,
-    device_unref: EiDeviceUnref,
-    dispatch: EiDispatch,
-    event_get_device: EiEventGetDevice,
-    event_get_seat: EiEventGetSeat,
-    event_get_type: EiEventGetType,
-    event_pong_get_ping: EiEventPongGetPing,
-    event_unref: EiEventUnref,
-    get_event: EiGetEvent,
-    get_fd: EiGetFd,
-    new_ping: EiNewPing,
-    new_sender: EiNewSender,
-    now: EiNow,
-    ping: EiPingRequest,
-    ping_unref: EiPingUnref,
-    seat_bind_capabilities: EiSeatBindCapabilities,
-    setup_backend_fd: EiSetupBackendFd,
-    unref: EiUnref,
-}
+dynamic_api!(EiApi, LIBEI, "libei", {
+    configure_name: unsafe extern "C" fn(*mut Ei, *const c_char) = c"ei_configure_name",
+    device_button_button: unsafe extern "C" fn(*mut EiDevice, c_uint, bool) = c"ei_device_button_button",
+    device_close: unsafe extern "C" fn(*mut EiDevice) = c"ei_device_close",
+    device_frame: unsafe extern "C" fn(*mut EiDevice, u64) = c"ei_device_frame",
+    device_has_capability: unsafe extern "C" fn(*mut EiDevice, c_int) -> bool = c"ei_device_has_capability",
+    device_keyboard_key: unsafe extern "C" fn(*mut EiDevice, c_uint, bool) = c"ei_device_keyboard_key",
+    device_ref: unsafe extern "C" fn(*mut EiDevice) -> *mut EiDevice = c"ei_device_ref",
+    device_start_emulating: unsafe extern "C" fn(*mut EiDevice, c_uint) = c"ei_device_start_emulating",
+    device_stop_emulating: unsafe extern "C" fn(*mut EiDevice) = c"ei_device_stop_emulating",
+    device_unref: unsafe extern "C" fn(*mut EiDevice) -> *mut EiDevice = c"ei_device_unref",
+    dispatch: unsafe extern "C" fn(*mut Ei) = c"ei_dispatch",
+    event_get_device: unsafe extern "C" fn(*mut EiEvent) -> *mut EiDevice = c"ei_event_get_device",
+    event_get_seat: unsafe extern "C" fn(*mut EiEvent) -> *mut EiSeat = c"ei_event_get_seat",
+    event_get_type: unsafe extern "C" fn(*mut EiEvent) -> c_int = c"ei_event_get_type",
+    event_pong_get_ping: unsafe extern "C" fn(*mut EiEvent) -> *mut EiPing = c"ei_event_pong_get_ping",
+    event_unref: unsafe extern "C" fn(*mut EiEvent) -> *mut EiEvent = c"ei_event_unref",
+    get_event: unsafe extern "C" fn(*mut Ei) -> *mut EiEvent = c"ei_get_event",
+    get_fd: unsafe extern "C" fn(*mut Ei) -> c_int = c"ei_get_fd",
+    new_ping: unsafe extern "C" fn(*mut Ei) -> *mut EiPing = c"ei_new_ping",
+    new_sender: unsafe extern "C" fn(*mut c_void) -> *mut Ei = c"ei_new_sender",
+    now: unsafe extern "C" fn(*mut Ei) -> u64 = c"ei_now",
+    ping: unsafe extern "C" fn(*mut EiPing) = c"ei_ping",
+    ping_unref: unsafe extern "C" fn(*mut EiPing) -> *mut EiPing = c"ei_ping_unref",
+    seat_bind_capabilities: unsafe extern "C" fn(*mut EiSeat, ...) = c"ei_seat_bind_capabilities",
+    setup_backend_fd: unsafe extern "C" fn(*mut Ei, c_int) -> c_int = c"ei_setup_backend_fd",
+    unref: unsafe extern "C" fn(*mut Ei) -> *mut Ei = c"ei_unref",
+});
 struct EiSession {
     action: TriggerAction,
     api: EiApi,
@@ -183,17 +167,16 @@ struct EiSession {
 struct Library {
     handle: NonNull<c_void>,
 }
-struct PortalApi {
-    _library: Library,
-    create_session: OeffisCreateSession,
-    dispatch: OeffisDispatch,
-    get_eis_fd: OeffisGetEisFd,
-    get_error_message: OeffisGetErrorMessage,
-    get_event: OeffisGetEvent,
-    get_fd: OeffisGetFd,
-    new: OeffisNew,
-    unref: OeffisUnref,
-}
+dynamic_api!(PortalApi, LIBOEFFIS, "liboeffis", {
+    create_session: unsafe extern "C" fn(*mut Oeffis, c_uint) = c"oeffis_create_session",
+    dispatch: unsafe extern "C" fn(*mut Oeffis) = c"oeffis_dispatch",
+    get_eis_fd: unsafe extern "C" fn(*mut Oeffis) -> c_int = c"oeffis_get_eis_fd",
+    get_error_message: unsafe extern "C" fn(*mut Oeffis) -> *const c_char = c"oeffis_get_error_message",
+    get_event: unsafe extern "C" fn(*mut Oeffis) -> c_int = c"oeffis_get_event",
+    get_fd: unsafe extern "C" fn(*mut Oeffis) -> c_int = c"oeffis_get_fd",
+    new: unsafe extern "C" fn(*mut c_void) -> *mut Oeffis = c"oeffis_new",
+    unref: unsafe extern "C" fn(*mut Oeffis) -> *mut Oeffis = c"oeffis_unref",
+});
 struct PortalSession {
     api: PortalApi,
     context: NonNull<Oeffis>,
@@ -294,76 +277,6 @@ impl EiApi {
         unsafe {
             (self.device_keyboard_key)(device.as_ptr(), F5_KEY_CODE, is_press);
         }
-    }
-}
-impl DynamicApi for EiApi {
-    const LIBRARY: &'static CStr = LIBEI;
-    const NAME: &'static str = "libei";
-    fn from_library(library: Library) -> InputResult<Self> {
-        let configure_name = library.typed_symbol::<EiConfigureName>(c"ei_configure_name")?;
-        let device_button_button =
-            library.typed_symbol::<EiDeviceButtonButton>(c"ei_device_button_button")?;
-        let device_close = library.typed_symbol::<EiDeviceClose>(c"ei_device_close")?;
-        let device_frame = library.typed_symbol::<EiDeviceFrame>(c"ei_device_frame")?;
-        let device_has_capability =
-            library.typed_symbol::<EiDeviceHasCapability>(c"ei_device_has_capability")?;
-        let device_keyboard_key =
-            library.typed_symbol::<EiDeviceKeyboardKey>(c"ei_device_keyboard_key")?;
-        let device_ref = library.typed_symbol::<EiDeviceRef>(c"ei_device_ref")?;
-        let device_start_emulating =
-            library.typed_symbol::<EiDeviceStartEmulating>(c"ei_device_start_emulating")?;
-        let device_stop_emulating =
-            library.typed_symbol::<EiDeviceStopEmulating>(c"ei_device_stop_emulating")?;
-        let device_unref = library.typed_symbol::<EiDeviceUnref>(c"ei_device_unref")?;
-        let dispatch = library.typed_symbol::<EiDispatch>(c"ei_dispatch")?;
-        let event_get_device =
-            library.typed_symbol::<EiEventGetDevice>(c"ei_event_get_device")?;
-        let event_get_seat = library.typed_symbol::<EiEventGetSeat>(c"ei_event_get_seat")?;
-        let event_get_type = library.typed_symbol::<EiEventGetType>(c"ei_event_get_type")?;
-        let event_pong_get_ping =
-            library.typed_symbol::<EiEventPongGetPing>(c"ei_event_pong_get_ping")?;
-        let event_unref = library.typed_symbol::<EiEventUnref>(c"ei_event_unref")?;
-        let get_event = library.typed_symbol::<EiGetEvent>(c"ei_get_event")?;
-        let get_fd = library.typed_symbol::<EiGetFd>(c"ei_get_fd")?;
-        let new_ping = library.typed_symbol::<EiNewPing>(c"ei_new_ping")?;
-        let new_sender = library.typed_symbol::<EiNewSender>(c"ei_new_sender")?;
-        let now = library.typed_symbol::<EiNow>(c"ei_now")?;
-        let ping = library.typed_symbol::<EiPingRequest>(c"ei_ping")?;
-        let ping_unref = library.typed_symbol::<EiPingUnref>(c"ei_ping_unref")?;
-        let seat_bind_capabilities = library
-            .typed_symbol::<EiSeatBindCapabilities>(c"ei_seat_bind_capabilities")?;
-        let setup_backend_fd =
-            library.typed_symbol::<EiSetupBackendFd>(c"ei_setup_backend_fd")?;
-        let unref = library.typed_symbol::<EiUnref>(c"ei_unref")?;
-        Ok(Self {
-            _library: library,
-            configure_name,
-            device_button_button,
-            device_close,
-            device_frame,
-            device_has_capability,
-            device_keyboard_key,
-            device_ref,
-            device_start_emulating,
-            device_stop_emulating,
-            device_unref,
-            dispatch,
-            event_get_device,
-            event_get_seat,
-            event_get_type,
-            event_pong_get_ping,
-            event_unref,
-            get_event,
-            get_fd,
-            new_ping,
-            new_sender,
-            now,
-            ping,
-            ping_unref,
-            seat_bind_capabilities,
-            setup_backend_fd,
-            unref,
-        })
     }
 }
 impl EiSession {
@@ -655,33 +568,6 @@ impl PollFd {
             events: POLLIN,
             revents: 0,
         }
-    }
-}
-impl DynamicApi for PortalApi {
-    const LIBRARY: &'static CStr = LIBOEFFIS;
-    const NAME: &'static str = "liboeffis";
-    fn from_library(library: Library) -> InputResult<Self> {
-        let create_session =
-            library.typed_symbol::<OeffisCreateSession>(c"oeffis_create_session")?;
-        let dispatch = library.typed_symbol::<OeffisDispatch>(c"oeffis_dispatch")?;
-        let get_eis_fd = library.typed_symbol::<OeffisGetEisFd>(c"oeffis_get_eis_fd")?;
-        let get_error_message =
-            library.typed_symbol::<OeffisGetErrorMessage>(c"oeffis_get_error_message")?;
-        let get_event = library.typed_symbol::<OeffisGetEvent>(c"oeffis_get_event")?;
-        let get_fd = library.typed_symbol::<OeffisGetFd>(c"oeffis_get_fd")?;
-        let new = library.typed_symbol::<OeffisNew>(c"oeffis_new")?;
-        let unref = library.typed_symbol::<OeffisUnref>(c"oeffis_unref")?;
-        Ok(Self {
-            _library: library,
-            create_session,
-            dispatch,
-            get_eis_fd,
-            get_error_message,
-            get_event,
-            get_fd,
-            new,
-            unref,
-        })
     }
 }
 impl PortalSession {

@@ -19,11 +19,6 @@ cfg_select! {
         use self::random_data::generate_random_data_with_rng;
         use self::random_output::persist_and_print_random_data;
         use std::io::stderr;
-    }
-    _ => {}
-}
-cfg_select! {
-    target_arch = "x86_64" => {
         mod batch;
         mod hardware_rng;
         mod ladder;

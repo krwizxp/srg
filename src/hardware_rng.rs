@@ -85,12 +85,8 @@ impl HardwareRng {
     }
     fn rdseed_random(&self) -> Result<u64> {
         let mut value = 0_u64;
-        for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
-            // SAFETY: callers only use this after confirming `rdseed` support.
-            if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
-                return Ok(value);
-            }
-            spin_loop();
+        if Self::try_rdseed(&mut value) {
+            return Ok(value);
         }
         match self.current_source() {
             HardwareRandomSource::RdSeed => {}
@@ -99,12 +95,8 @@ impl HardwareRng {
         }
         let retry_started_at = Instant::now();
         while Instant::now().saturating_duration_since(retry_started_at) < RDSEED_TIMEOUT {
-            for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
-                // SAFETY: callers only use this after confirming `rdseed` support.
-                if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
-                    return Ok(value);
-                }
-                spin_loop();
+            if Self::try_rdseed(&mut value) {
+                return Ok(value);
             }
             match self.current_source() {
                 HardwareRandomSource::RdSeed => yield_now(),
@@ -132,5 +124,15 @@ impl HardwareRng {
     pub(super) fn take_rdseed_fallback_notice(&self) -> bool {
         self.fallback_notice_pending
             .swap(false, Ordering::Relaxed)
+    }
+    fn try_rdseed(value: &mut u64) -> bool {
+        for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
+            // SAFETY: callers only use this after confirming `rdseed` support.
+            if unsafe { _rdseed64_step(value) } == 1_i32 {
+                return true;
+            }
+            spin_loop();
+        }
+        false
     }
 }

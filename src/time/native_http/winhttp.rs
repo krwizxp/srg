@@ -450,10 +450,7 @@ impl Client {
     }
 }
 fn wide(value: &str, context: &str) -> Result<Vec<u16>> {
-    let capacity = value
-        .len()
-        .checked_add(1)
-        .ok_or_else(|| error(context, "wide 문자열 용량 계산 실패"))?;
+    let capacity = value.len().wrapping_add(1);
     let mut out = Vec::new();
     out.try_reserve_exact(capacity)
         .map_err(|source| error_with_source(context, "wide 문자열 메모리 확보 실패", source))?;
