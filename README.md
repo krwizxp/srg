@@ -62,17 +62,13 @@ srg time-observe <host> <seconds>
 
 `.github/workflows/ci.yml`은 `ubuntu-latest`, `macos-26-intel`, `macos-26`, `windows-latest`에서 release build를 확인합니다. `main` 브랜치와 태그 push 실행은 다음 Artifact를 생성하고, Pull Request 실행은 같은 release build를 확인합니다.
 
-- Linux Artifact 이름: `srg-linux-x64`
-  - 포함 파일: `srg-linux-x64.tar`
+- Linux Artifact: `srg-linux-x64.tar`
   - 내부 실행 파일: `srg-linux-x64`
-- macOS x64 Artifact 이름: `srg-macos-x64`
-  - 포함 파일: `srg-macos-x64.tar`
+- macOS x64 Artifact: `srg-macos-x64.tar`
   - 내부 실행 파일: `srg-macos-x64`
-- macOS arm64 Artifact 이름: `srg-macos-arm64`
-  - 포함 파일: `srg-macos-arm64.tar`
+- macOS arm64 Artifact: `srg-macos-arm64.tar`
   - 내부 실행 파일: `srg-macos-arm64`
-- Windows Artifact 이름: `srg-windows-x64`
-  - 포함 파일: `srg-windows-x64.exe`
+- Windows Artifact: `srg-windows-x64.exe`
 
 Linux/macOS는 실행 권한 보존을 위해 바이너리를 Rust 아티팩트 도구로 `tar`에 묶어 업로드합니다. macOS x64 산출물은 하드웨어 RNG 메뉴를 포함하고, macOS arm64 산출물은 비 x86_64 메뉴 구성을 사용합니다. Windows는 같은 도구로 빌드 결과를 `srg-windows-x64.exe`로 이름만 바꿔 그대로 업로드합니다.
 
@@ -83,8 +79,7 @@ Linux/macOS는 실행 권한 보존을 위해 바이너리를 Rust 아티팩트 
 - Runner: `ubuntu-latest`
 - 빌드: `cargo build --release --locked`
 - 캐시: 매 실행마다 새 빌드 사용
-- 고정 Artifact 이름: `srg-result-console-log`, 필요 시 `srg-result-random-data`
-- 포함 파일: `srg-result-console.log`, 필요 시 `srg-result-random_data.txt`
+- 고정 Artifact: `srg-result-console.log`, 필요 시 `srg-result-random_data.txt`
 
 실행 순서는 다음과 같습니다.
 

@@ -127,7 +127,7 @@ impl MenuApp {
                         out,
                         BATCH_COUNT_INPUT_MAX_BYTES,
                     )?
-                    .parse::<u64>()
+                    .parse::<usize>()
                     .ok()
                     {
                         Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,

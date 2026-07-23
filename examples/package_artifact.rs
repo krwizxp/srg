@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write as _};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 const TAR_BLOCK_LEN: usize = 512;
 const TAR_BLOCK_LEN_U64: u64 = 512;
 const ZERO_BLOCK: [u8; TAR_BLOCK_LEN] = [0; TAR_BLOCK_LEN];
@@ -49,8 +49,8 @@ fn main() -> io::Result<()> {
         env!("CARGO_PKG_NAME"),
         env::consts::EXE_SUFFIX
     ));
-    let artifact_dir = PathBuf::from("artifacts");
-    fs::create_dir_all(&artifact_dir)?;
+    let artifact_dir = Path::new("artifacts");
+    fs::create_dir_all(artifact_dir)?;
     let destination = artifact_dir.join(format!(
         "{entry_name}.{}",
         if cfg!(windows) { "exe" } else { "tar" }

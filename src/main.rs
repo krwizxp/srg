@@ -70,10 +70,7 @@ fn unknown_option(label: &str, option: &OsStr) -> AppError {
     format!("{label}: {}", option.to_string_lossy()).into()
 }
 fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
-    match output.write_fmt(args) {
-        Ok(()) | Err(_) => {}
-    }
-    match output.write_all(b"\n") {
+    match writeln!(output, "{args}") {
         Ok(()) | Err(_) => {}
     }
 }
@@ -103,17 +100,10 @@ fn main() -> Result<()> {
             let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
             let rng = HardwareRng::new();
             let num_64 = match rng.source() {
-                HardwareRandomSource::RdSeed => {
+                HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
+                    rng.write_initial_source_notice(&mut stderr().lock())?;
                     let data = generate_random_data_with_rng(&rng)?;
                     rng.write_rdseed_fallback_notice(&mut stderr().lock())?;
-                    let num_64 = data.num_64;
-                    persist_and_print_random_data(&mut output_file, &data)?;
-                    num_64
-                }
-                HardwareRandomSource::RdRand => {
-                    let mut err = stderr().lock();
-                    err.write_all("RDSEED를 미지원하여 RDRAND를 사용합니다.\n".as_bytes())?;
-                    let data = generate_random_data_with_rng(&rng)?;
                     let num_64 = data.num_64;
                     persist_and_print_random_data(&mut output_file, &data)?;
                     num_64

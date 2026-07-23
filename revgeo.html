@@ -676,11 +676,15 @@
 
         :scope textarea {
           inline-size: 100%;
+          min-block-size: 90px;
           padding-block: var(--control-pad-block, 10px);
           padding-inline: var(--control-pad-inline, 12px);
           font-size: var(--fs-sm);
           font-weight: 500;
           line-height: 1.45;
+          resize: vertical;
+          scrollbar-width: thin;
+          caret-color: var(--accent-ink);
 
           &::placeholder {
             color: var(--muted-strong);
@@ -745,13 +749,6 @@
               }
             }
           }
-        }
-
-        :scope textarea {
-          min-block-size: 90px;
-          resize: vertical;
-          scrollbar-width: thin;
-          caret-color: var(--accent-ink);
         }
 
         :scope #output.coords-view {
@@ -1986,17 +1983,10 @@
   </main>
   <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" tabindex="-1">
     <div class="map-links" id="map-popover-links">
-      <a data-provider-key="Google" href="about:blank" data-url-template="https://www.google.com/maps?q={lat},{lon}"
-        target="_blank" rel="noopener noreferrer">Google</a>
-      <a data-provider-key="OSM" href="about:blank"
-        data-url-template="https://www.openstreetmap.org/search?query={lat},{lon}&zoom=16#map=16/{lat}/{lon}"
-        target="_blank" rel="noopener noreferrer">OSM</a>
-      <a data-provider-key="Naver" href="about:blank"
-        data-url-template="https://map.naver.com/?lng={lon}&lat={lat}&title={lat}%2C%20{lon}" target="_blank"
-        rel="noopener noreferrer">Naver</a>
-      <a data-provider-key="Kakao" href="about:blank"
-        data-url-template="https://map.kakao.com/link/map/{lat}%20{lon},{lat},{lon}" target="_blank"
-        rel="noopener noreferrer">Kakao</a>
+      <a href="about:blank" target="_blank" rel="noopener noreferrer">Google</a>
+      <a href="about:blank" target="_blank" rel="noopener noreferrer">OSM</a>
+      <a href="about:blank" target="_blank" rel="noopener noreferrer">Naver</a>
+      <a href="about:blank" target="_blank" rel="noopener noreferrer">Kakao</a>
     </div>
   </div>
   <template id="tmpl-row-skeleton">
@@ -2075,7 +2065,6 @@
     const CC_RI = "리".charCodeAt(0);
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
-    const RX_SIGUNGU_STRIP_CACHE = new Map();
     const csvEsc = (s) => {
       s = String(s ?? "");
       if (s) {
@@ -2114,7 +2103,7 @@
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
       REVERSE_CACHE_DB_VERSION: 3,
       REVERSE_CACHE_STORE: "nominatim-reverse",
-      REVERSE_CACHE_PARSER_VERSION: 1,
+      REVERSE_CACHE_PARSER_VERSION: 2,
       REVERSE_CACHE_MAX: 10_000,
       REVERSE_CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
       REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
@@ -2141,7 +2130,6 @@
     const ADMIN_SUFFIX_MYEON = 16;
     const ADMIN_SUFFIX_DONG = 32;
     const ADMIN_SUFFIX_RI = 64;
-    const RX_ADMIN_LEVEL = /^level\d+$/;
     function adminSuffix(name) {
       if (!name) return 0;
       switch (name.charCodeAt(name.length - 1)) {
@@ -2194,99 +2182,39 @@
       return !!l && (l === lowerCountryName || l === lowerAdminCountry);
     }
     const mapPopover = document.getElementById("map-popover");
-    const mapAnchors = document.querySelectorAll(
-      "#map-popover-links a[data-url-template]",
-    );
-    const MAP_PROVIDER_COUNT = mapAnchors.length;
-    const MAP_LINKS = new Array(MAP_PROVIDER_COUNT);
+    const mapAnchors = document.querySelectorAll("#map-popover-links a");
+    const MAP_LINKS = [
+      {
+        key: "Google",
+        build: (lat, lon) => "https://www.google.com/maps?q=" + lat + "," + lon,
+      },
+      {
+        key: "OSM",
+        build: (lat, lon) =>
+          "https://www.openstreetmap.org/search?query=" + lat + "," + lon +
+          "&zoom=16#map=16/" + lat + "/" + lon,
+      },
+      {
+        key: "Naver",
+        build: (_lat, _lon, lat6, lon6) =>
+          "https://map.naver.com/?lng=" + lon6 + "&lat=" + lat6 + "&title=" +
+          lat6 + "%2C%20" + lon6,
+      },
+      {
+        key: "Kakao",
+        build: (lat, lon) =>
+          "https://map.kakao.com/link/map/" + lat + "%20" + lon + "," + lat +
+          "," + lon,
+      },
+    ];
+    const MAP_PROVIDER_COUNT = MAP_LINKS.length;
     const setMapPopoverExpanded = (btn, expanded) => {
       btn.setAttribute("aria-expanded", expanded ? "true" : "false");
     };
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
-    let hasRound6MapLink = false;
-    const RX_MAP_TOKEN = /{lat}|{lon}/g;
-    for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-      const a = mapAnchors[i];
-      const key = a.dataset.providerKey || "";
-      const template = a.dataset.urlTemplate || "";
-      RX_MAP_TOKEN.lastIndex = 0;
-      const parts = [];
-      let last = 0;
-      for (let m; (m = RX_MAP_TOKEN.exec(template));) {
-        const idx = m.index;
-        if (idx > last) parts.push(template.slice(last, idx));
-        parts.push(m[0] === "{lat}" ? 0 : 1);
-        last = idx + m[0].length;
-      }
-      if (last < template.length) parts.push(template.slice(last));
-      const round6 = key === "Naver";
-      if (round6) hasRound6MapLink = true;
-      let build;
-      if (parts.length === 4) {
-        const p0 = parts[0];
-        const t1 = parts[1];
-        const p2 = parts[2];
-        const t3 = parts[3];
-        build = round6
-          ? (_lat, _lon, lat6, lon6) =>
-            p0 + (t1 === 0 ? lat6 : lon6) + p2 + (t3 === 0 ? lat6 : lon6)
-          : (lat, lon) =>
-            p0 + (t1 === 0 ? lat : lon) + p2 + (t3 === 0 ? lat : lon);
-      } else {
-        const p0 = parts[0];
-        const t1 = parts[1];
-        const p2 = parts[2];
-        const t3 = parts[3];
-        const p4 = parts[4];
-        const t5 = parts[5];
-        const p6 = parts[6];
-        const t7 = parts[7];
-        build = round6
-          ? (_lat, _lon, lat6, lon6) =>
-            p0 +
-            (t1 === 0 ? lat6 : lon6) +
-            p2 +
-            (t3 === 0 ? lat6 : lon6) +
-            p4 +
-            (t5 === 0 ? lat6 : lon6) +
-            p6 +
-            (t7 === 0 ? lat6 : lon6)
-          : (lat, lon) =>
-            p0 +
-            (t1 === 0 ? lat : lon) +
-            p2 +
-            (t3 === 0 ? lat : lon) +
-            p4 +
-            (t5 === 0 ? lat : lon) +
-            p6 +
-            (t7 === 0 ? lat : lon);
-      }
-      MAP_LINKS[i] = {
-        key,
-        build,
-      };
-    }
-    const MAP_HAS_ROUND6 = hasRound6MapLink;
     let LAST_MAP_INVOKER = null;
     let MAP_POPOVER_PREV_FOCUS = null;
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
-    function updateMapPopoverFromInvoker(invoker) {
-      const idxStr = invoker.dataset.idx;
-      const r = AppState.records[idxStr | 0];
-      const lat = r.latStr;
-      const lon = r.lonStr;
-      let lat6 = null;
-      let lon6 = null;
-      if (MAP_HAS_ROUND6) {
-        lat6 = r.lat6;
-        if (lat6 == null) r.lat6 = lat6 = fmtCoord6(lat);
-        lon6 = r.lon6;
-        if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
-      }
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
-      }
-    }
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return;
       const btn = e.source;
@@ -2296,7 +2224,14 @@
       if (prevInvoker && prevInvoker !== btn) {
         setMapPopoverExpanded(prevInvoker, false);
       }
-      updateMapPopoverFromInvoker(btn);
+      const r = AppState.records[btn.dataset.idx | 0];
+      const lat = r.latStr;
+      const lon = r.lonStr;
+      const lat6 = r.lat6 ??= fmtCoord6(lat);
+      const lon6 = r.lon6 ??= fmtCoord6(lon);
+      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+        mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
+      }
     });
     function closeMapPopover() {
       if (!isMapPopoverOpen()) return;
@@ -2395,12 +2330,15 @@
       tbody: tbl.tBodies[0],
       coords: document.getElementById("coords"),
       coordsContent: document.querySelector("#coords .coords-content"),
+      manualOutput: document.getElementById("output"),
+      manualOutputContent: document.querySelector("#output .coords-content"),
       parseBtn: document.getElementById("parse"),
       startBtn: document.getElementById("start"),
       pauseBtn: document.getElementById("pause"),
       resumeBtn: document.getElementById("resume"),
       stopBtn: document.getElementById("stop"),
       filterQ: document.getElementById("filter-q"),
+      filters: document.querySelector(".filters"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
       filterSigungu: document.getElementById("filter-sigungu"),
@@ -2408,16 +2346,19 @@
       filterTag: document.getElementById("filter-tag"),
       filterFullAddr: document.getElementById("filter-fulladdr"),
     };
-    const setCoordsText = (text) => {
-      domElements.coordsContent.textContent = text;
-      const hasContent = text.length > 0;
-      domElements.coords.toggleAttribute("data-has-content", hasContent);
+    const setScrollableText = (element, contentElement, text) => {
+      const value = String(text ?? "");
+      contentElement.textContent = value;
+      const hasContent = value.length > 0;
+      element.toggleAttribute("data-has-content", hasContent);
       if (!hasContent) {
-        clearScrollShadowState(domElements.coords);
+        clearScrollShadowState(element);
         return;
       }
-      requestScrollShadowSync(domElements.coords);
+      requestScrollShadowSync(element);
     };
+    const setCoordsText = (text) =>
+      setScrollableText(domElements.coords, domElements.coordsContent, text);
     const root = document.documentElement;
     const PERF_MODE_ATTR = "data-perf-mode";
     const THEME_STORAGE_KEY = "srg-theme";
@@ -2499,6 +2440,7 @@
     for (const el of [
       domElements.tableWrap,
       domElements.coords,
+      domElements.manualOutput,
     ]) {
       clearScrollShadowState(el);
       el.addEventListener(
@@ -2513,10 +2455,14 @@
       if (domElements.coords.hasAttribute("data-has-content")) {
         requestScrollShadowSync(domElements.coords);
       }
+      if (domElements.manualOutput.hasAttribute("data-has-content")) {
+        requestScrollShadowSync(domElements.manualOutput);
+      }
     });
     shadowResizeObserver.observe(tbl);
     shadowResizeObserver.observe(domElements.tbody);
     shadowResizeObserver.observe(domElements.coords);
+    shadowResizeObserver.observe(domElements.manualOutput);
     const KIND_COL_INDEX = 0;
     const IDX_COL_INDEX = 1;
     const COORDS_COL_INDEX = 2;
@@ -2636,23 +2582,41 @@
       return FILTER_SNAP;
     }
     const Q_SEARCH_SEP = "\u0000";
-    const getQSearch = (r) => {
-      let s = r._q;
-      if (s != null) return s;
+    const getSearchFields = (r) => {
+      let fields = r._search;
+      if (fields) return fields;
       const result = r.result;
-      return (r._q = result.nFullAddr +
+      const addr = result.addr;
+      fields = [
+        lower(result.kind || r.set),
+        norm(addr?.sido),
+        norm(addr?.sigungu),
+        norm(addr?.eupmyeon),
+        norm(addr?.tag),
+        norm(result.error || addr?.fullAddr),
+      ];
+      r._search = fields;
+      return fields;
+    };
+    const getQSearch = (r) => {
+      const fields = getSearchFields(r);
+      let q = fields[6];
+      if (q !== undefined) return q;
+      q = fields[5] +
         Q_SEARCH_SEP +
-        result.nTag +
+        fields[4] +
         Q_SEARCH_SEP +
-        result.nEmd +
+        fields[3] +
         Q_SEARCH_SEP +
-        result.nSigungu +
+        fields[2] +
         Q_SEARCH_SEP +
-        result.nSido +
+        fields[1] +
         Q_SEARCH_SEP +
         r.latStr +
         "," +
-        r.lonStr);
+        r.lonStr;
+      fields[6] = q;
+      return q;
     };
     function setRowHiddenByFilterActive(tr, wasHidden, f, r) {
       if (FIND_REVEALED_ROWS.has(tr)) {
@@ -2674,18 +2638,19 @@
       const tag = f.tag;
       const fullAddr = f.fullAddr;
       const qTest = f.qTest;
+      const fields = getSearchFields(r);
       let hide = false;
-      if (kind && (result.kindLower || lower(r.set)) !== kind) {
+      if (kind && fields[0] !== kind) {
         hide = true;
-      } else if (sido && result.nSido.indexOf(sido) === -1) {
+      } else if (sido && fields[1].indexOf(sido) === -1) {
         hide = true;
-      } else if (sigungu && result.nSigungu.indexOf(sigungu) === -1) {
+      } else if (sigungu && fields[2].indexOf(sigungu) === -1) {
         hide = true;
-      } else if (emd && result.nEmd.indexOf(emd) === -1) {
+      } else if (emd && fields[3].indexOf(emd) === -1) {
         hide = true;
-      } else if (tag && result.nTag.indexOf(tag) === -1) {
+      } else if (tag && fields[4].indexOf(tag) === -1) {
         hide = true;
-      } else if (fullAddr && result.nFullAddr.indexOf(fullAddr) === -1) {
+      } else if (fullAddr && fields[5].indexOf(fullAddr) === -1) {
         hide = true;
       } else if (qTest && !qTest(r)) {
         hide = true;
@@ -2829,16 +2794,9 @@
         startChunkedFilterApply(getLiveFilterSnapshot());
       }, 120);
     }
-    const CSV_ENCODER = new TextEncoder();
-    const CSV_NL_BYTES = CSV_ENCODER.encode("\n");
-    const CSV_HEADER_BYTES = (() => {
-      let header =
-        "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩";
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
-        header += "," + csvEsc("지도링크(" + MAP_LINKS[i].key + ")");
-      }
-      return CSV_ENCODER.encode(header);
-    })();
+    const CSV_HEADER =
+      "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
+      MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
     function downloadBlob(blob, filename) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -2850,31 +2808,16 @@
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
     function getAdminFromGeocoding(gc, countryCode, p0, p1) {
-        const levels = [];
-        const admin = gc.admin;
-        if (admin && typeof admin === "object") {
-          for (const key in admin) {
-            if (!RX_ADMIN_LEVEL.test(key)) continue;
-            const level = Number(key.slice(5));
-            switch (level) {
-              case 2:
-              case 4:
-              case 6:
-              case 7:
-              case 8:
-              case 9:
-              case 10:
-                levels[level] = geocodeText(admin[key]);
-            }
-          }
-        }
-        const level2 = levels[2] || "";
-        const level4 = levels[4] || "";
-        const level6 = levels[6] || "";
-        const level7 = levels[7] || "";
-        const level8 = levels[8] || "";
-        const level9 = levels[9] || "";
-        const level10 = levels[10] || "";
+        const admin = gc.admin && typeof gc.admin === "object"
+          ? gc.admin
+          : null;
+        const level2 = geocodeText(admin?.level2);
+        const level4 = geocodeText(admin?.level4);
+        const level6 = geocodeText(admin?.level6);
+        const level7 = geocodeText(admin?.level7);
+        const level8 = geocodeText(admin?.level8);
+        const level9 = geocodeText(admin?.level9);
+        const level10 = geocodeText(admin?.level10);
         const gcCountry = geocodeText(gc.country);
         const gcName = geocodeText(gc.name);
         const gcCityDistrict = geocodeText(gc.city_district);
@@ -3091,23 +3034,14 @@
                 ) {
                   s = s.slice(0, cut - 1).trim();
                 } else {
-                  if (
-                    RX_SIGUNGU_STRIP_CACHE.size > 4096 &&
-                    !RX_SIGUNGU_STRIP_CACHE.has(dl)
-                  ) {
-                    RX_SIGUNGU_STRIP_CACHE.clear();
-                  }
-                  const rx = RX_SIGUNGU_STRIP_CACHE.getOrInsertComputed(
-                    dl,
-                    () =>
+                  s = s
+                    .replace(
                       new RegExp(
                         `(?:^|\\s+)${RegExp.escape(dl)}(?:\\s+|$)`,
                         "g",
                       ),
-                  );
-                  rx.lastIndex = 0;
-                  s = s
-                    .replace(rx, " ")
+                      " ",
+                    )
                     .replace(RX_WS, " ")
                     .trim();
                 }
@@ -3155,31 +3089,9 @@
         let p0 = "";
         let p1 = "";
         if (label) {
-          const comma0 = label.indexOf(",");
-          if (comma0 === -1) {
-            const seg0 = label.trim();
-            firstLabelPart = seg0;
-            p0 = seg0;
-          } else {
-            const seg0 = label.slice(0, comma0).trim();
-            firstLabelPart = seg0;
-            if (seg0) p0 = seg0;
-            let start = comma0 + 1;
-            while (start < label.length) {
-              const comma = label.indexOf(",", start);
-              const end = comma === -1 ? label.length : comma;
-              const seg = label.slice(start, end).trim();
-              if (seg) {
-                if (!p0) p0 = seg;
-                else {
-                  p1 = seg;
-                  break;
-                }
-              }
-              if (comma === -1) break;
-              start = comma + 1;
-            }
-          }
+          const labelParts = label.split(",").map((part) => part.trim());
+          firstLabelPart = labelParts[0];
+          [p0 = "", p1 = ""] = labelParts.filter(Boolean);
         }
         const { sido, sigungu, eupmyeon } = getAdminFromGeocoding(
           gc,
@@ -3306,16 +3218,6 @@
       SR_STATUS_CACHE.msg = text;
       setStatusLiveText(text);
     }
-    function announceStatusMessage(msg) {
-      const text = String(msg ?? "").trim();
-      SR_STATUS_CACHE.progressBucket = -1;
-      if (!text) {
-        SR_STATUS_CACHE.msg = null;
-        setStatusLiveText("");
-        return;
-      }
-      announceStatusText(text);
-    }
     function setStatusVisual(msg, type) {
       const el = domElements.status;
       if (el.textContent !== msg) el.textContent = msg;
@@ -3326,7 +3228,14 @@
     function setStatusMessage(msg, type = "info") {
       const nextMsg = String(msg ?? "");
       setStatusVisual(nextMsg, type);
-      announceStatusMessage(nextMsg);
+      const text = nextMsg.trim();
+      SR_STATUS_CACHE.progressBucket = -1;
+      if (!text) {
+        SR_STATUS_CACHE.msg = null;
+        setStatusLiveText("");
+        return;
+      }
+      announceStatusText(text);
     }
     function setProgressStatus(processed, total, totalDisp) {
       setStatusVisual(`처리 중… (${fmt(processed)}/${totalDisp})`, "info");
@@ -3374,67 +3283,45 @@
       } else {
         wrap.classList.remove("filter-empty");
       }
-      if (RENDER_CACHE.hasResults) requestScrollShadowSync(wrap);
+      if (domElements.tbody.rows.length > 0) requestScrollShadowSync(wrap);
     }
     const RENDER_CACHE = {
       total: -1,
-      success: -1,
+      processed: -1,
       fail: -1,
-      remaining: -1,
-      pct: -1,
-      exportDisabled: null,
-      hasResults: null,
-      perfMode: null,
     };
     function renderFrame() {
       AppState.renderReq = null;
-      const wrap = domElements.tableWrap;
-      const tbody = domElements.tbody;
       const total = AppState.records.length;
       const processed = AppState.processed;
       const fail = AppState.cntFail;
+      const totalChanged = RENDER_CACHE.total !== total;
+      const processedChanged = RENDER_CACHE.processed !== processed;
+      const failChanged = RENDER_CACHE.fail !== fail;
+      if (!(totalChanged || processedChanged || failChanged)) return;
+      RENDER_CACHE.total = total;
+      RENDER_CACHE.processed = processed;
+      RENDER_CACHE.fail = fail;
       const success = processed - fail;
       const remaining = total - processed;
-      if (RENDER_CACHE.total !== total) {
-        RENDER_CACHE.total = total;
+      if (totalChanged) {
         domElements.cntTotal.textContent = fmt(total);
+        const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
+        if (perfMode) root.setAttribute(PERF_MODE_ATTR, "1");
+        else root.removeAttribute(PERF_MODE_ATTR);
       }
-      if (RENDER_CACHE.success !== success) {
-        RENDER_CACHE.success = success;
+      if (processedChanged || failChanged) {
         domElements.cntSuccess.textContent = fmt(success);
       }
-      if (RENDER_CACHE.fail !== fail) {
-        RENDER_CACHE.fail = fail;
-        domElements.cntFail.textContent = fmt(fail);
-      }
-      if (RENDER_CACHE.remaining !== remaining) {
-        RENDER_CACHE.remaining = remaining;
+      if (failChanged) domElements.cntFail.textContent = fmt(fail);
+      if (totalChanged || processedChanged) {
         domElements.cntRemain.textContent = fmt(remaining);
-      }
-      const pct = total ? Math.round((processed / total) * 100) : 0;
-      if (RENDER_CACHE.pct !== pct) {
-        RENDER_CACHE.pct = pct;
+        const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
         domElements.progShell.style.setProperty("--pct", String(pct));
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       }
-      const exportDisabled = processed === 0;
-      if (RENDER_CACHE.exportDisabled !== exportDisabled) {
-        RENDER_CACHE.exportDisabled = exportDisabled;
-        domElements.exportBtn.disabled = exportDisabled;
-      }
-      const hasResults = tbody.rows.length > 0;
-      if (RENDER_CACHE.hasResults !== hasResults) {
-        RENDER_CACHE.hasResults = hasResults;
-        wrap.classList.toggle("has-results", hasResults);
-        requestScrollShadowSync(wrap);
-      }
-      const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
-      if (RENDER_CACHE.perfMode !== perfMode) {
-        RENDER_CACHE.perfMode = perfMode;
-        if (perfMode) root.setAttribute(PERF_MODE_ATTR, "1");
-        else root.removeAttribute(PERF_MODE_ATTR);
-      }
+      if (processedChanged) domElements.exportBtn.disabled = processed === 0;
     }
     function scheduleRender() {
       if (AppState.renderReq !== null) return;
@@ -3451,7 +3338,6 @@
       closeMapPopover();
       domElements.tbody.replaceChildren();
       wrap.classList.remove("filter-empty", "has-results");
-      RENDER_CACHE.hasResults = false;
       resetScrollShadowState(wrap);
       requestAnimationFrame(() => {
         if (wrap.scrollTop || wrap.scrollLeft) {
@@ -3643,7 +3529,7 @@
             lat6: null,
             lon6: null,
             result: null,
-            _q: null,
+            _search: null,
           });
         }
       }
@@ -3653,16 +3539,6 @@
     const REVERSE_PARSED_CACHE_MAX = 5_000;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
-    function normalizeReverseParsed(parsed) {
-      const addr = parsed.addr;
-      parsed.kindLower ??= lower(parsed.kind);
-      parsed.nSido ??= norm(addr.sido);
-      parsed.nSigungu ??= norm(addr.sigungu);
-      parsed.nEmd ??= norm(addr.eupmyeon);
-      parsed.nTag ??= norm(addr.tag);
-      parsed.nFullAddr ??= norm(addr.fullAddr);
-      return parsed;
-    }
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -3680,16 +3556,7 @@
         isBoundedReverseText(addr.eupmyeon) &&
         isBoundedReverseText(addr.tag) &&
         isBoundedReverseText(addr.fullAddr) &&
-        (parsed.kind === undefined || isBoundedReverseText(parsed.kind)) &&
-        (parsed.kindLower === undefined ||
-          isBoundedReverseText(parsed.kindLower)) &&
-        (parsed.nSido === undefined || isBoundedReverseText(parsed.nSido)) &&
-        (parsed.nSigungu === undefined ||
-          isBoundedReverseText(parsed.nSigungu)) &&
-        (parsed.nEmd === undefined || isBoundedReverseText(parsed.nEmd)) &&
-        (parsed.nTag === undefined || isBoundedReverseText(parsed.nTag)) &&
-        (parsed.nFullAddr === undefined ||
-          isBoundedReverseText(parsed.nFullAddr));
+        (parsed.kind === undefined || isBoundedReverseText(parsed.kind));
     }
     function isFreshReverseCacheRow(row, expectedKey, now = Date.now()) {
       if (
@@ -3771,7 +3638,7 @@
         let tx;
         try {
           tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE), resolve);
+          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
         } catch {
           resolve();
           return;
@@ -3784,17 +3651,16 @@
       const db = await openReverseCacheDb();
       if (!db) return null;
       let result = null;
-      await runReverseCacheTransaction(db, (store, done) => {
+      await runReverseCacheTransaction(db, (store) => {
         const req = store.get(persistentKey);
         req.onsuccess = () => {
           const row = req.result;
           if (isFreshReverseCacheRow(row, persistentKey)) {
-            result = normalizeReverseParsed(row.parsed);
+            result = row.parsed;
           } else if (row) {
             store.delete(persistentKey);
           }
         };
-        req.onerror = done;
       });
       return result;
     }
@@ -3921,7 +3787,7 @@
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
-      let hasResultsClass = RENDER_CACHE.hasResults;
+      let hasResultsClass = wrap.classList.contains("has-results");
       let lastStatusUpdate = 0;
       let lastYield = performance.now();
       let pendingFrag = null;
@@ -3973,16 +3839,15 @@
           );
           tr.cells[IDX_COL_INDEX].textContent = "" + i1;
           tr.cells[MAPS_COL_INDEX].lastElementChild.dataset.idx = "" + i;
-          const f0 = filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP;
-          if (f0.active) {
+          let rowFilter = getLiveFilterSnapshot();
+          if (rowFilter.active) {
             tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
           }
           if (!hasResultsClass) {
             hasResultsClass = true;
             wrap.classList.add("has-results");
-            RENDER_CACHE.hasResults = true;
             requestScrollShadowSync(wrap);
-            if (f0.active) wrap.classList.add("filter-empty");
+            if (rowFilter.active) wrap.classList.add("filter-empty");
           }
           if (needsFetch) {
             tbody.append(tr);
@@ -4013,12 +3878,10 @@
             if (!parsed) {
               const url =
                 `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-              parsed = normalizeReverseParsed(
-                parseGeocodeAddress(
-                  await fetchReverseWithRetry(
-                    url,
-                    signal,
-                  ),
+              parsed = parseGeocodeAddress(
+                await fetchReverseWithRetry(
+                  url,
+                  signal,
                 ),
               );
               putReverseMemoryCache(cacheKey, parsed);
@@ -4026,13 +3889,14 @@
                 writePersistentReverseCache(cacheKey, parsed),
                 signal,
               );
+              rowFilter = getLiveFilterSnapshot();
             }
             r.result = parsed;
             commitResultRow(
               skeletonTr,
               r,
               wrap,
-              filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP,
+              rowFilter,
             );
           } catch (err) {
             if (AppState.isStopping && err && err.name === "AbortError") {
@@ -4044,18 +3908,12 @@
               addr: null,
               error: msg,
               kind: "에러",
-              kindLower: "에러",
-              nEmd: "",
-              nFullAddr: norm(msg),
-              nSido: "",
-              nSigungu: "",
-              nTag: "",
             };
             commitResultRow(
               skeletonTr,
               r,
               wrap,
-              filterDirty ? getLiveFilterSnapshot() : FILTER_SNAP,
+              getLiveFilterSnapshot(),
             );
             if (!AppState.isStopping) {
               setStatusMessage(
@@ -4163,13 +4021,13 @@
         const escCell = csvEsc;
         setStatusMessage("CSV 생성 중…");
         await yieldToMain();
-        const parts = [CSV_HEADER_BYTES];
+        const parts = [CSV_HEADER];
         const totalDisp = fmt(totalRows);
         let chunkLines = [];
         let chunkChars = 0;
         const flushChunk = () => {
           if (chunkLines.length === 0) return;
-          parts.push(CSV_NL_BYTES, CSV_ENCODER.encode(chunkLines.join("\n")));
+          parts.push("\n" + chunkLines.join("\n"));
           chunkChars = 0;
           chunkLines.length = 0;
         };
@@ -4202,14 +4060,8 @@
           line += "," + escCell(CSV_SOURCE_TEXT);
           line += "," + escCell(CSV_LICENSE_TEXT);
           line += "," + escCell(CSV_GEOCODER_TEXT);
-          let lat6 = null;
-          let lon6 = null;
-          if (MAP_HAS_ROUND6) {
-            lat6 = r.lat6;
-            if (lat6 == null) r.lat6 = lat6 = fmtCoord6(lat);
-            lon6 = r.lon6;
-            if (lon6 == null) r.lon6 = lon6 = fmtCoord6(lon);
-          }
+          const lat6 = r.lat6 ??= fmtCoord6(lat);
+          const lon6 = r.lon6 ??= fmtCoord6(lon);
           for (let k = 0; k < MAP_PROVIDER_COUNT; k++) {
             line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
           }
@@ -4290,19 +4142,7 @@
         task.inFlight = false;
       }
     }
-    domElements.filterQ.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterKind.addEventListener("change", scheduleApplyFilterAll);
-    domElements.filterSido.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterSigungu.addEventListener(
-      "input",
-      scheduleApplyFilterAll,
-    );
-    domElements.filterEmd.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterTag.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterFullAddr.addEventListener(
-      "input",
-      scheduleApplyFilterAll,
-    );
+    domElements.filters.addEventListener("input", scheduleApplyFilterAll);
     domElements.tbody.addEventListener("click", (e) => {
       if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
@@ -4322,14 +4162,13 @@
         bumpFindRehideTimer();
       },
     );
-    const startViewTransition = document.startViewTransition.bind(document);
     const maybeVT = (fn) => {
       if (
         domElements.tbody.childElementCount > 0 &&
         !root.hasAttribute(PERF_MODE_ATTR)
       ) {
         if (root.matches(":active-view-transition")) return fn();
-        return startViewTransition({ update: fn, types: ["results"] });
+        return document.startViewTransition({ update: fn, types: ["results"] });
       }
       return fn();
     };
@@ -5093,9 +4932,6 @@
           type: "text/plain;charset=utf-8",
         });
       }
-      function downloadRandomDataTxt(chunks) {
-        downloadBlob(randomDataBlob(chunks, true), "random_data.txt");
-      }
       async function copyRandomDataChunksToClipboard(chunks) {
         if (!navigator.clipboard || !window.isSecureContext) {
           throw new Error(
@@ -5114,37 +4950,13 @@
         const clearBtn = document.getElementById("clearBtn");
         const saveBtn = document.getElementById("saveOutput");
         const copyBtn = document.getElementById("copyOutput");
-        const output = document.getElementById("output");
-        const outputContent = output.querySelector(".coords-content");
+        const output = domElements.manualOutput;
+        const outputContent = domElements.manualOutputContent;
         const manualBody = runBtn.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
-        const requestManualOutputShadowSync = () =>
-          requestScrollShadowSync(output);
-        output.addEventListener(
-          "scroll",
-          requestManualOutputShadowSync,
-          EVT_PASSIVE,
-        );
-        const manualOutputResizeObserver =
-          new ResizeObserver(requestManualOutputShadowSync);
-        manualOutputResizeObserver.observe(output);
-        window.addEventListener(
-          "resize",
-          requestManualOutputShadowSync,
-          EVT_PASSIVE,
-        );
-        const setManualOutputText = (text) => {
-          const value = String(text ?? "");
-          outputContent.textContent = value;
-          if (value.length > 0) {
-            output.setAttribute("data-has-content", "");
-            requestManualOutputShadowSync();
-          } else {
-            output.removeAttribute("data-has-content");
-            clearScrollShadowState(output);
-          }
-        };
+        const setManualOutputText = (text) =>
+          setScrollableText(output, outputContent, text);
         let lastGeneratedChunks = [];
         const setManualBusy = (busy) => {
           const hasOutput = lastGeneratedChunks.length > 0;
@@ -5247,7 +5059,7 @@
         });
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
-          downloadRandomDataTxt(lastGeneratedChunks);
+          downloadBlob(randomDataBlob(lastGeneratedChunks, true), "random_data.txt");
           meta.textContent =
             (meta.textContent ? `${meta.textContent}\n` : "") +
             "random_data.txt 저장 요청을 완료했습니다.";

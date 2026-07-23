@@ -93,7 +93,7 @@ impl FromStr for ParsedServer {
         };
         Ok(Self {
             #[cfg(target_os = "windows")]
-            host: host_part.to_owned(),
+            host_wide: host_part.encode_utf16().chain([0]).collect(),
             #[cfg(target_os = "windows")]
             port,
             #[cfg(any(target_os = "linux", target_os = "macos"))]

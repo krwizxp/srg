@@ -26,7 +26,7 @@ use std::{
 pub(super) enum CliCommand {
     #[cfg(target_arch = "x86_64")]
     Generate {
-        count: u64,
+        count: usize,
     },
     #[cfg(target_arch = "x86_64")]
     Ladder {
@@ -116,31 +116,19 @@ impl CliCommand {
         })
     }
     #[cfg(target_arch = "x86_64")]
-    fn run_with_rng<T>(
+    fn run_with_rng(
         err: &mut dyn Write,
-        run: impl FnOnce(&HardwareRng) -> Result<T>,
-    ) -> Result<T> {
+        run: impl FnOnce(&HardwareRng) -> Result<()>,
+    ) -> Result<()> {
         let rng = HardwareRng::new();
         let source = rng.source();
         if source == HardwareRandomSource::None {
             return Err("RDSEED·RDRAND를 지원하지 않는 CPU입니다.".into());
         }
-        if source == HardwareRandomSource::RdRand {
-            writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
-        }
-        let result = run(&rng)?;
+        rng.write_initial_source_notice(err)?;
+        run(&rng)?;
         rng.write_rdseed_fallback_notice(err)?;
-        Ok(result)
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn take_two_args<I>(args: &mut I, usage: &str) -> Result<(OsString, OsString)>
-    where
-        I: Iterator<Item = OsString>,
-    {
-        let (Some(first), Some(second), None) = (args.next(), args.next(), args.next()) else {
-            return Err(AppError::message(format!("사용법: srg {usage}")));
-        };
-        Ok((first, second))
+        Ok(())
     }
 }
 impl<I> TryFrom<(OsString, I)> for CliCommand
@@ -151,13 +139,21 @@ where
     fn try_from((raw_command, mut args): (OsString, I)) -> Result<Self> {
         const INVALID_COMMAND_NAME: &str = "명령 이름은 유효한 Unicode여야 합니다.";
         let command = raw_command.to_str().ok_or(INVALID_COMMAND_NAME)?;
+        let take_two_args = |iterator: &mut I, usage: &str| -> Result<(OsString, OsString)> {
+            let (Some(first), Some(second), None) =
+                (iterator.next(), iterator.next(), iterator.next())
+            else {
+                return Err(AppError::message(format!("사용법: srg {usage}")));
+            };
+            Ok((first, second))
+        };
         match command {
             #[cfg(target_arch = "x86_64")]
             "generate" => {
                 let (Some(count_arg), None) = (args.next(), args.next()) else {
                     return Err(AppError::message("사용법: srg generate <count>"));
                 };
-                let count = Self::parse_arg::<u64>(&count_arg, "count")?;
+                let count = Self::parse_arg::<usize>(&count_arg, "count")?;
                 if !(1..=MAX_BATCH_GENERATE_COUNT).contains(&count) {
                     return Err(AppError::message(format!(
                         "count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다."
@@ -168,7 +164,7 @@ where
             #[cfg(target_arch = "x86_64")]
             "ladder" => {
                 let (players_arg, results_arg) =
-                    Self::take_two_args(&mut args, "ladder <players-csv> <results-csv>")?;
+                    take_two_args(&mut args, "ladder <players-csv> <results-csv>")?;
                 let players = Self::owned_text(players_arg, "players-csv")?;
                 let results = Self::owned_text(results_arg, "results-csv")?;
                 if players.contains(['\r', '\n']) || results.contains(['\r', '\n']) {
@@ -194,8 +190,7 @@ where
             }
             #[cfg(target_arch = "x86_64")]
             "random-float" => {
-                let (min_arg, max_arg) =
-                    Self::take_two_args(&mut args, "random-float <min> <max>")?;
+                let (min_arg, max_arg) = take_two_args(&mut args, "random-float <min> <max>")?;
                 let min = Self::parse_arg::<f64>(&min_arg, "min")?;
                 let max = Self::parse_arg::<f64>(&max_arg, "max")?;
                 validate_random_float_range(min, max)?;
@@ -203,8 +198,7 @@ where
             }
             #[cfg(target_arch = "x86_64")]
             "random-integer" => {
-                let (min_arg, max_arg) =
-                    Self::take_two_args(&mut args, "random-integer <min> <max>")?;
+                let (min_arg, max_arg) = take_two_args(&mut args, "random-integer <min> <max>")?;
                 let min = Self::parse_arg::<i64>(&min_arg, "min")?;
                 let max = Self::parse_arg::<i64>(&max_arg, "max")?;
                 validate_random_integer_range(min, max)?;
@@ -215,11 +209,8 @@ where
                 Err("이 명령은 x86_64의 RDSEED/RDRAND 지원 환경에서만 사용할 수 있습니다.".into())
             }
             "time-observe" => {
-                let (Some(host_arg), Some(seconds_arg), None) =
-                    (args.next(), args.next(), args.next())
-                else {
-                    return Err("사용법: srg time-observe <host> <seconds>".into());
-                };
+                let (host_arg, seconds_arg) =
+                    take_two_args(&mut args, "time-observe <host> <seconds>")?;
                 let host = Self::parse_arg::<ParsedServer>(&host_arg, "host")?;
                 let seconds = Self::parse_arg::<u64>(&seconds_arg, "seconds")?;
                 if !(1..=60).contains(&seconds) {

@@ -9,11 +9,7 @@ use core::{
     result::Result as CoreResult,
     str,
 };
-use std::{
-    ffi::OsStr,
-    os::windows::ffi::OsStrExt as WindowsOsStrExt,
-    time::{Instant, SystemTime},
-};
+use std::time::{Instant, SystemTime};
 mod sys;
 const DWORD_BYTE_SIZE: u32 = 4;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
@@ -98,19 +94,25 @@ impl Client {
     fn cached_connect_ptr(
         &mut self,
         server: &ParsedServer,
-        host_wide: &[u16],
         context: &str,
     ) -> Result<HInternet> {
         let cache = if let Some(ref mut cache) = self.session_cache {
             cache
         } else {
-                let user_agent = wide(
-                    match server.scheme {
-                        UrlScheme::Http => "Rust-Time-Sync",
-                        UrlScheme::Https => concat!("srg/", env!("CARGO_PKG_VERSION")),
-                    },
-                    context,
-                )?;
+                let user_agent_text = match server.scheme {
+                    UrlScheme::Http => "Rust-Time-Sync",
+                    UrlScheme::Https => concat!("srg/", env!("CARGO_PKG_VERSION")),
+                };
+                let capacity = user_agent_text
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| error(context, "wide 문자열 용량 계산 실패"))?;
+                let mut user_agent = Vec::new();
+                user_agent.try_reserve_exact(capacity).map_err(|source| {
+                    error_with_source(context, "wide 문자열 메모리 확보 실패", source)
+                })?;
+                user_agent.extend(user_agent_text.encode_utf16());
+                user_agent.push(0);
                 // SAFETY: user_agent is NUL-terminated and optional proxy pointers are intentionally null.
                 let raw_session = unsafe {
                     sys::WinHttpOpen(
@@ -178,7 +180,7 @@ impl Client {
         let raw_connect = unsafe {
             sys::WinHttpConnect(
                 cache.session.0.as_ptr(),
-                host_wide.as_ptr(),
+                server.host_wide.as_ptr(),
                 server.port,
                 0,
             )
@@ -195,8 +197,7 @@ impl Client {
         server: &ParsedServer,
         context: &str,
     ) -> Result<TimeSample> {
-        let host_wide = wide(&server.host, context)?;
-        let connect = self.cached_connect_ptr(server, &host_wide, context)?;
+        let connect = self.cached_connect_ptr(server, context)?;
         let (request, request_start, response_received) = (|| -> Result<_> {
             // SAFETY: method and path are NUL-terminated and connect is valid.
             let raw_request = unsafe {
@@ -456,16 +457,4 @@ impl Client {
     fn windows_error(operation: &str, code: u32, context: &str) -> TimeError {
         error(context, format!("{operation} 실패: Windows error {code}"))
     }
-}
-fn wide(value: &str, context: &str) -> Result<Vec<u16>> {
-    let capacity = value
-        .len()
-        .checked_add(1)
-        .ok_or_else(|| error(context, "wide 문자열 용량 계산 실패"))?;
-    let mut out = Vec::new();
-    out.try_reserve_exact(capacity)
-        .map_err(|source| error_with_source(context, "wide 문자열 메모리 확보 실패", source))?;
-    out.extend(<OsStr as WindowsOsStrExt>::encode_wide(OsStr::new(value)));
-    out.push(0);
-    Ok(out)
 }

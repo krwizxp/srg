@@ -9,7 +9,7 @@ use crate::{
 };
 use core::{
     num::NonZero,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 use std::{
@@ -19,79 +19,50 @@ use std::{
     time::Instant,
 };
 const BUFFERS_PER_WORKER: usize = 8;
-pub(super) const MAX_BATCH_GENERATE_COUNT: u64 = 10_000_000;
+pub(super) const MAX_BATCH_GENERATE_COUNT: usize = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 type DataBuffer = Box<[u8; BUFFER_SIZE]>;
-struct GeneratedChunk {
+struct GeneratedChunk<'scope> {
     buffer: DataBuffer,
     len: usize,
-    worker_idx: usize,
+    return_sender: &'scope SyncSender<DataBuffer>,
 }
-#[derive(Default)]
-enum WorkerOutcome {
-    Failed { count: u64, first_error: AppError },
-    #[default]
-    Success,
+struct WorkerFailure {
+    count: usize,
+    first_error: AppError,
 }
 struct WorkerJob<'scope> {
     local_pool: Vec<DataBuffer>,
-    loop_count: u64,
-    processed_ref: &'scope AtomicU64,
+    loop_count: usize,
+    processed_ref: &'scope AtomicUsize,
     return_rx: Receiver<DataBuffer>,
+    return_sender: &'scope SyncSender<DataBuffer>,
     rng: &'scope HardwareRng,
-    sender: SyncSender<GeneratedChunk>,
-    worker_idx: usize,
-}
-impl WorkerOutcome {
-    fn merge(&mut self, other: Self) {
-        match other {
-            Self::Failed { count, first_error } => match *self {
-                Self::Failed {
-                    count: ref mut total_count,
-                    ..
-                } => *total_count = total_count.wrapping_add(count),
-                Self::Success => *self = Self::Failed { count, first_error },
-            },
-            Self::Success => {}
-        }
-    }
-    fn record_failure(&mut self, count: u64, message: AppError) {
-        match *self {
-            Self::Failed {
-                count: ref mut total_count,
-                ..
-            } => *total_count = total_count.wrapping_add(count),
-            Self::Success => {
-                *self = Self::Failed {
-                    count,
-                    first_error: message,
-                };
-            }
-        }
-    }
+    sender: SyncSender<GeneratedChunk<'scope>>,
 }
 impl WorkerJob<'_> {
     fn record_failure(
-        processed_ref: &AtomicU64,
-        outcome: &mut WorkerOutcome,
+        processed_ref: &AtomicUsize,
+        outcome: &mut Option<WorkerFailure>,
         local_pool: &mut Vec<DataBuffer>,
         buffer: DataBuffer,
         message: AppError,
     ) {
-        outcome.record_failure(1, message);
+        record_failure(outcome, 1, message);
         processed_ref.fetch_add(1, Ordering::Relaxed);
         local_pool.push(buffer);
     }
-    fn run(mut self) -> WorkerOutcome {
+    fn run(mut self) -> Option<WorkerFailure> {
         let rng = self.rng;
-        let mut outcome = WorkerOutcome::default();
+        let mut outcome = None;
         for item_index in 0..self.loop_count {
             let mut buffer = if let Some(buf) = self.local_pool.pop() {
                 buf
             } else {
                 let Ok(buf) = self.return_rx.recv() else {
                     let remaining = self.loop_count.wrapping_sub(item_index);
-                    outcome.record_failure(
+                    record_failure(
+                        &mut outcome,
                         remaining,
                         AppError::message("writer buffer 반환 채널 연결 종료"),
                     );
@@ -136,7 +107,7 @@ impl WorkerJob<'_> {
                 .send(GeneratedChunk {
                     buffer,
                     len,
-                    worker_idx: self.worker_idx,
+                    return_sender: self.return_sender,
                 })
                 .is_ok()
             {
@@ -149,7 +120,8 @@ impl WorkerJob<'_> {
                 }
             } else {
                 let remaining = self.loop_count.wrapping_sub(item_index);
-                outcome.record_failure(
+                record_failure(
+                    &mut outcome,
                     remaining,
                     AppError::message("writer channel 전송 실패"),
                 );
@@ -159,6 +131,13 @@ impl WorkerJob<'_> {
             }
         }
         outcome
+    }
+}
+fn record_failure(outcome: &mut Option<WorkerFailure>, count: usize, first_error: AppError) {
+    if let Some(failure) = outcome.as_mut() {
+        failure.count = failure.count.wrapping_add(count);
+    } else {
+        *outcome = Some(WorkerFailure { count, first_error });
     }
 }
 fn try_reserved_vec<T>(capacity: usize, context: &'static str) -> Result<Vec<T>> {
@@ -171,7 +150,7 @@ fn try_reserved_vec<T>(capacity: usize, context: &'static str) -> Result<Vec<T>>
 pub(super) fn regenerate_with_count(
     output_file: &mut OutputFile,
     rng: &HardwareRng,
-    requested_count: u64,
+    requested_count: usize,
     out: &mut dyn Write,
 ) -> Result<u64> {
     if requested_count > MAX_BATCH_GENERATE_COUNT {
@@ -190,9 +169,8 @@ pub(super) fn regenerate_with_count(
     }
     let max_threads = available_parallelism()?;
     let pending_count = requested_count.wrapping_sub(1);
-    let pending_count_usize = usize::from_le_bytes(pending_count.to_le_bytes());
     let calculated_thread_count = NonZero::<usize>::MIN
-        .saturating_add(pending_count_usize.wrapping_sub(1))
+        .saturating_add(pending_count.wrapping_sub(1))
         .min(max_threads);
     let in_flight_buffers = calculated_thread_count
         .get()
@@ -215,31 +193,32 @@ pub(super) fn regenerate_with_count(
         return_senders.push(tx);
         worker_buffers.push((rx, local_pool));
     }
-    let (sender, receiver) = sync_channel::<GeneratedChunk>(in_flight_buffers);
-    let processed = AtomicU64::new(0);
+    let (sender, receiver) = sync_channel::<GeneratedChunk<'_>>(in_flight_buffers);
+    let processed = AtomicUsize::new(0);
     let processed_ref = &processed;
-    let thread_count_u64 = u64::from_le_bytes(calculated_thread_count.get().to_le_bytes());
-    let base_count = pending_count.div_euclid(thread_count_u64);
-    let remainder = pending_count.rem_euclid(thread_count_u64);
+    let base_count = pending_count.div_euclid(calculated_thread_count.get());
+    let remainder = pending_count.rem_euclid(calculated_thread_count.get());
     let worker_outcome = {
         let output_writer = output_file.writer();
-        scope(|scope_ctx| -> Result<WorkerOutcome> {
+        scope(|scope_ctx| -> Result<Option<WorkerFailure>> {
             let mut worker_handles = try_reserved_vec(
                 calculated_thread_count.get(),
                 "작업 스레드 handle 목록 메모리 확보 실패",
             )?;
-            for (worker_idx, (return_rx, local_pool)) in worker_buffers.into_iter().enumerate() {
-                let worker_idx_u64 = u64::from_le_bytes(worker_idx.to_le_bytes());
-                let loop_count =
-                    base_count.wrapping_add(u64::from(worker_idx_u64 < remainder));
+            for (worker_idx, ((return_rx, local_pool), return_sender)) in worker_buffers
+                .into_iter()
+                .zip(&return_senders)
+                .enumerate()
+            {
+                let loop_count = base_count.wrapping_add(usize::from(worker_idx < remainder));
                 let job = WorkerJob {
                     local_pool,
                     loop_count,
                     processed_ref,
                     return_rx,
+                    return_sender,
                     rng,
                     sender: sender.clone(),
-                    worker_idx,
                 };
                 worker_handles.push(scope_ctx.spawn(move || job.run()));
             }
@@ -253,7 +232,7 @@ pub(super) fn regenerate_with_count(
                         let GeneratedChunk {
                             buffer,
                             len,
-                            worker_idx,
+                            return_sender,
                         } = chunk;
                         let bytes = match output::prefix_slice(&buffer[..], len) {
                             Ok(bytes) => bytes,
@@ -262,11 +241,6 @@ pub(super) fn regenerate_with_count(
                         if let Err(error) = Write::write_all(output_writer, bytes) {
                             break Err(error.into());
                         }
-                        let Some(return_sender) = return_senders.get(worker_idx) else {
-                            break Err(AppError::message(
-                                "worker buffer 반환 채널 인덱스가 범위를 벗어났습니다",
-                            ));
-                        };
                         match return_sender.send(buffer) {
                             Ok(()) | Err(_) => {}
                         }
@@ -289,11 +263,15 @@ pub(super) fn regenerate_with_count(
                 }
             };
             drop(receiver);
-            let mut combined_outcome = WorkerOutcome::default();
+            let mut combined_outcome = None;
             let mut first_join_error = None;
             for handle in worker_handles {
                 match handle.join() {
-                    Ok(outcome) => combined_outcome.merge(outcome),
+                    Ok(Some(failure)) => record_failure(
+                        &mut combined_outcome,
+                        failure.count,
+                        failure.first_error,
+                    ),
                     Err(panic_payload) if first_join_error.is_none() => {
                         let panic_detail = panic_payload.downcast_ref::<String>().map_or_else(
                             || {
@@ -307,7 +285,7 @@ pub(super) fn regenerate_with_count(
                             "작업 스레드 패닉 발생: {panic_detail}"
                         )));
                     }
-                    Err(_) => {}
+                    Ok(None) | Err(_) => {}
                 }
             }
             let worker_result = first_join_error.map_or(Ok(combined_outcome), Err);
@@ -316,10 +294,10 @@ pub(super) fn regenerate_with_count(
             Ok(worker_outcome)
         })?
     };
-    if let WorkerOutcome::Failed {
+    if let Some(WorkerFailure {
         count: failed_count,
         first_error,
-    } = worker_outcome
+    }) = worker_outcome
     {
         return Err(AppError::context(
             format!(
