@@ -8,7 +8,6 @@ use std::{
     ffi::OsStr,
     io::{self, IsTerminal as TerminalDetect, Write as _},
     path::Path,
-    process::ExitCode,
     sync::LazyLock,
 };
 cfg_select! {
@@ -78,7 +77,7 @@ fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) 
         Ok(()) | Err(_) => {}
     }
 }
-fn main() -> Result<ExitCode> {
+fn main() -> Result<()> {
     let mut args = env::args_os().skip(1);
     if let Some(first) = args.next() {
         if first == OsStr::new("-h") || first == OsStr::new("--help") {
@@ -86,7 +85,7 @@ fn main() -> Result<ExitCode> {
                 return Err(unknown_option("알 수 없는 도움말 옵션", &extra));
             }
             output::write_slice_to_console(HELP_TEXT.as_bytes())?;
-            return Ok(ExitCode::SUCCESS);
+            return Ok(());
         }
         if first == OsStr::new("--version") {
             if let Some(extra) = args.next() {
@@ -94,7 +93,7 @@ fn main() -> Result<ExitCode> {
             }
             let mut out = io::stdout().lock();
             writeln!(out, "{APP_NAME} {APP_VERSION}")?;
-            return Ok(ExitCode::SUCCESS);
+            return Ok(());
         }
         return CliCommand::try_from((first, args))?.execute();
     }
@@ -106,10 +105,7 @@ fn main() -> Result<ExitCode> {
             let num_64 = match rng.source() {
                 HardwareRandomSource::RdSeed => {
                     let data = generate_random_data_with_rng(&rng)?;
-                    if rng.take_rdseed_fallback_notice() {
-                        let mut err = stderr().lock();
-                        err.write_all("RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.\n".as_bytes())?;
-                    }
+                    rng.write_rdseed_fallback_notice(&mut stderr().lock())?;
                     let num_64 = data.num_64;
                     persist_and_print_random_data(&mut output_file, &data)?;
                     num_64

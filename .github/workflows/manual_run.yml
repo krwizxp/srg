@@ -66,9 +66,7 @@ jobs:
         with:
           toolchain: 1.97.1
       - name: Install Linux native dependencies
-        run: sudo apt-get update
-      - name: Install Linux libcurl headers
-        run: sudo apt-get install -y libcurl4-openssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Build release binary
         run: cargo build --release --locked
       - name: Run selected SRG action

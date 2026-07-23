@@ -34,16 +34,6 @@ const _: () = assert!(offset_of!(CGPoint, y) == 8, "CoreGraphics CGPoint y offse
 struct Event {
     raw: NonNull<c_void>,
 }
-#[derive(Clone, Copy)]
-enum KeyDirection {
-    Down,
-    Up,
-}
-impl KeyDirection {
-    const fn is_down(self) -> bool {
-        matches!(self, Self::Down)
-    }
-}
 impl Drop for Event {
     fn drop(&mut self) {
         // SAFETY: raw is a CoreFoundation object returned by CGEventCreate* and released exactly once here.
@@ -61,12 +51,12 @@ impl Event {
     }
     fn keyboard(
         virtual_key: CGKeyCode,
-        direction: KeyDirection,
+        is_down: bool,
         context: &str,
     ) -> InputResult<Self> {
         // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
         let raw_ptr =
-            unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, direction.is_down()) };
+            unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) };
         Self::from_raw(raw_ptr, context)
     }
     fn location(&self) -> CGPoint {
@@ -76,7 +66,6 @@ impl Event {
     fn mouse(
         mouse_type: CGEventType,
         mouse_cursor_position: CGPoint,
-        mouse_button: CGMouseButton,
         context: &str,
     ) -> InputResult<Self> {
         // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
@@ -85,7 +74,7 @@ impl Event {
                 null_mut(),
                 mouse_type,
                 mouse_cursor_position,
-                mouse_button,
+                MOUSE_BUTTON_LEFT,
             )
         };
         Self::from_raw(raw_ptr, context)
@@ -118,21 +107,19 @@ impl TriggerAction {
                     let mouse_down = Event::mouse(
                         EVENT_LEFT_MOUSE_DOWN,
                         point,
-                        MOUSE_BUTTON_LEFT,
                         "마우스 누름",
                     )?;
                     let mouse_up = Event::mouse(
                         EVENT_LEFT_MOUSE_UP,
                         point,
-                        MOUSE_BUTTON_LEFT,
                         "마우스 뗌",
                     )?;
                     mouse_down.post();
                     mouse_up.post();
                 }
                 Self::F5Press => {
-                    let key_down = Event::keyboard(KEY_CODE_F5, KeyDirection::Down, "F5 누름")?;
-                    let key_up = Event::keyboard(KEY_CODE_F5, KeyDirection::Up, "F5 뗌")?;
+                    let key_down = Event::keyboard(KEY_CODE_F5, true, "F5 누름")?;
+                    let key_up = Event::keyboard(KEY_CODE_F5, false, "F5 뗌")?;
                     key_down.post();
                     key_up.post();
                 }

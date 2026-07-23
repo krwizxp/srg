@@ -63,9 +63,7 @@ unsafe extern "system" {
         buffer_size: u32,
     ) -> i32;
 }
-pub(super) struct OutputFile {
-    writer: BufWriter<File>,
-}
+pub(super) struct OutputFile(BufWriter<File>);
 impl TryFrom<&Path> for OutputFile {
     type Error = AppError;
     fn try_from(path: &Path) -> Result<Self> {
@@ -150,13 +148,14 @@ impl TryFrom<&Path> for OutputFile {
         if file.seek(SeekFrom::End(0))? == 0 {
             IoWrite::write_all(&mut file, UTF8_BOM)?;
         }
-        Ok(Self {
-            writer: BufWriter::with_capacity(OUTPUT_FILE_BUFFER_CAPACITY, file),
-        })
+        Ok(Self(BufWriter::with_capacity(
+            OUTPUT_FILE_BUFFER_CAPACITY,
+            file,
+        )))
     }
 }
 impl OutputFile {
     pub(super) const fn writer(&mut self) -> &mut BufWriter<File> {
-        &mut self.writer
+        &mut self.0
     }
 }

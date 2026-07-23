@@ -2132,22 +2132,52 @@
       }
       return v;
     };
-    const firstGeocodeText = (...vals) => {
-      for (let i = 0; i < vals.length; i++) {
-        const v = geocodeText(vals[i]);
-        if (v) return v;
+    const firstGeocodeText = (a, b, c, d) =>
+      geocodeText(a) || geocodeText(b) || geocodeText(c) || geocodeText(d);
+    const ADMIN_SUFFIX_SI = 1;
+    const ADMIN_SUFFIX_GUN = 2;
+    const ADMIN_SUFFIX_GU = 4;
+    const ADMIN_SUFFIX_EUP = 8;
+    const ADMIN_SUFFIX_MYEON = 16;
+    const ADMIN_SUFFIX_DONG = 32;
+    const ADMIN_SUFFIX_RI = 64;
+    const RX_ADMIN_LEVEL = /^level\d+$/;
+    function adminSuffix(name) {
+      if (!name) return 0;
+      switch (name.charCodeAt(name.length - 1)) {
+        case CC_SI: return ADMIN_SUFFIX_SI;
+        case CC_GUN: return ADMIN_SUFFIX_GUN;
+        case CC_GU: return ADMIN_SUFFIX_GU;
+        case CC_EUP: return ADMIN_SUFFIX_EUP;
+        case CC_MYEON: return ADMIN_SUFFIX_MYEON;
+        case CC_DONG: return ADMIN_SUFFIX_DONG;
+        case CC_RI: return ADMIN_SUFFIX_RI;
+        default: return 0;
+      }
+    }
+    function pickAdminName(
+      candidates,
+      suffixMask,
+      excludedA = "",
+      excludedB = "",
+      excludedC = "",
+      rejectSpecialCity = false,
+    ) {
+      for (const name of candidates) {
+        if (
+          !name || name === excludedA || name === excludedB ||
+          name === excludedC
+        ) continue;
+        if (suffixMask && !(adminSuffix(name) & suffixMask)) continue;
+        if (rejectSpecialCity && CONFIG.SPECIAL_CITIES.test(name)) continue;
+        return name;
       }
       return "";
-    };
+    }
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
-    const BASE_URL_HREF = (() => {
-      const url = new URL("https://nominatim.openstreetmap.org/reverse");
-      url.searchParams.set("format", "geocodejson");
-      url.searchParams.set("zoom", String(CONFIG.REVERSE_ZOOM));
-      url.searchParams.set("accept-language", "ko");
-      return url.href;
-    })();
+    const BASE_URL_HREF =
+      `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
     const REVERSE_CACHE_VARIANT =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
     const OSM_ATTRIBUTION_TEXT = "\u00A9 OpenStreetMap contributors";
@@ -2609,15 +2639,16 @@
     const getQSearch = (r) => {
       let s = r._q;
       if (s != null) return s;
-      return (r._q = r._f_fullAddr +
+      const result = r.result;
+      return (r._q = result.nFullAddr +
         Q_SEARCH_SEP +
-        r._f_tag +
+        result.nTag +
         Q_SEARCH_SEP +
-        r._f_emd +
+        result.nEmd +
         Q_SEARCH_SEP +
-        r._f_sigungu +
+        result.nSigungu +
         Q_SEARCH_SEP +
-        r._f_sido +
+        result.nSido +
         Q_SEARCH_SEP +
         r.latStr +
         "," +
@@ -2631,7 +2662,8 @@
       return setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r);
     }
     function setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r) {
-      if (!r || r._f_kind === undefined) {
+      const result = r?.result;
+      if (!result) {
         if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
         return true;
       }
@@ -2643,17 +2675,17 @@
       const fullAddr = f.fullAddr;
       const qTest = f.qTest;
       let hide = false;
-      if (kind && r._f_kind !== kind) {
+      if (kind && (result.kindLower || lower(r.set)) !== kind) {
         hide = true;
-      } else if (sido && r._f_sido.indexOf(sido) === -1) {
+      } else if (sido && result.nSido.indexOf(sido) === -1) {
         hide = true;
-      } else if (sigungu && r._f_sigungu.indexOf(sigungu) === -1) {
+      } else if (sigungu && result.nSigungu.indexOf(sigungu) === -1) {
         hide = true;
-      } else if (emd && r._f_emd.indexOf(emd) === -1) {
+      } else if (emd && result.nEmd.indexOf(emd) === -1) {
         hide = true;
-      } else if (tag && r._f_tag.indexOf(tag) === -1) {
+      } else if (tag && result.nTag.indexOf(tag) === -1) {
         hide = true;
-      } else if (fullAddr && r._f_fullAddr.indexOf(fullAddr) === -1) {
+      } else if (fullAddr && result.nFullAddr.indexOf(fullAddr) === -1) {
         hide = true;
       } else if (qTest && !qTest(r)) {
         hide = true;
@@ -2665,32 +2697,28 @@
       if (wasHidden) tr.removeAttribute("hidden");
       return false;
     }
-    let setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
     function clearFindReveals() {
       if (FIND_REVEALED_ROWS.size === 0 && !FIND_REHIDE_TIMER) return;
-      setHiddenByFilterActiveFn = setRowHiddenByFilterActiveNoReveal;
       if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
       FIND_REHIDE_TIMER = null;
       FIND_REVEALED_ROWS.clear();
     }
-    const FILTER_CTX = {
-      timer: null,
-      job: null,
-    };
+    let filterTimer = null;
+    let filterJob = null;
     function cancelPendingFilterDebounce() {
-      if (FILTER_CTX.timer) {
-        clearTimeout(FILTER_CTX.timer);
-        FILTER_CTX.timer = null;
+      if (filterTimer) {
+        clearTimeout(filterTimer);
+        filterTimer = null;
       }
     }
     function cancelActiveFilterApply() {
-      const job = FILTER_CTX.job;
+      const job = filterJob;
       if (!job) return;
       if (job.raf) {
         cancelAnimationFrame(job.raf);
         job.raf = 0;
       }
-      FILTER_CTX.job = null;
+      filterJob = null;
     }
     function cancelActiveFilterTask() {
       cancelPendingFilterDebounce();
@@ -2711,7 +2739,9 @@
         return;
       }
       const records = AppState.records;
-      const setHidden = setHiddenByFilterActiveFn;
+      const setHidden = FIND_REVEALED_ROWS.size === 0
+        ? setRowHiddenByFilterActiveNoReveal
+        : setRowHiddenByFilterActive;
       if (len <= 2000) {
         cancelActiveFilterApply();
         let anyVisible = false;
@@ -2723,7 +2753,7 @@
         syncFilterEmptyUI(true, len, anyVisible);
         return;
       }
-      const existing = FILTER_CTX.job;
+      const existing = filterJob;
       if (existing && existing.rows === rows) {
         existing.f = f;
         existing.i = 0;
@@ -2745,14 +2775,16 @@
         records,
         anyVisible: false,
         step: () => {
-          if (FILTER_CTX.job !== job) return;
+          if (filterJob !== job) return;
           job.raf = 0;
           const rows = job.rows;
           const records = job.records;
           const len = job.len;
           let i = job.i;
           let anyVisible = job.anyVisible;
-          const setHidden = setHiddenByFilterActiveFn;
+          const setHidden = FIND_REVEALED_ROWS.size === 0
+            ? setRowHiddenByFilterActiveNoReveal
+            : setRowHiddenByFilterActive;
           const deadline = performance.now() + 8;
           let processed = 0;
           while (i < len) {
@@ -2772,16 +2804,16 @@
             job.raf = requestAnimationFrame(job.step);
           } else {
             syncFilterEmptyUI(true, len, anyVisible);
-            FILTER_CTX.job = null;
+            filterJob = null;
           }
         },
       };
-      FILTER_CTX.job = job;
+      filterJob = job;
       job.raf = requestAnimationFrame(job.step);
     }
     function scheduleApplyFilterAll() {
       filterDirty = true;
-      const activeJob = FILTER_CTX.job;
+      const activeJob = filterJob;
       if (activeJob) {
         activeJob.i = activeJob.len;
         if (activeJob.raf) {
@@ -2790,8 +2822,8 @@
         }
       }
       cancelPendingFilterDebounce();
-      FILTER_CTX.timer = setTimeout(() => {
-        FILTER_CTX.timer = null;
+      filterTimer = setTimeout(() => {
+        filterTimer = null;
         closeMapPopover();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
@@ -2800,89 +2832,49 @@
     const CSV_ENCODER = new TextEncoder();
     const CSV_NL_BYTES = CSV_ENCODER.encode("\n");
     const CSV_HEADER_BYTES = (() => {
-      let header = "\uFEFF";
-      header += csvEsc("구분");
-      header += "," + csvEsc("순번");
-      header += "," + csvEsc("좌표 (위도,경도)");
-      header += "," + csvEsc("시·도");
-      header += "," + csvEsc("시·군·구");
-      header += "," + csvEsc("읍·면·동·리");
-      header += "," + csvEsc("지물 태그");
-      header += "," + csvEsc("전체주소");
-      header += "," + csvEsc("데이터 출처");
-      header += "," + csvEsc("라이선스");
-      header += "," + csvEsc("역지오코딩");
+      let header =
+        "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩";
       for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
         header += "," + csvEsc("지도링크(" + MAP_LINKS[i].key + ")");
       }
       return CSV_ENCODER.encode(header);
     })();
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
     function getAdminFromGeocoding(gc, countryCode, p0, p1) {
-        let level2 = "";
-        let level4 = "";
-        let level6 = "";
-        let level7 = "";
-        let level8 = "";
-        let level9 = "";
-        let level10 = "";
+        const levels = [];
         const admin = gc.admin;
         if (admin && typeof admin === "object") {
-          let filled = 0;
           for (const key in admin) {
-            if (
-              key.length < 6 ||
-              key.charCodeAt(0) !== 108 ||
-              key.charCodeAt(1) !== 101 ||
-              key.charCodeAt(2) !== 118 ||
-              key.charCodeAt(3) !== 101 ||
-              key.charCodeAt(4) !== 108
-            ) {
-              continue;
-            }
-            let n = 0;
-            for (let i = 5; i < key.length; i++) {
-              const d = key.charCodeAt(i) - 48;
-              if (d < 0 || d > 9) {
-                n = 0;
-                break;
-              }
-              n = n * 10 + d;
-            }
-            if (!n) continue;
-            const val = geocodeText(admin[key]);
-            switch (n) {
+            if (!RX_ADMIN_LEVEL.test(key)) continue;
+            const level = Number(key.slice(5));
+            switch (level) {
               case 2:
-                level2 = val;
-                filled |= 1;
-                break;
               case 4:
-                level4 = val;
-                filled |= 2;
-                break;
               case 6:
-                level6 = val;
-                filled |= 4;
-                break;
               case 7:
-                level7 = val;
-                filled |= 8;
-                break;
               case 8:
-                level8 = val;
-                filled |= 16;
-                break;
               case 9:
-                level9 = val;
-                filled |= 32;
-                break;
               case 10:
-                level10 = val;
-                filled |= 64;
-                break;
+                levels[level] = geocodeText(admin[key]);
             }
-            if (filled === 127) break;
           }
         }
+        const level2 = levels[2] || "";
+        const level4 = levels[4] || "";
+        const level6 = levels[6] || "";
+        const level7 = levels[7] || "";
+        const level8 = levels[8] || "";
+        const level9 = levels[9] || "";
+        const level10 = levels[10] || "";
         const gcCountry = geocodeText(gc.country);
         const gcName = geocodeText(gc.name);
         const gcCityDistrict = geocodeText(gc.city_district);
@@ -2933,234 +2925,84 @@
         const county = gcCounty;
         if (isKoreanPeninsula) {
           const level6Kr = level6 || level7;
-          const specialCities = CONFIG.SPECIAL_CITIES;
           sido = level4 || gcState || "";
-          let cityIsSpecial = false;
-          let cityIsSpecialKnown = false;
-          if (!sido && city) {
-            cityIsSpecialKnown = true;
-            cityIsSpecial = specialCities.test(city);
-            if (cityIsSpecial) {
-              sido = city;
-            }
-          }
-          let sidoIsSpecial = false;
-          if (sido) {
-            if (sido === city) {
-              if (!cityIsSpecialKnown && city) {
-                cityIsSpecialKnown = true;
-                cityIsSpecial = specialCities.test(city);
-              }
-              sidoIsSpecial = cityIsSpecial;
-            } else {
-              sidoIsSpecial = specialCities.test(sido);
-            }
-          }
+          const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
+          if (!sido && cityIsSpecial) sido = city;
+          const sidoIsSpecial = !!sido && (
+            sido === city ? cityIsSpecial : CONFIG.SPECIAL_CITIES.test(sido)
+          );
           if (sidoIsSpecial) {
-            let picked = "";
-            const cd = cityDistrict;
-            const l6 = level6Kr;
-            const co = county;
-            const pn = primaryName;
-            let cdLast = 0;
-            let l6Last = 0;
-            let coLast = 0;
-            let pnLast = 0;
-            let p0Last = 0;
-            let p1Last = 0;
-            if (cd && cd !== sido) {
-              cdLast = cd.charCodeAt(cd.length - 1);
-              if (cdLast === CC_GU || cdLast === CC_GUN) picked = cd;
-            }
-            if (!picked && l6 && l6 !== sido) {
-              l6Last = l6.charCodeAt(l6.length - 1);
-              if (l6Last === CC_GU || l6Last === CC_GUN) picked = l6;
-            }
-            if (!picked && co && co !== sido) {
-              coLast = co.charCodeAt(co.length - 1);
-              if (coLast === CC_GU || coLast === CC_GUN) picked = co;
-            }
-            if (!picked && pn && pn !== sido) {
-              pnLast = pn.charCodeAt(pn.length - 1);
-              if (pnLast === CC_GU || pnLast === CC_GUN) picked = pn;
-            }
-            if (!picked && p0 && p0 !== sido) {
-              p0Last = p0.charCodeAt(p0.length - 1);
-              if (p0Last === CC_GU || p0Last === CC_GUN) picked = p0;
-            }
-            if (!picked && p1 && p1 !== sido) {
-              p1Last = p1.charCodeAt(p1.length - 1);
-              if (p1Last === CC_GU || p1Last === CC_GUN) picked = p1;
-            }
-            if (!picked) {
-              if (
-                cdLast === CC_SI ||
-                l6Last === CC_SI ||
-                coLast === CC_SI ||
-                pnLast === CC_SI ||
-                p0Last === CC_SI ||
-                p1Last === CC_SI
-              ) {
-                const isSpecialCityName = (name) => {
-                  if (!name) return false;
-                  if (name === city) {
-                    if (!cityIsSpecialKnown && city) {
-                      cityIsSpecialKnown = true;
-                      cityIsSpecial = specialCities.test(city);
-                    }
-                    return cityIsSpecial;
-                  }
-                  return specialCities.test(name);
-                };
-                if (cdLast === CC_SI && !isSpecialCityName(cd)) picked = cd;
-                else if (l6Last === CC_SI && !isSpecialCityName(l6)) {
-                  picked = l6;
-                } else if (coLast === CC_SI && !isSpecialCityName(co)) {
-                  picked = co;
-                } else if (pnLast === CC_SI && !isSpecialCityName(pn)) {
-                  picked = pn;
-                } else if (p0Last === CC_SI && !isSpecialCityName(p0)) {
-                  picked = p0;
-                } else if (p1Last === CC_SI && !isSpecialCityName(p1)) {
-                  picked = p1;
-                }
-              }
-            }
-            sigungu = picked || "";
+            const candidates = [
+              cityDistrict,
+              level6Kr,
+              county,
+              primaryName,
+              p0,
+              p1,
+            ];
+            sigungu = pickAdminName(
+              candidates,
+              ADMIN_SUFFIX_GU | ADMIN_SUFFIX_GUN,
+              sido,
+            ) || pickAdminName(
+              candidates,
+              ADMIN_SUFFIX_SI,
+              sido,
+              "",
+              "",
+              true,
+            );
           } else {
-            let cityLike = "";
-            const l6 = level6Kr;
-            const co = county;
-            const pn = primaryName;
-            let cityLast = 0;
-            let coLast = 0;
-            let l6Last = 0;
-            let pnLast = 0;
-            let p1Last = 0;
-            let p0Last = 0;
-            if (city && city !== sido) {
-              cityLast = city.charCodeAt(city.length - 1);
-              if (cityLast === CC_SI || cityLast === CC_GUN) cityLike = city;
-            }
-            if (!cityLike && co && co !== sido) {
-              coLast = co.charCodeAt(co.length - 1);
-              if (coLast === CC_SI || coLast === CC_GUN) cityLike = co;
-            }
-            if (!cityLike && l6 && l6 !== sido) {
-              l6Last = l6.charCodeAt(l6.length - 1);
-              if (l6Last === CC_SI || l6Last === CC_GUN) cityLike = l6;
-            }
-            if (!cityLike && pn && pn !== sido) {
-              pnLast = pn.charCodeAt(pn.length - 1);
-              if (pnLast === CC_SI || pnLast === CC_GUN) cityLike = pn;
-            }
-            if (!cityLike && p1 && p1 !== sido) {
-              p1Last = p1.charCodeAt(p1.length - 1);
-              if (p1Last === CC_SI || p1Last === CC_GUN) cityLike = p1;
-            }
-            if (!cityLike && p0 && p0 !== sido) {
-              p0Last = p0.charCodeAt(p0.length - 1);
-              if (p0Last === CC_SI || p0Last === CC_GUN) cityLike = p0;
-            }
-            let districtLike = "";
-            const town = gcTown;
-            const locality = gcLocality;
-            const village = gcVillage;
-            let cdLast = 0;
-            if (
-              cityDistrict && cityDistrict !== cityLike &&
-              cityDistrict !== sido
-            ) {
-              cdLast = cityDistrict.charCodeAt(cityDistrict.length - 1);
-              if (cdLast === CC_GU) districtLike = cityDistrict;
-            }
-            if (
-              !districtLike &&
-              level8 &&
-              level8 !== cityLike &&
-              level8 !== sido &&
-              level8.charCodeAt(level8.length - 1) === CC_GU
-            ) {
-              districtLike = level8;
-            } else if (
-              !districtLike &&
-              level9 &&
-              level9 !== cityLike &&
-              level9 !== sido &&
-              level9.charCodeAt(level9.length - 1) === CC_GU
-            ) {
-              districtLike = level9;
-            } else if (
-              !districtLike &&
-              town &&
-              town !== cityLike &&
-              town !== sido &&
-              town.charCodeAt(town.length - 1) === CC_GU
-            ) {
-              districtLike = town;
-            } else if (
-              !districtLike &&
-              locality &&
-              locality !== cityLike &&
-              locality !== sido &&
-              locality.charCodeAt(locality.length - 1) === CC_GU
-            ) {
-              districtLike = locality;
-            } else if (
-              !districtLike &&
-              village &&
-              village !== cityLike &&
-              village !== sido &&
-              village.charCodeAt(village.length - 1) === CC_GU
-            ) {
-              districtLike = village;
-            }
+            const cityLike = pickAdminName(
+              [city, county, level6Kr, primaryName, p1, p0],
+              ADMIN_SUFFIX_SI | ADMIN_SUFFIX_GUN,
+              sido,
+            );
+            const districtLike = pickAdminName(
+              [
+                cityDistrict,
+                level8,
+                level9,
+                gcTown,
+                gcLocality,
+                gcVillage,
+              ],
+              ADMIN_SUFFIX_GU,
+              sido,
+              cityLike,
+            );
             if (cityLike && districtLike && districtLike !== cityLike) {
               sigungu = `${cityLike} ${districtLike}`;
             } else {
               sigungu = cityLike || districtLike || "";
             }
             if (!sigungu) {
-              if (coLast === CC_SI || coLast === CC_GU || coLast === CC_GUN) {
-                sigungu = co;
-              } else if (
-                l6Last === CC_SI || l6Last === CC_GU || l6Last === CC_GUN
-              ) sigungu = l6;
-              else if (
-                cdLast === CC_SI || cdLast === CC_GU || cdLast === CC_GUN
-              ) sigungu = cityDistrict;
-              else if (
-                pnLast === CC_SI || pnLast === CC_GU || pnLast === CC_GUN
-              ) sigungu = pn;
-              else if (
-                p0Last === CC_SI || p0Last === CC_GU || p0Last === CC_GUN
-              ) sigungu = p0;
-              else if (
-                p1Last === CC_SI || p1Last === CC_GU || p1Last === CC_GUN
-              ) sigungu = p1;
+              sigungu = pickAdminName(
+                [county, level6Kr, cityDistrict, primaryName, p0, p1],
+                ADMIN_SUFFIX_SI | ADMIN_SUFFIX_GU | ADMIN_SUFFIX_GUN,
+                sido,
+              );
             }
           }
           const emdNames = [];
-          for (let i = 0; i < 10; i++) {
-            let name;
-            switch (i) {
-              case 0: name = level8; break;
-              case 1: name = level9; break;
-              case 2: name = level10; break;
-              case 3: name = gcTown; break;
-              case 4: name = gcVillage; break;
-              case 5: name = gcLocality; break;
-              case 6: name = gcSuburb; break;
-              case 7: name = primaryName; break;
-              case 8: name = p0; break;
-              case 9: name = p1; break;
-            }
+          const emdSuffixes = ADMIN_SUFFIX_EUP | ADMIN_SUFFIX_MYEON |
+            ADMIN_SUFFIX_DONG | ADMIN_SUFFIX_RI;
+          for (const name of [
+            level8,
+            level9,
+            level10,
+            gcTown,
+            gcVillage,
+            gcLocality,
+            gcSuburb,
+            primaryName,
+            p0,
+            p1,
+          ]) {
             if (!name || name === sido || name === sigungu) continue;
-            const last = name.charCodeAt(name.length - 1);
             if (
               emdNames.includes(name) ||
-              (last !== CC_EUP && last !== CC_MYEON && last !== CC_DONG &&
-                last !== CC_RI)
+              !(adminSuffix(name) & emdSuffixes)
             ) continue;
             emdNames.push(name);
           }
@@ -3174,40 +3016,26 @@
             gcCounty ||
             gcCity ||
             "";
-          let cityLike = "";
-          if (city && city !== sido) cityLike = city;
-          else if (county && county !== sido) cityLike = county;
-          else if (level6 && level6 !== sido) cityLike = level6;
-          else if (level7 && level7 !== sido) cityLike = level7;
-          else if (primaryName && primaryName !== sido) {
-            cityLike = primaryName;
-          } else if (p1 && p1 !== sido) cityLike = p1;
-          else if (p0 && p0 !== sido) cityLike = p0;
-          let districtLike = "";
-          const town = gcTown;
-          const locality = gcLocality;
-          const village = gcVillage;
-          const suburb = gcSuburb;
-          const neighbourhood = gcNeighbourhood;
-          if (
-            cityDistrict && cityDistrict !== cityLike && cityDistrict !== sido
-          ) districtLike = cityDistrict;
-          else if (level8 && level8 !== cityLike && level8 !== sido) {
-            districtLike = level8;
-          } else if (level9 && level9 !== cityLike && level9 !== sido) {
-            districtLike = level9;
-          } else if (town && town !== cityLike && town !== sido) {
-            districtLike = town;
-          } else if (locality && locality !== cityLike && locality !== sido) {
-            districtLike = locality;
-          } else if (village && village !== cityLike && village !== sido) {
-            districtLike = village;
-          } else if (suburb && suburb !== cityLike && suburb !== sido) {
-            districtLike = suburb;
-          } else if (
-            neighbourhood && neighbourhood !== cityLike &&
-            neighbourhood !== sido
-          ) districtLike = neighbourhood;
+          const cityLike = pickAdminName(
+            [city, county, level6, level7, primaryName, p1, p0],
+            0,
+            sido,
+          );
+          const districtLike = pickAdminName(
+            [
+              cityDistrict,
+              level8,
+              level9,
+              gcTown,
+              gcLocality,
+              gcVillage,
+              gcSuburb,
+              gcNeighbourhood,
+            ],
+            0,
+            sido,
+            cityLike,
+          );
           if (cityLike && districtLike && cityLike !== districtLike) {
             sigungu = `${cityLike} ${districtLike}`;
           } else {
@@ -3225,34 +3053,35 @@
           if ((!sigungu || sigungu === sido) && isCityOrCounty) {
             sigungu = primaryName || gcCity || gcCounty || "";
           }
-          const quarter = gcQuarter;
-          const hamlet = gcHamlet;
-          const township = gcTownship;
-          const residential = gcResidential;
-          eupmyeon =
-            (locality && locality !== sido && locality !== cityLike && locality !== districtLike ? locality : "") ||
-            (level10 && level10 !== sido && level10 !== cityLike && level10 !== districtLike ? level10 : "") ||
-            (town && town !== sido && town !== cityLike && town !== districtLike ? town : "") ||
-            (village && village !== sido && village !== cityLike && village !== districtLike ? village : "") ||
-            (suburb && suburb !== sido && suburb !== cityLike && suburb !== districtLike ? suburb : "") ||
-            (neighbourhood && neighbourhood !== sido && neighbourhood !== cityLike &&
-              neighbourhood !== districtLike ? neighbourhood : "") ||
-            (quarter && quarter !== sido && quarter !== cityLike && quarter !== districtLike ? quarter : "") ||
-            (hamlet && hamlet !== sido && hamlet !== cityLike && hamlet !== districtLike ? hamlet : "") ||
-            (township && township !== sido && township !== cityLike && township !== districtLike ? township : "") ||
-            (residential && residential !== sido && residential !== cityLike &&
-              residential !== districtLike ? residential : "") ||
-            (gcName && gcName !== sido && gcName !== cityLike && gcName !== districtLike ? gcName : "") ||
-            (p0 && p0 !== sido && p0 !== cityLike && p0 !== districtLike ? p0 : "") ||
-            (p1 && p1 !== sido && p1 !== cityLike && p1 !== districtLike ? p1 : "");
+          eupmyeon = pickAdminName(
+            [
+              gcLocality,
+              level10,
+              gcTown,
+              gcVillage,
+              gcSuburb,
+              gcNeighbourhood,
+              gcQuarter,
+              gcHamlet,
+              gcTownship,
+              gcResidential,
+              gcName,
+              p0,
+              p1,
+            ],
+            0,
+            sido,
+            cityLike,
+            districtLike,
+          );
           if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
             eupmyeon = "";
           }
           if (!eupmyeon && districtLike && districtLike !== sido) {
             eupmyeon = districtLike;
             if (sigungu) {
-              let s = String(sigungu);
-              const dl = String(districtLike);
+              let s = sigungu;
+              const dl = districtLike;
               if (s === dl) {
                 s = "";
               } else {
@@ -3386,14 +3215,14 @@
     const AppState = {
       records: [],
       droppedFile: null,
-      status: "idle",
-      controller: null,
-      resumeHandler: null,
-      inFlight: false,
+      task: null,
       renderReq: null,
-      cntSuccess: 0,
+      processed: 0,
       cntFail: 0,
       bulkAcknowledged: true,
+      get status() {
+        return this.task?.status ?? "idle";
+      },
       get isRunning() {
         return (
           this.status === "running" ||
@@ -3402,8 +3231,7 @@
         );
       },
       get isBusy() {
-        return this.isRunning || this.status === "parsing" ||
-          this.status === "stopping";
+        return this.task !== null;
       },
       get isPaused() {
         return this.status === "paused";
@@ -3411,31 +3239,34 @@
       get isStopping() {
         return this.status === "stopping";
       },
-      get processedCount() {
-        return this.cntSuccess + this.cntFail;
-      },
       reset(status = "idle") {
-        this.cntSuccess = 0;
+        this.processed = 0;
         this.cntFail = 0;
-        this.status = status;
-        this.controller = null;
-        this.resumeHandler = null;
-        this.inFlight = false;
+        this.task = status === "idle"
+          ? null
+          : {
+            status,
+            controller: new AbortController(),
+            resumeHandler: null,
+            inFlight: false,
+          };
         if (this.renderReq !== null) {
           cancelAnimationFrame(this.renderReq);
           this.renderReq = null;
         }
         updateUIState();
         scheduleRender();
+        return this.task;
       },
       setRecords(newRecords, status = "idle") {
         this.records = newRecords;
         this.bulkAcknowledged =
           newRecords.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
-        this.reset(status);
+        return this.reset(status);
       },
       setStatus(st) {
-        this.status = st;
+        if (st === "idle") this.task = null;
+        else this.task.status = st;
         updateUIState();
       },
     };
@@ -3461,7 +3292,6 @@
       domElements.dropZone.toggleAttribute("inert", isBusy);
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
-    const RX_STATUS_PROGRESS = /^처리 중… \(([\d,]+)\/([\d,]+)\)$/;
     let statusLiveTimer = 0;
     function setStatusLiveText(text) {
       clearTimeout(statusLiveTimer);
@@ -3471,55 +3301,46 @@
         domElements.statusLive.textContent = text;
       }, 24);
     }
-    function announceStatusMessage(msg, type = "info") {
+    function announceStatusText(text) {
+      if (SR_STATUS_CACHE.msg === text) return;
+      SR_STATUS_CACHE.msg = text;
+      setStatusLiveText(text);
+    }
+    function announceStatusMessage(msg) {
       const text = String(msg ?? "").trim();
+      SR_STATUS_CACHE.progressBucket = -1;
       if (!text) {
         SR_STATUS_CACHE.msg = null;
-        SR_STATUS_CACHE.progressBucket = -1;
         setStatusLiveText("");
         return;
       }
-      let nextAnnouncement = text;
-      const progressMatch = type === "info"
-        ? RX_STATUS_PROGRESS.exec(text)
-        : null;
-      if (progressMatch) {
-        const processed = Number.parseInt(
-          progressMatch[1].replace(/,/g, ""),
-          10,
-        );
-        const total = Number.parseInt(progressMatch[2].replace(/,/g, ""), 10);
-        if (
-          Number.isFinite(processed) && Number.isFinite(total) && total > 0
-        ) {
-          const pct = Math.round((processed / total) * 100);
-          const bucket = total <= 10
-            ? pct
-            : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
-          if (
-            bucket === SR_STATUS_CACHE.progressBucket && processed !== total
-          ) return;
-          SR_STATUS_CACHE.progressBucket = bucket;
-          nextAnnouncement =
-            `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`;
-        }
-      } else {
-        SR_STATUS_CACHE.progressBucket = -1;
-      }
-      if (SR_STATUS_CACHE.msg === nextAnnouncement) return;
-      SR_STATUS_CACHE.msg = nextAnnouncement;
-      setStatusLiveText(nextAnnouncement);
+      announceStatusText(text);
     }
-    function setStatusMessage(msg, type = "info") {
+    function setStatusVisual(msg, type) {
       const el = domElements.status;
-      const nextMsg = String(msg ?? "");
-      if (el.textContent !== nextMsg) {
-        el.textContent = nextMsg;
-      }
+      if (el.textContent !== msg) el.textContent = msg;
       el.classList.toggle("err", type === "error");
       el.classList.toggle("warn", type === "warn");
       el.classList.toggle("stopped", type === "stopped");
-      announceStatusMessage(nextMsg, type);
+    }
+    function setStatusMessage(msg, type = "info") {
+      const nextMsg = String(msg ?? "");
+      setStatusVisual(nextMsg, type);
+      announceStatusMessage(nextMsg);
+    }
+    function setProgressStatus(processed, total, totalDisp) {
+      setStatusVisual(`처리 중… (${fmt(processed)}/${totalDisp})`, "info");
+      const pct = Math.round((processed / total) * 100);
+      const bucket = total <= 10
+        ? pct
+        : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
+      if (
+        bucket === SR_STATUS_CACHE.progressBucket && processed !== total
+      ) return;
+      SR_STATUS_CACHE.progressBucket = bucket;
+      announceStatusText(
+        `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`,
+      );
     }
     const FILE_READY_HINT = "파일 업로드 완료! 좌표 추출을 눌러주세요.";
     function ensureNominatimRequestOrigin() {
@@ -3570,9 +3391,9 @@
       const wrap = domElements.tableWrap;
       const tbody = domElements.tbody;
       const total = AppState.records.length;
-      const processed = AppState.processedCount;
-      const success = AppState.cntSuccess;
+      const processed = AppState.processed;
       const fail = AppState.cntFail;
+      const success = processed - fail;
       const remaining = total - processed;
       if (RENDER_CACHE.total !== total) {
         RENDER_CACHE.total = total;
@@ -3693,6 +3514,12 @@
           channel.port2.postMessage(0);
         });
     })();
+    async function cancelReadable(readable, reason) {
+      try {
+        await readable?.cancel(reason);
+      } catch {
+      }
+    }
     async function* decodedChunkIterator(stream, signal) {
       const reader = stream
         .pipeThrough(new TextDecoderStream(), { signal })
@@ -3710,12 +3537,7 @@
           yield chunk;
         }
       } finally {
-        if (!finished) {
-          try {
-            await reader.cancel(signal.reason);
-          } catch {
-          }
-        }
+        if (!finished) await cancelReadable(reader, signal.reason);
         reader.releaseLock();
       }
     }
@@ -3815,19 +3637,12 @@
           }
           out.push({
             set: m[1] === "대한민국" ? "KR" : "WORLD",
-            _f_kind: undefined,
-            _f_sido: "",
-            _f_sigungu: "",
-            _f_emd: "",
-            _f_tag: "",
-            _f_fullAddr: "",
             latStr: lat,
             lonStr: lon,
             cacheKey: fLat + "," + fLon,
             lat6: null,
             lon6: null,
-            addr: null,
-            fullAddr: "",
+            result: null,
             _q: null,
           });
         }
@@ -3838,6 +3653,16 @@
     const REVERSE_PARSED_CACHE_MAX = 5_000;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
+    function normalizeReverseParsed(parsed) {
+      const addr = parsed.addr;
+      parsed.kindLower ??= lower(parsed.kind);
+      parsed.nSido ??= norm(addr.sido);
+      parsed.nSigungu ??= norm(addr.sigungu);
+      parsed.nEmd ??= norm(addr.eupmyeon);
+      parsed.nTag ??= norm(addr.tag);
+      parsed.nFullAddr ??= norm(addr.fullAddr);
+      return parsed;
+    }
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -3870,8 +3695,6 @@
       if (
         !row ||
         row.key !== expectedKey ||
-        row.variant !== REVERSE_CACHE_VARIANT ||
-        row.parserVersion !== CONFIG.REVERSE_CACHE_PARSER_VERSION ||
         !Number.isFinite(row.savedAt) ||
         !isValidReverseParsed(row.parsed)
       ) {
@@ -3881,7 +3704,8 @@
       return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
     }
     function persistentReverseCacheKey(cacheKey) {
-      return REVERSE_CACHE_VARIANT + ":" + cacheKey;
+      return REVERSE_CACHE_VARIANT + ":" +
+        CONFIG.REVERSE_CACHE_PARSER_VERSION + ":" + cacheKey;
     }
     function openReverseCacheDb() {
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
@@ -3942,39 +3766,35 @@
       });
       return REVERSE_CACHE_DB_PROMISE;
     }
+    function runReverseCacheTransaction(db, operation) {
+      return new Promise((resolve) => {
+        let tx;
+        try {
+          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE), resolve);
+        } catch {
+          resolve();
+          return;
+        }
+        tx.oncomplete = tx.onerror = tx.onabort = resolve;
+      });
+    }
     async function readPersistentReverseCache(cacheKey) {
       const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
       if (!db) return null;
       let result = null;
-      await new Promise((resolve) => {
-        let settled = false;
-        const done = () => {
-          if (settled) return;
-          settled = true;
-          resolve();
+      await runReverseCacheTransaction(db, (store, done) => {
+        const req = store.get(persistentKey);
+        req.onsuccess = () => {
+          const row = req.result;
+          if (isFreshReverseCacheRow(row, persistentKey)) {
+            result = normalizeReverseParsed(row.parsed);
+          } else if (row) {
+            store.delete(persistentKey);
+          }
         };
-        let tx;
-        let req;
-        try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          const store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
-          req = store.get(persistentKey);
-          req.onsuccess = () => {
-            const row = req.result;
-            if (isFreshReverseCacheRow(row, persistentKey)) {
-              result = row.parsed;
-            } else if (row) {
-              store.delete(persistentKey);
-            }
-          };
-        } catch {
-          done();
-          return;
-        }
         req.onerror = done;
-        tx.onabort = done;
-        tx.oncomplete = done;
       });
       return result;
     }
@@ -3982,26 +3802,13 @@
       const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
       if (!db) return;
-      await new Promise((resolve) => {
-        let tx;
-        try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
-          const store = tx.objectStore(CONFIG.REVERSE_CACHE_STORE);
-          store.put({
-            key: persistentKey,
-            variant: REVERSE_CACHE_VARIANT,
-            parserVersion: CONFIG.REVERSE_CACHE_PARSER_VERSION,
-            savedAt: Date.now(),
-            parsed,
-          });
-          pruneExcessReverseCacheRows(store);
-        } catch {
-          resolve();
-          return;
-        }
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-        tx.onabort = resolve;
+      await runReverseCacheTransaction(db, (store) => {
+        store.put({
+          key: persistentKey,
+          savedAt: Date.now(),
+          parsed,
+        });
+        pruneExcessReverseCacheRows(store);
       });
     }
     function pruneExcessReverseCacheRows(store) {
@@ -4024,10 +3831,7 @@
       const limit = CONFIG.REVERSE_RESPONSE_MAX_BYTES;
       const contentLength = Number(response.headers.get("content-length"));
       if (Number.isFinite(contentLength) && contentLength > limit) {
-        try {
-          await response.body?.cancel();
-        } catch {
-        }
+        await cancelReadable(response.body);
         throw new Error(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
@@ -4053,12 +3857,7 @@
         finished = true;
         return parts.join("");
       } finally {
-        if (!finished) {
-          try {
-            await reader.cancel(signal.reason);
-          } catch {
-          }
-        }
+        if (!finished) await cancelReadable(reader, signal.reason);
         reader.releaseLock();
       }
     }
@@ -4105,10 +3904,7 @@
             `HTTP ${res.status}: ${(await readReverseResponseText(res, requestSignal)).slice(0, 200)}`,
           );
         } else {
-          try {
-            await res.body?.cancel();
-          } catch {
-          }
+          await cancelReadable(res.body);
           if (attempt >= maxRetry) {
             throw new Error(
               `HTTP ${res.status}: rate limited or server error`,
@@ -4118,9 +3914,9 @@
         await sleep(baseDelayMs * attempt, userSignal);
       }
     }
-    async function runProcessingLoop() {
+    async function runProcessingLoop(task) {
       const records = AppState.records;
-      const startIndex = AppState.processedCount;
+      const startIndex = AppState.processed;
       const total = records.length;
       const totalDisp = fmt(total);
       const wrap = domElements.tableWrap;
@@ -4137,9 +3933,7 @@
         pendingCount = 0;
         requestScrollShadowSync(wrap);
       };
-      const controller = new AbortController();
-      const signal = controller.signal;
-      AppState.controller = controller;
+      const signal = task.controller.signal;
       for (let i = startIndex; i < total; i++) {
         const i1 = i + 1;
         let skeletonTr = null;
@@ -4149,13 +3943,13 @@
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
             const resumeHandler = Promise.withResolvers();
-            AppState.resumeHandler = resumeHandler;
+            task.resumeHandler = resumeHandler;
             scheduleRender();
             await resumeHandler.promise;
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
           if (!AppState.isRunning) break;
-          AppState.inFlight = true;
+          task.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
@@ -4213,16 +4007,18 @@
                 i1 === total
               ) {
                 lastStatusUpdate = now;
-                setStatusMessage(`처리 중… (${fmt(i1)}/${totalDisp})`);
+                setProgressStatus(i1, total, totalDisp);
               }
             }
             if (!parsed) {
               const url =
                 `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-              parsed = parseGeocodeAddress(
-                await fetchReverseWithRetry(
-                  url,
-                  signal,
+              parsed = normalizeReverseParsed(
+                parseGeocodeAddress(
+                  await fetchReverseWithRetry(
+                    url,
+                    signal,
+                  ),
                 ),
               );
               putReverseMemoryCache(cacheKey, parsed);
@@ -4231,38 +4027,7 @@
                 signal,
               );
             }
-            const addr = parsed.addr;
-            const kind = parsed.kind;
-            if (kind) {
-              r.set = kind;
-              r._f_kind = parsed.kindLower ||
-                (parsed.kindLower = kind.toLowerCase());
-            } else {
-              r._f_kind = r.set === "KR"
-                ? "kr"
-                : r.set === "WORLD"
-                  ? "world"
-                  : lower(r.set);
-            }
-            r.addr = addr;
-            r.fullAddr = addr.fullAddr;
-            let nSido = parsed.nSido;
-            if (nSido === undefined) {
-              nSido = parsed.nSido = norm(addr.sido);
-              parsed.nSigungu = norm(addr.sigungu);
-              parsed.nEmd = norm(addr.eupmyeon);
-              parsed.nTag = norm(addr.tag);
-              parsed.nFullAddr = norm(addr.fullAddr);
-            }
-            const nSigungu = parsed.nSigungu;
-            const nEmd = parsed.nEmd;
-            const nTag = parsed.nTag;
-            const nFullAddr = parsed.nFullAddr;
-            r._f_sido = nSido;
-            r._f_sigungu = nSigungu;
-            r._f_emd = nEmd;
-            r._f_tag = nTag;
-            r._f_fullAddr = nFullAddr;
+            r.result = parsed;
             commitResultRow(
               skeletonTr,
               r,
@@ -4275,15 +4040,17 @@
               break;
             }
             const msg = getErrorMessage(err);
-            r.set = "에러";
-            r.addr = null;
-            r.fullAddr = msg;
-            r._f_kind = "에러";
-            r._f_sido = "";
-            r._f_sigungu = "";
-            r._f_emd = "";
-            r._f_tag = "";
-            r._f_fullAddr = norm(msg);
+            r.result = {
+              addr: null,
+              error: msg,
+              kind: "에러",
+              kindLower: "에러",
+              nEmd: "",
+              nFullAddr: norm(msg),
+              nSido: "",
+              nSigungu: "",
+              nTag: "",
+            };
             commitResultRow(
               skeletonTr,
               r,
@@ -4314,7 +4081,7 @@
           ) {
             skeletonTr.remove();
           }
-          AppState.resumeHandler = null;
+          task.resumeHandler = null;
           setControlsIdle(
             `오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(err)
             }`,
@@ -4322,14 +4089,13 @@
           );
           break;
         } finally {
-          AppState.inFlight = false;
+          task.inFlight = false;
         }
       }
-      AppState.controller = null;
       flushPending();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
-      } else if (AppState.processedCount >= AppState.records.length) {
+      } else if (AppState.processed >= AppState.records.length) {
         setControlsIdle("모든 처리가 완료되었습니다.");
       }
     }
@@ -4345,9 +4111,10 @@
       const cells = tr.cells;
       const latStr = r.latStr;
       const lonStr = r.lonStr;
-      cells[KIND_COL_INDEX].textContent = r.set;
+      const result = r.result;
+      cells[KIND_COL_INDEX].textContent = result.kind || r.set;
       cells[COORDS_COL_INDEX].textContent = latStr + ", " + lonStr;
-      const addr = r.addr;
+      const addr = result.addr;
       if (addr) {
         cells[SIDO_COL_INDEX].textContent = addr.sido;
         cells[SIGUNGU_COL_INDEX].textContent = addr.sigungu;
@@ -4360,7 +4127,7 @@
           cells[TAG_COL_INDEX].textContent =
           "";
       }
-      cells[FULLADDR_COL_INDEX].textContent = r.fullAddr;
+      cells[FULLADDR_COL_INDEX].textContent = result.error || addr.fullAddr;
       const td = cells[MAPS_COL_INDEX];
       const btn = td.lastElementChild;
       btn.disabled = false;
@@ -4371,13 +4138,16 @@
       const wasHidden = tr.hidden;
       let hidden = false;
       if (f.active) {
-        hidden = setHiddenByFilterActiveFn(tr, wasHidden, f, r);
+        const setHidden = FIND_REVEALED_ROWS.size === 0
+          ? setRowHiddenByFilterActiveNoReveal
+          : setRowHiddenByFilterActive;
+        hidden = setHidden(tr, wasHidden, f, r);
         if (!hidden) wrap.classList.remove("filter-empty");
       } else if (wasHidden) {
         tr.removeAttribute("hidden");
       }
-      if (r.set === "에러") AppState.cntFail++;
-      else AppState.cntSuccess++;
+      AppState.processed++;
+      if (result.error) AppState.cntFail++;
       scheduleRender();
       if (connected || hidden !== wasHidden) {
         requestScrollShadowSync(wrap);
@@ -4386,7 +4156,7 @@
     async function handleExport() {
       try {
         const records = AppState.records;
-        const totalRows = Math.min(records.length, AppState.processedCount);
+        const totalRows = Math.min(records.length, AppState.processed);
         if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
         }
@@ -4408,13 +4178,14 @@
           const lat = r.latStr;
           const lon = r.lonStr;
           const coords = lat + ", " + lon;
-          let line = escCell(r.set) +
+          const result = r.result;
+          let line = escCell(result.kind || r.set) +
             "," +
             escCell(i + 1) +
             "," +
             escCell(coords) +
             ",";
-          const addr = r.addr;
+          const addr = result.addr;
           if (addr) {
             line += escCell(addr.sido) +
               "," +
@@ -4427,7 +4198,7 @@
           } else {
             line += ",,,,";
           }
-          line += escCell(r.fullAddr);
+          line += escCell(result.error || addr.fullAddr);
           line += "," + escCell(CSV_SOURCE_TEXT);
           line += "," + escCell(CSV_LICENSE_TEXT);
           line += "," + escCell(CSV_GEOCODER_TEXT);
@@ -4451,17 +4222,11 @@
           }
         }
         flushChunk();
-        const url = URL.createObjectURL(
+        downloadBlob(
           new Blob(parts, { type: "text/csv;charset=utf-8" }),
+          `${AppState.droppedFile.name.replace(RX_FILE_EXT, "")
+            }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
         );
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${(AppState.droppedFile?.name || "revgeo").replace(RX_FILE_EXT, "")
-          }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
         console.error(err);
@@ -4473,15 +4238,14 @@
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
       setCoordsText("");
       clearTable();
-      AppState.setRecords([], "parsing");
+      const task = AppState.setRecords([], "parsing");
       domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
       setStatusMessage("파일 분석 중…");
-      AppState.controller = new AbortController();
-      AppState.inFlight = true;
+      task.inFlight = true;
       try {
         const records = await parseFileToRecords(
           file,
-          AppState.controller.signal,
+          task.controller.signal,
         );
         if (!records.length) {
           AppState.setRecords([]);
@@ -4523,8 +4287,7 @@
         console.error(err);
         setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
       } finally {
-        AppState.inFlight = false;
-        AppState.controller = null;
+        task.inFlight = false;
       }
     }
     domElements.filterQ.addEventListener("input", scheduleApplyFilterAll);
@@ -4553,7 +4316,6 @@
           ? e.target.closest("tr")
           : null;
         if (!tr) return;
-        setHiddenByFilterActiveFn = setRowHiddenByFilterActive;
         FIND_REVEALED_ROWS.add(tr);
         if (tr.hidden) tr.removeAttribute("hidden");
         domElements.tableWrap.classList.remove("filter-empty");
@@ -4578,15 +4340,12 @@
           if (!ensureNominatimRequestOrigin() || !confirmBulkNominatimUse()) {
             return;
           }
-          AppState.reset("running");
+          const task = AppState.reset("running");
           clearTable();
           resetScrollShadowState(domElements.coords);
           setStatusMessage("조회 시작…");
-          void runProcessingLoop().catch((err) => {
+          void runProcessingLoop(task).catch((err) => {
             console.error(err);
-            AppState.inFlight = false;
-            AppState.controller = null;
-            AppState.resumeHandler = null;
             setControlsIdle(
               `오류로 중단됨: ${getErrorMessage(err)}`,
               "error",
@@ -4595,8 +4354,9 @@
         }),
       "--pause": () => {
         if (!AppState.isRunning) return;
+        const task = AppState.task;
         AppState.setStatus("pausing");
-        if (AppState.inFlight) {
+        if (task.inFlight) {
           setStatusMessage(
             "일시정지 요청됨. 현재 작업을 마치고 멈춥니다…",
             "warn",
@@ -4605,18 +4365,20 @@
       },
       "--resume": () => {
         if (!AppState.isPaused) return;
+        const task = AppState.task;
         AppState.setStatus("running");
-        AppState.resumeHandler.resolve();
-        AppState.resumeHandler = null;
+        task.resumeHandler.resolve();
+        task.resumeHandler = null;
       },
       "--stop": () => {
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
         AppState.setStatus("stopping");
+        const task = AppState.task;
         resetScrollShadowState(domElements.tableWrap);
         resetScrollShadowState(domElements.coords);
-        AppState.resumeHandler?.resolve();
-        AppState.resumeHandler = null;
-        AppState.controller.abort();
+        task.resumeHandler?.resolve();
+        task.resumeHandler = null;
+        task.controller.abort();
         setStatusMessage("중지 요청됨. 취소 중…", "warn");
       },
       "--export": handleExport,
@@ -4761,6 +4523,7 @@
       ];
       const MAX_U64_DEC = U64_MAX.toString(10);
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
+      const U64_TOKEN = /^(?:0[xX][0-9a-fA-F]+|\+?\d+)$/u;
       function createDataSet(num64) {
         return {
           num_64: num64,
@@ -4797,36 +4560,15 @@
         if (input.length === 0) {
           throw new Error("빈 값은 허용되지 않습니다.");
         }
-        let value;
-        if (/^0[xX]/.test(input)) {
-          const rawDigits = input.slice(2);
-          if (!/^[0-9a-fA-F]+$/.test(rawDigits)) {
-            throw new Error(
-              `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-            );
-          }
-          const digits = rawDigits.replace(/^0+/g, "") || "0";
-          if (digits.length > 16) {
-            throw new Error(
-              `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-            );
-          }
-          value = BigInt(`0x${digits}`);
-        } else if (/^\+?\d+$/.test(input)) {
-          const rawDigits = input.startsWith("+") ? input.slice(1) : input;
-          const digits = rawDigits.replace(/^0+/g, "") || "0";
-          if (
-            digits.length > MAX_U64_DEC.length ||
-            (digits.length === MAX_U64_DEC.length && digits > MAX_U64_DEC)
-          ) {
-            throw new Error(
-              `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-            );
-          }
-          value = BigInt(digits);
-        } else {
+        if (!U64_TOKEN.test(input)) {
           throw new Error(
             `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+          );
+        }
+        const value = BigInt(input);
+        if (value > U64_MAX) {
+          throw new Error(
+            `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
           );
         }
         return value;
@@ -4896,24 +4638,24 @@
         F64_SCRATCH_VIEW.setBigUint64(0, bits, false);
         return F64_SCRATCH_VIEW.getFloat64(0, false);
       }
-      function fusedMultiplyAddF64(left, right, addend) {
-        const leftParts = decomposeF64(left);
-        const rightParts = decomposeF64(right);
-        const addendParts = decomposeF64(addend);
-        const productSignificand =
-          leftParts.significand * rightParts.significand;
+      function affineF64(
+        ratio,
+        scaleSignificand,
+        scaleExponent,
+        addendSignificand,
+        addendExponent,
+        addend,
+      ) {
+        const ratioParts = decomposeF64(ratio);
+        const productSignificand = scaleSignificand * ratioParts.significand;
         if (productSignificand === 0n) {
           return addend;
         }
-        if (addendParts.significand === 0n) {
-          return left * right;
-        }
-        const productExponent = leftParts.exponent + rightParts.exponent;
-        const commonExponent = Math.min(productExponent, addendParts.exponent);
+        const productExponent = scaleExponent + ratioParts.exponent;
+        const commonExponent = Math.min(productExponent, addendExponent);
         const exact =
           (productSignificand << BigInt(productExponent - commonExponent)) +
-          (addendParts.significand <<
-            BigInt(addendParts.exponent - commonExponent));
+          (addendSignificand << BigInt(addendExponent - commonExponent));
         return composeRoundedNormalF64(exact, commonExponent);
       }
       function formatRustF64(value) {
@@ -5194,12 +4936,12 @@
         const upperRatio = upper32 * U32_MAX_INV;
         const lowerRatio = lower32 * U32_MAX_INV;
         data.kor_coords = [
-          fusedMultiplyAddF64(5.504167, upperRatio, 33.1125),
-          fusedMultiplyAddF64(7.263056, lowerRatio, 124.609722),
+          affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
+          affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
         ];
         data.world_coords = [
-          fusedMultiplyAddF64(180, upperRatio, -90),
-          fusedMultiplyAddF64(360, lowerRatio, -180),
+          affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
+          affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
         ];
         data.planet_number = (extractValidBitsForNms(
           4,
@@ -5352,15 +5094,7 @@
         });
       }
       function downloadRandomDataTxt(chunks) {
-        const blob = randomDataBlob(chunks, true);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "random_data.txt";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        downloadBlob(randomDataBlob(chunks, true), "random_data.txt");
       }
       async function copyRandomDataChunksToClipboard(chunks) {
         if (!navigator.clipboard || !window.isSecureContext) {

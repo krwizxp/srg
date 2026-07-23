@@ -22,7 +22,6 @@ use core::{fmt::Display, str::FromStr, time::Duration};
 use std::{
     ffi::{OsStr, OsString},
     io,
-    process::ExitCode,
 };
 pub(super) enum CliCommand {
     #[cfg(target_arch = "x86_64")]
@@ -50,7 +49,7 @@ pub(super) enum CliCommand {
     },
 }
 impl CliCommand {
-    pub(super) fn execute(self) -> Result<ExitCode> {
+    pub(super) fn execute(self) -> Result<()> {
         let mut out = io::stdout().lock();
         let mut err = io::stderr().lock();
         match self {
@@ -97,16 +96,12 @@ impl CliCommand {
                 writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
             }
         }
-        Ok(ExitCode::SUCCESS)
+        Ok(())
     }
     #[cfg(target_arch = "x86_64")]
     fn owned_text(arg: OsString, label: &str) -> Result<String> {
-        let Ok(text) = arg.into_string() else {
-            return Err(AppError::message(format!(
-                "{label} 값은 유효한 Unicode여야 합니다."
-            )));
-        };
-        Ok(text)
+        arg.into_string()
+            .map_err(|_arg| AppError::message(format!("{label} 값은 유효한 Unicode여야 합니다.")))
     }
     fn parse_arg<T>(arg: &OsStr, label: &str) -> Result<T>
     where
@@ -134,9 +129,7 @@ impl CliCommand {
             writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
         }
         let result = run(&rng)?;
-        if rng.take_rdseed_fallback_notice() {
-            writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
-        }
+        rng.write_rdseed_fallback_notice(err)?;
         Ok(result)
     }
     #[cfg(target_arch = "x86_64")]

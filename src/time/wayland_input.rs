@@ -16,15 +16,14 @@ use std::{
 };
 mod sys;
 macro_rules! dynamic_api {
-    ($api:ident, $library:expr, $name:literal, {$($field:ident: $field_type:ty = $symbol:expr),+ $(,)?}) => {
+    ($api:ident, {$($field:ident: $field_type:ty = $symbol:expr),+ $(,)?}) => {
         struct $api {
             _library: Library,
             $($field: $field_type,)+
         }
-        impl DynamicApi for $api {
-            const LIBRARY: &'static CStr = $library;
-            const NAME: &'static str = $name;
-            fn from_library(library: Library) -> InputResult<Self> {
+        impl TryFrom<Library> for $api {
+            type Error = InputError;
+            fn try_from(library: Library) -> InputResult<Self> {
                 $(let $field = library.typed_symbol::<$field_type>($symbol)?;)+
                 Ok(Self {
                     _library: library,
@@ -32,6 +31,17 @@ macro_rules! dynamic_api {
                 })
             }
         }
+    };
+}
+macro_rules! opaque_ffi_types {
+    ($($name:ident),+ $(,)?) => {
+        $(
+            #[repr(C)]
+            struct $name {
+                _data: (),
+                _marker: PhantomData<(*mut u8, PhantomPinned)>,
+            }
+        )+
     };
 }
 const BTN_LEFT: c_uint = 0x0110;
@@ -65,36 +75,7 @@ const POLLHUP: c_short = 0x0010;
 const POLLIN: c_short = 0x0001;
 const POLLNVAL: c_short = 0x0020;
 const PREPARE_TIMEOUT: Duration = Duration::from_mins(2);
-#[repr(C)]
-struct Ei {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
-#[repr(C)]
-struct EiDevice {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
-#[repr(C)]
-struct EiEvent {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
-#[repr(C)]
-struct EiPing {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
-#[repr(C)]
-struct EiSeat {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
-#[repr(C)]
-struct Oeffis {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
+opaque_ffi_types!(Ei, EiDevice, EiEvent, EiPing, EiSeat, Oeffis);
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct PollFd {
@@ -107,11 +88,6 @@ const _: () = assert!(align_of::<PollFd>() == 4, "pollfd align mismatch");
 type PollDescriptorCount = c_ulong;
 type InputError = Cow<'static, str>;
 type InputResult<T> = Result<T, InputError>;
-trait DynamicApi: Sized {
-    const LIBRARY: &'static CStr;
-    const NAME: &'static str;
-    fn from_library(library: Library) -> InputResult<Self>;
-}
 #[derive(Clone, Copy)]
 struct DeviceState {
     active: bool,
@@ -129,7 +105,7 @@ union DlsymSymbol<F: Copy> {
     raw: *mut c_void,
     typed: F,
 }
-dynamic_api!(EiApi, LIBEI, "libei", {
+dynamic_api!(EiApi, {
     configure_name: unsafe extern "C" fn(*mut Ei, *const c_char) = c"ei_configure_name",
     device_button_button: unsafe extern "C" fn(*mut EiDevice, c_uint, bool) = c"ei_device_button_button",
     device_close: unsafe extern "C" fn(*mut EiDevice) = c"ei_device_close",
@@ -167,7 +143,7 @@ struct EiSession {
 struct Library {
     handle: NonNull<c_void>,
 }
-dynamic_api!(PortalApi, LIBOEFFIS, "liboeffis", {
+dynamic_api!(PortalApi, {
     create_session: unsafe extern "C" fn(*mut Oeffis, c_uint) = c"oeffis_create_session",
     dispatch: unsafe extern "C" fn(*mut Oeffis) = c"oeffis_dispatch",
     get_eis_fd: unsafe extern "C" fn(*mut Oeffis) -> c_int = c"oeffis_get_eis_fd",
@@ -280,9 +256,6 @@ impl EiApi {
     }
 }
 impl EiSession {
-    fn device_is_ready(&self) -> bool {
-        self.device.is_some_and(|device| device.active)
-    }
     fn dispatch(&mut self) -> InputResult<Option<NonNull<EiPing>>> {
         // SAFETY: context is a live libei sender context.
         unsafe {
@@ -509,26 +482,14 @@ impl TriggerAction {
     }
 }
 impl Library {
-    fn load_api<T>() -> InputResult<T>
-    where
-        T: DynamicApi,
-    {
-        // SAFETY: T::LIBRARY is a NUL-terminated library name that remains valid for the call.
-        let handle_ptr = unsafe { sys::dlopen(T::LIBRARY.as_ptr(), DL_NOW) };
+    fn load(name: &CStr, label: &str) -> InputResult<Self> {
+        // SAFETY: name is NUL-terminated and remains valid for the call.
+        let handle_ptr = unsafe { sys::dlopen(name.as_ptr(), DL_NOW) };
         let Some(handle) = NonNull::new(handle_ptr) else {
             let source = dl_error_message();
-            return Err(format!("{} 로드 실패: {source}", T::NAME).into());
+            return Err(format!("{label} 로드 실패: {source}").into());
         };
-        T::from_library(Self { handle })
-    }
-    fn symbol_address(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
-        // SAFETY: dlerror has no preconditions and clears any previous loader error.
-        unsafe {
-            sys::dlerror();
-        }
-        // SAFETY: self.handle is live and name is NUL-terminated.
-        let symbol = unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) };
-        NonNull::new(symbol).ok_or_else(dl_error_message)
+        Ok(Self { handle })
     }
     fn typed_symbol<F>(&self, name: &CStr) -> InputResult<F>
     where
@@ -541,7 +502,13 @@ impl Library {
                 "dynamic loader symbol ABI가 함수 포인터와 다릅니다.",
             ));
         }
-        let symbol = self.symbol_address(name)?;
+        // SAFETY: dlerror has no preconditions and clears any previous loader error.
+        unsafe {
+            sys::dlerror();
+        }
+        // SAFETY: self.handle is live and name is NUL-terminated.
+        let symbol_ptr = unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) };
+        let symbol = NonNull::new(symbol_ptr).ok_or_else(dl_error_message)?;
         // SAFETY: each symbol name is paired with its exact C function pointer type, ABI size and
         // alignment are checked above, and the owning API keeps this library loaded.
         Ok(unsafe {
@@ -668,7 +635,7 @@ impl PreparedInput {
     pub(super) const EMPTY: Self = Self { prepared: None };
     pub(super) fn maintain(&mut self, err: &mut dyn io::Write) {
         if let Some(prepared) = self.prepared.as_mut()
-            && let Err(source) = prepared.maintain()
+            && let Err(source) = prepared.dispatch(0)
         {
             write_line_best_effort(
                 err,
@@ -694,8 +661,8 @@ impl PreparedInput {
             if should_cancel() {
                 return Ok(None);
             }
-            let portal_api = Library::load_api::<PortalApi>()?;
-            let ei_api = Library::load_api::<EiApi>()?;
+            let portal_api = PortalApi::try_from(Library::load(LIBOEFFIS, "liboeffis")?)?;
+            let ei_api = EiApi::try_from(Library::load(LIBEI, "libei")?)?;
             let deadline = Instant::now()
                 .checked_add(PREPARE_TIMEOUT)
                 .ok_or(Cow::Borrowed("Wayland 입력 준비 제한 시간 계산 실패"))?;
@@ -773,7 +740,11 @@ impl PreparedInput {
             write_line_best_effort(err, format_args!("[경고] 준비된 Wayland 입력 세션이 없습니다."));
             return NativeInputSendStatus::FailedBeforeSend;
         };
-        match prepared.send() {
+        let send_result = match prepared.dispatch(0) {
+            Ok(()) => prepared.ei.send(),
+            Err(source) => Err(SendError::Before(source)),
+        };
+        match send_result {
             Ok(()) => NativeInputSendStatus::Sent,
             Err(SendError::Before(source)) => {
                 write_line_best_effort(err, format_args!("[경고] Wayland 입력 실패: {source}"));
@@ -823,13 +794,6 @@ impl WaylandInput {
         }
         Ok(())
     }
-    fn maintain(&mut self) -> InputResult<()> {
-        self.dispatch(0)
-    }
-    fn send(&mut self) -> Result<(), SendError> {
-        self.dispatch(0).map_err(SendError::Before)?;
-        self.ei.send()
-    }
     fn wait_until_ready<F>(
         &mut self,
         deadline: Instant,
@@ -843,7 +807,7 @@ impl WaylandInput {
                 return Ok(false);
             }
             self.dispatch(poll_timeout_until(deadline)?)?;
-            if self.ei.device_is_ready() {
+            if self.ei.device.is_some_and(|device| device.active) {
                 return Ok(true);
             }
             if should_cancel() {

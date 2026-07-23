@@ -1,10 +1,10 @@
 use super::{
     CivilDate, KST_OFFSET_SECS, Result, ServerTime, TimeError,
     http_date::civil_from_days,
-    util::{NewSampleWeight, blend_rtt, parse_result_with_context},
+    util::{blend_rtt, parse_result_with_context},
 };
 use crate::{
-    buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
+    buffmt::{ByteCursor, digit_byte, two_digits},
     numeric::low_u8_from_u32,
 };
 use core::time::Duration;
@@ -38,25 +38,14 @@ struct DisplayableTime {
 impl ByteCursor<'_> {
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
-        let digits_slice = self.take(TWO_DIGIT_WIDTH)?;
-        let Some(digits) = digits_slice.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-            return Err(write_zero_err());
-        };
-        copy_two_digits(digits, idx)?;
+        *self.take_array::<TWO_DIGIT_WIDTH>()? = two_digits(idx)?;
         Ok(())
     }
     fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
         let hundreds = usize::from(low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
         let rem = usize::from(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-        let head = self.take(THREE_DIGIT_WIDTH)?;
-        let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
-            return Err(write_zero_err());
-        };
-        *digit_slot = digit_byte(hundreds)?;
-        let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-            return Err(write_zero_err());
-        };
-        copy_two_digits(remaining_digits, rem)?;
+        let [tens, ones] = two_digits(rem)?;
+        *self.take_array::<THREE_DIGIT_WIDTH>()? = [digit_byte(hundreds)?, tens, ones];
         Ok(())
     }
     fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
@@ -69,16 +58,9 @@ impl ByteCursor<'_> {
                 let lo = usize::from(low_u8_from_u32(
                     year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
                 ));
-                let head = self.take(FOUR_DIGIT_WIDTH)?;
-                let Some((hi_digits, lo_tail)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-                else {
-                    return Err(write_zero_err());
-                };
-                let Some(lo_digits) = lo_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-                    return Err(write_zero_err());
-                };
-                copy_two_digits(hi_digits, hi)?;
-                copy_two_digits(lo_digits, lo)?;
+                let [h0, h1] = two_digits(hi)?;
+                let [l0, l1] = two_digits(lo)?;
+                *self.take_array::<FOUR_DIGIT_WIDTH>()? = [h0, h1, l0, l1];
                 return Ok(());
             }
             return self.write_u32_dec(year_value);
@@ -88,15 +70,8 @@ impl ByteCursor<'_> {
         if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
             let hundreds = usize::from(low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
             let rem = usize::from(low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let head = self.take(THREE_DIGIT_WIDTH)?;
-            let Some((digit_slot, remaining_tail)) = head.split_first_mut() else {
-                return Err(write_zero_err());
-            };
-            *digit_slot = digit_byte(hundreds)?;
-            let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-                return Err(write_zero_err());
-            };
-            copy_two_digits(remaining_digits, rem)?;
+            let [tens, ones] = two_digits(rem)?;
+            *self.take_array::<THREE_DIGIT_WIDTH>()? = [digit_byte(hundreds)?, tens, ones];
             return Ok(());
         }
         self.write_u32_dec(abs)
@@ -148,7 +123,7 @@ impl ServerTime {
             day: day_of_month,
             month,
             year,
-        } = civil_from_days(day_index).ok_or_else(|| TimeError::parse("일자 계산 중 범위 오류"))?;
+        } = civil_from_days(day_index);
         Ok(DisplayableTime {
             day_of_month,
             day_of_week_str,
@@ -168,7 +143,7 @@ impl ServerTime {
         server_time
     }
     pub(super) const fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
-        let smoothed_rtt = blend_rtt(self.baseline_rtt, new_rtt, NewSampleWeight::ThirtyPercent);
+        let smoothed_rtt = blend_rtt::<3>(self.baseline_rtt, new_rtt);
         Self {
             anchor_time: self.anchor_time,
             anchor_instant: self.anchor_instant,

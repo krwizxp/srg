@@ -140,9 +140,6 @@ pub(super) fn generate_random_float(
     } else {
         scale.mul_add(NumericSub::sub(max_value, min_value), min_value)
     };
-    if !result.is_finite() {
-        return Err("실수 난수 결과가 유한하지 않습니다.".into());
-    }
     writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}")?;
     Ok(())
 }

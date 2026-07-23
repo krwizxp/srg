@@ -1,11 +1,10 @@
 use super::{MIN_TRANSFER_TIME, Result, TimeError, TimeSample, error, error_with_source};
 use super::super::{
-    ParsedServer, http_date::parse_http_date_to_systemtime, sample::validate_http_age_value,
+    ParsedServer, UrlScheme, http_date::HttpDate,
 };
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
-    mem,
     ptr::{NonNull, null, null_mut},
     result::Result as CoreResult,
     str,
@@ -21,6 +20,7 @@ const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const AGE_HEADER_PREFIX: &[u8] = b"age:";
 const DATE_HEADER_PREFIX: &[u8] = b"date:";
 const WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY: u32 = 4;
+const WINHTTP_ACCESS_TYPE_NO_PROXY: u32 = 1;
 const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
 const WINHTTP_OPTION_DISABLE_FEATURE: u32 = 63;
 const WINHTTP_OPTION_SECURE_PROTOCOLS: u32 = 84;
@@ -104,13 +104,21 @@ impl Client {
         let cache = if let Some(ref mut cache) = self.session_cache {
             cache
         } else {
-                let user_agent =
-                    wide(concat!("srg/", env!("CARGO_PKG_VERSION")), context)?;
+                let user_agent = wide(
+                    match server.scheme {
+                        UrlScheme::Http => "Rust-Time-Sync",
+                        UrlScheme::Https => concat!("srg/", env!("CARGO_PKG_VERSION")),
+                    },
+                    context,
+                )?;
                 // SAFETY: user_agent is NUL-terminated and optional proxy pointers are intentionally null.
                 let raw_session = unsafe {
                     sys::WinHttpOpen(
                         user_agent.as_ptr(),
-                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                        match server.scheme {
+                            UrlScheme::Http => WINHTTP_ACCESS_TYPE_NO_PROXY,
+                            UrlScheme::Https => WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                        },
                         null(),
                         null(),
                         0,
@@ -199,7 +207,10 @@ impl Client {
                     null(),
                     null(),
                     null(),
-                    WINHTTP_FLAG_SECURE,
+                    match server.scheme {
+                        UrlScheme::Http => 0,
+                        UrlScheme::Https => WINHTTP_FLAG_SECURE,
+                    },
                 )
             };
             let request =
@@ -269,7 +280,11 @@ impl Client {
             .map(Handle)
             .ok_or_else(|| Self::last_error(operation, context))
     }
-    fn query_raw_headers(&mut self, request: &Handle, context: &str) -> Result<()> {
+    fn query_server_time(
+        &mut self,
+        request: &Handle,
+        context: &str,
+    ) -> Result<SystemTime> {
         let mut bytes = 0_u32;
         let mut index = 0_u32;
         // SAFETY: request is valid; this first call probes the required buffer size.
@@ -302,14 +317,14 @@ impl Client {
             ));
         }
         let units = header_bytes.div_euclid(2);
-        let buffer = &mut self.header_buffer;
-        buffer.clear();
-        if buffer.capacity() < units {
-            buffer.try_reserve_exact(units).map_err(|source| {
+        let header_buffer = &mut self.header_buffer;
+        header_buffer.clear();
+        if header_buffer.capacity() < units {
+            header_buffer.try_reserve_exact(units).map_err(|source| {
                 error_with_source(context, "응답 헤더 버퍼 메모리 확보 실패", source)
             })?;
         }
-        buffer.resize(units, 0_u16);
+        header_buffer.resize(units, 0_u16);
         index = 0;
         // SAFETY: buffer has the size requested by WinHTTP and request is valid.
         let fetch_ok = unsafe {
@@ -317,7 +332,7 @@ impl Client {
                 request.0.as_ptr(),
                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
                 null(),
-                buffer.as_mut_ptr().cast::<c_void>(),
+                header_buffer.as_mut_ptr().cast::<c_void>(),
                 &raw mut bytes,
                 &raw mut index,
             )
@@ -325,95 +340,88 @@ impl Client {
         if fetch_ok == 0_i32 {
             return Err(Self::last_error("WinHttpQueryHeaders", context));
         }
-        while buffer.pop_if(|value| *value == 0).is_some() {}
-        Ok(())
-    }
-    fn query_server_time(
-        &mut self,
-        request: &Handle,
-        context: &str,
-    ) -> Result<SystemTime> {
-        self.query_raw_headers(request, context)?;
-        let buffer = mem::take(&mut self.header_buffer);
-        let mut line_bytes = mem::take(&mut self.header_line_buffer);
-        let result = (|| {
-            let mut age_seen = false;
-            let mut line_stack = [0_u8; HTTP_HEADER_LINE_STACK_BYTES];
-            let mut parsed_date = None;
-            for raw_line in buffer.split(|unit| *unit == u16::from(b'\n')) {
-                let line = raw_line
-                    .strip_suffix(&[u16::from(b'\r')])
-                    .unwrap_or(raw_line);
-                if line.is_empty() {
-                    continue;
+        while header_buffer.pop_if(|value| *value == 0).is_some() {}
+        let line_bytes = &mut self.header_line_buffer;
+        let mut age_seen = false;
+        let mut line_stack = [0_u8; HTTP_HEADER_LINE_STACK_BYTES];
+        let mut parsed_date = None;
+        for raw_line in header_buffer.split(|unit| *unit == u16::from(b'\n')) {
+            let line = raw_line
+                .strip_suffix(&[u16::from(b'\r')])
+                .unwrap_or(raw_line);
+            if line.is_empty() {
+                continue;
+            }
+            let is_age_header = Self::line_starts_with_ascii_ignore_case(line, AGE_HEADER_PREFIX);
+            let is_date_header = Self::line_starts_with_ascii_ignore_case(line, DATE_HEADER_PREFIX);
+            if !(is_age_header || is_date_header) {
+                continue;
+            }
+            let line_ascii = if line.len() <= line_stack.len() {
+                let stack_line = line_stack
+                    .get_mut(..line.len())
+                    .ok_or_else(|| error(context, "응답 헤더 stack buffer 범위 오류"))?;
+                for (&unit, byte) in line.iter().zip(stack_line.iter_mut()) {
+                    *byte = u8::try_from(unit).map_err(|source| {
+                        error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
+                    })?;
                 }
-                let is_age_header =
-                    Self::line_starts_with_ascii_ignore_case(line, AGE_HEADER_PREFIX);
-                let is_date_header =
-                    Self::line_starts_with_ascii_ignore_case(line, DATE_HEADER_PREFIX);
-                if !(is_age_header || is_date_header) {
-                    continue;
+                stack_line
+            } else {
+                line_bytes.clear();
+                if line_bytes.capacity() < line.len() {
+                    line_bytes.try_reserve_exact(line.len()).map_err(|source| {
+                        error_with_source(
+                            context,
+                            "응답 헤더 ASCII buffer 메모리 확보 실패",
+                            source,
+                        )
+                    })?;
                 }
-                let line_ascii = if line.len() <= line_stack.len() {
-                    let stack_line = line_stack
-                        .get_mut(..line.len())
-                        .ok_or_else(|| error(context, "응답 헤더 stack buffer 범위 오류"))?;
-                    for (&unit, byte) in line.iter().zip(stack_line.iter_mut()) {
-                        *byte = u8::try_from(unit).map_err(|source| {
-                            error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
-                        })?;
-                    }
-                    stack_line
-                } else {
-                    line_bytes.clear();
-                    if line_bytes.capacity() < line.len() {
-                        line_bytes.try_reserve_exact(line.len()).map_err(|source| {
-                            error_with_source(
-                                context,
-                                "응답 헤더 ASCII buffer 메모리 확보 실패",
-                                source,
-                            )
-                        })?;
-                    }
-                    for &unit in line {
-                        line_bytes.push(u8::try_from(unit).map_err(|source| {
-                            error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
-                        })?);
-                    }
-                    line_bytes.as_slice()
-                };
-                if is_age_header {
-                    let age_header_raw = Self::ascii_header_value(
-                        line_ascii,
-                        AGE_HEADER_PREFIX.len(),
-                        context,
-                        "Age",
-                    )?;
-                    if age_seen {
-                        return Err(error(context, "Age 헤더가 여러 개입니다."));
-                    }
-                    age_seen = true;
-                    validate_http_age_value(age_header_raw)
-                        .map_err(|message| error(context, message))?;
+                for &unit in line {
+                    line_bytes.push(u8::try_from(unit).map_err(|source| {
+                        error_with_source(context, "응답 헤더 ASCII 변환 실패", source)
+                    })?);
                 }
-                if is_date_header {
-                    let date_header_raw = Self::ascii_header_value(
-                        line_ascii,
-                        DATE_HEADER_PREFIX.len(),
-                        context,
-                        "Date",
-                    )?;
-                    if parsed_date.is_some() {
-                        return Err(error(context, "Date 헤더가 여러 개입니다."));
-                    }
-                    parsed_date = Some(parse_http_date_to_systemtime(date_header_raw)?);
+                line_bytes.as_slice()
+            };
+            if is_age_header {
+                let age_header_raw = Self::ascii_header_value(
+                    line_ascii,
+                    AGE_HEADER_PREFIX.len(),
+                    context,
+                    "Age",
+                )?;
+                if age_seen {
+                    return Err(error(context, "Age 헤더가 여러 개입니다."));
+                }
+                age_seen = true;
+                let trimmed_age = age_header_raw.trim_ascii();
+                if trimmed_age.is_empty() {
+                    return Err(error(context, "Age 헤더 값이 비어 있습니다."));
+                }
+                if trimmed_age.bytes().any(|byte| !byte.is_ascii_digit()) {
+                    return Err(error(context, "Age 헤더 값이 숫자가 아닙니다."));
+                }
+                if trimmed_age.bytes().any(|byte| byte != b'0') {
+                    return Err(error(context, "Age 헤더가 0보다 커 캐시된 응답입니다."));
                 }
             }
-            parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
-        })();
-        self.header_buffer = buffer;
-        self.header_line_buffer = line_bytes;
-        result
+            if is_date_header {
+                let date_header_raw = Self::ascii_header_value(
+                    line_ascii,
+                    DATE_HEADER_PREFIX.len(),
+                    context,
+                    "Date",
+                )?;
+                if parsed_date.is_some() {
+                    return Err(error(context, "Date 헤더가 여러 개입니다."));
+                }
+                let HttpDate(server_time) = date_header_raw.parse()?;
+                parsed_date = Some(server_time);
+            }
+        }
+        parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
     }
     fn set_dword_option(
         handle: &Handle,
@@ -450,7 +458,10 @@ impl Client {
     }
 }
 fn wide(value: &str, context: &str) -> Result<Vec<u16>> {
-    let capacity = value.len().wrapping_add(1);
+    let capacity = value
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| error(context, "wide 문자열 용량 계산 실패"))?;
     let mut out = Vec::new();
     out.try_reserve_exact(capacity)
         .map_err(|source| error_with_source(context, "wide 문자열 메모리 확보 실패", source))?;

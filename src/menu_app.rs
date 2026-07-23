@@ -12,8 +12,8 @@ cfg_select! {
         use crate::{
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             hardware_rng::{HardwareRandomSource, HardwareRng},
-            input::{LadderEntryMode, parse_u64_digits, read_ladder_entries},
-            ladder::{MAX_LADDER_ENTRIES, write_ladder_results},
+            input::{LadderEntryMode, read_ladder_entries},
+            ladder::write_ladder_results,
             random_number::generate_random_number,
         };
         use crate::random_number::RandomNumberMode;
@@ -22,10 +22,7 @@ cfg_select! {
 }
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
-use std::{
-    io::{self, Seek as _, SeekFrom, Write, stderr, stdout},
-    process::ExitCode,
-};
+use std::io::{self, Seek as _, SeekFrom, Write, stderr, stdout};
 cfg_select! {
     target_arch = "x86_64" => {
         const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
@@ -124,12 +121,15 @@ impl MenuApp {
                 let input_buffer = &mut self.input_buffer;
                 let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
                 let requested_count = loop {
-                    match parse_u64_digits(read_line_reuse_limited(
+                    match read_line_reuse_limited(
                         count_prompt,
                         input_buffer,
                         out,
                         BATCH_COUNT_INPUT_MAX_BYTES,
-                    )?, 10) {
+                    )?
+                    .parse::<u64>()
+                    .ok()
+                    {
                         Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
                         Some(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
                             err,
@@ -141,7 +141,7 @@ impl MenuApp {
                 };
                 let next_num_64 =
                     regenerate_with_count(&mut self.output_file, &self.rng, requested_count, out)?;
-                write_rdseed_fallback_notice(&self.rng, err)?;
+                self.rng.write_rdseed_fallback_notice(err)?;
                 self.num_64 = next_num_64;
                 Ok(())
             }
@@ -155,7 +155,7 @@ impl MenuApp {
                 }
                 let next_num_64 =
                     regenerate_with_count(&mut self.output_file, &self.rng, 1, out)?;
-                write_rdseed_fallback_notice(&self.rng, err)?;
+                self.rng.write_rdseed_fallback_notice(err)?;
                 self.num_64 = next_num_64;
                 Ok(())
             }
@@ -165,30 +165,26 @@ impl MenuApp {
                 }
                 let players_storage = &mut self.input_buffer;
                 let results_storage = &mut self.ladder_results_storage;
-                let mut players_array: [&str; MAX_LADDER_ENTRIES] = [""; MAX_LADDER_ENTRIES];
                 let n = read_ladder_entries(
                     format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
                     (&mut *out, &mut *err),
                     players_storage,
-                    &mut players_array,
                     LadderEntryMode::Players,
                 )?;
-                let mut results_array: [&str; MAX_LADDER_ENTRIES] = [""; MAX_LADDER_ENTRIES];
                 read_ladder_entries(
                     format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
                     (&mut *out, &mut *err),
                     results_storage,
-                    &mut results_array,
                     LadderEntryMode::Results { expected_count: n },
                 )?;
                 write_ladder_results(
-                    players_array.iter().take(n).copied(),
-                    results_array.iter().take(n).copied(),
+                    players_storage.trim().split(',').map(str::trim),
+                    results_storage.trim().split(',').map(str::trim),
                     self.num_64,
                     &self.rng,
                     out,
                 )?;
-                write_rdseed_fallback_notice(&self.rng, err)
+                self.rng.write_rdseed_fallback_notice(err)
             }
         }
         _ => {}
@@ -250,8 +246,7 @@ impl MenuApp {
         } else {
             file_len
         };
-        let console_slice = prefix_slice(&buffer, console_len)?;
-        write_slice_to_console(console_slice)?;
+        write_slice_to_console(prefix_slice(&buffer, console_len)?)?;
         Ok(())
     }
     cfg_select! {
@@ -296,7 +291,7 @@ impl MenuApp {
                     }
                     _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
                 }
-                write_rdseed_fallback_notice(&self.rng, err)
+                self.rng.write_rdseed_fallback_notice(err)
             }
         }
         _ => {}
@@ -307,9 +302,46 @@ impl MenuApp {
         err: &mut dyn Write,
     ) -> Result<()> {
         let time_run_result = (|| -> CoreResult<(), TimeError> {
-            let host = self.read_server_host(out)?;
-            let scheduled_trigger = match self.read_target_time(out)? {
-                Some(target_time) => Some((target_time, self.read_trigger_action(out)?)),
+            let host = get_validated_input(
+                "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
+                &mut self.input_buffer,
+                &mut *out,
+                |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
+                    if raw_input.is_empty() {
+                        return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
+                    }
+                    raw_input.parse::<ParsedServer>().map_err(|source| {
+                        Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
+                    })
+                },
+            )?;
+            let requested_target_time = get_validated_input(
+                "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
+                &mut self.input_buffer,
+                &mut *out,
+                |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
+                    if raw_input.is_empty() {
+                        return Ok(None);
+                    }
+                    raw_input.parse::<TargetTimeOfDay>().map(Some)
+                },
+            )?;
+            let scheduled_trigger = match requested_target_time {
+                Some(target_time) => Some((
+                    target_time,
+                    get_validated_input(
+                        "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
+                        &mut self.input_buffer,
+                        &mut *out,
+                        |selection| -> CoreResult<TriggerAction, &'static str> {
+                            match selection.as_bytes() {
+                                b"1" => Ok(TriggerAction::LeftClick),
+                                b"2" => Ok(TriggerAction::F5Press),
+                                _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
+                            }
+                        },
+                    )?,
+                )),
                 None => None,
             };
             ServerTimeSession {
@@ -329,52 +361,7 @@ impl MenuApp {
         }
         Ok(())
     }
-    fn read_server_host(&mut self, out: &mut dyn Write) -> CoreResult<ParsedServer, TimeError> {
-        Ok(get_validated_input(
-            "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
-            &mut self.input_buffer,
-            out,
-            |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
-                if raw_input.is_empty() {
-                    return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
-                }
-                raw_input.parse::<ParsedServer>().map_err(|source| {
-                    Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
-                })
-            },
-        )?)
-    }
-    fn read_target_time(
-        &mut self,
-        out: &mut dyn Write,
-    ) -> CoreResult<Option<TargetTimeOfDay>, TimeError> {
-        Ok(get_validated_input(
-            "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
-            &mut self.input_buffer,
-            out,
-            |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
-                if raw_input.is_empty() {
-                    return Ok(None);
-                }
-                raw_input.parse::<TargetTimeOfDay>().map(Some)
-            },
-        )?)
-    }
-    fn read_trigger_action(&mut self, out: &mut dyn Write) -> CoreResult<TriggerAction, TimeError> {
-        Ok(get_validated_input(
-            "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
-            &mut self.input_buffer,
-            out,
-            |selection| -> CoreResult<TriggerAction, &'static str> {
-                match selection.as_bytes() {
-                    b"1" => Ok(TriggerAction::LeftClick),
-                    b"2" => Ok(TriggerAction::F5Press),
-                    _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
-                }
-            },
-        )?)
-    }
-    pub(super) fn run(&mut self) -> Result<ExitCode> {
+    pub(super) fn run(&mut self) -> Result<()> {
         let menu_prompt = format_args!("{MENU}");
         loop {
             let command = {
@@ -390,7 +377,7 @@ impl MenuApp {
                     }
                     Ok(_) => 0,
                     Err(read_err) if read_err.kind() == io::ErrorKind::UnexpectedEof => {
-                        return Ok(ExitCode::SUCCESS);
+                        return Ok(());
                     }
                     Err(read_err) => return Err(read_err.into()),
                 }
@@ -400,12 +387,12 @@ impl MenuApp {
             let keep_running = match self.execute_command(command, &mut out, &mut err) {
                 Ok(keep_running) => keep_running,
                 Err(command_err) if is_unexpected_eof(&command_err) => {
-                    return Ok(ExitCode::SUCCESS);
+                    return Ok(());
                 }
                 Err(command_err) => return Err(command_err),
             };
             if !keep_running {
-                return Ok(ExitCode::SUCCESS);
+                return Ok(());
             }
         }
     }
@@ -423,12 +410,6 @@ cfg_select! {
                 }
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
             }
-        }
-        fn write_rdseed_fallback_notice(rng: &HardwareRng, err: &mut dyn Write) -> Result<()> {
-            if rng.take_rdseed_fallback_notice() {
-                writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
-            }
-            Ok(())
         }
     }
     _ => {}

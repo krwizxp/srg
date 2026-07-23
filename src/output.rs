@@ -1,6 +1,6 @@
 use crate::{
     BUFFER_SIZE,
-    buffmt::{ByteCursor, copy_two_digits, digit_byte, write_zero_err},
+    buffmt::{ByteCursor, digit_byte, two_digits, write_zero_err},
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
@@ -16,17 +16,14 @@ cfg_select! {
 }
 const BYTE_GROUP_COUNT: usize = 8;
 const FOUR_DIGIT_WIDTH: usize = 4;
-const HASH_HEX24_LEN: usize = 7;
 const HEX_U16_FULL_WIDTH: usize = FOUR_DIGIT_WIDTH;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
-const M_HASH_HEX24_LEN: usize = 8;
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
 const OCTAL_TMP_LEN: usize = 22;
 const PASSWORD_FULL_WIDTH_THRESHOLD: u32 = 1_000_000;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
-const THREE_DIGIT_WIDTH: usize = 3;
 const TWO_DIGIT_WIDTH: usize = 2;
 const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
@@ -144,19 +141,19 @@ impl OutputFormatter<'_, '_, '_> {
                 buf_write_u8_dec(buffer_cur, b1)?;
                 buffer_cur.write_byte(b';')?;
                 buf_write_u8_dec(buffer_cur, b2)?;
-                buf_write_m_hash_hex24_from_bytes(buffer_cur, b0, b1, b2)?;
+                buf_write_prefixed_hex24(buffer_cur, b"m#", b0, b1, b2)?;
                 buffer_cur.write_bytes(b"\x1B[0m \x1B[38;2;")?;
                 buf_write_u8_dec(buffer_cur, b3)?;
                 buffer_cur.write_byte(b';')?;
                 buf_write_u8_dec(buffer_cur, b4)?;
                 buffer_cur.write_byte(b';')?;
                 buf_write_u8_dec(buffer_cur, b5)?;
-                buf_write_m_hash_hex24_from_bytes(buffer_cur, b3, b4, b5)?;
+                buf_write_prefixed_hex24(buffer_cur, b"m#", b3, b4, b5)?;
                 return buffer_cur.write_bytes(b"\x1B[0m");
             }
-            buf_write_hash_hex24_from_bytes(buffer_cur, b0, b1, b2)?;
+            buf_write_prefixed_hex24(buffer_cur, b"#", b0, b1, b2)?;
             buffer_cur.write_byte(b' ')?;
-            buf_write_hash_hex24_from_bytes(buffer_cur, b3, b4, b5)
+            buf_write_prefixed_hex24(buffer_cur, b"#", b3, b4, b5)
         })?;
         Ok(())
     }
@@ -203,26 +200,10 @@ impl OutputFormatter<'_, '_, '_> {
             let rem = usize::from(low_u16_from_u64(u64::from(
                 data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR),
             )));
-            let head = buffer_cur.take(PASSWORD_WIDTH)?;
-            let Some((hi_digits, rest)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-                return Err(write_zero_err());
-            };
-            copy_two_digits(hi_digits, hi)?;
-            let Some((mid_digits, lo_tail)) = rest.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-            else {
-                return Err(write_zero_err());
-            };
-            let Some(lo_digits) = lo_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-                return Err(write_zero_err());
-            };
-            copy_two_digits(
-                mid_digits,
-                rem.div_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)),
-            )?;
-            copy_two_digits(
-                lo_digits,
-                rem.rem_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)),
-            )?;
+            let [h0, h1] = two_digits(hi)?;
+            let [m0, m1] = two_digits(rem.div_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)))?;
+            let [l0, l1] = two_digits(rem.rem_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)))?;
+            *buffer_cur.take_array::<PASSWORD_WIDTH>()? = [h0, h1, m0, m1, l0, l1];
             Ok(())
         })?;
         self.write_labeled_line("8자리 비밀번호: ".as_bytes(), |buffer_cur| {
@@ -322,6 +303,12 @@ const fn hex_digit(nibble: u8) -> u8 {
         b'A'.wrapping_add(nibble.saturating_sub(10))
     }
 }
+const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
+    let [upper, lower] = value.to_be_bytes();
+    let [h0, h1] = hex_byte(upper);
+    let [h2, h3] = hex_byte(lower);
+    [h0, h1, h2, h3]
+}
 fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) -> IoResult<()> {
     let total = chars
         .iter()
@@ -351,14 +338,14 @@ fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<()> {
         let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        copy_two_digits(remaining_digits, rem)?;
+        *remaining_digits = two_digits(rem)?;
         return Ok(());
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {
         let Some(digits) = target.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        copy_two_digits(digits, usize::from(n))?;
+        *digits = two_digits(usize::from(n))?;
         return Ok(());
     }
     let Some(slot) = target.first_mut() else {
@@ -392,40 +379,21 @@ fn buf_write_u8_array_spaced<const N: usize>(
     }
     Ok(())
 }
-fn buf_write_hash_hex24_from_bytes(
+fn buf_write_prefixed_hex24(
     cur: &mut ByteCursor<'_>,
+    prefix: &[u8],
     b0: u8,
     b1: u8,
     b2: u8,
 ) -> IoResult<()> {
-    let head = cur.take(HASH_HEX24_LEN)?;
-    let Some((prefix, hex_bytes)) = head.split_first_mut() else {
+    let width = checked_add_index(prefix.len(), 6)?;
+    let head = cur.take(width)?;
+    let Some((prefix_out, hex_bytes)) = head.split_at_mut_checked(prefix.len()) else {
         return Err(write_zero_err());
     };
-    *prefix = b'#';
-    buf_write_hex24_bytes(hex_bytes, b0, b1, b2)?;
-    Ok(())
-}
-fn buf_write_m_hash_hex24_from_bytes(
-    cur: &mut ByteCursor<'_>,
-    b0: u8,
-    b1: u8,
-    b2: u8,
-) -> IoResult<()> {
-    let head = cur.take(M_HASH_HEX24_LEN)?;
-    let Some((m_prefix, rest)) = head.split_first_mut() else {
-        return Err(write_zero_err());
-    };
-    *m_prefix = b'm';
-    let Some((hash_prefix, hex_bytes)) = rest.split_first_mut() else {
-        return Err(write_zero_err());
-    };
-    *hash_prefix = b'#';
-    buf_write_hex24_bytes(hex_bytes, b0, b1, b2)?;
-    Ok(())
-}
-fn buf_write_hex24_bytes(buf: &mut [u8], b0: u8, b1: u8, b2: u8) -> IoResult<()> {
-    let Some((first_hex, remaining_hex_bytes)) = buf.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
+    prefix_out.copy_from_slice(prefix);
+    let Some((first_hex, remaining_hex_bytes)) =
+        hex_bytes.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
     else {
         return Err(write_zero_err());
     };
@@ -448,12 +416,12 @@ fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
         ));
         n = n.div_euclid(u64::from(U8_THREE_DIGIT_THRESHOLD));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
+        *range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)? = two_digits(rem)?;
     }
     if n >= u64::from(U8_TWO_DIGIT_THRESHOLD) {
         let rem = usize::from(low_u8_from_u64(n));
         sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        copy_two_digits(range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)?, rem)?;
+        *range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)? = two_digits(rem)?;
     } else {
         sub_from_index(&mut i, 1)?;
         let digit = low_u8_from_u64(n);
@@ -463,27 +431,12 @@ fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
     cur.write_bytes(suffix_slice(&tmp, i)?)
 }
 fn buf_write_hex_u16_0pad4(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
-    let head = cur.take(HEX_U16_FULL_WIDTH)?;
-    let upper = low_u8_from_u32(u32::from(value >> 8_u32));
-    let lower = low_u8_from_u32(u32::from(value));
-    let Some((upper_hex, lower_hex)) = head.split_first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-        return Err(write_zero_err());
-    };
-    upper_hex.copy_from_slice(&hex_byte(upper));
-    lower_hex.copy_from_slice(&hex_byte(lower));
-    Ok(())
+    cur.write_bytes(&hex_u16(value))
 }
 fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     if value < HEX_U16_SHORT_THRESHOLD {
-        let head = cur.take(THREE_DIGIT_WIDTH)?;
-        let hi = low_u8_from_u32(u32::from(value >> 8));
-        let lo = low_u8_from_u32(u32::from(value));
-        let Some((prefix, suffix)) = head.split_first_mut() else {
-            return Err(write_zero_err());
-        };
-        *prefix = hex_digit(hi);
-        suffix.copy_from_slice(&hex_byte(lo));
-        Ok(())
+        let [_, h1, h2, h3] = hex_u16(value);
+        cur.write_bytes(&[h1, h2, h3])
     } else {
         buf_write_hex_u16_0pad4(cur, value)
     }

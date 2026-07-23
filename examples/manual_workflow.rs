@@ -4,11 +4,6 @@ use std::fs::{self, File};
 use std::io::{self, Write as _};
 use std::path::Path;
 use std::process::{Command, Stdio};
-#[derive(Clone, Copy)]
-enum OutputCheck {
-    Console(&'static str),
-    RandomData,
-}
 fn invalid_input(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
@@ -19,13 +14,10 @@ fn required_env(name: &'static str) -> io::Result<OsString> {
 fn main() -> io::Result<()> {
     let action = required_env("SRG_ACTION")?;
     let (args, output_check) = match action.to_str() {
-        Some("generate-single") => (
-            vec![OsString::from("generate"), OsString::from("1")],
-            OutputCheck::RandomData,
-        ),
+        Some("generate-single") => (vec![OsString::from("generate"), OsString::from("1")], None),
         Some("generate-multiple") => (
             vec![OsString::from("generate"), required_env("SRG_COUNT")?],
-            OutputCheck::RandomData,
+            None,
         ),
         Some("ladder") => (
             vec![
@@ -33,7 +25,7 @@ fn main() -> io::Result<()> {
                 required_env("SRG_PLAYERS")?,
                 required_env("SRG_RESULTS")?,
             ],
-            OutputCheck::Console("사다리타기 결과:"),
+            Some("사다리타기 결과:"),
         ),
         Some("random-integer") => (
             vec![
@@ -41,7 +33,7 @@ fn main() -> io::Result<()> {
                 required_env("SRG_INT_MIN")?,
                 required_env("SRG_INT_MAX")?,
             ],
-            OutputCheck::Console("무작위 정수("),
+            Some("무작위 정수("),
         ),
         Some("random-float") => (
             vec![
@@ -49,7 +41,7 @@ fn main() -> io::Result<()> {
                 required_env("SRG_FLOAT_MIN")?,
                 required_env("SRG_FLOAT_MAX")?,
             ],
-            OutputCheck::Console("무작위 실수("),
+            Some("무작위 실수("),
         ),
         Some("time-sync-observe") => (
             vec![
@@ -57,7 +49,7 @@ fn main() -> io::Result<()> {
                 required_env("SRG_TIME_HOST")?,
                 required_env("SRG_OBSERVE_SECONDS")?,
             ],
-            OutputCheck::Console("서버 시간:"),
+            Some("서버 시간:"),
         ),
         Some(_) | None => return Err(invalid_input("unsupported SRG workflow action")),
     };
@@ -85,7 +77,7 @@ fn main() -> io::Result<()> {
     if !status.success() {
         return Err(io::Error::other("selected SRG action failed"));
     }
-    if let OutputCheck::Console(expected) = output_check
+    if let Some(expected) = output_check
         && !log_bytes
             .windows(expected.len())
             .any(|window| window == expected.as_bytes())
@@ -95,15 +87,13 @@ fn main() -> io::Result<()> {
         ));
     }
     if !random_data.try_exists()? {
-        return match output_check {
-            OutputCheck::Console(_) => Ok(()),
-            OutputCheck::RandomData => {
-                Err(io::Error::other("SRG created no random data output file"))
-            }
-        };
+        return output_check.map_or_else(
+            || Err(io::Error::other("SRG created no random data output file")),
+            |_| Ok(()),
+        );
     }
     let source_len = random_data.metadata()?.len();
-    if matches!(output_check, OutputCheck::RandomData) && source_len <= 3 {
+    if output_check.is_none() && source_len <= 3 {
         return Err(io::Error::other("SRG generated no random data"));
     }
     let copied = fs::copy(random_data, copied_random_data)?;

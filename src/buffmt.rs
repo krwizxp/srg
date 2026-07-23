@@ -24,6 +24,9 @@ impl<'buffer> ByteCursor<'buffer> {
         self.pos = end;
         Ok(slice)
     }
+    pub(super) fn take_array<const N: usize>(&mut self) -> io::Result<&mut [u8; N]> {
+        self.take(N)?.try_into().map_err(|_slice| write_zero_err())
+    }
     pub(super) fn write_byte(&mut self, byte: u8) -> io::Result<()> {
         self.write_bytes(&[byte])
     }
@@ -45,7 +48,7 @@ impl<'buffer> ByteCursor<'buffer> {
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
                 .ok_or_else(write_zero_err)?;
-            copy_two_digits(digits, remainder)?;
+            *digits = two_digits(remainder)?;
         }
         if value >= U32_TWO_DIGIT_THRESHOLD {
             index = index
@@ -55,7 +58,7 @@ impl<'buffer> ByteCursor<'buffer> {
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
                 .ok_or_else(write_zero_err)?;
-            copy_two_digits(digits, usize::from(low_u8_from_u32(value)))?;
+            *digits = two_digits(usize::from(low_u8_from_u32(value)))?;
         } else {
             index = index.checked_sub(1).ok_or_else(write_zero_err)?;
             let slot = buffer.get_mut(index).ok_or_else(write_zero_err)?;
@@ -76,12 +79,11 @@ impl fmt::Write for ByteCursor<'_> {
         }
     }
 }
-pub(super) fn copy_two_digits(target: &mut [u8; 2], value: usize) -> io::Result<()> {
-    *target = [
+pub(super) fn two_digits(value: usize) -> io::Result<[u8; 2]> {
+    Ok([
         digit_byte(value.div_euclid(10))?,
         digit_byte(value.rem_euclid(10))?,
-    ];
-    Ok(())
+    ])
 }
 pub(super) fn digit_byte(index: usize) -> io::Result<u8> {
     DIGITS.get(index).copied().ok_or_else(write_zero_err)

@@ -1,23 +1,13 @@
 use super::{Result, TimeError};
 use core::{error::Error, result::Result as CoreResult, time::Duration};
-#[derive(Clone, Copy)]
-pub(super) enum NewSampleWeight {
-    SeventyPercent,
-    ThirtyPercent,
-}
-pub(super) const fn blend_rtt(
+pub(super) const fn blend_rtt<const NEW_WEIGHT: u128>(
     old_value: Duration,
     new_value: Duration,
-    weight: NewSampleWeight,
 ) -> Duration {
-    let (old_weight, new_weight_value) = match weight {
-        NewSampleWeight::SeventyPercent => (3_u128, 7_u128),
-        NewSampleWeight::ThirtyPercent => (7_u128, 3_u128),
-    };
     let weighted_sum = old_value
         .as_nanos()
-        .saturating_mul(old_weight)
-        .saturating_add(new_value.as_nanos().saturating_mul(new_weight_value));
+        .saturating_mul(10_u128.saturating_sub(NEW_WEIGHT))
+        .saturating_add(new_value.as_nanos().saturating_mul(NEW_WEIGHT));
     Duration::from_nanos_u128(weighted_sum.div_euclid(10))
 }
 pub(super) fn parse_result_with_context<T, E>(

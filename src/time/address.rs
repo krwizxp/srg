@@ -75,34 +75,29 @@ impl FromStr for ParsedServer {
         if host_part.contains(':') && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_))) {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let build_host_port_text =
-            |prefix: &str, include_port: bool| match (host_part.contains(':'), include_port) {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let request_target = {
+            let prefix = match scheme {
+                UrlScheme::Http => HTTP_SCHEME_PREFIX,
+                UrlScheme::Https => HTTPS_SCHEME_PREFIX,
+            };
+            let request_target_text = match (host_part.contains(':'), explicit_port.is_some()) {
                 (true, true) => format!("{prefix}[{host_part}]:{port}"),
                 (true, false) => format!("{prefix}[{host_part}]"),
                 (false, true) => format!("{prefix}{host_part}:{port}"),
                 (false, false) => format!("{prefix}{host_part}"),
             };
-        let request_target_text = match scheme {
-            #[cfg(target_os = "windows")]
-            UrlScheme::Https => String::new(),
-            UrlScheme::Http => {
-                build_host_port_text("", port != DEFAULT_HTTP_PORT || explicit_port.is_some())
-            }
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
-            UrlScheme::Https => build_host_port_text(HTTPS_SCHEME_PREFIX, explicit_port.is_some()),
+            CString::new(request_target_text).map_err(|source| {
+                TimeError::parse_with_source("서버 HTTP 요청 대상 변환 실패", source)
+            })?
         };
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let request_target = CString::new(request_target_text).map_err(|source| {
-            TimeError::parse_with_source("서버 HTTP 요청 대상 변환 실패", source)
-        })?;
         Ok(Self {
+            #[cfg(target_os = "windows")]
             host: host_part.to_owned(),
-            literal_tcp_socket_addr: literal_ip_addr.map(|ip| net::SocketAddr::new(ip, port)),
+            #[cfg(target_os = "windows")]
             port,
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             request_target,
-            #[cfg(target_os = "windows")]
-            request_target: request_target_text,
             scheme,
         })
     }

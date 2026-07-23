@@ -77,23 +77,24 @@ struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
 }
+struct UniqueNumbers<const N: usize> {
+    len: usize,
+    seen: u64,
+    values: [u8; N],
+}
 struct RandomDataBuildState<'provider_ref, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
     data: RandomDataSet,
-    euro_lucky_next_idx: usize,
-    euro_main_next_idx: usize,
-    lotto7_next_idx: usize,
-    lotto_next_idx: usize,
+    euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
+    euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
+    lotto: UniqueNumbers<LOTTO_COUNT>,
+    lotto7: UniqueNumbers<LOTTO7_COUNT>,
     next_supp: &'provider_ref mut F,
     numeric_password_digits: u8,
     password_len: u8,
-    seen_euro_millions_lucky: u64,
-    seen_euro_millions_main: u64,
-    seen_lotto: u64,
-    seen_lotto7: u64,
-    supplemental: Option<RandomBitBuffer>,
+    supplemental: RandomBitBuffer,
 }
 impl RandomDataSet {
     pub(super) fn populate<F>(self, next_supp: &mut F) -> Result<Self>
@@ -102,25 +103,61 @@ impl RandomDataSet {
     {
         let mut state = RandomDataBuildState {
             data: self,
-            euro_lucky_next_idx: 0,
-            euro_main_next_idx: 0,
-            lotto7_next_idx: 0,
-            lotto_next_idx: 0,
+            euro_lucky: UniqueNumbers::new(),
+            euro_main: UniqueNumbers::new(),
+            lotto: UniqueNumbers::new(),
+            lotto7: UniqueNumbers::new(),
             next_supp,
             numeric_password_digits: 0,
             password_len: 0,
-            seen_euro_millions_lucky: 0,
-            seen_euro_millions_main: 0,
-            seen_lotto: 0,
-            seen_lotto7: 0,
-            supplemental: None,
+            supplemental: RandomBitBuffer {
+                bits_remaining: 0,
+                value: 0,
+            },
         };
         state.fill_required_fields()?;
         state.fill_lucky_stars()?;
         state.fill_hangul_syllables()?;
         state.fill_coords();
         state.fill_nms_fields()?;
+        state.data.euro_millions_lucky_stars = state.euro_lucky.values;
+        state.data.euro_millions_main_numbers = state.euro_main.values;
+        state.data.lotto_numbers = state.lotto.values;
+        state.data.lotto7_numbers = state.lotto7.values;
         Ok(state.data)
+    }
+}
+impl<const N: usize> UniqueNumbers<N> {
+    const fn is_full(&self) -> bool {
+        self.len >= N
+    }
+    const fn new() -> Self {
+        Self {
+            len: 0,
+            seen: 0,
+            values: [0; N],
+        }
+    }
+    fn push(&mut self, byte: u8, modulus: NonZeroU8) {
+        if self.is_full() {
+            return;
+        }
+        let number = NonZeroU8::MIN
+            .saturating_add(byte.rem_euclid(modulus.get()))
+            .get();
+        let mask = 1_u64 << number;
+        if (self.seen & mask) != 0 {
+            return;
+        }
+        let Some(slot) = self.values.get_mut(self.len) else {
+            return;
+        };
+        *slot = number;
+        self.seen |= mask;
+        self.len = self.len.wrapping_add(1);
+        if self.is_full() {
+            self.values.sort_unstable();
+        }
     }
 }
 impl<F> RandomDataBuildState<'_, F>
@@ -156,10 +193,10 @@ where
                 if syllable_index <= HANGUL_SYLLABLE_MAX {
                     break;
                 }
-                let supp_value = if let Some(supplemental) = self.supplemental {
-                    supplemental.value
-                } else {
+                let supp_value = if self.supplemental.bits_remaining == 0 {
                     self.next_supplemental("한글 음절 보완")?
+                } else {
+                    self.supplemental.value
                 };
                 let candidate_value = HANGUL_SHIFTS.into_iter().find_map(|supp_shift| {
                     let candidate = u32::from(low_u16_from_u64(supp_value >> supp_shift));
@@ -188,24 +225,19 @@ where
         Ok(())
     }
     fn fill_lucky_stars(&mut self) -> Result<()> {
-        let lucky_star_base = self
-            .supplemental
-            .as_ref()
-            .map_or(self.data.num_64, |supp| supp.value);
+        let lucky_star_base = if self.supplemental.bits_remaining == 0 {
+            self.data.num_64
+        } else {
+            self.supplemental.value
+        };
         let mut lucky_star_source = lucky_star_base.reverse_bits();
         for attempts_remaining in (0..SUPPLEMENTAL_RETRY_LIMIT).rev() {
             for byte in lucky_star_source.to_be_bytes() {
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
                     continue;
                 }
-                if process_lotto_numbers(
-                    byte,
-                    EURO_LUCKY_MODULUS,
-                    &mut self.data.euro_millions_lucky_stars,
-                    &mut self.seen_euro_millions_lucky,
-                    &mut self.euro_lucky_next_idx,
-                ) && self.euro_lucky_next_idx >= EURO_MILLIONS_LUCKY_COUNT
-                {
+                self.euro_lucky.push(byte, EURO_LUCKY_MODULUS);
+                if self.euro_lucky.is_full() {
                     return Ok(());
                 }
             }
@@ -296,92 +328,56 @@ where
             if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
                 continue;
             }
-            if self.numeric_password_digits < LOTTO_COUNT_U8 && {
+            if self.numeric_password_digits < LOTTO_COUNT_U8 {
                 let digit = u32::from(byte.rem_euclid(10));
                 self.data.numeric_password = self
                     .data
                     .numeric_password
                     .saturating_mul(10)
                     .saturating_add(digit);
-                let next_digit_count = self.numeric_password_digits.saturating_add(1);
-                self.numeric_password_digits = next_digit_count;
-                next_digit_count >= LOTTO_COUNT_U8 && self.is_complete()
-            } {
-                return;
+                self.numeric_password_digits = self.numeric_password_digits.saturating_add(1);
             }
-            let euro_main_added = self.euro_main_next_idx < EURO_MILLIONS_MAIN_COUNT
-                && process_lotto_numbers(
-                    byte,
-                    EURO_MAIN_MODULUS,
-                    &mut self.data.euro_millions_main_numbers,
-                    &mut self.seen_euro_millions_main,
-                    &mut self.euro_main_next_idx,
-                );
-            if euro_main_added
-                && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
-                && self.is_complete()
-            {
-                return;
+            if !self.euro_main.is_full() {
+                self.euro_main.push(byte, EURO_MAIN_MODULUS);
             }
-            if byte > INPUT_BYTE_MAX_FOR_LOTTO {
-                continue;
-            }
-            let lotto_added = self.lotto_next_idx < LOTTO_COUNT
-                && process_lotto_numbers(
-                    byte,
-                    LOTTO_MODULUS,
-                    &mut self.data.lotto_numbers,
-                    &mut self.seen_lotto,
-                    &mut self.lotto_next_idx,
-                );
-            if lotto_added && self.lotto_next_idx >= LOTTO_COUNT && self.is_complete() {
-                return;
-            }
-            if byte > INPUT_BYTE_MAX_FOR_LOTTO7 {
-                continue;
-            }
-            let lotto7_number_added = self.lotto7_next_idx < LOTTO7_COUNT
-                && process_lotto_numbers(
-                    byte,
-                    LOTTO7_MODULUS,
-                    &mut self.data.lotto7_numbers,
-                    &mut self.seen_lotto7,
-                    &mut self.lotto7_next_idx,
-                );
-            if lotto7_number_added && self.lotto7_next_idx >= LOTTO7_COUNT && self.is_complete() {
-                return;
-            }
-            if byte > INPUT_BYTE_MAX_FOR_PASSWORD {
-                continue;
-            }
-            if self.password_len < PASSWORD_BYTE_LEN_U8
-                && let Some(slot) = self.data.password.get_mut(usize::from(self.password_len))
-            {
-                let password_byte = byte
-                    .rem_euclid(ASCII_PRINTABLE_LEN)
-                    .saturating_add(ASCII_PRINTABLE_START);
-                *slot = password_byte;
-                let next_password_len = self.password_len.saturating_add(1);
-                self.password_len = next_password_len;
-                if next_password_len >= PASSWORD_BYTE_LEN_U8 && self.is_complete() {
-                    return;
+            if byte <= INPUT_BYTE_MAX_FOR_LOTTO {
+                if !self.lotto.is_full() {
+                    self.lotto.push(byte, LOTTO_MODULUS);
                 }
+                if byte <= INPUT_BYTE_MAX_FOR_LOTTO7 {
+                    if !self.lotto7.is_full() {
+                        self.lotto7.push(byte, LOTTO7_MODULUS);
+                    }
+                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD
+                        && self.password_len < PASSWORD_BYTE_LEN_U8
+                        && let Some(slot) =
+                            self.data.password.get_mut(usize::from(self.password_len))
+                    {
+                        *slot = byte
+                            .rem_euclid(ASCII_PRINTABLE_LEN)
+                            .saturating_add(ASCII_PRINTABLE_START);
+                        self.password_len = self.password_len.saturating_add(1);
+                    }
+                }
+            }
+            if self.is_complete() {
+                return;
             }
         }
     }
     const fn is_complete(&self) -> bool {
         self.numeric_password_digits >= LOTTO_COUNT_U8
-            && self.lotto_next_idx >= LOTTO_COUNT
-            && self.lotto7_next_idx >= LOTTO7_COUNT
+            && self.lotto.is_full()
+            && self.lotto7.is_full()
             && self.password_len >= PASSWORD_BYTE_LEN_U8
-            && self.euro_main_next_idx >= EURO_MILLIONS_MAIN_COUNT
+            && self.euro_main.is_full()
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
         let value = (self.next_supp)(reason)?;
-        self.supplemental = Some(RandomBitBuffer {
+        self.supplemental = RandomBitBuffer {
             bits_remaining: BYTE_BITS,
             value,
-        });
+        };
         Ok(value)
     }
 }
@@ -407,37 +403,13 @@ pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomD
     }
     _ => {}
 }
-fn process_lotto_numbers(
-    byte: u8,
-    modulus: NonZeroU8,
-    numbers: &mut [u8],
-    seen: &mut u64,
-    next_idx: &mut usize,
-) -> bool {
-    let number_base = byte.rem_euclid(modulus.get());
-    let number = NonZeroU8::MIN.saturating_add(number_base).get();
-    let mask = 1_u64 << number;
-    if (*seen & mask) != 0 {
-        return false;
-    }
-    let Some(slot) = numbers.get_mut(*next_idx) else {
-        return false;
-    };
-    *slot = number;
-    *seen |= mask;
-    *next_idx = next_idx.wrapping_add(1);
-    if *next_idx == numbers.len() {
-        numbers.sort_unstable();
-    }
-    true
-}
 fn extract_valid_bits_for_nms(
     num: u64,
     shifts: &[u8],
     bit_field: (u8, u64),
     max_value: u64,
     reason: &'static str,
-    supplemental: &mut Option<RandomBitBuffer>,
+    supplemental: &mut RandomBitBuffer,
     next_supp: &mut impl FnMut(&'static str) -> Result<u64>,
 ) -> Result<u64> {
     let (bits, mask) = bit_field;
@@ -448,16 +420,15 @@ fn extract_valid_bits_for_nms(
         return Ok(extracted_value);
     }
     for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-        let supp = match *supplemental {
-            Some(ref mut candidate) if candidate.bits_remaining >= bits => candidate,
-            None | Some(_) => supplemental.insert(RandomBitBuffer {
+        if supplemental.bits_remaining < bits {
+            *supplemental = RandomBitBuffer {
                 bits_remaining: BYTE_BITS,
                 value: next_supp(reason)?,
-            }),
-        };
-        let shift = supp.bits_remaining.abs_diff(bits);
-        supp.bits_remaining = shift;
-        let extracted = (supp.value >> shift) & mask;
+            };
+        }
+        let shift = supplemental.bits_remaining.abs_diff(bits);
+        supplemental.bits_remaining = shift;
+        let extracted = (supplemental.value >> shift) & mask;
         if extracted <= max_value {
             return Ok(extracted);
         }

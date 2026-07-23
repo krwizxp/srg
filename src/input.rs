@@ -1,4 +1,6 @@
 use crate::diagnostic::Result;
+#[cfg(target_arch = "x86_64")]
+use crate::ladder::MAX_LADDER_ENTRIES;
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
 cfg_select! {
@@ -25,63 +27,49 @@ pub(super) fn read_line_reuse_limited<'buffer>(
     out: &mut dyn Write,
     max_bytes: usize,
 ) -> IoResult<&'buffer str> {
-    buffer.clear();
     out.write_fmt(prompt)?;
     out.flush()?;
-    read_line_limited(buffer, max_bytes)?;
-    Ok(buffer.trim())
-}
-fn read_line_limited(buffer: &mut String, max_bytes: usize) -> IoResult<()> {
     let mut bytes = mem::take(buffer).into_bytes();
     bytes.clear();
-    {
-        let mut stdin_lock = stdin().lock();
-        loop {
-            let available = stdin_lock.fill_buf()?;
-            if available.is_empty() {
-                if bytes.is_empty() {
-                    return Err(IoError::new(
-                        io::ErrorKind::UnexpectedEof,
-                        "표준 입력이 종료되었습니다.",
-                    ));
-                }
-                break;
+    let mut stdin_lock = stdin().lock();
+    loop {
+        let available = stdin_lock.fill_buf()?;
+        if available.is_empty() {
+            if bytes.is_empty() {
+                return Err(IoError::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "표준 입력이 종료되었습니다.",
+                ));
             }
-            let line_end = available.iter().position(|&byte| byte == b'\n');
-            let reached_line_end = line_end.is_some();
-            let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
-            let segment = available
-                .get(..take_len)
-                .ok_or_else(|| IoError::new(io::ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
-            let next_len = match bytes.len().checked_add(segment.len()) {
-                Some(next_len) if next_len <= max_bytes => next_len,
-                _ => {
-                    stdin_lock.consume(take_len);
-                    if !reached_line_end {
-                        stdin_lock.skip_until(b'\n')?;
-                    }
-                    return Err(IoError::new(
-                        io::ErrorKind::InvalidInput,
-                        format!(
-                            "입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."
-                        ),
-                    ));
-                }
-            };
-            if bytes.capacity() < next_len {
-                bytes.try_reserve(segment.len()).map_err(IoError::other)?;
-            }
-            bytes.extend_from_slice(segment);
+            break;
+        }
+        let line_end = available.iter().position(|&byte| byte == b'\n');
+        let reached_line_end = line_end.is_some();
+        let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
+        let segment = available
+            .get(..take_len)
+            .ok_or_else(|| IoError::new(io::ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
+        if segment.len() > max_bytes.saturating_sub(bytes.len()) {
             stdin_lock.consume(take_len);
-            if reached_line_end {
-                drop(stdin_lock);
-                break;
+            if !reached_line_end {
+                stdin_lock.skip_until(b'\n')?;
             }
+            return Err(IoError::new(
+                io::ErrorKind::InvalidInput,
+                format!("입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."),
+            ));
+        }
+        bytes.try_reserve(segment.len()).map_err(IoError::other)?;
+        bytes.extend_from_slice(segment);
+        stdin_lock.consume(take_len);
+        if reached_line_end {
+            break;
         }
     }
+    drop(stdin_lock);
     *buffer = String::from_utf8(bytes)
         .map_err(|source| IoError::new(io::ErrorKind::InvalidData, source))?;
-    Ok(())
+    Ok(buffer.trim())
 }
 pub(super) fn read_u64_hex_input(
     prompt: Arguments<'_>,
@@ -95,8 +83,14 @@ pub(super) fn read_u64_hex_input(
             .strip_prefix('0')
             .and_then(|body| body.strip_prefix(['x', 'X']))
             .map_or_else(
-                || parse_u64_digits(raw, 10),
-                |hex| parse_u64_digits(hex, 16),
+                || raw.parse::<u64>().ok(),
+                |hex| {
+                    if hex.starts_with('+') {
+                        None
+                    } else {
+                        u64::from_str_radix(hex, 16).ok()
+                    }
+                },
             );
         if let Some(value) = parsed_value {
             return Ok(value);
@@ -106,13 +100,6 @@ pub(super) fn read_u64_hex_input(
             "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
             max_u64 = u64::MAX
         )?;
-    }
-}
-pub(super) fn parse_u64_digits(raw: &str, radix: u32) -> Option<u64> {
-    match radix {
-        10 => raw.parse::<u64>().ok(),
-        16 if !raw.starts_with('+') => u64::from_str_radix(raw, 16).ok(),
-        _ => None,
     }
 }
 pub(super) fn get_validated_input<T, E, F>(
@@ -126,12 +113,13 @@ where
     F: FnMut(&str) -> CoreResult<T, E>,
 {
     loop {
-        out.write_all(prompt.as_bytes())?;
-        out.flush()?;
-        input_buf.clear();
-        read_line_limited(input_buf, DEFAULT_INPUT_LINE_MAX_BYTES)?;
-        let trimmed = input_buf.trim();
-        match validator(trimmed) {
+        let input = read_line_reuse_limited(
+            format_args!("{prompt}"),
+            input_buf,
+            out,
+            DEFAULT_INPUT_LINE_MAX_BYTES,
+        )?;
+        match validator(input) {
             Ok(value) => return Ok(value),
             Err(err) => {
                 let err_text = err.as_ref();
@@ -149,11 +137,10 @@ cfg_select! {
                 .ok()
                 .filter(|value| value.is_finite() && !value.is_subnormal())
         }
-        pub(super) fn read_ladder_entries<'storage, const N: usize>(
+        pub(super) fn read_ladder_entries(
             prompt: Arguments<'_>,
             io: (&mut dyn Write, &mut dyn Write),
-            storage: &'storage mut String,
-            entries: &mut [&'storage str; N],
+            storage: &mut String,
             mode: LadderEntryMode,
         ) -> Result<usize> {
             let (out, err) = io;
@@ -164,8 +151,11 @@ cfg_select! {
                 for part in line.split(',') {
                     count = count.saturating_add(1);
                     match mode {
-                        LadderEntryMode::Players if count > N => {
-                            writeln!(err, "플레이어 수가 최대 {N}명을 초과했습니다.")?;
+                        LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
+                            writeln!(
+                                err,
+                                "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
+                            )?;
                             continue 'read;
                         }
                         LadderEntryMode::Results { expected_count } if count > expected_count => break,
@@ -196,13 +186,6 @@ cfg_select! {
                 }
                 break count;
             };
-            for (slot, part) in entries
-                .iter_mut()
-                .take(count)
-                .zip(storage.trim().split(',').map(str::trim))
-            {
-                *slot = part;
-            }
             Ok(count)
         }
         pub(super) fn read_parsed_value<T, F>(

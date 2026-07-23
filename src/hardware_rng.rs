@@ -6,6 +6,7 @@ use core::{
     time::Duration,
 };
 use std::{
+    io::Write,
     is_x86_feature_detected,
     sync::LazyLock,
     thread::yield_now,
@@ -30,11 +31,6 @@ pub(super) struct HardwareRng {
     fallback_notice_pending: AtomicBool,
     source: AtomicU8,
 }
-impl Default for HardwareRng {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum HardwareRandomSource {
     None,
@@ -51,13 +47,6 @@ impl HardwareRandomSource {
     }
 }
 impl HardwareRng {
-    fn current_source(&self) -> HardwareRandomSource {
-        match self.source.load(Ordering::Relaxed) {
-            RNG_SOURCE_RDRAND => HardwareRandomSource::RdRand,
-            RNG_SOURCE_RDSEED => HardwareRandomSource::RdSeed,
-            _ => HardwareRandomSource::None,
-        }
-    }
     pub(super) fn new() -> Self {
         let source = *INITIAL_RNG_SOURCE;
         Self {
@@ -66,7 +55,7 @@ impl HardwareRng {
         }
     }
     pub(super) fn next_u64(&self) -> Result<u64> {
-        match self.current_source() {
+        match self.source() {
             HardwareRandomSource::RdSeed => self.rdseed_random(),
             HardwareRandomSource::RdRand => Self::rdrand_random(),
             HardwareRandomSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
@@ -88,7 +77,7 @@ impl HardwareRng {
         if Self::try_rdseed(&mut value) {
             return Ok(value);
         }
-        match self.current_source() {
+        match self.source() {
             HardwareRandomSource::RdSeed => {}
             HardwareRandomSource::RdRand => return Self::rdrand_random(),
             HardwareRandomSource::None => return Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
@@ -98,7 +87,7 @@ impl HardwareRng {
             if Self::try_rdseed(&mut value) {
                 return Ok(value);
             }
-            match self.current_source() {
+            match self.source() {
                 HardwareRandomSource::RdSeed => yield_now(),
                 HardwareRandomSource::RdRand => return Self::rdrand_random(),
                 HardwareRandomSource::None => {
@@ -116,14 +105,14 @@ impl HardwareRng {
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
     }
     pub(super) fn source(&self) -> HardwareRandomSource {
-        self.current_source()
+        match self.source.load(Ordering::Relaxed) {
+            RNG_SOURCE_RDRAND => HardwareRandomSource::RdRand,
+            RNG_SOURCE_RDSEED => HardwareRandomSource::RdSeed,
+            _ => HardwareRandomSource::None,
+        }
     }
     fn store_source(&self, source: HardwareRandomSource) {
         self.source.store(source.code(), Ordering::Relaxed);
-    }
-    pub(super) fn take_rdseed_fallback_notice(&self) -> bool {
-        self.fallback_notice_pending
-            .swap(false, Ordering::Relaxed)
     }
     fn try_rdseed(value: &mut u64) -> bool {
         for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
@@ -134,5 +123,11 @@ impl HardwareRng {
             spin_loop();
         }
         false
+    }
+    pub(super) fn write_rdseed_fallback_notice(&self, err: &mut dyn Write) -> Result<()> {
+        if self.fallback_notice_pending.swap(false, Ordering::Relaxed) {
+            writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
+        }
+        Ok(())
     }
 }
