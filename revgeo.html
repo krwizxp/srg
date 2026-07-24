@@ -2207,7 +2207,6 @@
           "," + lon,
       },
     ];
-    const MAP_PROVIDER_COUNT = MAP_LINKS.length;
     const setMapPopoverExpanded = (btn, expanded) => {
       btn.setAttribute("aria-expanded", expanded ? "true" : "false");
     };
@@ -2229,7 +2228,7 @@
       const lon = r.lonStr;
       const lat6 = r.lat6 ??= fmtCoord6(lat);
       const lon6 = r.lon6 ??= fmtCoord6(lon);
-      for (let i = 0; i < MAP_PROVIDER_COUNT; i++) {
+      for (let i = 0; i < MAP_LINKS.length; i++) {
         mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
       }
     });
@@ -2387,7 +2386,7 @@
       );
     };
     const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
-    applyTheme(getStoredTheme() ?? getSystemTheme());
+    applyTheme(root.dataset.theme);
     themeMedia.addEventListener("change", () => {
       if (getStoredTheme()) return;
       applyTheme(getSystemTheme());
@@ -3159,7 +3158,7 @@
           : {
             status,
             controller: new AbortController(),
-            resumeHandler: null,
+            resume: null,
             inFlight: false,
           };
         if (this.renderReq !== null) {
@@ -3406,27 +3405,6 @@
       } catch {
       }
     }
-    async function* decodedChunkIterator(stream, signal) {
-      const reader = stream
-        .pipeThrough(new TextDecoderStream(), { signal })
-        .getReader();
-      let finished = false;
-      try {
-        while (true) {
-          const { value: chunk, done } = await reader.read();
-          if (done) {
-            finished = true;
-            signal.throwIfAborted();
-            return;
-          }
-          signal.throwIfAborted();
-          yield chunk;
-        }
-      } finally {
-        if (!finished) await cancelReadable(reader, signal.reason);
-        reader.releaseLock();
-      }
-    }
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
         throw new InputLimitError(
@@ -3435,63 +3413,78 @@
       }
     }
     async function* lineIterator(stream, signal) {
+      const reader = stream
+        .pipeThrough(new TextDecoderStream(), { signal })
+        .getReader();
+      let finished = false;
       let buffer = "";
       let pendingCR = false;
       let hasCR = false;
-      for await (const chunk of decodedChunkIterator(stream, signal)) {
-        if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
-        if (pendingCR) {
-          if (chunk && chunk[0] === "\n") {
-            buffer += chunk.slice(1);
+      try {
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            finished = true;
+            signal.throwIfAborted();
+            break;
+          }
+          signal.throwIfAborted();
+          if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
+          if (pendingCR) {
+            if (chunk && chunk[0] === "\n") {
+              buffer += chunk.slice(1);
+            } else {
+              buffer += chunk;
+            }
+            pendingCR = false;
           } else {
             buffer += chunk;
           }
-          pendingCR = false;
-        } else {
-          buffer += chunk;
-        }
-        let start = 0;
-        if (!hasCR) {
-          while (true) {
+          let start = 0;
+          if (!hasCR) {
+            while (true) {
+              const nl = buffer.indexOf("\n", start);
+              if (nl === -1) break;
+              ensureInputLineLength(nl - start);
+              yield buffer.substring(start, nl);
+              start = nl + 1;
+            }
+            buffer = buffer.substring(start);
+            ensureInputLineLength(buffer.length);
+            continue;
+          }
+          while (start < buffer.length) {
             const nl = buffer.indexOf("\n", start);
-            if (nl === -1) break;
-            ensureInputLineLength(nl - start);
-            yield buffer.substring(start, nl);
-            start = nl + 1;
+            const cr = buffer.indexOf("\r", start);
+            let pos;
+            if (nl === -1) pos = cr;
+            else if (cr === -1) pos = nl;
+            else pos = nl < cr ? nl : cr;
+            if (pos === -1) break;
+            ensureInputLineLength(pos - start);
+            yield buffer.substring(start, pos);
+            if (buffer[pos] === "\r") {
+              if (pos + 1 === buffer.length) {
+                pendingCR = true;
+                hasCR = true;
+                start = pos + 1;
+                break;
+              }
+              start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
+            } else {
+              start = pos + 1;
+            }
           }
           buffer = buffer.substring(start);
           ensureInputLineLength(buffer.length);
-          continue;
         }
-        while (start < buffer.length) {
-          const nl = buffer.indexOf("\n", start);
-          const cr = buffer.indexOf("\r", start);
-          let pos;
-          if (nl === -1) pos = cr;
-          else if (cr === -1) pos = nl;
-          else pos = nl < cr ? nl : cr;
-          if (pos === -1) break;
-          ensureInputLineLength(pos - start);
-          yield buffer.substring(start, pos);
-          if (buffer[pos] === "\r") {
-            if (pos + 1 === buffer.length) {
-              pendingCR = true;
-              hasCR = true;
-              start = pos + 1;
-              break;
-            }
-            start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
-          } else {
-            start = pos + 1;
-          }
+        if (buffer) {
+          ensureInputLineLength(buffer.length);
+          yield buffer;
         }
-        buffer = buffer.substring(start);
-        ensureInputLineLength(buffer.length);
-      }
-      signal.throwIfAborted();
-      if (buffer) {
-        ensureInputLineLength(buffer.length);
-        yield buffer;
+      } finally {
+        if (!finished) await cancelReadable(reader, signal.reason);
+        reader.releaseLock();
       }
     }
     async function parseFileToRecords(file, signal) {
@@ -3808,10 +3801,10 @@
           if (AppState.status === "pausing") {
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-            const resumeHandler = Promise.withResolvers();
-            task.resumeHandler = resumeHandler;
+            const { promise, resolve } = Promise.withResolvers();
+            task.resume = resolve;
             scheduleRender();
-            await resumeHandler.promise;
+            await promise;
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
           if (!AppState.isRunning) break;
@@ -3939,7 +3932,7 @@
           ) {
             skeletonTr.remove();
           }
-          task.resumeHandler = null;
+          task.resume = null;
           setControlsIdle(
             `오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(err)
             }`,
@@ -4062,7 +4055,7 @@
           line += "," + escCell(CSV_GEOCODER_TEXT);
           const lat6 = r.lat6 ??= fmtCoord6(lat);
           const lon6 = r.lon6 ??= fmtCoord6(lon);
-          for (let k = 0; k < MAP_PROVIDER_COUNT; k++) {
+          for (let k = 0; k < MAP_LINKS.length; k++) {
             line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
           }
           chunkLines.push(line);
@@ -4206,8 +4199,8 @@
         if (!AppState.isPaused) return;
         const task = AppState.task;
         AppState.setStatus("running");
-        task.resumeHandler.resolve();
-        task.resumeHandler = null;
+        task.resume();
+        task.resume = null;
       },
       "--stop": () => {
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
@@ -4215,8 +4208,8 @@
         const task = AppState.task;
         resetScrollShadowState(domElements.tableWrap);
         resetScrollShadowState(domElements.coords);
-        task.resumeHandler?.resolve();
-        task.resumeHandler = null;
+        task.resume?.();
+        task.resume = null;
         task.controller.abort();
         setStatusMessage("중지 요청됨. 취소 중…", "warn");
       },
@@ -4330,8 +4323,6 @@
     window.addEventListener("resize", syncViewportShadows, EVT_PASSIVE);
     syncViewportShadows();
     (() => {
-      const fmt =
-        new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
       const U64_MAX = (1n << 64n) - 1n;
       const U32_MAX_INV = 1 / 4294967295;
       const HANGUL_BASE_CODE_POINT = 0xac00;

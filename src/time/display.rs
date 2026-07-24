@@ -25,16 +25,6 @@ const U32_FOUR_DIGIT_THRESHOLD: u32 = 10_000;
 const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
-struct DisplayableTime {
-    day_of_month: u32,
-    day_of_week_str: &'static str,
-    hour: u32,
-    millis: u32,
-    minute: u32,
-    month: u32,
-    second: u32,
-    year: i32,
-}
 impl ByteCursor<'_> {
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
         let idx = usize::from(low_u8_from_u32(value));
@@ -78,7 +68,26 @@ impl ByteCursor<'_> {
     }
 }
 impl ServerTime {
-    fn calculate_display_time_at(&self, now: Instant) -> Result<DisplayableTime> {
+    pub(super) fn current_server_time_at(&self, now: Instant) -> SystemTime {
+        let elapsed_since_anchor = now.saturating_duration_since(self.anchor_instant);
+        let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
+            return self.anchor_time;
+        };
+        server_time
+    }
+    pub(super) const fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
+        let smoothed_rtt = blend_rtt::<3>(self.baseline_rtt, new_rtt);
+        Self {
+            anchor_time: self.anchor_time,
+            anchor_instant: self.anchor_instant,
+            baseline_rtt: smoothed_rtt,
+        }
+    }
+    pub(super) fn write_current_display_time_buf_at(
+        &self,
+        cur: &mut ByteCursor<'_>,
+        now: Instant,
+    ) -> Result<()> {
         let current_time = self.current_server_time_at(now);
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
         let total_seconds = parse_result_with_context(
@@ -124,53 +133,21 @@ impl ServerTime {
             month,
             year,
         } = civil_from_days(day_index);
-        Ok(DisplayableTime {
-            day_of_month,
-            day_of_week_str,
-            hour,
-            millis,
-            minute,
-            month,
-            second,
-            year,
-        })
-    }
-    pub(super) fn current_server_time_at(&self, now: Instant) -> SystemTime {
-        let elapsed_since_anchor = now.saturating_duration_since(self.anchor_instant);
-        let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
-            return self.anchor_time;
-        };
-        server_time
-    }
-    pub(super) const fn recalibrate_with_rtt(&self, new_rtt: Duration) -> Self {
-        let smoothed_rtt = blend_rtt::<3>(self.baseline_rtt, new_rtt);
-        Self {
-            anchor_time: self.anchor_time,
-            anchor_instant: self.anchor_instant,
-            baseline_rtt: smoothed_rtt,
-        }
-    }
-    pub(super) fn write_current_display_time_buf_at(
-        &self,
-        cur: &mut ByteCursor<'_>,
-        now: Instant,
-    ) -> Result<()> {
-        let dt = self.calculate_display_time_at(now)?;
-        cur.write_year_padded4(dt.year)?;
+        cur.write_year_padded4(year)?;
         cur.write_byte(b'-')?;
-        cur.write_u32_2digits(dt.month)?;
+        cur.write_u32_2digits(month)?;
         cur.write_byte(b'-')?;
-        cur.write_u32_2digits(dt.day_of_month)?;
+        cur.write_u32_2digits(day_of_month)?;
         cur.write_byte(b'(')?;
-        cur.write_bytes(dt.day_of_week_str.as_bytes())?;
+        cur.write_bytes(day_of_week_str.as_bytes())?;
         cur.write_bytes(b") ")?;
-        cur.write_u32_2digits(dt.hour)?;
+        cur.write_u32_2digits(hour)?;
         cur.write_byte(b':')?;
-        cur.write_u32_2digits(dt.minute)?;
+        cur.write_u32_2digits(minute)?;
         cur.write_byte(b':')?;
-        cur.write_u32_2digits(dt.second)?;
+        cur.write_u32_2digits(second)?;
         cur.write_byte(b'.')?;
-        cur.write_u32_3digits(dt.millis)?;
+        cur.write_u32_3digits(millis)?;
         Ok(())
     }
 }

@@ -8,8 +8,7 @@ use crate::{
     BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
 };
 use core::{
-    num::NonZero,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::Duration,
 };
 use std::{
@@ -32,6 +31,7 @@ struct WorkerFailure {
     first_error: AppError,
 }
 struct WorkerJob<'scope> {
+    cancelled: &'scope AtomicBool,
     local_pool: Vec<DataBuffer>,
     loop_count: usize,
     processed_ref: &'scope AtomicUsize,
@@ -59,18 +59,24 @@ impl WorkerJob<'_> {
             let mut buffer = if let Some(buf) = self.local_pool.pop() {
                 buf
             } else {
-                let Ok(buf) = self.return_rx.recv() else {
-                    let remaining = self.loop_count.wrapping_sub(item_index);
-                    record_failure(
-                        &mut outcome,
-                        remaining,
-                        AppError::message("writer buffer 반환 채널 연결 종료"),
-                    );
-                    self.processed_ref
-                        .fetch_add(remaining, Ordering::Relaxed);
-                    break;
-                };
-                buf
+                loop {
+                    match self.return_rx.recv_timeout(PROGRESS_UPDATE_INTERVAL) {
+                        Ok(buf) => break buf,
+                        Err(RecvTimeoutError::Timeout)
+                            if !self.cancelled.load(Ordering::Relaxed) => {}
+                        Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => {
+                            let remaining = self.loop_count.wrapping_sub(item_index);
+                            record_failure(
+                                &mut outcome,
+                                remaining,
+                                AppError::message("writer buffer 반환 중 작업 종료"),
+                            );
+                            self.processed_ref
+                                .fetch_add(remaining, Ordering::Relaxed);
+                            return outcome;
+                        }
+                    }
+                }
             };
             let data = match generate_random_data_with_rng(rng) {
                 Ok(data) => data,
@@ -169,21 +175,17 @@ pub(super) fn regenerate_with_count(
     }
     let max_threads = available_parallelism()?;
     let pending_count = requested_count.wrapping_sub(1);
-    let calculated_thread_count = NonZero::<usize>::MIN
-        .saturating_add(pending_count.wrapping_sub(1))
-        .min(max_threads);
-    let in_flight_buffers = calculated_thread_count
-        .get()
-        .wrapping_mul(BUFFERS_PER_WORKER);
+    let thread_count = pending_count.min(max_threads.get());
+    let in_flight_buffers = thread_count.wrapping_mul(BUFFERS_PER_WORKER);
     let mut return_senders = try_reserved_vec(
-        calculated_thread_count.get(),
+        thread_count,
         "buffer sender 목록 메모리 확보 실패",
     )?;
     let mut worker_buffers = try_reserved_vec(
-        calculated_thread_count.get(),
+        thread_count,
         "worker buffer 목록 메모리 확보 실패",
     )?;
-    for _ in 0..calculated_thread_count.get() {
+    for _ in 0..thread_count {
         let (tx, rx) = sync_channel(BUFFERS_PER_WORKER);
         let mut local_pool =
             try_reserved_vec(BUFFERS_PER_WORKER, "worker buffer pool 메모리 확보 실패")?;
@@ -194,15 +196,17 @@ pub(super) fn regenerate_with_count(
         worker_buffers.push((rx, local_pool));
     }
     let (sender, receiver) = sync_channel::<GeneratedChunk<'_>>(in_flight_buffers);
+    let cancelled = AtomicBool::new(false);
     let processed = AtomicUsize::new(0);
+    let cancelled_ref = &cancelled;
     let processed_ref = &processed;
-    let base_count = pending_count.div_euclid(calculated_thread_count.get());
-    let remainder = pending_count.rem_euclid(calculated_thread_count.get());
+    let base_count = pending_count.div_euclid(thread_count);
+    let remainder = pending_count.rem_euclid(thread_count);
     let worker_outcome = {
         let output_writer = output_file.writer();
         scope(|scope_ctx| -> Result<Option<WorkerFailure>> {
             let mut worker_handles = try_reserved_vec(
-                calculated_thread_count.get(),
+                thread_count,
                 "작업 스레드 handle 목록 메모리 확보 실패",
             )?;
             for (worker_idx, ((return_rx, local_pool), return_sender)) in worker_buffers
@@ -212,6 +216,7 @@ pub(super) fn regenerate_with_count(
             {
                 let loop_count = base_count.wrapping_add(usize::from(worker_idx < remainder));
                 let job = WorkerJob {
+                    cancelled: cancelled_ref,
                     local_pool,
                     loop_count,
                     processed_ref,
@@ -246,7 +251,9 @@ pub(super) fn regenerate_with_count(
                         }
                     }
                     Err(RecvTimeoutError::Timeout) => {}
-                    Err(RecvTimeoutError::Disconnected) => break output_writer.flush().map_err(Into::into),
+                    Err(RecvTimeoutError::Disconnected) => {
+                        break output_writer.flush().map_err(Into::into);
+                    }
                 }
                 if last_progress.elapsed() >= PROGRESS_UPDATE_INTERVAL
                     && let Some(progress_writer) = progress_out.as_mut()
@@ -262,6 +269,9 @@ pub(super) fn regenerate_with_count(
                     last_progress = Instant::now();
                 }
             };
+            if writer_result.is_err() {
+                cancelled_ref.store(true, Ordering::Relaxed);
+            }
             drop(receiver);
             let mut combined_outcome = None;
             let mut first_join_error = None;

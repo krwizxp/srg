@@ -35,6 +35,9 @@ const LOTTO_COUNT_U8: u8 = 6;
 const NIBBLE_MASK_U64: u64 = 0xF;
 const NMS_COORD_MASK: u64 = 0x0FFF;
 const NMS_GLYPH_COUNT: usize = 12;
+const NMS_GLYPHS: [char; 16] = [
+    '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
+];
 const NMS_PLANET_MAX_VALUE: u64 = 11;
 const NMS_PLANET_FIELD: (u8, u64) = (4, 0x0f);
 const NMS_PLANET_MODULUS: u64 = 6;
@@ -291,24 +294,11 @@ where
             num >> 8_u32,
         ];
         for (slot, nibble_source) in self.data.glyph_string.iter_mut().zip(glyph_sources) {
-            *slot = match low_u8_from_u64(nibble_source & NIBBLE_MASK_U64) {
-                0x0 => '🌅',
-                0x1 => '🐦',
-                0x2 => '👫',
-                0x3 => '🦕',
-                0x4 => '🌘',
-                0x5 => '🎈',
-                0x6 => '⛵',
-                0x7 => '🕷',
-                0x8 => '🦋',
-                0x9 => '🌀',
-                0xA => '🧊',
-                0xB => '🐟',
-                0xC => '⛺',
-                0xD => '🚀',
-                0xE => '🌳',
-                _ => '🔯',
+            let index = usize::from(low_u8_from_u64(nibble_source & NIBBLE_MASK_U64));
+            let Some(&glyph) = NMS_GLYPHS.get(index) else {
+                return Err("NMS 글리프 인덱스 계산 실패".into());
             };
+            *slot = glyph;
         }
         Ok(())
     }

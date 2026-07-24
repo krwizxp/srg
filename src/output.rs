@@ -25,7 +25,6 @@ const PASSWORD_FULL_WIDTH_THRESHOLD: u32 = 1_000_000;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
 const TWO_DIGIT_WIDTH: usize = 2;
-const U64_DEC_BUF_LEN: usize = 20;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
 #[derive(Clone, Copy)]
@@ -96,12 +95,12 @@ impl OutputFormatter<'_, '_, '_> {
         let bytes = self.bytes;
         let use_colors = self.use_colors;
         self.cursor.write_bytes("64비트 난수: ".as_bytes())?;
-        buf_write_u64_dec(self.cursor, number64)?;
+        self.cursor.write_u64_dec(number64)?;
         self.cursor.write_bytes(" (유부호 정수: ".as_bytes())?;
         if signed_number < 0 {
             self.cursor.write_byte(b'-')?;
         }
-        buf_write_u64_dec(self.cursor, signed_number.unsigned_abs())?;
+        self.cursor.write_u64_dec(signed_number.unsigned_abs())?;
         self.cursor.write_bytes(b")\n")?;
         self.write_prefixed_byte_groups("2진수: ", |byte| {
             [
@@ -123,13 +122,13 @@ impl OutputFormatter<'_, '_, '_> {
             let mut index = tmp.len();
             let mut octal_number = number64;
             while octal_number != 0 {
-                sub_from_index(&mut index, 1)?;
+                index = index.checked_sub(1).ok_or_else(write_zero_err)?;
                 let oct_digit = low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK);
                 let slot = tmp.get_mut(index).ok_or_else(write_zero_err)?;
                 *slot = digit_byte(usize::from(oct_digit))?;
                 octal_number >>= OCTAL_SHIFT_BITS;
             }
-            buffer_cur.write_bytes(suffix_slice(&tmp, index)?)
+            buffer_cur.write_bytes(tmp.get(index..).ok_or_else(write_zero_err)?)
         })?;
         self.write_prefixed_byte_groups("16진수: ", hex_byte)?;
         self.write_labeled_line("Hex 코드: ".as_bytes(), |buffer_cur| {
@@ -260,25 +259,13 @@ fn add_to_index(value: &mut usize, amount: usize) -> IoResult<()> {
     *value = checked_add_index(*value, amount)?;
     Ok(())
 }
-fn sub_from_index(value: &mut usize, amount: usize) -> IoResult<()> {
-    *value = value.checked_sub(amount).ok_or_else(write_zero_err)?;
-    Ok(())
-}
 pub(super) fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
     slice.get(..len).ok_or_else(write_zero_err)
-}
-fn suffix_slice(slice: &[u8], start: usize) -> IoResult<&[u8]> {
-    slice.get(start..).ok_or_else(write_zero_err)
 }
 fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut [u8]> {
     let end = checked_add_index(start, len)?;
     slice
         .get_mut(Range { start, end })
-        .ok_or_else(write_zero_err)
-}
-fn range_array_mut<const N: usize>(slice: &mut [u8], start: usize) -> IoResult<&mut [u8; N]> {
-    range_slice_mut(slice, start, N)?
-        .first_chunk_mut::<N>()
         .ok_or_else(write_zero_err)
 }
 const fn u8_dec_len(n: u8) -> usize {
@@ -406,29 +393,6 @@ fn buf_write_prefixed_hex24(
     second_hex.copy_from_slice(&hex_byte(b1));
     third_hex.copy_from_slice(&hex_byte(b2));
     Ok(())
-}
-fn buf_write_u64_dec(cur: &mut ByteCursor<'_>, mut n: u64) -> IoResult<()> {
-    let mut tmp = [0_u8; U64_DEC_BUF_LEN];
-    let mut i = tmp.len();
-    while n >= u64::from(U8_THREE_DIGIT_THRESHOLD) {
-        let rem = usize::from(low_u8_from_u64(
-            n.rem_euclid(u64::from(U8_THREE_DIGIT_THRESHOLD)),
-        ));
-        n = n.div_euclid(u64::from(U8_THREE_DIGIT_THRESHOLD));
-        sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        *range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)? = two_digits(rem)?;
-    }
-    if n >= u64::from(U8_TWO_DIGIT_THRESHOLD) {
-        let rem = usize::from(low_u8_from_u64(n));
-        sub_from_index(&mut i, TWO_DIGIT_WIDTH)?;
-        *range_array_mut::<TWO_DIGIT_WIDTH>(&mut tmp, i)? = two_digits(rem)?;
-    } else {
-        sub_from_index(&mut i, 1)?;
-        let digit = low_u8_from_u64(n);
-        let slot = tmp.get_mut(i).ok_or_else(write_zero_err)?;
-        *slot = digit_byte(usize::from(digit))?;
-    }
-    cur.write_bytes(suffix_slice(&tmp, i)?)
 }
 fn buf_write_hex_u16_0pad4(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     cur.write_bytes(&hex_u16(value))

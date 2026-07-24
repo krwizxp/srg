@@ -539,8 +539,7 @@ impl AppState<'_> {
         if current_dur.as_secs().checked_sub(prev_dur.as_secs()) != Some(1) {
             return None;
         }
-        let since_epoch = current_sample.server_time.duration_since(UNIX_EPOCH).ok()?;
-        let nanos_to_subtract = Duration::from_nanos(u64::from(since_epoch.subsec_nanos()));
+        let nanos_to_subtract = Duration::from_nanos(u64::from(current_dur.subsec_nanos()));
         let anchor_time = current_sample.server_time.checked_sub(nanos_to_subtract)?;
         let one_way_delay = effective_one_way_delay(current_sample.rtt);
         let anchor_instant = current_sample

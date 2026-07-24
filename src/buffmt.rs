@@ -1,10 +1,10 @@
-use crate::numeric::low_u8_from_u32;
+use crate::numeric::low_u8_from_u64;
 use core::{fmt, range::Range};
 use std::io;
 const TWO_DIGIT_WIDTH: usize = 2;
-const U32_DEC_BUF_LEN: usize = 10;
-const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
-const U32_TWO_DIGIT_THRESHOLD: u32 = 10;
+const U64_DEC_BUF_LEN: usize = 20;
+const U64_THREE_DIGIT_THRESHOLD: u64 = 100;
+const U64_TWO_DIGIT_THRESHOLD: u64 = 10;
 const DIGITS: [u8; 10] = *b"0123456789";
 pub(super) struct ByteCursor<'buffer> {
     buf: &'buffer mut [u8],
@@ -34,13 +34,16 @@ impl<'buffer> ByteCursor<'buffer> {
         self.take(bytes.len())?.copy_from_slice(bytes);
         Ok(())
     }
-    pub(super) fn write_u32_dec(&mut self, mut value: u32) -> io::Result<()> {
-        let mut buffer = [0_u8; U32_DEC_BUF_LEN];
+    pub(super) fn write_u32_dec(&mut self, value: u32) -> io::Result<()> {
+        self.write_u64_dec(u64::from(value))
+    }
+    pub(super) fn write_u64_dec(&mut self, mut value: u64) -> io::Result<()> {
+        let mut buffer = [0_u8; U64_DEC_BUF_LEN];
         let mut index = buffer.len();
-        while value >= U32_THREE_DIGIT_THRESHOLD {
+        while value >= U64_THREE_DIGIT_THRESHOLD {
             let remainder =
-                usize::from(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            value = value.div_euclid(U32_THREE_DIGIT_THRESHOLD);
+                usize::from(low_u8_from_u64(value.rem_euclid(U64_THREE_DIGIT_THRESHOLD)));
+            value = value.div_euclid(U64_THREE_DIGIT_THRESHOLD);
             index = index
                 .checked_sub(TWO_DIGIT_WIDTH)
                 .ok_or_else(write_zero_err)?;
@@ -50,7 +53,7 @@ impl<'buffer> ByteCursor<'buffer> {
                 .ok_or_else(write_zero_err)?;
             *digits = two_digits(remainder)?;
         }
-        if value >= U32_TWO_DIGIT_THRESHOLD {
+        if value >= U64_TWO_DIGIT_THRESHOLD {
             index = index
                 .checked_sub(TWO_DIGIT_WIDTH)
                 .ok_or_else(write_zero_err)?;
@@ -58,11 +61,11 @@ impl<'buffer> ByteCursor<'buffer> {
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
                 .ok_or_else(write_zero_err)?;
-            *digits = two_digits(usize::from(low_u8_from_u32(value)))?;
+            *digits = two_digits(usize::from(low_u8_from_u64(value)))?;
         } else {
             index = index.checked_sub(1).ok_or_else(write_zero_err)?;
             let slot = buffer.get_mut(index).ok_or_else(write_zero_err)?;
-            *slot = digit_byte(usize::from(low_u8_from_u32(value)))?;
+            *slot = digit_byte(usize::from(low_u8_from_u64(value)))?;
         }
         self.write_bytes(buffer.get(index..).ok_or_else(write_zero_err)?)
     }

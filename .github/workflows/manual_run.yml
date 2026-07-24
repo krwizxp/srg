@@ -81,7 +81,7 @@ jobs:
           SRG_FLOAT_MAX: ${{ inputs.float_max }}
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
-        run: cargo run --locked --example manual_workflow
+        run: cargo run --release --locked --example manual_workflow
       - name: Upload console log artifact
         if: ${{ always() && hashFiles('artifacts/srg-result-console.log') != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

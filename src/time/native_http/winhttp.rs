@@ -1,7 +1,7 @@
-use super::{MIN_TRANSFER_TIME, Result, TimeError, TimeSample, error, error_with_source};
-use super::super::{
-    ParsedServer, UrlScheme, http_date::HttpDate,
+use super::{
+    FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeError, TimeSample, error, error_with_source,
 };
+use super::super::{ParsedServer, UrlScheme};
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
@@ -13,8 +13,6 @@ use std::time::{Instant, SystemTime};
 mod sys;
 const DWORD_BYTE_SIZE: u32 = 4;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
-const AGE_HEADER_PREFIX: &[u8] = b"age:";
-const DATE_HEADER_PREFIX: &[u8] = b"date:";
 const WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY: u32 = 4;
 const WINHTTP_ACCESS_TYPE_NO_PROXY: u32 = 1;
 const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
@@ -250,7 +248,7 @@ impl Client {
             Ok((request, request_start, response_received))
         })()
         .inspect_err(|_| self.session_cache = None)?;
-        let server_time = self.query_server_time(&request, context)?;
+        let server_time = self.query_server_time(&request, response_received, context)?;
         let rtt = response_received
             .saturating_duration_since(request_start)
             .max(MIN_TRANSFER_TIME);
@@ -284,6 +282,7 @@ impl Client {
     fn query_server_time(
         &mut self,
         request: &Handle,
+        response_received: Instant,
         context: &str,
     ) -> Result<SystemTime> {
         let mut bytes = 0_u32;
@@ -343,9 +342,8 @@ impl Client {
         }
         while header_buffer.pop_if(|value| *value == 0).is_some() {}
         let line_bytes = &mut self.header_line_buffer;
-        let mut age_seen = false;
         let mut line_stack = [0_u8; HTTP_HEADER_LINE_STACK_BYTES];
-        let mut parsed_date = None;
+        let mut time_headers = FreshTimeHeaders::default();
         for raw_line in header_buffer.split(|unit| *unit == u16::from(b'\n')) {
             let line = raw_line
                 .strip_suffix(&[u16::from(b'\r')])
@@ -353,8 +351,10 @@ impl Client {
             if line.is_empty() {
                 continue;
             }
-            let is_age_header = Self::line_starts_with_ascii_ignore_case(line, AGE_HEADER_PREFIX);
-            let is_date_header = Self::line_starts_with_ascii_ignore_case(line, DATE_HEADER_PREFIX);
+            let is_age_header =
+                Self::line_starts_with_ascii_ignore_case(line, super::AGE_HEADER_PREFIX);
+            let is_date_header =
+                Self::line_starts_with_ascii_ignore_case(line, super::DATE_HEADER_PREFIX);
             if !(is_age_header || is_date_header) {
                 continue;
             }
@@ -389,40 +389,25 @@ impl Client {
             if is_age_header {
                 let age_header_raw = Self::ascii_header_value(
                     line_ascii,
-                    AGE_HEADER_PREFIX.len(),
+                    super::AGE_HEADER_PREFIX.len(),
                     context,
                     "Age",
                 )?;
-                if age_seen {
-                    return Err(error(context, "Age 헤더가 여러 개입니다."));
-                }
-                age_seen = true;
-                let trimmed_age = age_header_raw.trim_ascii();
-                if trimmed_age.is_empty() {
-                    return Err(error(context, "Age 헤더 값이 비어 있습니다."));
-                }
-                if trimmed_age.bytes().any(|byte| !byte.is_ascii_digit()) {
-                    return Err(error(context, "Age 헤더 값이 숫자가 아닙니다."));
-                }
-                if trimmed_age.bytes().any(|byte| byte != b'0') {
-                    return Err(error(context, "Age 헤더가 0보다 커 캐시된 응답입니다."));
-                }
+                time_headers.capture_age(age_header_raw);
             }
             if is_date_header {
                 let date_header_raw = Self::ascii_header_value(
                     line_ascii,
-                    DATE_HEADER_PREFIX.len(),
+                    super::DATE_HEADER_PREFIX.len(),
                     context,
                     "Date",
                 )?;
-                if parsed_date.is_some() {
-                    return Err(error(context, "Date 헤더가 여러 개입니다."));
-                }
-                let HttpDate(server_time) = date_header_raw.parse()?;
-                parsed_date = Some(server_time);
+                time_headers.capture_date(date_header_raw, response_received);
             }
         }
-        parsed_date.ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))
+        time_headers
+            .finish(context)
+            .map(|(server_time, _received_at)| server_time)
     }
     fn set_dword_option(
         handle: &Handle,

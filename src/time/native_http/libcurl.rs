@@ -1,5 +1,5 @@
-use super::{MIN_TRANSFER_TIME, Result, TimeSample, error};
-use super::super::{ParsedServer, TimeError, UrlScheme, http_date::HttpDate};
+use super::{FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeSample, error};
+use super::super::{ParsedServer, TimeError, UrlScheme};
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
@@ -12,7 +12,7 @@ use core::{
 };
 use std::{
     sync::LazyLock,
-    time::{Instant, SystemTime},
+    time::Instant,
 };
 mod sys;
 macro_rules! curl_setopt {
@@ -54,8 +54,6 @@ const CURL_SSLVERSION_MAX_DEFAULT: c_long = 1 << 16;
 const CURL_SSLVERSION_TLSV1_2: c_long = 6;
 const CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX: &str =
     "은 HTTP protocol 제한 최신 API를 지원하지 않습니다. libcurl 7.85.0 이상이 필요합니다.";
-const AGE_HEADER_PREFIX: &[u8; 4] = b"age:";
-const DATE_HEADER_PREFIX: &[u8; 5] = b"date:";
 const HTTP_PROTOCOL: &CStr = c"http";
 const HTTP_USER_AGENT: &CStr = c"Rust-Time-Sync";
 const HTTP_HEAD_MAX_BODY_BYTES: usize = 1024 * 1024;
@@ -138,15 +136,10 @@ struct CurlBodySink {
     error: Option<Cow<'static, str>>,
     limit: usize,
 }
-#[derive(Default)]
-struct CurlHeaderBlock {
-    age_result: Option<CoreResult<(), Cow<'static, str>>>,
-    date_result: Option<Result<(SystemTime, Instant)>>,
-}
 struct CurlHeaderCapture<'line> {
     bytes_seen: usize,
-    completed_block: Option<CurlHeaderBlock>,
-    current_block: Option<CurlHeaderBlock>,
+    completed_block: Option<FreshTimeHeaders>,
+    current_block: Option<FreshTimeHeaders>,
     error: Option<Cow<'static, str>>,
     limit: usize,
     pending_line: &'line mut Vec<u8>,
@@ -336,16 +329,12 @@ impl Client {
             self.easy_handle = None;
             return Err(scheme_error);
         }
-        let Some(mut header_block) = header_capture.completed_block.take() else {
-            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
+        let Some(header_block) = header_capture.completed_block.take() else {
+            return Err(TimeError::header_not_found(format!(
+                "{context} 응답에서 Date"
+            )));
         };
-        if let Some(age_result) = header_block.age_result.take() {
-            age_result.map_err(|header_error| error(context, header_error))?;
-        }
-        let Some(date_result) = header_block.date_result.take() else {
-            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
-        };
-        let (server_time, response_received_inst) = date_result?;
+        let (server_time, response_received_inst) = header_block.finish(context)?;
         let http_elapsed = response_received_inst
             .saturating_duration_since(request_start)
             .max(MIN_TRANSFER_TIME);
@@ -417,7 +406,7 @@ impl CurlHeaderCapture<'_> {
             .unwrap_or(self.pending_line.as_slice());
         let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
         if line.starts_with(b"HTTP/") {
-            self.current_block = Some(CurlHeaderBlock::default());
+            self.current_block = Some(FreshTimeHeaders::default());
             return true;
         }
         if line.is_empty() {
@@ -429,36 +418,20 @@ impl CurlHeaderCapture<'_> {
         let Some(current_block) = self.current_block.as_mut() else {
             return true;
         };
-        match find_header_value(line, AGE_HEADER_PREFIX) {
+        match find_header_value(line, super::AGE_HEADER_PREFIX) {
             Ok(Some(age_header_raw)) => {
-                if current_block.age_result.is_some() {
-                    current_block.age_result =
-                        Some(Err(Cow::Borrowed("Age 헤더가 여러 개입니다.")));
-                } else {
-                    let trimmed_age = age_header_raw.trim_ascii();
-                    let age_error = if trimmed_age.is_empty() {
-                        Some("Age 헤더 값이 비어 있습니다.")
-                    } else if trimmed_age.bytes().any(|byte| !byte.is_ascii_digit()) {
-                        Some("Age 헤더 값이 숫자가 아닙니다.")
-                    } else if trimmed_age.bytes().any(|byte| byte != b'0') {
-                        Some("Age 헤더가 0보다 커 캐시된 응답입니다.")
-                    } else {
-                        None
-                    };
-                    current_block.age_result =
-                        Some(age_error.map_or(Ok(()), |message| Err(Cow::Borrowed(message))));
-                }
+                current_block.capture_age(age_header_raw);
                 return true;
             }
             Ok(None) => {}
             Err(source) => {
-                current_block.age_result = Some(Err(Cow::Owned(format!(
+                self.error = Some(Cow::Owned(format!(
                     "HTTP HEAD 응답 Age 헤더 UTF-8 변환 실패: {source}",
-                ))));
-                return true;
+                )));
+                return false;
             }
         }
-        let date_header_raw = match find_header_value(line, DATE_HEADER_PREFIX) {
+        let date_header_raw = match find_header_value(line, super::DATE_HEADER_PREFIX) {
             Ok(Some(value)) => value,
             Ok(None) => return true,
             Err(source) => {
@@ -468,16 +441,8 @@ impl CurlHeaderCapture<'_> {
                 return false;
             }
         };
-        if current_block.date_result.is_some() {
-            current_block.date_result = Some(Err(TimeError::parse("Date 헤더가 여러 개입니다.")));
-            return true;
-        }
         let response_received_inst = Instant::now();
-        current_block.date_result = Some(
-            date_header_raw
-                .parse::<HttpDate>()
-                .map(|HttpDate(server_time)| (server_time, response_received_inst)),
-        );
+        current_block.capture_date(date_header_raw, response_received_inst);
         true
     }
 }

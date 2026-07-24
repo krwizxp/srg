@@ -435,12 +435,16 @@ impl EiSession {
         expected_ping: NonNull<EiPing>,
         deadline: Instant,
     ) -> InputResult<()> {
+        let mut connection_closed = false;
         loop {
             if let Some(pong) = self.dispatch()? {
                 if pong == expected_ping {
                     return Ok(());
                 }
                 return Err(Cow::Borrowed("예상하지 못한 libei PONG 이벤트가 발생했습니다."));
+            }
+            if connection_closed {
+                return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
             }
             if Instant::now() >= deadline {
                 return Err(Cow::Borrowed("Wayland 입력 전달 확인 시간이 초과되었습니다."));
@@ -453,17 +457,7 @@ impl EiSession {
             if poll_fd.is_invalid() {
                 return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
             }
-            if poll_fd.has_terminal_error() {
-                if let Some(pong) = self.dispatch()? {
-                    if pong == expected_ping {
-                        return Ok(());
-                    }
-                    return Err(Cow::Borrowed(
-                        "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
-                    ));
-                }
-                return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
-            }
+            connection_closed = poll_fd.has_terminal_error();
         }
     }
 }

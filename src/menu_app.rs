@@ -89,8 +89,45 @@ impl MenuApp {
                 match command {
                     b'1' => self.handle_ladder_command(out, err)?,
                     b'2' => self.handle_random_number_command(out, err)?,
-                    b'3' => self.handle_generate_once_command(out, err)?,
-                    b'4' => self.handle_generate_many_command(out, err)?,
+                    b'3' | b'4' => {
+                        if !prepare_hw_rng_menu_command(&self.rng, out)? {
+                            return Ok(true);
+                        }
+                        let requested_count = if command == b'3' {
+                            1
+                        } else {
+                            let input_buffer = &mut self.input_buffer;
+                            let count_prompt =
+                                format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
+                            loop {
+                                match read_line_reuse_limited(
+                                    count_prompt,
+                                    input_buffer,
+                                    out,
+                                    BATCH_COUNT_INPUT_MAX_BYTES,
+                                )?
+                                .parse::<usize>()
+                                .ok()
+                                {
+                                    Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
+                                    Some(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
+                                        err,
+                                        "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
+                                    )?,
+                                    Some(count) => break count,
+                                    None => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
+                                }
+                            }
+                        };
+                        let next_num_64 = regenerate_with_count(
+                            &mut self.output_file,
+                            &self.rng,
+                            requested_count,
+                            out,
+                        )?;
+                        self.rng.write_rdseed_fallback_notice(err)?;
+                        self.num_64 = next_num_64;
+                    }
                     _ => return Ok(false),
                 }
                 Ok(true)
@@ -110,55 +147,6 @@ impl MenuApp {
     }
     cfg_select! {
         target_arch = "x86_64" => {
-            fn handle_generate_many_command(
-                &mut self,
-                out: &mut dyn Write,
-                err: &mut dyn Write,
-            ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&self.rng, out)? {
-                    return Ok(());
-                }
-                let input_buffer = &mut self.input_buffer;
-                let count_prompt = format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
-                let requested_count = loop {
-                    match read_line_reuse_limited(
-                        count_prompt,
-                        input_buffer,
-                        out,
-                        BATCH_COUNT_INPUT_MAX_BYTES,
-                    )?
-                    .parse::<usize>()
-                    .ok()
-                    {
-                        Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
-                        Some(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
-                            err,
-                            "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
-                        )?,
-                        Some(count) => break count,
-                        None => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
-                    }
-                };
-                let next_num_64 =
-                    regenerate_with_count(&mut self.output_file, &self.rng, requested_count, out)?;
-                self.rng.write_rdseed_fallback_notice(err)?;
-                self.num_64 = next_num_64;
-                Ok(())
-            }
-            fn handle_generate_once_command(
-                &mut self,
-                out: &mut dyn Write,
-                err: &mut dyn Write,
-            ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&self.rng, out)? {
-                    return Ok(());
-                }
-                let next_num_64 =
-                    regenerate_with_count(&mut self.output_file, &self.rng, 1, out)?;
-                self.rng.write_rdseed_fallback_notice(err)?;
-                self.num_64 = next_num_64;
-                Ok(())
-            }
             fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
                 if !prepare_hw_rng_menu_command(&self.rng, out)? {
                     return Ok(());
