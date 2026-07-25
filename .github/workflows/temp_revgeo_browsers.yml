@@ -1,0 +1,35 @@
+name: Temporary Revgeo Browser Verification
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: /dev/null
+      - name: Install current Playwright browsers
+        run: |
+          npm install --no-save playwright@latest
+          npx playwright install --with-deps chromium firefox webkit
+          npx playwright --version
+      - name: Verify revgeo in three engines
+        run: node .github/temp/revgeo_browser_verify.mjs
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: revgeo-browser-results
+          path: browser-results.json
+          if-no-files-found: warn
+          retention-days: 1
