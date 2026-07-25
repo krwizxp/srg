@@ -80,10 +80,10 @@ for (const [engineName, engine] of Object.entries(engines)) {
   await page.locator("#start").click();
   await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("모든 처리가 완료"), null, { timeout: 20000 });
   const processed = await page.locator("#cnt-success").innerText();
-  const rowCount = await page.locator("#results tr").count();
+  const rowCount = await page.locator("#tbl tbody tr").count();
   await page.locator("#filter-q").fill("테스트 주소");
   await page.waitForTimeout(700);
-  const visibleRows = await page.locator("#results tr:not([hidden])").count();
+  const visibleRows = await page.locator("#tbl tbody tr:not([hidden])").count();
   const oldTheme = await page.locator("html").getAttribute("data-theme");
   await page.locator("#theme-toggle").click();
   const newTheme = await page.locator("html").getAttribute("data-theme");
