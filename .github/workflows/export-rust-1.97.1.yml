@@ -1,0 +1,41 @@
+name: export-rust-1.97.1
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install exact toolchain and targets
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt,clippy
+          rustup target add --toolchain 1.97.1 \
+            x86_64-pc-windows-msvc \
+            aarch64-pc-windows-msvc \
+            x86_64-unknown-linux-gnu \
+            aarch64-unknown-linux-gnu \
+            x86_64-apple-darwin \
+            aarch64-apple-darwin
+          rustc +1.97.1 --version --verbose
+          cargo +1.97.1 --version --verbose
+          rustfmt +1.97.1 --version
+          cargo +1.97.1 clippy --version
+      - name: Pack toolchain
+        run: |
+          set -euo pipefail
+          toolchain_dir="$(dirname "$(dirname "$(rustup which rustc --toolchain 1.97.1)")")"
+          toolchain_name="$(basename "$toolchain_dir")"
+          tar -C "$(dirname "$toolchain_dir")" -cf rust-1.97.1-x86_64-unknown-linux-gnu.tar "$toolchain_name"
+          sha256sum rust-1.97.1-x86_64-unknown-linux-gnu.tar > rust-1.97.1-x86_64-unknown-linux-gnu.tar.sha256
+      - name: Upload toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-1.97.1-x86_64-unknown-linux-gnu
+          path: |
+            rust-1.97.1-x86_64-unknown-linux-gnu.tar
+            rust-1.97.1-x86_64-unknown-linux-gnu.tar.sha256
+          compression-level: 9
+          retention-days: 1
