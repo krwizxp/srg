@@ -16,8 +16,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: /dev/null
       - name: Install current Playwright browsers
         run: |
           npm install --no-save playwright@latest
