@@ -52,10 +52,22 @@ for (const [engineName, engine] of Object.entries(engines)) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        type: "city",
-        name: "테스트 지점",
-        display_name: `테스트 주소 ${lat},${lon}`,
-        address: { country: "대한민국", country_code: "kr", state: "충청남도", city: "천안시", suburb: "불당동" },
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          properties: {
+            geocoding: {
+              type: "city",
+              name: "테스트 지점",
+              label: `테스트 주소 ${lat},${lon}`,
+              country: "대한민국",
+              country_code: "kr",
+              state: "충청남도",
+              city: "천안시",
+              district: "불당동"
+            }
+          }
+        }]
       }),
     });
   });
