@@ -19,15 +19,23 @@ pub(super) fn write_random_data_to_console(
     write_slice_to_console(prefix_slice(buffer, output_len)?)?;
     Ok(())
 }
+pub(super) fn persist_random_data(
+    output_file: &mut OutputFile,
+    data: &RandomDataSet,
+    buffer: &mut [u8; BUFFER_SIZE],
+) -> Result<usize> {
+    let file_len = format_data_into_buffer(data, buffer, OutputTarget::File)?;
+    let writer = output_file.writer();
+    IoWrite::write_all(&mut *writer, prefix_slice(buffer, file_len)?)?;
+    IoWrite::flush(writer)?;
+    Ok(file_len)
+}
 pub(super) fn persist_and_print_random_data(
     output_file: &mut OutputFile,
     data: &RandomDataSet,
 ) -> Result<()> {
     let mut buffer = [0_u8; BUFFER_SIZE];
-    let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
-    let writer = output_file.writer();
-    IoWrite::write_all(&mut *writer, prefix_slice(&buffer, file_len)?)?;
-    IoWrite::flush(writer)?;
+    let file_len = persist_random_data(output_file, data, &mut buffer)?;
     write_random_data_to_console(data, &mut buffer, file_len)?;
     Ok(())
 }

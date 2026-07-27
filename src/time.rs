@@ -9,7 +9,7 @@ cfg_select! {
     }
     _ => {}
 }
-use crate::{buffmt::ByteCursor, write_line_best_effort};
+use crate::buffmt::ByteCursor;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
 use alloc::{borrow::Cow, sync::Arc};
@@ -291,9 +291,9 @@ impl FromStr for TargetTimeOfDay {
             return Err(INVALID_TIME_INPUT_ERR);
         }
         let seconds_after_midnight = hour
-            .saturating_mul(KST_SECONDS_PER_HOUR_U32)
-            .saturating_add(minute.saturating_mul(KST_SECONDS_PER_MINUTE_U32))
-            .saturating_add(second);
+            .strict_mul(KST_SECONDS_PER_HOUR_U32)
+            .strict_add(minute.strict_mul(KST_SECONDS_PER_MINUTE_U32))
+            .strict_add(second);
         Ok(Self {
             seconds_after_midnight,
         })
@@ -302,9 +302,6 @@ impl FromStr for TargetTimeOfDay {
 impl TimeError {
     fn header_not_found(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::HeaderNotFound, detail)
-    }
-    pub(super) const fn is_io(&self) -> bool {
-        matches!(self.kind, TimeErrorKind::Io)
     }
     fn new(kind: TimeErrorKind, detail: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -377,7 +374,10 @@ impl SampleWorker {
         if pending_generation.is_some() {
             return Ok(());
         }
-        let generation = self.generation.wrapping_add(1);
+        let generation = self
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| TimeError::parse("시간 샘플 요청 세대 번호가 소진되었습니다."))?;
         match self.command_sender.try_send(generation) {
             Ok(()) => {
                 self.generation = generation;
@@ -446,7 +446,6 @@ struct AppState<'worker> {
 }
 struct LoopRuntime<'runtime> {
     err: &'runtime mut dyn io::Write,
-    out: &'runtime mut dyn io::Write,
     #[cfg(target_os = "linux")]
     prepared_input: &'runtime mut wayland_input::PreparedInput,
 }
@@ -485,10 +484,7 @@ impl ServerTimeSession {
                 if trigger_action.is_some()
                     && !macos_input::post_event_access_granted(true)
                 {
-                    write_line_best_effort(
-                        err,
-                        format_args!("[경고] macOS 입력 제어 권한이 허용되지 않았습니다."),
-                    );
+                    writeln!(err, "[경고] macOS 입력 제어 권한이 허용되지 않았습니다.")?;
                 }
             }
             _ => {}
@@ -520,29 +516,31 @@ impl AppState<'_> {
         &mut self,
         calibration: &CalibrationState,
         current_sample: TimeSample,
-    ) -> Option<ServerTime> {
+    ) -> Result<Option<ServerTime>> {
         let prev_dur = calibration
             .previous_sample
             .server_time
-            .duration_since(UNIX_EPOCH)
-            .ok()?;
-        let current_dur = current_sample.server_time.duration_since(UNIX_EPOCH).ok()?;
+            .duration_since(UNIX_EPOCH)?;
+        let current_dur = current_sample.server_time.duration_since(UNIX_EPOCH)?;
         if current_dur.as_secs().checked_sub(prev_dur.as_secs()) != Some(1) {
-            return None;
+            return Ok(None);
         }
         let nanos_to_subtract = Duration::from_nanos(u64::from(current_dur.subsec_nanos()));
-        let anchor_time = current_sample.server_time.checked_sub(nanos_to_subtract)?;
+        let anchor_time = current_sample
+            .server_time
+            .checked_sub(nanos_to_subtract)
+            .ok_or_else(|| TimeError::parse("정밀 보정 기준 서버 시각 계산 실패"))?;
         let one_way_delay = effective_one_way_delay(current_sample.rtt);
         let anchor_instant = current_sample
             .response_received_inst
             .checked_sub(one_way_delay)
-            .unwrap_or(current_sample.response_received_inst);
+            .ok_or_else(|| TimeError::parse("정밀 보정 기준 단조 시각 계산 실패"))?;
         self.last_full_sync_at = current_sample.response_received_inst;
-        Some(ServerTime {
+        Ok(Some(ServerTime {
             anchor_instant,
             anchor_time,
             baseline_rtt: calibration.baseline_rtt,
-        })
+        }))
     }
     fn begin_final_countdown_sampling(
         &mut self,
@@ -582,7 +580,7 @@ impl AppState<'_> {
         now: Instant,
         msg_buf: &mut String,
     ) -> Result<()> {
-        let current_server_time = server_time.current_server_time_at(now);
+        let current_server_time = server_time.current_server_time_at(now)?;
         let since_epoch = current_server_time.duration_since(UNIX_EPOCH)?;
         let kst_epoch_secs = since_epoch
             .as_secs()
@@ -662,17 +660,22 @@ impl AppState<'_> {
         if completed_at.saturating_duration_since(calibration.started_at) >= CALIBRATION_TIMEOUT {
             return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE, true);
         }
-        let Ok(current_sample) = sample_result else {
-            if let Err(start_err) = self
-                .sample_worker
-                .ensure_fetch(&mut calibration.pending_generation)
-            {
-                append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
+        let current_sample = match sample_result {
+            Ok(sample) => sample,
+            Err(sample_err) => {
+                append_error_detail(msg_buf, "정밀 보정 샘플 수집 실패: ", sample_err);
                 return transition_to_retry(msg_buf, true);
             }
-            return ActivityTransition::stay(Activity::CalibrateOnTick(calibration));
         };
-        if let Some(server_time) = self.accept_calibration_tick(&calibration, current_sample) {
+        let accepted_server_time = match self.accept_calibration_tick(&calibration, current_sample)
+        {
+            Ok(server_time) => server_time,
+            Err(calibration_err) => {
+                append_error_detail(msg_buf, "정밀 보정 시각 계산 실패: ", calibration_err);
+                return transition_to_retry(msg_buf, true);
+            }
+        };
+        if let Some(server_time) = accepted_server_time {
             if let Some(target_second) = self
                 .pending_target_time
                 .as_ref()
@@ -717,7 +720,13 @@ impl AppState<'_> {
         let now = Instant::now();
         let server_time = countdown.server_time;
         let target_time = countdown.target_time;
-        let current_server_time = server_time.current_server_time_at(now);
+        let current_server_time = match server_time.current_server_time_at(now) {
+            Ok(current) => current,
+            Err(time_err) => {
+                append_error_detail(msg_buf, "현재 서버 시간 계산 실패: ", time_err);
+                return transition_to_retry(msg_buf, true);
+            }
+        };
         let sample_interval = target_time.duration_since(current_server_time).map_or(
             FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL,
             final_countdown_sample_interval,
@@ -807,13 +816,15 @@ impl AppState<'_> {
         mut baseline: Box<BaselineRttState>,
         msg_buf: &'message mut String,
         now: Instant,
-        out: &mut dyn io::Write,
     ) -> ActivityTransition<'message> {
         if !baseline.started {
-            if !baseline.had_previous_sample {
-                write_line_best_effort(out, format_args!("1단계: RTT 기준값 측정을 시작합니다…"));
-            }
             baseline.started = true;
+            if !baseline.had_previous_sample {
+                return ActivityTransition::message(
+                    Activity::MeasureBaselineRtt(baseline),
+                    "1단계: RTT 기준값 측정을 시작합니다…",
+                );
+            }
         }
         let had_pending_request = baseline.pending_generation.is_some();
         let sample_poll = match self
@@ -859,7 +870,7 @@ impl AppState<'_> {
                 return transition_to_retry(msg_buf, baseline.had_previous_sample);
             }
         };
-        baseline.attempts = attempt_index.saturating_add(1);
+        baseline.attempts = attempt_index.strict_add(1);
         let Some(next_sample_at) = next_sample_base.checked_add(ADAPTIVE_POLL_INTERVAL) else {
             return transition_to_retry(
                 "다음 RTT 샘플 시각 계산 실패.",
@@ -883,13 +894,13 @@ impl AppState<'_> {
         }
         rtt_nanos.sort_unstable();
         let trim = sample_count.div_euclid(RTT_TRIM_DIVISOR);
-        let trimmed_sample_count = sample_count.saturating_sub(trim.saturating_mul(2));
+        let trimmed_sample_count = sample_count.strict_sub(trim.strict_mul(2));
         let (sum_nanos, averaged_sample_count) = rtt_nanos
             .iter()
             .skip(trim)
             .take(trimmed_sample_count)
             .fold((0_u128, 0_u128), |(sum, count), &sample_nanos| {
-                (sum.saturating_add(sample_nanos), count.saturating_add(1))
+                (sum.strict_add(sample_nanos), count.strict_add(1))
             });
         let avg_nanos = sum_nanos.div_euclid(averaged_sample_count);
         let baseline_rtt = Duration::from_nanos_u128(avg_nanos);
@@ -916,6 +927,10 @@ impl AppState<'_> {
         out: &mut dyn io::Write,
         err: &mut dyn io::Write,
     ) -> Result<()> {
+        #[cfg(target_os = "linux")]
+        if self.trigger_action.is_some() {
+            writeln!(err, "[안내] Wayland 입력 권한 승인을 기다립니다.")?;
+        }
         if let Some(duration) = stop_after {
             let stop_at = Instant::now()
                 .checked_add(duration)
@@ -1034,17 +1049,18 @@ impl AppState<'_> {
                 _ => {}
             }
             let now = Instant::now();
-            let timing_sensitive_activity = activity.is_final_countdown()
-                || matches!(
-                    &activity,
-                    Activity::Predicting { server_time }
-                        if self.target_time.is_some_and(|target| {
-                            target
-                                .duration_since(server_time.current_server_time_at(now))
-                                .ok()
-                                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
-                        })
-                );
+            let timing_sensitive_activity = if activity.is_final_countdown() {
+                true
+            } else if let (&Activity::Predicting { server_time }, Some(target)) =
+                (&activity, self.target_time)
+            {
+                target
+                    .duration_since(server_time.current_server_time_at(now)?)
+                    .ok()
+                    .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+            } else {
+                false
+            };
             if !timing_sensitive_activity {
                 Self::run_loop_write_display_if_due(
                     &activity,
@@ -1058,22 +1074,18 @@ impl AppState<'_> {
             let transition = {
                 let mut runtime = LoopRuntime {
                     err,
-                    out,
                     #[cfg(target_os = "linux")]
                     prepared_input,
                 };
                 match activity {
-                    Activity::MeasureBaselineRtt(baseline) => self.handle_measure_baseline_rtt(
-                        baseline,
-                        &mut message_buffer,
-                        now,
-                        runtime.out,
-                    ),
+                    Activity::MeasureBaselineRtt(baseline) => {
+                        self.handle_measure_baseline_rtt(baseline, &mut message_buffer, now)
+                    }
                     Activity::CalibrateOnTick(calibration) => {
                         self.handle_calibrate_on_tick(calibration, &mut message_buffer)
                     }
                     Activity::Predicting { server_time } => {
-                        let estimated_server_time = server_time.current_server_time_at(now);
+                        let estimated_server_time = server_time.current_server_time_at(now)?;
                         if let Some(target_time) = self.target_time.take_if(|target| {
                             target
                                 .duration_since(estimated_server_time)
@@ -1153,7 +1165,7 @@ impl AppState<'_> {
             let next_activity = transition.activity;
             cfg_select! {
                 windows => {
-                    self.sync_high_res_timer_state(&next_activity, err);
+                    self.sync_high_res_timer_state(&next_activity, err)?;
                 }
                 _ => {}
             }
@@ -1214,13 +1226,17 @@ impl AppState<'_> {
     }
     cfg_select! {
         windows => {
-            fn sync_high_res_timer_state(&mut self, next_activity: &Activity, err: &mut dyn io::Write) {
+            fn sync_high_res_timer_state(
+                &mut self,
+                next_activity: &Activity,
+                err: &mut dyn io::Write,
+            ) -> Result<()> {
                 if !next_activity.is_final_countdown() {
                     self.high_res_timer_guard = None;
-                    return;
+                    return Ok(());
                 }
                 if self.high_res_timer_guard.is_some() {
-                    return;
+                    return Ok(());
                 }
                 // SAFETY: No security attributes or name are needed, and a successful handle is
                 // transferred to the guard.
@@ -1233,17 +1249,18 @@ impl AppState<'_> {
                     )
                 };
                 let Some(handle) = NonNull::new(timer_handle) else {
-                    write_line_best_effort(
+                    writeln!(
                         err,
-                        format_args!(concat!(
+                        concat!(
                             "[경고] Windows 고해상도 대기 타이머 생성에 실패했습니다. ",
                             "카운트다운 정확도가 저하될 수 있습니다."
-                        )),
-                    );
-                    return;
+                        )
+                    )?;
+                    return Ok(());
                 };
                 let timer_guard = HighResTimerGuard { handle };
                 self.high_res_timer_guard = Some(timer_guard);
+                Ok(())
             }
         }
         _ => {}
@@ -1378,7 +1395,13 @@ impl AppState<'_> {
             }
         }
         let trigger_now = Instant::now();
-        let trigger_server_time = deadline.server_time.current_server_time_at(trigger_now);
+        let trigger_server_time = match deadline.server_time.current_server_time_at(trigger_now) {
+            Ok(current) => current,
+            Err(time_err) => {
+                append_error_detail(msg_buf, "실행 시점 서버 시간 계산 실패: ", time_err);
+                return transition_to_retry(msg_buf, true);
+            }
+        };
         let trigger = match deadline.target_time.duration_since(trigger_server_time) {
             Ok(remaining) => CountdownTrigger::WithRemaining(remaining),
             Err(late) => CountdownTrigger::Late(late.duration()),

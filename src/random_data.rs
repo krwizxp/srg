@@ -9,12 +9,12 @@ cfg_select! {
     }
     _ => {}
 }
-use core::{num::NonZeroU8, ops::Mul as NumericMul};
+use core::{array, ops::Mul as NumericMul};
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
 const BYTE_BITS: u8 = 64;
-const EURO_LUCKY_MODULUS: NonZeroU8 = NonZeroU8::MIN.saturating_add(11);
-const EURO_MAIN_MODULUS: NonZeroU8 = NonZeroU8::MIN.saturating_add(49);
+const EURO_LUCKY_MODULUS: u8 = 12;
+const EURO_MAIN_MODULUS: u8 = 50;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
 const HANGUL_BASE_CODE_POINT: u32 = 0xAC00;
@@ -27,9 +27,9 @@ const INPUT_BYTE_MAX_FOR_LOTTO: u8 = 224;
 const INPUT_BYTE_MAX_FOR_LOTTO7: u8 = 221;
 const INPUT_BYTE_MAX_FOR_LUCKY_STAR: u8 = 251;
 const INPUT_BYTE_MAX_FOR_PASSWORD: u8 = 187;
-const LOTTO_MODULUS: NonZeroU8 = NonZeroU8::MIN.saturating_add(44);
+const LOTTO_MODULUS: u8 = 45;
 const LOTTO7_COUNT: usize = 7;
-const LOTTO7_MODULUS: NonZeroU8 = NonZeroU8::MIN.saturating_add(36);
+const LOTTO7_MODULUS: u8 = 37;
 const LOTTO_COUNT: usize = 6;
 const LOTTO_COUNT_U8: u8 = 6;
 const NIBBLE_MASK_U64: u64 = 0xF;
@@ -45,7 +45,6 @@ const NMS_SOLAR_SYSTEM_MAX_VALUE: u64 = 3834;
 const NMS_SOLAR_SYSTEM_FIELD: (u8, u64) = (12, 0x0fff);
 const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
 const PASSWORD_BYTE_LEN: usize = 8;
-const PASSWORD_BYTE_LEN_U8: u8 = 8;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
 #[derive(Default)]
@@ -80,9 +79,7 @@ struct RandomBitBuffer {
     value: u64,
 }
 struct UniqueNumbers<const N: usize> {
-    len: usize,
     seen: u64,
-    values: [u8; N],
 }
 struct RandomDataBuildState<'provider_ref, F>
 where
@@ -95,7 +92,6 @@ where
     lotto7: UniqueNumbers<LOTTO7_COUNT>,
     next_supp: &'provider_ref mut F,
     numeric_password_digits: u8,
-    password_len: u8,
     supplemental: RandomBitBuffer,
 }
 impl RandomDataSet {
@@ -111,7 +107,6 @@ impl RandomDataSet {
             lotto7: UniqueNumbers::new(),
             next_supp,
             numeric_password_digits: 0,
-            password_len: 0,
             supplemental: RandomBitBuffer {
                 bits_remaining: 0,
                 value: 0,
@@ -122,44 +117,38 @@ impl RandomDataSet {
         state.fill_hangul_syllables()?;
         state.fill_coords();
         state.fill_nms_fields()?;
-        state.data.euro_millions_lucky_stars = state.euro_lucky.values;
-        state.data.euro_millions_main_numbers = state.euro_main.values;
-        state.data.lotto_numbers = state.lotto.values;
-        state.data.lotto7_numbers = state.lotto7.values;
+        state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
+        state.data.euro_millions_main_numbers = state.euro_main.into_values();
+        state.data.lotto_numbers = state.lotto.into_values();
+        state.data.lotto7_numbers = state.lotto7.into_values();
         Ok(state.data)
     }
 }
 impl<const N: usize> UniqueNumbers<N> {
-    const fn is_full(&self) -> bool {
-        self.len >= N
+    fn into_values(self) -> [u8; N] {
+        let mut seen = self.seen;
+        array::from_fn(|_| {
+            let number = low_u8_from_u32(seen.trailing_zeros());
+            seen &= seen.strict_sub(1);
+            number
+        })
+    }
+    fn is_full(&self) -> bool {
+        usize::from(low_u8_from_u32(self.seen.count_ones())) >= N
     }
     const fn new() -> Self {
-        Self {
-            len: 0,
-            seen: 0,
-            values: [0; N],
-        }
+        Self { seen: 0 }
     }
-    fn push(&mut self, byte: u8, modulus: NonZeroU8) {
+    fn push(&mut self, byte: u8, modulus: u8) {
         if self.is_full() {
             return;
         }
-        let number = NonZeroU8::MIN
-            .saturating_add(byte.rem_euclid(modulus.get()))
-            .get();
+        let number = byte.rem_euclid(modulus).strict_add(1);
         let mask = 1_u64 << number;
         if (self.seen & mask) != 0 {
             return;
         }
-        let Some(slot) = self.values.get_mut(self.len) else {
-            return;
-        };
-        *slot = number;
         self.seen |= mask;
-        self.len = self.len.strict_add(1);
-        if self.is_full() {
-            self.values.sort_unstable();
-        }
     }
 }
 impl<F> RandomDataBuildState<'_, F>
@@ -264,7 +253,7 @@ where
             self.next_supp,
         )?
         .rem_euclid(NMS_PLANET_MODULUS);
-        let planet_number = planet_number_base.saturating_add(1);
+        let planet_number = planet_number_base.strict_add(1);
         self.data.planet_number = low_u8_from_u64(planet_number);
         let solar_system_index_base = extract_valid_bits_for_nms(
             num,
@@ -276,7 +265,7 @@ where
             self.next_supp,
         )?
         .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS);
-        let solar_system_index = solar_system_index_base.saturating_add(1);
+        let solar_system_index = solar_system_index_base.strict_add(1);
         self.data.solar_system_index = low_u16_from_u64(solar_system_index);
         let glyph_sources = [
             u64::from(self.data.planet_number),
@@ -319,12 +308,9 @@ where
             }
             if self.numeric_password_digits < LOTTO_COUNT_U8 {
                 let digit = u32::from(byte.rem_euclid(10));
-                self.data.numeric_password = self
-                    .data
-                    .numeric_password
-                    .saturating_mul(10)
-                    .saturating_add(digit);
-                self.numeric_password_digits = self.numeric_password_digits.saturating_add(1);
+                self.data.numeric_password =
+                    self.data.numeric_password.strict_mul(10).strict_add(digit);
+                self.numeric_password_digits = self.numeric_password_digits.strict_add(1);
             }
             if !self.euro_main.is_full() {
                 self.euro_main.push(byte, EURO_MAIN_MODULUS);
@@ -337,15 +323,19 @@ where
                     if !self.lotto7.is_full() {
                         self.lotto7.push(byte, LOTTO7_MODULUS);
                     }
-                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD
-                        && self.password_len < PASSWORD_BYTE_LEN_U8
-                        && let Some(slot) =
-                            self.data.password.get_mut(usize::from(self.password_len))
-                    {
-                        *slot = byte
-                            .rem_euclid(ASCII_PRINTABLE_LEN)
-                            .saturating_add(ASCII_PRINTABLE_START);
-                        self.password_len = self.password_len.saturating_add(1);
+                    let [empty, p1, p2, p3, p4, p5, p6, p7] = self.data.password;
+                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD && empty == 0 {
+                        self.data.password = [
+                            p1,
+                            p2,
+                            p3,
+                            p4,
+                            p5,
+                            p6,
+                            p7,
+                            byte.rem_euclid(ASCII_PRINTABLE_LEN)
+                                .strict_add(ASCII_PRINTABLE_START),
+                        ];
                     }
                 }
             }
@@ -354,11 +344,12 @@ where
             }
         }
     }
-    const fn is_complete(&self) -> bool {
+    fn is_complete(&self) -> bool {
+        let [password_first, ..] = self.data.password;
         self.numeric_password_digits >= LOTTO_COUNT_U8
             && self.lotto.is_full()
             && self.lotto7.is_full()
-            && self.password_len >= PASSWORD_BYTE_LEN_U8
+            && password_first != 0
             && self.euro_main.is_full()
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
@@ -372,9 +363,9 @@ where
 }
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     if value >= SUB {
-        return value.saturating_sub(SUB);
+        return value.strict_sub(SUB);
     }
-    value.saturating_add(ADD)
+    value.strict_add(ADD)
 }
 cfg_select! {
     target_arch = "x86_64" => {

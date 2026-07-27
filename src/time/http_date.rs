@@ -88,7 +88,8 @@ impl FromStr for HttpDate {
             Err(err) => {
                 let secs_before_epoch = err.duration().as_secs();
                 let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
-                days_before_epoch.cast_signed().wrapping_neg()
+                parse_result_with_context(i64::try_from(days_before_epoch), ERR_LOCAL_YEAR)?
+                    .strict_neg()
             }
         };
         let day_index = parse_result_with_context(i32::try_from(day_index_i64), ERR_LOCAL_YEAR)?;
@@ -100,12 +101,12 @@ fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
     if !(d0.is_ascii_digit() && d1.is_ascii_digit()) {
         return None;
     }
-    let tens = d0.wrapping_sub(b'0');
-    let ones = d1.wrapping_sub(b'0');
+    let tens = d0.strict_sub(b'0');
+    let ones = d1.strict_sub(b'0');
     Some(
         u32::from(tens)
-            .wrapping_mul(DECIMAL_BASE_U32)
-            .wrapping_add(u32::from(ones)),
+            .strict_mul(DECIMAL_BASE_U32)
+            .strict_add(u32::from(ones)),
     )
 }
 fn parse_http_month(month_str: &str) -> Result<u32> {
@@ -226,7 +227,7 @@ fn parse_http_date_time(
     }
     let year_i64 = i64::from(year);
     let adjusted_year = if month <= MARCH_MONTH_THRESHOLD {
-        year_i64.wrapping_sub(1_i64)
+        year_i64.strict_sub(1_i64)
     } else {
         year_i64
     };
@@ -235,25 +236,25 @@ fn parse_http_date_time(
         adjusted_year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
     );
     let shifted_month = if month > MARCH_MONTH_THRESHOLD {
-        i64::from(month).wrapping_sub(MARCH_BASE_MONTH_OFFSET_I64)
+        i64::from(month).strict_sub(MARCH_BASE_MONTH_OFFSET_I64)
     } else {
-        i64::from(month).wrapping_add(PRE_MARCH_MONTH_OFFSET_I64)
+        i64::from(month).strict_add(PRE_MARCH_MONTH_OFFSET_I64)
     };
     let month_term = MONTH_TERM_MULTIPLIER_I64
-        .wrapping_mul(shifted_month)
-        .wrapping_add(MONTH_TERM_OFFSET_I64);
+        .strict_mul(shifted_month)
+        .strict_add(MONTH_TERM_OFFSET_I64);
     let day_of_year = month_term
         .div_euclid(MONTH_TERM_DIVISOR_I64)
-        .wrapping_add(i64::from(day).wrapping_sub(1_i64));
+        .strict_add(i64::from(day).strict_sub(1_i64));
     let day_of_era = DAYS_PER_COMMON_YEAR_I64
-        .wrapping_mul(year_of_era)
-        .wrapping_add(year_of_era.div_euclid(LEAP_YEAR_DIVISOR_I32.into()))
-        .wrapping_sub(year_of_era.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32.into()))
-        .wrapping_add(day_of_year);
+        .strict_mul(year_of_era)
+        .strict_add(year_of_era.div_euclid(LEAP_YEAR_DIVISOR_I32.into()))
+        .strict_sub(year_of_era.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32.into()))
+        .strict_add(day_of_year);
     let days = era
-        .wrapping_mul(DAYS_PER_400_YEARS_I64)
-        .wrapping_add(day_of_era)
-        .wrapping_sub(DAYS_UNTIL_UNIX_EPOCH_I64);
+        .strict_mul(DAYS_PER_400_YEARS_I64)
+        .strict_add(day_of_era)
+        .strict_sub(DAYS_UNTIL_UNIX_EPOCH_I64);
     let actual_weekday = parse_result_with_context(
         u32::try_from(
             days.checked_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
@@ -266,10 +267,10 @@ fn parse_http_date_time(
         return Err(TimeError::parse(ERR_WEEKDAY));
     }
     let timestamp_secs = days
-        .wrapping_mul(SECS_PER_DAY_I64)
-        .wrapping_add(i64::from(hour).wrapping_mul(SECS_PER_HOUR_I64))
-        .wrapping_add(i64::from(minute).wrapping_mul(SECS_PER_MINUTE_I64))
-        .wrapping_add(i64::from(second));
+        .strict_mul(SECS_PER_DAY_I64)
+        .strict_add(i64::from(hour).strict_mul(SECS_PER_HOUR_I64))
+        .strict_add(i64::from(minute).strict_mul(SECS_PER_MINUTE_I64))
+        .strict_add(i64::from(second));
     let duration = Duration::from_secs(timestamp_secs.unsigned_abs());
     if timestamp_secs >= 0 {
         return UNIX_EPOCH
@@ -358,11 +359,11 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             );
             let century_base = current_year
                 .div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32)
-                .wrapping_mul(LEAP_YEAR_CENTURY_DIVISOR_I32);
-            let mut year = century_base.wrapping_add(year2.cast_signed());
-            let cutoff = current_year.wrapping_add(RFC850_CENTURY_CUTOFF_OFFSET);
+                .strict_mul(LEAP_YEAR_CENTURY_DIVISOR_I32);
+            let mut year = century_base.strict_add(year2.cast_signed());
+            let cutoff = current_year.strict_add(RFC850_CENTURY_CUTOFF_OFFSET);
             if year > cutoff {
-                year = year.wrapping_sub(LEAP_YEAR_CENTURY_DIVISOR_I32);
+                year = year.strict_sub(LEAP_YEAR_CENTURY_DIVISOR_I32);
             }
             parse_http_date_time(day, month, year, weekday, time_token)
         }
@@ -372,32 +373,32 @@ pub(super) fn civil_from_days(z: i32) -> CivilDate {
     const DAYS_PER_400_YEARS: i32 = 146_097;
     const DAYS_UNTIL_UNIX_EPOCH: i32 = 719_468;
     let z_remainder = z.rem_euclid(DAYS_PER_400_YEARS);
-    let shifted_remainder = z_remainder.wrapping_add(DAYS_UNTIL_UNIX_EPOCH);
+    let shifted_remainder = z_remainder.strict_add(DAYS_UNTIL_UNIX_EPOCH);
     let era = z
         .div_euclid(DAYS_PER_400_YEARS)
-        .wrapping_add(shifted_remainder.div_euclid(DAYS_PER_400_YEARS));
+        .strict_add(shifted_remainder.div_euclid(DAYS_PER_400_YEARS));
     let doe = shifted_remainder.rem_euclid(DAYS_PER_400_YEARS);
     let yoe = doe
-        .wrapping_sub(doe.div_euclid(1_460))
-        .wrapping_add(doe.div_euclid(36_524))
-        .wrapping_sub(doe.div_euclid(DAYS_PER_400_YEARS.wrapping_sub(1)))
+        .strict_sub(doe.div_euclid(1_460))
+        .strict_add(doe.div_euclid(36_524))
+        .strict_sub(doe.div_euclid(DAYS_PER_400_YEARS.strict_sub(1)))
         .div_euclid(365);
-    let y = yoe.wrapping_add(era.wrapping_mul(LEAP_YEAR_ERA_DIVISOR_I32));
-    let doy = doe.wrapping_sub(
+    let y = yoe.strict_add(era.strict_mul(LEAP_YEAR_ERA_DIVISOR_I32));
+    let doy = doe.strict_sub(
         365_i32
-            .wrapping_mul(yoe)
-            .wrapping_add(yoe.div_euclid(LEAP_YEAR_DIVISOR_I32))
-            .wrapping_sub(yoe.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32)),
+            .strict_mul(yoe)
+            .strict_add(yoe.div_euclid(LEAP_YEAR_DIVISOR_I32))
+            .strict_sub(yoe.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32)),
     );
-    let mp = 5_i32.wrapping_mul(doy).wrapping_add(2).div_euclid(153);
-    let month_term = 153_i32.wrapping_mul(mp).wrapping_add(2).div_euclid(5);
-    let day = doy.wrapping_sub(month_term).wrapping_add(1).cast_unsigned();
+    let mp = 5_i32.strict_mul(doy).strict_add(2).div_euclid(153);
+    let month_term = 153_i32.strict_mul(mp).strict_add(2).div_euclid(5);
+    let day = doy.strict_sub(month_term).strict_add(1).cast_unsigned();
     let month_i32 = if mp < 10_i32 {
-        mp.wrapping_add(3)
+        mp.strict_add(3)
     } else {
-        mp.wrapping_sub(9)
+        mp.strict_sub(9)
     };
     let month = month_i32.cast_unsigned();
-    let year = y.wrapping_add(i32::from(month <= MARCH_MONTH_THRESHOLD));
+    let year = y.strict_add(i32::from(month <= MARCH_MONTH_THRESHOLD));
     CivilDate { day, month, year }
 }

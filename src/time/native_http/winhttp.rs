@@ -250,7 +250,8 @@ impl Client {
         .inspect_err(|_| self.session_cache = None)?;
         let server_time = self.query_server_time(&request, response_received, context)?;
         let rtt = response_received
-            .saturating_duration_since(request_start)
+            .checked_duration_since(request_start)
+            .ok_or_else(|| TimeError::parse("HTTP 응답 시각이 요청 시작 시각보다 앞섭니다."))?
             .max(MIN_TRANSFER_TIME);
         Ok(TimeSample {
             response_received_inst: response_received,

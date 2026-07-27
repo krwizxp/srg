@@ -45,11 +45,9 @@ pub(super) fn read_line_reuse_limited<'buffer>(
         }
         let line_end = available.iter().position(|&byte| byte == b'\n');
         let reached_line_end = line_end.is_some();
-        let take_len = line_end.map_or(available.len(), |index| index.saturating_add(1));
-        let segment = available
-            .get(..take_len)
-            .ok_or_else(|| IoError::new(io::ErrorKind::InvalidInput, "입력 범위 계산 실패"))?;
-        if segment.len() > max_bytes.saturating_sub(bytes.len()) {
+        let take_len = line_end.map_or(available.len(), |index| index.strict_add(1));
+        let (segment, _) = available.split_at(take_len);
+        if segment.len() > max_bytes.strict_sub(bytes.len()) {
             stdin_lock.consume(take_len);
             if !reached_line_end {
                 stdin_lock.skip_until(b'\n')?;
@@ -143,7 +141,7 @@ cfg_select! {
                     read_line_reuse_limited(prompt, storage, out, LADDER_INPUT_LINE_MAX_BYTES)?;
                 let mut count = 0_usize;
                 for part in line.split(',') {
-                    count = count.saturating_add(1);
+                    count = count.strict_add(1);
                     match mode {
                         LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
                             writeln!(

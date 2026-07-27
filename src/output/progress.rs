@@ -5,7 +5,7 @@ use crate::{
     numeric::{low_u8_from_u128, low_u8_from_usize, u128_from_usize},
     IS_TERMINAL,
 };
-use core::{fmt::Write as _, time::Duration};
+use core::time::Duration;
 use std::io::Write as IoWrite;
 const BAR_WIDTH: usize = 10;
 const DECI_PER_MINUTE: u128 = 600;
@@ -43,25 +43,22 @@ impl ProgressBuffers {
         }
         let elapsed_millis = elapsed.as_millis();
         let elapsed_deci = elapsed_millis.div_euclid(ELAPSED_MILLIS_PER_DECI);
-        let eta_deci = if total == 0 || completed >= total {
+        let eta_deci = if total == 0 || completed == total {
             Some(0)
         } else if completed == 0 {
             None
         } else {
-            let completed_scaled = u128_from_usize(completed)
-                .saturating_mul(PERCENT_SCALE_U128);
-            let remaining_wide = u128_from_usize(total.saturating_sub(completed));
-            let eta_numerator = elapsed_millis
-                .checked_mul(remaining_wide)
-                .ok_or("ETA 분자 계산 실패")?;
+            let completed_scaled =
+                u128_from_usize(completed).strict_mul(PERCENT_SCALE_U128);
+            let remaining_wide = u128_from_usize(total.strict_sub(completed));
+            let eta_numerator = elapsed_millis.strict_mul(remaining_wide);
             Some(eta_numerator.div_euclid(completed_scaled))
         };
         format_time_into(Some(elapsed_deci), &mut self.elapsed);
         format_time_into(eta_deci, &mut self.eta);
         let filled_value = scaled_progress_value(completed, total, BAR_WIDTH);
         let filled = usize::from(low_u8_from_usize(filled_value.min(BAR_WIDTH)));
-        let percent_value =
-            scaled_progress_value(completed, total, PERCENT_SCALE);
+        let percent_value = scaled_progress_value(completed, total, PERCENT_SCALE);
         let percent = low_u8_from_usize(percent_value.min(PERCENT_SCALE));
         let mut cur = ByteCursor::new(&mut self.line);
         cur.write_byte(b'\r')?;
@@ -74,14 +71,14 @@ impl ProgressBuffers {
         }
         cur.write_byte(b']')?;
         cur.write_byte(b' ')?;
-        let padding = PERCENT_WIDTH.saturating_sub(u8_dec_len(percent));
+        let padding = PERCENT_WIDTH.strict_sub(u8_dec_len(percent));
         for _ in 0..padding {
             cur.write_byte(b' ')?;
         }
         buf_write_u8_dec(&mut cur, percent)?;
         cur.write_byte(b'%')?;
         cur.write_bytes(b" (")?;
-        write!(&mut cur, "{completed}/{total}")?;
+        cur.write_format(format_args!("{completed}/{total}"))?;
         cur.write_bytes(") | 소요: ".as_bytes())?;
         cur.write_bytes(&self.elapsed)?;
         cur.write_bytes(b" | ETA: ")?;
@@ -106,13 +103,13 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
     );
     let tenths = low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND));
     *buf = [
-        b'0'.saturating_add(minutes.div_euclid(10)),
-        b'0'.saturating_add(minutes.rem_euclid(10)),
+        b'0'.strict_add(minutes.div_euclid(10)),
+        b'0'.strict_add(minutes.rem_euclid(10)),
         b':',
-        b'0'.saturating_add(sec_whole.div_euclid(10)),
-        b'0'.saturating_add(sec_whole.rem_euclid(10)),
+        b'0'.strict_add(sec_whole.div_euclid(10)),
+        b'0'.strict_add(sec_whole.rem_euclid(10)),
         b'.',
-        b'0'.saturating_add(tenths),
+        b'0'.strict_add(tenths),
     ];
 }
 const fn scaled_progress_value(
@@ -123,5 +120,5 @@ const fn scaled_progress_value(
     if total == 0 {
         return scale;
     }
-    completed.saturating_mul(scale).div_euclid(total)
+    completed.strict_mul(scale).div_euclid(total)
 }

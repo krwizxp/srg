@@ -56,19 +56,20 @@ impl ByteCursor<'_> {
     }
 }
 impl ServerTime {
-    pub(super) fn current_server_time_at(&self, now: Instant) -> SystemTime {
-        let elapsed_since_anchor = now.saturating_duration_since(self.anchor_instant);
-        let Some(server_time) = self.anchor_time.checked_add(elapsed_since_anchor) else {
-            return self.anchor_time;
-        };
-        server_time
+    pub(super) fn current_server_time_at(&self, now: Instant) -> Result<SystemTime> {
+        let elapsed_since_anchor = now
+            .checked_duration_since(self.anchor_instant)
+            .ok_or_else(|| TimeError::parse("현재 시각이 서버 시간 기준 시각보다 앞섭니다."))?;
+        self.anchor_time
+            .checked_add(elapsed_since_anchor)
+            .ok_or_else(|| TimeError::parse("현재 서버 시간 계산 범위를 초과했습니다."))
     }
     pub(super) fn write_current_display_time_buf_at(
         &self,
         cur: &mut ByteCursor<'_>,
         now: Instant,
     ) -> Result<()> {
-        let current_time = self.current_server_time_at(now);
+        let current_time = self.current_server_time_at(now)?;
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
         let total_seconds = parse_result_with_context(
             i64::try_from(since_epoch.as_secs()),

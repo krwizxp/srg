@@ -1,5 +1,5 @@
 use super::{NativeInputSendStatus, TriggerAction};
-use crate::write_line_best_effort;
+use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
 use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_short, c_uint, c_ulong, c_void},
@@ -633,7 +633,10 @@ impl PreparedInput {
         {
             write_line_best_effort(
                 err,
-                format_args!("[경고] Wayland 입력 세션 유지 실패: {source}"),
+                format_args!(
+                    "[경고] Wayland 입력 세션 유지 실패: {}",
+                    TerminalSafeDisplay::from(&source)
+                ),
             );
             self.prepared = None;
         }
@@ -650,7 +653,6 @@ impl PreparedInput {
         let Some(input_action) = action else {
             return false;
         };
-        write_line_best_effort(err, format_args!("[안내] Wayland 입력 권한 승인을 기다립니다."));
         let result = (|| -> InputResult<Option<WaylandInput>> {
             if should_cancel() {
                 return Ok(None);
@@ -720,7 +722,10 @@ impl PreparedInput {
             Err(source) => {
                 write_line_best_effort(
                     err,
-                    format_args!("[경고] Wayland 입력 사전 준비 실패: {source}"),
+                    format_args!(
+                        "[경고] Wayland 입력 사전 준비 실패: {}",
+                        TerminalSafeDisplay::from(&source)
+                    ),
                 );
                 false
             }
@@ -741,13 +746,22 @@ impl PreparedInput {
         match send_result {
             Ok(()) => NativeInputSendStatus::Sent,
             Err(SendError::Before(source)) => {
-                write_line_best_effort(err, format_args!("[경고] Wayland 입력 실패: {source}"));
+                write_line_best_effort(
+                    err,
+                    format_args!(
+                        "[경고] Wayland 입력 실패: {}",
+                        TerminalSafeDisplay::from(&source)
+                    ),
+                );
                 NativeInputSendStatus::FailedBeforeSend
             }
             Err(SendError::Partial(source)) => {
                 write_line_best_effort(
                     err,
-                    format_args!("[경고] Wayland 입력 전송 상태 불확실: {source}"),
+                    format_args!(
+                        "[경고] Wayland 입력 전송 상태 불확실: {}",
+                        TerminalSafeDisplay::from(&source)
+                    ),
                 );
                 NativeInputSendStatus::PartialOrUnknown
             }

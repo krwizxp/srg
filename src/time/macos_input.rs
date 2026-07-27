@@ -1,4 +1,4 @@
-use crate::write_line_best_effort;
+use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
 use super::{NativeInputSendStatus, TriggerAction};
 use alloc::borrow::Cow;
 use core::{
@@ -97,7 +97,7 @@ impl TriggerAction {
         }
         let result: InputResult<()> = (|| {
             match self {
-            Self::LeftClick => {
+                Self::LeftClick => {
                     // SAFETY: null asks CoreGraphics to use the default source.
                     let current = Event::from_raw(
                         unsafe { sys::CGEventCreate(null_mut()) },
@@ -131,7 +131,10 @@ impl TriggerAction {
             Err(source) => {
                 write_line_best_effort(
                     err,
-                    format_args!("[경고] macOS native 입력 실패: {source}"),
+                    format_args!(
+                        "[경고] macOS native 입력 실패: {}",
+                        TerminalSafeDisplay::from(&source)
+                    ),
                 );
                 NativeInputSendStatus::FailedBeforeSend
             }

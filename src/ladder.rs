@@ -1,9 +1,8 @@
 use crate::{
-    diagnostic::Result,
+    diagnostic::{Result, TerminalSafeDisplay},
     hardware_rng::HardwareRng,
-    random_number::random_bounded,
+    random_number::random_bounded_inclusive,
 };
-use core::num::NonZeroU64;
 use std::io::Write;
 pub(super) const MAX_LADDER_ENTRIES: usize = 512;
 pub(super) fn write_ladder_results<'player, 'result>(
@@ -29,13 +28,20 @@ pub(super) fn write_ladder_results<'player, 'result>(
     }
     for index in (1..entry_count).rev() {
         seed ^= rng.next_u64()?;
-        let upper_bound = NonZeroU64::MIN.saturating_add(u64::from_le_bytes(index.to_le_bytes()));
-        let swap_index = usize::from_le_bytes(random_bounded(upper_bound, seed, rng)?.to_le_bytes());
+        let upper_bound = u64::from_le_bytes(index.to_le_bytes());
+        let swap_index = usize::from_le_bytes(
+            random_bounded_inclusive(upper_bound, seed, rng)?.to_le_bytes(),
+        );
         result_entries.swap(index, swap_index);
     }
     writeln!(out, "사다리타기 결과:")?;
     for (player, result) in players.zip(result_entries.iter().take(entry_count)) {
-        writeln!(out, "{player} -> {result}")?;
+        writeln!(
+            out,
+            "{} -> {}",
+            TerminalSafeDisplay::from(player),
+            TerminalSafeDisplay::from(result)
+        )?;
     }
     Ok(())
 }

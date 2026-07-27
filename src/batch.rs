@@ -4,7 +4,9 @@ use crate::{
     hardware_rng::HardwareRng,
     output::{self, OutputTarget},
     random_data::generate_random_data_with_rng,
-    random_output::{persist_and_print_random_data, write_random_data_to_console},
+    random_output::{
+        persist_and_print_random_data, persist_random_data, write_random_data_to_console,
+    },
     BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
 };
 use core::{
@@ -19,6 +21,7 @@ use std::{
 };
 pub(super) const MAX_BATCH_GENERATE_COUNT: usize = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
+const WORKER_CHUNK_CAPACITY: usize = 0x0001_0000;
 struct WorkerFailure {
     count: usize,
     first_error: AppError,
@@ -29,6 +32,34 @@ fn record_failure(outcome: &mut Option<WorkerFailure>, count: usize, first_error
     } else {
         *outcome = Some(WorkerFailure { count, first_error });
     }
+}
+fn write_worker_chunk<W>(
+    writer_lock: &Mutex<&mut W>,
+    cancelled: &AtomicBool,
+    processed: &AtomicUsize,
+    bytes: &mut Vec<u8>,
+    record_count: &mut usize,
+) -> Result<()>
+where
+    W: Write,
+{
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    let mut writer = writer_lock
+        .lock()
+        .map_err(|_poison| AppError::message("output writer lock 손상"))?;
+    if cancelled.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    writer
+        .write_all(bytes)
+        .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
+    drop(writer);
+    processed.fetch_add(*record_count, Ordering::Relaxed);
+    bytes.clear();
+    *record_count = 0;
+    Ok(())
 }
 pub(super) fn regenerate_with_count(
     output_file: &mut OutputFile,
@@ -72,6 +103,16 @@ pub(super) fn regenerate_with_count(
                 worker_handles.push(scope_ctx.spawn(move || {
                     let result = (|| {
                         let mut buffer = [0_u8; BUFFER_SIZE];
+                        let mut chunk = Vec::new();
+                        chunk
+                            .try_reserve_exact(WORKER_CHUNK_CAPACITY)
+                            .map_err(|source| {
+                                AppError::context(
+                                    "작업자 출력 버퍼 메모리 확보 실패",
+                                    source,
+                                )
+                            })?;
+                        let mut chunk_record_count = 0_usize;
                         let mut outcome = None;
                         for _ in 0..loop_count {
                             if cancelled_ref.load(Ordering::Relaxed) {
@@ -106,19 +147,25 @@ pub(super) fn regenerate_with_count(
                                 }
                             };
                             let bytes = output::prefix_slice(&buffer, len)?;
-                            {
-                                let mut writer = writer_lock_ref.lock().map_err(|_poison| {
-                                    AppError::message("output writer lock 손상")
-                                })?;
-                                if cancelled_ref.load(Ordering::Relaxed) {
-                                    break;
-                                }
-                                writer.write_all(bytes).inspect_err(|_| {
-                                    cancelled_ref.store(true, Ordering::Relaxed);
-                                })?;
+                            if chunk.len().strict_add(bytes.len()) > WORKER_CHUNK_CAPACITY {
+                                write_worker_chunk(
+                                    writer_lock_ref,
+                                    cancelled_ref,
+                                    processed_ref,
+                                    &mut chunk,
+                                    &mut chunk_record_count,
+                                )?;
                             }
-                            processed_ref.fetch_add(1, Ordering::Relaxed);
+                            chunk.extend_from_slice(bytes);
+                            chunk_record_count = chunk_record_count.strict_add(1);
                         }
+                        write_worker_chunk(
+                            writer_lock_ref,
+                            cancelled_ref,
+                            processed_ref,
+                            &mut chunk,
+                            &mut chunk_record_count,
+                        )?;
                         Ok(outcome)
                     })()
                     .inspect_err(|_| cancelled_ref.store(true, Ordering::Relaxed));
@@ -205,14 +252,7 @@ pub(super) fn regenerate_with_count(
     }
     let final_data = generate_random_data_with_rng(rng)?;
     let mut final_buffer = [0_u8; BUFFER_SIZE];
-    let final_len = output::format_data_into_buffer(
-        &final_data,
-        &mut final_buffer,
-        OutputTarget::File,
-    )?;
-    let final_file = output_file.writer();
-    final_file.write_all(output::prefix_slice(&final_buffer, final_len)?)?;
-    final_file.flush()?;
+    let final_len = persist_random_data(output_file, &final_data, &mut final_buffer)?;
     let mut progress_buffers = output::progress::ProgressBuffers::new();
     progress_buffers.print(
         out,

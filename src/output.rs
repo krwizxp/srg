@@ -5,7 +5,7 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-use core::{fmt::Write as FmtWrite, range::Range};
+use core::range::Range;
 use std::io::{Result as IoResult, Write as IoWrite, stdout};
 cfg_select! {
     target_arch = "x86_64" => {
@@ -59,7 +59,7 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            let galaxy_number = u16::from(galaxy_number_byte).saturating_add(1);
+            let galaxy_number = u16::from(galaxy_number_byte).strict_add(1);
             buffer_cur.write_u32_dec(u32::from(galaxy_number))
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
@@ -173,7 +173,7 @@ impl OutputFormatter<'_, '_, '_> {
         let head = self.cursor.take(line_len)?;
         range_slice_mut(head, 0, prefix_len)?.copy_from_slice(prefix_bytes);
         let mut pos = prefix_len;
-        let last_index = BYTE_GROUP_COUNT.saturating_sub(1);
+        let last_index = BYTE_GROUP_COUNT.strict_sub(1);
         for (index, byte) in self.bytes.into_iter().enumerate() {
             let group = render_group(byte);
             range_slice_mut(head, pos, WIDTH)?.copy_from_slice(&group);
@@ -220,17 +220,13 @@ impl OutputFormatter<'_, '_, '_> {
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes())?;
         let kor_latitude = data.kor_coords.latitude;
         let kor_longitude = data.kor_coords.longitude;
-        FmtWrite::write_fmt(
-            self.cursor,
-            format_args!("{kor_latitude}, {kor_longitude}\n"),
-        )?;
+        self.cursor
+            .write_format(format_args!("{kor_latitude}, {kor_longitude}\n"))?;
         self.cursor.write_bytes("세계 위경도: ".as_bytes())?;
         let world_latitude = data.world_coords.latitude;
         let world_longitude = data.world_coords.longitude;
-        FmtWrite::write_fmt(
-            self.cursor,
-            format_args!("{world_latitude}, {world_longitude}\n"),
-        )?;
+        self.cursor
+            .write_format(format_args!("{world_latitude}, {world_longitude}\n"))?;
         Ok(())
     }
 }
@@ -280,9 +276,9 @@ const fn hex_byte(byte: u8) -> [u8; 2] {
 }
 const fn hex_digit(nibble: u8) -> u8 {
     if nibble < 10 {
-        b'0'.wrapping_add(nibble)
+        b'0'.strict_add(nibble)
     } else {
-        b'A'.wrapping_add(nibble.saturating_sub(10))
+        b'A'.strict_add(nibble.strict_sub(10))
     }
 }
 const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
@@ -340,7 +336,7 @@ fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
-    let separator_count = N.saturating_sub(1);
+    let separator_count = N.strict_sub(1);
     let total = nums.iter().try_fold(separator_count, |total, &n| {
         checked_add_index(total, u8_dec_len(n))
     })?;

@@ -34,6 +34,9 @@ impl<'buffer> ByteCursor<'buffer> {
         self.take(bytes.len())?.copy_from_slice(bytes);
         Ok(())
     }
+    pub(super) fn write_format(&mut self, args: fmt::Arguments<'_>) -> io::Result<()> {
+        fmt::Write::write_fmt(self, args).map_err(|_error| write_zero_err())
+    }
     pub(super) fn write_u32_dec(&mut self, value: u32) -> io::Result<()> {
         self.write_u64_dec(u64::from(value))
     }

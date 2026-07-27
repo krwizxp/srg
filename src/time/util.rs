@@ -6,8 +6,8 @@ pub(super) const fn blend_rtt<const NEW_WEIGHT: u128>(
 ) -> Duration {
     let weighted_sum = old_value
         .as_nanos()
-        .saturating_mul(10_u128.saturating_sub(NEW_WEIGHT))
-        .saturating_add(new_value.as_nanos().saturating_mul(NEW_WEIGHT));
+        .strict_mul(10_u128.strict_sub(NEW_WEIGHT))
+        .strict_add(new_value.as_nanos().strict_mul(NEW_WEIGHT));
     Duration::from_nanos_u128(weighted_sum.div_euclid(10))
 }
 pub(super) fn parse_result_with_context<T>(

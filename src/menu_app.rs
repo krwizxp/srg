@@ -344,8 +344,7 @@ impl MenuApp {
         match time_run_result {
             Ok(()) => {}
             Err(time_err) if is_unexpected_eof(&time_err) => {}
-            Err(time_err) if time_err.is_io() => return Err(time_err.into()),
-            Err(time_err) => writeln!(err, "서버 시간 확인 중 오류 발생: {time_err}")?,
+            Err(time_err) => return Err(time_err.into()),
         }
         Ok(())
     }

@@ -3,10 +3,7 @@ use super::{
     input::parse_regular_f64, input::read_parsed_value,
 };
 use crate::diagnostic::{AppError, Result};
-use core::{
-    num::NonZeroU64,
-    ops::{Mul as NumericMul, Sub as NumericSub},
-};
+use core::ops::{Mul as NumericMul, Sub as NumericSub};
 use std::io::Write;
 const FLOAT_INPUT_ERROR: &str =
     "유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).";
@@ -99,9 +96,9 @@ pub(super) fn generate_random_integer(
     rng: &HardwareRng,
 ) -> Result<()> {
     validate_random_integer_range(min_value, max_value)?;
-    let range_size = NonZeroU64::MIN.saturating_add(max_value.abs_diff(min_value));
-    let rand_offset = random_bounded(range_size, seed_modifier, rng)?;
-    let result = min_value.wrapping_add_unsigned(rand_offset);
+    let rand_offset =
+        random_bounded_inclusive(max_value.abs_diff(min_value), seed_modifier, rng)?;
+    let result = min_value.strict_add_unsigned(rand_offset);
     writeln!(
         out,
         "무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})"
@@ -159,12 +156,12 @@ pub(super) fn validate_random_float_range(min_value: f64, max_value: f64) -> Res
     }
     Ok(())
 }
-pub(super) fn random_bounded(
-    range_size: NonZeroU64,
+pub(super) fn random_bounded_inclusive(
+    inclusive_max: u64,
     seed_mod: u64,
     rng: &HardwareRng,
 ) -> Result<u64> {
-    let range_value = range_size.get();
+    let range_value = inclusive_max.strict_add(1);
     let threshold = range_value.wrapping_neg().rem_euclid(range_value);
     for _ in 0..RANDOM_BOUNDED_RETRY_LIMIT {
         let (low_bits, high_bits) =

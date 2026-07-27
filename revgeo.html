@@ -398,7 +398,7 @@
 
           .coords-placeholder {
             color: var(--muted-strong);
-            white-space: normal;
+            white-space: nowrap;
           }
 
           &[data-has-content] .coords-placeholder,
@@ -2247,16 +2247,20 @@
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return;
-      const source = e.source;
-      const btn = source instanceof HTMLButtonElement &&
-        source.matches("button.map-btn")
-        ? source
-        : LAST_MAP_INVOKER;
-      if (!(btn instanceof HTMLButtonElement)) {
+      const btn = e.source;
+      if (
+        !(btn instanceof HTMLButtonElement) ||
+        !btn.matches("button.map-btn")
+      ) {
         e.preventDefault();
         return;
       }
-      const r = AppState.records[btn.dataset.idx | 0];
+      const indexText = btn.dataset.idx;
+      const recordIndex = Number(indexText);
+      const r = String(recordIndex) === indexText &&
+          Number.isSafeInteger(recordIndex) && recordIndex >= 0
+        ? AppState.records[recordIndex]
+        : null;
       if (!r) {
         e.preventDefault();
         return;
@@ -2446,7 +2450,6 @@
     let SHADOW_SYNC_FRAME = 0;
     function clearScrollShadowState(el) {
       SHADOW_SYNC_PENDING.delete(el);
-      if (!(el instanceof HTMLElement)) return;
       el.style.setProperty("--top-shadow-opacity", "0");
       el.style.setProperty("--bottom-shadow-opacity", "0");
     }
@@ -2474,20 +2477,31 @@
       }
     }
     function requestScrollShadowSync(el) {
-      if (!(el instanceof HTMLElement) || SHADOW_SYNC_PENDING.has(el)) return;
+      if (SHADOW_SYNC_PENDING.has(el)) return;
       SHADOW_SYNC_PENDING.add(el);
       SHADOW_SYNC_FRAME ||= requestAnimationFrame(flushScrollShadowSync);
     }
     function resetScrollShadowState(el) {
-      if (!(el instanceof HTMLElement)) return;
       clearScrollShadowState(el);
       requestScrollShadowSync(el);
     }
-    for (const el of [
+    const SCROLL_SHADOW_ELEMENTS = [
       domElements.tableWrap,
       domElements.coords,
       domElements.manualOutput,
-    ]) {
+    ];
+    function syncScrollShadows() {
+      syncTableShadowOffset();
+      for (const el of SCROLL_SHADOW_ELEMENTS) {
+        if (
+          el === domElements.tableWrap ||
+          el.hasAttribute("data-has-content")
+        ) {
+          requestScrollShadowSync(el);
+        }
+      }
+    }
+    for (const el of SCROLL_SHADOW_ELEMENTS) {
       clearScrollShadowState(el);
       el.addEventListener(
         "scroll",
@@ -2495,16 +2509,7 @@
         EVT_PASSIVE,
       );
     }
-    const shadowResizeObserver = new ResizeObserver(() => {
-      syncTableShadowOffset();
-      requestScrollShadowSync(domElements.tableWrap);
-      if (domElements.coords.hasAttribute("data-has-content")) {
-        requestScrollShadowSync(domElements.coords);
-      }
-      if (domElements.manualOutput.hasAttribute("data-has-content")) {
-        requestScrollShadowSync(domElements.manualOutput);
-      }
-    });
+    const shadowResizeObserver = new ResizeObserver(syncScrollShadows);
     shadowResizeObserver.observe(tbl);
     shadowResizeObserver.observe(domElements.tbody);
     shadowResizeObserver.observe(domElements.coords);
@@ -2611,6 +2616,7 @@
         norm(addr?.eupmyeon),
         norm(addr?.tag),
         norm(result.error || addr?.fullAddr),
+        undefined,
       ];
       r._search = fields;
       return fields;
@@ -2620,6 +2626,8 @@
       let hay = fields[6];
       if (hay === undefined) {
         hay = fields[5] +
+          Q_SEARCH_SEP +
+          fields[0] +
           Q_SEARCH_SEP +
           fields[4] +
           Q_SEARCH_SEP +
@@ -2806,14 +2814,7 @@
     }
     function scheduleApplyFilterAll() {
       FILTER_SNAP = null;
-      const activeJob = filterJob;
-      if (activeJob) {
-        activeJob.i = activeJob.len;
-        if (activeJob.raf) {
-          cancelAnimationFrame(activeJob.raf);
-          activeJob.raf = 0;
-        }
-      }
+      cancelActiveFilterApply();
       cancelPendingFilterDebounce();
       filterTimer = setTimeout(() => {
         filterTimer = null;
@@ -2825,15 +2826,22 @@
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
       MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
+    let ACTIVE_DOWNLOAD_URL = null;
+    function revokeActiveDownloadUrl() {
+      if (!ACTIVE_DOWNLOAD_URL) return;
+      URL.revokeObjectURL(ACTIVE_DOWNLOAD_URL);
+      ACTIVE_DOWNLOAD_URL = null;
+    }
+    window.addEventListener("pagehide", revokeActiveDownloadUrl);
     function downloadBlob(blob, filename) {
-      const url = URL.createObjectURL(blob);
+      revokeActiveDownloadUrl();
+      ACTIVE_DOWNLOAD_URL = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = ACTIVE_DOWNLOAD_URL;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
     const AppState = {
       records: [],
@@ -2858,6 +2866,8 @@
         return this.status === "stopping";
       },
       reset(status = "idle") {
+        this.task?.resume?.();
+        this.task?.controller.abort();
         this.processed = 0;
         this.cntFail = 0;
         this.task = status === "idle"
@@ -2883,8 +2893,17 @@
         return this.reset(status);
       },
       setStatus(status) {
-        if (status === "idle") this.task = null;
-        else this.task.status = status;
+        if (status === "idle") {
+          this.task = null;
+        } else {
+          if (!this.task) {
+            throw new DOMException(
+              `작업이 없는 상태에서 ${status}(으)로 전환할 수 없습니다.`,
+              "InvalidStateError",
+            );
+          }
+          this.task.status = status;
+        }
         updateUIState();
       },
     };
@@ -3064,48 +3083,15 @@
         signal.throwIfAborted();
       });
     }
-    function abortable(promise, signal) {
-      signal.throwIfAborted();
-      return new Promise((resolve, reject) => {
-        const onAbort = () => {
-          signal.removeEventListener("abort", onAbort);
-          reject(signal.reason);
-        };
-        signal.addEventListener("abort", onAbort, { once: true });
-        Promise.resolve(promise).then(
-          (value) => {
-            signal.removeEventListener("abort", onAbort);
-            resolve(value);
-          },
-          (error) => {
-            signal.removeEventListener("abort", onAbort);
-            reject(error);
-          },
-        );
-      });
+    const YIELD_CHANNEL = new MessageChannel();
+    const YIELD_QUEUE = [];
+    YIELD_CHANNEL.port1.onmessage = () => YIELD_QUEUE.shift()?.();
+    function yieldToMain() {
+      const { promise, resolve } = Promise.withResolvers();
+      YIELD_QUEUE.push(resolve);
+      YIELD_CHANNEL.port2.postMessage(0);
+      return promise;
     }
-    const yieldToMain = (() => {
-      const y = window.scheduler?.yield;
-      if (typeof y === "function") {
-        return () => y.call(window.scheduler);
-      }
-      const channel = new MessageChannel();
-      const queue = [];
-      let head = 0;
-      channel.port1.onmessage = () => {
-        if (head >= queue.length) return;
-        queue[head++]();
-        if (head > 1024 && head * 2 > queue.length) {
-          queue.splice(0, head);
-          head = 0;
-        }
-      };
-      return () =>
-        new Promise((resolve) => {
-          queue.push(resolve);
-          channel.port2.postMessage(0);
-        });
-    })();
     async function cancelReadable(readable, reason) {
       try {
         await readable?.cancel(reason);
@@ -3211,7 +3197,7 @@
           const lon = m[3];
           const fLat = +lat;
           const fLon = +lon;
-          if (fLat !== fLat || fLon !== fLon) continue;
+          if (!Number.isFinite(fLat) || !Number.isFinite(fLon)) continue;
           if (fLat < -90 || fLat > 90 || fLon < -180 || fLon > 180) continue;
           if (out.length >= CONFIG.BULK_HARD_LIMIT) {
             throw new InputLimitError(
@@ -3319,47 +3305,99 @@
       });
       return REVERSE_CACHE_DB_PROMISE;
     }
-    function runReverseCacheTransaction(db, mode, operation) {
-      return new Promise((resolve) => {
+    function runReverseCacheTransaction(db, mode, signal, operation) {
+      signal.throwIfAborted();
+      return new Promise((resolve, reject) => {
+        let settled = false;
         let tx;
-        try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, mode);
-          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
-        } catch {
-          resolve();
-          return;
-        }
-        tx.oncomplete = tx.onerror = tx.onabort = resolve;
-      });
-    }
-    async function readPersistentReverseCache(cacheKey) {
-      const persistentKey = persistentReverseCacheKey(cacheKey);
-      const db = await openReverseCacheDb();
-      if (!db) return null;
-      let result = null;
-      await runReverseCacheTransaction(db, "readonly", (store) => {
-        const req = store.get(persistentKey);
-        req.onsuccess = () => {
-          const row = req.result;
-          if (isFreshReverseCacheRow(row, persistentKey)) {
-            result = row.parsed;
+        const finish = (callback, value) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener("abort", onAbort);
+          callback(value);
+        };
+        const abortTransaction = () => {
+          try {
+            tx?.abort();
+          } catch (err) {
+            console.warn("Reverse geocoding cache abort failed.", err);
           }
         };
+        const onAbort = () => {
+          abortTransaction();
+          finish(reject, signal.reason);
+        };
+        try {
+          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, mode);
+          tx.oncomplete = () => finish(resolve);
+          tx.onerror = () => finish(
+            reject,
+            tx.error ?? new Error("Reverse geocoding cache transaction failed."),
+          );
+          tx.onabort = () => finish(
+            reject,
+            signal.aborted
+              ? signal.reason
+              : tx.error ??
+                new Error("Reverse geocoding cache transaction aborted."),
+          );
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
+        } catch (err) {
+          abortTransaction();
+          finish(reject, err);
+        }
       });
-      return result;
     }
-    async function writePersistentReverseCache(cacheKey, parsed) {
+    async function readPersistentReverseCache(cacheKey, signal) {
       const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
-      if (!db) return;
-      await runReverseCacheTransaction(db, "readwrite", (store) => {
-        store.put({
-          key: persistentKey,
-          savedAt: Date.now(),
-          parsed,
+      signal.throwIfAborted();
+      if (!db) return null;
+      let result = null;
+      try {
+        await runReverseCacheTransaction(db, "readonly", signal, (store) => {
+          const req = store.get(persistentKey);
+          req.onsuccess = () => {
+            const row = req.result;
+            if (isFreshReverseCacheRow(row, persistentKey)) {
+              result = row.parsed;
+            }
+          };
         });
-        pruneExcessReverseCacheRows(store);
-      });
+      } catch (err) {
+        signal.throwIfAborted();
+        console.warn("Reverse geocoding cache read failed.", err);
+      }
+      return result;
+    }
+    async function writePersistentReverseCache(cacheKey, parsed, signal) {
+      const persistentKey = persistentReverseCacheKey(cacheKey);
+      const db = await openReverseCacheDb();
+      signal.throwIfAborted();
+      if (!db) return;
+      try {
+        await runReverseCacheTransaction(
+          db,
+          "readwrite",
+          signal,
+          (store) => {
+            store.put({
+              key: persistentKey,
+              savedAt: Date.now(),
+              parsed,
+            });
+            pruneExcessReverseCacheRows(store);
+          },
+        );
+      } catch (err) {
+        signal.throwIfAborted();
+        console.warn("Reverse geocoding cache write failed.", err);
+      }
     }
     function pruneExcessReverseCacheRows(store) {
       const countReq = store.count();
@@ -3414,7 +3452,6 @@
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
       const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
-      const anySignals = [userSignal, null];
       let attempt = 0;
       while (++attempt <= maxRetry) {
         userSignal.throwIfAborted();
@@ -3427,8 +3464,10 @@
           }
         }
         LAST_REVERSE_FETCH_AT = now;
-        anySignals[1] = AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS);
-        const requestSignal = AbortSignal.any(anySignals);
+        const requestSignal = AbortSignal.any([
+          userSignal,
+          AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS),
+        ]);
         let res;
         try {
           res = await fetch(url, {
@@ -3488,6 +3527,7 @@
         const i1 = i + 1;
         let skeletonTr = null;
         try {
+          signal.throwIfAborted();
           if (AppState.status === "pausing") {
             AppState.setStatus("paused");
             setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
@@ -3495,22 +3535,20 @@
             task.resume = resolve;
             scheduleRender();
             await promise;
+            signal.throwIfAborted();
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
-          if (!AppState.isRunning) break;
+          if (AppState.task !== task || !AppState.isRunning) break;
           task.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
           if (!parsed) {
-            parsed = await abortable(
-              readPersistentReverseCache(cacheKey),
-              signal,
-            );
+            parsed = await readPersistentReverseCache(cacheKey, signal);
           }
           if (parsed) putReverseMemoryCache(cacheKey, parsed);
           signal.throwIfAborted();
-          if (!AppState.isRunning) break;
+          if (AppState.task !== task || !AppState.isRunning) break;
           const needsFetch = !parsed;
           if (needsFetch) flushPending();
           const tr = ROW_TEMPLATE.cloneNode(true);
@@ -3567,12 +3605,9 @@
                 ),
               );
               putReverseMemoryCache(cacheKey, parsed);
-              await abortable(
-                writePersistentReverseCache(cacheKey, parsed),
-                signal,
-              );
+              await writePersistentReverseCache(cacheKey, parsed, signal);
             } catch (err) {
-              if (AppState.isStopping && err?.name === "AbortError") {
+              if (signal.aborted && err?.name === "AbortError") {
                 skeletonTr.remove();
                 break;
               }
@@ -3586,6 +3621,7 @@
             rowFilter = getLiveFilterSnapshot();
           }
           r.result = parsed;
+          r._search = null;
           commitResultRow(skeletonTr, r, wrap, rowFilter);
           if (rowError && !AppState.isStopping) {
             setStatusMessage(
@@ -3602,7 +3638,7 @@
             }
           }
         } catch (err) {
-          if (AppState.isStopping && err?.name === "AbortError") break;
+          if (signal.aborted && err?.name === "AbortError") break;
           console.error(err);
           if (
             skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)
@@ -3620,6 +3656,7 @@
           task.inFlight = false;
         }
       }
+      if (AppState.task !== task) return;
       flushPending();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
@@ -3687,8 +3724,12 @@
       try {
         const records = AppState.records;
         const totalRows = Math.min(records.length, AppState.processed);
+        const sourceFile = AppState.droppedFile;
         if (totalRows <= 0) {
           return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
+        }
+        if (!sourceFile) {
+          return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
         }
         const escCell = csvEsc;
         setStatusMessage("CSV 생성 중…");
@@ -3748,7 +3789,7 @@
         flushChunk();
         downloadBlob(
           new Blob(parts, { type: "text/csv;charset=utf-8" }),
-          `${AppState.droppedFile.name.replace(RX_FILE_EXT, "")
+          `${sourceFile.name.replace(RX_FILE_EXT, "")
           }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
         );
         setStatusMessage("CSV 파일을 다운로드했습니다.");
@@ -3771,6 +3812,7 @@
           file,
           task.controller.signal,
         );
+        if (AppState.task !== task) return;
         if (!records.length) {
           AppState.setRecords([]);
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
@@ -3798,6 +3840,7 @@
             : `분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`,
         );
       } catch (err) {
+        if (AppState.task !== task) return;
         if (err && err.name === "AbortError") {
           setControlsIdle("중지되었습니다.", "stopped");
           return;
@@ -3839,10 +3882,14 @@
         domElements.tbody.childElementCount > 0 &&
         !root.hasAttribute(PERF_MODE_ATTR)
       ) {
-        if (root.matches(":active-view-transition")) return fn();
-        return document.startViewTransition({ update: fn, types: ["results"] });
+        if (!root.matches(":active-view-transition")) {
+          return document.startViewTransition({
+            update: fn,
+            types: ["results"],
+          }).updateCallbackDone;
+        }
       }
-      return fn();
+      return Promise.try(fn);
     };
     const COMMANDS = {
       "--parse": () => maybeVT(handleParse),
@@ -3856,6 +3903,7 @@
           resetScrollShadowState(domElements.coords);
           setStatusMessage("조회 시작…");
           void runProcessingLoop(task).catch((err) => {
+            if (AppState.task !== task) return;
             console.error(err);
             setControlsIdle(
               `오류로 중단됨: ${getErrorMessage(err)}`,
@@ -3919,9 +3967,7 @@
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      Promise.try(cmd).then((ret) => {
-        ret?.updateCallbackDone?.catch(handleCommandError);
-      }, handleCommandError);
+      Promise.try(cmd).catch(handleCommandError);
     });
     function handleFile(file) {
       if (!file) return;
@@ -3992,15 +4038,8 @@
         closeMapPopover();
       }
     });
-    const syncViewportShadows = () => {
-      syncTableShadowOffset();
-      requestScrollShadowSync(domElements.tableWrap);
-      if (domElements.coords.hasAttribute("data-has-content")) {
-        requestScrollShadowSync(domElements.coords);
-      }
-    };
-    window.addEventListener("resize", syncViewportShadows, EVT_PASSIVE);
-    syncViewportShadows();
+    window.addEventListener("resize", syncScrollShadows, EVT_PASSIVE);
+    syncScrollShadows();
     (() => {
       const U64_MAX = (1n << 64n) - 1n;
       const U32_MAX_INV = 1 / 4294967295;
@@ -4065,7 +4104,7 @@
         );
       }
       function parseU64(raw) {
-        const input = String(raw || "").trim();
+        const input = String(raw ?? "").trim();
         if (input.length === 0) {
           throw new Error("빈 값은 허용되지 않습니다.");
         }
@@ -4547,7 +4586,7 @@
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
       const RX_U64_WS = /\s/u;
       function* iterU64Tokens(raw) {
-        const text = String(raw || "");
+        const text = String(raw ?? "");
         let tokenStart = -1;
         for (let i = 0; i < text.length; i += 1) {
           const ch = text[i];
