@@ -82,6 +82,6 @@ srg time-observe <host> <seconds>
 
 ## GitHub Actions
 
-CI 워크플로는 `main` 브랜치와 태그에서 Windows, Linux, Intel Mac, Apple Silicon Mac용 release Artifact를 제공합니다.
-
-수동 실행 워크플로에서는 데이터 생성, 사다리타기, 범위형 난수 생성과 서버 시간 관찰을 선택할 수 있습니다. 실행 결과와 생성 파일은 Workflow run의 Artifact에서 내려받을 수 있습니다.
+- **CI**: `main` 브랜치와 태그에서 Windows, Linux, Intel Mac, Apple Silicon Mac용 release Artifact를 제공합니다.
+- **Run SRG Manually**: 데이터 생성, 사다리타기, 범위형 난수 생성과 서버 시간 관찰을 선택해 실행합니다. 실행 결과와 생성 파일은 Workflow run의 Artifact에서 내려받을 수 있습니다.
+- **pages build and deployment**: `revgeo.html`을 GitHub Pages 웹페이지로 빌드하고 배포합니다.
