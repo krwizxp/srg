@@ -9,20 +9,16 @@ pub(super) struct AppError {
     source: Option<BoxError>,
 }
 impl AppError {
-    pub(super) fn context<M, E>(context: M, source: E) -> Self
-    where
-        M: Into<Cow<'static, str>>,
-        E: Error + Send + Sync + 'static,
-    {
+    pub(super) fn context(
+        context: impl Into<Cow<'static, str>>,
+        source: impl Error + Send + Sync + 'static,
+    ) -> Self {
         Self {
             message: context.into(),
             source: Some(Box::new(source)),
         }
     }
-    pub(super) fn message<M>(message: M) -> Self
-    where
-        M: Into<Cow<'static, str>>,
-    {
+    pub(super) fn message(message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             message: message.into(),
             source: None,
@@ -45,15 +41,9 @@ impl fmt::Debug for AppError {
 }
 impl Error for AppError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_deref().map(|source| {
-            let source_ref: &(dyn Error + 'static) = source;
-            source_ref
-        })
-    }
-}
-impl From<Cow<'static, str>> for AppError {
-    fn from(value: Cow<'static, str>) -> Self {
-        Self::message(value)
+        self.source
+            .as_deref()
+            .map(|source| -> &(dyn Error + 'static) { source })
     }
 }
 impl From<String> for AppError {

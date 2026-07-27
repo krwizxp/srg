@@ -82,6 +82,6 @@ srg time-observe <host> <seconds>
 
 ## GitHub Actions
 
-CI 워크플로는 Windows, Linux, Intel Mac, Apple Silicon Mac용 release build를 확인합니다. `main` 브랜치와 태그 실행에서는 플랫폼별 배포용 Artifact를 제공하며, Pull Request에서는 같은 환경의 빌드를 검증합니다.
+CI 워크플로는 `main` 브랜치와 태그에서 Windows, Linux, Intel Mac, Apple Silicon Mac용 release Artifact를 제공합니다.
 
 수동 실행 워크플로에서는 데이터 생성, 사다리타기, 범위형 난수 생성과 서버 시간 관찰을 선택할 수 있습니다. 실행 결과와 생성 파일은 Workflow run의 Artifact에서 내려받을 수 있습니다.

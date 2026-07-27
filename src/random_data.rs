@@ -75,7 +75,6 @@ pub(super) struct RandomDataSet {
     pub solar_system_index: u16,
     pub world_coords: Coordinates,
 }
-#[derive(Clone, Copy)]
 struct RandomBitBuffer {
     bits_remaining: u8,
     value: u64,
@@ -157,7 +156,7 @@ impl<const N: usize> UniqueNumbers<N> {
         };
         *slot = number;
         self.seen |= mask;
-        self.len = self.len.wrapping_add(1);
+        self.len = self.len.strict_add(1);
         if self.is_full() {
             self.values.sort_unstable();
         }

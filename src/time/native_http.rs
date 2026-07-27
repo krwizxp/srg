@@ -49,9 +49,9 @@ impl FreshTimeHeaders {
         });
     }
     fn finish(self, context: &str) -> Result<(SystemTime, Instant)> {
-        if let Some(age_result) = self.age_result {
-            age_result.map_err(|message| error(context, message))?;
-        }
+        self.age_result
+            .transpose()
+            .map_err(|message| error(context, message))?;
         self.date_result
             .ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))?
     }

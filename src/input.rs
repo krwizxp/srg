@@ -79,19 +79,14 @@ pub(super) fn read_u64_hex_input(
 ) -> Result<u64> {
     loop {
         let raw = read_line_reuse_limited(prompt, input_buffer, out, HEX_INPUT_LINE_MAX_BYTES)?;
-        let parsed_value = raw
+        let parsed_value = match raw
             .strip_prefix('0')
             .and_then(|body| body.strip_prefix(['x', 'X']))
-            .map_or_else(
-                || raw.parse::<u64>().ok(),
-                |hex| {
-                    if hex.starts_with('+') {
-                        None
-                    } else {
-                        u64::from_str_radix(hex, 16).ok()
-                    }
-                },
-            );
+        {
+            Some(hex) if !hex.starts_with('+') => u64::from_str_radix(hex, 16).ok(),
+            Some(_) => None,
+            None => raw.parse::<u64>().ok(),
+        };
         if let Some(value) = parsed_value {
             return Ok(value);
         }
@@ -102,15 +97,14 @@ pub(super) fn read_u64_hex_input(
         )?;
     }
 }
-pub(super) fn get_validated_input<T, E, F>(
+pub(super) fn get_validated_input<T, E>(
     prompt: &str,
     input_buf: &mut String,
     out: &mut dyn Write,
-    mut validator: F,
+    mut validator: impl FnMut(&str) -> CoreResult<T, E>,
 ) -> IoResult<T>
 where
     E: AsRef<str>,
-    F: FnMut(&str) -> CoreResult<T, E>,
 {
     loop {
         let input = read_line_reuse_limited(
@@ -144,7 +138,7 @@ cfg_select! {
             mode: LadderEntryMode,
         ) -> Result<usize> {
             let (out, err) = io;
-            let count = 'read: loop {
+            Ok('read: loop {
                 let line =
                     read_line_reuse_limited(prompt, storage, out, LADDER_INPUT_LINE_MAX_BYTES)?;
                 let mut count = 0_usize;
@@ -185,19 +179,16 @@ cfg_select! {
                     LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
                 }
                 break count;
-            };
-            Ok(count)
+            })
         }
-        pub(super) fn read_parsed_value<T, F>(
+        pub(super) fn read_parsed_value<T>(
             prompt: Arguments<'_>,
             buffer: &mut String,
             out: &mut dyn Write,
             err: &mut dyn Write,
             invalid_message: &str,
-            mut parse: F,
+            mut parse: impl FnMut(&str) -> Option<T>,
         ) -> Result<T>
-        where
-            F: FnMut(&str) -> Option<T>,
         {
             loop {
                 let line = read_line_reuse_limited(

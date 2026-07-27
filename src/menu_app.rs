@@ -201,7 +201,7 @@ impl MenuApp {
         }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
-            supp_input_count = supp_input_count.wrapping_add(1);
+            supp_input_count = supp_input_count.strict_add(1);
             let supp = read_u64_hex_input(
                 format_args!(
                     concat!(

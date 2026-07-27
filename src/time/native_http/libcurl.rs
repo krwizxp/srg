@@ -330,9 +330,7 @@ impl Client {
             return Err(scheme_error);
         }
         let Some(header_block) = header_capture.completed_block.take() else {
-            return Err(TimeError::header_not_found(format!(
-                "{context} 응답에서 Date"
-            )));
+            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
         };
         let (server_time, response_received_inst) = header_block.finish(context)?;
         let http_elapsed = response_received_inst

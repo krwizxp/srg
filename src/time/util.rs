@@ -10,13 +10,10 @@ pub(super) const fn blend_rtt<const NEW_WEIGHT: u128>(
         .saturating_add(new_value.as_nanos().saturating_mul(NEW_WEIGHT));
     Duration::from_nanos_u128(weighted_sum.div_euclid(10))
 }
-pub(super) fn parse_result_with_context<T, E>(
-    result: CoreResult<T, E>,
+pub(super) fn parse_result_with_context<T>(
+    result: CoreResult<T, impl Error + Send + Sync + 'static>,
     context: &'static str,
-) -> Result<T>
-where
-    E: Error + Send + Sync + 'static,
-{
+) -> Result<T> {
     result.map_err(|err| TimeError::parse_with_source(context, err))
 }
 pub(super) fn parse_u32_digits(raw: &str) -> Option<u32> {

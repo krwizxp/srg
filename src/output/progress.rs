@@ -48,10 +48,9 @@ impl ProgressBuffers {
         } else if completed == 0 {
             None
         } else {
-            let remaining = total.saturating_sub(completed);
             let completed_scaled = u128_from_usize(completed)
                 .saturating_mul(PERCENT_SCALE_U128);
-            let remaining_wide = u128_from_usize(remaining);
+            let remaining_wide = u128_from_usize(total.saturating_sub(completed));
             let eta_numerator = elapsed_millis
                 .checked_mul(remaining_wide)
                 .ok_or("ETA 분자 계산 실패")?;
@@ -59,10 +58,10 @@ impl ProgressBuffers {
         };
         format_time_into(Some(elapsed_deci), &mut self.elapsed);
         format_time_into(eta_deci, &mut self.eta);
-        let filled_value = scaled_progress_value(completed, total, BAR_WIDTH, BAR_WIDTH);
+        let filled_value = scaled_progress_value(completed, total, BAR_WIDTH);
         let filled = usize::from(low_u8_from_usize(filled_value.min(BAR_WIDTH)));
         let percent_value =
-            scaled_progress_value(completed, total, PERCENT_SCALE, PERCENT_SCALE);
+            scaled_progress_value(completed, total, PERCENT_SCALE);
         let percent = low_u8_from_usize(percent_value.min(PERCENT_SCALE));
         let mut cur = ByteCursor::new(&mut self.line);
         cur.write_byte(b'\r')?;
@@ -120,10 +119,9 @@ const fn scaled_progress_value(
     completed: usize,
     total: usize,
     scale: usize,
-    zero_total_value: usize,
 ) -> usize {
     if total == 0 {
-        return zero_total_value;
+        return scale;
     }
     completed.saturating_mul(scale).div_euclid(total)
 }

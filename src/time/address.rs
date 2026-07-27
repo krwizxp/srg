@@ -40,10 +40,6 @@ impl FromStr for ParsedServer {
         {
             return Err(TimeError::parse(ERR_HOST));
         }
-        let default_port = match scheme {
-            UrlScheme::Http => DEFAULT_HTTP_PORT,
-            UrlScheme::Https => DEFAULT_HTTPS_PORT,
-        };
         let (host_part, explicit_port, bracketed) =
             if let Some(bracketed_host) = after_scheme.strip_prefix('[') {
                 let (host_part, rem) = bracketed_host
@@ -64,15 +60,17 @@ impl FromStr for ParsedServer {
             } else {
                 (after_scheme, None, false)
             };
-        let port = explicit_port.unwrap_or(default_port);
+        let port = explicit_port.unwrap_or(match scheme {
+            UrlScheme::Http => DEFAULT_HTTP_PORT,
+            UrlScheme::Https => DEFAULT_HTTPS_PORT,
+        });
         if host_part.is_empty() || host_part.contains(['[', ']']) {
             return Err(TimeError::parse(ERR_HOST));
         }
         let literal_ip_addr = host_part.parse::<net::IpAddr>().ok();
-        if bracketed && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_))) {
-            return Err(TimeError::parse(ERR_HOST));
-        }
-        if host_part.contains(':') && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_))) {
+        if (bracketed || host_part.contains(':'))
+            && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_)))
+        {
             return Err(TimeError::parse(ERR_HOST));
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]

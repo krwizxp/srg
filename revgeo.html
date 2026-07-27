@@ -11,7 +11,7 @@
   <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
   <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
   <meta property="og:locale" content="ko_KR">
-  <link rel="icon" id="app-favicon" href="./icon.svg?v=4&theme=light" type="image/svg+xml" sizes="any">
+  <link rel="icon" href="./icon.svg?v=4" type="image/svg+xml" sizes="any">
   <link rel="manifest" href="./site.webmanifest?v=4">
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -26,8 +26,6 @@
           : "light";
       const applyInitialTheme = (theme) => {
         document.documentElement.dataset.theme = theme;
-        const favicon = document.getElementById("app-favicon");
-        favicon.href = `./icon.svg?v=4&theme=${theme}`;
       };
       try {
         const storedTheme = localStorage.getItem("srg-theme");
@@ -93,17 +91,12 @@
         --shimmer-from: -120%;
         --shimmer-to: 120%;
         --shimmer-opacity: 0.78;
-        --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h),
-            oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
+        --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
         --fs-sm: 14px;
         --results-pane-mobile-height: 70dvh;
-        font-family:
-          "Pretendard", -apple-system, BlinkMacSystemFont, system-ui,
-          sans-serif;
+        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
-        scrollbar-color: color-mix(in oklch,
-            color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%,
-            var(--accent) 18%) oklch(0% 0 0 / 0);
+        scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
 
         &[dir="rtl"] {
           --safe-inline-start: env(safe-area-inset-right);
@@ -132,12 +125,9 @@
         line-height: 1.6;
 
         &::selection {
-          background: color-mix(in oklch,
-              var(--accent) 25%,
-              var(--card-surface));
+          background: color-mix(in oklch, var(--accent) 25%, var(--card-surface));
           color: var(--fg);
         }
-
       }
     }
 
@@ -166,16 +156,12 @@
         scrollbar-width: thin;
         overflow: auto;
         --scroll-shadow-size: 14px;
-        --scroll-shadow-color: color-mix(in oklch,
-            var(--line-soft) 70%,
-            oklch(0% 0 0 / 0));
+        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, oklch(0% 0 0 / 0));
         --top-shadow-opacity: 0;
         --bottom-shadow-opacity: 0;
       }
 
       .coords-view {
-        --coords-pad-block: 12px;
-        --coords-pad-inline: 12px;
 
         &[data-has-content]::before,
         &[data-has-content]::after {
@@ -191,18 +177,14 @@
         &[data-has-content]::before {
           inset-block-start: 0;
           margin-block-start: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(180deg,
-              var(--scroll-shadow-color),
-              oklch(0% 0 0 / 0));
+          background: linear-gradient(180deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
           opacity: var(--top-shadow-opacity);
         }
 
         &[data-has-content]::after {
           inset-block-end: 0;
           margin-block-end: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(0deg,
-              var(--scroll-shadow-color),
-              oklch(0% 0 0 / 0));
+          background: linear-gradient(0deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
           opacity: var(--bottom-shadow-opacity);
         }
       }
@@ -224,18 +206,14 @@
         &.has-results::before {
           inset-block-start: var(--table-head-offset);
           margin-block-end: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(180deg,
-              var(--scroll-shadow-color),
-              oklch(0% 0 0 / 0));
+          background: linear-gradient(180deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
           opacity: var(--top-shadow-opacity);
         }
 
         &.has-results::after {
           inset-block-end: 0;
           margin-block-start: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(0deg,
-              var(--scroll-shadow-color),
-              oklch(0% 0 0 / 0));
+          background: linear-gradient(0deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
           opacity: var(--bottom-shadow-opacity);
         }
       }
@@ -281,7 +259,6 @@
         --card-pad-inline: clamp(20px, 2.5vw, 32px);
         --control-pad-block: 10px;
         --control-pad-inline: 12px;
-        --control-min-block-size: 44px;
         border: 1px solid var(--line-soft);
         border-radius: 24px;
         overflow: hidden;
@@ -363,10 +340,7 @@
             stroke-width: 1.5;
           }
 
-          .drop-text strong {
-            color: var(--accent-ink);
-          }
-
+          .drop-text strong,
           &:is(:hover, :focus-within) .drop-icon {
             color: var(--accent-ink);
           }
@@ -401,18 +375,12 @@
           stroke-linejoin: round;
         }
 
-        :where(.coords-view,
-          .manual-rng > summary,
-          .filters input[type="search"],
-          .filters select,
-          .manual-rng textarea) {
+        :where(.coords-view, .manual-rng > summary, .filters input[type="search"], .filters select, .manual-rng textarea) {
           border-radius: 12px;
           transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        :where(.filters input[type="search"],
-          .filters select,
-          .manual-rng textarea) {
+        :where(.filters input[type="search"], .filters select, .manual-rng textarea) {
           color: var(--fg);
         }
 
@@ -424,8 +392,7 @@
 
           :is(.coords-placeholder, .coords-content) {
             display: block;
-            padding-block: var(--coords-pad-block);
-            padding-inline: var(--coords-pad-inline);
+            padding: 12px;
             font: inherit;
           }
 
@@ -433,10 +400,7 @@
             color: var(--muted-strong);
           }
 
-          &[data-has-content] .coords-placeholder {
-            display: none;
-          }
-
+          &[data-has-content] .coords-placeholder,
           &:not([data-has-content]) .coords-content {
             display: none;
           }
@@ -446,19 +410,8 @@
           }
         }
 
-        :where(button,
-          .filters input[type="search"],
-          .filters select,
-          .manual-rng textarea):focus-visible {
-          outline: 2px solid var(--focus-ring);
-          outline-offset: -2px;
-        }
-
-        :where(.coords-view, .manual-rng > summary):focus-visible {
-          outline: 2px solid var(--focus-ring);
-          outline-offset: -2px;
-        }
-
+        :where(button, .filters input[type="search"], .filters select, .manual-rng textarea):focus-visible,
+        :where(.coords-view, .manual-rng > summary):focus-visible,
         .drop-zone:has(input[type="file"]:focus-visible) {
           outline: 2px solid var(--focus-ring);
           outline-offset: -2px;
@@ -537,11 +490,7 @@
           overflow: hidden;
           transform: scaleX(calc(var(--pct) / 100));
           transform-origin: var(--inline-origin-x) 50%;
-          background: linear-gradient(in oklch var(--inline-angle),
-              light-dark(oklch(from var(--accent) calc(l - 0.05) calc(c * 0.86) h),
-                oklch(from var(--accent) calc(l + 0.05) calc(c * 0.86) h)),
-              light-dark(oklch(from var(--accent) calc(l - 0.09) calc(c * 0.78) h),
-                oklch(from var(--accent) calc(l + 0.08) calc(c * 0.78) h)));
+          background: linear-gradient(in oklch var(--inline-angle), light-dark(oklch(from var(--accent) calc(l - 0.05) calc(c * 0.86) h), oklch(from var(--accent) calc(l + 0.05) calc(c * 0.86) h)), light-dark(oklch(from var(--accent) calc(l - 0.09) calc(c * 0.78) h), oklch(from var(--accent) calc(l + 0.08) calc(c * 0.78) h)));
           position: relative;
         }
 
@@ -551,10 +500,7 @@
           inset-block: 0;
           inset-inline: 0;
           transform: translateX(var(--shimmer-from));
-          background: linear-gradient(in oklch var(--inline-angle),
-              oklch(0% 0 0 / 0) 0%,
-              color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%,
-              oklch(0% 0 0 / 0) 100%);
+          background: linear-gradient(in oklch var(--inline-angle), oklch(0% 0 0 / 0) 0%, color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%, oklch(0% 0 0 / 0) 100%);
           opacity: var(--shimmer-opacity);
           animation: skeleton-shimmer-x 1.5s linear infinite;
           will-change: transform;
@@ -584,25 +530,20 @@
         }
 
         &.err {
-          color: light-dark(oklch(from var(--err) calc(l - 0.18) calc(c * 0.82) h),
-              oklch(from var(--err) calc(l + 0.12) calc(c * 0.72) h));
-          border-inline-start-color: light-dark(oklch(from var(--err) calc(l + 0.1) calc(c * 0.74) h),
-              oklch(from var(--err) calc(l - 0.06) calc(c * 0.82) h));
+          color: light-dark(oklch(from var(--err) calc(l - 0.18) calc(c * 0.82) h), oklch(from var(--err) calc(l + 0.12) calc(c * 0.72) h));
+          border-inline-start-color: light-dark(oklch(from var(--err) calc(l + 0.1) calc(c * 0.74) h), oklch(from var(--err) calc(l - 0.06) calc(c * 0.82) h));
           background: oklch(from var(--err) l calc(c * 0.45) h / 0.1);
         }
 
         &.warn {
-          color: light-dark(oklch(from var(--warn) calc(l - 0.22) calc(c * 0.8) h),
-              oklch(from var(--warn) calc(l + 0.1) calc(c * 0.7) h));
-          border-inline-start-color: light-dark(oklch(from var(--warn) calc(l - 0.04) calc(c * 0.82) h),
-              oklch(from var(--warn) l calc(c * 0.78) h));
+          color: light-dark(oklch(from var(--warn) calc(l - 0.22) calc(c * 0.8) h), oklch(from var(--warn) calc(l + 0.1) calc(c * 0.7) h));
+          border-inline-start-color: light-dark(oklch(from var(--warn) calc(l - 0.04) calc(c * 0.82) h), oklch(from var(--warn) l calc(c * 0.78) h));
           background: oklch(from var(--warn) l calc(c * 0.42) h / 0.1);
         }
 
         &.stopped {
           color: var(--muted-strong);
-          background: light-dark(color-mix(in oklch, var(--muted) 12%, var(--surface-panel)),
-              color-mix(in oklch, var(--muted) 16%, var(--surface-panel)));
+          background: light-dark(color-mix(in oklch, var(--muted) 12%, var(--surface-panel)), color-mix(in oklch, var(--muted) 16%, var(--surface-panel)));
         }
       }
 
@@ -656,11 +597,7 @@
           overflow-y: auto;
           padding-inline-end: 4px;
           scrollbar-width: thin;
-          scrollbar-color: color-mix(in oklch,
-              color-mix(in oklch,
-                var(--line-soft) 75%,
-                var(--surface-panel)) 82%,
-              var(--accent) 18%) oklch(0% 0 0 / 0);
+          scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
         }
 
         :scope .manual-rng-help {
@@ -765,8 +702,7 @@
         }
 
         :scope #error {
-          color: light-dark(oklch(from var(--err) calc(l - 0.1) calc(c * 0.95) h),
-              oklch(from var(--err) calc(l + 0.08) calc(c * 0.85) h));
+          color: light-dark(oklch(from var(--err) calc(l - 0.1) calc(c * 0.95) h), oklch(from var(--err) calc(l + 0.08) calc(c * 0.85) h));
         }
       }
 
@@ -784,7 +720,7 @@
         :is(input[type="search"], select) {
           padding-block: var(--control-pad-block, 10px);
           padding-inline: var(--control-pad-inline, 12px);
-          min-block-size: var(--control-min-block-size, 44px);
+          min-block-size: 44px;
         }
 
         input[type="search"] {
@@ -797,10 +733,7 @@
           }
         }
 
-        select {
-          flex: 0 0 auto;
-        }
-
+        select,
         #filter-clear {
           flex: 0 0 auto;
         }
@@ -831,8 +764,7 @@
           position: sticky;
           inset-block-start: 0;
           z-index: 10;
-          background: light-dark(oklch(98.3678% 0.00398 258.32),
-              oklch(17.4973% 0.03507 259.82));
+          background: light-dark(oklch(98.3678% 0.00398 258.32), oklch(17.4973% 0.03507 259.82));
           text-align: start;
           font-weight: 600;
           color: var(--muted-strong);
@@ -866,9 +798,7 @@
 
           @media (any-hover: hover) {
             &:hover {
-              background: color-mix(in oklch,
-                  var(--accent) 4%,
-                  var(--surface-panel));
+              background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
             }
           }
 
@@ -911,13 +841,9 @@
               gap: 10px;
               padding-block: 16px;
               padding-inline: 16px;
-              background: color-mix(in oklch,
-                  var(--surface-panel) 86%,
-                  var(--card-surface));
+              background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
               border-radius: 16px;
-              box-shadow:
-                0 1px 2px oklch(from var(--fg) l c h / 0.12),
-                0 1px 1px oklch(from var(--fg) l c h / 0.08);
+              box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
               animation: row-fade-in 1s both;
               animation-timeline: view();
               animation-range: entry 0% cover 25%;
@@ -956,8 +882,7 @@
           position: relative;
           overflow: hidden;
           contain: paint;
-          background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h),
-              oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
+          background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h), oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
 
           &::after {
             content: "";
@@ -965,11 +890,7 @@
             inset-block: 0;
             inset-inline: 0;
             transform: translateX(var(--shimmer-from));
-            background: linear-gradient(in oklch var(--inline-angle),
-                oklch(0% 0 0 / 0),
-                light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h),
-                  oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)),
-                oklch(0% 0 0 / 0));
+            background: linear-gradient(in oklch var(--inline-angle), oklch(0% 0 0 / 0), light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h), oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)), oklch(0% 0 0 / 0));
             animation: skeleton-shimmer-x 1.5s linear infinite;
             will-change: transform;
           }
@@ -1115,8 +1036,7 @@
 
             @media (any-hover: hover) {
               &:hover {
-                color: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.8) h),
-                    oklch(from var(--accent) calc(l + 0.12) calc(c * 0.75) h));
+                color: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.8) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.75) h));
                 text-decoration: underline;
                 text-underline-offset: 3px;
               }
@@ -1189,8 +1109,7 @@
     body {
       letter-spacing: 0;
       padding-block-start: calc(var(--site-header-height) + var(--site-header-gap));
-      padding-block-end: max(var(--page-pad-block-end),
-          env(safe-area-inset-bottom));
+      padding-block-end: max(var(--page-pad-block-end), env(safe-area-inset-bottom));
     }
 
     @media (min-width: 941px) {
@@ -1202,8 +1121,7 @@
     }
 
     #app {
-      scroll-margin-block-start:
-        calc(var(--site-header-height) + var(--site-header-gap));
+      scroll-margin-block-start: calc(var(--site-header-height) + var(--site-header-gap));
 
       >* {
         min-block-size: 0;
@@ -1269,9 +1187,7 @@
     }
 
     .map-popover:focus-visible {
-      box-shadow:
-        0 12px 20px -16px oklch(from var(--fg) l c h / 0.18),
-        inset 0 0 0 2px var(--focus-ring);
+      box-shadow: 0 12px 20px -16px oklch(from var(--fg) l c h / 0.18), inset 0 0 0 2px var(--focus-ring);
     }
 
     .card .card-intro {
@@ -1349,10 +1265,7 @@
         font-size: 1.35rem;
         line-height: 1;
         flex: 0 0 auto;
-        transition:
-          transform 0.2s ease,
-          border-color 0.2s ease,
-          background-color 0.2s ease;
+        transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 
         &:hover {
           border-color: var(--accent);
@@ -1380,12 +1293,7 @@
       position: relative;
       overflow: hidden;
       isolation: isolate;
-      transition:
-        transform 0.18s ease,
-        background 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease,
-        color 0.2s ease;
+      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 
       .action-btn__icon {
         inline-size: 16px;
@@ -1426,52 +1334,26 @@
     }
 
     :is(#parse, #start, #export, #runBtn).action-btn--primary {
-      --action-bg: linear-gradient(135deg,
-          light-dark(oklch(59.5615% 0.2385 280.75),
-            oklch(56.1461% 0.2584 277.61)),
-          light-dark(oklch(74.638% 0.1563 238.96),
-            oklch(73.0225% 0.1669 239.11)));
-      --action-hover-bg: linear-gradient(135deg,
-          light-dark(oklch(56.4017% 0.259 280.04), oklch(59.3616% 0.2381 279)),
-          light-dark(oklch(72.1505% 0.1672 242.95),
-            oklch(76.8225% 0.1515 232.73)));
-      --action-border: light-dark(oklch(86.2548% 0.077 288.32),
-          oklch(44.3794% 0.2586 262.87));
+      --action-bg: linear-gradient(135deg, light-dark(oklch(59.5615% 0.2385 280.75), oklch(56.1461% 0.2584 277.61)), light-dark(oklch(74.638% 0.1563 238.96), oklch(73.0225% 0.1669 239.11)));
+      --action-hover-bg: linear-gradient(135deg, light-dark(oklch(56.4017% 0.259 280.04), oklch(59.3616% 0.2381 279)), light-dark(oklch(72.1505% 0.1672 242.95), oklch(76.8225% 0.1515 232.73)));
+      --action-border: light-dark(oklch(86.2548% 0.077 288.32), oklch(44.3794% 0.2586 262.87));
       --action-color: oklch(100% 0 0);
-      box-shadow:
-        inset 0 1px 0 oklch(100% 0 0 / 0.24),
-        0 14px 24px -18px light-dark(oklch(62.9919% 0.2104 261.11 / 0.58),
-          oklch(70.4516% 0.1751 245.52 / 0.44));
+      box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.24), 0 14px 24px -18px light-dark(oklch(62.9919% 0.2104 261.11 / 0.58), oklch(70.4516% 0.1751 245.52 / 0.44));
     }
 
-    :is(#pause,
-      #resume,
-      #filter-clear,
-      #saveOutput,
-      #copyOutput,
-      #clearBtn,
-      .map-btn).action-btn--soft {
-      --action-bg: light-dark(oklch(98.4152% 0.00341 247.86),
-          color-mix(in oklch, var(--surface-panel) 78%, oklch(24% 0.03 268)));
-      --action-hover-bg: light-dark(oklch(96.826% 0.00685 247.9),
-          color-mix(in oklch, var(--surface-panel) 72%, oklch(28% 0.03 268)));
-      --action-border: light-dark(oklch(92.8761% 0.01262 255.51),
-          oklch(30.3242% 0.06705 260.4));
-      --action-color: light-dark(oklch(20.7682% 0.03982 265.75),
-          oklch(94.4326% 0.01785 261.34));
+    :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft {
+      --action-bg: light-dark(oklch(98.4152% 0.00341 247.86), color-mix(in oklch, var(--surface-panel) 78%, oklch(24% 0.03 268)));
+      --action-hover-bg: light-dark(oklch(96.826% 0.00685 247.9), color-mix(in oklch, var(--surface-panel) 72%, oklch(28% 0.03 268)));
+      --action-border: light-dark(oklch(92.8761% 0.01262 255.51), oklch(30.3242% 0.06705 260.4));
+      --action-color: light-dark(oklch(20.7682% 0.03982 265.75), oklch(94.4326% 0.01785 261.34));
     }
 
     #stop.action-btn--danger {
-      --action-bg: light-dark(oklch(96.941% 0.0187 12.42),
-          oklch(from var(--err) l calc(c * 0.55) h / 0.18));
-      --action-hover-bg: light-dark(oklch(94.1918% 0.0371 7.52),
-          oklch(from var(--err) l calc(c * 0.65) h / 0.24));
-      --action-border: light-dark(oklch(90.8442% 0.0603 7.08),
-          oklch(from var(--err) l calc(c * 0.85) h / 0.44));
-      --action-color: light-dark(oklch(58.5838% 0.2568 17.58),
-          oklch(from var(--err) calc(l + 0.06) calc(c * 0.78) h));
-      box-shadow: 0 12px 22px -20px light-dark(oklch(58.5838% 0.2568 17.58 / 0.42),
-          oklch(71.6163% 0.2181 13.83 / 0.34));
+      --action-bg: light-dark(oklch(96.941% 0.0187 12.42), oklch(from var(--err) l calc(c * 0.55) h / 0.18));
+      --action-hover-bg: light-dark(oklch(94.1918% 0.0371 7.52), oklch(from var(--err) l calc(c * 0.65) h / 0.24));
+      --action-border: light-dark(oklch(90.8442% 0.0603 7.08), oklch(from var(--err) l calc(c * 0.85) h / 0.44));
+      --action-color: light-dark(oklch(58.5838% 0.2568 17.58), oklch(from var(--err) calc(l + 0.06) calc(c * 0.78) h));
+      box-shadow: 0 12px 22px -20px light-dark(oklch(58.5838% 0.2568 17.58 / 0.42), oklch(71.6163% 0.2181 13.83 / 0.34));
     }
 
     .action-btn--compact {
@@ -1546,14 +1428,11 @@
           text-align: center;
         }
 
-        &.has-results .empty-hint {
-          display: none;
-        }
-
         &.filter-empty .filter-empty-hint {
           display: grid;
         }
 
+        &.has-results .empty-hint,
         &:not(.filter-empty) .filter-empty-hint {
           display: none;
         }
@@ -1578,27 +1457,19 @@
     }
 
     @media (max-width: 940px) {
-
       html {
         overflow: auto;
       }
 
-      body {
-        overflow: visible;
-        overscroll-behavior: auto;
-      }
-
-      main {
-        block-size: auto;
-      }
-
-      #app>section.card {
-        block-size: auto;
-      }
-
+      body,
       #app>section.card:has(>.left-pane-scroll) {
         overflow: visible;
         overscroll-behavior: auto;
+      }
+
+      main,
+      #app>section.card {
+        block-size: auto;
       }
 
       .results-card .table-wrap.has-results {
@@ -1623,36 +1494,23 @@
           inline-size: 100%;
         }
 
-        #filter-q {
+        :is(#filter-q, #filter-fulladdr) {
           grid-column: 1 / span 5;
         }
 
-        #filter-kind {
+        :is(#filter-kind, #filter-clear) {
           grid-column: 6 / span 3;
         }
 
-        #filter-sido {
+        :is(#filter-sido, #filter-emd) {
           grid-column: 1 / span 4;
         }
 
-        #filter-sigungu {
+        :is(#filter-sigungu, #filter-tag) {
           grid-column: 5 / span 4;
-        }
-
-        #filter-emd {
-          grid-column: 1 / span 4;
-        }
-
-        #filter-tag {
-          grid-column: 5 / span 4;
-        }
-
-        #filter-fulladdr {
-          grid-column: 1 / span 5;
         }
 
         #filter-clear {
-          grid-column: 6 / span 3;
           justify-self: stretch;
         }
       }
@@ -1730,7 +1588,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="site-brand" href="#app" aria-label="SRG 역지오코딩 상단으로 이동">
-        <img class="brand-mark" src="./icon.svg?v=4&theme=light" alt="">
+        <img class="brand-mark" src="./icon.svg?v=4" alt="">
         <strong>SRG 역지오코딩</strong>
       </a>
       <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
@@ -1872,9 +1730,8 @@
             <div id="meta" class="manual-rng-meta" role="status" aria-atomic="true"></div>
             <div id="error" class="manual-rng-meta" role="alert" aria-atomic="true"></div>
             <section aria-label="변환 결과">
-              <pre id="output" class="coords-view"><span
-                class="coords-placeholder" aria-hidden="true">여기에 결과가 표시됩니다.</span><code
-                class="coords-content"></code></pre>
+              <pre id="output" class="coords-view"><span class="coords-placeholder" aria-hidden="true">여기에 결과가
+                  표시됩니다.</span><code class="coords-content"></code></pre>
             </section>
           </div>
         </details>
@@ -1896,13 +1753,13 @@
         <div id="status-live" class="sr-only" role="status" aria-atomic="true">
         </div>
         <footer>
-          <p>• 품질을 위해 속도는 초당 1회로 제한됩니다.</p>
+          <p>• 공용 Nominatim은 초당 1회 이하로 사용합니다. <a href="https://operations.osmfoundation.org/policies/nominatim/"
+              target="_blank" rel="noopener noreferrer">사용 정책</a></p>
         </footer>
         <section aria-labelledby="coords-label">
           <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-          <pre id="coords" class="coords-view"><span
-            class="coords-placeholder" aria-hidden="true">좌표가 이곳에 표시됩니다.</span><code
-              class="coords-content"></code></pre>
+          <pre id="coords" class="coords-view"><span class="coords-placeholder" aria-hidden="true">좌표가 이곳에
+              표시됩니다.</span><code class="coords-content"></code></pre>
         </section>
       </div>
     </section>
@@ -1989,45 +1846,6 @@
       <a href="about:blank" target="_blank" rel="noopener noreferrer">Kakao</a>
     </div>
   </div>
-  <template id="tmpl-row-skeleton">
-    <tr>
-      <td data-label="구분">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="순번"></td>
-      <td data-label="좌표 (위도,경도)">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="시·도">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="시·군·구">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="읍·면·동·리">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="지물 태그">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="전체주소">
-        <div class="skeleton-bar"></div>
-      </td>
-      <td data-label="지도링크">
-        <div class="skeleton-bar"></div>
-        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
-          aria-controls="map-popover" aria-expanded="false" popovertarget="map-popover" popovertargetaction="show"
-          disabled>
-          <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
-            </path>
-            <circle cx="12" cy="10.75" r="1.8"></circle>
-          </svg>
-          <span class="sr-only">지도</span>
-        </button>
-      </td>
-    </tr>
-  </template>
   <template id="tmpl-row">
     <tr>
       <td data-label="구분"></td>
@@ -2056,13 +1874,6 @@
   <script type="module">
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
-    const CC_SI = "시".charCodeAt(0);
-    const CC_GUN = "군".charCodeAt(0);
-    const CC_GU = "구".charCodeAt(0);
-    const CC_EUP = "읍".charCodeAt(0);
-    const CC_MYEON = "면".charCodeAt(0);
-    const CC_DONG = "동".charCodeAt(0);
-    const CC_RI = "리".charCodeAt(0);
     const RX_STAMP = /[:.]/g;
     const RX_FILE_EXT = /\.[^.]+$/;
     const csvEsc = (s) => {
@@ -2109,59 +1920,280 @@
       REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
       REVERSE_TEXT_HARD_LIMIT: 4_096,
     };
-    const REVERSE_TEXT_LIMIT_MESSAGE =
-      `역지오코딩 문자열이 허용 길이 ${CONFIG.REVERSE_TEXT_HARD_LIMIT}자를 초과했습니다.`;
-    class InputLimitError extends Error {}
-    const isBoundedReverseText = (v) =>
-      typeof v === "string" && v.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
-    const geocodeText = (v) => {
-      if (typeof v !== "string") return "";
-      if (!isBoundedReverseText(v)) {
-        throw new InputLimitError(REVERSE_TEXT_LIMIT_MESSAGE);
+    class InputLimitError extends Error { }
+    const GeocodeParser = (() => {
+      const SI = 1;
+      const GUN = 2;
+      const GU = 4;
+      const EUP = 8;
+      const MYEON = 16;
+      const DONG = 32;
+      const RI = 64;
+      const KIND_BY_COUNTRY = Object.freeze({ kr: "KR", kp: "KP" });
+      const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
+        CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
+      const isBoundedText = (value) =>
+        typeof value === "string" &&
+        value.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
+      function text(value) {
+        if (typeof value !== "string") return "";
+        if (!isBoundedText(value)) throw new InputLimitError(TEXT_LIMIT_MESSAGE);
+        return value;
       }
-      return v;
-    };
-    const firstGeocodeText = (a, b, c, d) =>
-      geocodeText(a) || geocodeText(b) || geocodeText(c) || geocodeText(d);
-    const ADMIN_SUFFIX_SI = 1;
-    const ADMIN_SUFFIX_GUN = 2;
-    const ADMIN_SUFFIX_GU = 4;
-    const ADMIN_SUFFIX_EUP = 8;
-    const ADMIN_SUFFIX_MYEON = 16;
-    const ADMIN_SUFFIX_DONG = 32;
-    const ADMIN_SUFFIX_RI = 64;
-    function adminSuffix(name) {
-      if (!name) return 0;
-      switch (name.charCodeAt(name.length - 1)) {
-        case CC_SI: return ADMIN_SUFFIX_SI;
-        case CC_GUN: return ADMIN_SUFFIX_GUN;
-        case CC_GU: return ADMIN_SUFFIX_GU;
-        case CC_EUP: return ADMIN_SUFFIX_EUP;
-        case CC_MYEON: return ADMIN_SUFFIX_MYEON;
-        case CC_DONG: return ADMIN_SUFFIX_DONG;
-        case CC_RI: return ADMIN_SUFFIX_RI;
-        default: return 0;
+      const firstText = (a, b, c, d) =>
+        text(a) || text(b) || text(c) || text(d);
+      function adminSuffix(name) {
+        if (!name) return 0;
+        switch (name.at(-1)) {
+          case "시": return SI;
+          case "군": return GUN;
+          case "구": return GU;
+          case "읍": return EUP;
+          case "면": return MYEON;
+          case "동": return DONG;
+          case "리": return RI;
+          default: return 0;
+        }
       }
-    }
-    function pickAdminName(
-      candidates,
-      suffixMask,
-      excludedA = "",
-      excludedB = "",
-      excludedC = "",
-      rejectSpecialCity = false,
-    ) {
-      for (const name of candidates) {
-        if (
-          !name || name === excludedA || name === excludedB ||
-          name === excludedC
-        ) continue;
-        if (suffixMask && !(adminSuffix(name) & suffixMask)) continue;
-        if (rejectSpecialCity && CONFIG.SPECIAL_CITIES.test(name)) continue;
-        return name;
+      function pickAdminName(
+        candidates, suffixMask, excludedA = "", excludedB = "",
+        excludedC = "",
+        rejectSpecialCity = false,
+      ) {
+        for (const name of candidates) {
+          if (!name || name === excludedA || name === excludedB ||
+            name === excludedC) continue;
+          if (suffixMask && !(adminSuffix(name) & suffixMask)) continue;
+          if (rejectSpecialCity && CONFIG.SPECIAL_CITIES.test(name)) continue;
+          return name;
+        }
+        return "";
       }
-      return "";
-    }
+      function readFields(gc) {
+        const admin = gc.admin && typeof gc.admin === "object"
+          ? gc.admin
+          : null;
+        return {
+          level2: text(admin?.level2),
+          level4: text(admin?.level4),
+          level6: text(admin?.level6),
+          level7: text(admin?.level7),
+          level8: text(admin?.level8),
+          level9: text(admin?.level9),
+          level10: text(admin?.level10),
+          country: text(gc.country),
+          name: text(gc.name),
+          cityDistrict: text(gc.city_district),
+          district: text(gc.district),
+          suburb: text(gc.suburb),
+          city: text(gc.city),
+          county: text(gc.county),
+          state: text(gc.state),
+          region: text(gc.region),
+          province: text(gc.province),
+          town: text(gc.town),
+          locality: text(gc.locality),
+          village: text(gc.village),
+          neighbourhood: text(gc.neighbourhood),
+          municipality: text(gc.municipality),
+          quarter: text(gc.quarter),
+          hamlet: text(gc.hamlet),
+          township: text(gc.township),
+          residential: text(gc.residential),
+        };
+      }
+      function parseKoreanAdmin(fields, p0, p1) {
+        const primaryName = firstText(fields.name, p0);
+        const cityDistrict = firstText(
+          fields.cityDistrict, fields.district, fields.suburb,
+        );
+        const level6 = fields.level6 || fields.level7;
+        const { city, county } = fields;
+        let sido = fields.level4 || fields.state || "";
+        let sigungu = "";
+        const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
+        if (!sido && cityIsSpecial) sido = city;
+        const sidoIsSpecial = !!sido && (sido === city
+          ? cityIsSpecial
+          : CONFIG.SPECIAL_CITIES.test(sido));
+        if (sidoIsSpecial) {
+          const candidates = [cityDistrict, level6, county, primaryName, p0, p1];
+          sigungu = pickAdminName(candidates, GU | GUN, sido) ||
+            pickAdminName(candidates, SI, sido, "", "", true);
+        } else {
+          const cityLike = pickAdminName(
+            [city, county, level6, primaryName, p1, p0], SI | GUN, sido,
+          );
+          const districtLike = pickAdminName(
+            [
+              cityDistrict, fields.level8, fields.level9,
+              fields.town, fields.locality, fields.village,
+            ],
+            GU, sido, cityLike,
+          );
+          sigungu = cityLike && districtLike && districtLike !== cityLike
+            ? cityLike + " " + districtLike
+            : cityLike || districtLike || "";
+          sigungu ||= pickAdminName(
+            [county, level6, cityDistrict, primaryName, p0, p1],
+            SI | GU | GUN, sido,
+          );
+        }
+        const eupmyeon = [];
+        const emdSuffixes = EUP | MYEON | DONG | RI;
+        for (const name of [
+          fields.level8, fields.level9, fields.level10, fields.town,
+          fields.village, fields.locality, fields.suburb, primaryName, p0, p1,
+        ]) {
+          if (!name || name === sido || name === sigungu) continue;
+          if (eupmyeon.includes(name)) continue;
+          if (adminSuffix(name) & emdSuffixes) eupmyeon.push(name);
+        }
+        return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
+      }
+      function removeDistrict(sigungu, district) {
+        if (!sigungu || sigungu === district) return "";
+        const cut = sigungu.length - district.length;
+        if (cut > 0 && sigungu.endsWith(district) &&
+          sigungu.charCodeAt(cut - 1) === 32) {
+          return sigungu.slice(0, cut - 1).trim();
+        }
+        const pattern = new RegExp(
+          "(?:^|\\s+)" + RegExp.escape(district) + "(?:\\s+|$)", "g",
+        );
+        return sigungu.replace(pattern, " ").replace(/\s+/g, " ").trim();
+      }
+      function parseGlobalAdmin(gc, fields, p0, p1) {
+        const primaryName = firstText(fields.name, p0);
+        const cityDistrict = firstText(
+          fields.cityDistrict, fields.district, fields.suburb,
+        );
+        const { city, county } = fields;
+        const sido = fields.level4 || fields.state || fields.region ||
+          fields.province || county || city || "";
+        const cityLike = pickAdminName(
+          [city, county, fields.level6, fields.level7, primaryName, p1, p0],
+          0, sido,
+        );
+        const districtLike = pickAdminName(
+          [
+            cityDistrict, fields.level8, fields.level9, fields.town,
+            fields.locality, fields.village, fields.suburb,
+            fields.neighbourhood,
+          ],
+          0, sido, cityLike,
+        );
+        let sigungu = cityLike && districtLike && cityLike !== districtLike
+          ? cityLike + " " + districtLike
+          : cityLike || districtLike || fields.level6 || fields.level8 ||
+          city || fields.town || county || fields.district ||
+          fields.municipality || "";
+        if ((!sigungu || sigungu === sido) &&
+          (gc.type === "city" || gc.type === "county")) {
+          sigungu = primaryName || city || county || "";
+        }
+        let eupmyeon = pickAdminName(
+          [
+            fields.locality, fields.level10, fields.town, fields.village,
+            fields.suburb, fields.neighbourhood, fields.quarter, fields.hamlet,
+            fields.township, fields.residential, fields.name, p0, p1,
+          ],
+          0, sido, cityLike, districtLike,
+        );
+        if (eupmyeon === sigungu || eupmyeon === sido) eupmyeon = "";
+        if (!eupmyeon && districtLike && districtLike !== sido) {
+          eupmyeon = districtLike;
+          sigungu = removeDistrict(sigungu, districtLike);
+        }
+        return { sido, sigungu, eupmyeon };
+      }
+      function getAdmin(gc, countryCode, p0, p1) {
+        const fields = readFields(gc);
+        const adminCountry = fields.level2;
+        const countryName = fields.country || adminCountry;
+        let lowerCountryName = "";
+        let lowerAdminCountry = "";
+        const explicitKorean =
+          countryCode === "kr" ||
+          countryCode === "kp" ||
+          countryName === "대한민국" ||
+          countryName === "조선민주주의인민공화국";
+        if (!explicitKorean) {
+          lowerCountryName = lower(countryName);
+          lowerAdminCountry = lower(adminCountry);
+        }
+        const korean = explicitKorean ||
+          lowerCountryName.includes("korea") ||
+          lowerAdminCountry.includes("korea");
+        const result = korean
+          ? parseKoreanAdmin(fields, p0, p1)
+          : parseGlobalAdmin(gc, fields, p0, p1);
+        if (!korean) {
+          for (const key of ["sido", "sigungu", "eupmyeon"]) {
+            const value = lower(result[key]);
+            if (value && (
+              value === lowerCountryName || value === lowerAdminCountry
+            )) result[key] = "";
+          }
+        }
+        if (result.sido && result.sido === result.sigungu) result.sigungu = "";
+        return result;
+      }
+      function isValid(parsed) {
+        const addr = parsed?.addr;
+        return !!addr && typeof parsed === "object" &&
+          typeof addr === "object" &&
+          isBoundedText(addr.sido) &&
+          isBoundedText(addr.sigungu) &&
+          isBoundedText(addr.eupmyeon) &&
+          isBoundedText(addr.tag) &&
+          isBoundedText(addr.fullAddr) &&
+          (parsed.kind === undefined || isBoundedText(parsed.kind));
+      }
+      function parse(data) {
+        const gc = (data && typeof data === "object" &&
+          Array.isArray(data.features)
+          ? data.features[0]?.properties?.geocoding
+          : null) || null;
+        if (!gc) {
+          return {
+            addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
+          };
+        }
+        const label = text(gc.label);
+        const countryCode = text(gc.country_code).toLowerCase();
+        let firstLabelPart = "";
+        let p0 = "";
+        let p1 = "";
+        for (let start = 0; start <= label.length && !p1;) {
+          const comma = label.indexOf(",", start);
+          const end = comma < 0 ? label.length : comma;
+          const part = label.slice(start, end).trim();
+          if (start === 0) firstLabelPart = part;
+          if (part) {
+            if (p0) p1 = part;
+            else p0 = part;
+          }
+          if (comma < 0) break;
+          start = comma + 1;
+        }
+        const { sido, sigungu, eupmyeon } = getAdmin(
+          gc, countryCode, p0, p1,
+        );
+        let tag = firstText(gc.name, firstLabelPart, gc.street, gc.city);
+        const tagType = text(gc.type);
+        if (tagType) tag = tag ? tag + ", " + tagType : tagType;
+        const kind = KIND_BY_COUNTRY[countryCode] ||
+          (countryCode ? "WORLD" : undefined);
+        const parsed = {
+          addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
+          kind,
+        };
+        if (!isValid(parsed)) throw new InputLimitError(TEXT_LIMIT_MESSAGE);
+        return parsed;
+      }
+      return Object.freeze({ isValid, parse });
+    })();
     const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
     const EVT_PASSIVE = { passive: true };
     const BASE_URL_HREF =
@@ -2174,13 +2206,11 @@
     const ODBL_LICENSE_URL = "https://opendatacommons.org/licenses/odbl/";
     const NOMINATIM_ATTRIBUTION_TEXT = "Reverse geocoding by Nominatim";
     const NOMINATIM_URL = "https://nominatim.org/";
+    const NOMINATIM_POLICY_URL =
+      "https://operations.osmfoundation.org/policies/nominatim/";
     const CSV_SOURCE_TEXT = `${OSM_ATTRIBUTION_TEXT} (${OSM_COPYRIGHT_URL})`;
     const CSV_LICENSE_TEXT = `${ODBL_LICENSE_TEXT} (${ODBL_LICENSE_URL})`;
     const CSV_GEOCODER_TEXT = `${NOMINATIM_ATTRIBUTION_TEXT} (${NOMINATIM_URL})`;
-    function isCountryLike(name, lowerCountryName, lowerAdminCountry) {
-      const l = lower(name);
-      return !!l && (l === lowerCountryName || l === lowerAdminCountry);
-    }
     const mapPopover = document.getElementById("map-popover");
     const mapAnchors = document.querySelectorAll("#map-popover-links a");
     const MAP_LINKS = [
@@ -2216,14 +2246,26 @@
     let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return;
-      const btn = e.source;
+      const source = e.source;
+      const btn = source instanceof HTMLButtonElement &&
+        source.matches("button.map-btn")
+        ? source
+        : LAST_MAP_INVOKER;
+      if (!(btn instanceof HTMLButtonElement)) {
+        e.preventDefault();
+        return;
+      }
+      const r = AppState.records[btn.dataset.idx | 0];
+      if (!r) {
+        e.preventDefault();
+        return;
+      }
       const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
       MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
       if (prevInvoker && prevInvoker !== btn) {
         setMapPopoverExpanded(prevInvoker, false);
       }
-      const r = AppState.records[btn.dataset.idx | 0];
       const lat = r.latStr;
       const lon = r.lonStr;
       const lat6 = r.lat6 ??= fmtCoord6(lat);
@@ -2238,7 +2280,9 @@
     }
     mapPopover.addEventListener("toggle", (e) => {
       if (e.newState !== "open") {
-        setMapPopoverExpanded(LAST_MAP_INVOKER, false);
+        if (LAST_MAP_INVOKER) {
+          setMapPopoverExpanded(LAST_MAP_INVOKER, false);
+        }
         if (MAP_POPOVER_PREV_FOCUS) {
           const active = document.activeElement;
           if (
@@ -2257,6 +2301,10 @@
         ? document.activeElement
         : LAST_MAP_INVOKER;
       const invoker = LAST_MAP_INVOKER;
+      if (!invoker) {
+        mapPopover.hidePopover();
+        return;
+      }
       setMapPopoverExpanded(invoker, true);
       requestAnimationFrame(() => {
         if (!isMapPopoverOpen()) return;
@@ -2311,8 +2359,6 @@
       dropZone: document.querySelector(".drop-zone"),
       themeToggle: document.getElementById("theme-toggle"),
       themeIcon: document.getElementById("themeIcon"),
-      brandMark: document.querySelector(".brand-mark"),
-      favicon: document.getElementById("app-favicon"),
       app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
@@ -2373,9 +2419,6 @@
     };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
-      const iconHref = `./icon.svg?v=4&theme=${theme}`;
-      domElements.brandMark.src = iconHref;
-      domElements.favicon.href = iconHref;
       const label = theme === "dark" ? "라이트 모드" : "다크 모드";
       domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
       domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
@@ -2385,11 +2428,10 @@
         String(theme === "dark"),
       );
     };
-    const getSystemTheme = () => (themeMedia.matches ? "dark" : "light");
     applyTheme(root.dataset.theme);
     themeMedia.addEventListener("change", () => {
       if (getStoredTheme()) return;
-      applyTheme(getSystemTheme());
+      applyTheme(themeMedia.matches ? "dark" : "light");
     });
     domElements.themeToggle.addEventListener("click", () => {
       const next = root.dataset.theme === "dark" ? "light" : "dark";
@@ -2399,18 +2441,17 @@
       }
       applyTheme(next);
     });
-    const SHADOW_SYNC_PENDING = new WeakSet();
+    const SHADOW_SYNC_PENDING = new Set();
+    let SHADOW_SYNC_FRAME = 0;
     function clearScrollShadowState(el) {
       SHADOW_SYNC_PENDING.delete(el);
       if (!(el instanceof HTMLElement)) return;
       el.style.setProperty("--top-shadow-opacity", "0");
       el.style.setProperty("--bottom-shadow-opacity", "0");
     }
-    function requestScrollShadowSync(el) {
-      if (!(el instanceof HTMLElement)) return;
-      if (SHADOW_SYNC_PENDING.has(el)) return;
-      SHADOW_SYNC_PENDING.add(el);
-      requestAnimationFrame(() => {
+    function flushScrollShadowSync() {
+      SHADOW_SYNC_FRAME = 0;
+      for (const el of SHADOW_SYNC_PENDING) {
         SHADOW_SYNC_PENDING.delete(el);
         const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
         const atTop = el.scrollTop <= 1;
@@ -2429,7 +2470,12 @@
           "--bottom-shadow-opacity",
           bottomOpacity.toFixed(3),
         );
-      });
+      }
+    }
+    function requestScrollShadowSync(el) {
+      if (!(el instanceof HTMLElement) || SHADOW_SYNC_PENDING.has(el)) return;
+      SHADOW_SYNC_PENDING.add(el);
+      SHADOW_SYNC_FRAME ||= requestAnimationFrame(flushScrollShadowSync);
     }
     function resetScrollShadowState(el) {
       if (!(el instanceof HTMLElement)) return;
@@ -2471,8 +2517,6 @@
     const TAG_COL_INDEX = 6;
     const FULLADDR_COL_INDEX = 7;
     const MAPS_COL_INDEX = 8;
-    const SKELETON_TEMPLATE = document.getElementById("tmpl-row-skeleton")
-      .content.querySelector("tr");
     const ROW_TEMPLATE = document.getElementById("tmpl-row").content
       .querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
@@ -2508,7 +2552,7 @@
       }, 8000);
     }
     function buildFilterSnapshot() {
-      let q = norm(domElements.filterQ.value);
+      const q = norm(domElements.filterQ.value);
       const kind = domElements.filterKind.value;
       const sido = norm(domElements.filterSido.value);
       const sigungu = norm(domElements.filterSigungu.value);
@@ -2525,40 +2569,16 @@
           const token = rawToken.trim();
           if (token) tokens.add(token);
         }
-        if (tokens.size === 0) {
-          q = "";
-        } else if (tokens.size === 1) {
+        if (tokens.size === 1) {
           qMode = 1;
           q1 = tokens.values().next().value;
-        } else {
+        } else if (tokens.size > 1) {
           qMode = isOr ? 2 : 1;
           qTokens = isOr ? tokens : [...tokens].sort((a, b) => b.length - a.length);
         }
       }
-      let qTest = null;
-      if (qMode) {
-        if (!qTokens) {
-          qTest = (r) => getQSearch(r).indexOf(q1) !== -1;
-        } else if (qMode === 2) {
-          qTest = (r) => {
-            const hay = getQSearch(r);
-            for (const token of qTokens) {
-              if (hay.indexOf(token) !== -1) return true;
-            }
-            return false;
-          };
-        } else {
-          qTest = (r) => {
-            const hay = getQSearch(r);
-            for (const token of qTokens) {
-              if (hay.indexOf(token) === -1) return false;
-            }
-            return true;
-          };
-        }
-      }
       const active =
-        !!(kind || sido || sigungu || emd || tag || fullAddr || qTest);
+        !!(kind || sido || sigungu || emd || tag || fullAddr || qMode);
       if (!active) return { active: false };
       return {
         active: true,
@@ -2568,17 +2588,14 @@
         emd,
         tag,
         fullAddr,
-        qTest,
+        qMode,
+        q1,
+        qTokens,
       };
     }
     let FILTER_SNAP = buildFilterSnapshot();
-    let filterDirty = false;
     function getLiveFilterSnapshot() {
-      if (filterDirty) {
-        FILTER_SNAP = buildFilterSnapshot();
-        filterDirty = false;
-      }
-      return FILTER_SNAP;
+      return FILTER_SNAP ??= buildFilterSnapshot();
     }
     const Q_SEARCH_SEP = "\u0000";
     const getSearchFields = (r) => {
@@ -2597,34 +2614,42 @@
       r._search = fields;
       return fields;
     };
-    const getQSearch = (r) => {
+    function matchesQuery(r, qMode, q1, qTokens) {
       const fields = getSearchFields(r);
-      let q = fields[6];
-      if (q !== undefined) return q;
-      q = fields[5] +
-        Q_SEARCH_SEP +
-        fields[4] +
-        Q_SEARCH_SEP +
-        fields[3] +
-        Q_SEARCH_SEP +
-        fields[2] +
-        Q_SEARCH_SEP +
-        fields[1] +
-        Q_SEARCH_SEP +
-        r.latStr +
-        "," +
-        r.lonStr;
-      fields[6] = q;
-      return q;
-    };
-    function setRowHiddenByFilterActive(tr, wasHidden, f, r) {
-      if (FIND_REVEALED_ROWS.has(tr)) {
+      let hay = fields[6];
+      if (hay === undefined) {
+        hay = fields[5] +
+          Q_SEARCH_SEP +
+          fields[4] +
+          Q_SEARCH_SEP +
+          fields[3] +
+          Q_SEARCH_SEP +
+          fields[2] +
+          Q_SEARCH_SEP +
+          fields[1] +
+          Q_SEARCH_SEP +
+          r.latStr +
+          "," +
+          r.lonStr;
+        fields[6] = hay;
+      }
+      if (!qTokens) return hay.indexOf(q1) !== -1;
+      if (qMode === 2) {
+        for (const token of qTokens) {
+          if (hay.indexOf(token) !== -1) return true;
+        }
+        return false;
+      }
+      for (const token of qTokens) {
+        if (hay.indexOf(token) === -1) return false;
+      }
+      return true;
+    }
+    function setRowHiddenByFilterActive(tr, wasHidden, f, r, revealedRows) {
+      if (revealedRows?.has(tr)) {
         if (wasHidden) tr.removeAttribute("hidden");
         return false;
       }
-      return setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r);
-    }
-    function setRowHiddenByFilterActiveNoReveal(tr, wasHidden, f, r) {
       const result = r?.result;
       if (!result) {
         if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
@@ -2636,7 +2661,7 @@
       const emd = f.emd;
       const tag = f.tag;
       const fullAddr = f.fullAddr;
-      const qTest = f.qTest;
+      const qMode = f.qMode;
       const fields = getSearchFields(r);
       let hide = false;
       if (kind && fields[0] !== kind) {
@@ -2651,7 +2676,7 @@
         hide = true;
       } else if (fullAddr && fields[5].indexOf(fullAddr) === -1) {
         hide = true;
-      } else if (qTest && !qTest(r)) {
+      } else if (qMode && !matchesQuery(r, qMode, f.q1, f.qTokens)) {
         hide = true;
       }
       if (hide) {
@@ -2688,6 +2713,40 @@
       cancelPendingFilterDebounce();
       cancelActiveFilterApply();
     }
+    function runFilterJobFrame() {
+      const job = filterJob;
+      if (!job) return;
+      job.raf = 0;
+      const rows = job.rows;
+      const records = job.records;
+      const len = job.len;
+      let i = job.i;
+      let anyVisible = job.anyVisible;
+      const revealedRows = FIND_REVEALED_ROWS.size === 0
+        ? null
+        : FIND_REVEALED_ROWS;
+      const deadline = performance.now() + 8;
+      let processed = 0;
+      while (i < len) {
+        const tr = rows[i];
+        const wasHidden = tr.hidden;
+        if (!setRowHiddenByFilterActive(
+          tr, wasHidden, job.f, records[i], revealedRows,
+        )) anyVisible = true;
+        i++;
+        processed++;
+        if (processed >= 1500) break;
+        if ((processed & 7) === 0 && performance.now() >= deadline) break;
+      }
+      job.i = i;
+      job.anyVisible = anyVisible;
+      if (i < len) {
+        job.raf = requestAnimationFrame(runFilterJobFrame);
+      } else {
+        syncFilterEmptyUI(true, len, anyVisible);
+        filterJob = null;
+      }
+    }
     function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
       const rows = domElements.tbody.rows;
       const len = rows.length;
@@ -2703,16 +2762,18 @@
         return;
       }
       const records = AppState.records;
-      const setHidden = FIND_REVEALED_ROWS.size === 0
-        ? setRowHiddenByFilterActiveNoReveal
-        : setRowHiddenByFilterActive;
+      const revealedRows = FIND_REVEALED_ROWS.size === 0
+        ? null
+        : FIND_REVEALED_ROWS;
       if (len <= 2000) {
         cancelActiveFilterApply();
         let anyVisible = false;
         for (let i = 0; i < len; i++) {
           const tr = rows[i];
           const wasHidden = tr.hidden;
-          if (!setHidden(tr, wasHidden, f, records[i])) anyVisible = true;
+          if (!setRowHiddenByFilterActive(
+            tr, wasHidden, f, records[i], revealedRows,
+          )) anyVisible = true;
         }
         syncFilterEmptyUI(true, len, anyVisible);
         return;
@@ -2725,7 +2786,7 @@
         existing.records = records;
         existing.anyVisible = false;
         if (!existing.raf) {
-          existing.raf = requestAnimationFrame(existing.step);
+          existing.raf = requestAnimationFrame(runFilterJobFrame);
         }
         return;
       }
@@ -2738,45 +2799,12 @@
         f,
         records,
         anyVisible: false,
-        step: () => {
-          if (filterJob !== job) return;
-          job.raf = 0;
-          const rows = job.rows;
-          const records = job.records;
-          const len = job.len;
-          let i = job.i;
-          let anyVisible = job.anyVisible;
-          const setHidden = FIND_REVEALED_ROWS.size === 0
-            ? setRowHiddenByFilterActiveNoReveal
-            : setRowHiddenByFilterActive;
-          const deadline = performance.now() + 8;
-          let processed = 0;
-          while (i < len) {
-            const tr = rows[i];
-            const wasHidden = tr.hidden;
-            if (!setHidden(tr, wasHidden, job.f, records[i])) {
-              anyVisible = true;
-            }
-            i++;
-            processed++;
-            if (processed >= 1500) break;
-            if ((processed & 7) === 0 && performance.now() >= deadline) break;
-          }
-          job.i = i;
-          job.anyVisible = anyVisible;
-          if (i < len) {
-            job.raf = requestAnimationFrame(job.step);
-          } else {
-            syncFilterEmptyUI(true, len, anyVisible);
-            filterJob = null;
-          }
-        },
       };
       filterJob = job;
-      job.raf = requestAnimationFrame(job.step);
+      job.raf = requestAnimationFrame(runFilterJobFrame);
     }
     function scheduleApplyFilterAll() {
-      filterDirty = true;
+      FILTER_SNAP = null;
       const activeJob = filterJob;
       if (activeJob) {
         activeJob.i = activeJob.len;
@@ -2806,323 +2834,6 @@
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
-    function getAdminFromGeocoding(gc, countryCode, p0, p1) {
-        const admin = gc.admin && typeof gc.admin === "object"
-          ? gc.admin
-          : null;
-        const level2 = geocodeText(admin?.level2);
-        const level4 = geocodeText(admin?.level4);
-        const level6 = geocodeText(admin?.level6);
-        const level7 = geocodeText(admin?.level7);
-        const level8 = geocodeText(admin?.level8);
-        const level9 = geocodeText(admin?.level9);
-        const level10 = geocodeText(admin?.level10);
-        const gcCountry = geocodeText(gc.country);
-        const gcName = geocodeText(gc.name);
-        const gcCityDistrict = geocodeText(gc.city_district);
-        const gcDistrict = geocodeText(gc.district);
-        const gcSuburb = geocodeText(gc.suburb);
-        const gcCity = geocodeText(gc.city);
-        const gcCounty = geocodeText(gc.county);
-        const gcState = geocodeText(gc.state);
-        const gcRegion = geocodeText(gc.region);
-        const gcProvince = geocodeText(gc.province);
-        const gcTown = geocodeText(gc.town);
-        const gcLocality = geocodeText(gc.locality);
-        const gcVillage = geocodeText(gc.village);
-        const gcNeighbourhood = geocodeText(gc.neighbourhood);
-        const gcMunicipality = geocodeText(gc.municipality);
-        const gcQuarter = geocodeText(gc.quarter);
-        const gcHamlet = geocodeText(gc.hamlet);
-        const gcTownship = geocodeText(gc.township);
-        const gcResidential = geocodeText(gc.residential);
-        const adminCountry = level2;
-        const countryName = gcCountry || adminCountry;
-        let lowerCountryName = "";
-        let lowerAdminCountry = "";
-        let isKoreanPeninsula = false;
-        if (
-          countryCode === "kr" ||
-          countryCode === "kp" ||
-          countryName === "대한민국" ||
-          countryName === "조선민주주의인민공화국"
-        ) {
-          isKoreanPeninsula = true;
-        } else {
-          lowerCountryName = lower(countryName);
-          lowerAdminCountry = lower(adminCountry);
-          isKoreanPeninsula = lowerCountryName.indexOf("korea") !== -1 ||
-            lowerAdminCountry.indexOf("korea") !== -1;
-        }
-        let sido = "";
-        let sigungu = "";
-        let eupmyeon = "";
-        const primaryName = firstGeocodeText(gcName, p0);
-        const cityDistrict = firstGeocodeText(
-          gcCityDistrict,
-          gcDistrict,
-          gcSuburb,
-        );
-        const city = gcCity;
-        const county = gcCounty;
-        if (isKoreanPeninsula) {
-          const level6Kr = level6 || level7;
-          sido = level4 || gcState || "";
-          const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
-          if (!sido && cityIsSpecial) sido = city;
-          const sidoIsSpecial = !!sido && (
-            sido === city ? cityIsSpecial : CONFIG.SPECIAL_CITIES.test(sido)
-          );
-          if (sidoIsSpecial) {
-            const candidates = [
-              cityDistrict,
-              level6Kr,
-              county,
-              primaryName,
-              p0,
-              p1,
-            ];
-            sigungu = pickAdminName(
-              candidates,
-              ADMIN_SUFFIX_GU | ADMIN_SUFFIX_GUN,
-              sido,
-            ) || pickAdminName(
-              candidates,
-              ADMIN_SUFFIX_SI,
-              sido,
-              "",
-              "",
-              true,
-            );
-          } else {
-            const cityLike = pickAdminName(
-              [city, county, level6Kr, primaryName, p1, p0],
-              ADMIN_SUFFIX_SI | ADMIN_SUFFIX_GUN,
-              sido,
-            );
-            const districtLike = pickAdminName(
-              [
-                cityDistrict,
-                level8,
-                level9,
-                gcTown,
-                gcLocality,
-                gcVillage,
-              ],
-              ADMIN_SUFFIX_GU,
-              sido,
-              cityLike,
-            );
-            if (cityLike && districtLike && districtLike !== cityLike) {
-              sigungu = `${cityLike} ${districtLike}`;
-            } else {
-              sigungu = cityLike || districtLike || "";
-            }
-            if (!sigungu) {
-              sigungu = pickAdminName(
-                [county, level6Kr, cityDistrict, primaryName, p0, p1],
-                ADMIN_SUFFIX_SI | ADMIN_SUFFIX_GU | ADMIN_SUFFIX_GUN,
-                sido,
-              );
-            }
-          }
-          const emdNames = [];
-          const emdSuffixes = ADMIN_SUFFIX_EUP | ADMIN_SUFFIX_MYEON |
-            ADMIN_SUFFIX_DONG | ADMIN_SUFFIX_RI;
-          for (const name of [
-            level8,
-            level9,
-            level10,
-            gcTown,
-            gcVillage,
-            gcLocality,
-            gcSuburb,
-            primaryName,
-            p0,
-            p1,
-          ]) {
-            if (!name || name === sido || name === sigungu) continue;
-            if (
-              emdNames.includes(name) ||
-              !(adminSuffix(name) & emdSuffixes)
-            ) continue;
-            emdNames.push(name);
-          }
-          eupmyeon = emdNames.join(" ");
-        } else {
-          const isCityOrCounty = gc.type === "city" || gc.type === "county";
-          sido = level4 ||
-            gcState ||
-            gcRegion ||
-            gcProvince ||
-            gcCounty ||
-            gcCity ||
-            "";
-          const cityLike = pickAdminName(
-            [city, county, level6, level7, primaryName, p1, p0],
-            0,
-            sido,
-          );
-          const districtLike = pickAdminName(
-            [
-              cityDistrict,
-              level8,
-              level9,
-              gcTown,
-              gcLocality,
-              gcVillage,
-              gcSuburb,
-              gcNeighbourhood,
-            ],
-            0,
-            sido,
-            cityLike,
-          );
-          if (cityLike && districtLike && cityLike !== districtLike) {
-            sigungu = `${cityLike} ${districtLike}`;
-          } else {
-            sigungu = cityLike ||
-              districtLike ||
-              level6 ||
-              level8 ||
-              gcCity ||
-              gcTown ||
-              gcCounty ||
-              gcDistrict ||
-              gcMunicipality ||
-              "";
-          }
-          if ((!sigungu || sigungu === sido) && isCityOrCounty) {
-            sigungu = primaryName || gcCity || gcCounty || "";
-          }
-          eupmyeon = pickAdminName(
-            [
-              gcLocality,
-              level10,
-              gcTown,
-              gcVillage,
-              gcSuburb,
-              gcNeighbourhood,
-              gcQuarter,
-              gcHamlet,
-              gcTownship,
-              gcResidential,
-              gcName,
-              p0,
-              p1,
-            ],
-            0,
-            sido,
-            cityLike,
-            districtLike,
-          );
-          if (eupmyeon && (eupmyeon === sigungu || eupmyeon === sido)) {
-            eupmyeon = "";
-          }
-          if (!eupmyeon && districtLike && districtLike !== sido) {
-            eupmyeon = districtLike;
-            if (sigungu) {
-              let s = sigungu;
-              const dl = districtLike;
-              if (s === dl) {
-                s = "";
-              } else {
-                const cut = s.length - dl.length;
-                if (
-                  cut > 0 && s.endsWith(dl) && s.charCodeAt(cut - 1) === 32
-                ) {
-                  s = s.slice(0, cut - 1).trim();
-                } else {
-                  s = s
-                    .replace(
-                      new RegExp(
-                        `(?:^|\\s+)${RegExp.escape(dl)}(?:\\s+|$)`,
-                        "g",
-                      ),
-                      " ",
-                    )
-                    .replace(RX_WS, " ")
-                    .trim();
-                }
-              }
-              sigungu = s;
-            }
-          }
-        }
-        if (!isKoreanPeninsula) {
-          if (isCountryLike(sido, lowerCountryName, lowerAdminCountry)) {
-            sido = "";
-          }
-          if (isCountryLike(sigungu, lowerCountryName, lowerAdminCountry)) {
-            sigungu = "";
-          }
-          if (isCountryLike(eupmyeon, lowerCountryName, lowerAdminCountry)) {
-            eupmyeon = "";
-          }
-        }
-        if (sido && sigungu && sido === sigungu) {
-          sigungu = "";
-        }
-      return { sido, sigungu, eupmyeon };
-    }
-    function parseGeocodeAddress(data) {
-        const gc = (
-          data && typeof data === "object" && Array.isArray(data.features)
-            ? (data.features[0] || null)
-            : null
-        )?.properties?.geocoding || null;
-        if (!gc) {
-          return {
-            addr: {
-              sido: "",
-              sigungu: "",
-              eupmyeon: "",
-              tag: "",
-              fullAddr: "",
-            },
-          };
-        }
-        const label = geocodeText(gc.label);
-        const countryCode = geocodeText(gc.country_code).toLowerCase();
-        let firstLabelPart = "";
-        let p0 = "";
-        let p1 = "";
-        if (label) {
-          const labelParts = label.split(",").map((part) => part.trim());
-          firstLabelPart = labelParts[0];
-          [p0 = "", p1 = ""] = labelParts.filter(Boolean);
-        }
-        const { sido, sigungu, eupmyeon } = getAdminFromGeocoding(
-          gc,
-          countryCode,
-          p0,
-          p1,
-        );
-        let tag = firstGeocodeText(
-          gc.name,
-          firstLabelPart,
-          gc.street,
-          gc.city,
-        );
-        const tagType = geocodeText(gc.type);
-        if (tagType) tag = tag ? tag + ", " + tagType : tagType;
-        const addr = {
-          sido,
-          sigungu,
-          eupmyeon,
-          tag,
-          fullAddr: label,
-        };
-        let kind;
-        if (countryCode === "kr") kind = "KR";
-        else if (countryCode === "kp") kind = "KP";
-        else if (countryCode) kind = "WORLD";
-        const parsed = { addr, kind };
-        if (!isValidReverseParsed(parsed)) {
-          throw new InputLimitError(REVERSE_TEXT_LIMIT_MESSAGE);
-        }
-      return parsed;
-    }
     const AppState = {
       records: [],
       droppedFile: null,
@@ -3135,17 +2846,12 @@
         return this.task?.status ?? "idle";
       },
       get isRunning() {
-        return (
-          this.status === "running" ||
+        return this.status === "running" ||
           this.status === "paused" ||
-          this.status === "pausing"
-        );
+          this.status === "pausing";
       },
       get isBusy() {
         return this.task !== null;
-      },
-      get isPaused() {
-        return this.status === "paused";
       },
       get isStopping() {
         return this.status === "stopping";
@@ -3169,15 +2875,15 @@
         scheduleRender();
         return this.task;
       },
-      setRecords(newRecords, status = "idle") {
-        this.records = newRecords;
+      setRecords(records, status = "idle") {
+        this.records = records;
         this.bulkAcknowledged =
-          newRecords.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
+          records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
         return this.reset(status);
       },
-      setStatus(st) {
-        if (st === "idle") this.task = null;
-        else this.task.status = st;
+      setStatus(status) {
+        if (status === "idle") this.task = null;
+        else this.task.status = status;
         updateUIState();
       },
     };
@@ -3267,7 +2973,7 @@
         return true;
       }
       const ok = window.confirm(
-        `공용 Nominatim은 대량 역지오코딩이 권장되지 않습니다.\n\n${fmt(count)}건을 단일 브라우저에서 초당 1회 이하로 일회성 조회하고, 결과를 이 브라우저에 캐시합니다. 반복/정기 실행이나 격자형 좌표 수집이 아니라는 점을 확인해야 계속 진행합니다.`,
+        `공용 Nominatim은 대량 역지오코딩이 권장되지 않습니다.\n\n${fmt(count)}건을 단일 브라우저에서 초당 1회 이하로 일회성 조회하고, 결과를 이 브라우저에 캐시합니다. 반복/정기 실행이나 격자형 좌표 수집이 아니라는 점을 확인해야 계속 진행합니다.\n\n사용 정책: ${NOMINATIM_POLICY_URL}`,
       );
       AppState.bulkAcknowledged = ok;
       if (!ok) {
@@ -3414,12 +3120,29 @@
     }
     async function* lineIterator(stream, signal) {
       const reader = stream
-        .pipeThrough(new TextDecoderStream(), { signal })
+        .pipeThrough(new TextDecoderStream("utf-8", { fatal: true }), { signal })
         .getReader();
       let finished = false;
-      let buffer = "";
+      const parts = [];
+      let lineLength = 0;
       let pendingCR = false;
-      let hasCR = false;
+      const appendPart = (chunk, start, end) => {
+        const length = end - start;
+        ensureInputLineLength(lineLength + length);
+        if (length > 0) parts.push(chunk.substring(start, end));
+        lineLength += length;
+      };
+      const takeLine = (chunk, start, end) => {
+        if (parts.length === 0) {
+          ensureInputLineLength(end - start);
+          return chunk.substring(start, end);
+        }
+        appendPart(chunk, start, end);
+        const line = parts.join("");
+        parts.length = 0;
+        lineLength = 0;
+        return line;
+      };
       try {
         while (true) {
           const { value: chunk, done } = await reader.read();
@@ -3429,58 +3152,38 @@
             break;
           }
           signal.throwIfAborted();
-          if (!hasCR && chunk && chunk.indexOf("\r") !== -1) hasCR = true;
-          if (pendingCR) {
-            if (chunk && chunk[0] === "\n") {
-              buffer += chunk.slice(1);
-            } else {
-              buffer += chunk;
-            }
-            pendingCR = false;
-          } else {
-            buffer += chunk;
-          }
           let start = 0;
-          if (!hasCR) {
-            while (true) {
-              const nl = buffer.indexOf("\n", start);
-              if (nl === -1) break;
-              ensureInputLineLength(nl - start);
-              yield buffer.substring(start, nl);
-              start = nl + 1;
-            }
-            buffer = buffer.substring(start);
-            ensureInputLineLength(buffer.length);
-            continue;
+          if (pendingCR) {
+            if (chunk[0] === "\n") start = 1;
+            pendingCR = false;
           }
-          while (start < buffer.length) {
-            const nl = buffer.indexOf("\n", start);
-            const cr = buffer.indexOf("\r", start);
+          while (start < chunk.length) {
+            const nl = chunk.indexOf("\n", start);
+            const cr = chunk.indexOf("\r", start);
             let pos;
             if (nl === -1) pos = cr;
             else if (cr === -1) pos = nl;
             else pos = nl < cr ? nl : cr;
-            if (pos === -1) break;
-            ensureInputLineLength(pos - start);
-            yield buffer.substring(start, pos);
-            if (buffer[pos] === "\r") {
-              if (pos + 1 === buffer.length) {
+            if (pos === -1) {
+              appendPart(chunk, start, chunk.length);
+              start = chunk.length;
+              break;
+            }
+            yield takeLine(chunk, start, pos);
+            if (chunk[pos] === "\r") {
+              if (pos + 1 === chunk.length) {
                 pendingCR = true;
-                hasCR = true;
                 start = pos + 1;
                 break;
               }
-              start = buffer[pos + 1] === "\n" ? pos + 2 : pos + 1;
+              start = chunk[pos + 1] === "\n" ? pos + 2 : pos + 1;
             } else {
               start = pos + 1;
             }
           }
-          buffer = buffer.substring(start);
-          ensureInputLineLength(buffer.length);
         }
-        if (buffer) {
-          ensureInputLineLength(buffer.length);
-          yield buffer;
+        if (lineLength > 0) {
+          yield parts.join("");
         }
       } finally {
         if (!finished) await cancelReadable(reader, signal.reason);
@@ -3540,23 +3243,12 @@
         if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
     }
-    function isValidReverseParsed(parsed) {
-      const addr = parsed?.addr;
-      return !!addr && typeof parsed === "object" &&
-        typeof addr === "object" &&
-        isBoundedReverseText(addr.sido) &&
-        isBoundedReverseText(addr.sigungu) &&
-        isBoundedReverseText(addr.eupmyeon) &&
-        isBoundedReverseText(addr.tag) &&
-        isBoundedReverseText(addr.fullAddr) &&
-        (parsed.kind === undefined || isBoundedReverseText(parsed.kind));
-    }
     function isFreshReverseCacheRow(row, expectedKey, now = Date.now()) {
       if (
         !row ||
         row.key !== expectedKey ||
         !Number.isFinite(row.savedAt) ||
-        !isValidReverseParsed(row.parsed)
+        !GeocodeParser.isValid(row.parsed)
       ) {
         return false;
       }
@@ -3626,11 +3318,11 @@
       });
       return REVERSE_CACHE_DB_PROMISE;
     }
-    function runReverseCacheTransaction(db, operation) {
+    function runReverseCacheTransaction(db, mode, operation) {
       return new Promise((resolve) => {
         let tx;
         try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, mode);
           operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
         } catch {
           resolve();
@@ -3644,14 +3336,12 @@
       const db = await openReverseCacheDb();
       if (!db) return null;
       let result = null;
-      await runReverseCacheTransaction(db, (store) => {
+      await runReverseCacheTransaction(db, "readonly", (store) => {
         const req = store.get(persistentKey);
         req.onsuccess = () => {
           const row = req.result;
           if (isFreshReverseCacheRow(row, persistentKey)) {
             result = row.parsed;
-          } else if (row) {
-            store.delete(persistentKey);
           }
         };
       });
@@ -3661,7 +3351,7 @@
       const persistentKey = persistentReverseCacheKey(cacheKey);
       const db = await openReverseCacheDb();
       if (!db) return;
-      await runReverseCacheTransaction(db, (store) => {
+      await runReverseCacheTransaction(db, "readwrite", (store) => {
         store.put({
           key: persistentKey,
           savedAt: Date.now(),
@@ -3796,7 +3486,6 @@
       for (let i = startIndex; i < total; i++) {
         const i1 = i + 1;
         let skeletonTr = null;
-        let needsFetch = false;
         try {
           if (AppState.status === "pausing") {
             AppState.setStatus("paused");
@@ -3812,24 +3501,18 @@
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
-          if (parsed) {
-            putReverseMemoryCache(cacheKey, parsed);
-          } else {
+          if (!parsed) {
             parsed = await abortable(
               readPersistentReverseCache(cacheKey),
               signal,
             );
-            if (parsed) putReverseMemoryCache(cacheKey, parsed);
           }
+          if (parsed) putReverseMemoryCache(cacheKey, parsed);
           signal.throwIfAborted();
           if (!AppState.isRunning) break;
-          needsFetch = !parsed;
-          if (needsFetch) {
-            flushPending();
-          }
-          const tr = (parsed ? ROW_TEMPLATE : SKELETON_TEMPLATE).cloneNode(
-            true,
-          );
+          const needsFetch = !parsed;
+          if (needsFetch) flushPending();
+          const tr = ROW_TEMPLATE.cloneNode(true);
           tr.cells[IDX_COL_INDEX].textContent = "" + i1;
           tr.cells[MAPS_COL_INDEX].lastElementChild.dataset.idx = "" + i;
           let rowFilter = getLiveFilterSnapshot();
@@ -3843,6 +3526,12 @@
             if (rowFilter.active) wrap.classList.add("filter-empty");
           }
           if (needsFetch) {
+            for (const cell of tr.cells) {
+              if (cell.cellIndex === IDX_COL_INDEX) continue;
+              const skeleton = document.createElement("div");
+              skeleton.className = "skeleton-bar";
+              cell.prepend(skeleton);
+            }
             tbody.append(tr);
             requestScrollShadowSync(wrap);
           } else {
@@ -3850,28 +3539,27 @@
             if (++pendingCount >= 200) flushPending();
           }
           skeletonTr = tr;
+          if (needsFetch && !AppState.isRunning) {
+            skeletonTr.remove();
+            break;
+          }
           let now = 0;
-          try {
-            if (needsFetch) {
-              if (!AppState.isRunning) {
-                skeletonTr.remove();
-                break;
-              }
+          if (AppState.status !== "paused") {
+            now = performance.now();
+            if (
+              now - lastStatusUpdate >= 200 || i === startIndex ||
+              i1 === total
+            ) {
+              lastStatusUpdate = now;
+              setProgressStatus(i1, total, totalDisp);
             }
-            if (!AppState.isPaused) {
-              now = performance.now();
-              if (
-                now - lastStatusUpdate >= 200 || i === startIndex ||
-                i1 === total
-              ) {
-                lastStatusUpdate = now;
-                setProgressStatus(i1, total, totalDisp);
-              }
-            }
-            if (!parsed) {
+          }
+          let rowError = null;
+          if (needsFetch) {
+            try {
               const url =
                 `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-              parsed = parseGeocodeAddress(
+              parsed = GeocodeParser.parse(
                 await fetchReverseWithRetry(
                   url,
                   signal,
@@ -3882,46 +3570,34 @@
                 writePersistentReverseCache(cacheKey, parsed),
                 signal,
               );
-              rowFilter = getLiveFilterSnapshot();
-            }
-            r.result = parsed;
-            commitResultRow(
-              skeletonTr,
-              r,
-              wrap,
-              rowFilter,
-            );
-          } catch (err) {
-            if (AppState.isStopping && err && err.name === "AbortError") {
-              skeletonTr.remove();
-              break;
-            }
-            const msg = getErrorMessage(err);
-            r.result = {
-              addr: null,
-              error: msg,
-              kind: "에러",
-            };
-            commitResultRow(
-              skeletonTr,
-              r,
-              wrap,
-              getLiveFilterSnapshot(),
-            );
-            if (!AppState.isStopping) {
-              setStatusMessage(
-                `에러 발생: (${fmt(i1)}/${totalDisp}) ${msg}`,
-                "error",
-              );
-            }
-          } finally {
-            if (!needsFetch) {
-              if (!now) now = performance.now();
-              if (now - lastYield >= 8) {
-                flushPending();
-                await yieldToMain();
-                lastYield = performance.now();
+            } catch (err) {
+              if (AppState.isStopping && err?.name === "AbortError") {
+                skeletonTr.remove();
+                break;
               }
+              rowError = err;
+              parsed = {
+                addr: null,
+                error: getErrorMessage(err),
+                kind: "에러",
+              };
+            }
+            rowFilter = getLiveFilterSnapshot();
+          }
+          r.result = parsed;
+          commitResultRow(skeletonTr, r, wrap, rowFilter);
+          if (rowError && !AppState.isStopping) {
+            setStatusMessage(
+              `에러 발생: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(rowError)}`,
+              "error",
+            );
+          }
+          if (!needsFetch) {
+            if (!now) now = performance.now();
+            if (now - lastYield >= 8) {
+              flushPending();
+              await yieldToMain();
+              lastYield = performance.now();
             }
           }
         } catch (err) {
@@ -3989,10 +3665,12 @@
       const wasHidden = tr.hidden;
       let hidden = false;
       if (f.active) {
-        const setHidden = FIND_REVEALED_ROWS.size === 0
-          ? setRowHiddenByFilterActiveNoReveal
-          : setRowHiddenByFilterActive;
-        hidden = setHidden(tr, wasHidden, f, r);
+        const revealedRows = FIND_REVEALED_ROWS.size === 0
+          ? null
+          : FIND_REVEALED_ROWS;
+        hidden = setRowHiddenByFilterActive(
+          tr, wasHidden, f, r, revealedRows,
+        );
         if (!hidden) wrap.classList.remove("filter-empty");
       } else if (wasHidden) {
         tr.removeAttribute("hidden");
@@ -4020,7 +3698,7 @@
         let chunkChars = 0;
         const flushChunk = () => {
           if (chunkLines.length === 0) return;
-          parts.push("\n" + chunkLines.join("\n"));
+          parts.push("\n", chunkLines.join("\n"));
           chunkChars = 0;
           chunkLines.length = 0;
         };
@@ -4070,7 +3748,7 @@
         downloadBlob(
           new Blob(parts, { type: "text/csv;charset=utf-8" }),
           `${AppState.droppedFile.name.replace(RX_FILE_EXT, "")
-            }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
+          }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
         );
         setStatusMessage("CSV 파일을 다운로드했습니다.");
       } catch (err) {
@@ -4196,7 +3874,7 @@
         }
       },
       "--resume": () => {
-        if (!AppState.isPaused) return;
+        if (AppState.status !== "paused") return;
         const task = AppState.task;
         AppState.setStatus("running");
         task.resume();
@@ -4226,7 +3904,7 @@
         ]) {
           el.value = "";
         }
-        filterDirty = true;
+        FILTER_SNAP = null;
         cancelActiveFilterTask();
         clearFindReveals();
         startChunkedFilterApply(getLiveFilterSnapshot());
@@ -4934,7 +4612,7 @@
           "text/plain": blob,
         })]);
       }
-      function main() {
+      function initializeManualRng() {
         const num64Input = document.getElementById("num64");
         const suppInput = document.getElementById("suppValues");
         const runBtn = document.getElementById("runBtn");
@@ -5077,7 +4755,7 @@
           setManualBusy(false);
         });
       }
-      main();
+      initializeManualRng();
     })();
   </script>
 </body>

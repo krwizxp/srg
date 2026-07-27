@@ -15,8 +15,7 @@ cfg_select! {
     _ => {}
 }
 const BYTE_GROUP_COUNT: usize = 8;
-const FOUR_DIGIT_WIDTH: usize = 4;
-const HEX_U16_FULL_WIDTH: usize = FOUR_DIGIT_WIDTH;
+const HEX_U16_FULL_WIDTH: usize = 4;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
@@ -79,13 +78,13 @@ impl OutputFormatter<'_, '_, '_> {
             buffer_cur.write_bytes(b")")
         })?;
         self.write_labeled_line("NMS 은하 좌표: ".as_bytes(), |buffer_cur| {
-            buf_write_hex_u16_0pad4(buffer_cur, data.galaxy_x)?;
+            buffer_cur.write_bytes(&hex_u16(data.galaxy_x))?;
             buffer_cur.write_byte(b':')?;
-            buf_write_hex_u16_0pad4(buffer_cur, data.galaxy_y)?;
+            buffer_cur.write_bytes(&hex_u16(data.galaxy_y))?;
             buffer_cur.write_byte(b':')?;
-            buf_write_hex_u16_0pad4(buffer_cur, data.galaxy_z)?;
+            buffer_cur.write_bytes(&hex_u16(data.galaxy_z))?;
             buffer_cur.write_byte(b':')?;
-            buf_write_hex_u16_0pad4(buffer_cur, data.solar_system_index)
+            buffer_cur.write_bytes(&hex_u16(data.solar_system_index))
         })?;
         Ok(())
     }
@@ -178,10 +177,10 @@ impl OutputFormatter<'_, '_, '_> {
         for (index, byte) in self.bytes.into_iter().enumerate() {
             let group = render_group(byte);
             range_slice_mut(head, pos, WIDTH)?.copy_from_slice(&group);
-            add_to_index(&mut pos, WIDTH)?;
+            pos = checked_add_index(pos, WIDTH)?;
             let slot = head.get_mut(pos).ok_or_else(write_zero_err)?;
             *slot = if index == last_index { b'\n' } else { b' ' };
-            add_to_index(&mut pos, 1)?;
+            pos = checked_add_index(pos, 1)?;
         }
         Ok(())
     }
@@ -254,10 +253,6 @@ pub(super) fn format_data_into_buffer(
 }
 fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
     value.checked_add(amount).ok_or_else(write_zero_err)
-}
-fn add_to_index(value: &mut usize, amount: usize) -> IoResult<()> {
-    *value = checked_add_index(*value, amount)?;
-    Ok(())
 }
 pub(super) fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
     slice.get(..len).ok_or_else(write_zero_err)
@@ -357,12 +352,12 @@ fn buf_write_u8_array_spaced<const N: usize>(
                 return Err(write_zero_err());
             };
             *slot = b' ';
-            add_to_index(&mut pos, 1)?;
+            pos = checked_add_index(pos, 1)?;
         }
         let width = u8_dec_len(n);
         let slot = range_slice_mut(head, pos, width)?;
         write_u8_dec_into_slice(slot, n)?;
-        add_to_index(&mut pos, width)?;
+        pos = checked_add_index(pos, width)?;
     }
     Ok(())
 }
@@ -394,15 +389,12 @@ fn buf_write_prefixed_hex24(
     third_hex.copy_from_slice(&hex_byte(b2));
     Ok(())
 }
-fn buf_write_hex_u16_0pad4(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
-    cur.write_bytes(&hex_u16(value))
-}
 fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {
     if value < HEX_U16_SHORT_THRESHOLD {
         let [_, h1, h2, h3] = hex_u16(value);
         cur.write_bytes(&[h1, h2, h3])
     } else {
-        buf_write_hex_u16_0pad4(cur, value)
+        cur.write_bytes(&hex_u16(value))
     }
 }
 pub(super) fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {

@@ -6,17 +6,13 @@ use crate::{
 use core::num::NonZeroU64;
 use std::io::Write;
 pub(super) const MAX_LADDER_ENTRIES: usize = 512;
-pub(super) fn write_ladder_results<'player, 'result, P, R>(
-    players: P,
-    results: R,
+pub(super) fn write_ladder_results<'player, 'result>(
+    players: impl Iterator<Item = &'player str>,
+    results: impl Iterator<Item = &'result str>,
     mut seed: u64,
     rng: &HardwareRng,
     out: &mut dyn Write,
-) -> Result<()>
-where
-    P: Iterator<Item = &'player str>,
-    R: Iterator<Item = &'result str>,
-{
+) -> Result<()> {
     let mut result_entries = [""; MAX_LADDER_ENTRIES];
     let mut remaining_results = results;
     let mut entry_count = 0_usize;
@@ -26,7 +22,7 @@ where
         .enumerate()
     {
         *slot = result;
-        entry_count = index.wrapping_add(1);
+        entry_count = index.strict_add(1);
     }
     if remaining_results.next().is_some() {
         return Err("사다리 결과 배열 범위 초과".into());

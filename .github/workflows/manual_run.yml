@@ -61,14 +61,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
-        with:
-          toolchain: 1.97.1
+      - name: Install latest stable Rust
+        run: rustup toolchain install stable --profile minimal --no-self-update
+      - name: Update Linux package index
+        run: sudo apt-get update
       - name: Install Linux native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-      - name: Build release binary
-        run: cargo build --release --locked
+        run: sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Build release binary and workflow runner
+        run: cargo +stable build --release --frozen --bin srg --example manual_workflow
       - name: Run selected SRG action
         env:
           SRG_ACTION: ${{ inputs.action }}
@@ -81,9 +81,9 @@ jobs:
           SRG_FLOAT_MAX: ${{ inputs.float_max }}
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
-        run: cargo run --release --locked --example manual_workflow
+        run: ./target/release/examples/manual_workflow
       - name: Upload console log artifact
-        if: ${{ always() && hashFiles('artifacts/srg-result-console.log') != '' }}
+        if: always() && hashFiles('artifacts/srg-result-console.log') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: artifacts/srg-result-console.log
@@ -91,7 +91,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload generated data artifact
-        if: ${{ always() && hashFiles('artifacts/srg-result-random_data.txt') != '' }}
+        if: always() && hashFiles('artifacts/srg-result-random_data.txt') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: artifacts/srg-result-random_data.txt

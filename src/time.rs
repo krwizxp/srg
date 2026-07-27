@@ -94,6 +94,7 @@ const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
 type BoxError = Box<dyn Error + Send + Sync>;
 type Result<T> = CoreResult<T, TimeError>;
+type SampleWorkerResponse = (u64, Result<TimeSample>);
 #[derive(Clone, Copy, Debug)]
 pub(super) enum TriggerAction {
     F5Press,
@@ -312,14 +313,11 @@ impl TimeError {
             source: None,
         }
     }
-    fn new_with_source<E>(
+    fn new_with_source(
         kind: TimeErrorKind,
         detail: impl Into<Cow<'static, str>>,
-        source: E,
-    ) -> Self
-    where
-        E: Error + Send + Sync + 'static,
-    {
+        source: impl Error + Send + Sync + 'static,
+    ) -> Self {
         Self {
             detail: detail.into(),
             kind,
@@ -329,10 +327,10 @@ impl TimeError {
     fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::new(TimeErrorKind::Parse, detail)
     }
-    fn parse_with_source<E>(detail: impl Into<Cow<'static, str>>, source: E) -> Self
-    where
-        E: Error + Send + Sync + 'static,
-    {
+    fn parse_with_source(
+        detail: impl Into<Cow<'static, str>>,
+        source: impl Error + Send + Sync + 'static,
+    ) -> Self {
         Self::new_with_source(TimeErrorKind::Parse, detail, source)
     }
 }
@@ -369,27 +367,24 @@ impl fmt::Display for TimeError {
 }
 impl Error for TimeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_deref().map(|source| {
-            let source_ref: &(dyn Error + 'static) = source;
-            source_ref
-        })
+        self.source
+            .as_deref()
+            .map(|source| -> &(dyn Error + 'static) { source })
     }
 }
 impl SampleWorker {
     fn ensure_fetch(&mut self, pending_generation: &mut Option<u64>) -> Result<()> {
-        if pending_generation.is_none() {
-            *pending_generation = self.fetch()?;
+        if pending_generation.is_some() {
+            return Ok(());
         }
-        Ok(())
-    }
-    fn fetch(&mut self) -> Result<Option<u64>> {
         let generation = self.generation.wrapping_add(1);
         match self.command_sender.try_send(generation) {
             Ok(()) => {
                 self.generation = generation;
-                Ok(Some(generation))
+                *pending_generation = Some(generation);
+                Ok(())
             }
-            Err(mpsc::TrySendError::Full(_)) => Ok(None),
+            Err(mpsc::TrySendError::Full(_)) => Ok(()),
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 self.respawn()?;
                 Err(TimeError::parse(SAMPLE_WORKER_RESTARTED_MESSAGE))
@@ -414,10 +409,10 @@ impl SampleWorker {
         };
         loop {
             match self.response_receiver.try_recv() {
-                Ok(response) => {
-                    if response.generation == expected_generation {
+                Ok((generation, result)) => {
+                    if generation == expected_generation {
                         *pending_generation = None;
-                        return Ok(Some(response.result));
+                        return Ok(Some(result));
                     }
                 }
                 Err(mpsc::TryRecvError::Empty) => {
@@ -464,7 +459,7 @@ struct SampleWorker {
     command_sender: mpsc::SyncSender<u64>,
     generation: u64,
     host: Arc<ParsedServer>,
-    response_receiver: mpsc::Receiver<SampleWorkerResult>,
+    response_receiver: mpsc::Receiver<SampleWorkerResponse>,
 }
 struct FinalCountdownDeadline {
     one_way_delay: Duration,
@@ -472,10 +467,6 @@ struct FinalCountdownDeadline {
     source: CountdownTriggerSource,
     target_time: SystemTime,
     trigger_instant: Instant,
-}
-struct SampleWorkerResult {
-    generation: u64,
-    result: Result<TimeSample>,
 }
 impl ServerTimeSession {
     pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
@@ -779,7 +770,11 @@ impl AppState<'_> {
         runtime: &mut LoopRuntime<'_>,
     ) -> ActivityTransition<'message> {
         let sample_rtt = sample.rtt;
-        let calibrated_server_time = countdown.server_time.recalibrate_with_rtt(sample_rtt);
+        let calibrated_server_time = ServerTime {
+            anchor_time: countdown.server_time.anchor_time,
+            anchor_instant: countdown.server_time.anchor_instant,
+            baseline_rtt: blend_rtt::<3>(countdown.server_time.baseline_rtt, sample_rtt),
+        };
         let sample_now = Instant::now();
         let live_rtt = blend_rtt::<7>(countdown.live_rtt, sample_rtt);
         countdown.live_rtt = live_rtt;
@@ -914,95 +909,6 @@ impl AppState<'_> {
             }),
             msg_buf,
         )
-    }
-    fn handle_predicting<'message>(
-        &mut self,
-        server_time: ServerTime,
-        msg_buf: &'message mut String,
-        now: Instant,
-    ) -> ActivityTransition<'message> {
-        let estimated_server_time = server_time.current_server_time_at(now);
-        let target_remaining = self
-            .target_time
-            .and_then(|target| target.duration_since(estimated_server_time).ok());
-        let protect_target =
-            target_remaining.is_some_and(|remaining| remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW);
-        if let Some(warmup_remaining) = target_remaining
-            && warmup_remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW
-        {
-            let sample_interval = final_countdown_sample_interval(warmup_remaining);
-            if let Err(start_err) = self.begin_final_countdown_sampling(sample_interval) {
-                self.end_final_countdown_sampling();
-                append_error_detail(msg_buf, "카운트다운 샘플러 시작 실패: ", start_err);
-                return ActivityTransition::message(Activity::Predicting { server_time }, msg_buf);
-            }
-        }
-        if now.saturating_duration_since(self.last_full_sync_at) >= FULL_SYNC_INTERVAL
-            && !protect_target
-        {
-            self.end_final_countdown_sampling();
-            ActivityTransition::message(
-                Activity::measure_baseline(now, true),
-                "서버 시간 보정 주기 도래, 재보정 시작.",
-            )
-        } else {
-            ActivityTransition::stay(Activity::Predicting { server_time })
-        }
-    }
-    fn next_activity<'message>(
-        &mut self,
-        activity: Activity,
-        message_buffer: &'message mut String,
-        now: Instant,
-        runtime: &mut LoopRuntime<'_>,
-    ) -> ActivityTransition<'message> {
-        match activity {
-            Activity::MeasureBaselineRtt(baseline) => {
-                self.handle_measure_baseline_rtt(baseline, message_buffer, now, runtime.out)
-            }
-            Activity::CalibrateOnTick(calibration) => {
-                self.handle_calibrate_on_tick(calibration, message_buffer)
-            }
-            Activity::Predicting { server_time } => {
-                let estimated_server_time = server_time.current_server_time_at(now);
-                if let Some(target_time) = self.target_time.take_if(|target| {
-                    target
-                        .duration_since(estimated_server_time)
-                        .ok()
-                        .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
-                }) {
-                    return ActivityTransition::message(
-                        Activity::FinalCountdown(FinalCountdownState {
-                            last_sample_error_message_at: None,
-                            live_rtt: server_time.baseline_rtt,
-                            server_time,
-                            target_time,
-                        }),
-                        "최종 카운트다운 시작!",
-                    );
-                }
-                self.handle_predicting(server_time, message_buffer, now)
-            }
-            Activity::FinalCountdown(countdown) => {
-                self.handle_final_countdown(countdown, message_buffer, runtime)
-            }
-            Activity::Retrying {
-                had_previous_sample,
-                started_at,
-            } => {
-                if now.saturating_duration_since(started_at) >= RETRY_DELAY {
-                    ActivityTransition::message(
-                        Activity::measure_baseline(now, had_previous_sample),
-                        "[재시도] 동기화를 다시 시작합니다.",
-                    )
-                } else {
-                    ActivityTransition::stay(Activity::Retrying {
-                        had_previous_sample,
-                        started_at,
-                    })
-                }
-            }
-        }
     }
     fn run_loop(
         &mut self,
@@ -1156,7 +1062,93 @@ impl AppState<'_> {
                     #[cfg(target_os = "linux")]
                     prepared_input,
                 };
-                self.next_activity(activity, &mut message_buffer, now, &mut runtime)
+                match activity {
+                    Activity::MeasureBaselineRtt(baseline) => self.handle_measure_baseline_rtt(
+                        baseline,
+                        &mut message_buffer,
+                        now,
+                        runtime.out,
+                    ),
+                    Activity::CalibrateOnTick(calibration) => {
+                        self.handle_calibrate_on_tick(calibration, &mut message_buffer)
+                    }
+                    Activity::Predicting { server_time } => {
+                        let estimated_server_time = server_time.current_server_time_at(now);
+                        if let Some(target_time) = self.target_time.take_if(|target| {
+                            target
+                                .duration_since(estimated_server_time)
+                                .ok()
+                                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
+                        }) {
+                            ActivityTransition::message(
+                                Activity::FinalCountdown(FinalCountdownState {
+                                    last_sample_error_message_at: None,
+                                    live_rtt: server_time.baseline_rtt,
+                                    server_time,
+                                    target_time,
+                                }),
+                                "최종 카운트다운 시작!",
+                            )
+                        } else {
+                            let target_remaining = self.target_time.and_then(|target| {
+                                target.duration_since(estimated_server_time).ok()
+                            });
+                            let protect_target = target_remaining.is_some_and(|remaining| {
+                                remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW
+                            });
+                            let sampling_error = target_remaining
+                                .filter(|remaining| *remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW)
+                                .and_then(|remaining| {
+                                    self.begin_final_countdown_sampling(
+                                        final_countdown_sample_interval(remaining),
+                                    )
+                                    .err()
+                                });
+                            if let Some(start_err) = sampling_error {
+                                self.end_final_countdown_sampling();
+                                append_error_detail(
+                                    &mut message_buffer,
+                                    "카운트다운 샘플러 시작 실패: ",
+                                    start_err,
+                                );
+                                ActivityTransition::message(
+                                    Activity::Predicting { server_time },
+                                    &message_buffer,
+                                )
+                            } else if now.saturating_duration_since(self.last_full_sync_at)
+                                >= FULL_SYNC_INTERVAL
+                                && !protect_target
+                            {
+                                self.end_final_countdown_sampling();
+                                ActivityTransition::message(
+                                    Activity::measure_baseline(now, true),
+                                    "서버 시간 보정 주기 도래, 재보정 시작.",
+                                )
+                            } else {
+                                ActivityTransition::stay(Activity::Predicting { server_time })
+                            }
+                        }
+                    }
+                    Activity::FinalCountdown(countdown) => {
+                        self.handle_final_countdown(countdown, &mut message_buffer, &mut runtime)
+                    }
+                    Activity::Retrying {
+                        had_previous_sample,
+                        started_at,
+                    } => {
+                        if now.saturating_duration_since(started_at) >= RETRY_DELAY {
+                            ActivityTransition::message(
+                                Activity::measure_baseline(now, had_previous_sample),
+                                "[재시도] 동기화를 다시 시작합니다.",
+                            )
+                        } else {
+                            ActivityTransition::stay(Activity::Retrying {
+                                had_previous_sample,
+                                started_at,
+                            })
+                        }
+                    }
+                }
             };
             let next_activity = transition.activity;
             cfg_select! {
@@ -1403,7 +1395,7 @@ impl AppState<'_> {
 }
 fn sample_worker_channels(
     host: Arc<ParsedServer>,
-) -> Result<(mpsc::SyncSender<u64>, mpsc::Receiver<SampleWorkerResult>)> {
+) -> Result<(mpsc::SyncSender<u64>, mpsc::Receiver<SampleWorkerResponse>)> {
     let (command_sender, command_receiver) = mpsc::sync_channel(1);
     let (response_sender, response_receiver) = mpsc::channel();
     drop(
@@ -1417,10 +1409,7 @@ fn sample_worker_channels(
                         UrlScheme::Https => "HTTPS",
                     };
                     let result = native_http.fetch_head(&host, context);
-                    if response_sender
-                        .send(SampleWorkerResult { generation, result })
-                        .is_err()
-                    {
+                    if response_sender.send((generation, result)).is_err() {
                         return;
                     }
                 }
@@ -1476,9 +1465,10 @@ fn trigger_instant_for_target(
     Some(target_instant.checked_sub(one_way_delay).unwrap_or(now))
 }
 fn append_fmt(target: &mut String, args: fmt::Arguments<'_>) {
-    match FmtWrite::write_fmt(target, args) {
-        Ok(()) | Err(_) => {}
-    }
+    assert!(
+        FmtWrite::write_fmt(target, args).is_ok(),
+        "String formatting must be infallible"
+    );
 }
 fn transition_to_retry(msg: &str, had_previous_sample: bool) -> ActivityTransition<'_> {
     ActivityTransition::message(
