@@ -4,7 +4,6 @@ use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_short, c_uint, c_ulong, c_void},
     marker::{PhantomData, PhantomPinned},
-    mem::{align_of, size_of},
     ptr::{NonNull, null_mut},
     slice,
     time::Duration,
@@ -254,12 +253,7 @@ impl EiApi {
             (self.device_keyboard_key)(device.as_ptr(), F5_KEY_CODE, is_press);
         }
     }
-    fn send_action(
-        &self,
-        action: TriggerAction,
-        context: NonNull<Ei>,
-        device: NonNull<EiDevice>,
-    ) {
+    fn send_action(&self, action: TriggerAction, context: NonNull<Ei>, device: NonNull<EiDevice>) {
         for pressed in [true, false] {
             match action {
                 TriggerAction::F5Press => self.keyboard_key(device, pressed),
@@ -332,10 +326,7 @@ impl EiSession {
                 Ok(())
             }
             DeviceEventType::Removed => {
-                if let Some(current) = self
-                    .device
-                    .take_if(|current| current.raw == device)
-                {
+                if let Some(current) = self.device.take_if(|current| current.raw == device) {
                     // SAFETY: current is the retained reference corresponding to the removed device.
                     unsafe {
                         (self.api.device_unref)(current.raw.as_ptr());
@@ -416,11 +407,9 @@ impl EiSession {
             )))?;
         // SAFETY: context is a live libei sender context.
         let ping_ptr = unsafe { (self.api.new_ping)(self.context.as_ptr()) };
-        let ping = NonNull::new(ping_ptr).ok_or(SendError::Before(Cow::Borrowed(
-            "ei_new_ping 실패",
-        )))?;
-        self.api
-            .send_action(self.action, self.context, device.raw);
+        let ping =
+            NonNull::new(ping_ptr).ok_or(SendError::Before(Cow::Borrowed("ei_new_ping 실패")))?;
+        self.api.send_action(self.action, self.context, device.raw);
         // SAFETY: ping is a live synchronization object owned by this send operation.
         unsafe {
             (self.api.ping)(ping.as_ptr());
@@ -443,17 +432,24 @@ impl EiSession {
                 if pong == expected_ping {
                     return Ok(());
                 }
-                return Err(Cow::Borrowed("예상하지 못한 libei PONG 이벤트가 발생했습니다."));
+                return Err(Cow::Borrowed(
+                    "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
+                ));
             }
             if connection_closed {
                 return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
             }
             let now = Instant::now();
             if now >= deadline {
-                return Err(Cow::Borrowed("Wayland 입력 전달 확인 시간이 초과되었습니다."));
+                return Err(Cow::Borrowed(
+                    "Wayland 입력 전달 확인 시간이 초과되었습니다.",
+                ));
             }
             let mut poll_fd = PollFd::new(self.poll_fd()?);
-            poll_fds(slice::from_mut(&mut poll_fd), poll_timeout_until(deadline, now))?;
+            poll_fds(
+                slice::from_mut(&mut poll_fd),
+                poll_timeout_until(deadline, now),
+            )?;
             if poll_fd.is_invalid() {
                 return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
             }
@@ -601,12 +597,19 @@ impl PortalSession {
             }
             let now = Instant::now();
             if now >= deadline {
-                return Err(Cow::Borrowed("Wayland 입력 권한 준비 시간이 초과되었습니다."));
+                return Err(Cow::Borrowed(
+                    "Wayland 입력 권한 준비 시간이 초과되었습니다.",
+                ));
             }
             let mut poll_fd = PollFd::new(self.poll_fd()?);
-            poll_fds(slice::from_mut(&mut poll_fd), poll_timeout_until(deadline, now))?;
+            poll_fds(
+                slice::from_mut(&mut poll_fd),
+                poll_timeout_until(deadline, now),
+            )?;
             if poll_fd.is_invalid() {
-                return Err(Cow::Borrowed("liboeffis poll descriptor가 무효화되었습니다."));
+                return Err(Cow::Borrowed(
+                    "liboeffis poll descriptor가 무효화되었습니다.",
+                ));
             }
             if should_cancel() {
                 return Ok(None);
@@ -662,8 +665,8 @@ impl PreparedInput {
                 .ok_or(Cow::Borrowed("Wayland 입력 준비 제한 시간 계산 실패"))?;
             // SAFETY: null user data is permitted by oeffis_new.
             let portal_context_ptr = unsafe { (portal_api.new)(null_mut()) };
-            let portal_context = NonNull::new(portal_context_ptr)
-                .ok_or(Cow::Borrowed("oeffis_new 실패"))?;
+            let portal_context =
+                NonNull::new(portal_context_ptr).ok_or(Cow::Borrowed("oeffis_new 실패"))?;
             let mut portal = PortalSession {
                 api: portal_api,
                 context: portal_context,
@@ -671,10 +674,7 @@ impl PreparedInput {
             portal.poll_fd()?;
             // SAFETY: context is new and the requested device mask is defined by liboeffis.
             unsafe {
-                (portal.api.create_session)(
-                    portal.context.as_ptr(),
-                    input_action.portal_devices(),
-                );
+                (portal.api.create_session)(portal.context.as_ptr(), input_action.portal_devices());
             }
             let Some(portal_eis_fd) = portal.wait_for_eis_fd(deadline, &mut should_cancel)? else {
                 return Ok(None);
@@ -698,9 +698,8 @@ impl PreparedInput {
                 (ei.api.configure_name)(ei.context.as_ptr(), EI_CLIENT_NAME.as_ptr());
             }
             // SAFETY: context is new and libei takes ownership of the descriptor on every result.
-            let setup_result = unsafe {
-                (ei.api.setup_backend_fd)(ei.context.as_ptr(), eis_fd.into_raw_fd())
-            };
+            let setup_result =
+                unsafe { (ei.api.setup_backend_fd)(ei.context.as_ptr(), eis_fd.into_raw_fd()) };
             if setup_result < 0_i32 {
                 return Err(format!("ei_setup_backend_fd 실패: {setup_result}").into());
             }
@@ -729,12 +728,12 @@ impl PreparedInput {
             }
         }
     }
-    pub(super) fn send(
-        &mut self,
-        err: &mut dyn io::Write,
-    ) -> NativeInputSendStatus {
+    pub(super) fn send(&mut self, err: &mut dyn io::Write) -> NativeInputSendStatus {
         let Some(mut prepared) = self.prepared.take() else {
-            write_line_best_effort(err, format_args!("[경고] 준비된 Wayland 입력 세션이 없습니다."));
+            write_line_best_effort(
+                err,
+                format_args!("[경고] 준비된 Wayland 입력 세션이 없습니다."),
+            );
             return NativeInputSendStatus::FailedBeforeSend;
         };
         let send_result = match prepared.dispatch(0) {
@@ -775,7 +774,9 @@ impl WaylandInput {
         poll_fds(&mut fds, timeout)?;
         let [portal_poll, ei_poll] = fds;
         if portal_poll.is_invalid() {
-            return Err(Cow::Borrowed("liboeffis poll descriptor가 무효화되었습니다."));
+            return Err(Cow::Borrowed(
+                "liboeffis poll descriptor가 무효화되었습니다.",
+            ));
         }
         if ei_poll.is_invalid() {
             return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
@@ -795,16 +796,14 @@ impl WaylandInput {
                 return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
             }
             if pong.is_some() {
-                return Err(Cow::Borrowed("예상하지 못한 libei PONG 이벤트가 발생했습니다."));
+                return Err(Cow::Borrowed(
+                    "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
+                ));
             }
         }
         Ok(())
     }
-    fn wait_until_ready<F>(
-        &mut self,
-        deadline: Instant,
-        should_cancel: &mut F,
-    ) -> InputResult<bool>
+    fn wait_until_ready<F>(&mut self, deadline: Instant, should_cancel: &mut F) -> InputResult<bool>
     where
         F: FnMut() -> bool,
     {

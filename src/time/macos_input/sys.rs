@@ -1,6 +1,6 @@
 use super::{
-    CGEventRef, CGEventSourceRef, CGEventTapLocation, CGEventType, CGKeyCode, CGMouseButton, CGPoint,
-    c_void,
+    CGEventRef, CGEventSourceRef, CGEventTapLocation, CGEventType, CGKeyCode, CGMouseButton,
+    CGPoint, c_void,
 };
 #[link(name = "CoreFoundation", kind = "framework")]
 unsafe extern "C" {

@@ -1,6 +1,6 @@
-use crate::write_line_best_effort;
 use super::{NativeInputSendStatus, TriggerAction};
-use core::mem::{align_of, offset_of, size_of};
+use crate::write_line_best_effort;
+use core::mem::offset_of;
 use std::io::Write;
 macro_rules! assert_ffi_layout {
     ($type:ty, $size:expr, $align:expr, $($field:ident: $offset:expr),+ $(,)?) => {
@@ -112,9 +112,7 @@ fn send_input_events(inputs: [Input; 2], err: &mut dyn Write) -> NativeInputSend
     }
     write_line_best_effort(
         err,
-        format_args!(
-            "[경고] Windows 입력 이벤트 전송 실패: 요청 {INPUT_EVENT_COUNT}, 전송 {sent}"
-        ),
+        format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {INPUT_EVENT_COUNT}, 전송 {sent}"),
     );
     if sent == 1 {
         let [_press, release_input] = inputs;

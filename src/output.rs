@@ -5,14 +5,13 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
+#[cfg(target_arch = "x86_64")]
+use crate::{IS_TERMINAL, file_output::OutputFile};
 use std::io::{Result as IoResult, Write as IoWrite, stdout};
-cfg_select! {
-    target_arch = "x86_64" => {
-        pub(super) mod progress;
-        pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
-    }
-    _ => {}
-}
+#[cfg(target_arch = "x86_64")]
+pub(super) mod progress;
+#[cfg(target_arch = "x86_64")]
+pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
 const HEX_U16_FULL_WIDTH: usize = 4;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
@@ -254,6 +253,24 @@ pub(super) fn format_data_into_buffer(
     formatter.write_random_lines()?;
     formatter.write_nms_lines()?;
     Ok(cur.written_slice()?.len())
+}
+#[cfg(target_arch = "x86_64")]
+pub(super) fn persist_and_print_random_data(
+    output_file: &mut OutputFile,
+    data: &RandomDataSet,
+) -> Result<()> {
+    let mut buffer = [0_u8; BUFFER_SIZE];
+    let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
+    output_file
+        .writer()
+        .write_all(prefix_slice(&buffer, file_len)?)?;
+    let output_len = if *IS_TERMINAL {
+        format_data_into_buffer(data, &mut buffer, OutputTarget::Console)?
+    } else {
+        file_len
+    };
+    write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
+    Ok(())
 }
 fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
     value.checked_add(amount).ok_or_else(write_zero_err)

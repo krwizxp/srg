@@ -5,10 +5,7 @@ cfg_select! {
         use std::io::{IsTerminal as _, stdin};
     }
     any(target_os = "linux", target_os = "macos") => {
-        use core::{
-            ffi::{c_int, c_short, c_void},
-            mem::size_of,
-        };
+        use core::ffi::{c_int, c_short, c_void};
     }
     _ => {}
 }
@@ -98,14 +95,10 @@ unsafe extern "C" {
     #[link_name = "read"]
     fn read_stdin(file: c_int, buffer: *mut c_void, count: usize) -> isize;
 }
-cfg_select! {
-    target_os = "windows" => {
-        enum StopInputBackend {
-            Console,
-            Stream { file: *mut c_void, pipe: bool },
-        }
-    }
-    _ => {}
+#[cfg(target_os = "windows")]
+enum StopInputBackend {
+    Console,
+    Stream { file: *mut c_void, pipe: bool },
 }
 pub(crate) struct StopInput {
     #[cfg(target_os = "windows")]

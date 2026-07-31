@@ -5,13 +5,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use std::{
-    io::Write,
-    is_x86_feature_detected,
-    sync::LazyLock,
-    thread::yield_now,
-    time::Instant,
-};
+use std::{io::Write, is_x86_feature_detected, sync::LazyLock, thread::yield_now, time::Instant};
 const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
 const RDSEED_SPIN_BURST_RETRY_COUNT: u16 = 256;
 const RDSEED_TIMEOUT: Duration = Duration::from_mins(5);
@@ -84,8 +78,7 @@ impl HardwareRng {
         }
         self.rdseed_active.store(false, Ordering::Relaxed);
         if self.rdrand_supported {
-            self.fallback_notice_pending
-                .store(true, Ordering::Relaxed);
+            self.fallback_notice_pending.store(true, Ordering::Relaxed);
             return Self::rdrand_random();
         }
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())

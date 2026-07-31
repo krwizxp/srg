@@ -44,8 +44,7 @@ impl ProgressBuffers {
         } else if completed == 0 {
             None
         } else {
-            let completed_scaled =
-                u128_from_usize(completed).strict_mul(PERCENT_SCALE_U128);
+            let completed_scaled = u128_from_usize(completed).strict_mul(PERCENT_SCALE_U128);
             let remaining_wide = u128_from_usize(total.strict_sub(completed));
             let eta_numerator = elapsed_millis.strict_mul(remaining_wide);
             Some(eta_numerator.div_euclid(completed_scaled))
@@ -97,9 +96,7 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
         *buf = *INVALID_TIME;
         return;
     };
-    let minutes = low_u8_from_u128(
-        (deci.div_euclid(DECI_PER_MINUTE)).min(MAX_TIME_MINUTES),
-    );
+    let minutes = low_u8_from_u128((deci.div_euclid(DECI_PER_MINUTE)).min(MAX_TIME_MINUTES));
     let sec_whole = low_u8_from_u128(
         deci.div_euclid(DECI_PER_SECOND)
             .rem_euclid(SECONDS_PER_MINUTE_U128),
@@ -115,11 +112,7 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
         b'0'.strict_add(tenths),
     ];
 }
-const fn scaled_progress_value(
-    completed: usize,
-    total: usize,
-    scale: usize,
-) -> usize {
+const fn scaled_progress_value(completed: usize, total: usize, scale: usize) -> usize {
     if total == 0 {
         return scale;
     }

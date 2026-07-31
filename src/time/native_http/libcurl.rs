@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
-    mem::{align_of, offset_of, size_of},
+    mem::offset_of,
     ptr::{NonNull, null_mut},
     slice,
     str,

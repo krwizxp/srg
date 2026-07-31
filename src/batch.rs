@@ -1,16 +1,14 @@
 use crate::{
+    BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
     diagnostic::{AppError, Result},
     file_output::OutputFile,
     hardware_rng::HardwareRng,
     output::{
-        self, OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console,
+        self, OutputTarget, format_data_into_buffer, persist_and_print_random_data,
+        write_slice_to_console,
     },
     random_data::generate_random_data_with_rng,
-    random_output::{
-        persist_and_print_random_data, persist_random_data, write_random_data_to_console,
-    },
     stop_input::StopInput,
-    BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
 };
 use core::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -121,18 +119,17 @@ pub(super) fn regenerate_with_count(
     } else {
         None
     };
-    let pending_count = requested_count.strict_sub(1);
-    let thread_count = pending_count.min(available_parallelism()?.get());
+    let thread_count = requested_count.min(available_parallelism()?.get());
     let (cancelled, processed) = (AtomicBool::new(false), AtomicUsize::new(0));
-    let base_count = pending_count.div_euclid(thread_count);
-    let remainder = pending_count.rem_euclid(thread_count);
-    let (worker_outcome, user_cancelled, last_recorded_data) = {
-        let writer_lock = Mutex::new(WorkerOutput {
-            last: None,
-            writer: output_file.writer(),
-        });
-        let coordinator = thread::current();
-        scope(|scope_ctx| -> Result<(Option<WorkerFailure>, bool, Option<RecordedData>)> {
+    let base_count = requested_count.div_euclid(thread_count);
+    let remainder = requested_count.rem_euclid(thread_count);
+    let writer_lock = Mutex::new(WorkerOutput {
+        last: None,
+        writer: output_file.writer(),
+    });
+    let coordinator = thread::current();
+    let (worker_outcome, user_cancelled) =
+        scope(|scope_ctx| -> Result<(Option<WorkerFailure>, bool)> {
             let mut worker_handles = Vec::new();
             worker_handles
                 .try_reserve_exact(thread_count)
@@ -146,20 +143,20 @@ pub(super) fn regenerate_with_count(
                         let mut chunk = WorkerChunk::default();
                         let chunk_capacity =
                             WORKER_CHUNK_CAPACITY.min(loop_count.strict_mul(BUFFER_SIZE));
-                        chunk.bytes.try_reserve_exact(chunk_capacity).map_err(|source| {
-                            AppError::context("작업자 출력 버퍼 메모리 확보 실패", source)
-                        })?;
+                        chunk
+                            .bytes
+                            .try_reserve_exact(chunk_capacity)
+                            .map_err(|source| {
+                                AppError::context("작업자 출력 버퍼 메모리 확보 실패", source)
+                            })?;
                         chunk.bytes.resize(chunk_capacity, 0);
                         let mut outcome = None;
                         for _ in 0..loop_count {
-                            if stop.load(Ordering::Relaxed) {
-                                break;
-                            }
                             if chunk.written_len > chunk.bytes.len().strict_sub(BUFFER_SIZE) {
                                 write_worker_chunk(writer, stop, done, &mut chunk)?;
-                                if stop.load(Ordering::Relaxed) {
-                                    break;
-                                }
+                            }
+                            if stop.load(Ordering::Relaxed) {
+                                break;
                             }
                             let record = generate_random_data_with_rng(rng)
                                 .map_err(|source| AppError::context("난수 생성 실패", source))
@@ -168,12 +165,14 @@ pub(super) fn regenerate_with_count(
                                         .bytes
                                         .get_mut(chunk.written_len..)
                                         .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>())
-                                        .ok_or_else(|| AppError::message("작업자 출력 버퍼 범위 손상"))?;
+                                        .ok_or_else(|| {
+                                            AppError::message("작업자 출력 버퍼 범위 손상")
+                                        })?;
                                     let len =
                                         format_data_into_buffer(&data, buffer, OutputTarget::File)
                                             .map_err(|source| {
-                                        AppError::context("난수 데이터 포맷 실패", source)
-                                    })?;
+                                                AppError::context("난수 데이터 포맷 실패", source)
+                                            })?;
                                     Ok((data.num_64, len))
                                 });
                             let (num_64, len) = match record {
@@ -219,12 +218,12 @@ pub(super) fn regenerate_with_count(
                     }
                 }
                 thread::park_timeout(PROGRESS_UPDATE_INTERVAL);
-                if *IS_TERMINAL
-                    && last_progress.elapsed() >= PROGRESS_UPDATE_INTERVAL
-                {
+                if *IS_TERMINAL && last_progress.elapsed() >= PROGRESS_UPDATE_INTERVAL {
                     if let Err(error) = progress_buffers.print(
-                        out, processed.load(Ordering::Relaxed), requested_count,
-                        start_time.elapsed()
+                        out,
+                        processed.load(Ordering::Relaxed),
+                        requested_count,
+                        start_time.elapsed(),
                     ) {
                         cancelled.store(true, Ordering::Relaxed);
                         progress_error = Some(error);
@@ -260,14 +259,12 @@ pub(super) fn regenerate_with_count(
             if let Some(error) = join_error.or(progress_error).or(worker_error) {
                 return Err(error);
             }
-            let last_recorded_data = writer_lock
-                .lock()
-                .map_err(|_poison| AppError::message("output writer lock 손상"))?
-                .last
-                .take();
-            Ok((combined, user_cancelled, last_recorded_data))
-        })?
-    };
+            Ok((combined, user_cancelled))
+        })?;
+    let last_recorded_data = writer_lock
+        .into_inner()
+        .map_err(|_poison| AppError::message("output writer lock 손상"))?
+        .last;
     if let Some(failure) = worker_outcome {
         return Err(AppError::context(
             format!(
@@ -284,21 +281,19 @@ pub(super) fn regenerate_with_count(
             out,
             "\nEnter 입력으로 작업을 중단했습니다. 총 {completed_count}건이 {FILE_NAME}에 기록되었습니다.\n"
         )?;
-        out.flush()?;
-        let Some(last_record) = last_recorded_data else {
-            return Ok(None);
-        };
-        let mut buffer = [0_u8; BUFFER_SIZE];
-        output_file.read_tail_into(last_record.len, &mut buffer)?;
-        write_slice_to_console(prefix_slice(&buffer, last_record.len)?)?;
-        return Ok(Some(last_record.num_64));
+    } else {
+        print_final_progress(out, requested_count, requested_count, start_time.elapsed())?;
+        writeln!(
+            out,
+            "\n총 {requested_count}건 생성 완료 ({FILE_NAME} 에 추가).\n"
+        )?;
     }
-    let final_data = generate_random_data_with_rng(rng)?;
-    let mut final_buffer = [0_u8; BUFFER_SIZE];
-    let final_len = persist_random_data(output_file, &final_data, &mut final_buffer)?;
-    print_final_progress(out, requested_count, requested_count, start_time.elapsed())?;
-    writeln!(out, "\n총 {requested_count}건 생성 완료 ({FILE_NAME} 에 추가).\n")?;
     out.flush()?;
-    write_random_data_to_console(&final_data, &mut final_buffer, final_len)?;
-    Ok(Some(final_data.num_64))
+    let Some(last_record) = last_recorded_data else {
+        return Ok(None);
+    };
+    let mut buffer = [0_u8; BUFFER_SIZE];
+    let last_output = output_file.read_tail_into(last_record.len, &mut buffer)?;
+    write_slice_to_console(last_output)?;
+    Ok(Some(last_record.num_64))
 }

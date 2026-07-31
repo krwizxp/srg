@@ -1,14 +1,11 @@
+#[cfg(target_arch = "x86_64")]
+use super::hardware_rng::HardwareRng;
+#[cfg(target_arch = "x86_64")]
+use crate::diagnostic::AppError;
 use crate::{
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
-cfg_select! {
-    target_arch = "x86_64" => {
-        use super::hardware_rng::HardwareRng;
-        use crate::diagnostic::AppError;
-    }
-    _ => {}
-}
 use core::{array, ops::Mul as NumericMul};
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
@@ -364,21 +361,18 @@ const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
     }
     value.strict_add(ADD)
 }
-cfg_select! {
-    target_arch = "x86_64" => {
+#[cfg(target_arch = "x86_64")]
 pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomDataSet> {
-            let num = rng.next_u64()?;
-            let mut next_supp = |reason: &'static str| -> Result<u64> {
-                rng.next_u64().map_err(|source| AppError::context(reason, source))
-            };
-            RandomDataSet {
-                num_64: num,
-                ..Default::default()
-            }
-            .populate(&mut next_supp)
-        }
+    let num = rng.next_u64()?;
+    let mut next_supp = |reason: &'static str| -> Result<u64> {
+        rng.next_u64()
+            .map_err(|source| AppError::context(reason, source))
+    };
+    RandomDataSet {
+        num_64: num,
+        ..Default::default()
     }
-    _ => {}
+    .populate(&mut next_supp)
 }
 fn extract_valid_bits_for_nms(
     num: u64,

@@ -9,7 +9,7 @@ use std::{
 };
 cfg_select! {
     windows => {
-        use core::{ffi::c_void, mem::size_of};
+        use core::ffi::c_void;
         use std::{
             io::Error as IoError,
             os::windows::{
@@ -31,15 +31,10 @@ cfg_select! {
     }
     _ => {}
 }
-cfg_select! {
-    target_os = "linux" => {
-        const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
-    }
-    target_os = "macos" => {
-        const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
-    }
-    _ => {}
-}
+#[cfg(target_os = "linux")]
+const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
+#[cfg(target_os = "macos")]
+const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
 #[cfg(target_os = "windows")]
 const _: () = assert!(
     size_of::<FileStandardInfo>() == 24,
@@ -135,19 +130,17 @@ impl TryFrom<&Path> for OutputFile {
                 "출력 파일의 하드 링크 수는 1이어야 합니다.",
             ));
         }
-        cfg_select! {
-            any(target_os = "linux", target_os = "macos") => {
-                match file.try_lock() {
-                    Ok(()) => {}
-                    Err(TryLockError::WouldBlock) => {
-                        return Err(AppError::message("다른 srg 인스턴스가 출력 파일을 사용 중입니다."));
-                    }
-                    Err(TryLockError::Error(err)) => {
-                        return Err(AppError::context("출력 파일 잠금 실패", err));
-                    }
-                }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => {
+                return Err(AppError::message(
+                    "다른 srg 인스턴스가 출력 파일을 사용 중입니다.",
+                ));
             }
-            _ => {}
+            Err(TryLockError::Error(err)) => {
+                return Err(AppError::context("출력 파일 잠금 실패", err));
+            }
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         if metadata.mode() & 0o077 != 0 {
@@ -174,7 +167,11 @@ impl OutputFile {
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]
-    pub(super) fn read_tail_into(&mut self, len: usize, buffer: &mut [u8]) -> Result<()> {
+    pub(super) fn read_tail_into<'buffer>(
+        &mut self,
+        len: usize,
+        buffer: &'buffer mut [u8],
+    ) -> Result<&'buffer [u8]> {
         let tail = buffer
             .get_mut(..len)
             .ok_or_else(|| AppError::message("마지막 출력 데이터가 읽기 버퍼보다 큽니다."))?;
@@ -183,7 +180,7 @@ impl OutputFile {
         self.file.seek(SeekFrom::End(offset.strict_neg()))?;
         self.file.read_exact(tail)?;
         self.file.seek(SeekFrom::End(0))?;
-        Ok(())
+        Ok(tail)
     }
     pub(super) const fn writer(&mut self) -> &mut File {
         &mut self.file

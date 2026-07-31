@@ -28,22 +28,7 @@ const ERR_LOCAL_YEAR: &str = "HTTP Date 파싱 실패: 현재 연도 계산에 �
 const ERR_RFC850_FORMAT: &str = "HTTP Date 파싱 실패: rfc850-date 형식이 아닙니다.";
 const ERR_RFC850_NUM: &str = "HTTP Date 파싱 실패: rfc850-date 숫자 변환에 실패했습니다.";
 const FEBRUARY_DAY_LEAP: u32 = 29;
-const FEBRUARY_DAY_NORMAL: u32 = 28;
 const IMF_FIXDATE_WEEKDAY_COMMA_INDEX: usize = 3;
-const HTTP_MONTH_DAY_MAX: [u32; 12] = [
-    31,
-    FEBRUARY_DAY_NORMAL,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31,
-];
 const LEAP_YEAR_CENTURY_DIVISOR_I32: i32 = 100;
 const LEAP_YEAR_DIVISOR_I32: i32 = 4;
 const LEAP_YEAR_ERA_DIVISOR_I32: i32 = 400;
@@ -66,6 +51,11 @@ enum HttpDateFormat {
     Asctime,
     ImfFixdate,
     Rfc850 { current_year: i32 },
+}
+#[derive(Clone, Copy)]
+struct HttpMonth {
+    max_day: u32,
+    number: u32,
 }
 impl FromStr for HttpDate {
     type Err = TimeError;
@@ -109,23 +99,24 @@ fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
             .strict_add(u32::from(ones)),
     )
 }
-fn parse_http_month(month_str: &str) -> Result<u32> {
+fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
     const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
-    match month_str {
-        "Jan" => Ok(1),
-        "Feb" => Ok(2),
-        "Mar" => Ok(3),
-        "Apr" => Ok(4),
-        "May" => Ok(5),
-        "Jun" => Ok(6),
-        "Jul" => Ok(7),
-        "Aug" => Ok(8),
-        "Sep" => Ok(9),
-        "Oct" => Ok(10),
-        "Nov" => Ok(11),
-        "Dec" => Ok(12),
-        _ => Err(TimeError::parse(ERR_MONTH)),
-    }
+    let (number, max_day) = match month_str {
+        "Jan" => (1, 31),
+        "Feb" => (2, 28),
+        "Mar" => (3, 31),
+        "Apr" => (4, 30),
+        "May" => (5, 31),
+        "Jun" => (6, 30),
+        "Jul" => (7, 31),
+        "Aug" => (8, 31),
+        "Sep" => (9, 30),
+        "Oct" => (10, 31),
+        "Nov" => (11, 30),
+        "Dec" => (12, 31),
+        _ => return Err(TimeError::parse(ERR_MONTH)),
+    };
+    Ok(HttpMonth { max_day, number })
 }
 fn parse_http_weekday(weekday_str: &str) -> Option<u32> {
     match weekday_str {
@@ -169,7 +160,7 @@ fn ensure_parts_exhausted(parts: &mut SplitAsciiWhitespace<'_>, err: &'static st
 }
 fn parse_http_date_time(
     day: u32,
-    month: u32,
+    month: HttpMonth,
     year: i32,
     weekday: u32,
     time_token: &str,
@@ -209,24 +200,18 @@ fn parse_http_date_time(
     let leap_year = (year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
         && year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32)
         || year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32;
-    let month_index = usize::try_from(
-        month
-            .checked_sub(1)
-            .ok_or_else(|| TimeError::parse(ERR_DAY))?,
-    )
-    .ok()
-    .ok_or_else(|| TimeError::parse(ERR_DAY))?;
-    let Some(mut max_day) = HTTP_MONTH_DAY_MAX.get(month_index).copied() else {
-        return Err(TimeError::parse(ERR_DAY));
-    };
-    if month == 2 && leap_year {
+    let HttpMonth {
+        mut max_day,
+        number: month_number,
+    } = month;
+    if month_number == 2 && leap_year {
         max_day = FEBRUARY_DAY_LEAP;
     }
     if day == 0 || day > max_day {
         return Err(TimeError::parse(ERR_DAY));
     }
     let year_i64 = i64::from(year);
-    let adjusted_year = if month <= MARCH_MONTH_THRESHOLD {
+    let adjusted_year = if month_number <= MARCH_MONTH_THRESHOLD {
         year_i64.strict_sub(1_i64)
     } else {
         year_i64
@@ -235,10 +220,10 @@ fn parse_http_date_time(
         adjusted_year.div_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
         adjusted_year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
     );
-    let shifted_month = if month > MARCH_MONTH_THRESHOLD {
-        i64::from(month).strict_sub(MARCH_BASE_MONTH_OFFSET_I64)
+    let shifted_month = if month_number > MARCH_MONTH_THRESHOLD {
+        i64::from(month_number).strict_sub(MARCH_BASE_MONTH_OFFSET_I64)
     } else {
-        i64::from(month).strict_add(PRE_MARCH_MONTH_OFFSET_I64)
+        i64::from(month_number).strict_add(PRE_MARCH_MONTH_OFFSET_I64)
     };
     let month_term = MONTH_TERM_MULTIPLIER_I64
         .strict_mul(shifted_month)
@@ -255,15 +240,11 @@ fn parse_http_date_time(
         .strict_mul(DAYS_PER_400_YEARS_I64)
         .strict_add(day_of_era)
         .strict_sub(DAYS_UNTIL_UNIX_EPOCH_I64);
-    let actual_weekday = parse_result_with_context(
-        u32::try_from(
-            days.checked_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
-                .ok_or_else(|| TimeError::parse(ERR_WEEKDAY))?
-                .rem_euclid(DAYS_PER_WEEK_I64),
-        ),
-        ERR_WEEKDAY,
-    )?;
-    if actual_weekday != weekday {
+    let actual_weekday = days
+        .rem_euclid(DAYS_PER_WEEK_I64)
+        .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
+        .rem_euclid(DAYS_PER_WEEK_I64);
+    if actual_weekday != i64::from(weekday) {
         return Err(TimeError::parse(ERR_WEEKDAY));
     }
     let timestamp_secs = days

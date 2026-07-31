@@ -21,26 +21,14 @@
   <script>
     (() => {
       const root = document.documentElement;
-      const getSystemTheme = () =>
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-      const applyInitialTheme = (theme, source) => {
-        root.dataset.theme = theme;
-        root.dataset.themeSource = source;
-      };
       try {
         const storedTheme = localStorage.getItem(root.dataset.themeStorageKey);
         if (storedTheme === "light" || storedTheme === "dark") {
-          applyInitialTheme(storedTheme, "stored");
-        } else {
-          if (storedTheme !== null) {
-            localStorage.removeItem(root.dataset.themeStorageKey);
-          }
-          applyInitialTheme(getSystemTheme(), "system");
+          root.dataset.theme = storedTheme;
+        } else if (storedTheme !== null) {
+          localStorage.removeItem(root.dataset.themeStorageKey);
         }
       } catch {
-        applyInitialTheme(getSystemTheme(), "system");
       }
     })();
   </script>
@@ -80,23 +68,12 @@
     @layer theme {
       :root {
         color-scheme: light dark;
-        --safe-inline-start: env(safe-area-inset-left);
-        --safe-inline-end: env(safe-area-inset-right);
-        --inline-origin-x: 0%;
-        --inline-angle: 90deg;
         --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
         --fs-sm: 14px;
         --results-pane-mobile-height: 70dvh;
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         scrollbar-width: thin;
         scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
-
-        &[dir="rtl"] {
-          --safe-inline-start: env(safe-area-inset-right);
-          --safe-inline-end: env(safe-area-inset-left);
-          --inline-origin-x: 100%;
-          --inline-angle: 270deg;
-        }
 
         &[data-theme="light"] {
           color-scheme: light;
@@ -109,7 +86,7 @@
 
       body {
         color: var(--fg);
-        padding-inline: max(20px, var(--safe-inline-start)) max(20px, var(--safe-inline-end));
+        padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
         font-variant-numeric: tabular-nums;
         font-size: 15px;
         line-height: 1.6;
@@ -145,12 +122,66 @@
         flex: 1;
         scrollbar-width: thin;
         overflow: auto;
-        --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, oklch(0% 0 0 / 0));
-        box-shadow: inset 0 12px 12px -14px var(--scroll-shadow-color), inset 0 -12px 12px -14px var(--scroll-shadow-color);
+        --scroll-shadow-size: 20px;
+        --scroll-shadow-color: light-dark(oklch(20.7682% 0.03982 265.75 / 0.24), oklch(0% 0 0 / 0.92));
       }
 
       .coords-view {
         white-space: pre-wrap;
+      }
+
+      @supports (animation-timeline: scroll()) {
+
+        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::before,
+        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::after {
+          content: "";
+          display: block;
+          position: sticky;
+          block-size: var(--scroll-shadow-size);
+          pointer-events: none;
+          z-index: 11;
+          opacity: 0;
+          animation-duration: 1s;
+          animation-timing-function: linear;
+          animation-fill-mode: both;
+          animation-timeline: scroll(nearest);
+        }
+
+        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::before {
+          inset-block-start: var(--scroll-shadow-top, 0);
+          margin-block-end: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
+          animation-name: scroll-shadow-top;
+          animation-range: 0% 90%;
+        }
+
+        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::after {
+          inset-block-end: 0;
+          margin-block-start: calc(-1 * var(--scroll-shadow-size));
+          background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
+          animation-name: scroll-shadow-bottom;
+          animation-range: 10% 100%;
+        }
+
+        @keyframes scroll-shadow-top {
+          from {
+            opacity: 0;
+          }
+
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes scroll-shadow-bottom {
+          from {
+            opacity: 1;
+          }
+
+          to {
+            opacity: 0;
+          }
+        }
       }
 
       #app>.input-card {
@@ -282,7 +313,7 @@
             }
           }
 
-          &[inert] {
+          &:has(input[type="file"]:disabled) {
             opacity: 0.5;
           }
         }
@@ -383,30 +414,57 @@
       }
 
       .progress-shell {
+        --progress-fill: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 68%, white));
+        --progress-shimmer: linear-gradient(110deg, transparent 30%, oklch(from white l c h / 0.42) 50%, transparent 70%);
+        appearance: none;
+        display: block;
+        inline-size: 100%;
+        border: 0;
         border-radius: 999px;
         overflow: hidden;
         contain: paint;
         block-size: 8px;
+        background: oklch(from var(--fg) l c h / 0.12);
 
-        >progress {
-          appearance: none;
-          display: block;
-          inline-size: 100%;
-          block-size: 100%;
-          border: 0;
+        &::-webkit-progress-bar {
           border-radius: inherit;
-          overflow: hidden;
-          background: oklch(from var(--fg) l c h / 0.12);
-          accent-color: var(--accent);
-        }
-
-        >progress::-webkit-progress-bar {
           background: oklch(from var(--fg) l c h / 0.12);
         }
 
-        >progress::-webkit-progress-value,
-        >progress::-moz-progress-bar {
-          background: var(--accent);
+        &::-webkit-progress-value {
+          border-radius: inherit;
+          background: var(--progress-shimmer), var(--progress-fill);
+          background-position: 110% 0, 0 0;
+          background-repeat: no-repeat;
+          background-size: 220% 100%, 100% 100%;
+        }
+
+        &::-moz-progress-bar {
+          border-radius: inherit;
+          background: var(--progress-shimmer), var(--progress-fill);
+          background-position: 110% 0, 0 0;
+          background-repeat: no-repeat;
+          background-size: 220% 100%, 100% 100%;
+        }
+
+        &:not([value="0"]):not([value="100"])::-webkit-progress-value {
+          animation: loading-shimmer 1.4s linear infinite;
+        }
+
+        &:not([value="0"]):not([value="100"])::-moz-progress-bar {
+          animation: loading-shimmer 1.4s linear infinite;
+        }
+      }
+
+      @keyframes loading-shimmer {
+        to {
+          background-position: -110% 0, 0 0;
+        }
+      }
+
+      @keyframes skeleton-shimmer-x {
+        to {
+          transform: translateX(120%);
         }
       }
 
@@ -609,8 +667,49 @@
       }
 
       .table-wrap {
+        --scroll-shadow-top: 50px;
         border-radius: 18px;
         scrollbar-gutter: stable;
+      }
+
+      .loading-rows {
+        display: none;
+      }
+
+      .table-wrap[aria-busy="true"] .loading-rows {
+        display: table-footer-group;
+      }
+
+      .loading-row td {
+        padding-block: 14px;
+      }
+
+      .skeleton-bar {
+        display: block;
+        position: relative;
+        overflow: hidden;
+        block-size: 1.1em;
+        margin-block: 4px;
+        border-radius: 999px;
+        contain: paint;
+        background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h), oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
+
+        &::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(in oklch 90deg, transparent, light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h), oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)), transparent);
+          transform: translateX(-120%);
+          animation: skeleton-shimmer-x 1.5s linear infinite;
+          will-change: transform;
+        }
+      }
+
+      @container (inline-size <=900px) {
+        .table-wrap[aria-busy="true"] .loading-rows {
+          display: block;
+          padding: 16px;
+        }
       }
 
       .filters {
@@ -703,13 +802,6 @@
               background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
             }
           }
-
-          &[hidden="until-found"] {
-            display: block;
-            content-visibility: hidden;
-            block-size: 0;
-            overflow: hidden;
-          }
         }
 
         @container (inline-size > 900px) {
@@ -735,103 +827,37 @@
             tr:not([hidden])+tr:not([hidden]) {
               margin-block-start: 16px;
             }
+          }
 
-            tr {
-              contain-intrinsic-block-size: auto 375px;
-              display: flex;
-              flex-direction: column;
+          :is(tbody, tfoot) tr {
+            contain-intrinsic-block-size: auto 375px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-block: 16px;
+            padding-inline: 16px;
+            background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
+            border-radius: 16px;
+            box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
+
+            td {
+              display: grid;
+              grid-template-columns: 64px 1fr;
               gap: 10px;
-              padding-block: 16px;
-              padding-inline: 16px;
-              background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
-              border-radius: 16px;
-              box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
-              td {
-                display: grid;
-                grid-template-columns: 64px 1fr;
-                gap: 10px;
-                align-items: baseline;
-                padding-block: 2px;
-                padding-inline: 0;
+              align-items: baseline;
+              padding-block: 2px;
+              padding-inline: 0;
 
-                &::before {
-                  content: attr(data-label);
-                  font-weight: 600;
-                  color: var(--muted);
-                  text-transform: uppercase;
-                }
+              &::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: var(--muted);
+                text-transform: uppercase;
               }
             }
-
           }
         }
-      }
-    }
 
-    @layer transitions {
-      .results-card .table-wrap {
-        view-transition-name: results-card;
-      }
-
-      html:active-view-transition-type(results)::view-transition-old(root),
-      html:active-view-transition-type(results)::view-transition-new(root) {
-        animation: none;
-      }
-
-      html:active-view-transition-type(results)::view-transition-group(results-card) {
-        animation-duration: 0.5s;
-        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-      }
-
-      html:active-view-transition-type(results)::view-transition-old(results-card),
-      html:active-view-transition-type(results)::view-transition-new(results-card) {
-        position: absolute;
-        inset-block: 0;
-        inset-inline: 0;
-        mix-blend-mode: plus-lighter;
-        backface-visibility: hidden;
-      }
-
-      html:active-view-transition-type(results)::view-transition-old(results-card) {
-        animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out-blur;
-        transform-origin: 50% 100%;
-      }
-
-      html:active-view-transition-type(results)::view-transition-new(results-card) {
-        animation: 500ms cubic-bezier(0.25, 1, 0.5, 1) both vt-slide-in-spring;
-        transform-origin: 50% 0%;
-      }
-
-      @keyframes vt-fade-out-blur {
-        0% {
-          opacity: 1;
-          filter: blur(0);
-          transform: scale(1);
-        }
-
-        100% {
-          opacity: 0;
-          filter: blur(12px);
-          transform: scale(0.92) translateY(10px);
-        }
-      }
-
-      @keyframes vt-slide-in-spring {
-        0% {
-          opacity: 0;
-          filter: blur(12px);
-          transform: scale(0.96) translateY(20px);
-        }
-
-        50% {
-          opacity: 1;
-        }
-
-        100% {
-          opacity: 1;
-          filter: blur(0);
-          transform: scale(1) translateY(0);
-        }
       }
     }
 
@@ -920,54 +946,40 @@
       --site-header-height: 72px;
       --site-header-gap: 20px;
       --page-pad-block-end: 20px;
-      --page-bg: oklch(100% 0 0);
-      --card-surface: oklch(100% 0 0);
-      --surface-panel: oklch(100% 0 0);
-      --panel-bg: oklch(98.1449% 0.00453 258.32);
-      --fg: oklch(23.2073% 0.03283 265.79);
-      --tone-base: oklch(98.1449% 0.00453 258.32);
-      --muted: oklch(55.1732% 0.02965 266.41);
-      --muted-strong: oklch(27.6759% 0.0319 263.84);
-      --line-soft: oklch(94.4327% 0.01086 256.7);
-      --accent: oklch(62.9919% 0.2104 261.11);
-      --accent-ink: oklch(62.9919% 0.2104 261.11);
-      --accent-border: oklch(from var(--accent) calc(l + 0.28) calc(c * 0.21) h);
-      --accent-wash: oklch(from var(--accent) calc(l + 0.34) calc(c * 0.08) h);
-      --warn: oklch(73.5214% 0.1698 78.98);
-      --err: oklch(60.0856% 0.2631 15.86);
-      --header-bg: oklch(100% 0 0 / 0.96);
-      --header-border: oklch(95.654% 0.00797 253.85);
+      --page-bg: light-dark(oklch(100% 0 0), oklch(13.4824% 0.03772 255.32));
+      --card-surface: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32));
+      --surface-panel: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32));
+      --panel-bg: light-dark(oklch(98.1449% 0.00453 258.32), oklch(17.3147% 0.03443 259.54));
+      --fg: light-dark(oklch(23.2073% 0.03283 265.79), oklch(100% 0 0));
+      --tone-base: light-dark(oklch(98.1449% 0.00453 258.32), oklch(17.3147% 0.03443 259.54));
+      --muted: light-dark(oklch(55.1732% 0.02965 266.41), oklch(68.4542% 0.04287 269.76));
+      --muted-strong: light-dark(oklch(27.6759% 0.0319 263.84), oklch(92.6985% 0.02464 265.59));
+      --line-soft: light-dark(oklch(94.4327% 0.01086 256.7), oklch(25.767% 0.05772 259.88));
+      --accent: light-dark(oklch(62.9919% 0.2104 261.11), oklch(65.3229% 0.1969 258.23));
+      --accent-ink: light-dark(oklch(62.9919% 0.2104 261.11), oklch(71.8796% 0.1599 251.87));
+      --accent-border: light-dark(oklch(from var(--accent) calc(l + 0.28) calc(c * 0.21) h), oklch(from var(--accent) calc(l - 0.35) calc(c * 0.75) h));
+      --accent-wash: light-dark(oklch(from var(--accent) calc(l + 0.34) calc(c * 0.08) h), oklch(from var(--accent) l c h / 0.12));
+      --warn: light-dark(oklch(73.5214% 0.1698 78.98), oklch(80.9396% 0.1868 79.23));
+      --err: light-dark(oklch(60.0856% 0.2631 15.86), oklch(71.6163% 0.2181 13.83));
+      --header-bg: light-dark(oklch(100% 0 0 / 0.96), oklch(13.4824% 0.03772 255.32 / 0.96));
+      --header-border: light-dark(oklch(95.654% 0.00797 253.85), oklch(46.12% 0.0851 264.23 / 0.22));
       --shadow: 0 16px 36px oklch(20.7682% 0.03982 265.75 / 0.05);
       --shadow-soft: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
-      --toggle-bg: oklch(100% 0 0);
-      --toggle-border: oklch(92.8761% 0.01262 255.51);
-      --toggle-text: oklch(27.6759% 0.0319 263.84);
-      --brand-text: oklch(22.4879% 0.0368 267.24);
+      --toggle-bg: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32 / 0.88));
+      --toggle-border: light-dark(oklch(92.8761% 0.01262 255.51), oklch(30.3242% 0.06705 260.4));
+      --toggle-text: light-dark(oklch(27.6759% 0.0319 263.84), oklch(100% 0 0));
+      --brand-text: light-dark(oklch(22.4879% 0.0368 267.24), oklch(100% 0 0));
 
       &[data-theme="dark"] {
-        --page-bg: oklch(13.4824% 0.03772 255.32);
-        --card-surface: oklch(18.8135% 0.03978 261.32);
-        --surface-panel: oklch(18.8135% 0.03978 261.32);
-        --panel-bg: oklch(17.3147% 0.03443 259.54);
-        --fg: oklch(100% 0 0);
-        --tone-base: oklch(17.3147% 0.03443 259.54);
-        --muted: oklch(68.4542% 0.04287 269.76);
-        --muted-strong: oklch(92.6985% 0.02464 265.59);
-        --line-soft: oklch(25.767% 0.05772 259.88);
-        --accent: oklch(65.3229% 0.1969 258.23);
-        --accent-ink: oklch(71.8796% 0.1599 251.87);
-        --accent-border: oklch(from var(--accent) calc(l - 0.35) calc(c * 0.75) h);
-        --accent-wash: oklch(from var(--accent) l c h / 0.12);
-        --warn: oklch(80.9396% 0.1868 79.23);
-        --err: oklch(71.6163% 0.2181 13.83);
-        --header-bg: oklch(13.4824% 0.03772 255.32 / 0.96);
-        --header-border: oklch(46.12% 0.0851 264.23 / 0.22);
-        --toggle-bg: oklch(18.8135% 0.03978 261.32 / 0.88);
-        --toggle-border: oklch(30.3242% 0.06705 260.4);
-        --toggle-text: oklch(100% 0 0);
-        --brand-text: oklch(100% 0 0);
         --shadow: 0 18px 40px oklch(0% 0 0 / 0.2);
         --shadow-soft: 0 10px 24px oklch(0% 0 0 / 0.18);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        &:not([data-theme="light"]) {
+          --shadow: 0 18px 40px oklch(0% 0 0 / 0.2);
+          --shadow-soft: 0 10px 24px oklch(0% 0 0 / 0.18);
+        }
       }
     }
 
@@ -1133,6 +1145,14 @@
         flex: 0 0 auto;
         transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 
+        &::before {
+          content: "☀️";
+        }
+
+        &[aria-pressed="true"]::before {
+          content: "🌙";
+        }
+
         &:hover {
           border-color: var(--accent);
           transform: translateY(-1px);
@@ -1281,6 +1301,18 @@
           table {
             display: none;
           }
+
+          &[aria-busy="true"] {
+            display: block;
+
+            .empty-hint {
+              display: none;
+            }
+
+            table {
+              display: table;
+            }
+          }
         }
 
         .table-hint {
@@ -1294,13 +1326,29 @@
           text-align: center;
         }
 
-        &.filter-empty .filter-empty-hint {
+        &.has-results:not(:has(tbody > tr)) .filter-empty-hint {
           display: grid;
         }
 
-        &.has-results .empty-hint,
-        &:not(.filter-empty) .filter-empty-hint {
+        &.has-results .empty-hint {
           display: none;
+        }
+
+        &:not(.has-results:not(:has(tbody > tr))) .filter-empty-hint {
+          display: none;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+          &.has-results table {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 180ms ease-out, transform 180ms ease-out;
+
+            @starting-style {
+              opacity: 0;
+              transform: translateY(8px);
+            }
+          }
         }
       }
 
@@ -1339,17 +1387,6 @@
           display: none;
         }
       }
-
-      .find-index {
-        position: fixed;
-        inset-block-start: 0;
-        inset-inline-start: -10000px;
-        inline-size: 1px;
-        block-size: 1px;
-        overflow: hidden;
-        pointer-events: none;
-        white-space: pre;
-      }
     }
 
     @media (max-width: 940px) {
@@ -1376,6 +1413,12 @@
 
       .results-card .table-wrap:not(.has-results) {
         min-block-size: 220px;
+      }
+    }
+
+    @container page (inline-size <=900px) {
+      .table-wrap {
+        --scroll-shadow-top: 0px;
       }
     }
 
@@ -1464,6 +1507,14 @@
 
     @media (prefers-reduced-motion: reduce) {
 
+      .progress-shell::-webkit-progress-value {
+        animation: none;
+      }
+
+      .progress-shell::-moz-progress-bar {
+        animation: none;
+      }
+
       :root:root:root,
       :root:root:root::before,
       :root:root:root::after,
@@ -1484,9 +1535,8 @@
         <img class="brand-mark" src="./icon.svg?v=4" alt="">
         <strong>SRG 역지오코딩</strong>
       </a>
-      <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환">
-        <span id="themeIcon" aria-hidden="true">🌙</span>
-      </button>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환"
+        title="테마 전환"></button>
     </div>
   </header>
   <main id="app">
@@ -1631,9 +1681,7 @@
         <div class="row-progress">
           <div class="sp">
             <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
-            <div id="prog-shell" class="progress-shell">
-              <progress id="prog" value="0" max="100"></progress>
-            </div>
+            <progress id="prog" class="progress-shell" value="0" max="100" aria-labelledby="prog-label"></progress>
           </div>
           <output id="counts">총 <strong id="cnt-total">0</strong>건 중
             <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
@@ -1664,7 +1712,7 @@
       <search>
         <form id="filters" class="filters">
           <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
-            aria-label="전체검색">
+            aria-label="전체검색" aria-keyshortcuts="Control+F Meta+F">
           <select id="filter-kind" aria-label="구분">
             <option value="">구분(전체)</option>
             <option value="kr">KR</option>
@@ -1716,6 +1764,19 @@
             </tr>
           </thead>
           <tbody></tbody>
+          <tfoot class="loading-rows" aria-hidden="true">
+            <tr class="loading-row">
+              <td data-label="구분"><span class="skeleton-bar"></span></td>
+              <td data-label="순번"></td>
+              <td data-label="좌표 (위도,경도)"><span class="skeleton-bar"></span></td>
+              <td data-label="시·도"><span class="skeleton-bar"></span></td>
+              <td data-label="시·군·구"><span class="skeleton-bar"></span></td>
+              <td data-label="읍·면·동·리"><span class="skeleton-bar"></span></td>
+              <td data-label="지물 태그"><span class="skeleton-bar"></span></td>
+              <td data-label="전체주소"><span class="skeleton-bar"></span></td>
+              <td data-label="지도링크"><span class="skeleton-bar"></span></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <nav id="result-pages" class="result-pages" aria-label="결과 페이지" hidden>
@@ -1725,7 +1786,6 @@
         <button type="button" id="page-next" class="action-btn action-btn--soft action-btn--compact" commandfor="app"
           command="--page-next">다음</button>
       </nav>
-      <div id="find-index" class="find-index" aria-hidden="true"></div>
       <p class="result-attribution">
         &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap
           contributors</a>
@@ -2146,7 +2206,10 @@
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
     mapPopover.addEventListener("beforetoggle", (e) => {
-      if (e.newState !== "open") return;
+      if (e.newState !== "open") {
+        LAST_MAP_INVOKER = null;
+        return;
+      }
       const btn = e.source;
       if (
         !(btn instanceof HTMLButtonElement) ||
@@ -2178,9 +2241,6 @@
       if (!isMapPopoverOpen()) return;
       mapPopover.hidePopover();
     }
-    mapPopover.addEventListener("toggle", (e) => {
-      if (e.newState !== "open") LAST_MAP_INVOKER = null;
-    });
     const fmt =
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -2213,12 +2273,9 @@
       if (end && s.charCodeAt(end - 1) === 46) end--;
       return normalizeCoordText(end === s.length ? s : s.slice(0, end));
     };
-    const tbl = document.getElementById("tbl");
     const domElements = {
       file: document.getElementById("file"),
-      dropZone: document.querySelector(".drop-zone"),
       themeToggle: document.getElementById("theme-toggle"),
-      themeIcon: document.getElementById("themeIcon"),
       app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
@@ -2231,8 +2288,7 @@
       progLabel: document.getElementById("prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
       emptyHint: document.querySelector(".table-wrap .empty-hint"),
-      tbody: tbl.tBodies[0],
-      coords: document.getElementById("coords"),
+      tbody: document.getElementById("tbl").tBodies[0],
       coordsContent: document.querySelector("#coords .coords-content"),
       manualOutput: document.getElementById("output"),
       manualOutputContent: document.querySelector("#output .coords-content"),
@@ -2253,7 +2309,6 @@
       pagePrev: document.getElementById("page-prev"),
       pageNext: document.getElementById("page-next"),
       pageStatus: document.getElementById("page-status"),
-      findIndex: document.getElementById("find-index"),
     };
     const setScrollableText = (contentElement, text) => {
       contentElement.textContent = String(text ?? "");
@@ -2261,33 +2316,21 @@
     const setCoordsText = (text) =>
       setScrollableText(domElements.coordsContent, text);
     const root = document.documentElement;
-    const THEME_STORAGE_KEY = root.dataset.themeStorageKey;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = (theme) => {
-      root.dataset.theme = theme;
-      const label = theme === "dark" ? "라이트 모드" : "다크 모드";
-      domElements.themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
-      domElements.themeToggle.setAttribute("aria-label", `${label}로 전환`);
-      domElements.themeToggle.setAttribute("title", `${label}로 전환`);
-      domElements.themeToggle.setAttribute(
-        "aria-pressed",
-        String(theme === "dark"),
-      );
-    };
-    applyTheme(root.dataset.theme);
-    themeMedia.addEventListener("change", () => {
-      if (root.dataset.themeSource === "stored") return;
-      applyTheme(themeMedia.matches ? "dark" : "light");
-    });
+    const currentTheme = () =>
+      root.dataset.theme || (themeMedia.matches ? "dark" : "light");
+    const updateThemeToggle = () =>
+      domElements.themeToggle.ariaPressed = String(currentTheme() === "dark");
+    updateThemeToggle();
+    themeMedia.addEventListener("change", updateThemeToggle);
     domElements.themeToggle.addEventListener("click", () => {
-      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      const next = currentTheme() === "dark" ? "light" : "dark";
       try {
-        localStorage.setItem(THEME_STORAGE_KEY, next);
-        root.dataset.themeSource = "stored";
+        localStorage.setItem(root.dataset.themeStorageKey, next);
       } catch {
-        root.dataset.themeSource = "system";
       }
-      applyTheme(next);
+      root.dataset.theme = next;
+      updateThemeToggle();
     });
     const KIND_COL_INDEX = 0;
     const IDX_COL_INDEX = 1;
@@ -2418,99 +2461,26 @@
         (!f.qMode || matchesQuery(r, fields, f.qMode, f.q1, f.qTokens));
     }
     const RESULT_PAGE_SIZE = 100;
-    const FIND_TEXT_CHUNK_SIZE = 500;
     let filterTimer = null;
     let pageRenderReq = 0;
-    let findRefreshToken = 0;
     function cancelActiveFilterTask() {
       if (filterTimer) {
         clearTimeout(filterTimer);
         filterTimer = null;
       }
     }
-    function lowerBound(indices, index) {
-      let low = 0;
-      let high = indices.length;
-      while (low < high) {
-        const mid = (low + high) >>> 1;
-        if (indices[mid] < index) low = mid + 1;
-        else high = mid;
-      }
-      return low;
-    }
     function insertVisibleIndex(index) {
       const indices = AppState.visibleIndices;
-      const position = lowerBound(indices, index);
+      let position = 0;
+      let high = indices.length;
+      while (position < high) {
+        const mid = (position + high) >>> 1;
+        if (indices[mid] < index) position = mid + 1;
+        else high = mid;
+      }
       if (indices[position] !== index) indices.splice(position, 0, index);
     }
-    function findText(record, index) {
-      const result = record.result;
-      if (!result) {
-        return `${record.set} ${index + 1} ${record.latStr} ${record.lonStr}`;
-      }
-      const addr = result.addr;
-      return [
-        result.kind || record.set,
-        index + 1,
-        record.latStr,
-        record.lonStr,
-        addr?.sido,
-        addr?.sigungu,
-        addr?.eupmyeon,
-        addr?.tag,
-        result.error || addr?.fullAddr,
-      ].filter(Boolean).join(" ");
-    }
-    function rebuildFindIndex() {
-      const fragment = document.createDocumentFragment();
-      const chunks = Math.ceil(
-        AppState.records.length / FIND_TEXT_CHUNK_SIZE,
-      );
-      for (let i = 0; i < chunks; i++) {
-        fragment.append(document.createElement("span"));
-      }
-      domElements.findIndex.replaceChildren(fragment);
-      scheduleFindIndexRefresh();
-    }
-    function scheduleFindIndexRefresh() {
-      const token = ++findRefreshToken;
-      const generation = AppState.generation;
-      void (async () => {
-        await yieldToMain();
-        const items = domElements.findIndex.children;
-        for (let chunk = 0; chunk < items.length; chunk++) {
-          if (
-            token !== findRefreshToken ||
-            generation !== AppState.generation
-          ) return;
-          const start = chunk * FIND_TEXT_CHUNK_SIZE;
-          const end = Math.min(
-            AppState.records.length,
-            start + FIND_TEXT_CHUNK_SIZE,
-          );
-          const parts = [];
-          for (let i = start; i < end; i++) {
-            parts.push(findText(AppState.records[i], i));
-          }
-          items[chunk].textContent = parts.join("\n");
-          await yieldToMain();
-        }
-      })();
-    }
-    function cancelFindIndexRefresh() {
-      findRefreshToken++;
-    }
-    function deferFindIndexRebuild() {
-      const token = ++findRefreshToken;
-      const generation = AppState.generation;
-      setTimeout(() => {
-        if (
-          token === findRefreshToken &&
-          generation === AppState.generation
-        ) rebuildFindIndex();
-      }, 250);
-    }
-    function rebuildVisibleIndices(resetPage = true) {
+    function rebuildVisibleIndices() {
       const f = getLiveFilterSnapshot();
       const indices = [];
       const records = AppState.records;
@@ -2518,9 +2488,8 @@
         if (matchesFilter(records[i], f)) indices.push(i);
       }
       AppState.visibleIndices = indices;
-      AppState.filterActive = f.active;
-      if (resetPage) AppState.page = 0;
-      renderCurrentPage(resetPage);
+      AppState.page = 0;
+      renderCurrentPage(true);
     }
     function renderCurrentPage(resetScroll = false) {
       pageRenderReq = 0;
@@ -2532,17 +2501,13 @@
       const start = AppState.page * RESULT_PAGE_SIZE;
       const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
       const fragment = document.createDocumentFragment();
-      const pageIndices = indices.slice(start, end);
-      for (const recordIndex of pageIndices) {
+      for (let position = start; position < end; position++) {
+        const recordIndex = indices[position];
         fragment.append(createResultRow(AppState.records[recordIndex], recordIndex));
       }
       domElements.tbody.replaceChildren(fragment);
       const hasResults = AppState.processed > 0;
       domElements.tableWrap.classList.toggle("has-results", hasResults);
-      domElements.tableWrap.classList.toggle(
-        "filter-empty",
-        hasResults && AppState.filterActive && visibleCount === 0,
-      );
       domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
       domElements.pagePrev.disabled = AppState.page === 0;
       domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
@@ -2595,7 +2560,6 @@
       processed: 0,
       cntFail: 0,
       visibleIndices: [],
-      filterActive: false,
       page: 0,
       bulkAcknowledged: true,
       generation: 0,
@@ -2620,7 +2584,6 @@
         this.processed = 0;
         this.cntFail = 0;
         this.visibleIndices = [];
-        this.filterActive = getLiveFilterSnapshot().active;
         this.page = 0;
         this.task = status === "idle"
           ? null
@@ -2666,7 +2629,7 @@
     function updateUIState() {
       const s = AppState.status;
       const isBusy = AppState.isBusy;
-      domElements.tableWrap.setAttribute("aria-busy", String(isBusy));
+      domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
       domElements.parseBtn.disabled = isBusy;
       domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
       domElements.pauseBtn.disabled = s !== "running";
@@ -2674,7 +2637,7 @@
       const stopDisabled = !(AppState.isRunning || s === "parsing") ||
         s === "stopping";
       domElements.stopBtn.disabled = stopDisabled;
-      domElements.dropZone.toggleAttribute("inert", isBusy);
+      domElements.file.disabled = isBusy;
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     let statusLiveTimer = 0;
@@ -2794,11 +2757,9 @@
       const wrap = domElements.tableWrap;
       closeMapPopover();
       domElements.tbody.replaceChildren();
-      cancelFindIndexRefresh();
-      domElements.findIndex.replaceChildren();
       wrap.scrollTop = 0;
       wrap.scrollLeft = 0;
-      wrap.classList.remove("filter-empty", "has-results");
+      wrap.classList.remove("has-results");
       domElements.pageNav.hidden = true;
     }
     function sleep(ms, signal) {
@@ -2839,12 +2800,7 @@
       YIELD_CHANNEL.port2.postMessage(0);
       return promise;
     }
-    async function cancelReadable(readable, reason) {
-      try {
-        await readable?.cancel(reason);
-      } catch {
-      }
-    }
+    const cancelReadableBestEffort = (readable) => readable?.cancel().catch(() => {});
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
         throw new InputValidationError(
@@ -3000,9 +2956,6 @@
       }
       const age = now - row.savedAt;
       return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
-    }
-    function persistentReverseCacheKey(cacheKey) {
-      return REVERSE_CACHE_KEY_PREFIX + cacheKey;
     }
     function openReverseCacheDb() {
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
@@ -3177,7 +3130,7 @@
             const savedAt = Date.now();
             for (const { cacheKey, parsed } of entries) {
               store.put({
-                key: persistentReverseCacheKey(cacheKey),
+                key: REVERSE_CACHE_KEY_PREFIX + cacheKey,
                 savedAt,
                 parsed,
               });
@@ -3228,7 +3181,7 @@
       const limit = CONFIG.REVERSE_RESPONSE_MAX_BYTES;
       const contentLength = Number(response.headers.get("content-length"));
       if (Number.isFinite(contentLength) && contentLength > limit) {
-        await cancelReadable(response.body);
+        await cancelReadableBestEffort(response.body);
         throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
@@ -3311,7 +3264,7 @@
             `HTTP ${res.status}: ${(await readReverseResponseText(res, requestSignal)).slice(0, 200)}`,
           );
         } else {
-          await cancelReadable(res.body);
+          await cancelReadableBestEffort(res.body);
           if (attempt >= maxRetry) {
             throw new Error(
               `HTTP ${res.status}: 요청 제한 또는 서버 오류`,
@@ -3340,8 +3293,8 @@
       const cacheWriteBatch = [];
       const flushCacheWrites = async () => {
         if (cacheWriteBatch.length === 0) return;
-        const entries = cacheWriteBatch.splice(0);
-        await writePersistentReverseCacheBatch(entries, signal);
+        await writePersistentReverseCacheBatch(cacheWriteBatch, signal);
+        cacheWriteBatch.length = 0;
       };
       for (const record of records) {
         record.result = null;
@@ -3477,7 +3430,6 @@
           );
         }
       }
-      deferFindIndexRebuild();
     }
     function setControlsIdle(message, type = "info") {
       AppState.setStatus("idle");
@@ -3658,6 +3610,7 @@
         if (AppState.task !== task) return;
         if (!records.length) {
           AppState.setRecords([]);
+          domElements.emptyHint.textContent = "좌표를 찾지 못했습니다.";
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
@@ -3709,47 +3662,46 @@
       e.preventDefault();
       scheduleApplyFilterAll();
     });
+    document.addEventListener("keydown", (e) => {
+      if (
+        AppState.processed === 0 ||
+        e.defaultPrevented ||
+        e.altKey ||
+        e.shiftKey ||
+        !(e.ctrlKey || e.metaKey) ||
+        e.code !== "KeyF"
+      ) return;
+      e.preventDefault();
+      const query = domElements.filterQ.value;
+      domElements.filters.reset();
+      domElements.filterQ.value = query;
+      domElements.filterQ.focus();
+      domElements.filterQ.select();
+    });
     domElements.tbody.addEventListener("click", (e) => {
       if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
     }, { capture: true });
-    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-    const maybeVT = (fn) => {
-      if (
-        domElements.tbody.childElementCount > 0 &&
-        domElements.tbody.childElementCount <= RESULT_PAGE_SIZE &&
-        !reducedMotion.matches
-      ) {
-        if (!document.activeViewTransition) {
-          return document.startViewTransition({
-            update: fn,
-            types: ["results"],
-          }).updateCallbackDone;
-        }
-      }
-      return Promise.try(fn);
-    };
     const COMMANDS = {
-      "--parse": () => maybeVT(handleParse),
-      "--start": () =>
-        maybeVT(() => {
-          if (!ensureNominatimRequestOrigin() || !confirmBulkNominatimUse()) {
-            return;
-          }
-          const task = AppState.reset("running");
-          clearTable();
-          setStatusMessage("조회 시작…");
-          void runProcessingLoop(task).catch((err) => {
-            if (AppState.task !== task) return;
-            console.error(err);
-            setControlsIdle(
-              `오류로 중단됨: ${getErrorMessage(err)}`,
-              "error",
-            );
-          });
-        }),
+      "--parse": handleParse,
+      "--start": () => {
+        if (!ensureNominatimRequestOrigin() || !confirmBulkNominatimUse()) {
+          return;
+        }
+        const task = AppState.reset("running");
+        clearTable();
+        setStatusMessage("조회 시작…");
+        void runProcessingLoop(task).catch((err) => {
+          if (AppState.task !== task) return;
+          console.error(err);
+          setControlsIdle(
+            `오류로 중단됨: ${getErrorMessage(err)}`,
+            "error",
+          );
+        });
+      },
       "--pause": () => {
         if (!AppState.isRunning) return;
         const task = AppState.task;
@@ -3837,16 +3789,8 @@
     }
     domElements.file.addEventListener(
       "change",
-      () => maybeVT(() => handleFile(domElements.file.files?.[0] || null)),
+      () => handleFile(domElements.file.files?.[0] || null),
     );
-    domElements.dropZone.addEventListener(
-      "dragover",
-      (e) => e.preventDefault(),
-    );
-    domElements.dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
-    });
     function loadManualRng() {
       const U64_MAX = (1n << 64n) - 1n;
       const U32_MAX_INV = 1 / 4294967295;

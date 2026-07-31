@@ -5,15 +5,11 @@ use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
 const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
 const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
-cfg_select! {
-    target_arch = "x86_64" => {
-        #[derive(Clone, Copy)]
-        pub(super) enum LadderEntryMode {
-            Players,
-            Results { expected_count: usize },
-        }
-    }
-    _ => {}
+#[cfg(target_arch = "x86_64")]
+#[derive(Clone, Copy)]
+pub(super) enum LadderEntryMode {
+    Players,
+    Results { expected_count: usize },
 }
 pub(super) fn read_line_reuse_limited<'buffer>(
     prompt: Arguments<'_>,
@@ -116,85 +112,76 @@ where
         }
     }
 }
-cfg_select! {
-    target_arch = "x86_64" => {
-        pub(super) fn parse_regular_f64(raw: &str) -> Option<f64> {
-            raw.parse::<f64>()
-                .ok()
-                .filter(|value| value.is_finite() && !value.is_subnormal())
-        }
-        pub(super) fn read_ladder_entries(
-            prompt: Arguments<'_>,
-            io: (&mut dyn Write, &mut dyn Write),
-            storage: &mut String,
-            mode: LadderEntryMode,
-        ) -> Result<usize> {
-            let (out, err) = io;
-            Ok('read: loop {
-                let line =
-                    read_line_reuse_limited(prompt, storage, out, MAX_LADDER_INPUT_BYTES)?;
-                let mut count = 0_usize;
-                for part in line.split(',') {
-                    count = count.strict_add(1);
-                    match mode {
-                        LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
-                            writeln!(
-                                err,
-                                "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
-                            )?;
-                            continue 'read;
-                        }
-                        LadderEntryMode::Results { expected_count } if count > expected_count => break,
-                        LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
-                    }
-                    if part.trim().is_empty() {
-                        let message = match mode {
-                            LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
-                            LadderEntryMode::Results { .. } => "결과값은 비워둘 수 없습니다.",
-                        };
-                        writeln!(err, "{message}")?;
-                        continue 'read;
-                    }
+#[cfg(target_arch = "x86_64")]
+pub(super) fn parse_regular_f64(raw: &str) -> Option<f64> {
+    raw.parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite() && !value.is_subnormal())
+}
+#[cfg(target_arch = "x86_64")]
+pub(super) fn read_ladder_entries(
+    prompt: Arguments<'_>,
+    io: (&mut dyn Write, &mut dyn Write),
+    storage: &mut String,
+    mode: LadderEntryMode,
+) -> Result<usize> {
+    let (out, err) = io;
+    Ok('read: loop {
+        let line = read_line_reuse_limited(prompt, storage, out, MAX_LADDER_INPUT_BYTES)?;
+        let mut count = 0_usize;
+        for part in line.split(',') {
+            count = count.strict_add(1);
+            match mode {
+                LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
+                    writeln!(
+                        err,
+                        "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
+                    )?;
+                    continue 'read;
                 }
-                match mode {
-                    LadderEntryMode::Players if count < 2 => {
-                        writeln!(err, "플레이어 수는 최소 2명이어야 합니다.")?;
-                        continue;
-                    }
-                    LadderEntryMode::Results { expected_count } if count != expected_count => {
-                        writeln!(
-                            err,
-                            "결과값의 개수({count})가 플레이어 수({expected_count})와 일치하지 않습니다.\n"
-                        )?;
-                        continue;
-                    }
-                    LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
-                }
-                break count;
-            })
-        }
-        pub(super) fn read_parsed_value<T>(
-            prompt: Arguments<'_>,
-            buffer: &mut String,
-            out: &mut dyn Write,
-            err: &mut dyn Write,
-            invalid_message: &str,
-            mut parse: impl FnMut(&str) -> Option<T>,
-        ) -> Result<T>
-        {
-            loop {
-                let line = read_line_reuse_limited(
-                    prompt,
-                    buffer,
-                    out,
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
-                )?;
-                if let Some(value) = parse(line) {
-                    return Ok(value);
-                }
-                writeln!(err, "{invalid_message}")?;
+                LadderEntryMode::Results { expected_count } if count > expected_count => break,
+                LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
+            }
+            if part.trim().is_empty() {
+                let message = match mode {
+                    LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
+                    LadderEntryMode::Results { .. } => "결과값은 비워둘 수 없습니다.",
+                };
+                writeln!(err, "{message}")?;
+                continue 'read;
             }
         }
+        match mode {
+            LadderEntryMode::Players if count < 2 => {
+                writeln!(err, "플레이어 수는 최소 2명이어야 합니다.")?;
+                continue;
+            }
+            LadderEntryMode::Results { expected_count } if count != expected_count => {
+                writeln!(
+                    err,
+                    "결과값의 개수({count})가 플레이어 수({expected_count})와 일치하지 않습니다.\n"
+                )?;
+                continue;
+            }
+            LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
+        }
+        break count;
+    })
+}
+#[cfg(target_arch = "x86_64")]
+pub(super) fn read_parsed_value<T>(
+    prompt: Arguments<'_>,
+    buffer: &mut String,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    invalid_message: &str,
+    mut parse: impl FnMut(&str) -> Option<T>,
+) -> Result<T> {
+    loop {
+        let line = read_line_reuse_limited(prompt, buffer, out, DEFAULT_INPUT_LINE_MAX_BYTES)?;
+        if let Some(value) = parse(line) {
+            return Ok(value);
+        }
+        writeln!(err, "{invalid_message}")?;
     }
-    _ => {}
 }

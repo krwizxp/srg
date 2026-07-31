@@ -1,9 +1,9 @@
-use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
 use super::{NativeInputSendStatus, TriggerAction};
+use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
 use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
-    mem::{align_of, offset_of, size_of},
+    mem::offset_of,
     ptr::{NonNull, null_mut},
 };
 use std::io::Write;
@@ -27,10 +27,22 @@ struct CGPoint {
     x: f64,
     y: f64,
 }
-const _: () = assert!(size_of::<CGPoint>() == 16, "CoreGraphics CGPoint size mismatch");
-const _: () = assert!(align_of::<CGPoint>() == 8, "CoreGraphics CGPoint align mismatch");
-const _: () = assert!(offset_of!(CGPoint, x) == 0, "CoreGraphics CGPoint x offset mismatch");
-const _: () = assert!(offset_of!(CGPoint, y) == 8, "CoreGraphics CGPoint y offset mismatch");
+const _: () = assert!(
+    size_of::<CGPoint>() == 16,
+    "CoreGraphics CGPoint size mismatch"
+);
+const _: () = assert!(
+    align_of::<CGPoint>() == 8,
+    "CoreGraphics CGPoint align mismatch"
+);
+const _: () = assert!(
+    offset_of!(CGPoint, x) == 0,
+    "CoreGraphics CGPoint x offset mismatch"
+);
+const _: () = assert!(
+    offset_of!(CGPoint, y) == 8,
+    "CoreGraphics CGPoint y offset mismatch"
+);
 struct Event {
     raw: NonNull<c_void>,
 }
@@ -49,14 +61,9 @@ impl Event {
         };
         Ok(Self { raw })
     }
-    fn keyboard(
-        virtual_key: CGKeyCode,
-        is_down: bool,
-        context: &str,
-    ) -> InputResult<Self> {
+    fn keyboard(virtual_key: CGKeyCode, is_down: bool, context: &str) -> InputResult<Self> {
         // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
-        let raw_ptr =
-            unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) };
+        let raw_ptr = unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) };
         Self::from_raw(raw_ptr, context)
     }
     fn location(&self) -> CGPoint {
@@ -89,10 +96,7 @@ impl Event {
 impl TriggerAction {
     pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
         if !post_event_access_granted(false) {
-            write_line_best_effort(
-                err,
-                format_args!("[경고] macOS 입력 제어 권한이 없습니다."),
-            );
+            write_line_best_effort(err, format_args!("[경고] macOS 입력 제어 권한이 없습니다."));
             return NativeInputSendStatus::FailedBeforeSend;
         }
         let result: InputResult<()> = (|| {
@@ -104,16 +108,8 @@ impl TriggerAction {
                         "현재 마우스 위치 조회",
                     )?;
                     let point = current.location();
-                    let mouse_down = Event::mouse(
-                        EVENT_LEFT_MOUSE_DOWN,
-                        point,
-                        "마우스 누름",
-                    )?;
-                    let mouse_up = Event::mouse(
-                        EVENT_LEFT_MOUSE_UP,
-                        point,
-                        "마우스 뗌",
-                    )?;
+                    let mouse_down = Event::mouse(EVENT_LEFT_MOUSE_DOWN, point, "마우스 누름")?;
+                    let mouse_up = Event::mouse(EVENT_LEFT_MOUSE_UP, point, "마우스 뗌")?;
                     mouse_down.post();
                     mouse_up.post();
                 }

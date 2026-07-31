@@ -2,7 +2,15 @@ extern crate alloc;
 use self::command::CliCommand;
 use self::diagnostic::{AppError, Result};
 use self::{file_output::OutputFile, menu_app::MenuApp};
+#[cfg(target_arch = "x86_64")]
+use self::{
+    hardware_rng::{HardwareRandomSource, HardwareRng},
+    output::persist_and_print_random_data,
+    random_data::generate_random_data_with_rng,
+};
 use core::fmt;
+#[cfg(target_arch = "x86_64")]
+use std::io::stderr;
 use std::{
     env,
     ffi::OsStr,
@@ -10,31 +18,23 @@ use std::{
     path::Path,
     sync::LazyLock,
 };
-cfg_select! {
-    target_arch = "x86_64" => {
-        use self::hardware_rng::{
-            HardwareRandomSource, HardwareRng,
-        };
-        use self::random_data::generate_random_data_with_rng;
-        use self::random_output::persist_and_print_random_data;
-        use std::io::stderr;
-        mod batch;
-        mod hardware_rng;
-        mod ladder;
-        mod random_number;
-        mod random_output;
-    }
-    _ => {}
-}
+#[cfg(target_arch = "x86_64")]
+mod batch;
 mod buffmt;
 mod command;
 mod diagnostic;
 mod file_output;
+#[cfg(target_arch = "x86_64")]
+mod hardware_rng;
 mod input;
+#[cfg(target_arch = "x86_64")]
+mod ladder;
 mod menu_app;
 mod numeric;
 mod output;
 mod random_data;
+#[cfg(target_arch = "x86_64")]
+mod random_number;
 mod stop_input;
 mod time;
 const BUFFER_SIZE: usize = 1016;

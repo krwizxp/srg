@@ -1,9 +1,5 @@
 use super::HighResTimerGuard;
-use core::{
-    ffi::c_void,
-    ptr::null,
-    time::Duration,
-};
+use core::{ffi::c_void, ptr::null, time::Duration};
 use std::{thread::sleep, time::Instant};
 pub(super) mod sys;
 pub(super) const CREATE_WAITABLE_TIMER_HIGH_RESOLUTION: u32 = 0x0000_0002;
@@ -14,8 +10,7 @@ const WAIT_OBJECT_0: u32 = 0;
 impl HighResTimerGuard {
     pub(super) fn sleep(&self, duration: Duration) {
         let started_at = Instant::now();
-        let Ok(due_time_units) = i64::try_from(duration.as_nanos().div_ceil(100).max(1))
-        else {
+        let Ok(due_time_units) = i64::try_from(duration.as_nanos().div_ceil(100).max(1)) else {
             sleep_remaining(started_at, duration);
             return;
         };
@@ -38,9 +33,7 @@ impl HighResTimerGuard {
             return;
         }
         // SAFETY: handle remains valid while waiting.
-        if unsafe {
-            sys::wait_for_single_object(self.handle.as_ptr(), INFINITE) != WAIT_OBJECT_0
-        } {
+        if unsafe { sys::wait_for_single_object(self.handle.as_ptr(), INFINITE) != WAIT_OBJECT_0 } {
             sleep_remaining(started_at, duration);
         }
     }

@@ -14,7 +14,7 @@ cfg_select! {
             input::{LadderEntryMode, read_ladder_entries},
             ladder::write_ladder_results,
             random_number::generate_random_number,
-            random_output::persist_and_print_random_data,
+            output::persist_and_print_random_data,
         };
         use crate::random_number::RandomNumberMode;
     }
@@ -28,12 +28,8 @@ cfg_select! {
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
 use std::io::{self, Write, stderr, stdout};
-cfg_select! {
-    target_arch = "x86_64" => {
-        const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
-    }
-    _ => {}
-}
+#[cfg(target_arch = "x86_64")]
+const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
 const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
@@ -148,37 +144,33 @@ impl MenuApp {
             }
         }
     }
-    cfg_select! {
-        target_arch = "x86_64" => {
-            fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&self.rng, out)? {
-                    return Ok(());
-                }
-                let players_storage = &mut self.input_buffer;
-                let results_storage = &mut self.ladder_results_storage;
-                let n = read_ladder_entries(
-                    format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
-                    (&mut *out, &mut *err),
-                    players_storage,
-                    LadderEntryMode::Players,
-                )?;
-                read_ladder_entries(
-                    format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-                    (&mut *out, &mut *err),
-                    results_storage,
-                    LadderEntryMode::Results { expected_count: n },
-                )?;
-                write_ladder_results(
-                    players_storage.trim().split(',').map(str::trim),
-                    results_storage.trim().split(',').map(str::trim),
-                    self.num_64,
-                    &self.rng,
-                    out,
-                )?;
-                self.rng.write_rdseed_fallback_notice(err)
-            }
+    #[cfg(target_arch = "x86_64")]
+    fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
+        if !prepare_hw_rng_menu_command(&self.rng, out)? {
+            return Ok(());
         }
-        _ => {}
+        let players_storage = &mut self.input_buffer;
+        let results_storage = &mut self.ladder_results_storage;
+        let n = read_ladder_entries(
+            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
+            (&mut *out, &mut *err),
+            players_storage,
+            LadderEntryMode::Players,
+        )?;
+        read_ladder_entries(
+            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
+            (&mut *out, &mut *err),
+            results_storage,
+            LadderEntryMode::Results { expected_count: n },
+        )?;
+        write_ladder_results(
+            players_storage.trim().split(',').map(str::trim),
+            results_storage.trim().split(',').map(str::trim),
+            self.num_64,
+            &self.rng,
+            out,
+        )?;
+        self.rng.write_rdseed_fallback_notice(err)
     }
     fn handle_manual_input_command(
         &mut self,
@@ -196,11 +188,9 @@ impl MenuApp {
             out,
             err,
         )?;
-        cfg_select! {
-            target_arch = "x86_64" => {
-                self.num_64 = manual_num_64;
-            }
-            _ => {}
+        #[cfg(target_arch = "x86_64")]
+        {
+            self.num_64 = manual_num_64;
         }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
@@ -245,52 +235,48 @@ impl MenuApp {
             }
         }
     }
-    cfg_select! {
-        target_arch = "x86_64" => {
-            fn handle_random_number_command(
-                &mut self,
-                out: &mut dyn Write,
-                err: &mut dyn Write,
-            ) -> Result<()> {
-                if !prepare_hw_rng_menu_command(&self.rng, out)? {
-                    return Ok(());
-                }
-                let num_64 = self.num_64;
-                let input_buffer = &mut self.input_buffer;
-                writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
-                let selection = read_line_reuse_limited(
-                    format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
+    #[cfg(target_arch = "x86_64")]
+    fn handle_random_number_command(
+        &mut self,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+    ) -> Result<()> {
+        if !prepare_hw_rng_menu_command(&self.rng, out)? {
+            return Ok(());
+        }
+        let num_64 = self.num_64;
+        let input_buffer = &mut self.input_buffer;
+        writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
+        let selection = read_line_reuse_limited(
+            format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
+            input_buffer,
+            out,
+            MENU_SELECTION_INPUT_MAX_BYTES,
+        )?;
+        match selection.as_bytes() {
+            b"1" => {
+                generate_random_number(
+                    RandomNumberMode::Integer,
+                    num_64,
                     input_buffer,
                     out,
-                    MENU_SELECTION_INPUT_MAX_BYTES,
+                    err,
+                    &self.rng,
                 )?;
-                match selection.as_bytes() {
-                    b"1" => {
-                        generate_random_number(
-                            RandomNumberMode::Integer,
-                            num_64,
-                            input_buffer,
-                            out,
-                            err,
-                            &self.rng,
-                        )?;
-                    }
-                    b"2" => {
-                        generate_random_number(
-                            RandomNumberMode::Float,
-                            num_64,
-                            input_buffer,
-                            out,
-                            err,
-                            &self.rng,
-                        )?;
-                    }
-                    _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
-                }
-                self.rng.write_rdseed_fallback_notice(err)
             }
+            b"2" => {
+                generate_random_number(
+                    RandomNumberMode::Float,
+                    num_64,
+                    input_buffer,
+                    out,
+                    err,
+                    &self.rng,
+                )?;
+            }
+            _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
         }
-        _ => {}
+        self.rng.write_rdseed_fallback_notice(err)
     }
     fn handle_server_time_command(
         &mut self,
@@ -392,20 +378,16 @@ impl MenuApp {
         }
     }
 }
-cfg_select! {
-    target_arch = "x86_64" => {
-        fn prepare_hw_rng_menu_command(rng: &HardwareRng, out: &mut dyn Write) -> Result<bool> {
-            match rng.source() {
-                HardwareRandomSource::None => {
-                    writeln!(
-                        out,
-                        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-                    )?;
-                    Ok(false)
-                }
-                HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
-            }
+#[cfg(target_arch = "x86_64")]
+fn prepare_hw_rng_menu_command(rng: &HardwareRng, out: &mut dyn Write) -> Result<bool> {
+    match rng.source() {
+        HardwareRandomSource::None => {
+            writeln!(
+                out,
+                "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
+            )?;
+            Ok(false)
         }
+        HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
     }
-    _ => {}
 }

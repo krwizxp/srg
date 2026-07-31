@@ -1,14 +1,8 @@
+#[cfg(target_os = "windows")]
+use self::timer_resolution::{
+    CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, SYNCHRONIZE_ACCESS, TIMER_MODIFY_STATE_ACCESS, sys,
+};
 use self::util::{blend_rtt, parse_u32_digits};
-cfg_select! {
-    target_os = "windows" => {
-        use self::timer_resolution::{
-            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, SYNCHRONIZE_ACCESS, TIMER_MODIFY_STATE_ACCESS,
-            sys,
-        };
-        use core::{ffi::c_void, ptr::{NonNull, null}};
-    }
-    _ => {}
-}
 use crate::{IS_TERMINAL, buffmt::ByteCursor, stop_input::StopInput};
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
@@ -22,6 +16,11 @@ use core::{
     str::FromStr,
     time::Duration,
 };
+#[cfg(target_os = "windows")]
+use core::{
+    ffi::c_void,
+    ptr::{NonNull, null},
+};
 use std::{
     io,
     sync::mpsc,
@@ -31,28 +30,18 @@ use std::{
 mod address;
 mod display;
 mod http_date;
-cfg_select! {
-    target_os = "linux" => {
-        mod wayland_input;
-    }
-    target_os = "macos" => {
-        mod macos_input;
-    }
-    target_os = "windows" => {
-        mod windows_input;
-    }
-    _ => {
-        compile_error!("SRG native input supports only Windows, Linux, and macOS.");
-    }
-}
+#[cfg(target_os = "macos")]
+mod macos_input;
 mod native_http;
+#[cfg(target_os = "windows")]
+mod timer_resolution;
 mod util;
-cfg_select! {
-    target_os = "windows" => {
-        mod timer_resolution;
-    }
-    _ => {}
-}
+#[cfg(target_os = "linux")]
+mod wayland_input;
+#[cfg(target_os = "windows")]
+mod windows_input;
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+compile_error!("SRG native input supports only Windows, Linux, and macOS.");
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const PASSIVE_POLL_INTERVAL: Duration = Duration::from_millis(45);
@@ -93,7 +82,7 @@ const RTT_TRIM_DIVISOR: usize = 5;
 type BoxError = Box<dyn Error + Send + Sync>;
 type Result<T> = CoreResult<T, TimeError>;
 type SampleWorkerResponse = (u64, Result<TimeSample>);
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(super) enum TriggerAction {
     F5Press,
     LeftClick,
@@ -104,7 +93,7 @@ enum NativeInputSendStatus {
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     Sent,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 enum TimeErrorKind {
     HeaderNotFound,
     Io,
@@ -127,12 +116,11 @@ pub(super) struct TimeError {
     kind: TimeErrorKind,
     source: Option<BoxError>,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 enum UrlScheme {
     Http,
     Https,
 }
-#[derive(Debug)]
 pub(super) struct ParsedServer {
     #[cfg(target_os = "windows")]
     host_wide: Vec<u16>,
@@ -151,7 +139,6 @@ pub(super) struct ServerTimeSession {
     pub scheduled_trigger: Option<(TargetTimeOfDay, TriggerAction)>,
     pub stop_after: Option<Duration>,
 }
-#[derive(Clone, Copy, Debug)]
 struct CivilDate {
     day: u32,
     month: u32,
@@ -175,13 +162,12 @@ impl<'message> ActivityTransition<'message> {
         }
     }
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct TimeSample {
     response_received_inst: Instant,
     rtt: Duration,
     server_time: SystemTime,
 }
-#[derive(Debug)]
 struct BaselineRttState {
     attempts: usize,
     had_previous_sample: bool,
@@ -190,14 +176,13 @@ struct BaselineRttState {
     samples: [Option<TimeSample>; NUM_SAMPLES],
     started: bool,
 }
-#[derive(Debug)]
 struct CalibrationState {
     baseline_rtt: Duration,
     pending_generation: Option<u64>,
     previous_sample: TimeSample,
     started_at: Instant,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct FinalCountdownState {
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     action: TriggerAction,
@@ -226,13 +211,12 @@ struct ConfirmedTrigger {
     action: TriggerAction,
     target_time: SystemTime,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct ServerTime {
     anchor_instant: Instant,
     anchor_time: SystemTime,
     baseline_rtt: Duration,
 }
-#[derive(Debug)]
 enum Activity {
     CalibrateOnTick(CalibrationState),
     FinalCountdown(FinalCountdownState),
@@ -245,7 +229,6 @@ enum Activity {
         started_at: Instant,
     },
 }
-#[derive(Clone, Copy)]
 enum CountdownTrigger {
     Late(Duration),
     WithRemaining(Duration),
@@ -542,15 +525,9 @@ impl ServerTimeSession {
                     action,
                     target: ScheduledTarget::Pending(target_time),
                 });
-        cfg_select! {
-            target_os = "macos" => {
-                if scheduled_trigger.is_some()
-                    && !macos_input::post_event_access_granted(true)
-                {
-                    writeln!(err, "[경고] macOS 입력 제어 권한이 허용되지 않았습니다.")?;
-                }
-            }
-            _ => {}
+        #[cfg(target_os = "macos")]
+        if scheduled_trigger.is_some() && !macos_input::post_event_access_granted(true) {
+            writeln!(err, "[경고] macOS 입력 제어 권한이 허용되지 않았습니다.")?;
         }
         if let Some(stop_after) = self.stop_after {
             writeln!(
@@ -1113,12 +1090,8 @@ impl AppState<'_> {
                 break;
             }
             thread::sleep(poll_timeout);
-            cfg_select! {
-                target_os = "linux" => {
-                    prepared_input.maintain(err);
-                }
-                _ => {}
-            }
+            #[cfg(target_os = "linux")]
+            prepared_input.maintain(err);
             let now = Instant::now();
             let confirmed_trigger =
                 self.scheduled_trigger
@@ -1196,12 +1169,8 @@ impl AppState<'_> {
                 }
             };
             let next_activity = transition.activity;
-            cfg_select! {
-                windows => {
-                    self.sync_high_res_timer_state(&next_activity, err)?;
-                }
-                _ => {}
-            }
+            #[cfg(target_os = "windows")]
+            self.sync_high_res_timer_state(&next_activity, err)?;
             let transition_had_message = if let Some(console_msg) = transition.message {
                 writeln!(out, "\n{console_msg}")?;
                 true
@@ -1259,47 +1228,43 @@ impl AppState<'_> {
         };
         trigger_instant.saturating_duration_since(now) > FINAL_COUNTDOWN_FREEZE_WINDOW
     }
-    cfg_select! {
-        windows => {
-            fn sync_high_res_timer_state(
-                &mut self,
-                next_activity: &Activity,
-                err: &mut dyn io::Write,
-            ) -> Result<()> {
-                if !next_activity.is_final_countdown() {
-                    self.high_res_timer_attempted = false;
-                    self.high_res_timer_guard = None;
-                    return Ok(());
-                }
-                if self.high_res_timer_attempted {
-                    return Ok(());
-                }
-                self.high_res_timer_attempted = true;
-                // SAFETY: No security attributes or name are needed, and a successful handle is
-                // transferred to the guard.
-                let timer_handle = unsafe {
-                    sys::create_waitable_timer_ex_w(
-                        null(),
-                        null(),
-                        CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
-                        SYNCHRONIZE_ACCESS | TIMER_MODIFY_STATE_ACCESS,
-                    )
-                };
-                let Some(handle) = NonNull::new(timer_handle) else {
-                    writeln!(
-                        err,
-                        concat!(
-                            "[경고] Windows 고해상도 대기 타이머 생성에 실패했습니다. ",
-                            "카운트다운 정확도가 저하될 수 있습니다."
-                        )
-                    )?;
-                    return Ok(());
-                };
-                self.high_res_timer_guard = Some(HighResTimerGuard { handle });
-                Ok(())
-            }
+    #[cfg(target_os = "windows")]
+    fn sync_high_res_timer_state(
+        &mut self,
+        next_activity: &Activity,
+        err: &mut dyn io::Write,
+    ) -> Result<()> {
+        if !next_activity.is_final_countdown() {
+            self.high_res_timer_attempted = false;
+            self.high_res_timer_guard = None;
+            return Ok(());
         }
-        _ => {}
+        if self.high_res_timer_attempted {
+            return Ok(());
+        }
+        self.high_res_timer_attempted = true;
+        // SAFETY: No security attributes or name are needed, and a successful handle is
+        // transferred to the guard.
+        let timer_handle = unsafe {
+            sys::create_waitable_timer_ex_w(
+                null(),
+                null(),
+                CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                SYNCHRONIZE_ACCESS | TIMER_MODIFY_STATE_ACCESS,
+            )
+        };
+        let Some(handle) = NonNull::new(timer_handle) else {
+            writeln!(
+                err,
+                concat!(
+                    "[경고] Windows 고해상도 대기 타이머 생성에 실패했습니다. ",
+                    "카운트다운 정확도가 저하될 수 있습니다."
+                )
+            )?;
+            return Ok(());
+        };
+        self.high_res_timer_guard = Some(HighResTimerGuard { handle });
+        Ok(())
     }
     fn trigger_final_countdown_deadline<'message>(
         &mut self,

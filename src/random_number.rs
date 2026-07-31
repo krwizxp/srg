@@ -1,7 +1,4 @@
-use super::{
-    hardware_rng::HardwareRng,
-    input::parse_regular_f64, input::read_parsed_value,
-};
+use super::{hardware_rng::HardwareRng, input::parse_regular_f64, input::read_parsed_value};
 use crate::diagnostic::{AppError, Result};
 use core::ops::{Mul as NumericMul, Sub as NumericSub};
 use std::io::Write;
@@ -41,7 +38,10 @@ pub(super) fn generate_random_number(
                 if value >= MIN_ALLOWED_INTEGER_VALUE {
                     break value;
                 }
-                writeln!(err, "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요.")?;
+                writeln!(
+                    err,
+                    "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요."
+                )?;
             };
             let max_value = loop {
                 let value = read_parsed_value(
@@ -96,8 +96,7 @@ pub(super) fn generate_random_integer(
     rng: &HardwareRng,
 ) -> Result<()> {
     validate_random_integer_range(min_value, max_value)?;
-    let rand_offset =
-        random_bounded_inclusive(max_value.abs_diff(min_value), seed_modifier, rng)?;
+    let rand_offset = random_bounded_inclusive(max_value.abs_diff(min_value), seed_modifier, rng)?;
     let result = min_value.strict_add_unsigned(rand_offset);
     writeln!(
         out,
@@ -164,8 +163,7 @@ pub(super) fn random_bounded_inclusive(
     let range_value = inclusive_max.strict_add(1);
     let threshold = range_value.wrapping_neg().rem_euclid(range_value);
     for _ in 0..RANDOM_BOUNDED_RETRY_LIMIT {
-        let (low_bits, high_bits) =
-            (rng.next_u64()? ^ seed_mod).carrying_mul(range_value, 0_u64);
+        let (low_bits, high_bits) = (rng.next_u64()? ^ seed_mod).carrying_mul(range_value, 0_u64);
         if low_bits >= threshold {
             return Ok(high_bits);
         }
