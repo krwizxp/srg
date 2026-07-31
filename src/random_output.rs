@@ -27,7 +27,6 @@ pub(super) fn persist_random_data(
     let file_len = format_data_into_buffer(data, buffer, OutputTarget::File)?;
     let writer = output_file.writer();
     IoWrite::write_all(&mut *writer, prefix_slice(buffer, file_len)?)?;
-    IoWrite::flush(writer)?;
     Ok(file_len)
 }
 pub(super) fn persist_and_print_random_data(

@@ -79,6 +79,7 @@ struct RandomBitBuffer {
     value: u64,
 }
 struct UniqueNumbers<const N: usize> {
+    count: u8,
     seen: u64,
 }
 struct RandomDataBuildState<'provider_ref, F>
@@ -92,6 +93,7 @@ where
     lotto7: UniqueNumbers<LOTTO7_COUNT>,
     next_supp: &'provider_ref mut F,
     numeric_password_digits: u8,
+    password_len: u8,
     supplemental: RandomBitBuffer,
 }
 impl RandomDataSet {
@@ -107,6 +109,7 @@ impl RandomDataSet {
             lotto7: UniqueNumbers::new(),
             next_supp,
             numeric_password_digits: 0,
+            password_len: 0,
             supplemental: RandomBitBuffer {
                 bits_remaining: 0,
                 value: 0,
@@ -134,21 +137,19 @@ impl<const N: usize> UniqueNumbers<N> {
         })
     }
     fn is_full(&self) -> bool {
-        usize::from(low_u8_from_u32(self.seen.count_ones())) >= N
+        usize::from(self.count) >= N
     }
     const fn new() -> Self {
-        Self { seen: 0 }
+        Self { count: 0, seen: 0 }
     }
-    fn push(&mut self, byte: u8, modulus: u8) {
-        if self.is_full() {
-            return;
-        }
+    const fn push(&mut self, byte: u8, modulus: u8) {
         let number = byte.rem_euclid(modulus).strict_add(1);
         let mask = 1_u64 << number;
         if (self.seen & mask) != 0 {
             return;
         }
         self.seen |= mask;
+        self.count = self.count.strict_add(1);
     }
 }
 impl<F> RandomDataBuildState<'_, F>
@@ -291,17 +292,18 @@ where
         Ok(())
     }
     fn fill_required_fields(&mut self) -> Result<()> {
-        self.fill_required_fields_from_u64(self.data.num_64);
+        if self.fill_required_fields_from_u64(self.data.num_64) {
+            return Ok(());
+        }
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-            if self.is_complete() {
+            let new_supp = self.next_supplemental("기본 필드 보완")?;
+            if self.fill_required_fields_from_u64(new_supp) {
                 return Ok(());
             }
-            let new_supp = self.next_supplemental("기본 필드 보완")?;
-            self.fill_required_fields_from_u64(new_supp);
         }
         Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into())
     }
-    fn fill_required_fields_from_u64(&mut self, value: u64) {
+    fn fill_required_fields_from_u64(&mut self, value: u64) -> bool {
         for byte in value.to_be_bytes() {
             if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
                 continue;
@@ -323,33 +325,28 @@ where
                     if !self.lotto7.is_full() {
                         self.lotto7.push(byte, LOTTO7_MODULUS);
                     }
-                    let [empty, p1, p2, p3, p4, p5, p6, p7] = self.data.password;
-                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD && empty == 0 {
-                        self.data.password = [
-                            p1,
-                            p2,
-                            p3,
-                            p4,
-                            p5,
-                            p6,
-                            p7,
-                            byte.rem_euclid(ASCII_PRINTABLE_LEN)
-                                .strict_add(ASCII_PRINTABLE_START),
-                        ];
+                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD
+                        && let Some(slot) =
+                            self.data.password.get_mut(usize::from(self.password_len))
+                    {
+                        *slot = byte
+                            .rem_euclid(ASCII_PRINTABLE_LEN)
+                            .strict_add(ASCII_PRINTABLE_START);
+                        self.password_len = self.password_len.strict_add(1);
                     }
                 }
             }
             if self.is_complete() {
-                return;
+                return true;
             }
         }
+        false
     }
     fn is_complete(&self) -> bool {
-        let [password_first, ..] = self.data.password;
         self.numeric_password_digits >= LOTTO_COUNT_U8
             && self.lotto.is_full()
             && self.lotto7.is_full()
-            && password_first != 0
+            && usize::from(self.password_len) >= PASSWORD_BYTE_LEN
             && self.euro_main.is_full()
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
@@ -406,7 +403,7 @@ fn extract_valid_bits_for_nms(
                 value: next_supp(reason)?,
             };
         }
-        let shift = supplemental.bits_remaining.abs_diff(bits);
+        let shift = supplemental.bits_remaining.strict_sub(bits);
         supplemental.bits_remaining = shift;
         let extracted = (supplemental.value >> shift) & mask;
         if extracted <= max_value {

@@ -1,9 +1,8 @@
 use crate::{
-    BUFFER_SIZE, FILE_NAME, IS_TERMINAL, UTF8_BOM,
+    FILE_NAME,
     diagnostic::{Result, is_unexpected_eof},
     file_output::OutputFile,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
-    output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
     random_data::RandomDataSet,
     time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
 };
@@ -15,14 +14,20 @@ cfg_select! {
             input::{LadderEntryMode, read_ladder_entries},
             ladder::write_ladder_results,
             random_number::generate_random_number,
+            random_output::persist_and_print_random_data,
         };
         use crate::random_number::RandomNumberMode;
     }
-    _ => {}
+    _ => {
+        use crate::{
+            BUFFER_SIZE, IS_TERMINAL,
+            output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
+        };
+    }
 }
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
-use std::io::{self, Seek as _, SeekFrom, Write, stderr, stdout};
+use std::io::{self, Write, stderr, stdout};
 cfg_select! {
     target_arch = "x86_64" => {
         const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
@@ -69,12 +74,7 @@ impl MenuApp {
                 return Ok(true);
             }
             b'6' => {
-                let writer = self.output_file.writer();
-                Write::flush(&mut *writer)?;
-                writer.get_ref().set_len(0)?;
-                writer.seek(SeekFrom::Start(0))?;
-                Write::write_all(&mut *writer, UTF8_BOM)?;
-                Write::flush(writer)?;
+                self.output_file.clear()?;
                 writeln!(out, "파일 '{FILE_NAME}'를 초기화했습니다.")?;
                 return Ok(true);
             }
@@ -119,14 +119,17 @@ impl MenuApp {
                                 }
                             }
                         };
-                        let next_num_64 = regenerate_with_count(
+                        let completion = regenerate_with_count(
                             &mut self.output_file,
                             &self.rng,
                             requested_count,
+                            command == b'4',
                             out,
                         )?;
                         self.rng.write_rdseed_fallback_notice(err)?;
-                        self.num_64 = next_num_64;
+                        if let Some(next_num_64) = completion {
+                            self.num_64 = next_num_64;
+                        }
                     }
                     _ => return Ok(false),
                 }
@@ -224,18 +227,23 @@ impl MenuApp {
             ..Default::default()
         }
         .populate(&mut next_supp)?;
-        let mut buffer = [0_u8; BUFFER_SIZE];
-        let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
-        let writer = self.output_file.writer();
-        Write::write_all(&mut *writer, prefix_slice(&buffer, file_len)?)?;
-        Write::flush(writer)?;
-        let console_len = if *IS_TERMINAL {
-            format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
-        } else {
-            file_len
-        };
-        write_slice_to_console(prefix_slice(&buffer, console_len)?)?;
-        Ok(())
+        cfg_select! {
+            target_arch = "x86_64" => {
+                persist_and_print_random_data(&mut self.output_file, &data)
+            }
+            _ => {
+                let mut buffer = [0_u8; BUFFER_SIZE];
+                let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
+                self.output_file.writer().write_all(prefix_slice(&buffer, file_len)?)?;
+                let output_len = if *IS_TERMINAL {
+                    format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
+                } else {
+                    file_len
+                };
+                write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
+                Ok(())
+            }
+        }
     }
     cfg_select! {
         target_arch = "x86_64" => {

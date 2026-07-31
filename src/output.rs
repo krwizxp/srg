@@ -5,7 +5,6 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-use core::range::Range;
 use std::io::{Result as IoResult, Write as IoWrite, stdout};
 cfg_select! {
     target_arch = "x86_64" => {
@@ -171,16 +170,25 @@ impl OutputFormatter<'_, '_, '_> {
             .and_then(|value| value.checked_add(BYTE_GROUP_COUNT))
             .ok_or_else(write_zero_err)?;
         let head = self.cursor.take(line_len)?;
-        range_slice_mut(head, 0, prefix_len)?.copy_from_slice(prefix_bytes);
-        let mut pos = prefix_len;
+        let Some((prefix_out, groups)) = head.split_at_mut_checked(prefix_len) else {
+            return Err(write_zero_err());
+        };
+        prefix_out.copy_from_slice(prefix_bytes);
         let last_index = BYTE_GROUP_COUNT.strict_sub(1);
-        for (index, byte) in self.bytes.into_iter().enumerate() {
+        for (index, (group_out, byte)) in groups
+            .chunks_exact_mut(WIDTH.strict_add(1))
+            .zip(self.bytes)
+            .enumerate()
+        {
             let group = render_group(byte);
-            range_slice_mut(head, pos, WIDTH)?.copy_from_slice(&group);
-            pos = checked_add_index(pos, WIDTH)?;
-            let slot = head.get_mut(pos).ok_or_else(write_zero_err)?;
-            *slot = if index == last_index { b'\n' } else { b' ' };
-            pos = checked_add_index(pos, 1)?;
+            let Some((value_out, separator_out)) = group_out.split_at_mut_checked(WIDTH) else {
+                return Err(write_zero_err());
+            };
+            value_out.copy_from_slice(&group);
+            let Some(separator) = separator_out.first_mut() else {
+                return Err(write_zero_err());
+            };
+            *separator = if index == last_index { b'\n' } else { b' ' };
         }
         Ok(())
     }
@@ -253,21 +261,6 @@ fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
 pub(super) fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
     slice.get(..len).ok_or_else(write_zero_err)
 }
-fn range_slice_mut(slice: &mut [u8], start: usize, len: usize) -> IoResult<&mut [u8]> {
-    let end = checked_add_index(start, len)?;
-    slice
-        .get_mut(Range { start, end })
-        .ok_or_else(write_zero_err)
-}
-const fn u8_dec_len(n: u8) -> usize {
-    if n >= U8_THREE_DIGIT_THRESHOLD {
-        3
-    } else if n >= U8_TWO_DIGIT_THRESHOLD {
-        2
-    } else {
-        1
-    }
-}
 const fn bit(byte: u8, mask: u8) -> u8 {
     if byte & mask == 0 { b'0' } else { b'1' }
 }
@@ -301,11 +294,13 @@ fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) 
     Ok(())
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) -> IoResult<()> {
-    let head = cur.take(u8_dec_len(n))?;
-    write_u8_dec_into_slice(head, n)?;
-    Ok(())
-}
-fn write_u8_dec_into_slice(target: &mut [u8], n: u8) -> IoResult<()> {
+    let target = cur.take(if n >= U8_THREE_DIGIT_THRESHOLD {
+        3
+    } else if n >= U8_TWO_DIGIT_THRESHOLD {
+        2
+    } else {
+        1
+    })?;
     if n >= U8_THREE_DIGIT_THRESHOLD {
         let hundreds = usize::from(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
         let rem = usize::from(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
@@ -336,24 +331,11 @@ fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
     nums: &[u8; N],
 ) -> IoResult<()> {
-    let separator_count = N.strict_sub(1);
-    let total = nums.iter().try_fold(separator_count, |total, &n| {
-        checked_add_index(total, u8_dec_len(n))
-    })?;
-    let head = cur.take(total)?;
-    let mut pos = 0_usize;
     for (index, &n) in nums.iter().enumerate() {
         if index != 0 {
-            let Some(slot) = head.get_mut(pos) else {
-                return Err(write_zero_err());
-            };
-            *slot = b' ';
-            pos = checked_add_index(pos, 1)?;
+            cur.write_byte(b' ')?;
         }
-        let width = u8_dec_len(n);
-        let slot = range_slice_mut(head, pos, width)?;
-        write_u8_dec_into_slice(slot, n)?;
-        pos = checked_add_index(pos, width)?;
+        buf_write_u8_dec(cur, n)?;
     }
     Ok(())
 }

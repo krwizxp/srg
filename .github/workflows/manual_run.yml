@@ -65,8 +65,8 @@ jobs:
         run: rustup toolchain install stable --profile minimal --no-self-update
       - name: Install Linux native dependencies
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
-      - name: Build release binary and workflow runner
-        run: cargo +stable build --release --frozen --bin srg --example manual_workflow
+      - name: Build release binary
+        run: cargo +stable build --release --frozen --bin srg
       - name: Run selected SRG action
         env:
           SRG_ACTION: ${{ inputs.action }}
@@ -79,7 +79,7 @@ jobs:
           SRG_FLOAT_MAX: ${{ inputs.float_max }}
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
-        run: ./target/release/examples/manual_workflow
+        run: cargo +stable run --frozen --example manual_workflow
       - name: Upload console log artifact
         if: always() && hashFiles('artifacts/srg-result-console.log') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

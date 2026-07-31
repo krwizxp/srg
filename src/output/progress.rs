@@ -1,9 +1,8 @@
-use super::{buf_write_u8_dec, u8_dec_len};
+use super::buf_write_u8_dec;
 use crate::{
     buffmt::ByteCursor,
     diagnostic::Result,
     numeric::{low_u8_from_u128, low_u8_from_usize, u128_from_usize},
-    IS_TERMINAL,
 };
 use core::time::Duration;
 use std::io::Write as IoWrite;
@@ -38,9 +37,6 @@ impl ProgressBuffers {
         total: usize,
         elapsed: Duration,
     ) -> Result<()> {
-        if !*IS_TERMINAL {
-            return Ok(());
-        }
         let elapsed_millis = elapsed.as_millis();
         let elapsed_deci = elapsed_millis.div_euclid(ELAPSED_MILLIS_PER_DECI);
         let eta_deci = if total == 0 || completed == total {
@@ -71,7 +67,14 @@ impl ProgressBuffers {
         }
         cur.write_byte(b']')?;
         cur.write_byte(b' ')?;
-        let padding = PERCENT_WIDTH.strict_sub(u8_dec_len(percent));
+        let percent_width = if percent >= 100 {
+            3
+        } else if percent >= 10 {
+            2
+        } else {
+            1
+        };
+        let padding = PERCENT_WIDTH.strict_sub(percent_width);
         for _ in 0..padding {
             cur.write_byte(b' ')?;
         }

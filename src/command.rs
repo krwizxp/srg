@@ -8,7 +8,7 @@ cfg_select! {
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
-            ladder::{MAX_LADDER_ENTRIES, write_ladder_results},
+            ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
             random_number::{generate_random_float, generate_random_integer, validate_random_float_range, validate_random_integer_range},
             FILE_NAME,
         };
@@ -57,7 +57,8 @@ impl CliCommand {
             Self::Generate { count } => {
                 Self::run_with_rng(&mut err, |rng| {
                     let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
-                    regenerate_with_count(&mut output_file, rng, count, &mut out)?;
+                    let _completion =
+                        regenerate_with_count(&mut output_file, rng, count, false, &mut out)?;
                     Ok(())
                 })?;
             }
@@ -167,23 +168,47 @@ where
                     take_two_args(&mut args, "ladder <players-csv> <results-csv>")?;
                 let players = Self::owned_text(players_arg, "players-csv")?;
                 let results = Self::owned_text(results_arg, "results-csv")?;
-                if players.contains(['\r', '\n']) || results.contains(['\r', '\n']) {
+                if players.len() > MAX_LADDER_INPUT_BYTES || results.len() > MAX_LADDER_INPUT_BYTES
+                {
+                    return Err(AppError::message(format!(
+                        "입력이 너무 깁니다. 최대 {MAX_LADDER_INPUT_BYTES} bytes까지 입력할 수 있습니다."
+                    )));
+                }
+                let csv_shape = |value: &str| {
+                    let mut count = 1_usize;
+                    let mut entry_has_text = false;
+                    let mut has_empty = false;
+                    let mut has_line_break = false;
+                    for character in value.chars() {
+                        match character {
+                            ',' => {
+                                count = count.strict_add(1);
+                                has_empty |= !entry_has_text;
+                                entry_has_text = false;
+                            }
+                            '\r' | '\n' => has_line_break = true,
+                            _ if !character.is_whitespace() => entry_has_text = true,
+                            _ => {}
+                        }
+                    }
+                    (count, has_empty || !entry_has_text, has_line_break)
+                };
+                let (player_count, players_have_empty, players_have_line_break) =
+                    csv_shape(&players);
+                let (result_count, results_have_empty, results_have_line_break) =
+                    csv_shape(&results);
+                if players_have_line_break || results_have_line_break {
                     return Err("플레이어와 결과값은 한 줄로 입력해야 합니다.".into());
                 }
-                let player_count = players.split(',').count();
                 if !(2..=MAX_LADDER_ENTRIES).contains(&player_count) {
                     return Err(AppError::message(format!(
                         "플레이어는 2~{MAX_LADDER_ENTRIES}명이어야 합니다."
                     )));
                 }
-                if player_count != results.split(',').count() {
+                if player_count != result_count {
                     return Err("결과값 개수는 플레이어 수와 같아야 합니다.".into());
                 }
-                if players
-                    .split(',')
-                    .chain(results.split(','))
-                    .any(|entry| entry.trim().is_empty())
-                {
+                if players_have_empty || results_have_empty {
                     return Err("플레이어와 결과값은 비워둘 수 없습니다.".into());
                 }
                 Ok(Self::Ladder { players, results })

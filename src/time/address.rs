@@ -1,6 +1,6 @@
 use super::{
     HTTP_SCHEME_PREFIX, HTTP_SCHEME_PREFIX_LEN, HTTPS_SCHEME_PREFIX, HTTPS_SCHEME_PREFIX_LEN,
-    ParsedServer, Result, TimeError, UrlScheme, util::parse_result_with_context,
+    ParsedServer, Result, TimeError, UrlScheme,
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
@@ -31,13 +31,23 @@ impl FromStr for ParsedServer {
         } else {
             (UrlScheme::Https, trimmed_input)
         };
-        if after_scheme.contains(['/', '\\', '?', '#']) {
+        let (has_path, invalid_host_char, colon_count) = after_scheme.chars().fold(
+            (false, false, 0_usize),
+            |(has_path, invalid_host_char, colon_count), ch| {
+                (
+                    has_path || matches!(ch, '/' | '\\' | '?' | '#'),
+                    invalid_host_char
+                        || matches!(ch, '@' | '%')
+                        || ch.is_control()
+                        || ch.is_whitespace(),
+                    colon_count.strict_add(usize::from(ch == ':')),
+                )
+            },
+        );
+        if has_path {
             return Err(TimeError::parse(ERR_PATH));
         }
-        if after_scheme.is_empty()
-            || after_scheme.contains(['@', '%'])
-            || after_scheme.contains(|ch: char| ch.is_control() || ch.is_whitespace())
-        {
+        if after_scheme.is_empty() || invalid_host_char {
             return Err(TimeError::parse(ERR_HOST));
         }
         let (host_part, explicit_port, bracketed) =
@@ -53,8 +63,8 @@ impl FromStr for ParsedServer {
                         .ok_or_else(|| TimeError::parse(ERR_HOST))?;
                     (host_part, Some(parse_port(port_part)?), true)
                 }
-            } else if let Some((host_part, port_part)) = after_scheme.split_once(':')
-                && !port_part.contains(':')
+            } else if colon_count == 1
+                && let Some((host_part, port_part)) = after_scheme.split_once(':')
             {
                 (host_part, Some(parse_port(port_part)?), false)
             } else {
@@ -68,9 +78,9 @@ impl FromStr for ParsedServer {
             return Err(TimeError::parse(ERR_HOST));
         }
         let literal_ip_addr = host_part.parse::<net::IpAddr>().ok();
-        if (bracketed || host_part.contains(':'))
-            && !matches!(literal_ip_addr, Some(net::IpAddr::V6(_)))
-        {
+        let host_is_ipv6 = matches!(literal_ip_addr, Some(net::IpAddr::V6(_)));
+        let host_requires_ipv6 = bracketed || (explicit_port.is_none() && colon_count > 0);
+        if host_requires_ipv6 && !host_is_ipv6 {
             return Err(TimeError::parse(ERR_HOST));
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -79,7 +89,7 @@ impl FromStr for ParsedServer {
                 UrlScheme::Http => HTTP_SCHEME_PREFIX,
                 UrlScheme::Https => HTTPS_SCHEME_PREFIX,
             };
-            let request_target_text = match (host_part.contains(':'), explicit_port.is_some()) {
+            let request_target_text = match (host_is_ipv6, explicit_port.is_some()) {
                 (true, true) => format!("{prefix}[{host_part}]:{port}"),
                 (true, false) => format!("{prefix}[{host_part}]"),
                 (false, true) => format!("{prefix}{host_part}:{port}"),
@@ -89,9 +99,23 @@ impl FromStr for ParsedServer {
                 TimeError::parse_with_source("서버 HTTP 요청 대상 변환 실패", source)
             })?
         };
+        #[cfg(target_os = "windows")]
+        let host_wide = {
+            let capacity = host_part
+                .len()
+                .checked_add(1)
+                .ok_or_else(|| TimeError::parse("서버 host UTF-16 용량 계산 실패"))?;
+            let mut value = Vec::new();
+            value.try_reserve_exact(capacity).map_err(|source| {
+                TimeError::parse_with_source("서버 host UTF-16 메모리 확보 실패", source)
+            })?;
+            value.extend(host_part.encode_utf16());
+            value.push(0);
+            value
+        };
         Ok(Self {
             #[cfg(target_os = "windows")]
-            host_wide: host_part.encode_utf16().chain([0]).collect(),
+            host_wide,
             #[cfg(target_os = "windows")]
             port,
             #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -104,7 +128,9 @@ fn parse_port(port_part: &str) -> Result<u16> {
     if port_part.is_empty() || !port_part.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(TimeError::parse(ERR_PORT));
     }
-    let port = parse_result_with_context(port_part.parse::<u16>(), ERR_PORT)?;
+    let port = port_part
+        .parse::<u16>()
+        .map_err(|source| TimeError::parse_with_source(ERR_PORT, source))?;
     if port == 0 {
         return Err(TimeError::parse(ERR_PORT));
     }

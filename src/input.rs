@@ -1,14 +1,8 @@
 use crate::diagnostic::Result;
 #[cfg(target_arch = "x86_64")]
-use crate::ladder::MAX_LADDER_ENTRIES;
+use crate::ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES};
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
-cfg_select! {
-    target_arch = "x86_64" => {
-        const LADDER_INPUT_LINE_MAX_BYTES: usize = 64 * 1024;
-    }
-    _ => {}
-}
 const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
 const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
 cfg_select! {
@@ -138,7 +132,7 @@ cfg_select! {
             let (out, err) = io;
             Ok('read: loop {
                 let line =
-                    read_line_reuse_limited(prompt, storage, out, LADDER_INPUT_LINE_MAX_BYTES)?;
+                    read_line_reuse_limited(prompt, storage, out, MAX_LADDER_INPUT_BYTES)?;
                 let mut count = 0_usize;
                 for part in line.split(',') {
                     count = count.strict_add(1);

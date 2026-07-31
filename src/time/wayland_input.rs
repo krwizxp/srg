@@ -254,6 +254,20 @@ impl EiApi {
             (self.device_keyboard_key)(device.as_ptr(), F5_KEY_CODE, is_press);
         }
     }
+    fn send_action(
+        &self,
+        action: TriggerAction,
+        context: NonNull<Ei>,
+        device: NonNull<EiDevice>,
+    ) {
+        for pressed in [true, false] {
+            match action {
+                TriggerAction::F5Press => self.keyboard_key(device, pressed),
+                TriggerAction::LeftClick => self.button(device, pressed),
+            }
+            self.frame(context, device);
+        }
+    }
 }
 impl EiSession {
     fn dispatch(&mut self) -> InputResult<Option<NonNull<EiPing>>> {
@@ -405,20 +419,8 @@ impl EiSession {
         let ping = NonNull::new(ping_ptr).ok_or(SendError::Before(Cow::Borrowed(
             "ei_new_ping 실패",
         )))?;
-        match self.action {
-            TriggerAction::F5Press => {
-                self.api.keyboard_key(device.raw, true);
-                self.api.frame(self.context, device.raw);
-                self.api.keyboard_key(device.raw, false);
-                self.api.frame(self.context, device.raw);
-            }
-            TriggerAction::LeftClick => {
-                self.api.button(device.raw, true);
-                self.api.frame(self.context, device.raw);
-                self.api.button(device.raw, false);
-                self.api.frame(self.context, device.raw);
-            }
-        }
+        self.api
+            .send_action(self.action, self.context, device.raw);
         // SAFETY: ping is a live synchronization object owned by this send operation.
         unsafe {
             (self.api.ping)(ping.as_ptr());
@@ -446,14 +448,12 @@ impl EiSession {
             if connection_closed {
                 return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
             }
-            if Instant::now() >= deadline {
+            let now = Instant::now();
+            if now >= deadline {
                 return Err(Cow::Borrowed("Wayland 입력 전달 확인 시간이 초과되었습니다."));
             }
             let mut poll_fd = PollFd::new(self.poll_fd()?);
-            poll_fds(
-                slice::from_mut(&mut poll_fd),
-                poll_timeout_until(deadline)?,
-            )?;
+            poll_fds(slice::from_mut(&mut poll_fd), poll_timeout_until(deadline, now))?;
             if poll_fd.is_invalid() {
                 return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
             }
@@ -599,14 +599,12 @@ impl PortalSession {
             if should_cancel() {
                 return Ok(None);
             }
-            if Instant::now() >= deadline {
+            let now = Instant::now();
+            if now >= deadline {
                 return Err(Cow::Borrowed("Wayland 입력 권한 준비 시간이 초과되었습니다."));
             }
             let mut poll_fd = PollFd::new(self.poll_fd()?);
-            poll_fds(
-                slice::from_mut(&mut poll_fd),
-                poll_timeout_until(deadline)?,
-            )?;
+            poll_fds(slice::from_mut(&mut poll_fd), poll_timeout_until(deadline, now))?;
             if poll_fd.is_invalid() {
                 return Err(Cow::Borrowed("liboeffis poll descriptor가 무효화되었습니다."));
             }
@@ -810,17 +808,19 @@ impl WaylandInput {
     where
         F: FnMut() -> bool,
     {
-        while Instant::now() < deadline {
+        let mut now = Instant::now();
+        while now < deadline {
             if should_cancel() {
                 return Ok(false);
             }
-            self.dispatch(poll_timeout_until(deadline)?)?;
+            self.dispatch(poll_timeout_until(deadline, now))?;
             if self.ei.device.is_some_and(|device| device.active) {
                 return Ok(true);
             }
             if should_cancel() {
                 return Ok(false);
             }
+            now = Instant::now();
         }
         Err(Cow::Borrowed(
             "Wayland 가상 입력 장치 준비 시간이 초과되었습니다.",
@@ -839,14 +839,13 @@ fn dl_error_message() -> InputError {
         .into_owned()
         .into()
 }
-fn poll_timeout_until(deadline: Instant) -> InputResult<c_int> {
-    let timeout_millis = deadline
-        .saturating_duration_since(Instant::now())
-        .min(POLL_INTERVAL)
-        .as_millis()
-        .max(1);
-    c_int::try_from(timeout_millis)
-        .map_err(|source| format!("poll 제한 시간 변환 실패: {source}").into())
+fn poll_timeout_until(deadline: Instant, now: Instant) -> c_int {
+    let remaining = deadline.saturating_duration_since(now).min(POLL_INTERVAL);
+    if remaining == POLL_INTERVAL {
+        1_000
+    } else {
+        remaining.subsec_millis().cast_signed().max(1)
+    }
 }
 fn poll_fds(fds: &mut [PollFd], timeout: c_int) -> InputResult<()> {
     let descriptor_count = PollDescriptorCount::try_from(fds.len())

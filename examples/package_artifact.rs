@@ -102,9 +102,8 @@ fn main() -> io::Result<()> {
     }
     let remainder = source_len.rem_euclid(TAR_BLOCK_LEN_U64);
     if remainder != 0 {
-        let remainder_usize = usize::try_from(remainder).map_err(|conversion_error| {
-            io::Error::new(io::ErrorKind::InvalidInput, conversion_error)
-        })?;
+        let [low, high, _, _, _, _, _, _] = remainder.to_le_bytes();
+        let remainder_usize = usize::from(u16::from_le_bytes([low, high]));
         let padding = TAR_BLOCK_LEN.abs_diff(remainder_usize);
         let (padding_bytes, _) = ZERO_BLOCK.split_at(padding);
         output.write_all(padding_bytes)?;

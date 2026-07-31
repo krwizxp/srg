@@ -1,8 +1,10 @@
 use crate::UTF8_BOM;
 use crate::diagnostic::{AppError, Result};
+#[cfg(target_arch = "x86_64")]
+use std::io::Read as _;
 use std::{
     fs::File,
-    io::{BufWriter, Seek as _, SeekFrom, Write as IoWrite},
+    io::{Seek as _, SeekFrom, Write as IoWrite},
     path::Path,
 };
 cfg_select! {
@@ -18,13 +20,14 @@ cfg_select! {
         const ERROR_SHARING_VIOLATION_CODE: i32 = 32;
         const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
         const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
+        const FILE_FLAG_SEQUENTIAL_SCAN: u32 = 0x0800_0000;
         const FILE_SHARE_READ_FLAG: u32 = 0x0000_0001;
         const FILE_STANDARD_INFO_CLASS: i32 = 1;
         const FILE_STANDARD_INFO_SIZE: u32 = 24;
     }
     any(target_os = "linux", target_os = "macos") => {
         use std::fs::TryLockError;
-        use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
+        use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
     }
     _ => {}
 }
@@ -37,7 +40,6 @@ cfg_select! {
     }
     _ => {}
 }
-const OUTPUT_FILE_BUFFER_CAPACITY: usize = 0x0010_0000;
 #[cfg(target_os = "windows")]
 const _: () = assert!(
     size_of::<FileStandardInfo>() == 24,
@@ -63,7 +65,9 @@ unsafe extern "system" {
         buffer_size: u32,
     ) -> i32;
 }
-pub(super) struct OutputFile(BufWriter<File>);
+pub(super) struct OutputFile {
+    file: File,
+}
 impl TryFrom<&Path> for OutputFile {
     type Error = AppError;
     fn try_from(path: &Path) -> Result<Self> {
@@ -72,11 +76,11 @@ impl TryFrom<&Path> for OutputFile {
         cfg_select! {
             target_os = "windows" => {
                 options
-                    .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG)
+                    .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG | FILE_FLAG_SEQUENTIAL_SCAN)
                     .share_mode(FILE_SHARE_READ_FLAG);
             }
             any(target_os = "linux", target_os = "macos") => {
-                options.custom_flags(OPEN_NOFOLLOW_FLAG);
+                options.custom_flags(OPEN_NOFOLLOW_FLAG).mode(0o600);
             }
             _ => {}
         }
@@ -145,17 +149,43 @@ impl TryFrom<&Path> for OutputFile {
             }
             _ => {}
         }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        if metadata.mode() & 0o077 != 0 {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(metadata.mode() & !0o077);
+            file.set_permissions(permissions)?;
+            if file.metadata()?.mode() & 0o077 != 0 {
+                return Err(AppError::message(
+                    "출력 파일의 group/other 접근 권한을 제거하지 못했습니다.",
+                ));
+            }
+        }
         if file.seek(SeekFrom::End(0))? == 0 {
             IoWrite::write_all(&mut file, UTF8_BOM)?;
         }
-        Ok(Self(BufWriter::with_capacity(
-            OUTPUT_FILE_BUFFER_CAPACITY,
-            file,
-        )))
+        Ok(Self { file })
     }
 }
 impl OutputFile {
-    pub(super) const fn writer(&mut self) -> &mut BufWriter<File> {
-        &mut self.0
+    pub(super) fn clear(&mut self) -> Result<()> {
+        self.file.set_len(0)?;
+        self.file.rewind()?;
+        self.file.write_all(UTF8_BOM)?;
+        Ok(())
+    }
+    #[cfg(target_arch = "x86_64")]
+    pub(super) fn read_tail_into(&mut self, len: usize, buffer: &mut [u8]) -> Result<()> {
+        let tail = buffer
+            .get_mut(..len)
+            .ok_or_else(|| AppError::message("마지막 출력 데이터가 읽기 버퍼보다 큽니다."))?;
+        let offset = i64::try_from(len)
+            .map_err(|source| AppError::context("마지막 출력 데이터 길이 변환 실패", source))?;
+        self.file.seek(SeekFrom::End(offset.strict_neg()))?;
+        self.file.read_exact(tail)?;
+        self.file.seek(SeekFrom::End(0))?;
+        Ok(())
+    }
+    pub(super) const fn writer(&mut self) -> &mut File {
+        &mut self.file
     }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme-storage-key="srg-theme">
 
 <head>
   <meta charset="utf-8">
@@ -20,35 +20,31 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
   <script>
     (() => {
+      const root = document.documentElement;
       const getSystemTheme = () =>
         window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"
           : "light";
-      const applyInitialTheme = (theme) => {
-        document.documentElement.dataset.theme = theme;
+      const applyInitialTheme = (theme, source) => {
+        root.dataset.theme = theme;
+        root.dataset.themeSource = source;
       };
       try {
-        const storedTheme = localStorage.getItem("srg-theme");
+        const storedTheme = localStorage.getItem(root.dataset.themeStorageKey);
         if (storedTheme === "light" || storedTheme === "dark") {
-          applyInitialTheme(storedTheme);
+          applyInitialTheme(storedTheme, "stored");
         } else {
           if (storedTheme !== null) {
-            localStorage.removeItem("srg-theme");
+            localStorage.removeItem(root.dataset.themeStorageKey);
           }
-          applyInitialTheme(getSystemTheme());
+          applyInitialTheme(getSystemTheme(), "system");
         }
       } catch {
-        applyInitialTheme(getSystemTheme());
+        applyInitialTheme(getSystemTheme(), "system");
       }
     })();
   </script>
   <style>
-    @property --pct {
-      syntax: "<number>";
-      inherits: true;
-      initial-value: 0;
-    }
-
     @layer reset {
 
       *,
@@ -88,9 +84,6 @@
         --safe-inline-end: env(safe-area-inset-right);
         --inline-origin-x: 0%;
         --inline-angle: 90deg;
-        --shimmer-from: -120%;
-        --shimmer-to: 120%;
-        --shimmer-opacity: 0.78;
         --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
         --fs-sm: 14px;
         --results-pane-mobile-height: 70dvh;
@@ -103,8 +96,6 @@
           --safe-inline-end: env(safe-area-inset-left);
           --inline-origin-x: 100%;
           --inline-angle: 270deg;
-          --shimmer-from: 120%;
-          --shimmer-to: -120%;
         }
 
         &[data-theme="light"] {
@@ -113,7 +104,6 @@
 
         &[data-theme="dark"] {
           color-scheme: dark;
-          --shimmer-opacity: 0.55;
         }
       }
 
@@ -155,88 +145,17 @@
         flex: 1;
         scrollbar-width: thin;
         overflow: auto;
-        --scroll-shadow-size: 14px;
         --scroll-shadow-color: color-mix(in oklch, var(--line-soft) 70%, oklch(0% 0 0 / 0));
-        --top-shadow-opacity: 0;
-        --bottom-shadow-opacity: 0;
+        box-shadow: inset 0 12px 12px -14px var(--scroll-shadow-color), inset 0 -12px 12px -14px var(--scroll-shadow-color);
       }
 
       .coords-view {
-
-        &[data-has-content]::before,
-        &[data-has-content]::after {
-          content: "";
-          display: block;
-          position: sticky;
-          inset-inline: 0;
-          block-size: var(--scroll-shadow-size);
-          pointer-events: none;
-          z-index: 5;
-        }
-
-        &[data-has-content]::before {
-          inset-block-start: 0;
-          margin-block-start: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(180deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
-          opacity: var(--top-shadow-opacity);
-        }
-
-        &[data-has-content]::after {
-          inset-block-end: 0;
-          margin-block-end: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(0deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
-          opacity: var(--bottom-shadow-opacity);
-        }
+        white-space: pre-wrap;
       }
 
-      .table-wrap {
-        --table-head-offset: 0px;
-
-        &.has-results::before,
-        &.has-results::after {
-          content: "";
-          display: block;
-          position: sticky;
-          inset-inline: 0;
-          block-size: var(--scroll-shadow-size);
-          pointer-events: none;
-          z-index: 11;
-        }
-
-        &.has-results::before {
-          inset-block-start: var(--table-head-offset);
-          margin-block-end: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(180deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
-          opacity: var(--top-shadow-opacity);
-        }
-
-        &.has-results::after {
-          inset-block-end: 0;
-          margin-block-start: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(0deg, var(--scroll-shadow-color), oklch(0% 0 0 / 0));
-          opacity: var(--bottom-shadow-opacity);
-        }
-      }
-
-      @keyframes skeleton-shimmer-x {
-        from {
-          transform: translateX(var(--shimmer-from));
-        }
-
-        to {
-          transform: translateX(var(--shimmer-to));
-        }
-      }
-
-      @keyframes row-fade-in {
-        from {
-          opacity: 0;
-        }
-      }
-
-      #app>section.card:has(>.left-pane-scroll) {
-        overflow-x: hidden;
-        overflow-y: auto;
+      #app>.input-card {
+        overflow-inline: hidden;
+        overflow-block: auto;
         overscroll-behavior: contain;
         scrollbar-width: thin;
       }
@@ -271,7 +190,7 @@
         container-type: inline-size;
         min-block-size: 0;
 
-        .left-pane-scroll> :has(#coords) {
+        .left-pane-scroll>.coords-section {
           flex: 1 1 180px;
           display: flex;
           flex-direction: column;
@@ -281,7 +200,7 @@
           padding-inline-end: var(--card-pad-inline);
         }
 
-        .left-pane-scroll:has(.manual-rng[open]) #coords {
+        .left-pane-scroll:has(.manual-rng:open) #coords {
           max-block-size: none;
         }
 
@@ -390,20 +309,16 @@
           line-height: 1.5;
           font-size: 14px;
 
-          :is(.coords-placeholder, .coords-content) {
+          .coords-content {
             display: block;
             padding: 12px;
             font: inherit;
           }
 
-          .coords-placeholder {
+          .coords-content:empty::before {
+            content: attr(data-placeholder);
             color: var(--muted-strong);
             white-space: nowrap;
-          }
-
-          &[data-has-content] .coords-placeholder,
-          &:not([data-has-content]) .coords-content {
-            display: none;
           }
 
           @container page (inline-size <=900px) {
@@ -469,43 +384,29 @@
 
       .progress-shell {
         border-radius: 999px;
-        position: relative;
         overflow: hidden;
         contain: paint;
-        background: oklch(from var(--fg) l c h / 0.12);
         block-size: 8px;
-        transition: --pct 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 
         >progress {
-          opacity: 0;
-        }
-
-        .progress-visual {
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-        }
-
-        .progress-fill {
+          appearance: none;
+          display: block;
+          inline-size: 100%;
           block-size: 100%;
+          border: 0;
+          border-radius: inherit;
           overflow: hidden;
-          transform: scaleX(calc(var(--pct) / 100));
-          transform-origin: var(--inline-origin-x) 50%;
-          background: linear-gradient(in oklch var(--inline-angle), light-dark(oklch(from var(--accent) calc(l - 0.05) calc(c * 0.86) h), oklch(from var(--accent) calc(l + 0.05) calc(c * 0.86) h)), light-dark(oklch(from var(--accent) calc(l - 0.09) calc(c * 0.78) h), oklch(from var(--accent) calc(l + 0.08) calc(c * 0.78) h)));
-          position: relative;
+          background: oklch(from var(--fg) l c h / 0.12);
+          accent-color: var(--accent);
         }
 
-        &.active .progress-fill::after {
-          content: "";
-          position: absolute;
-          inset-block: 0;
-          inset-inline: 0;
-          transform: translateX(var(--shimmer-from));
-          background: linear-gradient(in oklch var(--inline-angle), oklch(0% 0 0 / 0) 0%, color-mix(in oklch, var(--page-bg) 75%, oklch(0% 0 0 / 0)) 45%, oklch(0% 0 0 / 0) 100%);
-          opacity: var(--shimmer-opacity);
-          animation: skeleton-shimmer-x 1.5s linear infinite;
-          will-change: transform;
-          pointer-events: none;
+        >progress::-webkit-progress-bar {
+          background: oklch(from var(--fg) l c h / 0.12);
+        }
+
+        >progress::-webkit-progress-value,
+        >progress::-moz-progress-bar {
+          background: var(--accent);
         }
       }
 
@@ -579,7 +480,7 @@
           }
         }
 
-        :scope[open] summary::before {
+        :scope:open summary::before {
           transform: rotate(90deg);
         }
 
@@ -593,9 +494,9 @@
           min-inline-size: 0;
         }
 
-        :scope[open] .manual-rng-body {
+        :scope:open .manual-rng-body {
           max-block-size: min(52dvh, 420px);
-          overflow-y: auto;
+          overflow-block: auto;
           padding-inline-end: 4px;
           scrollbar-width: thin;
           scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
@@ -845,10 +746,6 @@
               background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
               border-radius: 16px;
               box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
-              animation: row-fade-in 1s both;
-              animation-timeline: view();
-              animation-range: entry 0% cover 25%;
-
               td {
                 display: grid;
                 grid-template-columns: 64px 1fr;
@@ -866,41 +763,13 @@
               }
             }
 
-            :root[data-perf-mode="1"] & tr {
-              animation: none;
-
-              &:hover {
-                background: oklch(0% 0 0 / 0);
-              }
-            }
-          }
-        }
-
-        .skeleton-bar {
-          border-radius: 999px;
-          block-size: 1.1em;
-          margin-block: 4px;
-          position: relative;
-          overflow: hidden;
-          contain: paint;
-          background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h), oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
-
-          &::after {
-            content: "";
-            position: absolute;
-            inset-block: 0;
-            inset-inline: 0;
-            transform: translateX(var(--shimmer-from));
-            background: linear-gradient(in oklch var(--inline-angle), oklch(0% 0 0 / 0), light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h), oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)), oklch(0% 0 0 / 0));
-            animation: skeleton-shimmer-x 1.5s linear infinite;
-            will-change: transform;
           }
         }
       }
     }
 
     @layer transitions {
-      .card:has(#tbl) .table-wrap {
+      .results-card .table-wrap {
         view-transition-name: results-card;
       }
 
@@ -1187,10 +1056,6 @@
       box-shadow: var(--shadow);
     }
 
-    .map-popover:focus-visible {
-      box-shadow: 0 12px 20px -16px oklch(from var(--fg) l c h / 0.18), inset 0 0 0 2px var(--focus-ring);
-    }
-
     .card .card-intro {
       display: grid;
       gap: 12px;
@@ -1455,6 +1320,36 @@
           }
         }
       }
+
+      .result-pages {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-block-start: 10px;
+
+        output {
+          min-inline-size: 9em;
+          text-align: center;
+          color: var(--muted);
+          font-size: var(--fs-sm);
+        }
+
+        &[hidden] {
+          display: none;
+        }
+      }
+
+      .find-index {
+        position: fixed;
+        inset-block-start: 0;
+        inset-inline-start: -10000px;
+        inline-size: 1px;
+        block-size: 1px;
+        overflow: hidden;
+        pointer-events: none;
+        white-space: pre;
+      }
     }
 
     @media (max-width: 940px) {
@@ -1463,7 +1358,7 @@
       }
 
       body,
-      #app>section.card:has(>.left-pane-scroll) {
+      #app>.input-card {
         overflow: visible;
         overscroll-behavior: auto;
       }
@@ -1562,10 +1457,7 @@
     @media (pointer: coarse),
     (width <=700px) {
 
-      :is(input, select, textarea),
-      .filters input[type="search"],
-      .filters select,
-      .manual-rng textarea {
+      :is(input, select, textarea) {
         font-size: 16px;
       }
     }
@@ -1598,7 +1490,7 @@
     </div>
   </header>
   <main id="app">
-    <section class="card">
+    <section class="card input-card">
       <div class="left-pane-scroll">
         <header class="card-intro">
           <div class="card-label reverse">
@@ -1731,8 +1623,8 @@
             <div id="meta" class="manual-rng-meta" role="status" aria-atomic="true"></div>
             <div id="error" class="manual-rng-meta" role="alert" aria-atomic="true"></div>
             <section aria-label="변환 결과">
-              <pre id="output" class="coords-view"><span class="coords-placeholder" aria-hidden="true">여기에 결과가
-                  표시됩니다.</span><code class="coords-content"></code></pre>
+              <pre id="output" class="coords-view"><code class="coords-content"
+                  data-placeholder="여기에 결과가 표시됩니다."></code></pre>
             </section>
           </div>
         </details>
@@ -1741,9 +1633,6 @@
             <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
             <div id="prog-shell" class="progress-shell">
               <progress id="prog" value="0" max="100"></progress>
-              <div class="progress-visual">
-                <div class="progress-fill"></div>
-              </div>
             </div>
           </div>
           <output id="counts">총 <strong id="cnt-total">0</strong>건 중
@@ -1757,10 +1646,10 @@
           <p>• 공용 Nominatim은 초당 1회 이하로 사용합니다. <a href="https://operations.osmfoundation.org/policies/nominatim/"
               target="_blank" rel="noopener noreferrer">사용 정책</a></p>
         </footer>
-        <section aria-labelledby="coords-label">
+        <section class="coords-section" aria-labelledby="coords-label">
           <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-          <pre id="coords" class="coords-view"><span class="coords-placeholder" aria-hidden="true">좌표가 이곳에
-              표시됩니다.</span><code class="coords-content"></code></pre>
+          <pre id="coords" class="coords-view"><code class="coords-content"
+              data-placeholder="좌표가 이곳에 표시됩니다."></code></pre>
         </section>
       </div>
     </section>
@@ -1773,7 +1662,7 @@
         <h2 class="sr-only">주소 조회 결과</h2>
       </header>
       <search>
-        <div class="filters">
+        <form id="filters" class="filters">
           <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
             aria-label="전체검색">
           <select id="filter-kind" aria-label="구분">
@@ -1793,15 +1682,14 @@
             aria-label="지물 태그">
           <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
             aria-label="전체주소">
-          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact"
-            commandfor="app" command="--filter-clear">
+          <button type="reset" id="filter-clear" class="action-btn action-btn--soft action-btn--compact">
             <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.5 7.5h7a4.25 4.25 0 1 1 0 8.5h-7"></path>
               <path d="m9.75 4.5-3.25 3 3.25 3"></path>
             </svg>
             <span class="action-btn__label">필터 초기화</span>
           </button>
-        </div>
+        </form>
       </search>
       <div class="table-wrap">
         <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
@@ -1830,6 +1718,14 @@
           <tbody></tbody>
         </table>
       </div>
+      <nav id="result-pages" class="result-pages" aria-label="결과 페이지" hidden>
+        <button type="button" id="page-prev" class="action-btn action-btn--soft action-btn--compact" commandfor="app"
+          command="--page-prev">이전</button>
+        <output id="page-status" aria-live="polite"></output>
+        <button type="button" id="page-next" class="action-btn action-btn--soft action-btn--compact" commandfor="app"
+          command="--page-next">다음</button>
+      </nav>
+      <div id="find-index" class="find-index" aria-hidden="true"></div>
       <p class="result-attribution">
         &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap
           contributors</a>
@@ -1839,14 +1735,14 @@
       </p>
     </section>
   </main>
-  <div id="map-popover" popover="auto" class="map-popover" role="dialog" aria-label="지도 링크" tabindex="-1">
+  <nav id="map-popover" popover="auto" class="map-popover" aria-label="지도 링크">
     <div class="map-links" id="map-popover-links">
       <a href="about:blank" target="_blank" rel="noopener noreferrer">Google</a>
       <a href="about:blank" target="_blank" rel="noopener noreferrer">OSM</a>
       <a href="about:blank" target="_blank" rel="noopener noreferrer">Naver</a>
       <a href="about:blank" target="_blank" rel="noopener noreferrer">Kakao</a>
     </div>
-  </div>
+  </nav>
   <template id="tmpl-row">
     <tr>
       <td data-label="구분"></td>
@@ -1858,9 +1754,8 @@
       <td data-label="지물 태그"></td>
       <td data-label="전체주소"></td>
       <td data-label="지도링크">
-        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly" aria-haspopup="dialog"
-          aria-controls="map-popover" aria-expanded="false" popovertarget="map-popover" popovertargetaction="show"
-          disabled>
+        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly"
+          popovertarget="map-popover" popovertargetaction="show" disabled>
           <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
             </path>
@@ -1906,11 +1801,12 @@
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
       RATE_LIMIT_DELAY_MS: 1_000,
+      MAX_RETRY_DELAY_MS: 60_000,
       REVERSE_ZOOM: 14,
       SPECIAL_CITIES: /서울|부산|대구|인천|광주|대전|울산|세종/,
-      BIG_MODE_THRESHOLD: 1000,
       BULK_CONFIRM_THRESHOLD: 1_000,
       BULK_HARD_LIMIT: 5_000,
+      INPUT_FILE_HARD_LIMIT: 64 * 1024 * 1024,
       INPUT_LINE_HARD_LIMIT: 1_000_000,
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
       REVERSE_CACHE_DB_VERSION: 3,
@@ -1921,7 +1817,7 @@
       REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
       REVERSE_TEXT_HARD_LIMIT: 4_096,
     };
-    class InputLimitError extends Error { }
+    class InputValidationError extends Error { }
     const GeocodeParser = (() => {
       const SI = 1;
       const GUN = 2;
@@ -1938,7 +1834,9 @@
         value.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
       function text(value) {
         if (typeof value !== "string") return "";
-        if (!isBoundedText(value)) throw new InputLimitError(TEXT_LIMIT_MESSAGE);
+        if (!isBoundedText(value)) {
+          throw new InputValidationError(TEXT_LIMIT_MESSAGE);
+        }
         return value;
       }
       const firstText = (a, b, c, d) =>
@@ -2048,7 +1946,16 @@
         ]) {
           if (!name || name === sido || name === sigungu) continue;
           if (eupmyeon.includes(name)) continue;
-          if (adminSuffix(name) & emdSuffixes) eupmyeon.push(name);
+          const suffix = adminSuffix(name);
+          const last = name.length - 1;
+          if (
+            suffix & emdSuffixes ||
+            (
+              name.charCodeAt(last) === 0xac00 &&
+              name.charCodeAt(last - 1) >= 48 &&
+              name.charCodeAt(last - 1) <= 57
+            )
+          ) eupmyeon.push(name);
         }
         return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
       }
@@ -2059,10 +1966,11 @@
           sigungu.charCodeAt(cut - 1) === 32) {
           return sigungu.slice(0, cut - 1).trim();
         }
-        const pattern = new RegExp(
-          "(?:^|\\s+)" + RegExp.escape(district) + "(?:\\s+|$)", "g",
-        );
-        return sigungu.replace(pattern, " ").replace(/\s+/g, " ").trim();
+        const normalized = sigungu.replace(/\s+/gu, " ").trim();
+        const normalizedDistrict = district.replace(/\s+/gu, " ").trim();
+        return (` ${normalized} `)
+          .replaceAll(` ${normalizedDistrict} `, " ")
+          .trim();
       }
       function parseGlobalAdmin(gc, fields, p0, p1) {
         const primaryName = firstText(fields.name, p0);
@@ -2190,28 +2098,25 @@
           addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
           kind,
         };
-        if (!isValid(parsed)) throw new InputLimitError(TEXT_LIMIT_MESSAGE);
+        if (!isValid(parsed)) throw new InputValidationError(TEXT_LIMIT_MESSAGE);
         return parsed;
       }
       return Object.freeze({ isValid, parse });
     })();
-    const EVT_CAPTURE_PASSIVE = { capture: true, passive: true };
-    const EVT_PASSIVE = { passive: true };
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
     const REVERSE_CACHE_VARIANT =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
-    const OSM_ATTRIBUTION_TEXT = "\u00A9 OpenStreetMap contributors";
-    const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
-    const ODBL_LICENSE_TEXT = "Open Database License (ODbL)";
-    const ODBL_LICENSE_URL = "https://opendatacommons.org/licenses/odbl/";
-    const NOMINATIM_ATTRIBUTION_TEXT = "Reverse geocoding by Nominatim";
-    const NOMINATIM_URL = "https://nominatim.org/";
+    const REVERSE_CACHE_KEY_PREFIX = REVERSE_CACHE_VARIANT + ":" +
+      CONFIG.REVERSE_CACHE_PARSER_VERSION + ":";
     const NOMINATIM_POLICY_URL =
       "https://operations.osmfoundation.org/policies/nominatim/";
-    const CSV_SOURCE_TEXT = `${OSM_ATTRIBUTION_TEXT} (${OSM_COPYRIGHT_URL})`;
-    const CSV_LICENSE_TEXT = `${ODBL_LICENSE_TEXT} (${ODBL_LICENSE_URL})`;
-    const CSV_GEOCODER_TEXT = `${NOMINATIM_ATTRIBUTION_TEXT} (${NOMINATIM_URL})`;
+    const CSV_SOURCE_TEXT =
+      "\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)";
+    const CSV_LICENSE_TEXT =
+      "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)";
+    const CSV_GEOCODER_TEXT =
+      "Reverse geocoding by Nominatim (https://nominatim.org/)";
     const mapPopover = document.getElementById("map-popover");
     const mapAnchors = document.querySelectorAll("#map-popover-links a");
     const MAP_LINKS = [
@@ -2238,13 +2143,8 @@
           "," + lon,
       },
     ];
-    const setMapPopoverExpanded = (btn, expanded) => {
-      btn.setAttribute("aria-expanded", expanded ? "true" : "false");
-    };
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
-    let MAP_POPOVER_PREV_FOCUS = null;
-    let MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return;
       const btn = e.source;
@@ -2265,12 +2165,7 @@
         e.preventDefault();
         return;
       }
-      const prevInvoker = LAST_MAP_INVOKER;
       LAST_MAP_INVOKER = btn;
-      MAP_POPOVER_OPEN_WITH_KEYBOARD = btn.matches(":focus-visible");
-      if (prevInvoker && prevInvoker !== btn) {
-        setMapPopoverExpanded(prevInvoker, false);
-      }
       const lat = r.latStr;
       const lon = r.lonStr;
       const lat6 = r.lat6 ??= fmtCoord6(lat);
@@ -2284,47 +2179,7 @@
       mapPopover.hidePopover();
     }
     mapPopover.addEventListener("toggle", (e) => {
-      if (e.newState !== "open") {
-        if (LAST_MAP_INVOKER) {
-          setMapPopoverExpanded(LAST_MAP_INVOKER, false);
-        }
-        if (MAP_POPOVER_PREV_FOCUS) {
-          const active = document.activeElement;
-          if (
-            (active === document.body || mapPopover.contains(active)) &&
-            MAP_POPOVER_PREV_FOCUS.isConnected
-          ) {
-            MAP_POPOVER_PREV_FOCUS.focus();
-          }
-        }
-        MAP_POPOVER_PREV_FOCUS = null;
-        LAST_MAP_INVOKER = null;
-        MAP_POPOVER_OPEN_WITH_KEYBOARD = false;
-        return;
-      }
-      MAP_POPOVER_PREV_FOCUS = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : LAST_MAP_INVOKER;
-      const invoker = LAST_MAP_INVOKER;
-      if (!invoker) {
-        mapPopover.hidePopover();
-        return;
-      }
-      setMapPopoverExpanded(invoker, true);
-      requestAnimationFrame(() => {
-        if (!isMapPopoverOpen()) return;
-        const active = document.activeElement;
-        if (
-          active === document.body || active === invoker ||
-          active === mapPopover
-        ) {
-          if (MAP_POPOVER_OPEN_WITH_KEYBOARD) {
-            mapAnchors[0].focus({ preventScroll: true });
-          } else {
-            mapPopover.focus({ preventScroll: true });
-          }
-        }
-      });
+      if (e.newState !== "open") LAST_MAP_INVOKER = null;
     });
     const fmt =
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
@@ -2372,7 +2227,6 @@
       cntSuccess: document.getElementById("cnt-success"),
       cntFail: document.getElementById("cnt-fail"),
       cntRemain: document.getElementById("cnt-remain"),
-      progShell: document.getElementById("prog-shell"),
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
       tableWrap: document.querySelector(".table-wrap"),
@@ -2395,33 +2249,20 @@
       filterEmd: document.getElementById("filter-emd"),
       filterTag: document.getElementById("filter-tag"),
       filterFullAddr: document.getElementById("filter-fulladdr"),
+      pageNav: document.getElementById("result-pages"),
+      pagePrev: document.getElementById("page-prev"),
+      pageNext: document.getElementById("page-next"),
+      pageStatus: document.getElementById("page-status"),
+      findIndex: document.getElementById("find-index"),
     };
-    const setScrollableText = (element, contentElement, text) => {
-      const value = String(text ?? "");
-      contentElement.textContent = value;
-      const hasContent = value.length > 0;
-      element.toggleAttribute("data-has-content", hasContent);
-      if (!hasContent) {
-        clearScrollShadowState(element);
-        return;
-      }
-      requestScrollShadowSync(element);
+    const setScrollableText = (contentElement, text) => {
+      contentElement.textContent = String(text ?? "");
     };
     const setCoordsText = (text) =>
-      setScrollableText(domElements.coords, domElements.coordsContent, text);
+      setScrollableText(domElements.coordsContent, text);
     const root = document.documentElement;
-    const PERF_MODE_ATTR = "data-perf-mode";
-    const THEME_STORAGE_KEY = "srg-theme";
+    const THEME_STORAGE_KEY = root.dataset.themeStorageKey;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const getStoredTheme = () => {
-      try {
-        const stored = localStorage.getItem(THEME_STORAGE_KEY);
-        if (stored === "light" || stored === "dark") return stored;
-        if (stored !== null) localStorage.removeItem(THEME_STORAGE_KEY);
-      } catch {
-      }
-      return null;
-    };
     const applyTheme = (theme) => {
       root.dataset.theme = theme;
       const label = theme === "dark" ? "라이트 모드" : "다크 모드";
@@ -2435,85 +2276,19 @@
     };
     applyTheme(root.dataset.theme);
     themeMedia.addEventListener("change", () => {
-      if (getStoredTheme()) return;
+      if (root.dataset.themeSource === "stored") return;
       applyTheme(themeMedia.matches ? "dark" : "light");
     });
     domElements.themeToggle.addEventListener("click", () => {
       const next = root.dataset.theme === "dark" ? "light" : "dark";
       try {
         localStorage.setItem(THEME_STORAGE_KEY, next);
+        root.dataset.themeSource = "stored";
       } catch {
+        root.dataset.themeSource = "system";
       }
       applyTheme(next);
     });
-    const SHADOW_SYNC_PENDING = new Set();
-    let SHADOW_SYNC_FRAME = 0;
-    function clearScrollShadowState(el) {
-      SHADOW_SYNC_PENDING.delete(el);
-      el.style.setProperty("--top-shadow-opacity", "0");
-      el.style.setProperty("--bottom-shadow-opacity", "0");
-    }
-    function flushScrollShadowSync() {
-      SHADOW_SYNC_FRAME = 0;
-      for (const el of SHADOW_SYNC_PENDING) {
-        SHADOW_SYNC_PENDING.delete(el);
-        const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-        const atTop = el.scrollTop <= 1;
-        const atBottom = maxScrollTop <= 1 ||
-          el.scrollTop >= maxScrollTop - 1;
-        const ramp = 200;
-        const hasOverflow = maxScrollTop > 1;
-        const floor = 0.16;
-        const topOpacity = !hasOverflow || atTop
-          ? 0
-          : floor + (1 - floor) * Math.min(1, el.scrollTop / ramp);
-        const bottomOpacity = !hasOverflow || atBottom ? 0 : floor +
-          (1 - floor) * Math.min(1, (maxScrollTop - el.scrollTop) / ramp);
-        el.style.setProperty("--top-shadow-opacity", topOpacity.toFixed(3));
-        el.style.setProperty(
-          "--bottom-shadow-opacity",
-          bottomOpacity.toFixed(3),
-        );
-      }
-    }
-    function requestScrollShadowSync(el) {
-      if (SHADOW_SYNC_PENDING.has(el)) return;
-      SHADOW_SYNC_PENDING.add(el);
-      SHADOW_SYNC_FRAME ||= requestAnimationFrame(flushScrollShadowSync);
-    }
-    function resetScrollShadowState(el) {
-      clearScrollShadowState(el);
-      requestScrollShadowSync(el);
-    }
-    const SCROLL_SHADOW_ELEMENTS = [
-      domElements.tableWrap,
-      domElements.coords,
-      domElements.manualOutput,
-    ];
-    function syncScrollShadows() {
-      syncTableShadowOffset();
-      for (const el of SCROLL_SHADOW_ELEMENTS) {
-        if (
-          el === domElements.tableWrap ||
-          el.hasAttribute("data-has-content")
-        ) {
-          requestScrollShadowSync(el);
-        }
-      }
-    }
-    for (const el of SCROLL_SHADOW_ELEMENTS) {
-      clearScrollShadowState(el);
-      el.addEventListener(
-        "scroll",
-        () => requestScrollShadowSync(el),
-        EVT_PASSIVE,
-      );
-    }
-    const shadowResizeObserver = new ResizeObserver(syncScrollShadows);
-    shadowResizeObserver.observe(tbl);
-    shadowResizeObserver.observe(domElements.tbody);
-    shadowResizeObserver.observe(domElements.coords);
-    shadowResizeObserver.observe(domElements.manualOutput);
     const KIND_COL_INDEX = 0;
     const IDX_COL_INDEX = 1;
     const COORDS_COL_INDEX = 2;
@@ -2526,7 +2301,6 @@
     const ROW_TEMPLATE = document.getElementById("tmpl-row").content
       .querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
-    const RX_WS = /\s+/g;
     const norm = (s) => {
       if (s == null) return "";
       if (typeof s !== "string") s = String(s);
@@ -2535,28 +2309,6 @@
       s = s.toLowerCase();
       return s.indexOf(",") !== -1 ? s.replace(RX_COMMA_WS, ",") : s;
     };
-    const HIDDEN_UNTIL_FOUND = "until-found";
-    let FIND_REHIDE_TIMER = null;
-    const FIND_REVEALED_ROWS = new Set();
-    function unhideUntilFoundRows() {
-      const rows = domElements.tbody.rows;
-      for (let i = 0; i < rows.length; i++) {
-        const tr = rows[i];
-        if (tr.hidden) tr.removeAttribute("hidden");
-      }
-    }
-    function bumpFindRehideTimer() {
-      if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
-      FIND_REHIDE_TIMER = setTimeout(() => {
-        clearFindReveals();
-        const f = getLiveFilterSnapshot();
-        if (f.active) {
-          startChunkedFilterApply(f);
-          return;
-        }
-        unhideUntilFoundRows();
-      }, 8000);
-    }
     function buildFilterSnapshot() {
       const q = norm(domElements.filterQ.value);
       const kind = domElements.filterKind.value;
@@ -2621,8 +2373,7 @@
       r._search = fields;
       return fields;
     };
-    function matchesQuery(r, qMode, q1, qTokens) {
-      const fields = getSearchFields(r);
+    function matchesQuery(r, fields, qMode, q1, qTokens) {
       let hay = fields[6];
       if (hay === undefined) {
         hay = fields[5] +
@@ -2654,179 +2405,167 @@
       }
       return true;
     }
-    function setRowHiddenByFilterActive(tr, wasHidden, f, r, revealedRows) {
-      if (revealedRows?.has(tr)) {
-        if (wasHidden) tr.removeAttribute("hidden");
-        return false;
-      }
-      const result = r?.result;
-      if (!result) {
-        if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-        return true;
-      }
-      const kind = f.kind;
-      const sido = f.sido;
-      const sigungu = f.sigungu;
-      const emd = f.emd;
-      const tag = f.tag;
-      const fullAddr = f.fullAddr;
-      const qMode = f.qMode;
+    function matchesFilter(r, f) {
+      if (!r.result) return false;
+      if (!f.active) return true;
       const fields = getSearchFields(r);
-      let hide = false;
-      if (kind && fields[0] !== kind) {
-        hide = true;
-      } else if (sido && fields[1].indexOf(sido) === -1) {
-        hide = true;
-      } else if (sigungu && fields[2].indexOf(sigungu) === -1) {
-        hide = true;
-      } else if (emd && fields[3].indexOf(emd) === -1) {
-        hide = true;
-      } else if (tag && fields[4].indexOf(tag) === -1) {
-        hide = true;
-      } else if (fullAddr && fields[5].indexOf(fullAddr) === -1) {
-        hide = true;
-      } else if (qMode && !matchesQuery(r, qMode, f.q1, f.qTokens)) {
-        hide = true;
-      }
-      if (hide) {
-        if (!wasHidden) tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-        return true;
-      }
-      if (wasHidden) tr.removeAttribute("hidden");
-      return false;
+      return (!f.kind || fields[0] === f.kind) &&
+        (!f.sido || fields[1].indexOf(f.sido) !== -1) &&
+        (!f.sigungu || fields[2].indexOf(f.sigungu) !== -1) &&
+        (!f.emd || fields[3].indexOf(f.emd) !== -1) &&
+        (!f.tag || fields[4].indexOf(f.tag) !== -1) &&
+        (!f.fullAddr || fields[5].indexOf(f.fullAddr) !== -1) &&
+        (!f.qMode || matchesQuery(r, fields, f.qMode, f.q1, f.qTokens));
     }
-    function clearFindReveals() {
-      if (FIND_REVEALED_ROWS.size === 0 && !FIND_REHIDE_TIMER) return;
-      if (FIND_REHIDE_TIMER) clearTimeout(FIND_REHIDE_TIMER);
-      FIND_REHIDE_TIMER = null;
-      FIND_REVEALED_ROWS.clear();
-    }
+    const RESULT_PAGE_SIZE = 100;
+    const FIND_TEXT_CHUNK_SIZE = 500;
     let filterTimer = null;
-    let filterJob = null;
-    function cancelPendingFilterDebounce() {
+    let pageRenderReq = 0;
+    let findRefreshToken = 0;
+    function cancelActiveFilterTask() {
       if (filterTimer) {
         clearTimeout(filterTimer);
         filterTimer = null;
       }
     }
-    function cancelActiveFilterApply() {
-      const job = filterJob;
-      if (!job) return;
-      if (job.raf) {
-        cancelAnimationFrame(job.raf);
-        job.raf = 0;
+    function lowerBound(indices, index) {
+      let low = 0;
+      let high = indices.length;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (indices[mid] < index) low = mid + 1;
+        else high = mid;
       }
-      filterJob = null;
+      return low;
     }
-    function cancelActiveFilterTask() {
-      cancelPendingFilterDebounce();
-      cancelActiveFilterApply();
+    function insertVisibleIndex(index) {
+      const indices = AppState.visibleIndices;
+      const position = lowerBound(indices, index);
+      if (indices[position] !== index) indices.splice(position, 0, index);
     }
-    function runFilterJobFrame() {
-      const job = filterJob;
-      if (!job) return;
-      job.raf = 0;
-      const rows = job.rows;
-      const records = job.records;
-      const len = job.len;
-      let i = job.i;
-      let anyVisible = job.anyVisible;
-      const revealedRows = FIND_REVEALED_ROWS.size === 0
-        ? null
-        : FIND_REVEALED_ROWS;
-      const deadline = performance.now() + 8;
-      let processed = 0;
-      while (i < len) {
-        const tr = rows[i];
-        const wasHidden = tr.hidden;
-        if (!setRowHiddenByFilterActive(
-          tr, wasHidden, job.f, records[i], revealedRows,
-        )) anyVisible = true;
-        i++;
-        processed++;
-        if (processed >= 1500) break;
-        if ((processed & 7) === 0 && performance.now() >= deadline) break;
+    function findText(record, index) {
+      const result = record.result;
+      if (!result) {
+        return `${record.set} ${index + 1} ${record.latStr} ${record.lonStr}`;
       }
-      job.i = i;
-      job.anyVisible = anyVisible;
-      if (i < len) {
-        job.raf = requestAnimationFrame(runFilterJobFrame);
-      } else {
-        syncFilterEmptyUI(true, len, anyVisible);
-        filterJob = null;
-      }
+      const addr = result.addr;
+      return [
+        result.kind || record.set,
+        index + 1,
+        record.latStr,
+        record.lonStr,
+        addr?.sido,
+        addr?.sigungu,
+        addr?.eupmyeon,
+        addr?.tag,
+        result.error || addr?.fullAddr,
+      ].filter(Boolean).join(" ");
     }
-    function startChunkedFilterApply(f = getLiveFilterSnapshot()) {
-      const rows = domElements.tbody.rows;
-      const len = rows.length;
-      if (len === 0) {
-        cancelActiveFilterApply();
-        syncFilterEmptyUI(f.active, 0, false);
-        return;
+    function rebuildFindIndex() {
+      const fragment = document.createDocumentFragment();
+      const chunks = Math.ceil(
+        AppState.records.length / FIND_TEXT_CHUNK_SIZE,
+      );
+      for (let i = 0; i < chunks; i++) {
+        fragment.append(document.createElement("span"));
       }
-      if (!f.active) {
-        cancelActiveFilterApply();
-        unhideUntilFoundRows();
-        syncFilterEmptyUI(false, len, true);
-        return;
-      }
+      domElements.findIndex.replaceChildren(fragment);
+      scheduleFindIndexRefresh();
+    }
+    function scheduleFindIndexRefresh() {
+      const token = ++findRefreshToken;
+      const generation = AppState.generation;
+      void (async () => {
+        await yieldToMain();
+        const items = domElements.findIndex.children;
+        for (let chunk = 0; chunk < items.length; chunk++) {
+          if (
+            token !== findRefreshToken ||
+            generation !== AppState.generation
+          ) return;
+          const start = chunk * FIND_TEXT_CHUNK_SIZE;
+          const end = Math.min(
+            AppState.records.length,
+            start + FIND_TEXT_CHUNK_SIZE,
+          );
+          const parts = [];
+          for (let i = start; i < end; i++) {
+            parts.push(findText(AppState.records[i], i));
+          }
+          items[chunk].textContent = parts.join("\n");
+          await yieldToMain();
+        }
+      })();
+    }
+    function cancelFindIndexRefresh() {
+      findRefreshToken++;
+    }
+    function deferFindIndexRebuild() {
+      const token = ++findRefreshToken;
+      const generation = AppState.generation;
+      setTimeout(() => {
+        if (
+          token === findRefreshToken &&
+          generation === AppState.generation
+        ) rebuildFindIndex();
+      }, 250);
+    }
+    function rebuildVisibleIndices(resetPage = true) {
+      const f = getLiveFilterSnapshot();
+      const indices = [];
       const records = AppState.records;
-      const revealedRows = FIND_REVEALED_ROWS.size === 0
-        ? null
-        : FIND_REVEALED_ROWS;
-      if (len <= 2000) {
-        cancelActiveFilterApply();
-        let anyVisible = false;
-        for (let i = 0; i < len; i++) {
-          const tr = rows[i];
-          const wasHidden = tr.hidden;
-          if (!setRowHiddenByFilterActive(
-            tr, wasHidden, f, records[i], revealedRows,
-          )) anyVisible = true;
-        }
-        syncFilterEmptyUI(true, len, anyVisible);
-        return;
+      for (let i = 0; i < records.length; i++) {
+        if (matchesFilter(records[i], f)) indices.push(i);
       }
-      const existing = filterJob;
-      if (existing && existing.rows === rows) {
-        existing.f = f;
-        existing.i = 0;
-        existing.len = len;
-        existing.records = records;
-        existing.anyVisible = false;
-        if (!existing.raf) {
-          existing.raf = requestAnimationFrame(runFilterJobFrame);
-        }
-        return;
+      AppState.visibleIndices = indices;
+      AppState.filterActive = f.active;
+      if (resetPage) AppState.page = 0;
+      renderCurrentPage(resetPage);
+    }
+    function renderCurrentPage(resetScroll = false) {
+      pageRenderReq = 0;
+      closeMapPopover();
+      const indices = AppState.visibleIndices;
+      const visibleCount = indices.length;
+      const pageCount = Math.max(1, Math.ceil(visibleCount / RESULT_PAGE_SIZE));
+      if (AppState.page >= pageCount) AppState.page = pageCount - 1;
+      const start = AppState.page * RESULT_PAGE_SIZE;
+      const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
+      const fragment = document.createDocumentFragment();
+      const pageIndices = indices.slice(start, end);
+      for (const recordIndex of pageIndices) {
+        fragment.append(createResultRow(AppState.records[recordIndex], recordIndex));
       }
-      cancelActiveFilterApply();
-      const job = {
-        raf: 0,
-        i: 0,
-        rows,
-        len,
-        f,
-        records,
-        anyVisible: false,
-      };
-      filterJob = job;
-      job.raf = requestAnimationFrame(runFilterJobFrame);
+      domElements.tbody.replaceChildren(fragment);
+      const hasResults = AppState.processed > 0;
+      domElements.tableWrap.classList.toggle("has-results", hasResults);
+      domElements.tableWrap.classList.toggle(
+        "filter-empty",
+        hasResults && AppState.filterActive && visibleCount === 0,
+      );
+      domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
+      domElements.pagePrev.disabled = AppState.page === 0;
+      domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
+      domElements.pageStatus.textContent =
+        `${fmt(AppState.page + 1)} / ${fmt(pageCount)} 페이지 · ${fmt(visibleCount)}건`;
+      if (resetScroll) domElements.tableWrap.scrollTop = 0;
+    }
+    function schedulePageRender() {
+      pageRenderReq ||= requestAnimationFrame(() => renderCurrentPage());
     }
     function scheduleApplyFilterAll() {
       FILTER_SNAP = null;
-      cancelActiveFilterApply();
-      cancelPendingFilterDebounce();
+      cancelActiveFilterTask();
       filterTimer = setTimeout(() => {
         filterTimer = null;
-        closeMapPopover();
-        clearFindReveals();
-        startChunkedFilterApply(getLiveFilterSnapshot());
-      }, 120);
+        rebuildVisibleIndices();
+      }, 80);
     }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
       MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
     let ACTIVE_DOWNLOAD_URL = null;
+    let EXPORT_TASK = null;
     function revokeActiveDownloadUrl() {
       if (!ACTIVE_DOWNLOAD_URL) return;
       URL.revokeObjectURL(ACTIVE_DOWNLOAD_URL);
@@ -2835,13 +2574,18 @@
     window.addEventListener("pagehide", revokeActiveDownloadUrl);
     function downloadBlob(blob, filename) {
       revokeActiveDownloadUrl();
-      ACTIVE_DOWNLOAD_URL = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      ACTIVE_DOWNLOAD_URL = url;
       const a = document.createElement("a");
-      a.href = ACTIVE_DOWNLOAD_URL;
+      a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        if (ACTIVE_DOWNLOAD_URL === url) ACTIVE_DOWNLOAD_URL = null;
+      }, 60_000);
     }
     const AppState = {
       records: [],
@@ -2850,7 +2594,11 @@
       renderReq: null,
       processed: 0,
       cntFail: 0,
+      visibleIndices: [],
+      filterActive: false,
+      page: 0,
       bulkAcknowledged: true,
+      generation: 0,
       get status() {
         return this.task?.status ?? "idle";
       },
@@ -2866,10 +2614,14 @@
         return this.status === "stopping";
       },
       reset(status = "idle") {
+        this.generation += 1;
         this.task?.resume?.();
         this.task?.controller.abort();
         this.processed = 0;
         this.cntFail = 0;
+        this.visibleIndices = [];
+        this.filterActive = getLiveFilterSnapshot().active;
+        this.page = 0;
         this.task = status === "idle"
           ? null
           : {
@@ -2881,6 +2633,10 @@
         if (this.renderReq !== null) {
           cancelAnimationFrame(this.renderReq);
           this.renderReq = null;
+        }
+        if (pageRenderReq) {
+          cancelAnimationFrame(pageRenderReq);
+          pageRenderReq = 0;
         }
         updateUIState();
         scheduleRender();
@@ -2907,25 +2663,17 @@
         updateUIState();
       },
     };
-    function syncDisabled(element, disabled) {
-      if (element.disabled === disabled) return;
-      element.disabled = disabled;
-    }
     function updateUIState() {
       const s = AppState.status;
       const isBusy = AppState.isBusy;
-      syncDisabled(domElements.parseBtn, isBusy);
-      syncDisabled(
-        domElements.startBtn,
-        isBusy || AppState.records.length === 0,
-      );
-      syncDisabled(domElements.pauseBtn, s !== "running");
-      syncDisabled(domElements.resumeBtn, s !== "paused");
+      domElements.tableWrap.setAttribute("aria-busy", String(isBusy));
+      domElements.parseBtn.disabled = isBusy;
+      domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
+      domElements.pauseBtn.disabled = s !== "running";
+      domElements.resumeBtn.disabled = s !== "paused";
       const stopDisabled = !(AppState.isRunning || s === "parsing") ||
         s === "stopping";
-      syncDisabled(domElements.stopBtn, stopDisabled);
-      const progActive = s === "running" || s === "pausing";
-      domElements.progShell.classList.toggle("active", progActive);
+      domElements.stopBtn.disabled = stopDisabled;
       domElements.dropZone.toggleAttribute("inert", isBusy);
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
@@ -3001,15 +2749,6 @@
       }
       return ok;
     }
-    function syncFilterEmptyUI(active, totalRows, anyVisible) {
-      const wrap = domElements.tableWrap;
-      if (active && totalRows > 0) {
-        wrap.classList.toggle("filter-empty", !anyVisible);
-      } else {
-        wrap.classList.remove("filter-empty");
-      }
-      if (domElements.tbody.rows.length > 0) requestScrollShadowSync(wrap);
-    }
     const RENDER_CACHE = {
       total: -1,
       processed: -1,
@@ -3031,9 +2770,6 @@
       const remaining = total - processed;
       if (totalChanged) {
         domElements.cntTotal.textContent = fmt(total);
-        const perfMode = total > CONFIG.BIG_MODE_THRESHOLD;
-        if (perfMode) root.setAttribute(PERF_MODE_ATTR, "1");
-        else root.removeAttribute(PERF_MODE_ATTR);
       }
       if (processedChanged || failChanged) {
         domElements.cntSuccess.textContent = fmt(success);
@@ -3043,10 +2779,11 @@
         domElements.cntRemain.textContent = fmt(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
-        domElements.progShell.style.setProperty("--pct", String(pct));
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       }
-      if (processedChanged) domElements.exportBtn.disabled = processed === 0;
+      if (processedChanged) {
+        domElements.exportBtn.disabled = processed === 0 || EXPORT_TASK !== null;
+      }
     }
     function scheduleRender() {
       if (AppState.renderReq !== null) return;
@@ -3054,22 +2791,15 @@
     }
     function clearTable() {
       cancelActiveFilterTask();
-      clearFindReveals();
       const wrap = domElements.tableWrap;
-      if (wrap.scrollTop || wrap.scrollLeft) {
-        wrap.scrollTop = 0;
-        wrap.scrollLeft = 0;
-      }
       closeMapPopover();
       domElements.tbody.replaceChildren();
+      cancelFindIndexRefresh();
+      domElements.findIndex.replaceChildren();
+      wrap.scrollTop = 0;
+      wrap.scrollLeft = 0;
       wrap.classList.remove("filter-empty", "has-results");
-      resetScrollShadowState(wrap);
-      requestAnimationFrame(() => {
-        if (wrap.scrollTop || wrap.scrollLeft) {
-          wrap.scrollTop = 0;
-          wrap.scrollLeft = 0;
-        }
-      });
+      domElements.pageNav.hidden = true;
     }
     function sleep(ms, signal) {
       if (ms <= 0 || signal.aborted) {
@@ -3082,6 +2812,23 @@
       }).then(() => {
         signal.throwIfAborted();
       });
+    }
+    function retryDelay(response, attempt) {
+      const fallback = CONFIG.RATE_LIMIT_DELAY_MS * attempt;
+      if (response.status === 429) {
+        const value = response.headers.get("retry-after");
+        if (value) {
+          const seconds = Number(value);
+          const delay = Number.isFinite(seconds)
+            ? seconds * 1_000
+            : Date.parse(value) - Date.now();
+          return Math.min(
+            CONFIG.MAX_RETRY_DELAY_MS,
+            Math.max(fallback, Number.isFinite(delay) ? delay : 0),
+          );
+        }
+      }
+      return fallback * (0.8 + Math.random() * 0.4);
     }
     const YIELD_CHANNEL = new MessageChannel();
     const YIELD_QUEUE = [];
@@ -3100,16 +2847,16 @@
     }
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
-        throw new InputLimitError(
+        throw new InputValidationError(
           `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
         );
       }
     }
     async function* lineIterator(stream, signal) {
-      const reader = stream
-        .pipeThrough(new TextDecoderStream("utf-8", { fatal: true }), { signal })
-        .getReader();
-      let finished = false;
+      const decodedStream = stream.pipeThrough(
+        new TextDecoderStream("utf-8", { fatal: true }),
+        { signal },
+      );
       const parts = [];
       let lineLength = 0;
       let pendingCR = false;
@@ -3131,13 +2878,7 @@
         return line;
       };
       try {
-        while (true) {
-          const { value: chunk, done } = await reader.read();
-          if (done) {
-            finished = true;
-            signal.throwIfAborted();
-            break;
-          }
+        for await (const chunk of decodedStream) {
           signal.throwIfAborted();
           let start = 0;
           if (pendingCR) {
@@ -3172,12 +2913,23 @@
         if (lineLength > 0) {
           yield parts.join("");
         }
-      } finally {
-        if (!finished) await cancelReadable(reader, signal.reason);
-        reader.releaseLock();
+      } catch (err) {
+        signal.throwIfAborted();
+        if (err instanceof TypeError) {
+          throw new InputValidationError(
+            "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
+            { cause: err },
+          );
+        }
+        throw err;
       }
     }
     async function parseFileToRecords(file, signal) {
+      if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT) {
+        throw new InputValidationError(
+          `입력 파일이 허용 크기 ${fmt(CONFIG.INPUT_FILE_HARD_LIMIT)} bytes를 초과했습니다.`,
+        );
+      }
       const out = [];
       let lastYield = performance.now();
       let linesSinceYield = 0;
@@ -3200,7 +2952,7 @@
           if (!Number.isFinite(fLat) || !Number.isFinite(fLon)) continue;
           if (fLat < -90 || fLat > 90 || fLon < -180 || fLon > 180) continue;
           if (out.length >= CONFIG.BULK_HARD_LIMIT) {
-            throw new InputLimitError(
+            throw new InputValidationError(
               `공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
             );
           }
@@ -3220,8 +2972,15 @@
     }
     const REVERSE_PARSED_CACHE = new Map();
     const REVERSE_PARSED_CACHE_MAX = 5_000;
+    const REVERSE_CACHE_WRITE_LIMIT = 8;
+    const REVERSE_CACHE_PRUNE_INTERVAL = 32;
+    let REVERSE_CACHE_WRITES_SINCE_PRUNE =
+      REVERSE_CACHE_PRUNE_INTERVAL - 1;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
+    let REVERSE_CACHE_RETRY_AT = 0;
+    const REVERSE_CACHE_OPEN_RETRY_MS = 5_000;
+    const NO_REVERSE_CACHE_DB = Promise.resolve(null);
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -3230,7 +2989,7 @@
         if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
     }
-    function isFreshReverseCacheRow(row, expectedKey, now = Date.now()) {
+    function isFreshReverseCacheRow(row, expectedKey, now) {
       if (
         !row ||
         row.key !== expectedKey ||
@@ -3243,18 +3002,26 @@
       return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
     }
     function persistentReverseCacheKey(cacheKey) {
-      return REVERSE_CACHE_VARIANT + ":" +
-        CONFIG.REVERSE_CACHE_PARSER_VERSION + ":" + cacheKey;
+      return REVERSE_CACHE_KEY_PREFIX + cacheKey;
     }
     function openReverseCacheDb() {
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
-      REVERSE_CACHE_DB_PROMISE = new Promise((resolve) => {
+      if (Date.now() < REVERSE_CACHE_RETRY_AT) {
+        return NO_REVERSE_CACHE_DB;
+      }
+      const attempt = new Promise((resolve) => {
         let settled = false;
         const finish = (db) => {
           if (settled) return false;
           settled = true;
           resolve(db);
           return true;
+        };
+        const fail = (message, detail) => {
+          if (!finish(null)) return;
+          REVERSE_CACHE_RETRY_AT =
+            Date.now() + REVERSE_CACHE_OPEN_RETRY_MS;
+          console.warn(message, detail);
         };
         let req;
         try {
@@ -3263,8 +3030,7 @@
             CONFIG.REVERSE_CACHE_DB_VERSION,
           );
         } catch (err) {
-          console.warn("Reverse geocoding cache is unavailable.", err);
-          finish(null);
+          fail("Reverse geocoding cache is unavailable.", err);
           return;
         }
         req.onupgradeneeded = (event) => {
@@ -3286,6 +3052,7 @@
         };
         req.onsuccess = () => {
           const db = req.result;
+          REVERSE_CACHE_RETRY_AT = 0;
           db.onversionchange = () => {
             db.close();
             REVERSE_CACHE_DB_PROMISE = null;
@@ -3294,16 +3061,19 @@
             REVERSE_CACHE_DB_PROMISE = Promise.resolve(db);
           }
         };
-        req.onerror = () => {
-          console.warn("Reverse geocoding cache is unavailable.", req.error);
-          finish(null);
-        };
-        req.onblocked = () => {
-          console.warn("Reverse geocoding cache upgrade is blocked.");
-          finish(null);
-        };
+        req.onerror = () =>
+          fail("Reverse geocoding cache is unavailable.", req.error);
+        req.onblocked = () =>
+          fail("Reverse geocoding cache upgrade is blocked.");
       });
-      return REVERSE_CACHE_DB_PROMISE;
+      const shared = attempt.then((db) => {
+        if (!db && REVERSE_CACHE_DB_PROMISE === shared) {
+          REVERSE_CACHE_DB_PROMISE = null;
+        }
+        return db;
+      });
+      REVERSE_CACHE_DB_PROMISE = shared;
+      return shared;
     }
     function runReverseCacheTransaction(db, mode, signal, operation) {
       signal.throwIfAborted();
@@ -3353,19 +3123,39 @@
         }
       });
     }
-    async function readPersistentReverseCache(cacheKey, signal) {
-      const persistentKey = persistentReverseCacheKey(cacheKey);
+    async function readPersistentReverseCache(records, signal) {
+      const results = new Map();
+      for (const record of records) {
+        const cacheKey = record.cacheKey;
+        if (!REVERSE_PARSED_CACHE.has(cacheKey)) {
+          results.getOrInsert(cacheKey, null);
+        }
+      }
+      if (results.size === 0) return results;
       const db = await openReverseCacheDb();
       signal.throwIfAborted();
-      if (!db) return null;
-      let result = null;
+      if (!db) return results;
+      const now = Date.now();
       try {
         await runReverseCacheTransaction(db, "readonly", signal, (store) => {
-          const req = store.get(persistentKey);
+          const req = store.getAll(
+            undefined,
+            CONFIG.REVERSE_CACHE_MAX + REVERSE_CACHE_PRUNE_INTERVAL,
+          );
           req.onsuccess = () => {
-            const row = req.result;
-            if (isFreshReverseCacheRow(row, persistentKey)) {
-              result = row.parsed;
+            for (const row of req.result) {
+              const persistentKey = row?.key;
+              if (
+                typeof persistentKey !== "string" ||
+                !persistentKey.startsWith(REVERSE_CACHE_KEY_PREFIX)
+              ) continue;
+              const cacheKey = persistentKey.slice(
+                REVERSE_CACHE_KEY_PREFIX.length,
+              );
+              if (
+                results.has(cacheKey) &&
+                isFreshReverseCacheRow(row, persistentKey, now)
+              ) results.set(cacheKey, row.parsed);
             }
           };
         });
@@ -3373,30 +3163,40 @@
         signal.throwIfAborted();
         console.warn("Reverse geocoding cache read failed.", err);
       }
-      return result;
+      return results;
     }
-    async function writePersistentReverseCache(cacheKey, parsed, signal) {
-      const persistentKey = persistentReverseCacheKey(cacheKey);
-      const db = await openReverseCacheDb();
-      signal.throwIfAborted();
-      if (!db) return;
+    async function writePersistentReverseCacheBatch(entries, signal) {
       try {
+        const db = await openReverseCacheDb();
+        if (!db || signal.aborted) return;
         await runReverseCacheTransaction(
           db,
           "readwrite",
           signal,
           (store) => {
-            store.put({
-              key: persistentKey,
-              savedAt: Date.now(),
-              parsed,
-            });
-            pruneExcessReverseCacheRows(store);
+            const savedAt = Date.now();
+            for (const { cacheKey, parsed } of entries) {
+              store.put({
+                key: persistentReverseCacheKey(cacheKey),
+                savedAt,
+                parsed,
+              });
+            }
+            REVERSE_CACHE_WRITES_SINCE_PRUNE += entries.length;
+            if (
+              REVERSE_CACHE_WRITES_SINCE_PRUNE >=
+              REVERSE_CACHE_PRUNE_INTERVAL
+            ) {
+              REVERSE_CACHE_WRITES_SINCE_PRUNE %=
+                REVERSE_CACHE_PRUNE_INTERVAL;
+              pruneExcessReverseCacheRows(store);
+            }
           },
         );
       } catch (err) {
-        signal.throwIfAborted();
-        console.warn("Reverse geocoding cache write failed.", err);
+        if (!signal.aborted) {
+          console.warn("Reverse geocoding cache write failed.", err);
+        }
       }
     }
     function pruneExcessReverseCacheRows(store) {
@@ -3414,40 +3214,39 @@
         };
       };
     }
-    void openReverseCacheDb();
+    function decodeReverseBytes(decoder, value, stream) {
+      try {
+        return decoder.decode(value, { stream });
+      } catch (err) {
+        throw new SyntaxError(
+          "역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.",
+          { cause: err },
+        );
+      }
+    }
     async function readReverseResponseText(response, signal) {
       const limit = CONFIG.REVERSE_RESPONSE_MAX_BYTES;
       const contentLength = Number(response.headers.get("content-length"));
       if (Number.isFinite(contentLength) && contentLength > limit) {
         await cancelReadable(response.body);
-        throw new Error(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
+        throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
-      const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8", { fatal: true });
       const parts = [];
       let bytesRead = 0;
-      let finished = false;
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          signal.throwIfAborted();
-          if (done) break;
-          bytesRead += value.byteLength;
-          if (bytesRead > limit) {
-            throw new Error(
-              `응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
-            );
-          }
-          parts.push(decoder.decode(value, { stream: true }));
+      for await (const value of response.body) {
+        signal.throwIfAborted();
+        bytesRead += value.byteLength;
+        if (bytesRead > limit) {
+          throw new RangeError(
+            `응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
+          );
         }
-        parts.push(decoder.decode());
-        finished = true;
-        return parts.join("");
-      } finally {
-        if (!finished) await cancelReadable(reader, signal.reason);
-        reader.releaseLock();
+        parts.push(decodeReverseBytes(decoder, value, true));
       }
+      parts.push(decodeReverseBytes(decoder, undefined, false));
+      return parts.join("");
     }
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
@@ -3477,16 +3276,35 @@
           });
         } catch (e) {
           userSignal.throwIfAborted();
-          if (attempt >= maxRetry) throw e;
+          if (attempt >= maxRetry) {
+            throw new Error(
+              "역지오코딩 서버에 연결하지 못했습니다.",
+              { cause: e },
+            );
+          }
           await sleep(baseDelayMs * attempt, userSignal);
           continue;
         }
         if (res.ok) {
           try {
-            return JSON.parse(await readReverseResponseText(res, requestSignal));
+            const body = await readReverseResponseText(res, requestSignal);
+            try {
+              return JSON.parse(body);
+            } catch (err) {
+              throw new SyntaxError(
+                "역지오코딩 응답이 올바른 JSON 형식이 아닙니다.",
+                { cause: err },
+              );
+            }
           } catch (e) {
             userSignal.throwIfAborted();
-            if (attempt >= maxRetry) throw e;
+            if (
+              e instanceof RangeError ||
+              e instanceof SyntaxError ||
+              attempt >= maxRetry
+            ) {
+              throw e;
+            }
           }
         } else if (res.status !== 429 && res.status < 500) {
           throw new Error(
@@ -3496,155 +3314,140 @@
           await cancelReadable(res.body);
           if (attempt >= maxRetry) {
             throw new Error(
-              `HTTP ${res.status}: rate limited or server error`,
+              `HTTP ${res.status}: 요청 제한 또는 서버 오류`,
             );
           }
         }
-        await sleep(baseDelayMs * attempt, userSignal);
+        await sleep(retryDelay(res, attempt), userSignal);
       }
+    }
+    async function pauseProcessing(task, message) {
+      AppState.setStatus("paused");
+      setStatusMessage(message, "warn");
+      const { promise, resolve } = Promise.withResolvers();
+      task.resume = resolve;
+      scheduleRender();
+      await promise;
+      task.resume = null;
     }
     async function runProcessingLoop(task) {
       const records = AppState.records;
-      const startIndex = AppState.processed;
       const total = records.length;
       const totalDisp = fmt(total);
-      const wrap = domElements.tableWrap;
-      const tbody = domElements.tbody;
-      let hasResultsClass = wrap.classList.contains("has-results");
+      const signal = task.controller.signal;
       let lastStatusUpdate = 0;
       let lastYield = performance.now();
-      let pendingFrag = null;
-      let pendingCount = 0;
-      const flushPending = () => {
-        if (!pendingFrag) return;
-        tbody.append(pendingFrag);
-        pendingFrag = null;
-        pendingCount = 0;
-        requestScrollShadowSync(wrap);
+      const cacheWriteBatch = [];
+      const flushCacheWrites = async () => {
+        if (cacheWriteBatch.length === 0) return;
+        const entries = cacheWriteBatch.splice(0);
+        await writePersistentReverseCacheBatch(entries, signal);
       };
-      const signal = task.controller.signal;
-      for (let i = startIndex; i < total; i++) {
+      for (const record of records) {
+        record.result = null;
+        record._search = null;
+      }
+      task.inFlight = true;
+      let persistentCache;
+      try {
+        persistentCache = await readPersistentReverseCache(records, signal);
+      } catch (err) {
+        if (!signal.aborted) throw err;
+        persistentCache = new Map();
+      } finally {
+        task.inFlight = false;
+      }
+      for (let i = 0; i < total && !signal.aborted; i++) {
+        const r = records[i];
+        const cacheKey = r.cacheKey;
+        const parsed = REVERSE_PARSED_CACHE.get(cacheKey) ??
+          persistentCache.get(cacheKey);
+        if (!parsed) continue;
+        putReverseMemoryCache(cacheKey, parsed);
+        commitResult(i, parsed, false);
+        const now = performance.now();
+        if (now - lastStatusUpdate >= 200) {
+          lastStatusUpdate = now;
+          setProgressStatus(AppState.processed, total, totalDisp);
+        }
+        if (now - lastYield >= 8) {
+          await yieldToMain();
+          lastYield = performance.now();
+        }
+      }
+      schedulePageRender();
+      for (let i = 0; i < total && !signal.aborted; i++) {
+        if (records[i].result) continue;
         const i1 = i + 1;
-        let skeletonTr = null;
         try {
-          signal.throwIfAborted();
-          if (AppState.status === "pausing") {
-            AppState.setStatus("paused");
-            setStatusMessage('일시정지됨. "재개"를 눌러 이어서 진행', "warn");
-            const { promise, resolve } = Promise.withResolvers();
-            task.resume = resolve;
-            scheduleRender();
-            await promise;
-            signal.throwIfAborted();
+          if (AppState.status === "pausing" || !navigator.onLine) {
+            const offline = !navigator.onLine;
+            await pauseProcessing(
+              task,
+              offline
+                ? '네트워크가 오프라인입니다. 연결 후 "재개"를 눌러주세요.'
+                : '일시정지됨. "재개"를 눌러 이어서 진행',
+            );
+            if (signal.aborted) break;
+            if (offline && !navigator.onLine) {
+              i--;
+              continue;
+            }
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
           if (AppState.task !== task || !AppState.isRunning) break;
           task.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
-          let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
-          if (!parsed) {
-            parsed = await readPersistentReverseCache(cacheKey, signal);
-          }
-          if (parsed) putReverseMemoryCache(cacheKey, parsed);
-          signal.throwIfAborted();
-          if (AppState.task !== task || !AppState.isRunning) break;
-          const needsFetch = !parsed;
-          if (needsFetch) flushPending();
-          const tr = ROW_TEMPLATE.cloneNode(true);
-          tr.cells[IDX_COL_INDEX].textContent = "" + i1;
-          tr.cells[MAPS_COL_INDEX].lastElementChild.dataset.idx = "" + i;
-          let rowFilter = getLiveFilterSnapshot();
-          if (rowFilter.active) {
-            tr.setAttribute("hidden", HIDDEN_UNTIL_FOUND);
-          }
-          if (!hasResultsClass) {
-            hasResultsClass = true;
-            wrap.classList.add("has-results");
-            requestScrollShadowSync(wrap);
-            if (rowFilter.active) wrap.classList.add("filter-empty");
-          }
-          if (needsFetch) {
-            for (const cell of tr.cells) {
-              if (cell.cellIndex === IDX_COL_INDEX) continue;
-              const skeleton = document.createElement("div");
-              skeleton.className = "skeleton-bar";
-              cell.prepend(skeleton);
-            }
-            tbody.append(tr);
-            requestScrollShadowSync(wrap);
-          } else {
-            (pendingFrag ??= document.createDocumentFragment()).append(tr);
-            if (++pendingCount >= 200) flushPending();
-          }
-          skeletonTr = tr;
-          if (needsFetch && !AppState.isRunning) {
-            skeletonTr.remove();
-            break;
-          }
-          let now = 0;
-          if (AppState.status !== "paused") {
-            now = performance.now();
-            if (
-              now - lastStatusUpdate >= 200 || i === startIndex ||
-              i1 === total
-            ) {
-              lastStatusUpdate = now;
-              setProgressStatus(i1, total, totalDisp);
-            }
-          }
+          let parsed;
           let rowError = null;
-          if (needsFetch) {
-            try {
-              const url =
-                `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-              parsed = GeocodeParser.parse(
-                await fetchReverseWithRetry(
-                  url,
-                  signal,
-                ),
-              );
-              putReverseMemoryCache(cacheKey, parsed);
-              await writePersistentReverseCache(cacheKey, parsed, signal);
-            } catch (err) {
-              if (signal.aborted && err?.name === "AbortError") {
-                skeletonTr.remove();
-                break;
-              }
-              rowError = err;
-              parsed = {
-                addr: null,
-                error: getErrorMessage(err),
-                kind: "에러",
-              };
+          try {
+            const url = `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
+            parsed = GeocodeParser.parse(
+              await fetchReverseWithRetry(url, signal),
+            );
+            putReverseMemoryCache(cacheKey, parsed);
+            cacheWriteBatch.push({ cacheKey, parsed });
+            if (cacheWriteBatch.length >= REVERSE_CACHE_WRITE_LIMIT) {
+              await flushCacheWrites();
             }
-            rowFilter = getLiveFilterSnapshot();
+          } catch (err) {
+            if (signal.aborted && err?.name === "AbortError") break;
+            if (!navigator.onLine) {
+              task.inFlight = false;
+              await pauseProcessing(
+                task,
+                '네트워크 연결이 끊겼습니다. 연결 후 "재개"를 눌러주세요.',
+              );
+              if (signal.aborted) break;
+              i--;
+              continue;
+            }
+            rowError = err;
+            parsed = {
+              addr: null,
+              error: getErrorMessage(err),
+              kind: "에러",
+            };
           }
-          r.result = parsed;
-          r._search = null;
-          commitResultRow(skeletonTr, r, wrap, rowFilter);
+          commitResult(i, parsed, true);
+          const now = performance.now();
+          if (
+            now - lastStatusUpdate >= 200 ||
+            AppState.processed === total
+          ) {
+            lastStatusUpdate = now;
+            setProgressStatus(AppState.processed, total, totalDisp);
+          }
           if (rowError && !AppState.isStopping) {
             setStatusMessage(
               `에러 발생: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(rowError)}`,
               "error",
             );
           }
-          if (!needsFetch) {
-            if (!now) now = performance.now();
-            if (now - lastYield >= 8) {
-              flushPending();
-              await yieldToMain();
-              lastYield = performance.now();
-            }
-          }
         } catch (err) {
           if (signal.aborted && err?.name === "AbortError") break;
           console.error(err);
-          if (
-            skeletonTr && (skeletonTr.isConnected || skeletonTr.parentNode)
-          ) {
-            skeletonTr.remove();
-          }
           task.resume = null;
           setControlsIdle(
             `오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(err)
@@ -3656,13 +3459,25 @@
           task.inFlight = false;
         }
       }
+      await flushCacheWrites();
       if (AppState.task !== task) return;
-      flushPending();
+      if (pageRenderReq) cancelAnimationFrame(pageRenderReq);
+      renderCurrentPage();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
       } else if (AppState.processed >= AppState.records.length) {
-        setControlsIdle("모든 처리가 완료되었습니다.");
+        const failed = AppState.cntFail;
+        if (failed === 0) {
+          setControlsIdle("모든 처리가 완료되었습니다.");
+        } else {
+          const succeeded = AppState.processed - failed;
+          setControlsIdle(
+            `처리 완료: ${fmt(succeeded)}건 성공, ${fmt(failed)}건 실패했습니다.`,
+            succeeded === 0 ? "error" : "warn",
+          );
+        }
       }
+      deferFindIndexRebuild();
     }
     function setControlsIdle(message, type = "info") {
       AppState.setStatus("idle");
@@ -3671,12 +3486,13 @@
     function getErrorMessage(err) {
       return String(err?.message || err);
     }
-    function commitResultRow(tr, r, wrap, f) {
-      const connected = tr.isConnected;
+    function createResultRow(r, index) {
+      const tr = ROW_TEMPLATE.cloneNode(true);
       const cells = tr.cells;
       const latStr = r.latStr;
       const lonStr = r.lonStr;
       const result = r.result;
+      cells[IDX_COL_INDEX].textContent = String(index + 1);
       cells[KIND_COL_INDEX].textContent = result.kind || r.set;
       cells[COORDS_COL_INDEX].textContent = latStr + ", " + lonStr;
       const addr = result.addr;
@@ -3696,107 +3512,134 @@
       const td = cells[MAPS_COL_INDEX];
       const btn = td.lastElementChild;
       btn.disabled = false;
+      btn.dataset.idx = String(index);
       btn.setAttribute("aria-label", `지도 링크 열기: ${latStr}, ${lonStr}`);
-      btn.setAttribute("aria-expanded", "false");
-      const sk = td.firstElementChild;
-      if (sk !== btn) sk.remove();
-      const wasHidden = tr.hidden;
-      let hidden = false;
-      if (f.active) {
-        const revealedRows = FIND_REVEALED_ROWS.size === 0
-          ? null
-          : FIND_REVEALED_ROWS;
-        hidden = setRowHiddenByFilterActive(
-          tr, wasHidden, f, r, revealedRows,
-        );
-        if (!hidden) wrap.classList.remove("filter-empty");
-      } else if (wasHidden) {
-        tr.removeAttribute("hidden");
-      }
+      return tr;
+    }
+    function commitResult(index, parsed, render) {
+      const r = AppState.records[index];
+      r.result = parsed;
+      r._search = null;
       AppState.processed++;
-      if (result.error) AppState.cntFail++;
+      if (parsed.error) AppState.cntFail++;
+      if (matchesFilter(r, getLiveFilterSnapshot())) insertVisibleIndex(index);
       scheduleRender();
-      if (connected || hidden !== wasHidden) {
-        requestScrollShadowSync(wrap);
-      }
+      if (render) schedulePageRender();
     }
     async function handleExport() {
-      try {
-        const records = AppState.records;
-        const totalRows = Math.min(records.length, AppState.processed);
-        const sourceFile = AppState.droppedFile;
-        if (totalRows <= 0) {
-          return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
-        }
-        if (!sourceFile) {
-          return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
-        }
-        const escCell = csvEsc;
-        setStatusMessage("CSV 생성 중…");
-        await yieldToMain();
-        const parts = [CSV_HEADER];
-        const totalDisp = fmt(totalRows);
-        let chunkLines = [];
-        let chunkChars = 0;
-        const flushChunk = () => {
-          if (chunkLines.length === 0) return;
-          parts.push("\n", chunkLines.join("\n"));
-          chunkChars = 0;
-          chunkLines.length = 0;
-        };
-        for (let i = 0; i < totalRows; i++) {
-          const r = records[i];
-          const lat = r.latStr;
-          const lon = r.lonStr;
-          const coords = lat + ", " + lon;
-          const result = r.result;
-          let line = escCell(result.kind || r.set) +
-            "," +
-            escCell(i + 1) +
-            "," +
-            escCell(coords) +
-            ",";
-          const addr = result.addr;
-          if (addr) {
-            line += escCell(addr.sido) +
-              "," +
-              escCell(addr.sigungu) +
-              "," +
-              escCell(addr.eupmyeon) +
-              "," +
-              escCell(addr.tag) +
-              ",";
-          } else {
-            line += ",,,,";
-          }
-          line += escCell(result.error || addr.fullAddr);
-          line += "," + escCell(CSV_SOURCE_TEXT);
-          line += "," + escCell(CSV_LICENSE_TEXT);
-          line += "," + escCell(CSV_GEOCODER_TEXT);
-          const lat6 = r.lat6 ??= fmtCoord6(lat);
-          const lon6 = r.lon6 ??= fmtCoord6(lon);
-          for (let k = 0; k < MAP_LINKS.length; k++) {
-            line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
-          }
-          chunkLines.push(line);
-          chunkChars += line.length + 1;
-          if (chunkChars >= 1_000_000) {
-            flushChunk();
-            setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${totalDisp})`);
-            await yieldToMain();
-          }
-        }
-        flushChunk();
-        downloadBlob(
-          new Blob(parts, { type: "text/csv;charset=utf-8" }),
-          `${sourceFile.name.replace(RX_FILE_EXT, "")
-          }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
-        );
-        setStatusMessage("CSV 파일을 다운로드했습니다.");
-      } catch (err) {
-        console.error(err);
-        setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
+      if (EXPORT_TASK) return EXPORT_TASK.promise;
+      const resultIndices = [];
+      for (let i = 0; i < AppState.records.length; i++) {
+        if (AppState.records[i].result) resultIndices.push(i);
       }
+      const exportTask = {
+        appGeneration: AppState.generation,
+        file: AppState.droppedFile,
+        records: AppState.records,
+        resultIndices,
+        promise: null,
+      };
+      const ensureCurrent = () => {
+        if (
+          AppState.generation !== exportTask.appGeneration ||
+          AppState.records !== exportTask.records ||
+          AppState.droppedFile !== exportTask.file
+        ) {
+          throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
+        }
+      };
+      EXPORT_TASK = exportTask;
+      domElements.exportBtn.disabled = true;
+      exportTask.promise = (async () => {
+        try {
+          const records = exportTask.records;
+          const resultIndices = exportTask.resultIndices;
+          const totalRows = resultIndices.length;
+          const sourceFile = exportTask.file;
+          if (totalRows <= 0) {
+            return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
+          }
+          if (!sourceFile) {
+            return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
+          }
+          const escCell = csvEsc;
+          setStatusMessage("CSV 생성 중…");
+          await yieldToMain();
+          ensureCurrent();
+          const parts = [CSV_HEADER];
+          const totalDisp = fmt(totalRows);
+          let chunkLines = [];
+          let chunkChars = 0;
+          const flushChunk = () => {
+            if (chunkLines.length === 0) return;
+            parts.push("\n", chunkLines.join("\n"));
+            chunkChars = 0;
+            chunkLines.length = 0;
+          };
+          for (let i = 0; i < totalRows; i++) {
+            const recordIndex = resultIndices[i];
+            const r = records[recordIndex];
+            const lat = r.latStr;
+            const lon = r.lonStr;
+            const coords = lat + ", " + lon;
+            const result = r.result;
+            let line = escCell(result.kind || r.set) +
+              "," +
+              escCell(recordIndex + 1) +
+              "," +
+              escCell(coords) +
+              ",";
+            const addr = result.addr;
+            if (addr) {
+              line += escCell(addr.sido) +
+                "," +
+                escCell(addr.sigungu) +
+                "," +
+                escCell(addr.eupmyeon) +
+                "," +
+                escCell(addr.tag) +
+                ",";
+            } else {
+              line += ",,,,";
+            }
+            line += escCell(result.error || addr.fullAddr);
+            line += "," + escCell(CSV_SOURCE_TEXT);
+            line += "," + escCell(CSV_LICENSE_TEXT);
+            line += "," + escCell(CSV_GEOCODER_TEXT);
+            const lat6 = r.lat6 ??= fmtCoord6(lat);
+            const lon6 = r.lon6 ??= fmtCoord6(lon);
+            for (let k = 0; k < MAP_LINKS.length; k++) {
+              line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
+            }
+            chunkLines.push(line);
+            chunkChars += line.length + 1;
+            if (chunkChars >= 1_000_000) {
+              flushChunk();
+              setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${totalDisp})`);
+              await yieldToMain();
+              ensureCurrent();
+            }
+          }
+          flushChunk();
+          ensureCurrent();
+          downloadBlob(
+            new Blob(parts, { type: "text/csv;charset=utf-8" }),
+            `${sourceFile.name.replace(RX_FILE_EXT, "")
+            }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
+          );
+          setStatusMessage("CSV 파일을 다운로드했습니다.");
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+          console.error(err);
+          setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
+        } finally {
+          if (EXPORT_TASK === exportTask) {
+            EXPORT_TASK = null;
+            domElements.exportBtn.disabled = AppState.processed === 0;
+          }
+        }
+      })();
+      return exportTask.promise;
     }
     async function handleParse() {
       const file = AppState.droppedFile;
@@ -3820,7 +3663,7 @@
         AppState.setRecords(records);
         domElements.emptyHint.textContent =
           "좌표 추출 완료. 조회 시작을 눌러주세요.";
-        const MAX_DISP = 1_000;
+        const MAX_DISP = 200;
         const disp = [];
         for (
           let i = 0, dispLen = Math.min(records.length, MAX_DISP);
@@ -3842,10 +3685,11 @@
       } catch (err) {
         if (AppState.task !== task) return;
         if (err && err.name === "AbortError") {
+          domElements.emptyHint.textContent = FILE_READY_HINT;
           setControlsIdle("중지되었습니다.", "stopped");
           return;
         }
-        if (err instanceof InputLimitError) {
+        if (err instanceof InputValidationError) {
           AppState.setRecords([]);
           domElements.emptyHint.textContent = FILE_READY_HINT;
           setControlsIdle(err.message, "warn");
@@ -3858,31 +3702,27 @@
       }
     }
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
+    domElements.filters.addEventListener("reset", () => {
+      queueMicrotask(scheduleApplyFilterAll);
+    });
+    domElements.filters.addEventListener("submit", (e) => {
+      e.preventDefault();
+      scheduleApplyFilterAll();
+    });
     domElements.tbody.addEventListener("click", (e) => {
       if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
-    }, EVT_CAPTURE_PASSIVE);
-    domElements.tbody.addEventListener(
-      "beforematch",
-      (e) => {
-        const tr = e.target instanceof Element
-          ? e.target.closest("tr")
-          : null;
-        if (!tr) return;
-        FIND_REVEALED_ROWS.add(tr);
-        if (tr.hidden) tr.removeAttribute("hidden");
-        domElements.tableWrap.classList.remove("filter-empty");
-        bumpFindRehideTimer();
-      },
-    );
+    }, { capture: true });
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const maybeVT = (fn) => {
       if (
         domElements.tbody.childElementCount > 0 &&
-        !root.hasAttribute(PERF_MODE_ATTR)
+        domElements.tbody.childElementCount <= RESULT_PAGE_SIZE &&
+        !reducedMotion.matches
       ) {
-        if (!root.matches(":active-view-transition")) {
+        if (!document.activeViewTransition) {
           return document.startViewTransition({
             update: fn,
             types: ["results"],
@@ -3900,7 +3740,6 @@
           }
           const task = AppState.reset("running");
           clearTable();
-          resetScrollShadowState(domElements.coords);
           setStatusMessage("조회 시작…");
           void runProcessingLoop(task).catch((err) => {
             if (AppState.task !== task) return;
@@ -3933,30 +3772,24 @@
         if (!(AppState.isRunning || AppState.status === "parsing")) return;
         AppState.setStatus("stopping");
         const task = AppState.task;
-        resetScrollShadowState(domElements.tableWrap);
-        resetScrollShadowState(domElements.coords);
         task.resume?.();
         task.resume = null;
         task.controller.abort();
         setStatusMessage("중지 요청됨. 취소 중…", "warn");
       },
       "--export": handleExport,
-      "--filter-clear": () => {
-        for (const el of [
-          domElements.filterQ,
-          domElements.filterKind,
-          domElements.filterSido,
-          domElements.filterSigungu,
-          domElements.filterEmd,
-          domElements.filterTag,
-          domElements.filterFullAddr,
-        ]) {
-          el.value = "";
-        }
-        FILTER_SNAP = null;
-        cancelActiveFilterTask();
-        clearFindReveals();
-        startChunkedFilterApply(getLiveFilterSnapshot());
+      "--page-prev": () => {
+        if (AppState.page === 0) return;
+        AppState.page--;
+        renderCurrentPage(true);
+      },
+      "--page-next": () => {
+        const pages = Math.ceil(
+          AppState.visibleIndices.length / RESULT_PAGE_SIZE,
+        );
+        if (AppState.page + 1 >= pages) return;
+        AppState.page++;
+        renderCurrentPage(true);
       },
     };
     function handleCommandError(err) {
@@ -3989,7 +3822,6 @@
       setCoordsText("");
       clearTable();
       AppState.setRecords([]);
-      REVERSE_PARSED_CACHE.clear();
       AppState.droppedFile = file;
       domElements.emptyHint.textContent = FILE_READY_HINT;
       setStatusMessage(
@@ -4015,37 +3847,10 @@
       e.preventDefault();
       maybeVT(() => handleFile(e.dataTransfer.files?.[0] || null));
     });
-    document.addEventListener("scroll", () => {
-      closeMapPopover();
-      if (FIND_REVEALED_ROWS.size !== 0) bumpFindRehideTimer();
-    }, EVT_CAPTURE_PASSIVE);
-    function syncTableShadowOffset() {
-      const wrap = domElements.tableWrap;
-      if (!(wrap instanceof HTMLElement)) return;
-      const headCell = tbl.tHead?.rows?.[0]?.cells?.[0];
-      let offset = 0;
-      if (
-        headCell instanceof HTMLElement &&
-        getComputedStyle(headCell).display !== "none"
-      ) {
-        offset = Math.round(headCell.getBoundingClientRect().height);
-      }
-      wrap.style.setProperty("--table-head-offset", `${offset}px`);
-    }
-    window.addEventListener("pagehide", closeMapPopover);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        closeMapPopover();
-      }
-    });
-    window.addEventListener("resize", syncScrollShadows, EVT_PASSIVE);
-    syncScrollShadows();
-    (() => {
+    function loadManualRng() {
       const U64_MAX = (1n << 64n) - 1n;
       const U32_MAX_INV = 1 / 4294967295;
       const HANGUL_BASE_CODE_POINT = 0xac00;
-      const HANGUL_SHIFTS = [48n, 32n, 16n, 0n];
-      const U64_BYTE_SHIFTS = [56n, 48n, 40n, 32n, 24n, 16n, 8n, 0n];
       const NMS_PLANET_SHIFTS = [52n, 4n, 0n];
       const NMS_SOLAR_SYSTEM_SHIFTS = [40n];
       const HANGUL_SYLLABLE_MAX = 55859;
@@ -4071,6 +3876,7 @@
       ];
       const MAX_U64_DEC = U64_MAX.toString(10);
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
+      const U64_TOKEN_HARD_LIMIT = 64;
       const U64_TOKEN = /^(?:0[xX][0-9a-fA-F]+|\+?\d+)$/u;
       function createDataSet(num64) {
         return {
@@ -4108,6 +3914,11 @@
         if (input.length === 0) {
           throw new Error("빈 값은 허용되지 않습니다.");
         }
+        if (input.length > U64_TOKEN_HARD_LIMIT) {
+          throw new Error(
+            `u64 입력값이 허용 길이 ${U64_TOKEN_HARD_LIMIT}자를 초과했습니다.`,
+          );
+        }
         if (!U64_TOKEN.test(input)) {
           throw new Error(
             `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
@@ -4121,14 +3932,16 @@
         }
         return value;
       }
-      const F64_SCRATCH_VIEW = new DataView(new ArrayBuffer(8));
+      const NUMERIC_SCRATCH_BUFFER = new ArrayBuffer(8);
+      const NUMERIC_SCRATCH_VIEW = new DataView(NUMERIC_SCRATCH_BUFFER);
+      const NUMERIC_SCRATCH_BYTES = new Uint8Array(NUMERIC_SCRATCH_BUFFER);
       const F64_FRACTION_MASK = (1n << 52n) - 1n;
       const F64_HIDDEN_BIT = 1n << 52n;
       const F64_CARRY_BIT = 1n << 53n;
       const F64_SIGN_BIT = 1n << 63n;
       function decomposeF64(value) {
-        F64_SCRATCH_VIEW.setFloat64(0, value, false);
-        const bits = F64_SCRATCH_VIEW.getBigUint64(0, false);
+        NUMERIC_SCRATCH_VIEW.setFloat64(0, value, false);
+        const bits = NUMERIC_SCRATCH_VIEW.getBigUint64(0, false);
         const exponentBits = Number((bits >> 52n) & 0x7ffn);
         const fraction = bits & F64_FRACTION_MASK;
         if (exponentBits === 0x7ff) {
@@ -4154,7 +3967,13 @@
         }
         const negative = integer < 0n;
         const magnitude = negative ? -integer : integer;
-        let shift = magnitude.toString(2).length - 53;
+        const magnitudeHex = magnitude.toString(16);
+        const firstNibble = Number.parseInt(magnitudeHex.charAt(0), 16);
+        let shift =
+          (magnitudeHex.length - 1) * 4 +
+          32 -
+          Math.clz32(firstNibble) -
+          53;
         let significand;
         if (shift > 0) {
           const shiftBits = BigInt(shift);
@@ -4183,8 +4002,8 @@
         if (negative) {
           bits |= F64_SIGN_BIT;
         }
-        F64_SCRATCH_VIEW.setBigUint64(0, bits, false);
-        return F64_SCRATCH_VIEW.getFloat64(0, false);
+        NUMERIC_SCRATCH_VIEW.setBigUint64(0, bits, false);
+        return NUMERIC_SCRATCH_VIEW.getFloat64(0, false);
       }
       function affineF64(
         ratio,
@@ -4234,13 +4053,6 @@
         return sign + digits.slice(0, decimalIndex) + "." +
           digits.slice(decimalIndex);
       }
-      function u64ToBytesBe(v) {
-        const bytes = new Array(8);
-        for (let i = 0; i < U64_BYTE_SHIFTS.length; i += 1) {
-          bytes[i] = Number((v >> U64_BYTE_SHIFTS[i]) & 0xffn);
-        }
-        return bytes;
-      }
       function reverseBitsU64(v) {
         let x = v;
         x = ((x >> 1n) & 0x5555_5555_5555_5555n) |
@@ -4271,8 +4083,8 @@
         return seen | mask;
       }
       function fillDataFieldsFromU64(v, data) {
-        for (const shift of U64_BYTE_SHIFTS) {
-          const byte = Number((v >> shift) & 0xffn);
+        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
+        for (const byte of NUMERIC_SCRATCH_BYTES) {
           if (byte > 249) {
             continue;
           }
@@ -4413,8 +4225,8 @@
           attempt < SUPPLEMENTAL_RETRY_LIMIT;
           attempt++
         ) {
-          for (const shift of U64_BYTE_SHIFTS) {
-            const byte = Number((luckyStarSource >> shift) & 0xffn);
+          NUMERIC_SCRATCH_VIEW.setBigUint64(0, luckyStarSource, false);
+          for (const byte of NUMERIC_SCRATCH_BYTES) {
             if (byte > 251) {
               continue;
             }
@@ -4444,9 +4256,10 @@
         if (!luckyStarComplete) {
           throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
         }
-        const hangul = new Array(HANGUL_SHIFTS.length).fill("\0");
-        for (let i = 0; i < HANGUL_SHIFTS.length; i += 1) {
-          let index = Number((num >> HANGUL_SHIFTS[i]) & 0xffffn);
+        const hangul = new Array(4);
+        for (let i = 0; i < hangul.length; i += 1) {
+          NUMERIC_SCRATCH_VIEW.setBigUint64(0, num, false);
+          let index = NUMERIC_SCRATCH_VIEW.getUint16(i * 2, false);
           for (
             let attempt = 0;
             index > HANGUL_SYLLABLE_MAX &&
@@ -4456,9 +4269,14 @@
             if (supplementalRef.current === null) {
               supplementalRef.current = nextSupp("한글 음절 보완");
             }
-            const suppValue = supplementalRef.current.value;
-            for (const shift of HANGUL_SHIFTS) {
-              const candidate = Number((suppValue >> shift) & 0xffffn);
+            const supp = supplementalRef.current;
+            NUMERIC_SCRATCH_VIEW.setBigUint64(0, supp.value, false);
+            for (
+              let offset = 0;
+              offset < NUMERIC_SCRATCH_BYTES.length;
+              offset += 2
+            ) {
+              const candidate = NUMERIC_SCRATCH_VIEW.getUint16(offset, false);
               if (candidate <= HANGUL_SYLLABLE_MAX) {
                 index = candidate;
                 break;
@@ -4479,8 +4297,10 @@
           );
         }
         data.hangul_syllables = hangul;
-        const upper32 = Number((num >> 32n) & 0xffff_ffffn);
-        const lower32 = Number(num & 0xffff_ffffn);
+        NUMERIC_SCRATCH_VIEW.setBigUint64(0, num, false);
+        const upper32 = NUMERIC_SCRATCH_VIEW.getUint32(0, false);
+        const lower32 = NUMERIC_SCRATCH_VIEW.getUint32(4, false);
+        const portalBits = NUMERIC_SCRATCH_VIEW.getUint32(3, false);
         const upperRatio = upper32 * U32_MAX_INV;
         const lowerRatio = lower32 * U32_MAX_INV;
         data.kor_coords = [
@@ -4514,25 +4334,18 @@
           767) +
           1;
         data.nms_portal_yy = upper32 & 0xff;
-        data.nms_portal_zzz = Number((num >> 20n) & 0xfffn);
-        data.nms_portal_xxx = Number((num >> 8n) & 0xfffn);
+        data.nms_portal_zzz = (portalBits >>> 12) & 0xfff;
+        data.nms_portal_xxx = portalBits & 0xfff;
         data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x801, 0x7ff);
         data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x81, 0x7f);
         data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x801, 0x7ff);
-        for (let i = 0; i < data.glyph_string.length; i += 1) {
-          let nibbleSource;
-          if (i === 0) {
-            nibbleSource = BigInt(data.planet_number);
-          } else if (i === 1) {
-            nibbleSource = BigInt(data.solar_system_index >> 8);
-          } else if (i === 2) {
-            nibbleSource = BigInt(data.solar_system_index >> 4);
-          } else if (i === 3) {
-            nibbleSource = BigInt(data.solar_system_index);
-          } else {
-            nibbleSource = num >> BigInt(36 - (i - 4) * 4);
-          }
-          data.glyph_string[i] = GLYPHS[Number(nibbleSource & 0xfn)];
+        data.glyph_string[0] = GLYPHS[data.planet_number & 0xf];
+        data.glyph_string[1] = GLYPHS[(data.solar_system_index >> 8) & 0xf];
+        data.glyph_string[2] = GLYPHS[(data.solar_system_index >> 4) & 0xf];
+        data.glyph_string[3] = GLYPHS[data.solar_system_index & 0xf];
+        for (let i = 4; i < data.glyph_string.length; i += 1) {
+          const nibble = (portalBits >>> (28 - (i - 4) * 4)) & 0xf;
+          data.glyph_string[i] = GLYPHS[nibble];
         }
         return data;
       }
@@ -4548,14 +4361,19 @@
       }
       function formatOutput(data) {
         const v = data.num_64;
-        const bytes = u64ToBytesBe(v);
+        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
+        const bytes = NUMERIC_SCRATCH_BYTES;
         const b0 = bytes[0];
-        const hexBytes = bytes.map(hexByte);
+        const binaryBytes = new Array(bytes.length);
+        const hexBytes = new Array(bytes.length);
+        for (let i = 0; i < bytes.length; i += 1) {
+          binaryBytes[i] = bytes[i].toString(2).padStart(8, "0");
+          hexBytes[i] = hexByte(bytes[i]);
+        }
         return [
           `64비트 난수: ${v.toString(10)} (유부호 정수: ${BigInt.asIntN(64, v).toString(10)
           })`,
-          `2진수: ${bytes.map((b) => b.toString(2).padStart(8, "0")).join(" ")
-          }`,
+          `2진수: ${binaryBytes.join(" ")}`,
           `8진수: ${v.toString(8)}`,
           `16진수: ${hexBytes.join(" ")}`,
           `Hex 코드: #${hexBytes[0]}${hexBytes[1]}${hexBytes[2]} #${hexBytes[3]
@@ -4584,23 +4402,11 @@
       const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
-      const RX_U64_WS = /\s/u;
+      const RX_U64_TOKEN_SCAN = /[^\s,]+/gu;
       function* iterU64Tokens(raw) {
         const text = String(raw ?? "");
-        let tokenStart = -1;
-        for (let i = 0; i < text.length; i += 1) {
-          const ch = text[i];
-          if (ch === "," || RX_U64_WS.test(ch)) {
-            if (tokenStart >= 0) {
-              yield text.slice(tokenStart, i);
-              tokenStart = -1;
-            }
-          } else if (tokenStart < 0) {
-            tokenStart = i;
-          }
-        }
-        if (tokenStart >= 0) {
-          yield text.slice(tokenStart);
+        for (const match of text.matchAll(RX_U64_TOKEN_SCAN)) {
+          yield match[0];
         }
       }
       function manualPreviewText(parts, omittedCount) {
@@ -4665,13 +4471,16 @@
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
         const setManualOutputText = (text) =>
-          setScrollableText(output, outputContent, text);
+          setScrollableText(outputContent, text);
         let lastGeneratedChunks = [];
+        let manualBusy = false;
+        let copyTask = null;
         const setManualBusy = (busy) => {
+          manualBusy = busy;
           const hasOutput = lastGeneratedChunks.length > 0;
-          runBtn.disabled = busy;
-          saveBtn.disabled = busy || !hasOutput;
-          copyBtn.disabled = busy || !hasOutput;
+          runBtn.disabled = manualBusy;
+          saveBtn.disabled = manualBusy || !hasOutput;
+          copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
         };
         let manualGenerationId = 0;
         setManualBusy(false);
@@ -4690,6 +4499,7 @@
             let processedCount = 0;
             let suppInputCount = 0;
             let queuedSuppCount = 0;
+            let renderedPreviewCount = -1;
             const nextSupp = (reason) => {
               const queued = suppTokens.next();
               const value = queued.done
@@ -4702,9 +4512,12 @@
               return { value, bitsRemaining: 64 };
             };
             const updateManualProgress = (finished) => {
-              setManualOutputText(
-                manualPreviewText(previewParts, omittedPreviewCount),
-              );
+              if (finished || renderedPreviewCount !== previewParts.length) {
+                setManualOutputText(
+                  manualPreviewText(previewParts, omittedPreviewCount),
+                );
+                renderedPreviewCount = previewParts.length;
+              }
               meta.textContent =
                 `기본 난수 변환 ${finished ? "완료" : "처리 중"}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 팝업 ${fmt(suppInputCount - queuedSuppCount)}개)`;
             };
@@ -4715,7 +4528,7 @@
                 return;
               }
               if (processedCount >= MANUAL_GENERATION_HARD_LIMIT) {
-                throw new InputLimitError(
+                throw new InputValidationError(
                   `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
                 );
               }
@@ -4774,16 +4587,33 @@
             "random_data.txt 저장 요청을 완료했습니다.";
         });
         copyBtn.addEventListener("click", async () => {
+          if (copyTask) return;
+          const generationId = manualGenerationId;
+          const chunks = lastGeneratedChunks;
           error.textContent = "";
+          copyTask = copyRandomDataChunksToClipboard(chunks);
+          setManualBusy(manualBusy);
           try {
-            await copyRandomDataChunksToClipboard(lastGeneratedChunks);
+            await copyTask;
+            if (
+              generationId !== manualGenerationId ||
+              chunks !== lastGeneratedChunks
+            ) return;
             meta.textContent =
               (meta.textContent ? `${meta.textContent}\n` : "") +
               "변환 결과를 클립보드에 복사했습니다.";
           } catch (err) {
-            error.textContent = err instanceof Error
-              ? err.message
-              : "클립보드 복사에 실패했습니다.";
+            if (
+              generationId === manualGenerationId &&
+              chunks === lastGeneratedChunks
+            ) {
+              error.textContent = err instanceof Error
+                ? err.message
+                : "클립보드 복사에 실패했습니다.";
+            }
+          } finally {
+            copyTask = null;
+            setManualBusy(manualBusy);
           }
         });
         clearBtn.addEventListener("click", () => {
@@ -4796,7 +4626,12 @@
         });
       }
       initializeManualRng();
-    })();
+    }
+    document.querySelector(".manual-rng").addEventListener(
+      "toggle",
+      loadManualRng,
+      { once: true },
+    );
   </script>
 </body>
 

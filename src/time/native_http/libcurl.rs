@@ -6,7 +6,6 @@ use core::{
     marker::{PhantomData, PhantomPinned},
     mem::{align_of, offset_of, size_of},
     ptr::{NonNull, null_mut},
-    result::Result as CoreResult,
     slice,
     str,
 };
@@ -134,7 +133,6 @@ struct EasyHandle(NonNull<Curl>);
 struct CurlBodySink {
     bytes_seen: usize,
     error: Option<Cow<'static, str>>,
-    limit: usize,
 }
 struct CurlHeaderCapture<'line> {
     bytes_seen: usize,
@@ -220,10 +218,7 @@ impl Client {
         context: &str,
     ) -> Result<TimeSample> {
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
-        let mut body_sink = CurlBodySink {
-            limit: HTTP_HEAD_MAX_BODY_BYTES,
-            ..CurlBodySink::default()
-        };
+        let mut body_sink = CurlBodySink::default();
         self.header_line_buffer.clear();
         let mut header_capture = CurlHeaderCapture {
             bytes_seen: 0,
@@ -304,7 +299,7 @@ impl Client {
             header_capture.capture_pending();
             header_capture.pending_line.clear();
         }
-        if let Some(callback_error) = body_sink.error.take().or_else(|| header_capture.error.take()) {
+        if let Some(callback_error) = body_sink.error.or(header_capture.error) {
             self.easy_handle = None;
             return Err(error(context, callback_error));
         }
@@ -329,9 +324,9 @@ impl Client {
             self.easy_handle = None;
             return Err(scheme_error);
         }
-        let Some(header_block) = header_capture.completed_block.take() else {
-            return Err(TimeError::header_not_found(format!("{context} 응답에서 Date")));
-        };
+        let header_block = header_capture
+            .completed_block
+            .ok_or_else(|| error(context, "완료된 HTTP 응답 header block을 찾지 못했습니다."))?;
         let (server_time, response_received_inst) = header_block.finish(context)?;
         let http_elapsed = response_received_inst
             .checked_duration_since(request_start)
@@ -350,10 +345,9 @@ impl CurlBodySink {
             self.error = Some(Cow::Borrowed("HTTP HEAD 응답 본문 크기 계산 실패"));
             return false;
         };
-        if next_len > self.limit {
+        if next_len > HTTP_HEAD_MAX_BODY_BYTES {
             self.error = Some(Cow::Owned(format!(
-                "HTTP HEAD 응답 본문 크기가 허용 한도({} bytes)를 초과했습니다.",
-                self.limit
+                "HTTP HEAD 응답 본문 크기가 허용 한도({HTTP_HEAD_MAX_BODY_BYTES} bytes)를 초과했습니다."
             )));
             return false;
         }
@@ -417,31 +411,34 @@ impl CurlHeaderCapture<'_> {
         let Some(current_block) = self.current_block.as_mut() else {
             return true;
         };
-        match find_header_value(line, super::AGE_HEADER_PREFIX) {
-            Ok(Some(age_header_raw)) => {
-                current_block.capture_age(age_header_raw);
-                return true;
-            }
-            Ok(None) => {}
+        let Some(colon) = line.iter().position(|byte| *byte == b':') else {
+            return true;
+        };
+        let Some((name, value_with_colon)) = line.split_at_checked(colon) else {
+            return true;
+        };
+        let is_age_header = match name.len() {
+            3 if name.eq_ignore_ascii_case(super::AGE_HEADER_NAME) => true,
+            4 if name.eq_ignore_ascii_case(super::DATE_HEADER_NAME) => false,
+            _ => return true,
+        };
+        let Some((_, value_bytes)) = value_with_colon.split_first() else {
+            return true;
+        };
+        let header_raw = match str::from_utf8(value_bytes).map(str::trim_ascii) {
+            Ok(header_raw) => header_raw,
             Err(source) => {
                 self.error = Some(Cow::Owned(format!(
-                    "HTTP HEAD 응답 Age 헤더 UTF-8 변환 실패: {source}",
-                )));
-                return false;
-            }
-        }
-        let date_header_raw = match find_header_value(line, super::DATE_HEADER_PREFIX) {
-            Ok(Some(value)) => value,
-            Ok(None) => return true,
-            Err(source) => {
-                self.error = Some(Cow::Owned(format!(
-                    "HTTP HEAD 응답 Date 헤더 UTF-8 변환 실패: {source}"
+                    "HTTP HEAD 응답 헤더 UTF-8 변환 실패: {source}"
                 )));
                 return false;
             }
         };
-        let response_received_inst = Instant::now();
-        current_block.capture_date(date_header_raw, response_received_inst);
+        if is_age_header {
+            current_block.capture_age(header_raw);
+        } else {
+            current_block.capture_date(header_raw, Instant::now());
+        }
         true
     }
 }
@@ -455,18 +452,6 @@ fn curl_error(context: &str, code: CurlCode) -> String {
         unsafe { CStr::from_ptr(raw_ptr) }.to_string_lossy()
     };
     format!("{context} 실패: {message} ({code})")
-}
-fn find_header_value<'line, const PREFIX_LEN: usize>(
-    line: &'line [u8],
-    expected_prefix: &[u8; PREFIX_LEN],
-) -> CoreResult<Option<&'line str>, str::Utf8Error> {
-    let Some((prefix, value)) = line.split_first_chunk::<PREFIX_LEN>() else {
-        return Ok(None);
-    };
-    if !prefix.eq_ignore_ascii_case(expected_prefix) {
-        return Ok(None);
-    }
-    str::from_utf8(value).map(str::trim_ascii).map(Some)
 }
 unsafe extern "C" fn write_callback(
     ptr: *mut c_char,

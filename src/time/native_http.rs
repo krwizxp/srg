@@ -16,8 +16,10 @@ cfg_select! {
         compile_error!("SRG native HTTP supports only Windows, Linux, and macOS.");
     }
 }
-const AGE_HEADER_PREFIX: &[u8; 4] = b"age:";
-const DATE_HEADER_PREFIX: &[u8; 5] = b"date:";
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const AGE_HEADER_NAME: &[u8; 3] = b"age";
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const DATE_HEADER_NAME: &[u8; 4] = b"date";
 #[derive(Default)]
 struct FreshTimeHeaders {
     age_result: Option<CoreResult<(), &'static str>>,
@@ -31,12 +33,19 @@ impl FreshTimeHeaders {
             let trimmed = raw.trim_ascii();
             if trimmed.is_empty() {
                 Err("Age 헤더 값이 비어 있습니다.")
-            } else if trimmed.bytes().any(|byte| !byte.is_ascii_digit()) {
-                Err("Age 헤더 값이 숫자가 아닙니다.")
-            } else if trimmed.bytes().any(|byte| byte != b'0') {
-                Err("Age 헤더가 0보다 커 캐시된 응답입니다.")
             } else {
-                Ok(())
+                let mut nonzero = false;
+                let valid = trimmed.bytes().all(|byte| {
+                    nonzero |= byte != b'0';
+                    byte.is_ascii_digit()
+                });
+                if !valid {
+                    Err("Age 헤더 값이 숫자가 아닙니다.")
+                } else if nonzero {
+                    Err("Age 헤더가 0보다 커 캐시된 응답입니다.")
+                } else {
+                    Ok(())
+                }
             }
         });
     }
@@ -52,8 +61,12 @@ impl FreshTimeHeaders {
         self.age_result
             .transpose()
             .map_err(|message| error(context, message))?;
-        self.date_result
-            .ok_or_else(|| TimeError::header_not_found(format!("{context} 응답에서 Date")))?
+        self.date_result.ok_or_else(|| {
+            TimeError::new(
+                TimeErrorKind::HeaderNotFound,
+                format!("{context} 응답에서 Date"),
+            )
+        })?
     }
 }
 fn error(context: &str, detail: impl Display) -> TimeError {

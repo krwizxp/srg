@@ -35,6 +35,7 @@ mod menu_app;
 mod numeric;
 mod output;
 mod random_data;
+mod stop_input;
 mod time;
 const BUFFER_SIZE: usize = 1016;
 const FILE_NAME: &str = "random_data.txt";

@@ -5,6 +5,7 @@ use crate::{
 };
 use std::io::Write;
 pub(super) const MAX_LADDER_ENTRIES: usize = 512;
+pub(super) const MAX_LADDER_INPUT_BYTES: usize = 64 * 1024;
 pub(super) fn write_ladder_results<'player, 'result>(
     players: impl Iterator<Item = &'player str>,
     results: impl Iterator<Item = &'result str>,
