@@ -16,8 +16,8 @@
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" crossorigin="anonymous"
-    integrity="sha384-uGEvnSEpW2nM9xJFsrxrwakwrk9QdDTQIBJh0hVMu90OaVyMAMpAK1rIn0/Kh1/k"
-    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css?ver=1.3.9">
+    integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <script>
     (() => {
       const root = document.documentElement;
@@ -2876,6 +2876,7 @@
         new TextDecoderStream("utf-8", {fatal: true}),
         {signal},
       );
+      const reader = decodedStream.getReader();
       const parts = [];
       let lineLength = 0;
       let pendingCR = false;
@@ -2897,7 +2898,22 @@
         return line;
       };
       try {
-        for await (const chunk of decodedStream) {
+        for (;;) {
+          let read;
+          try {
+            read = await reader.read();
+          } catch (err) {
+            signal.throwIfAborted();
+            if (err instanceof TypeError) {
+              throw new InputValidationError(
+                "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
+                {cause: err},
+              );
+            }
+            throw err;
+          }
+          if (read.done) break;
+          const chunk = read.value;
           signal.throwIfAborted();
           let start = 0;
           if (pendingCR) {
@@ -2932,15 +2948,9 @@
         if (lineLength > 0) {
           yield parts.join("");
         }
-      } catch (err) {
-        signal.throwIfAborted();
-        if (err instanceof TypeError) {
-          throw new InputValidationError(
-            "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
-            {cause: err},
-          );
-        }
-        throw err;
+      } finally {
+        await cancelReadableBestEffort(reader);
+        reader.releaseLock();
       }
     }
     async function parseFileToRecords(file, signal) {
@@ -3241,20 +3251,28 @@
       }
       if (!response.body) return "";
       const decoder = new TextDecoder("utf-8", {fatal: true});
+      const reader = response.body.getReader();
       const parts = [];
       let bytesRead = 0;
-      for await (const value of response.body) {
-        signal.throwIfAborted();
-        bytesRead += value.byteLength;
-        if (bytesRead > limit) {
-          throw new RangeError(
-            `응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
-          );
+      try {
+        for (;;) {
+          const read = await reader.read();
+          if (read.done) break;
+          signal.throwIfAborted();
+          bytesRead += read.value.byteLength;
+          if (bytesRead > limit) {
+            throw new RangeError(
+              `응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
+            );
+          }
+          parts.push(decodeReverseBytes(decoder, read.value, true));
         }
-        parts.push(decodeReverseBytes(decoder, value, true));
+        parts.push(decodeReverseBytes(decoder, undefined, false));
+        return parts.join("");
+      } finally {
+        await cancelReadableBestEffort(reader);
+        reader.releaseLock();
       }
-      parts.push(decodeReverseBytes(decoder, undefined, false));
-      return parts.join("");
     }
     async function fetchReverseWithRetry(url, userSignal) {
       const maxRetry = CONFIG.MAX_RETRY;
