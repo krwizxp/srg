@@ -648,6 +648,45 @@
           }
         }
 
+        :scope #supp-dialog {
+          inline-size: min(560px, calc(100vw - 24px));
+          max-block-size: calc(100dvh - 24px);
+          padding: 0;
+          overflow: auto;
+          color: var(--fg);
+          font: inherit;
+          background: var(--surface-panel);
+          border: 1px solid var(--line-soft);
+          border-radius: 18px;
+          box-shadow: var(--shadow);
+          scrollbar-width: thin;
+        }
+
+        :scope #supp-dialog::backdrop {
+          background: oklch(10% 0.02 260 / 0.48);
+          backdrop-filter: blur(2px);
+        }
+
+        :scope .supp-dialog-form {
+          display: grid;
+          gap: 12px;
+          padding: 20px;
+        }
+
+        :scope .supp-dialog-form h2 {
+          color: var(--fg);
+          font-size: 1.05rem;
+        }
+
+        :scope .supp-dialog-form textarea {
+          min-block-size: 140px;
+          max-block-size: min(40dvh, 300px);
+        }
+
+        :scope #supp-dialog-error {
+          min-block-size: 1.35em;
+        }
+
         :scope #output.coords-view {
           inline-size: 100%;
           max-inline-size: 100%;
@@ -661,7 +700,7 @@
           min-inline-size: 0;
         }
 
-        :scope #error {
+        :scope :is(#error, #supp-dialog-error) {
           color: light-dark(oklch(from var(--err) calc(l - 0.1) calc(c * 0.95) h), oklch(from var(--err) calc(l + 0.08) calc(c * 0.85) h));
         }
       }
@@ -857,7 +896,6 @@
             }
           }
         }
-
       }
     }
 
@@ -1499,14 +1537,12 @@
 
     @media (pointer: coarse),
     (width <=700px) {
-
       :is(input, select, textarea) {
         font-size: 16px;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-
       .progress-shell::-webkit-progress-value {
         animation: none;
       }
@@ -1634,7 +1670,7 @@
               <textarea id="suppValues" aria-describedby="suppValues-help" placeholder="쉼표/공백/줄바꿈 구분
 예) 0x123456789ABCDEF0
 18446744073709551615"></textarea>
-              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 팝업으로 보조 난수값을 추가 입력합니다.</span>
+              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다.</span>
             </div>
             <div class="manual-rng-actions">
               <button id="runBtn" class="action-btn action-btn--primary" type="button">
@@ -1677,6 +1713,29 @@
                   data-placeholder="여기에 결과가 표시됩니다."></code></pre>
             </section>
           </div>
+          <dialog id="supp-dialog" aria-labelledby="supp-dialog-title"
+            aria-describedby="supp-dialog-context supp-dialog-help">
+            <form id="supp-dialog-form" class="supp-dialog-form" novalidate>
+              <h2 id="supp-dialog-title">보조 난수값 추가</h2>
+              <p id="supp-dialog-context" class="manual-rng-meta"></p>
+              <div class="manual-rng-field">
+                <label class="manual-rng-label" for="supp-dialog-values">보조 난수값</label>
+                <textarea id="supp-dialog-values" required inputmode="text" autocomplete="off"
+                  aria-describedby="supp-dialog-help supp-dialog-error" placeholder="공백이나 줄바꿈으로 여러 값을 구분하세요."
+                  autofocus></textarea>
+              </div>
+              <p id="supp-dialog-help" class="manual-rng-meta">10진수 또는 0x로 시작하는 16진수 값을 여러 개 입력할 수 있습니다.</p>
+              <output id="supp-dialog-error" class="manual-rng-meta" role="alert" aria-atomic="true"></output>
+              <div class="manual-rng-actions">
+                <button type="button" id="supp-dialog-cancel" class="action-btn action-btn--danger">
+                  <span class="action-btn__label">현재까지 결과를 유지하고 중단</span>
+                </button>
+                <button type="submit" class="action-btn action-btn--primary">
+                  <span class="action-btn__label">입력 후 계속</span>
+                </button>
+              </div>
+            </form>
+          </dialog>
         </details>
         <div class="row-progress">
           <div class="sp">
@@ -1886,7 +1945,7 @@
       const MYEON = 16;
       const DONG = 32;
       const RI = 64;
-      const KIND_BY_COUNTRY = Object.freeze({ kr: "KR", kp: "KP" });
+      const KIND_BY_COUNTRY = Object.freeze({kr: "KR", kp: "KP"});
       const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
         CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
       const isBoundedText = (value) =>
@@ -1967,7 +2026,7 @@
           fields.cityDistrict, fields.district, fields.suburb,
         );
         const level6 = fields.level6 || fields.level7;
-        const { city, county } = fields;
+        const {city, county} = fields;
         let sido = fields.level4 || fields.state || "";
         let sigungu = "";
         const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
@@ -2017,7 +2076,7 @@
             )
           ) eupmyeon.push(name);
         }
-        return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
+        return {sido, sigungu, eupmyeon: eupmyeon.join(" ")};
       }
       function removeDistrict(sigungu, district) {
         if (!sigungu || sigungu === district) return "";
@@ -2037,7 +2096,7 @@
         const cityDistrict = firstText(
           fields.cityDistrict, fields.district, fields.suburb,
         );
-        const { city, county } = fields;
+        const {city, county} = fields;
         const sido = fields.level4 || fields.state || fields.region ||
           fields.province || county || city || "";
         const cityLike = pickAdminName(
@@ -2074,7 +2133,7 @@
           eupmyeon = districtLike;
           sigungu = removeDistrict(sigungu, districtLike);
         }
-        return { sido, sigungu, eupmyeon };
+        return {sido, sigungu, eupmyeon};
       }
       function getAdmin(gc, countryCode, p0, p1) {
         const fields = readFields(gc);
@@ -2126,7 +2185,7 @@
           : null) || null;
         if (!gc) {
           return {
-            addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
+            addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""},
           };
         }
         const label = text(gc.label);
@@ -2146,7 +2205,7 @@
           if (comma < 0) break;
           start = comma + 1;
         }
-        const { sido, sigungu, eupmyeon } = getAdmin(
+        const {sido, sigungu, eupmyeon} = getAdmin(
           gc, countryCode, p0, p1,
         );
         let tag = firstText(gc.name, firstLabelPart, gc.street, gc.city);
@@ -2155,13 +2214,13 @@
         const kind = KIND_BY_COUNTRY[countryCode] ||
           (countryCode ? "WORLD" : undefined);
         const parsed = {
-          addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
+          addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
           kind,
         };
         if (!isValid(parsed)) throw new InputValidationError(TEXT_LIMIT_MESSAGE);
         return parsed;
       }
-      return Object.freeze({ isValid, parse });
+      return Object.freeze({isValid, parse});
     })();
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
@@ -2221,7 +2280,7 @@
       const indexText = btn.dataset.idx;
       const recordIndex = Number(indexText);
       const r = String(recordIndex) === indexText &&
-          Number.isSafeInteger(recordIndex) && recordIndex >= 0
+        Number.isSafeInteger(recordIndex) && recordIndex >= 0
         ? AppState.records[recordIndex]
         : null;
       if (!r) {
@@ -2242,7 +2301,7 @@
       mapPopover.hidePopover();
     }
     const fmt =
-      new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
+      new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
     const normalizeCoordText = (s) => s === "-0" ? "0" : s;
@@ -2252,7 +2311,7 @@
         if (!s0) return "";
         const dot = s0.indexOf(".");
         if (dot === -1) return normalizeCoordText(s0);
-        if (s0.indexOf("e") === -1 && s0.indexOf("E") === -1) {
+        if (!s0.includes("e") && !s0.includes("E")) {
           if (s0.length - dot - 1 <= COORD_DECIMALS) {
             let end = s0.length;
             while (end && s0.charCodeAt(end - 1) === 48) end--;
@@ -2350,7 +2409,7 @@
       s = s.trim();
       if (!s) return "";
       s = s.toLowerCase();
-      return s.indexOf(",") !== -1 ? s.replace(RX_COMMA_WS, ",") : s;
+      return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
     };
     function buildFilterSnapshot() {
       const q = norm(domElements.filterQ.value);
@@ -2380,7 +2439,7 @@
       }
       const active =
         !!(kind || sido || sigungu || emd || tag || fullAddr || qMode);
-      if (!active) return { active: false };
+      if (!active) return {active: false};
       return {
         active: true,
         kind,
@@ -2436,15 +2495,15 @@
           r.lonStr;
         fields[6] = hay;
       }
-      if (!qTokens) return hay.indexOf(q1) !== -1;
+      if (!qTokens) return hay.includes(q1);
       if (qMode === 2) {
         for (const token of qTokens) {
-          if (hay.indexOf(token) !== -1) return true;
+          if (hay.includes(token)) return true;
         }
         return false;
       }
       for (const token of qTokens) {
-        if (hay.indexOf(token) === -1) return false;
+        if (!hay.includes(token)) return false;
       }
       return true;
     }
@@ -2453,11 +2512,11 @@
       if (!f.active) return true;
       const fields = getSearchFields(r);
       return (!f.kind || fields[0] === f.kind) &&
-        (!f.sido || fields[1].indexOf(f.sido) !== -1) &&
-        (!f.sigungu || fields[2].indexOf(f.sigungu) !== -1) &&
-        (!f.emd || fields[3].indexOf(f.emd) !== -1) &&
-        (!f.tag || fields[4].indexOf(f.tag) !== -1) &&
-        (!f.fullAddr || fields[5].indexOf(f.fullAddr) !== -1) &&
+        (!f.sido || fields[1].includes(f.sido)) &&
+        (!f.sigungu || fields[2].includes(f.sigungu)) &&
+        (!f.emd || fields[3].includes(f.emd)) &&
+        (!f.tag || fields[4].includes(f.tag)) &&
+        (!f.fullAddr || fields[5].includes(f.fullAddr)) &&
         (!f.qMode || matchesQuery(r, fields, f.qMode, f.q1, f.qTokens));
     }
     const RESULT_PAGE_SIZE = 100;
@@ -2528,7 +2587,7 @@
     }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
-      MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
+      MAP_LINKS.map(({key}) => "," + csvEsc(`지도링크(${key})`)).join("");
     let ACTIVE_DOWNLOAD_URL = null;
     let EXPORT_TASK = null;
     function revokeActiveDownloadUrl() {
@@ -2639,7 +2698,7 @@
       domElements.stopBtn.disabled = stopDisabled;
       domElements.file.disabled = isBusy;
     }
-    const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
+    const SR_STATUS_CACHE = {msg: null, progressBucket: -1};
     let statusLiveTimer = 0;
     function setStatusLiveText(text) {
       clearTimeout(statusLiveTimer);
@@ -2769,7 +2828,7 @@
       }
       return new Promise((resolve) => {
         const waitSignal = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
-        waitSignal.addEventListener("abort", resolve, { once: true });
+        waitSignal.addEventListener("abort", resolve, {once: true});
       }).then(() => {
         signal.throwIfAborted();
       });
@@ -2791,16 +2850,20 @@
       }
       return fallback * (0.8 + Math.random() * 0.4);
     }
-    const YIELD_CHANNEL = new MessageChannel();
-    const YIELD_QUEUE = [];
-    YIELD_CHANNEL.port1.onmessage = () => YIELD_QUEUE.shift()?.();
-    function yieldToMain() {
-      const { promise, resolve } = Promise.withResolvers();
-      YIELD_QUEUE.push(resolve);
-      YIELD_CHANNEL.port2.postMessage(0);
-      return promise;
-    }
-    const cancelReadableBestEffort = (readable) => readable?.cancel().catch(() => {});
+    const yieldToMain = typeof globalThis.scheduler?.yield === "function"
+      ? () => globalThis.scheduler.yield()
+      : (() => {
+        const channel = new MessageChannel();
+        const queue = [];
+        channel.port1.onmessage = () => queue.shift()?.();
+        return () => {
+          const {promise, resolve} = Promise.withResolvers();
+          queue.push(resolve);
+          channel.port2.postMessage(0);
+          return promise;
+        };
+      })();
+    const cancelReadableBestEffort = (readable) => readable?.cancel().catch(() => { });
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
         throw new InputValidationError(
@@ -2810,8 +2873,8 @@
     }
     async function* lineIterator(stream, signal) {
       const decodedStream = stream.pipeThrough(
-        new TextDecoderStream("utf-8", { fatal: true }),
-        { signal },
+        new TextDecoderStream("utf-8", {fatal: true}),
+        {signal},
       );
       const parts = [];
       let lineLength = 0;
@@ -2874,7 +2937,7 @@
         if (err instanceof TypeError) {
           throw new InputValidationError(
             "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
-            { cause: err },
+            {cause: err},
           );
         }
         throw err;
@@ -2898,7 +2961,7 @@
           }
           linesSinceYield = 0;
         }
-        if (line.indexOf("위경도") === -1) continue;
+        if (!line.includes("위경도")) continue;
         COORD_REGEX.lastIndex = 0;
         for (let m; (m = COORD_REGEX.exec(line));) {
           const lat = m[2];
@@ -3062,9 +3125,9 @@
             signal.aborted
               ? signal.reason
               : tx.error ??
-                new Error("Reverse geocoding cache transaction aborted."),
+              new Error("Reverse geocoding cache transaction aborted."),
           );
-          signal.addEventListener("abort", onAbort, { once: true });
+          signal.addEventListener("abort", onAbort, {once: true});
           if (signal.aborted) {
             onAbort();
             return;
@@ -3076,18 +3139,11 @@
         }
       });
     }
-    async function readPersistentReverseCache(records, signal) {
-      const results = new Map();
-      for (const record of records) {
-        const cacheKey = record.cacheKey;
-        if (!REVERSE_PARSED_CACHE.has(cacheKey)) {
-          results.getOrInsert(cacheKey, null);
-        }
-      }
-      if (results.size === 0) return results;
+    async function readPersistentReverseCache(results, signal) {
+      if (results.size === 0) return;
       const db = await openReverseCacheDb();
       signal.throwIfAborted();
-      if (!db) return results;
+      if (!db) return;
       const now = Date.now();
       try {
         await runReverseCacheTransaction(db, "readonly", signal, (store) => {
@@ -3116,7 +3172,6 @@
         signal.throwIfAborted();
         console.warn("Reverse geocoding cache read failed.", err);
       }
-      return results;
     }
     async function writePersistentReverseCacheBatch(entries, signal) {
       try {
@@ -3128,7 +3183,7 @@
           signal,
           (store) => {
             const savedAt = Date.now();
-            for (const { cacheKey, parsed } of entries) {
+            for (const {cacheKey, parsed} of entries) {
               store.put({
                 key: REVERSE_CACHE_KEY_PREFIX + cacheKey,
                 savedAt,
@@ -3169,11 +3224,11 @@
     }
     function decodeReverseBytes(decoder, value, stream) {
       try {
-        return decoder.decode(value, { stream });
+        return decoder.decode(value, {stream});
       } catch (err) {
         throw new SyntaxError(
           "역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.",
-          { cause: err },
+          {cause: err},
         );
       }
     }
@@ -3185,7 +3240,7 @@
         throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
-      const decoder = new TextDecoder("utf-8", { fatal: true });
+      const decoder = new TextDecoder("utf-8", {fatal: true});
       const parts = [];
       let bytesRead = 0;
       for await (const value of response.body) {
@@ -3223,7 +3278,7 @@
         let res;
         try {
           res = await fetch(url, {
-            headers: { Accept: "application/json" },
+            headers: {Accept: "application/json"},
             referrerPolicy: "strict-origin-when-cross-origin",
             signal: requestSignal,
           });
@@ -3232,7 +3287,7 @@
           if (attempt >= maxRetry) {
             throw new Error(
               "역지오코딩 서버에 연결하지 못했습니다.",
-              { cause: e },
+              {cause: e},
             );
           }
           await sleep(baseDelayMs * attempt, userSignal);
@@ -3246,7 +3301,7 @@
             } catch (err) {
               throw new SyntaxError(
                 "역지오코딩 응답이 올바른 JSON 형식이 아닙니다.",
-                { cause: err },
+                {cause: err},
               );
             }
           } catch (e) {
@@ -3277,7 +3332,7 @@
     async function pauseProcessing(task, message) {
       AppState.setStatus("paused");
       setStatusMessage(message, "warn");
-      const { promise, resolve } = Promise.withResolvers();
+      const {promise, resolve} = Promise.withResolvers();
       task.resume = resolve;
       scheduleRender();
       await promise;
@@ -3296,17 +3351,19 @@
         await writePersistentReverseCacheBatch(cacheWriteBatch, signal);
         cacheWriteBatch.length = 0;
       };
+      const persistentCache = new Map();
       for (const record of records) {
         record.result = null;
         record._search = null;
+        if (!REVERSE_PARSED_CACHE.has(record.cacheKey)) {
+          persistentCache.getOrInsert(record.cacheKey, null);
+        }
       }
       task.inFlight = true;
-      let persistentCache;
       try {
-        persistentCache = await readPersistentReverseCache(records, signal);
+        await readPersistentReverseCache(persistentCache, signal);
       } catch (err) {
         if (!signal.aborted) throw err;
-        persistentCache = new Map();
       } finally {
         task.inFlight = false;
       }
@@ -3352,17 +3409,20 @@
           task.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
-          let parsed;
+          let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
+          const cacheHit = parsed !== undefined;
           let rowError = null;
           try {
-            const url = `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-            parsed = GeocodeParser.parse(
-              await fetchReverseWithRetry(url, signal),
-            );
-            putReverseMemoryCache(cacheKey, parsed);
-            cacheWriteBatch.push({ cacheKey, parsed });
-            if (cacheWriteBatch.length >= REVERSE_CACHE_WRITE_LIMIT) {
-              await flushCacheWrites();
+            if (!cacheHit) {
+              const url = `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
+              parsed = GeocodeParser.parse(
+                await fetchReverseWithRetry(url, signal),
+              );
+              putReverseMemoryCache(cacheKey, parsed);
+              cacheWriteBatch.push({cacheKey, parsed});
+              if (cacheWriteBatch.length >= REVERSE_CACHE_WRITE_LIMIT) {
+                await flushCacheWrites();
+              }
             }
           } catch (err) {
             if (signal.aborted && err?.name === "AbortError") break;
@@ -3397,6 +3457,10 @@
               `에러 발생: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(rowError)}`,
               "error",
             );
+          }
+          if (cacheHit && now - lastYield >= 8) {
+            await yieldToMain();
+            lastYield = performance.now();
           }
         } catch (err) {
           if (signal.aborted && err?.name === "AbortError") break;
@@ -3575,7 +3639,7 @@
           flushChunk();
           ensureCurrent();
           downloadBlob(
-            new Blob(parts, { type: "text/csv;charset=utf-8" }),
+            new Blob(parts, {type: "text/csv;charset=utf-8"}),
             `${sourceFile.name.replace(RX_FILE_EXT, "")
             }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
           );
@@ -3683,7 +3747,7 @@
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
-    }, { capture: true });
+    }, {capture: true});
     const COMMANDS = {
       "--parse": handleParse,
       "--start": () => {
@@ -4147,7 +4211,7 @@
       function generateRandomDataFromNum(num, nextSupp) {
         const data = createDataSet(num);
         fillDataFieldsFromU64(num, data);
-        const supplementalRef = { current: null };
+        const supplementalRef = {current: null};
         for (
           let attempt = 0;
           !isComplete(data) && attempt < SUPPLEMENTAL_RETRY_LIMIT;
@@ -4363,22 +4427,7 @@
         }
         return `${preview}\n\n… 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
       }
-      function promptSuppValue(index, reason) {
-        for (; ;) {
-          const input = window.prompt(
-            `supp 값 #${index} 입력 (${reason}) - 최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}`,
-            "",
-          );
-          if (input === null) {
-            throw new Error("supp 입력이 취소되어 생성을 중단했습니다.");
-          }
-          try {
-            return parseU64(input);
-          } catch (err) {
-            window.alert(err.message);
-          }
-        }
-      }
+      class SupplementRequired extends Error { }
       function randomDataBlob(chunks, includeBom) {
         const parts = includeBom ? ["\uFEFF"] : [];
         for (const chunk of chunks) {
@@ -4414,8 +4463,71 @@
         const manualBody = runBtn.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
+        const suppDialog = document.getElementById("supp-dialog");
+        const suppDialogForm = document.getElementById("supp-dialog-form");
+        const suppDialogContext = document.getElementById("supp-dialog-context");
+        const suppDialogValues = document.getElementById("supp-dialog-values");
+        const suppDialogError = document.getElementById("supp-dialog-error");
+        const suppDialogCancel = document.getElementById("supp-dialog-cancel");
         const setManualOutputText = (text) =>
           setScrollableText(outputContent, text);
+        let supplementRequest = null;
+        function finishSupplementRequest(values) {
+          if (!supplementRequest) return;
+          const resolve = supplementRequest;
+          supplementRequest = null;
+          suppDialog.close();
+          clearBtn.focus({preventScroll: true});
+          resolve(values);
+        }
+        function requestSupplementBatch(index, reason, processedCount) {
+          const {promise, resolve} = Promise.withResolvers();
+          supplementRequest = resolve;
+          suppDialogContext.textContent =
+            `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processedCount)}개`;
+          suppDialogValues.value = "";
+          suppDialogValues.ariaInvalid = "false";
+          suppDialogError.textContent = "";
+          try {
+            suppDialog.showModal();
+          } catch (err) {
+            supplementRequest = null;
+            throw err;
+          }
+          return promise;
+        }
+        suppDialogForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!supplementRequest) return;
+          try {
+            const values = [];
+            for (const token of iterU64Tokens(suppDialogValues.value)) {
+              if (values.length >= MANUAL_GENERATION_HARD_LIMIT) {
+                throw new InputValidationError(
+                  `보조 난수값은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 입력할 수 있습니다.`,
+                );
+              }
+              values.push(parseU64(token));
+            }
+            if (values.length === 0) {
+              throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
+            }
+            suppDialogValues.ariaInvalid = "false";
+            finishSupplementRequest(values);
+          } catch (err) {
+            suppDialogValues.ariaInvalid = "true";
+            suppDialogError.textContent = getErrorMessage(err);
+            suppDialogValues.focus({preventScroll: true});
+          }
+        });
+        suppDialogCancel.addEventListener(
+          "click",
+          () => finishSupplementRequest(null),
+        );
+        suppDialog.addEventListener("cancel", (event) => {
+          event.preventDefault();
+          finishSupplementRequest(null);
+        });
         let lastGeneratedChunks = [];
         let manualBusy = false;
         let copyTask = null;
@@ -4438,35 +4550,52 @@
           setManualBusy(true);
           try {
             const suppTokens = iterU64Tokens(suppInput.value);
+            const dialogSuppValues = [];
+            let dialogSuppIndex = 0;
             const previewParts = [];
             let omittedPreviewCount = 0;
             let processedCount = 0;
             let suppInputCount = 0;
             let queuedSuppCount = 0;
             let renderedPreviewCount = -1;
-            const nextSupp = (reason) => {
-              const queued = suppTokens.next();
-              const value = queued.done
-                ? promptSuppValue(suppInputCount + 1, reason)
-                : parseU64(queued.value);
-              if (!queued.done) {
-                queuedSuppCount += 1;
+            const supplementReplay = [];
+            let supplementReplayIndex = 0;
+            let preloadedCount = 0;
+            const nextSupplement = (reason) => {
+              let value;
+              if (supplementReplayIndex < supplementReplay.length) {
+                value = supplementReplay[supplementReplayIndex];
+              } else {
+                const queued = suppTokens.next();
+                if (!queued.done) {
+                  value = parseU64(queued.value);
+                  preloadedCount += 1;
+                } else if (dialogSuppIndex < dialogSuppValues.length) {
+                  value = dialogSuppValues[dialogSuppIndex++];
+                } else {
+                  throw new SupplementRequired(reason);
+                }
+                supplementReplay.push(value);
               }
-              suppInputCount += 1;
-              return { value, bitsRemaining: 64 };
+              supplementReplayIndex += 1;
+              return {value, bitsRemaining: 64};
             };
-            const updateManualProgress = (finished) => {
-              if (finished || renderedPreviewCount !== previewParts.length) {
+            const updateManualProgress = (state) => {
+              if (
+                state !== "처리 중" ||
+                renderedPreviewCount !== previewParts.length
+              ) {
                 setManualOutputText(
                   manualPreviewText(previewParts, omittedPreviewCount),
                 );
                 renderedPreviewCount = previewParts.length;
               }
               meta.textContent =
-                `기본 난수 변환 ${finished ? "완료" : "처리 중"}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 팝업 ${fmt(suppInputCount - queuedSuppCount)}개)`;
+                `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 대화상자 ${fmt(suppInputCount - queuedSuppCount)}개)`;
             };
             let lastYieldAt = performance.now();
             let lastMetaUpdateAt = lastYieldAt;
+            let cancelled = false;
             for (const token of iterU64Tokens(num64Input.value)) {
               if (generationId !== manualGenerationId) {
                 return;
@@ -4476,9 +4605,34 @@
                   `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
                 );
               }
-              const outputBlock = formatOutput(
-                generateRandomDataFromNum(parseU64(token), nextSupp),
-              );
+              const num = parseU64(token);
+              supplementReplay.length = 0;
+              preloadedCount = 0;
+              let generated;
+              for (;;) {
+                supplementReplayIndex = 0;
+                try {
+                  generated = generateRandomDataFromNum(num, nextSupplement);
+                  suppInputCount += supplementReplay.length;
+                  queuedSuppCount += preloadedCount;
+                  break;
+                } catch (err) {
+                  if (!(err instanceof SupplementRequired)) throw err;
+                  const values = await requestSupplementBatch(
+                    suppInputCount + supplementReplay.length + 1,
+                    err.message,
+                    processedCount,
+                  );
+                  if (generationId !== manualGenerationId) return;
+                  if (values === null) {
+                    cancelled = true;
+                    break;
+                  }
+                  for (const value of values) dialogSuppValues.push(value);
+                }
+              }
+              if (cancelled) break;
+              const outputBlock = formatOutput(generated);
               const outputChunk = processedCount === 0
                 ? outputBlock
                 : `\n${outputBlock}`;
@@ -4492,7 +4646,7 @@
               const now = performance.now();
               if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
                 if (now - lastMetaUpdateAt >= MANUAL_META_UPDATE_INTERVAL_MS) {
-                  updateManualProgress(false);
+                  updateManualProgress("처리 중");
                   lastMetaUpdateAt = now;
                 }
                 await yieldToMain();
@@ -4502,10 +4656,10 @@
                 lastYieldAt = performance.now();
               }
             }
-            if (processedCount === 0) {
+            if (!cancelled && processedCount === 0) {
               throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
             }
-            updateManualProgress(true);
+            updateManualProgress(cancelled ? "중단" : "완료");
             manualBody.scrollTop = 0;
             output.scrollTop = 0;
           } catch (err) {
@@ -4513,9 +4667,7 @@
               lastGeneratedChunks = [];
               meta.textContent = "";
               setManualOutputText("");
-              error.textContent = err instanceof Error
-                ? err.message
-                : String(err);
+              error.textContent = getErrorMessage(err);
             }
           } finally {
             if (generationId === manualGenerationId) {
@@ -4561,6 +4713,7 @@
           }
         });
         clearBtn.addEventListener("click", () => {
+          finishSupplementRequest(null);
           manualGenerationId += 1;
           lastGeneratedChunks = [];
           error.textContent = "";
@@ -4574,7 +4727,7 @@
     document.querySelector(".manual-rng").addEventListener(
       "toggle",
       loadManualRng,
-      { once: true },
+      {once: true},
     );
   </script>
 </body>
