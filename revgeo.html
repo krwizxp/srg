@@ -2290,8 +2290,8 @@
       LAST_MAP_INVOKER = btn;
       const lat = r.latStr;
       const lon = r.lonStr;
-      const lat6 = r.lat6 ??= fmtCoord6(lat);
-      const lon6 = r.lon6 ??= fmtCoord6(lon);
+      const lat6 = fmtCoord6(lat);
+      const lon6 = fmtCoord6(lon);
       for (let i = 0; i < MAP_LINKS.length; i++) {
         mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
       }
@@ -2528,17 +2528,6 @@
         filterTimer = null;
       }
     }
-    function insertVisibleIndex(index) {
-      const indices = AppState.visibleIndices;
-      let position = 0;
-      let high = indices.length;
-      while (position < high) {
-        const mid = (position + high) >>> 1;
-        if (indices[mid] < index) position = mid + 1;
-        else high = mid;
-      }
-      if (indices[position] !== index) indices.splice(position, 0, index);
-    }
     function rebuildVisibleIndices() {
       const f = getLiveFilterSnapshot();
       const indices = [];
@@ -2604,8 +2593,14 @@
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
-      a.click();
-      a.remove();
+      try {
+        a.click();
+      } catch (err) {
+        revokeActiveDownloadUrl();
+        throw err;
+      } finally {
+        a.remove();
+      }
       setTimeout(() => {
         URL.revokeObjectURL(url);
         if (ACTIVE_DOWNLOAD_URL === url) ACTIVE_DOWNLOAD_URL = null;
@@ -2990,8 +2985,6 @@
             latStr: lat,
             lonStr: lon,
             cacheKey: fLat + "," + fLon,
-            lat6: null,
-            lon6: null,
             result: null,
             _search: null,
           });
@@ -3556,7 +3549,9 @@
       r._search = null;
       AppState.processed++;
       if (parsed.error) AppState.cntFail++;
-      if (matchesFilter(r, getLiveFilterSnapshot())) insertVisibleIndex(index);
+      if (matchesFilter(r, getLiveFilterSnapshot())) {
+        AppState.visibleIndices.push(index);
+      }
       scheduleRender();
       if (render) schedulePageRender();
     }
@@ -3640,8 +3635,8 @@
             line += "," + escCell(CSV_SOURCE_TEXT);
             line += "," + escCell(CSV_LICENSE_TEXT);
             line += "," + escCell(CSV_GEOCODER_TEXT);
-            const lat6 = r.lat6 ??= fmtCoord6(lat);
-            const lon6 = r.lon6 ??= fmtCoord6(lon);
+            const lat6 = fmtCoord6(lat);
+            const lon6 = fmtCoord6(lon);
             for (let k = 0; k < MAP_LINKS.length; k++) {
               line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
             }
@@ -3719,14 +3714,13 @@
         );
       } catch (err) {
         if (AppState.task !== task) return;
+        domElements.emptyHint.textContent = FILE_READY_HINT;
         if (err && err.name === "AbortError") {
-          domElements.emptyHint.textContent = FILE_READY_HINT;
           setControlsIdle("중지되었습니다.", "stopped");
           return;
         }
         if (err instanceof InputValidationError) {
           AppState.setRecords([]);
-          domElements.emptyHint.textContent = FILE_READY_HINT;
           setControlsIdle(err.message, "warn");
           return;
         }
@@ -3750,6 +3744,7 @@
         e.defaultPrevented ||
         e.altKey ||
         e.shiftKey ||
+        (e.target instanceof Element && e.target.closest(".manual-rng")) ||
         !(e.ctrlKey || e.metaKey) ||
         e.code !== "KeyF"
       ) return;
@@ -4490,15 +4485,23 @@
         const setManualOutputText = (text) =>
           setScrollableText(outputContent, text);
         let supplementRequest = null;
+        let supplementReturnFocus = null;
         function finishSupplementRequest(values) {
           if (!supplementRequest) return;
           const resolve = supplementRequest;
           supplementRequest = null;
+          if (values === null) supplementReturnFocus = clearBtn;
           suppDialog.close();
-          clearBtn.focus({preventScroll: true});
           resolve(values);
         }
         function requestSupplementBatch(index, reason, processedCount) {
+          if (!supplementReturnFocus) {
+            const active = document.activeElement;
+            supplementReturnFocus = active instanceof HTMLElement &&
+              active !== document.body
+              ? active
+              : runBtn;
+          }
           const {promise, resolve} = Promise.withResolvers();
           supplementRequest = resolve;
           suppDialogContext.textContent =
@@ -4690,15 +4693,28 @@
           } finally {
             if (generationId === manualGenerationId) {
               setManualBusy(false);
+              const focusTarget = supplementReturnFocus;
+              supplementReturnFocus = null;
+              if (
+                focusTarget?.isConnected &&
+                !focusTarget.matches(":disabled")
+              ) focusTarget.focus({preventScroll: true});
             }
           }
         });
         saveBtn.addEventListener("click", () => {
           error.textContent = "";
-          downloadBlob(randomDataBlob(lastGeneratedChunks, true), "random_data.txt");
-          meta.textContent =
-            (meta.textContent ? `${meta.textContent}\n` : "") +
-            "random_data.txt 저장 요청을 완료했습니다.";
+          try {
+            downloadBlob(
+              randomDataBlob(lastGeneratedChunks, true),
+              "random_data.txt",
+            );
+            meta.textContent =
+              (meta.textContent ? `${meta.textContent}\n` : "") +
+              "random_data.txt 저장 요청을 완료했습니다.";
+          } catch (err) {
+            error.textContent = `저장 실패: ${getErrorMessage(err)}`;
+          }
         });
         copyBtn.addEventListener("click", async () => {
           if (copyTask) return;
@@ -4732,6 +4748,7 @@
         });
         clearBtn.addEventListener("click", () => {
           finishSupplementRequest(null);
+          supplementReturnFocus = null;
           manualGenerationId += 1;
           lastGeneratedChunks = [];
           error.textContent = "";

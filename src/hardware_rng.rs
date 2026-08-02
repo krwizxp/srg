@@ -19,6 +19,7 @@ pub(super) struct HardwareRng {
     fallback_notice_pending: AtomicBool,
     rdrand_supported: bool,
     rdseed_active: AtomicBool,
+    stop_pending: AtomicBool,
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum HardwareRandomSource {
@@ -33,6 +34,7 @@ impl HardwareRng {
             fallback_notice_pending: AtomicBool::new(false),
             rdrand_supported,
             rdseed_active: AtomicBool::new(rdseed_supported),
+            stop_pending: AtomicBool::new(false),
         }
     }
     pub(super) fn next_u64(&self) -> Result<u64> {
@@ -65,6 +67,12 @@ impl HardwareRng {
         }
         let retry_started_at = Instant::now();
         while Instant::now().saturating_duration_since(retry_started_at) < RDSEED_TIMEOUT {
+            if self.stop_pending.load(Ordering::Relaxed) {
+                if self.rdrand_supported {
+                    return Self::rdrand_random();
+                }
+                return Err("RDSEED 재시도 중단, RDRAND 미지원".into());
+            }
             if Self::try_rdseed(&mut value) {
                 return Ok(value);
             }
@@ -82,6 +90,9 @@ impl HardwareRng {
             return Self::rdrand_random();
         }
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
+    }
+    pub(super) fn set_pending_read_interruption(&self, pending: bool) {
+        self.stop_pending.store(pending, Ordering::Relaxed);
     }
     pub(super) fn source(&self) -> HardwareRandomSource {
         if self.rdseed_active.load(Ordering::Relaxed) {

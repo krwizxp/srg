@@ -1276,6 +1276,8 @@ impl AppState<'_> {
         runtime: &mut LoopRuntime<'_>,
     ) -> ActivityTransition<'message> {
         self.end_final_countdown_sampling();
+        #[cfg(target_os = "windows")]
+        let mut high_res_wait_error = None;
         let FinalCountdownState {
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             action,
@@ -1292,7 +1294,7 @@ impl AppState<'_> {
                 cfg_select! {
                     target_os = "windows" => {
                         if let Some(guard) = self.high_res_timer_guard.as_ref() {
-                            guard.sleep(sleep_duration);
+                            high_res_wait_error = guard.sleep(sleep_duration).err();
                         } else {
                             thread::sleep(sleep_duration);
                         }
@@ -1373,6 +1375,15 @@ impl AppState<'_> {
             );
         }
         msg_buf.push_str(final_parenthesis);
+        #[cfg(target_os = "windows")]
+        if let Some(wait_error) = high_res_wait_error {
+            append_fmt(
+                msg_buf,
+                format_args!(
+                    "\n[경고] Windows 고해상도 대기 타이머 실패로 표준 대기를 사용했습니다: {wait_error}"
+                ),
+            );
+        }
         ActivityTransition::message(Activity::Predicting { server_time }, msg_buf)
     }
 }

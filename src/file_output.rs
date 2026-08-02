@@ -1,10 +1,11 @@
-use crate::UTF8_BOM;
 use crate::diagnostic::{AppError, Result};
-#[cfg(target_arch = "x86_64")]
-use std::io::Read as _;
+use crate::{
+    BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_LINE_COUNT, FILE_RECORD_START, UTF8_BOM,
+};
+use core::str;
 use std::{
     fs::File,
-    io::{Seek as _, SeekFrom, Write as IoWrite},
+    io::{Read as _, Seek as _, SeekFrom, Write as IoWrite},
     path::Path,
 };
 cfg_select! {
@@ -153,8 +154,96 @@ impl TryFrom<&Path> for OutputFile {
                 ));
             }
         }
-        if file.seek(SeekFrom::End(0))? == 0 {
+        let len = file.seek(SeekFrom::End(0))?;
+        if len == 0 {
             IoWrite::write_all(&mut file, UTF8_BOM)?;
+        } else {
+            let mut bom = [0_u8; UTF8_BOM.len()];
+            file.rewind()?;
+            file.read_exact(&mut bom)
+                .map_err(|source| AppError::context("기존 출력 파일 BOM 읽기 실패", source))?;
+            if &bom != UTF8_BOM {
+                return Err(AppError::message(
+                    "기존 출력 파일은 SRG UTF-8 형식이어야 합니다.",
+                ));
+            }
+            let bom_len = u64::try_from(UTF8_BOM.len())
+                .map_err(|source| AppError::context("UTF-8 BOM 길이 변환 실패", source))?;
+            if len != bom_len {
+                let max_tail_len = u64::try_from(BUFFER_SIZE)
+                    .map_err(|source| AppError::context("출력 버퍼 길이 변환 실패", source))?;
+                let tail_len = usize::try_from(len.min(max_tail_len)).map_err(|source| {
+                    AppError::context("기존 출력 파일 tail 길이 변환 실패", source)
+                })?;
+                let mut tail = [0_u8; BUFFER_SIZE];
+                let tail_start = len.strict_sub(u64::try_from(tail_len).map_err(|source| {
+                    AppError::context("기존 출력 파일 tail offset 변환 실패", source)
+                })?);
+                file.seek(SeekFrom::Start(tail_start))?;
+                file.read_exact(
+                    tail.get_mut(..tail_len)
+                        .ok_or_else(|| AppError::message("기존 출력 파일 tail 범위 손상"))?,
+                )?;
+                file.seek(SeekFrom::End(0))?;
+                let content_start = if tail_start == 0 { UTF8_BOM.len() } else { 0 };
+                let content = tail
+                    .get(content_start..tail_len)
+                    .ok_or_else(|| AppError::message("기존 출력 파일 tail 내용 범위 손상"))?;
+                let record_start = content
+                    .windows(FILE_RECORD_START.len())
+                    .rposition(|window| window == FILE_RECORD_START)
+                    .ok_or_else(|| {
+                        AppError::message("기존 출력 파일의 마지막 SRG 레코드를 찾지 못했습니다.")
+                    })?;
+                if record_start != 0
+                    && content
+                        .get(record_start.strict_sub(1))
+                        .is_none_or(|&byte| byte != b'\n')
+                {
+                    return Err(AppError::message(
+                        "기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.",
+                    ));
+                }
+                let record = content.get(record_start..).ok_or_else(|| {
+                    AppError::message("기존 출력 파일의 마지막 SRG 레코드 범위 손상")
+                })?;
+                str::from_utf8(record).map_err(|source| {
+                    AppError::context("기존 출력 파일이 올바른 UTF-8이 아닙니다.", source)
+                })?;
+                let body = record.strip_suffix(b"\n").ok_or_else(|| {
+                    AppError::message("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")
+                })?;
+                let mut lines = body.split(|&byte| byte == b'\n');
+                let first = lines.next().ok_or_else(|| {
+                    AppError::message("기존 출력 파일의 마지막 SRG 레코드가 비어 있습니다.")
+                })?;
+                let mut record_line_count = 1_usize;
+                let mut last = first;
+                for line in lines {
+                    record_line_count = record_line_count.strict_add(1);
+                    last = line;
+                }
+                let final_value_is_valid =
+                    last.strip_prefix(FILE_RECORD_FINAL_LABEL)
+                        .is_some_and(|value| {
+                            let mut coordinate_count = 0_usize;
+                            value.split(|&byte| byte == b':').all(|coordinate| {
+                                coordinate_count = coordinate_count.strict_add(1);
+                                coordinate.len() == 4
+                                    && coordinate.iter().all(|&byte| {
+                                        byte.is_ascii_digit() || matches!(byte, b'A'..=b'F')
+                                    })
+                            }) && coordinate_count == 4
+                        });
+                if !first.starts_with(FILE_RECORD_START)
+                    || record_line_count != FILE_RECORD_LINE_COUNT
+                    || !final_value_is_valid
+                {
+                    return Err(AppError::message(
+                        "기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.",
+                    ));
+                }
+            }
         }
         Ok(Self { file })
     }

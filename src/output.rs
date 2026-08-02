@@ -1,5 +1,5 @@
 use crate::{
-    BUFFER_SIZE,
+    BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_START,
     buffmt::{ByteCursor, digit_byte, two_digits, write_zero_err},
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
@@ -75,7 +75,7 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_chars(buffer_cur, &data.glyph_string)?;
             buffer_cur.write_bytes(b")")
         })?;
-        self.write_labeled_line("NMS 은하 좌표: ".as_bytes(), |buffer_cur| {
+        self.write_labeled_line(FILE_RECORD_FINAL_LABEL, |buffer_cur| {
             buffer_cur.write_bytes(&hex_u16(data.galaxy_x))?;
             buffer_cur.write_byte(b':')?;
             buffer_cur.write_bytes(&hex_u16(data.galaxy_y))?;
@@ -91,7 +91,7 @@ impl OutputFormatter<'_, '_, '_> {
         let signed_number = number64.cast_signed();
         let bytes = self.bytes;
         let use_colors = self.use_colors;
-        self.cursor.write_bytes("64비트 난수: ".as_bytes())?;
+        self.cursor.write_bytes(FILE_RECORD_START)?;
         self.cursor.write_u64_dec(number64)?;
         self.cursor.write_bytes(" (유부호 정수: ".as_bytes())?;
         if signed_number < 0 {

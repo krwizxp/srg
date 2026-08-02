@@ -232,6 +232,7 @@ pub(super) fn regenerate_with_count(
                     last_progress = Instant::now();
                 }
             }
+            rng.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
             let mut combined = None;
             let mut join_error = None;
             let mut worker_error = None;
@@ -256,8 +257,10 @@ pub(super) fn regenerate_with_count(
                     Ok(Ok(None) | Err(_)) | Err(_) => {}
                 }
             }
-            if let Some(error) = join_error.or(progress_error).or(worker_error) {
-                return Err(error);
+            let error = join_error.or(progress_error).or(worker_error);
+            rng.set_pending_read_interruption(false);
+            if let Some(outcome_error) = error {
+                return Err(outcome_error);
             }
             Ok((combined, user_cancelled))
         })?;
