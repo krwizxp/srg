@@ -1,6 +1,9 @@
 use crate::diagnostic::{AppError, Result};
 use crate::{
-    BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_LINE_COUNT, FILE_RECORD_START, UTF8_BOM,
+    BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_LINE_COUNT, FILE_RECORD_START, IS_TERMINAL,
+    UTF8_BOM,
+    output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
+    random_data::RandomDataSet,
 };
 use core::str;
 use std::{
@@ -25,6 +28,28 @@ cfg_select! {
         const FILE_SHARE_READ_FLAG: u32 = 0x0000_0001;
         const FILE_STANDARD_INFO_CLASS: i32 = 1;
         const FILE_STANDARD_INFO_SIZE: u32 = 24;
+        const _: () = assert!(
+            size_of::<FileStandardInfo>() == 24,
+            "Windows FILE_STANDARD_INFO size mismatch"
+        );
+        #[repr(C)]
+        #[derive(Default)]
+        struct FileStandardInfo {
+            allocation_size: i64,
+            end_of_file: i64,
+            number_of_links: u32,
+            delete_pending: u8,
+            directory: u8,
+        }
+        unsafe extern "system" {
+            #[link_name = "GetFileInformationByHandleEx"]
+            fn get_file_information_by_handle_ex(
+                file: *mut c_void,
+                information_class: i32,
+                information: *mut c_void,
+                buffer_size: u32,
+            ) -> i32;
+        }
     }
     any(target_os = "linux", target_os = "macos") => {
         use std::fs::TryLockError;
@@ -36,31 +61,6 @@ cfg_select! {
 const OPEN_NOFOLLOW_FLAG: i32 = 0x2_0000;
 #[cfg(target_os = "macos")]
 const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
-#[cfg(target_os = "windows")]
-const _: () = assert!(
-    size_of::<FileStandardInfo>() == 24,
-    "Windows FILE_STANDARD_INFO size mismatch"
-);
-#[cfg(target_os = "windows")]
-#[repr(C)]
-#[derive(Default)]
-struct FileStandardInfo {
-    allocation_size: i64,
-    end_of_file: i64,
-    number_of_links: u32,
-    delete_pending: u8,
-    directory: u8,
-}
-#[cfg(target_os = "windows")]
-unsafe extern "system" {
-    #[link_name = "GetFileInformationByHandleEx"]
-    fn get_file_information_by_handle_ex(
-        file: *mut c_void,
-        information_class: i32,
-        information: *mut c_void,
-        buffer_size: u32,
-    ) -> i32;
-}
 pub(super) struct OutputFile {
     file: File,
 }
@@ -255,6 +255,18 @@ impl OutputFile {
         self.file.write_all(UTF8_BOM)?;
         Ok(())
     }
+    pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
+        let mut buffer = [0_u8; BUFFER_SIZE];
+        let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
+        self.file.write_all(prefix_slice(&buffer, file_len)?)?;
+        let output_len = if *IS_TERMINAL {
+            format_data_into_buffer(data, &mut buffer, OutputTarget::Console)?
+        } else {
+            file_len
+        };
+        write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
+        Ok(())
+    }
     #[cfg(target_arch = "x86_64")]
     pub(super) fn read_tail_into<'buffer>(
         &mut self,
@@ -271,6 +283,7 @@ impl OutputFile {
         self.file.seek(SeekFrom::End(0))?;
         Ok(tail)
     }
+    #[cfg(target_arch = "x86_64")]
     pub(super) const fn writer(&mut self) -> &mut File {
         &mut self.file
     }

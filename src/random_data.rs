@@ -193,21 +193,18 @@ where
                 });
                 if let Some(candidate) = candidate_value {
                     syllable_index = candidate;
-                } else {
-                    if attempts_remaining == 0 {
-                        break;
-                    }
-                    self.next_supplemental("한글 음절 보완 재시도")?;
+                    break;
                 }
+                if attempts_remaining == 0 {
+                    break;
+                }
+                self.next_supplemental("한글 음절 보완 재시도")?;
             }
             if syllable_index > HANGUL_SYLLABLE_MAX {
                 return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
             }
-            let Some(code_point) = HANGUL_BASE_CODE_POINT
-                .checked_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS))
-            else {
-                return Err("한글 음절 코드포인트 계산 실패".into());
-            };
+            let code_point = HANGUL_BASE_CODE_POINT
+                .strict_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
             *slot = char::from_u32(code_point).ok_or("한글 음절 변환 실패")?;
         }
         self.data.hangul_syllables = hangul;

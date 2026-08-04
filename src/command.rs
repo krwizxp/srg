@@ -128,8 +128,7 @@ impl CliCommand {
         }
         rng.write_initial_source_notice(err)?;
         run(&rng)?;
-        rng.write_rdseed_fallback_notice(err)?;
-        Ok(())
+        rng.write_rdseed_fallback_notice(err)
     }
 }
 impl<I> TryFrom<(OsString, I)> for CliCommand

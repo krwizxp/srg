@@ -1768,8 +1768,8 @@
         </div>
         <h2 class="sr-only">주소 조회 결과</h2>
       </header>
-      <search>
-        <form id="filters" class="filters">
+      <search aria-label="주소 조회 결과 필터">
+        <div id="filters" class="filters">
           <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
             aria-label="전체검색" aria-keyshortcuts="Control+F Meta+F">
           <select id="filter-kind" aria-label="구분">
@@ -1789,14 +1789,14 @@
             aria-label="지물 태그">
           <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
             aria-label="전체주소">
-          <button type="reset" id="filter-clear" class="action-btn action-btn--soft action-btn--compact">
+          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact">
             <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.5 7.5h7a4.25 4.25 0 1 1 0 8.5h-7"></path>
               <path d="m9.75 4.5-3.25 3 3.25 3"></path>
             </svg>
             <span class="action-btn__label">필터 초기화</span>
           </button>
-        </form>
+        </div>
       </search>
       <div class="table-wrap">
         <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
@@ -1945,7 +1945,6 @@
       const MYEON = 16;
       const DONG = 32;
       const RI = 64;
-      const KIND_BY_COUNTRY = Object.freeze({kr: "KR", kp: "KP"});
       const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
         CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
       const isBoundedText = (value) =>
@@ -2026,7 +2025,7 @@
           fields.cityDistrict, fields.district, fields.suburb,
         );
         const level6 = fields.level6 || fields.level7;
-        const {city, county} = fields;
+        const { city, county } = fields;
         let sido = fields.level4 || fields.state || "";
         let sigungu = "";
         const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
@@ -2076,7 +2075,7 @@
             )
           ) eupmyeon.push(name);
         }
-        return {sido, sigungu, eupmyeon: eupmyeon.join(" ")};
+        return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
       }
       function removeDistrict(sigungu, district) {
         if (!sigungu || sigungu === district) return "";
@@ -2096,7 +2095,7 @@
         const cityDistrict = firstText(
           fields.cityDistrict, fields.district, fields.suburb,
         );
-        const {city, county} = fields;
+        const { city, county } = fields;
         const sido = fields.level4 || fields.state || fields.region ||
           fields.province || county || city || "";
         const cityLike = pickAdminName(
@@ -2133,7 +2132,7 @@
           eupmyeon = districtLike;
           sigungu = removeDistrict(sigungu, districtLike);
         }
-        return {sido, sigungu, eupmyeon};
+        return { sido, sigungu, eupmyeon };
       }
       function getAdmin(gc, countryCode, p0, p1) {
         const fields = readFields(gc);
@@ -2185,7 +2184,7 @@
           : null) || null;
         if (!gc) {
           return {
-            addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""},
+            addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
           };
         }
         const label = text(gc.label);
@@ -2205,22 +2204,23 @@
           if (comma < 0) break;
           start = comma + 1;
         }
-        const {sido, sigungu, eupmyeon} = getAdmin(
+        const { sido, sigungu, eupmyeon } = getAdmin(
           gc, countryCode, p0, p1,
         );
         let tag = firstText(gc.name, firstLabelPart, gc.street, gc.city);
         const tagType = text(gc.type);
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
-        const kind = KIND_BY_COUNTRY[countryCode] ||
-          (countryCode ? "WORLD" : undefined);
+        const kind = countryCode === "kr" ? "KR" :
+          countryCode === "kp" ? "KP" :
+            countryCode ? "WORLD" : undefined;
         const parsed = {
-          addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
+          addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
           kind,
         };
         if (!isValid(parsed)) throw new InputValidationError(TEXT_LIMIT_MESSAGE);
         return parsed;
       }
-      return Object.freeze({isValid, parse});
+      return Object.freeze({ isValid, parse });
     })();
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
@@ -2301,7 +2301,7 @@
       mapPopover.hidePopover();
     }
     const fmt =
-      new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format;
+      new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
     const normalizeCoordText = (s) => s === "-0" ? "0" : s;
@@ -2357,7 +2357,8 @@
       resumeBtn: document.getElementById("resume"),
       stopBtn: document.getElementById("stop"),
       filterQ: document.getElementById("filter-q"),
-      filters: document.querySelector(".filters"),
+      filters: document.getElementById("filters"),
+      filterClear: document.getElementById("filter-clear"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
       filterSigungu: document.getElementById("filter-sigungu"),
@@ -2369,11 +2370,8 @@
       pageNext: document.getElementById("page-next"),
       pageStatus: document.getElementById("page-status"),
     };
-    const setScrollableText = (contentElement, text) => {
-      contentElement.textContent = String(text ?? "");
-    };
     const setCoordsText = (text) =>
-      setScrollableText(domElements.coordsContent, text);
+      domElements.coordsContent.textContent = text;
     const root = document.documentElement;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const currentTheme = () =>
@@ -2439,7 +2437,7 @@
       }
       const active =
         !!(kind || sido || sigungu || emd || tag || fullAddr || qMode);
-      if (!active) return {active: false};
+      if (!active) return { active: false };
       return {
         active: true,
         kind,
@@ -2454,9 +2452,6 @@
       };
     }
     let FILTER_SNAP = buildFilterSnapshot();
-    function getLiveFilterSnapshot() {
-      return FILTER_SNAP ??= buildFilterSnapshot();
-    }
     const Q_SEARCH_SEP = "\u0000";
     const getSearchFields = (r) => {
       let fields = r._search;
@@ -2521,15 +2516,15 @@
     }
     const RESULT_PAGE_SIZE = 100;
     let filterTimer = null;
-    let pageRenderReq = 0;
+    let pageRenderReq = null;
     function cancelActiveFilterTask() {
-      if (filterTimer) {
+      if (filterTimer !== null) {
         clearTimeout(filterTimer);
         filterTimer = null;
       }
     }
     function rebuildVisibleIndices() {
-      const f = getLiveFilterSnapshot();
+      const f = FILTER_SNAP;
       const indices = [];
       const records = AppState.records;
       for (let i = 0; i < records.length; i++) {
@@ -2540,7 +2535,7 @@
       renderCurrentPage(true);
     }
     function renderCurrentPage(resetScroll = false) {
-      pageRenderReq = 0;
+      pageRenderReq = null;
       closeMapPopover();
       const indices = AppState.visibleIndices;
       const visibleCount = indices.length;
@@ -2564,19 +2559,30 @@
       if (resetScroll) domElements.tableWrap.scrollTop = 0;
     }
     function schedulePageRender() {
-      pageRenderReq ||= requestAnimationFrame(() => renderCurrentPage());
+      pageRenderReq ??= requestAnimationFrame(() => renderCurrentPage());
     }
     function scheduleApplyFilterAll() {
-      FILTER_SNAP = null;
+      FILTER_SNAP = buildFilterSnapshot();
       cancelActiveFilterTask();
       filterTimer = setTimeout(() => {
         filterTimer = null;
         rebuildVisibleIndices();
       }, 80);
     }
+    function clearFilters({ keepQuery = false } = {}) {
+      const query = keepQuery ? domElements.filterQ.value : "";
+      domElements.filterQ.value = query;
+      domElements.filterKind.value = "";
+      domElements.filterSido.value = "";
+      domElements.filterSigungu.value = "";
+      domElements.filterEmd.value = "";
+      domElements.filterTag.value = "";
+      domElements.filterFullAddr.value = "";
+      scheduleApplyFilterAll();
+    }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
-      MAP_LINKS.map(({key}) => "," + csvEsc(`지도링크(${key})`)).join("");
+      MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
     let ACTIVE_DOWNLOAD_URL = null;
     let EXPORT_TASK = null;
     function revokeActiveDownloadUrl() {
@@ -2651,9 +2657,9 @@
           cancelAnimationFrame(this.renderReq);
           this.renderReq = null;
         }
-        if (pageRenderReq) {
+        if (pageRenderReq !== null) {
           cancelAnimationFrame(pageRenderReq);
-          pageRenderReq = 0;
+          pageRenderReq = null;
         }
         updateUIState();
         scheduleRender();
@@ -2693,7 +2699,7 @@
       domElements.stopBtn.disabled = stopDisabled;
       domElements.file.disabled = isBusy;
     }
-    const SR_STATUS_CACHE = {msg: null, progressBucket: -1};
+    const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     let statusLiveTimer = 0;
     function setStatusLiveText(text) {
       clearTimeout(statusLiveTimer);
@@ -2823,7 +2829,7 @@
       }
       return new Promise((resolve) => {
         const waitSignal = AbortSignal.any([signal, AbortSignal.timeout(ms)]);
-        waitSignal.addEventListener("abort", resolve, {once: true});
+        waitSignal.addEventListener("abort", resolve, { once: true });
       }).then(() => {
         signal.throwIfAborted();
       });
@@ -2852,7 +2858,7 @@
         const queue = [];
         channel.port1.onmessage = () => queue.shift()?.();
         return () => {
-          const {promise, resolve} = Promise.withResolvers();
+          const { promise, resolve } = Promise.withResolvers();
           queue.push(resolve);
           channel.port2.postMessage(0);
           return promise;
@@ -2868,8 +2874,8 @@
     }
     async function* lineIterator(stream, signal) {
       const decodedStream = stream.pipeThrough(
-        new TextDecoderStream("utf-8", {fatal: true}),
-        {signal},
+        new TextDecoderStream("utf-8", { fatal: true }),
+        { signal },
       );
       const reader = decodedStream.getReader();
       const parts = [];
@@ -2893,7 +2899,7 @@
         return line;
       };
       try {
-        for (;;) {
+        for (; ;) {
           let read;
           try {
             read = await reader.read();
@@ -2902,7 +2908,7 @@
             if (err instanceof TypeError) {
               throw new InputValidationError(
                 "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
-                {cause: err},
+                { cause: err },
               );
             }
             throw err;
@@ -2994,10 +3000,10 @@
     }
     const REVERSE_PARSED_CACHE = new Map();
     const REVERSE_PARSED_CACHE_MAX = 5_000;
+    const REVERSE_CACHE_KEYED_READ_LIMIT = 2_000;
     const REVERSE_CACHE_WRITE_LIMIT = 8;
     const REVERSE_CACHE_PRUNE_INTERVAL = 32;
-    let REVERSE_CACHE_WRITES_SINCE_PRUNE =
-      REVERSE_CACHE_PRUNE_INTERVAL - 1;
+    let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
     let REVERSE_CACHE_RETRY_AT = 0;
@@ -3011,10 +3017,9 @@
         if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
     }
-    function isFreshReverseCacheRow(row, expectedKey, now) {
+    function isFreshReverseCacheRow(row, now) {
       if (
         !row ||
-        row.key !== expectedKey ||
         !Number.isFinite(row.savedAt) ||
         !GeocodeParser.isValid(row.parsed)
       ) {
@@ -3079,6 +3084,7 @@
           if (!finish(db)) {
             REVERSE_CACHE_DB_PROMISE = Promise.resolve(db);
           }
+          setTimeout(() => startReverseCacheMaintenance(db), 0);
         };
         req.onerror = () =>
           fail("Reverse geocoding cache is unavailable.", req.error);
@@ -3130,7 +3136,7 @@
               : tx.error ??
               new Error("Reverse geocoding cache transaction aborted."),
           );
-          signal.addEventListener("abort", onAbort, {once: true});
+          signal.addEventListener("abort", onAbort, { once: true });
           if (signal.aborted) {
             onAbort();
             return;
@@ -3150,25 +3156,33 @@
       const now = Date.now();
       try {
         await runReverseCacheTransaction(db, "readonly", signal, (store) => {
+          const acceptRow = (row) => {
+            const persistentKey = row?.key;
+            if (
+              typeof persistentKey !== "string" ||
+              !persistentKey.startsWith(REVERSE_CACHE_KEY_PREFIX)
+            ) return;
+            const cacheKey = persistentKey.slice(
+              REVERSE_CACHE_KEY_PREFIX.length,
+            );
+            if (
+              results.has(cacheKey) &&
+              isFreshReverseCacheRow(row, now)
+            ) results.set(cacheKey, row.parsed);
+          };
+          if (results.size <= REVERSE_CACHE_KEYED_READ_LIMIT) {
+            for (const cacheKey of results.keys()) {
+              const req = store.get(REVERSE_CACHE_KEY_PREFIX + cacheKey);
+              req.onsuccess = () => acceptRow(req.result);
+            }
+            return;
+          }
           const req = store.getAll(
             undefined,
             CONFIG.REVERSE_CACHE_MAX + REVERSE_CACHE_PRUNE_INTERVAL,
           );
           req.onsuccess = () => {
-            for (const row of req.result) {
-              const persistentKey = row?.key;
-              if (
-                typeof persistentKey !== "string" ||
-                !persistentKey.startsWith(REVERSE_CACHE_KEY_PREFIX)
-              ) continue;
-              const cacheKey = persistentKey.slice(
-                REVERSE_CACHE_KEY_PREFIX.length,
-              );
-              if (
-                results.has(cacheKey) &&
-                isFreshReverseCacheRow(row, persistentKey, now)
-              ) results.set(cacheKey, row.parsed);
-            }
+            for (const row of req.result) acceptRow(row);
           };
         });
       } catch (err) {
@@ -3180,58 +3194,84 @@
       try {
         const db = await openReverseCacheDb();
         if (!db || signal.aborted) return;
+        const pendingWrites =
+          REVERSE_CACHE_WRITES_SINCE_PRUNE + entries.length;
+        const maintain = pendingWrites >= REVERSE_CACHE_PRUNE_INTERVAL;
         await runReverseCacheTransaction(
           db,
           "readwrite",
           signal,
           (store) => {
             const savedAt = Date.now();
-            for (const {cacheKey, parsed} of entries) {
+            for (const { cacheKey, parsed } of entries) {
               store.put({
                 key: REVERSE_CACHE_KEY_PREFIX + cacheKey,
                 savedAt,
                 parsed,
               });
             }
-            REVERSE_CACHE_WRITES_SINCE_PRUNE += entries.length;
-            if (
-              REVERSE_CACHE_WRITES_SINCE_PRUNE >=
-              REVERSE_CACHE_PRUNE_INTERVAL
-            ) {
-              REVERSE_CACHE_WRITES_SINCE_PRUNE %=
-                REVERSE_CACHE_PRUNE_INTERVAL;
-              pruneExcessReverseCacheRows(store);
-            }
+            if (maintain) maintainReverseCacheRows(store);
           },
         );
+        REVERSE_CACHE_WRITES_SINCE_PRUNE = maintain
+          ? pendingWrites % REVERSE_CACHE_PRUNE_INTERVAL
+          : pendingWrites;
       } catch (err) {
         if (!signal.aborted) {
           console.warn("Reverse geocoding cache write failed.", err);
         }
       }
     }
-    function pruneExcessReverseCacheRows(store) {
-      const countReq = store.count();
-      countReq.onsuccess = () => {
-        let excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
-        if (excess <= 0) return;
-        const cursorReq = store.index("savedAt").openCursor();
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (!cursor || excess <= 0) return;
-          cursor.delete();
-          excess--;
-          cursor.continue();
+    function startReverseCacheMaintenance(db) {
+      try {
+        const tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+        tx.onabort = () => {
+          console.warn(
+            "Reverse geocoding cache maintenance failed.",
+            tx.error ?? new Error("Reverse geocoding cache maintenance failed."),
+          );
+        };
+        maintainReverseCacheRows(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
+      } catch (err) {
+        console.warn("Reverse geocoding cache maintenance failed.", err);
+      }
+    }
+    function maintainReverseCacheRows(store) {
+      const expiredReq = store.index("savedAt").openKeyCursor(
+        IDBKeyRange.upperBound(
+          Date.now() - CONFIG.REVERSE_CACHE_TTL_MS,
+          true,
+        ),
+      );
+      expiredReq.onsuccess = () => {
+        const expired = expiredReq.result;
+        if (expired) {
+          store.delete(expired.primaryKey);
+          expired.continue();
+          return;
+        }
+        const countReq = store.count();
+        countReq.onsuccess = () => {
+          let excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
+          if (excess <= 0) return;
+          const oldestReq = store.index("savedAt").openKeyCursor();
+          oldestReq.onsuccess = () => {
+            const oldest = oldestReq.result;
+            if (!oldest || excess <= 0) return;
+            store.delete(oldest.primaryKey);
+            excess--;
+            oldest.continue();
+          };
         };
       };
     }
     function decodeReverseBytes(decoder, value, stream) {
       try {
-        return decoder.decode(value, {stream});
+        return decoder.decode(value, { stream });
       } catch (err) {
         throw new SyntaxError(
           "역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.",
-          {cause: err},
+          { cause: err },
         );
       }
     }
@@ -3243,12 +3283,12 @@
         throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
-      const decoder = new TextDecoder("utf-8", {fatal: true});
+      const decoder = new TextDecoder("utf-8", { fatal: true });
       const reader = response.body.getReader();
       const parts = [];
       let bytesRead = 0;
       try {
-        for (;;) {
+        for (; ;) {
           const read = await reader.read();
           if (read.done) break;
           signal.throwIfAborted();
@@ -3289,7 +3329,7 @@
         let res;
         try {
           res = await fetch(url, {
-            headers: {Accept: "application/json"},
+            headers: { Accept: "application/json" },
             referrerPolicy: "strict-origin-when-cross-origin",
             signal: requestSignal,
           });
@@ -3298,7 +3338,7 @@
           if (attempt >= maxRetry) {
             throw new Error(
               "역지오코딩 서버에 연결하지 못했습니다.",
-              {cause: e},
+              { cause: e },
             );
           }
           await sleep(baseDelayMs * attempt, userSignal);
@@ -3312,7 +3352,7 @@
             } catch (err) {
               throw new SyntaxError(
                 "역지오코딩 응답이 올바른 JSON 형식이 아닙니다.",
-                {cause: err},
+                { cause: err },
               );
             }
           } catch (e) {
@@ -3343,7 +3383,7 @@
     async function pauseProcessing(task, message) {
       AppState.setStatus("paused");
       setStatusMessage(message, "warn");
-      const {promise, resolve} = Promise.withResolvers();
+      const { promise, resolve } = Promise.withResolvers();
       task.resume = resolve;
       scheduleRender();
       await promise;
@@ -3430,7 +3470,7 @@
                 await fetchReverseWithRetry(url, signal),
               );
               putReverseMemoryCache(cacheKey, parsed);
-              cacheWriteBatch.push({cacheKey, parsed});
+              cacheWriteBatch.push({ cacheKey, parsed });
               if (cacheWriteBatch.length >= REVERSE_CACHE_WRITE_LIMIT) {
                 await flushCacheWrites();
               }
@@ -3489,7 +3529,7 @@
       }
       await flushCacheWrites();
       if (AppState.task !== task) return;
-      if (pageRenderReq) cancelAnimationFrame(pageRenderReq);
+      if (pageRenderReq !== null) cancelAnimationFrame(pageRenderReq);
       renderCurrentPage();
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
@@ -3549,7 +3589,7 @@
       r._search = null;
       AppState.processed++;
       if (parsed.error) AppState.cntFail++;
-      if (matchesFilter(r, getLiveFilterSnapshot())) {
+      if (matchesFilter(r, FILTER_SNAP)) {
         AppState.visibleIndices.push(index);
       }
       scheduleRender();
@@ -3652,7 +3692,7 @@
           flushChunk();
           ensureCurrent();
           downloadBlob(
-            new Blob(parts, {type: "text/csv;charset=utf-8"}),
+            new Blob(parts, { type: "text/csv;charset=utf-8" }),
             `${sourceFile.name.replace(RX_FILE_EXT, "")
             }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
           );
@@ -3731,12 +3771,8 @@
       }
     }
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filters.addEventListener("reset", () => {
-      queueMicrotask(scheduleApplyFilterAll);
-    });
-    domElements.filters.addEventListener("submit", (e) => {
-      e.preventDefault();
-      scheduleApplyFilterAll();
+    domElements.filterClear.addEventListener("click", () => {
+      clearFilters();
     });
     document.addEventListener("keydown", (e) => {
       if (
@@ -3749,9 +3785,7 @@
         e.code !== "KeyF"
       ) return;
       e.preventDefault();
-      const query = domElements.filterQ.value;
-      domElements.filters.reset();
-      domElements.filterQ.value = query;
+      clearFilters({ keepQuery: true });
       domElements.filterQ.focus();
       domElements.filterQ.select();
     });
@@ -3760,7 +3794,7 @@
       const btn = e.target?.closest?.("button.map-btn");
       if (!btn || btn === LAST_MAP_INVOKER) return;
       closeMapPopover();
-    }, {capture: true});
+    }, { capture: true });
     const COMMANDS = {
       "--parse": handleParse,
       "--start": () => {
@@ -3931,7 +3965,7 @@
         );
       }
       function parseU64(raw) {
-        const input = String(raw ?? "").trim();
+        const input = raw.trim();
         if (input.length === 0) {
           throw new Error("빈 값은 허용되지 않습니다.");
         }
@@ -3960,28 +3994,6 @@
       const F64_HIDDEN_BIT = 1n << 52n;
       const F64_CARRY_BIT = 1n << 53n;
       const F64_SIGN_BIT = 1n << 63n;
-      function decomposeF64(value) {
-        NUMERIC_SCRATCH_VIEW.setFloat64(0, value, false);
-        const bits = NUMERIC_SCRATCH_VIEW.getBigUint64(0, false);
-        const exponentBits = Number((bits >> 52n) & 0x7ffn);
-        const fraction = bits & F64_FRACTION_MASK;
-        if (exponentBits === 0x7ff) {
-          throw new RangeError("유한한 f64 좌표값이 필요합니다.");
-        }
-        if (exponentBits === 0) {
-          return {
-            exponent: -1074,
-            significand: (bits & F64_SIGN_BIT) === 0n ? fraction : -fraction,
-          };
-        }
-        const significand = F64_HIDDEN_BIT | fraction;
-        return {
-          exponent: exponentBits - 1023 - 52,
-          significand: (bits & F64_SIGN_BIT) === 0n
-            ? significand
-            : -significand,
-        };
-      }
       function composeRoundedNormalF64(integer, exponent) {
         if (integer === 0n) {
           return 0;
@@ -4034,12 +4046,27 @@
         addendExponent,
         addend,
       ) {
-        const ratioParts = decomposeF64(ratio);
-        const productSignificand = scaleSignificand * ratioParts.significand;
+        NUMERIC_SCRATCH_VIEW.setFloat64(0, ratio, false);
+        const ratioBits = NUMERIC_SCRATCH_VIEW.getBigUint64(0, false);
+        const exponentBits = Number((ratioBits >> 52n) & 0x7ffn);
+        const fraction = ratioBits & F64_FRACTION_MASK;
+        if (exponentBits === 0x7ff) {
+          throw new RangeError("유한한 f64 좌표값이 필요합니다.");
+        }
+        const unsignedSignificand = exponentBits === 0
+          ? fraction
+          : F64_HIDDEN_BIT | fraction;
+        const ratioSignificand = (ratioBits & F64_SIGN_BIT) === 0n
+          ? unsignedSignificand
+          : -unsignedSignificand;
+        const ratioExponent = exponentBits === 0
+          ? -1074
+          : exponentBits - 1023 - 52;
+        const productSignificand = scaleSignificand * ratioSignificand;
         if (productSignificand === 0n) {
           return addend;
         }
-        const productExponent = scaleExponent + ratioParts.exponent;
+        const productExponent = scaleExponent + ratioExponent;
         const commonExponent = Math.min(productExponent, addendExponent);
         const exact =
           (productSignificand << BigInt(productExponent - commonExponent)) +
@@ -4112,9 +4139,6 @@
           if (data.numeric_password_digits < 6) {
             data.numeric_password = data.numeric_password * 10 + (byte % 10);
             data.numeric_password_digits += 1;
-            if (isComplete(data)) {
-              return;
-            }
           }
           if (data.euro_main_next_idx < 5) {
             const updatedSeen = processLottoNumber(
@@ -4127,61 +4151,43 @@
             if (updatedSeen !== null) {
               data.seen_euro_millions_main = updatedSeen;
               data.euro_main_next_idx += 1;
-              if (isComplete(data)) {
-                return;
+            }
+          }
+          if (byte <= 224) {
+            if (data.lotto_next_idx < 6) {
+              const updatedSeen = processLottoNumber(
+                byte,
+                45,
+                data.lotto_numbers,
+                data.seen_lotto,
+                data.lotto_next_idx,
+              );
+              if (updatedSeen !== null) {
+                data.seen_lotto = updatedSeen;
+                data.lotto_next_idx += 1;
               }
             }
-          }
-          if (byte > 224) {
-            continue;
-          }
-          if (data.lotto_next_idx < 6) {
-            const updatedSeen = processLottoNumber(
-              byte,
-              45,
-              data.lotto_numbers,
-              data.seen_lotto,
-              data.lotto_next_idx,
-            );
-            if (updatedSeen !== null) {
-              data.seen_lotto = updatedSeen;
-              data.lotto_next_idx += 1;
-              if (isComplete(data)) {
-                return;
+            if (byte <= 221 && data.lotto7_next_idx < 7) {
+              const updatedSeen = processLottoNumber(
+                byte,
+                37,
+                data.lotto7_numbers,
+                data.seen_lotto7,
+                data.lotto7_next_idx,
+              );
+              if (updatedSeen !== null) {
+                data.seen_lotto7 = updatedSeen;
+                data.lotto7_next_idx += 1;
               }
             }
-          }
-          if (byte > 221) {
-            continue;
-          }
-          if (data.lotto7_next_idx < 7) {
-            const updatedSeen = processLottoNumber(
-              byte,
-              37,
-              data.lotto7_numbers,
-              data.seen_lotto7,
-              data.lotto7_next_idx,
-            );
-            if (updatedSeen !== null) {
-              data.seen_lotto7 = updatedSeen;
-              data.lotto7_next_idx += 1;
-              if (isComplete(data)) {
-                return;
-              }
+            if (byte <= 187 && data.password_len < 8) {
+              data.password[data.password_len] = String.fromCodePoint(
+                (byte % 94) + 33,
+              );
+              data.password_len += 1;
             }
           }
-          if (byte > 187) {
-            continue;
-          }
-          if (data.password_len < 8) {
-            data.password[data.password_len] = String.fromCodePoint(
-              (byte % 94) + 33,
-            );
-            data.password_len += 1;
-            if (isComplete(data)) {
-              return;
-            }
-          }
+          if (isComplete(data)) return;
         }
       }
       function extractValidBitsForNms(
@@ -4224,7 +4230,7 @@
       function generateRandomDataFromNum(num, nextSupp) {
         const data = createDataSet(num);
         fillDataFieldsFromU64(num, data);
-        const supplementalRef = {current: null};
+        const supplementalRef = { current: null };
         for (
           let attempt = 0;
           !isComplete(data) && attempt < SUPPLEMENTAL_RETRY_LIMIT;
@@ -4425,8 +4431,7 @@
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
       const RX_U64_TOKEN_SCAN = /[^\s,]+/gu;
       function* iterU64Tokens(raw) {
-        const text = String(raw ?? "");
-        for (const match of text.matchAll(RX_U64_TOKEN_SCAN)) {
+        for (const match of raw.matchAll(RX_U64_TOKEN_SCAN)) {
           yield match[0];
         }
       }
@@ -4483,7 +4488,7 @@
         const suppDialogError = document.getElementById("supp-dialog-error");
         const suppDialogCancel = document.getElementById("supp-dialog-cancel");
         const setManualOutputText = (text) =>
-          setScrollableText(outputContent, text);
+          outputContent.textContent = text;
         let supplementRequest = null;
         let supplementReturnFocus = null;
         function finishSupplementRequest(values) {
@@ -4502,7 +4507,7 @@
               ? active
               : runBtn;
           }
-          const {promise, resolve} = Promise.withResolvers();
+          const { promise, resolve } = Promise.withResolvers();
           supplementRequest = resolve;
           suppDialogContext.textContent =
             `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processedCount)}개`;
@@ -4538,7 +4543,7 @@
           } catch (err) {
             suppDialogValues.ariaInvalid = "true";
             suppDialogError.textContent = getErrorMessage(err);
-            suppDialogValues.focus({preventScroll: true});
+            suppDialogValues.focus({ preventScroll: true });
           }
         });
         suppDialogCancel.addEventListener(
@@ -4599,7 +4604,7 @@
                 supplementReplay.push(value);
               }
               supplementReplayIndex += 1;
-              return {value, bitsRemaining: 64};
+              return { value, bitsRemaining: 64 };
             };
             const updateManualProgress = (state) => {
               if (
@@ -4630,7 +4635,7 @@
               supplementReplay.length = 0;
               preloadedCount = 0;
               let generated;
-              for (;;) {
+              for (; ;) {
                 supplementReplayIndex = 0;
                 try {
                   generated = generateRandomDataFromNum(num, nextSupplement);
@@ -4698,7 +4703,7 @@
               if (
                 focusTarget?.isConnected &&
                 !focusTarget.matches(":disabled")
-              ) focusTarget.focus({preventScroll: true});
+              ) focusTarget.focus({ preventScroll: true });
             }
           }
         });
@@ -4762,7 +4767,7 @@
     document.querySelector(".manual-rng").addEventListener(
       "toggle",
       loadManualRng,
-      {once: true},
+      { once: true },
     );
   </script>
 </body>

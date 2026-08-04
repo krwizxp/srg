@@ -5,8 +5,6 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-#[cfg(target_arch = "x86_64")]
-use crate::{IS_TERMINAL, file_output::OutputFile};
 use std::io::{Result as IoResult, Write as IoWrite, stdout};
 #[cfg(target_arch = "x86_64")]
 pub(super) mod progress;
@@ -122,7 +120,7 @@ impl OutputFormatter<'_, '_, '_> {
                 index = index.checked_sub(1).ok_or_else(write_zero_err)?;
                 let oct_digit = low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK);
                 let slot = tmp.get_mut(index).ok_or_else(write_zero_err)?;
-                *slot = digit_byte(usize::from(oct_digit))?;
+                *slot = digit_byte(oct_digit);
                 octal_number >>= OCTAL_SHIFT_BITS;
             }
             buffer_cur.write_bytes(tmp.get(index..).ok_or_else(write_zero_err)?)
@@ -199,15 +197,17 @@ impl OutputFormatter<'_, '_, '_> {
             if data.numeric_password >= PASSWORD_FULL_WIDTH_THRESHOLD {
                 return buffer_cur.write_u32_dec(data.numeric_password);
             }
-            let hi = usize::from(low_u8_from_u32(
-                data.numeric_password.div_euclid(PASSWORD_HIGH_DIVISOR),
-            ));
-            let rem = usize::from(low_u16_from_u64(u64::from(
+            let hi = low_u8_from_u32(data.numeric_password.div_euclid(PASSWORD_HIGH_DIVISOR));
+            let rem = low_u16_from_u64(u64::from(
                 data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR),
-            )));
-            let [h0, h1] = two_digits(hi)?;
-            let [m0, m1] = two_digits(rem.div_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)))?;
-            let [l0, l1] = two_digits(rem.rem_euclid(usize::from(U8_THREE_DIGIT_THRESHOLD)))?;
+            ));
+            let [h0, h1] = two_digits(hi);
+            let [m0, m1] = two_digits(low_u8_from_u32(
+                u32::from(rem).div_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
+            ));
+            let [l0, l1] = two_digits(low_u8_from_u32(
+                u32::from(rem).rem_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
+            ));
             *buffer_cur.take_array::<PASSWORD_WIDTH>()? = [h0, h1, m0, m1, l0, l1];
             Ok(())
         })?;
@@ -253,24 +253,6 @@ pub(super) fn format_data_into_buffer(
     formatter.write_random_lines()?;
     formatter.write_nms_lines()?;
     Ok(cur.written_slice()?.len())
-}
-#[cfg(target_arch = "x86_64")]
-pub(super) fn persist_and_print_random_data(
-    output_file: &mut OutputFile,
-    data: &RandomDataSet,
-) -> Result<()> {
-    let mut buffer = [0_u8; BUFFER_SIZE];
-    let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
-    output_file
-        .writer()
-        .write_all(prefix_slice(&buffer, file_len)?)?;
-    let output_len = if *IS_TERMINAL {
-        format_data_into_buffer(data, &mut buffer, OutputTarget::Console)?
-    } else {
-        file_len
-    };
-    write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
-    Ok(())
 }
 fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
     value.checked_add(amount).ok_or_else(write_zero_err)
@@ -319,29 +301,29 @@ fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) -> IoResult<()> {
         1
     })?;
     if n >= U8_THREE_DIGIT_THRESHOLD {
-        let hundreds = usize::from(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
-        let rem = usize::from(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
+        let hundreds = n.div_euclid(U8_THREE_DIGIT_THRESHOLD);
+        let rem = n.rem_euclid(U8_THREE_DIGIT_THRESHOLD);
         let Some((digit_slot, remaining_tail)) = target.split_first_mut() else {
             return Err(write_zero_err());
         };
-        *digit_slot = digit_byte(hundreds)?;
+        *digit_slot = digit_byte(hundreds);
         let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        *remaining_digits = two_digits(rem)?;
+        *remaining_digits = two_digits(rem);
         return Ok(());
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {
         let Some(digits) = target.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
             return Err(write_zero_err());
         };
-        *digits = two_digits(usize::from(n))?;
+        *digits = two_digits(n);
         return Ok(());
     }
     let Some(slot) = target.first_mut() else {
         return Err(write_zero_err());
     };
-    *slot = digit_byte(usize::from(n))?;
+    *slot = digit_byte(n);
     Ok(())
 }
 fn buf_write_u8_array_spaced<const N: usize>(

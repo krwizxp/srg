@@ -16,10 +16,6 @@ cfg_select! {
         compile_error!("SRG native HTTP supports only Windows, Linux, and macOS.");
     }
 }
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-const AGE_HEADER_NAME: &[u8; 3] = b"age";
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-const DATE_HEADER_NAME: &[u8; 4] = b"date";
 #[derive(Default)]
 struct FreshTimeHeaders {
     age_result: Option<CoreResult<(), &'static str>>,

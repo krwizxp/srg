@@ -5,16 +5,10 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use std::{io::Write, is_x86_feature_detected, sync::LazyLock, thread::yield_now, time::Instant};
+use std::{io::Write, is_x86_feature_detected, thread::yield_now, time::Instant};
 const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
 const RDSEED_SPIN_BURST_RETRY_COUNT: u16 = 256;
 const RDSEED_TIMEOUT: Duration = Duration::from_mins(5);
-static INITIAL_RNG_SUPPORT: LazyLock<(bool, bool)> = LazyLock::new(|| {
-    (
-        is_x86_feature_detected!("rdseed"),
-        is_x86_feature_detected!("rdrand"),
-    )
-});
 pub(super) struct HardwareRng {
     fallback_notice_pending: AtomicBool,
     rdrand_supported: bool,
@@ -29,7 +23,8 @@ pub(super) enum HardwareRandomSource {
 }
 impl HardwareRng {
     pub(super) fn new() -> Self {
-        let &(rdseed_supported, rdrand_supported) = &*INITIAL_RNG_SUPPORT;
+        let rdseed_supported = is_x86_feature_detected!("rdseed");
+        let rdrand_supported = is_x86_feature_detected!("rdrand");
         Self {
             fallback_notice_pending: AtomicBool::new(false),
             rdrand_supported,

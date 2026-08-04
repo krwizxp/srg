@@ -3,10 +3,7 @@ use crate::{
     diagnostic::{AppError, Result},
     file_output::OutputFile,
     hardware_rng::HardwareRng,
-    output::{
-        self, OutputTarget, format_data_into_buffer, persist_and_print_random_data,
-        write_slice_to_console,
-    },
+    output::{self, OutputTarget, format_data_into_buffer, write_slice_to_console},
     random_data::generate_random_data_with_rng,
     stop_input::StopInput,
 };
@@ -108,7 +105,7 @@ pub(super) fn regenerate_with_count(
     }
     if requested_count == 1 {
         let final_data = generate_random_data_with_rng(rng)?;
-        persist_and_print_random_data(output_file, &final_data)?;
+        output_file.persist_and_print(&final_data)?;
         return Ok(Some(final_data.num_64));
     }
     let start_time = Instant::now();

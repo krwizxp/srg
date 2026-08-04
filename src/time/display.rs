@@ -22,22 +22,17 @@ const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 impl ByteCursor<'_> {
     fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
-        let idx = usize::from(low_u8_from_u32(value));
-        *self.take_array::<2>()? = two_digits(idx)?;
+        *self.take_array::<2>()? = two_digits(low_u8_from_u32(value));
         Ok(())
     }
     fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
         if year >= 0_i32 {
             let year_value = year.cast_unsigned();
             if year_value < U32_FOUR_DIGIT_THRESHOLD {
-                let hi = usize::from(low_u8_from_u32(
-                    year_value.div_euclid(U32_THREE_DIGIT_THRESHOLD),
-                ));
-                let lo = usize::from(low_u8_from_u32(
-                    year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
-                ));
-                let [h0, h1] = two_digits(hi)?;
-                let [l0, l1] = two_digits(lo)?;
+                let hi = low_u8_from_u32(year_value.div_euclid(U32_THREE_DIGIT_THRESHOLD));
+                let lo = low_u8_from_u32(year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
+                let [h0, h1] = two_digits(hi);
+                let [l0, l1] = two_digits(lo);
                 *self.take_array::<4>()? = [h0, h1, l0, l1];
                 return Ok(());
             }
@@ -46,10 +41,10 @@ impl ByteCursor<'_> {
         self.write_byte(b'-')?;
         let abs = year.unsigned_abs();
         if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
-            let hundreds = usize::from(low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let rem = usize::from(low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-            let [tens, ones] = two_digits(rem)?;
-            *self.take_array::<3>()? = [digit_byte(hundreds)?, tens, ones];
+            let hundreds = low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD));
+            let rem = low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
+            let [tens, ones] = two_digits(rem);
+            *self.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
             return Ok(());
         }
         self.write_u32_dec(abs)
@@ -128,14 +123,10 @@ impl ServerTime {
         cur.write_byte(b':')?;
         cur.write_u32_2digits(second)?;
         cur.write_byte(b'.')?;
-        let hundreds = usize::from(low_u8_from_u32(
-            millis.div_euclid(U32_THREE_DIGIT_THRESHOLD),
-        ));
-        let rem = usize::from(low_u8_from_u32(
-            millis.rem_euclid(U32_THREE_DIGIT_THRESHOLD),
-        ));
-        let [tens, ones] = two_digits(rem)?;
-        *cur.take_array::<3>()? = [digit_byte(hundreds)?, tens, ones];
+        let hundreds = low_u8_from_u32(millis.div_euclid(U32_THREE_DIGIT_THRESHOLD));
+        let rem = low_u8_from_u32(millis.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
+        let [tens, ones] = two_digits(rem);
+        *cur.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
         Ok(())
     }
 }

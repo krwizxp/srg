@@ -5,7 +5,6 @@ const TWO_DIGIT_WIDTH: usize = 2;
 const U64_DEC_BUF_LEN: usize = 20;
 const U64_THREE_DIGIT_THRESHOLD: u64 = 100;
 const U64_TWO_DIGIT_THRESHOLD: u64 = 10;
-const DIGITS: [u8; 10] = *b"0123456789";
 pub(super) struct ByteCursor<'buffer> {
     buf: &'buffer mut [u8],
     pos: usize,
@@ -44,8 +43,7 @@ impl<'buffer> ByteCursor<'buffer> {
         let mut buffer = [0_u8; U64_DEC_BUF_LEN];
         let mut index = buffer.len();
         while value >= U64_THREE_DIGIT_THRESHOLD {
-            let remainder =
-                usize::from(low_u8_from_u64(value.rem_euclid(U64_THREE_DIGIT_THRESHOLD)));
+            let remainder = low_u8_from_u64(value.rem_euclid(U64_THREE_DIGIT_THRESHOLD));
             value = value.div_euclid(U64_THREE_DIGIT_THRESHOLD);
             index = index
                 .checked_sub(TWO_DIGIT_WIDTH)
@@ -54,7 +52,7 @@ impl<'buffer> ByteCursor<'buffer> {
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
                 .ok_or_else(write_zero_err)?;
-            *digits = two_digits(remainder)?;
+            *digits = two_digits(remainder);
         }
         if value >= U64_TWO_DIGIT_THRESHOLD {
             index = index
@@ -64,11 +62,11 @@ impl<'buffer> ByteCursor<'buffer> {
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
                 .ok_or_else(write_zero_err)?;
-            *digits = two_digits(usize::from(low_u8_from_u64(value)))?;
+            *digits = two_digits(low_u8_from_u64(value));
         } else {
             index = index.checked_sub(1).ok_or_else(write_zero_err)?;
             let slot = buffer.get_mut(index).ok_or_else(write_zero_err)?;
-            *slot = digit_byte(usize::from(low_u8_from_u64(value)))?;
+            *slot = digit_byte(low_u8_from_u64(value));
         }
         self.write_bytes(buffer.get(index..).ok_or_else(write_zero_err)?)
     }
@@ -85,14 +83,14 @@ impl fmt::Write for ByteCursor<'_> {
         }
     }
 }
-pub(super) fn two_digits(value: usize) -> io::Result<[u8; 2]> {
-    Ok([
-        digit_byte(value.div_euclid(10))?,
-        digit_byte(value.rem_euclid(10))?,
-    ])
+pub(super) const fn two_digits(value: u8) -> [u8; 2] {
+    [
+        digit_byte(value.div_euclid(10)),
+        digit_byte(value.rem_euclid(10)),
+    ]
 }
-pub(super) fn digit_byte(index: usize) -> io::Result<u8> {
-    DIGITS.get(index).copied().ok_or_else(write_zero_err)
+pub(super) const fn digit_byte(value: u8) -> u8 {
+    b'0'.strict_add(value)
 }
 #[inline(never)]
 #[cold]

@@ -6,25 +6,14 @@ use crate::{
     random_data::RandomDataSet,
     time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
 };
-cfg_select! {
-    target_arch = "x86_64" => {
-        use crate::{
-            batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
-            hardware_rng::{HardwareRandomSource, HardwareRng},
-            input::{LadderEntryMode, read_ladder_entries},
-            ladder::write_ladder_results,
-            random_number::generate_random_number,
-            output::persist_and_print_random_data,
-        };
-        use crate::random_number::RandomNumberMode;
-    }
-    _ => {
-        use crate::{
-            BUFFER_SIZE, IS_TERMINAL,
-            output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
-        };
-    }
-}
+#[cfg(target_arch = "x86_64")]
+use crate::{
+    batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
+    hardware_rng::{HardwareRandomSource, HardwareRng},
+    input::{LadderEntryMode, read_ladder_entries},
+    ladder::write_ladder_results,
+    random_number::{RandomNumberMode, generate_random_number},
+};
 use alloc::borrow::Cow;
 use core::result::Result as CoreResult;
 use std::io::{self, Write, stderr, stdout};
@@ -195,7 +184,7 @@ impl MenuApp {
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
             supp_input_count = supp_input_count.strict_add(1);
-            let supp = read_u64_hex_input(
+            read_u64_hex_input(
                 format_args!(
                     concat!(
                         "supp 값 #{} 입력 ({}, 최소값 예: 0 또는 0x0, ",
@@ -209,31 +198,14 @@ impl MenuApp {
                 &mut self.input_buffer,
                 out,
                 err,
-            )?;
-            Ok(supp)
+            )
         };
         let data = RandomDataSet {
             num_64: manual_num_64,
             ..Default::default()
         }
         .populate(&mut next_supp)?;
-        cfg_select! {
-            target_arch = "x86_64" => {
-                persist_and_print_random_data(&mut self.output_file, &data)
-            }
-            _ => {
-                let mut buffer = [0_u8; BUFFER_SIZE];
-                let file_len = format_data_into_buffer(&data, &mut buffer, OutputTarget::File)?;
-                self.output_file.writer().write_all(prefix_slice(&buffer, file_len)?)?;
-                let output_len = if *IS_TERMINAL {
-                    format_data_into_buffer(&data, &mut buffer, OutputTarget::Console)?
-                } else {
-                    file_len
-                };
-                write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
-                Ok(())
-            }
-        }
+        self.output_file.persist_and_print(&data)
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_random_number_command(

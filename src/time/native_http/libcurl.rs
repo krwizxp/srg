@@ -28,6 +28,7 @@ macro_rules! curl_setopt {
         }
     }};
 }
+const AGE_HEADER_NAME: &[u8; 3] = b"age";
 const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
 const CURL_GLOBAL_DEFAULT: c_long = 3;
@@ -51,6 +52,7 @@ const CURLOPT_WRITEDATA: CurlOption = 10_001;
 const CURLOPT_WRITEFUNCTION: CurlOption = 20_011;
 const CURL_SSLVERSION_MAX_DEFAULT: c_long = 1 << 16;
 const CURL_SSLVERSION_TLSV1_2: c_long = 6;
+const DATE_HEADER_NAME: &[u8; 4] = b"date";
 const CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX: &str =
     "은 HTTP protocol 제한 최신 API를 지원하지 않습니다. libcurl 7.85.0 이상이 필요합니다.";
 const HTTP_PROTOCOL: &CStr = c"http";
@@ -374,11 +376,9 @@ impl CurlHeaderCapture<'_> {
             return false;
         };
         if self.pending_line.capacity() < pending_capacity
-            && let Err(source) = self.pending_line.try_reserve(bytes.len())
+            && self.pending_line.try_reserve(bytes.len()).is_err()
         {
-            self.error = Some(Cow::Owned(format!(
-                "HTTP HEAD 응답 헤더 메모리 확보 실패: {source}"
-            )));
+            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 메모리 확보 실패"));
             return false;
         }
         for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
@@ -418,8 +418,8 @@ impl CurlHeaderCapture<'_> {
             return true;
         };
         let is_age_header = match name.len() {
-            3 if name.eq_ignore_ascii_case(super::AGE_HEADER_NAME) => true,
-            4 if name.eq_ignore_ascii_case(super::DATE_HEADER_NAME) => false,
+            3 if name.eq_ignore_ascii_case(AGE_HEADER_NAME) => true,
+            4 if name.eq_ignore_ascii_case(DATE_HEADER_NAME) => false,
             _ => return true,
         };
         let Some((_, value_bytes)) = value_with_colon.split_first() else {

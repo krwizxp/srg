@@ -5,7 +5,6 @@ use self::{file_output::OutputFile, menu_app::MenuApp};
 #[cfg(target_arch = "x86_64")]
 use self::{
     hardware_rng::{HardwareRandomSource, HardwareRng},
-    output::persist_and_print_random_data,
     random_data::generate_random_data_with_rng,
 };
 use core::fmt;
@@ -109,7 +108,7 @@ fn main() -> Result<()> {
                     let data = generate_random_data_with_rng(&rng)?;
                     rng.write_rdseed_fallback_notice(&mut stderr().lock())?;
                     let num_64 = data.num_64;
-                    persist_and_print_random_data(&mut output_file, &data)?;
+                    output_file.persist_and_print(&data)?;
                     num_64
                 }
                 HardwareRandomSource::None => {

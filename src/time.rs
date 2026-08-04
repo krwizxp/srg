@@ -30,18 +30,23 @@ use std::{
 mod address;
 mod display;
 mod http_date;
-#[cfg(target_os = "macos")]
-mod macos_input;
 mod native_http;
-#[cfg(target_os = "windows")]
-mod timer_resolution;
 mod util;
-#[cfg(target_os = "linux")]
-mod wayland_input;
-#[cfg(target_os = "windows")]
-mod windows_input;
-#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-compile_error!("SRG native input supports only Windows, Linux, and macOS.");
+cfg_select! {
+    target_os = "windows" => {
+        mod timer_resolution;
+        mod windows_input;
+    }
+    target_os = "linux" => {
+        mod wayland_input;
+    }
+    target_os = "macos" => {
+        mod macos_input;
+    }
+    _ => {
+        compile_error!("SRG native input supports only Windows, Linux, and macOS.");
+    }
+}
 const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const PASSIVE_POLL_INTERVAL: Duration = Duration::from_millis(45);
@@ -70,11 +75,16 @@ const FINAL_COUNTDOWN_SAMPLE_ERROR_MESSAGE_INTERVAL: Duration = Duration::from_s
 const FINAL_COUNTDOWN_SAMPLE_FAST_INTERVAL: Duration = Duration::from_millis(50);
 const FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL: Duration = Duration::from_millis(25);
 const FINAL_COUNTDOWN_SAMPLE_NORMAL_INTERVAL: Duration = Duration::from_millis(200);
-const FINAL_COUNTDOWN_SAMPLE_WARMUP_INTERVAL: Duration = Duration::from_millis(500);
 const FINAL_COUNTDOWN_SLEEP_MARGIN: Duration = Duration::from_millis(2);
-const FINAL_COUNTDOWN_WARMUP_WINDOW: Duration = Duration::from_mins(1);
+const FINAL_COUNTDOWN_FULL_SYNC_PROTECTION_WINDOW: Duration = Duration::from_mins(1);
 const FINAL_COUNTDOWN_WINDOW: Duration = Duration::from_secs(10);
 const HALF_RTT_DIVISOR: u32 = 2;
+const HTTP_DATE_RESOLUTION: Duration = Duration::from_secs(1);
+const HTTP_MAX_ONE_WAY_DELAY: Duration = Duration::from_millis(500);
+const MAX_FINAL_SAMPLE_RTT: Duration = Duration::from_secs(2);
+const HTTP_MAX_TOTAL_DEADLINE_SHIFT: Duration = Duration::from_secs(2);
+const HTTP_SAMPLE_FRESHNESS: Duration = Duration::from_secs(2);
+const MAX_ACTION_LATENESS: Duration = Duration::from_secs(1);
 const MESSAGE_BUFFER_CAPACITY: usize = 256;
 const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
@@ -188,17 +198,19 @@ struct FinalCountdownState {
     action: TriggerAction,
     last_sample_error_message_at: Option<Instant>,
     live_rtt: Duration,
+    next_sample_at: Instant,
+    pending_sample_generation: Option<u64>,
+    sample_interval: Duration,
     server_time: ServerTime,
     target_time: SystemTime,
-}
-struct FinalSamplingState {
-    interval: Duration,
-    next_sample_at: Instant,
-    pending_generation: Option<u64>,
+    timing_policy: TriggerTimingPolicy,
 }
 #[derive(Clone, Copy)]
 enum ScheduledTarget {
-    Confirmed(SystemTime),
+    Confirmed {
+        target_time: SystemTime,
+        timing_policy: TriggerTimingPolicy,
+    },
     Pending(TargetTimeOfDay),
 }
 struct ScheduledTrigger {
@@ -210,6 +222,17 @@ struct ConfirmedTrigger {
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     action: TriggerAction,
     target_time: SystemTime,
+    timing_policy: TriggerTimingPolicy,
+}
+#[derive(Clone, Copy)]
+enum TriggerTimingPolicy {
+    AuthenticatedHttps,
+    UnauthenticatedHttp(HttpActionGuard),
+}
+#[derive(Clone, Copy)]
+struct HttpActionGuard {
+    last_valid_sample_at: Option<Instant>,
+    reference_server_deadline: Instant,
 }
 #[derive(Clone, Copy)]
 struct ServerTime {
@@ -312,6 +335,84 @@ impl TargetTimeOfDay {
             ),
         );
         Ok(target_system_time)
+    }
+}
+impl TriggerTimingPolicy {
+    fn accept_sample(
+        &mut self,
+        sample: TimeSample,
+        effective_rtt: Duration,
+        server_time: ServerTime,
+    ) -> Result<()> {
+        if sample.rtt == Duration::ZERO || sample.rtt > MAX_FINAL_SAMPLE_RTT {
+            return Err(TimeError::parse(
+                "최종 샘플 RTT가 허용 범위를 벗어났습니다.",
+            ));
+        }
+        if effective_rtt == Duration::ZERO || effective_rtt > MAX_FINAL_SAMPLE_RTT {
+            return Err(TimeError::parse(
+                "액션에 사용하는 RTT가 허용 범위를 벗어났습니다.",
+            ));
+        }
+        let &mut Self::UnauthenticatedHttp(ref mut guard) = self else {
+            return Ok(());
+        };
+        let expected_sample_time =
+            server_time.current_server_time_at(sample.response_received_inst)?;
+        let clock_offset = match sample.server_time.duration_since(expected_sample_time) {
+            Ok(offset) => offset,
+            Err(source) => source.duration(),
+        };
+        if clock_offset.saturating_sub(sample.rtt) > HTTP_DATE_RESOLUTION {
+            return Err(TimeError::parse(
+                "HTTP 최종 샘플 서버 시각이 기준 시각과 일치하지 않습니다.",
+            ));
+        }
+        guard.last_valid_sample_at = Some(sample.response_received_inst);
+        Ok(())
+    }
+    fn one_way_delay(self, rtt: Duration) -> Duration {
+        let delay = effective_one_way_delay(rtt);
+        match self {
+            Self::AuthenticatedHttps => delay,
+            Self::UnauthenticatedHttp(_) => delay.min(HTTP_MAX_ONE_WAY_DELAY),
+        }
+    }
+    fn validate_action(self, now: Instant) -> Result<()> {
+        let Self::UnauthenticatedHttp(guard) = self else {
+            return Ok(());
+        };
+        let last_sample_at = guard
+            .last_valid_sample_at
+            .ok_or_else(|| TimeError::parse("HTTP 최신 유효 샘플이 없습니다."))?;
+        let sample_age = now
+            .checked_duration_since(last_sample_at)
+            .ok_or_else(|| TimeError::parse("HTTP 샘플 단조 시각 순서가 유효하지 않습니다."))?;
+        if sample_age > HTTP_SAMPLE_FRESHNESS {
+            return Err(TimeError::parse("HTTP 최신 샘플이 만료되었습니다."));
+        }
+        Ok(())
+    }
+    fn validate_server_deadline(
+        self,
+        server_time: ServerTime,
+        target_time: SystemTime,
+    ) -> Result<()> {
+        let Self::UnauthenticatedHttp(guard) = self else {
+            return Ok(());
+        };
+        let deadline = strict_server_deadline(server_time, target_time)?;
+        let shift = if deadline >= guard.reference_server_deadline {
+            deadline.duration_since(guard.reference_server_deadline)
+        } else {
+            guard.reference_server_deadline.duration_since(deadline)
+        };
+        if shift > HTTP_MAX_TOTAL_DEADLINE_SHIFT {
+            return Err(TimeError::parse(
+                "HTTP 서버 deadline 누적 이동량이 허용 범위를 초과했습니다.",
+            ));
+        }
+        Ok(())
     }
 }
 impl FromStr for TargetTimeOfDay {
@@ -484,7 +585,6 @@ impl SampleWorker {
     }
 }
 struct AppState<'worker> {
-    final_sampling: Option<FinalSamplingState>,
     #[cfg(target_os = "windows")]
     high_res_timer_attempted: bool,
     #[cfg(target_os = "windows")]
@@ -525,6 +625,15 @@ impl ServerTimeSession {
                     action,
                     target: ScheduledTarget::Pending(target_time),
                 });
+        if scheduled_trigger.is_some() && matches!(sample_worker.host.scheme, UrlScheme::Http) {
+            err.write_all(
+                concat!(
+                    "[경고] HTTP 서버 시간은 네트워크에서 위조될 수 있습니다.\n",
+                    "이상 보정, 과도한 지연 또는 최신 샘플 부재가 감지되면 예약 액션을 자동 취소합니다.\n"
+                )
+                .as_bytes(),
+            )?;
+        }
         #[cfg(target_os = "macos")]
         if scheduled_trigger.is_some() && !macos_input::post_event_access_granted(true) {
             writeln!(err, "[경고] macOS 입력 제어 권한이 허용되지 않았습니다.")?;
@@ -539,7 +648,6 @@ impl ServerTimeSession {
             out.write_all("\n서버 시간 확인을 시작합니다… (Enter를 누르면 종료)\n".as_bytes())?;
         }
         let mut app_state = AppState {
-            final_sampling: None,
             #[cfg(target_os = "windows")]
             high_res_timer_attempted: false,
             #[cfg(target_os = "windows")]
@@ -582,39 +690,40 @@ impl AppState<'_> {
             baseline_rtt: calibration.baseline_rtt,
         }))
     }
-    fn begin_final_countdown_sampling(
+    fn cancel_final_countdown(
+        server_time: ServerTime,
+        msg_buf: &mut String,
+        reason: impl fmt::Display,
+    ) -> ActivityTransition<'_> {
+        append_error_detail(msg_buf, "[경고] 예약 액션 취소: ", reason);
+        ActivityTransition::message(Activity::Predicting { server_time }, msg_buf)
+    }
+    fn fetch_final_countdown_sample(
         &mut self,
+        countdown: &mut FinalCountdownState,
         interval: Duration,
         now: Instant,
     ) -> Result<Option<Result<TimeSample>>> {
         let next_sample_at = now
             .checked_add(interval)
             .ok_or_else(|| TimeError::parse("카운트다운 다음 샘플 시각 계산 실패"))?;
-        let sampling = self.final_sampling.get_or_insert(FinalSamplingState {
-            interval,
-            next_sample_at: now,
-            pending_generation: None,
-        });
-        if sampling.interval != interval {
-            sampling.interval = interval;
-            if sampling.pending_generation.is_none() {
-                sampling.next_sample_at = next_sample_at;
+        if countdown.sample_interval != interval {
+            countdown.sample_interval = interval;
+            if countdown.pending_sample_generation.is_none() {
+                countdown.next_sample_at = next_sample_at;
             }
         }
         let latest_sample = self
             .sample_worker
-            .poll_fetch(&mut sampling.pending_generation)?;
+            .poll_fetch(&mut countdown.pending_sample_generation)?;
         if latest_sample.is_some() {
-            sampling.next_sample_at = next_sample_at;
+            countdown.next_sample_at = next_sample_at;
         }
-        if sampling.pending_generation.is_none() && now >= sampling.next_sample_at {
+        if countdown.pending_sample_generation.is_none() && now >= countdown.next_sample_at {
             self.sample_worker
-                .ensure_fetch(&mut sampling.pending_generation)?;
+                .ensure_fetch(&mut countdown.pending_sample_generation)?;
         }
         Ok(latest_sample)
-    }
-    const fn end_final_countdown_sampling(&mut self) {
-        self.final_sampling = None;
     }
     fn handle_calibrate_on_tick<'message>(
         &mut self,
@@ -657,22 +766,77 @@ impl AppState<'_> {
                     }
                 };
             if let Some(server_time) = accepted_server_time {
-                if let Some(schedule) = self.scheduled_trigger.as_mut()
-                    && let ScheduledTarget::Pending(target_time) = schedule.target
+                if let Some(scheduled_target) = self
+                    .scheduled_trigger
+                    .as_ref()
+                    .map(|schedule| schedule.target)
                 {
-                    msg_buf.push_str("[성공] 정밀 보정 완료!");
-                    let resolved_target =
-                        match target_time.resolve(server_time, completed_at, msg_buf) {
-                            Ok(target) => target,
-                            Err(target_err) => {
-                                append_error_detail(msg_buf, "\n목표 시각 확정 실패: ", target_err);
-                                return transition_to_retry(msg_buf, true);
+                    let pending = matches!(scheduled_target, ScheduledTarget::Pending(_));
+                    let updated = match scheduled_target {
+                        ScheduledTarget::Pending(target_time) => {
+                            msg_buf.push_str("[성공] 정밀 보정 완료!");
+                            let resolved_target =
+                                match target_time.resolve(server_time, completed_at, msg_buf) {
+                                    Ok(resolved) => resolved,
+                                    Err(target_err) => {
+                                        append_error_detail(
+                                            msg_buf,
+                                            "\n목표 시각 확정 실패: ",
+                                            target_err,
+                                        );
+                                        return transition_to_retry(msg_buf, true);
+                                    }
+                                };
+                            match self.sample_worker.host.scheme {
+                                UrlScheme::Https => Ok(TriggerTimingPolicy::AuthenticatedHttps),
+                                UrlScheme::Http => strict_server_deadline(
+                                    server_time,
+                                    resolved_target,
+                                )
+                                .map(|deadline| {
+                                    TriggerTimingPolicy::UnauthenticatedHttp(HttpActionGuard {
+                                        last_valid_sample_at: None,
+                                        reference_server_deadline: deadline,
+                                    })
+                                }),
                             }
-                        };
-                    schedule.target = ScheduledTarget::Confirmed(resolved_target);
+                            .map(|timing_policy| {
+                                ScheduledTarget::Confirmed {
+                                    target_time: resolved_target,
+                                    timing_policy,
+                                }
+                            })
+                        }
+                        ScheduledTarget::Confirmed {
+                            target_time,
+                            timing_policy,
+                        } => timing_policy
+                            .validate_server_deadline(server_time, target_time)
+                            .map(|()| ScheduledTarget::Confirmed {
+                                target_time,
+                                timing_policy,
+                            }),
+                    };
+                    let message = match updated {
+                        Ok(updated_target) => {
+                            if let Some(schedule) = self.scheduled_trigger.as_mut() {
+                                schedule.target = updated_target;
+                            }
+                            if pending {
+                                msg_buf.as_str()
+                            } else {
+                                "[성공] 정밀 보정 완료!"
+                            }
+                        }
+                        Err(reason) => {
+                            self.scheduled_trigger = None;
+                            append_error_detail(msg_buf, "\n[경고] HTTP 예약 액션 취소: ", reason);
+                            msg_buf.as_str()
+                        }
+                    };
                     return ActivityTransition::message(
                         Activity::Predicting { server_time },
-                        msg_buf,
+                        message,
                     );
                 }
                 return ActivityTransition::message(
@@ -702,43 +866,101 @@ impl AppState<'_> {
         let target_time = countdown.target_time;
         let current_server_time = match server_time.current_server_time_at(now) {
             Ok(current) => current,
-            Err(time_err) => {
-                append_error_detail(msg_buf, "현재 서버 시간 계산 실패: ", time_err);
-                return transition_to_retry(msg_buf, true);
-            }
+            Err(time_err) => return Self::cancel_final_countdown(server_time, msg_buf, time_err),
         };
-        let sample_interval = target_time.duration_since(current_server_time).map_or(
-            FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL,
-            final_countdown_sample_interval,
-        );
-        let sample_error_reported = match self.begin_final_countdown_sampling(sample_interval, now)
-        {
-            Ok(Some(Ok(sample))) => {
-                return self.handle_final_countdown_sample(countdown, msg_buf, sample, runtime);
-            }
-            Ok(Some(Err(fetch_err))) => append_final_countdown_sample_error(
-                &mut countdown.last_sample_error_message_at,
-                now,
-                msg_buf,
-                fetch_err,
-            ),
-            Err(sampling_err) => append_final_countdown_sample_error(
-                &mut countdown.last_sample_error_message_at,
-                now,
-                msg_buf,
-                sampling_err,
-            ),
-            Ok(None) => false,
-        };
-        let estimated_one_way_delay = effective_one_way_delay(countdown.live_rtt);
-        let Some(trigger_instant) =
-            trigger_instant_for_target(server_time, target_time, estimated_one_way_delay, now)
-        else {
-            msg_buf.push_str("카운트다운 실행 시각 계산 실패");
-            return ActivityTransition::message(Activity::FinalCountdown(countdown), msg_buf);
-        };
+        let sample_interval =
+            final_countdown_sample_interval(target_time.duration_since(current_server_time).ok());
+        let sample_error_reported =
+            match self.fetch_final_countdown_sample(&mut countdown, sample_interval, now) {
+                Ok(Some(Ok(sample))) => {
+                    let sample_rtt = sample.rtt;
+                    let calibrated_server_time = ServerTime {
+                        anchor_time: countdown.server_time.anchor_time,
+                        anchor_instant: countdown.server_time.anchor_instant,
+                        baseline_rtt: blend_rtt::<3>(
+                            countdown.server_time.baseline_rtt,
+                            sample_rtt,
+                        ),
+                    };
+                    let sample_now = Instant::now();
+                    let live_rtt = blend_rtt::<7>(countdown.live_rtt, sample_rtt);
+                    let effective_rtt = live_rtt.max(sample_rtt);
+                    if let Err(policy_err) = countdown.timing_policy.accept_sample(
+                        sample,
+                        effective_rtt,
+                        calibrated_server_time,
+                    ) {
+                        return Self::cancel_final_countdown(
+                            calibrated_server_time,
+                            msg_buf,
+                            policy_err,
+                        );
+                    }
+                    countdown.live_rtt = live_rtt;
+                    countdown.server_time = calibrated_server_time;
+                    let one_way_delay = countdown.timing_policy.one_way_delay(effective_rtt);
+                    let trigger_instant = match trigger_instant_for_target(
+                        calibrated_server_time,
+                        countdown.target_time,
+                        one_way_delay,
+                    ) {
+                        Ok(trigger) => trigger,
+                        Err(time_err) => {
+                            return Self::cancel_final_countdown(
+                                calibrated_server_time,
+                                msg_buf,
+                                time_err,
+                            );
+                        }
+                    };
+                    if trigger_instant.saturating_duration_since(sample_now)
+                        <= FINAL_COUNTDOWN_FREEZE_WINDOW
+                    {
+                        return Self::trigger_final_countdown_deadline(
+                            #[cfg(target_os = "windows")]
+                            self.high_res_timer_guard.as_ref(),
+                            countdown,
+                            one_way_delay,
+                            CountdownTriggerSource::Sampled { rtt: sample_rtt },
+                            trigger_instant,
+                            msg_buf,
+                            runtime,
+                        );
+                    }
+                    return ActivityTransition::stay(Activity::FinalCountdown(countdown));
+                }
+                Ok(Some(Err(fetch_err))) | Err(fetch_err) => {
+                    if matches!(
+                        countdown.timing_policy,
+                        TriggerTimingPolicy::UnauthenticatedHttp(_)
+                    ) {
+                        return Self::cancel_final_countdown(server_time, msg_buf, fetch_err);
+                    }
+                    if countdown.last_sample_error_message_at.is_some_and(|last| {
+                        now.saturating_duration_since(last)
+                            < FINAL_COUNTDOWN_SAMPLE_ERROR_MESSAGE_INTERVAL
+                    }) {
+                        false
+                    } else {
+                        countdown.last_sample_error_message_at = Some(now);
+                        append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", fetch_err);
+                        true
+                    }
+                }
+                Ok(None) => false,
+            };
+        let estimated_one_way_delay = countdown.timing_policy.one_way_delay(countdown.live_rtt);
+        let trigger_instant =
+            match trigger_instant_for_target(server_time, target_time, estimated_one_way_delay) {
+                Ok(trigger) => trigger,
+                Err(time_err) => {
+                    return Self::cancel_final_countdown(server_time, msg_buf, time_err);
+                }
+            };
         if trigger_instant.saturating_duration_since(now) <= FINAL_COUNTDOWN_FREEZE_WINDOW {
-            return self.trigger_final_countdown_deadline(
+            return Self::trigger_final_countdown_deadline(
+                #[cfg(target_os = "windows")]
+                self.high_res_timer_guard.as_ref(),
                 countdown,
                 estimated_one_way_delay,
                 CountdownTriggerSource::Estimated,
@@ -749,46 +971,6 @@ impl AppState<'_> {
         }
         if sample_error_reported {
             return ActivityTransition::message(Activity::FinalCountdown(countdown), msg_buf);
-        }
-        ActivityTransition::stay(Activity::FinalCountdown(countdown))
-    }
-    fn handle_final_countdown_sample<'message>(
-        &mut self,
-        mut countdown: FinalCountdownState,
-        msg_buf: &'message mut String,
-        sample: TimeSample,
-        runtime: &mut LoopRuntime<'_>,
-    ) -> ActivityTransition<'message> {
-        let sample_rtt = sample.rtt;
-        let calibrated_server_time = ServerTime {
-            anchor_time: countdown.server_time.anchor_time,
-            anchor_instant: countdown.server_time.anchor_instant,
-            baseline_rtt: blend_rtt::<3>(countdown.server_time.baseline_rtt, sample_rtt),
-        };
-        let sample_now = Instant::now();
-        let live_rtt = blend_rtt::<7>(countdown.live_rtt, sample_rtt);
-        countdown.live_rtt = live_rtt;
-        countdown.server_time = calibrated_server_time;
-        let effective_rtt = live_rtt.max(sample_rtt);
-        let one_way_delay = effective_one_way_delay(effective_rtt);
-        let Some(trigger_instant) = trigger_instant_for_target(
-            calibrated_server_time,
-            countdown.target_time,
-            one_way_delay,
-            sample_now,
-        ) else {
-            msg_buf.push_str("카운트다운 실행 시각 계산 실패");
-            return ActivityTransition::message(Activity::FinalCountdown(countdown), msg_buf);
-        };
-        if trigger_instant.saturating_duration_since(sample_now) <= FINAL_COUNTDOWN_FREEZE_WINDOW {
-            return self.trigger_final_countdown_deadline(
-                countdown,
-                one_way_delay,
-                CountdownTriggerSource::Sampled { rtt: sample_rtt },
-                trigger_instant,
-                msg_buf,
-                runtime,
-            );
         }
         ActivityTransition::stay(Activity::FinalCountdown(countdown))
     }
@@ -905,60 +1087,48 @@ impl AppState<'_> {
             msg_buf,
         )
     }
-    fn handle_predicting<'message>(
+    fn handle_predicting(
         &mut self,
         server_time: ServerTime,
         confirmed_trigger: Option<ConfirmedTrigger>,
         now: Instant,
-        msg_buf: &'message mut String,
-    ) -> Result<ActivityTransition<'message>> {
+    ) -> Result<ActivityTransition<'static>> {
         let estimated_server_time = server_time.current_server_time_at(now)?;
-        if let Some(trigger) = confirmed_trigger.filter(|trigger| {
-            trigger
-                .target_time
-                .duration_since(estimated_server_time)
-                .ok()
-                .is_none_or(|remaining| remaining <= FINAL_COUNTDOWN_WINDOW)
-        }) {
-            self.scheduled_trigger = None;
-            return Ok(ActivityTransition::message(
-                Activity::FinalCountdown(FinalCountdownState {
-                    #[cfg(any(target_os = "windows", target_os = "macos"))]
-                    action: trigger.action,
-                    last_sample_error_message_at: None,
-                    live_rtt: server_time.baseline_rtt,
-                    server_time,
-                    target_time: trigger.target_time,
-                }),
-                "최종 카운트다운 시작!",
-            ));
-        }
-        let target_remaining = confirmed_trigger.and_then(|trigger| {
-            trigger
-                .target_time
-                .duration_since(estimated_server_time)
-                .ok()
-        });
-        let protect_target =
-            target_remaining.is_some_and(|remaining| remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW);
-        let sampling_error = target_remaining
-            .filter(|remaining| *remaining <= FINAL_COUNTDOWN_WARMUP_WINDOW)
-            .and_then(|remaining| {
-                self.begin_final_countdown_sampling(final_countdown_sample_interval(remaining), now)
-                    .err()
-            });
-        if let Some(start_err) = sampling_error {
-            self.end_final_countdown_sampling();
-            append_error_detail(msg_buf, "카운트다운 샘플러 시작 실패: ", start_err);
-            return Ok(ActivityTransition::message(
-                Activity::Predicting { server_time },
-                msg_buf,
-            ));
-        }
+        let protect_target = match confirmed_trigger {
+            Some(trigger) => {
+                let remaining = trigger
+                    .target_time
+                    .duration_since(estimated_server_time)
+                    .ok();
+                match remaining {
+                    Some(duration) if duration > FINAL_COUNTDOWN_WINDOW => {
+                        duration <= FINAL_COUNTDOWN_FULL_SYNC_PROTECTION_WINDOW
+                    }
+                    _ => {
+                        self.scheduled_trigger = None;
+                        return Ok(ActivityTransition::message(
+                            Activity::FinalCountdown(FinalCountdownState {
+                                #[cfg(any(target_os = "windows", target_os = "macos"))]
+                                action: trigger.action,
+                                last_sample_error_message_at: None,
+                                live_rtt: server_time.baseline_rtt,
+                                next_sample_at: now,
+                                pending_sample_generation: None,
+                                sample_interval: final_countdown_sample_interval(remaining),
+                                server_time,
+                                target_time: trigger.target_time,
+                                timing_policy: trigger.timing_policy,
+                            }),
+                            "최종 카운트다운 시작!",
+                        ));
+                    }
+                }
+            }
+            None => false,
+        };
         if now.saturating_duration_since(self.last_full_sync_at) >= FULL_SYNC_INTERVAL
             && !protect_target
         {
-            self.end_final_countdown_sampling();
             return Ok(ActivityTransition::message(
                 Activity::measure_baseline(now, true),
                 "서버 시간 보정 주기 도래, 재보정 시작.",
@@ -1097,10 +1267,14 @@ impl AppState<'_> {
                 self.scheduled_trigger
                     .as_ref()
                     .and_then(|schedule| match schedule.target {
-                        ScheduledTarget::Confirmed(target_time) => Some(ConfirmedTrigger {
+                        ScheduledTarget::Confirmed {
+                            target_time,
+                            timing_policy,
+                        } => Some(ConfirmedTrigger {
                             #[cfg(any(target_os = "windows", target_os = "macos"))]
                             action: schedule.action,
                             target_time,
+                            timing_policy,
                         }),
                         ScheduledTarget::Pending(_) => None,
                     });
@@ -1141,12 +1315,9 @@ impl AppState<'_> {
                     Activity::CalibrateOnTick(calibration) => {
                         self.handle_calibrate_on_tick(calibration, &mut message_buffer)
                     }
-                    Activity::Predicting { server_time } => self.handle_predicting(
-                        server_time,
-                        confirmed_trigger,
-                        now,
-                        &mut message_buffer,
-                    )?,
+                    Activity::Predicting { server_time } => {
+                        self.handle_predicting(server_time, confirmed_trigger, now)?
+                    }
                     Activity::FinalCountdown(countdown) => {
                         self.handle_final_countdown(countdown, &mut message_buffer, &mut runtime)
                     }
@@ -1220,9 +1391,9 @@ impl AppState<'_> {
         let Activity::FinalCountdown(countdown) = *activity else {
             return true;
         };
-        let one_way_delay = effective_one_way_delay(countdown.live_rtt);
-        let Some(trigger_instant) =
-            trigger_instant_for_target(server_time, countdown.target_time, one_way_delay, now)
+        let one_way_delay = countdown.timing_policy.one_way_delay(countdown.live_rtt);
+        let Ok(trigger_instant) =
+            trigger_instant_for_target(server_time, countdown.target_time, one_way_delay)
         else {
             return true;
         };
@@ -1267,7 +1438,7 @@ impl AppState<'_> {
         Ok(())
     }
     fn trigger_final_countdown_deadline<'message>(
-        &mut self,
+        #[cfg(target_os = "windows")] high_res_timer_guard: Option<&HighResTimerGuard>,
         countdown: FinalCountdownState,
         one_way_delay: Duration,
         source: CountdownTriggerSource,
@@ -1275,7 +1446,6 @@ impl AppState<'_> {
         msg_buf: &'message mut String,
         runtime: &mut LoopRuntime<'_>,
     ) -> ActivityTransition<'message> {
-        self.end_final_countdown_sampling();
         #[cfg(target_os = "windows")]
         let mut high_res_wait_error = None;
         let FinalCountdownState {
@@ -1283,6 +1453,7 @@ impl AppState<'_> {
             action,
             server_time,
             target_time,
+            timing_policy,
             ..
         } = countdown;
         let now = Instant::now();
@@ -1293,7 +1464,7 @@ impl AppState<'_> {
                 let sleep_duration = sleep_until.duration_since(now);
                 cfg_select! {
                     target_os = "windows" => {
-                        if let Some(guard) = self.high_res_timer_guard.as_ref() {
+                        if let Some(guard) = high_res_timer_guard {
                             high_res_wait_error = guard.sleep(sleep_duration).err();
                         } else {
                             thread::sleep(sleep_duration);
@@ -1312,14 +1483,25 @@ impl AppState<'_> {
         let trigger_server_time = match server_time.current_server_time_at(trigger_now) {
             Ok(current) => current,
             Err(time_err) => {
-                append_error_detail(msg_buf, "실행 시점 서버 시간 계산 실패: ", time_err);
-                return transition_to_retry(msg_buf, true);
+                return Self::cancel_final_countdown(server_time, msg_buf, time_err);
             }
         };
         let trigger = match target_time.duration_since(trigger_server_time) {
             Ok(remaining) => CountdownTrigger::WithRemaining(remaining),
-            Err(late) => CountdownTrigger::Late(late.duration()),
+            Err(late) if late.duration() <= MAX_ACTION_LATENESS => {
+                CountdownTrigger::Late(late.duration())
+            }
+            Err(_) => {
+                return Self::cancel_final_countdown(
+                    server_time,
+                    msg_buf,
+                    "목표 시각을 1초 넘게 지나 예약 액션을 전송하지 않습니다.",
+                );
+            }
         };
+        if let Err(time_err) = timing_policy.validate_action(trigger_now) {
+            return Self::cancel_final_countdown(server_time, msg_buf, time_err);
+        }
         let send_status = cfg_select! {
             target_os = "linux" => {
                 runtime.prepared_input.send(runtime.err)
@@ -1391,7 +1573,7 @@ fn sample_worker_channels(
     host: Arc<ParsedServer>,
 ) -> Result<(mpsc::SyncSender<u64>, mpsc::Receiver<SampleWorkerResponse>)> {
     let (command_sender, command_receiver) = mpsc::sync_channel(1);
-    let (response_sender, response_receiver) = mpsc::channel();
+    let (response_sender, response_receiver) = mpsc::sync_channel(1);
     drop(
         thread::Builder::new()
             .name(String::from("srg-sample-worker"))
@@ -1417,46 +1599,36 @@ fn duration_millis_f64(duration: Duration) -> f64 {
 fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display) {
     append_fmt(target, format_args!("{prefix}{err}"));
 }
-fn append_final_countdown_sample_error(
-    last_message_at: &mut Option<Instant>,
-    now: Instant,
-    msg_buf: &mut String,
-    err: impl fmt::Display,
-) -> bool {
-    if last_message_at.is_some_and(|last| {
-        now.saturating_duration_since(last) < FINAL_COUNTDOWN_SAMPLE_ERROR_MESSAGE_INTERVAL
-    }) {
-        return false;
-    }
-    *last_message_at = Some(now);
-    append_error_detail(msg_buf, "카운트다운 샘플 획득 실패: ", err);
-    true
-}
 fn effective_one_way_delay(rtt: Duration) -> Duration {
     Duration::from_nanos_u128(rtt.as_nanos().div_euclid(u128::from(HALF_RTT_DIVISOR)))
 }
-fn final_countdown_sample_interval(duration_until_target: Duration) -> Duration {
-    if duration_until_target <= Duration::from_secs(1) {
-        FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL
-    } else if duration_until_target <= Duration::from_secs(3) {
-        FINAL_COUNTDOWN_SAMPLE_FAST_INTERVAL
-    } else if duration_until_target <= FINAL_COUNTDOWN_WINDOW {
-        FINAL_COUNTDOWN_SAMPLE_NORMAL_INTERVAL
-    } else {
-        FINAL_COUNTDOWN_SAMPLE_WARMUP_INTERVAL
+fn final_countdown_sample_interval(remaining: Option<Duration>) -> Duration {
+    match remaining {
+        Some(duration) if duration <= Duration::from_secs(1) => {
+            FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL
+        }
+        Some(duration) if duration <= Duration::from_secs(3) => {
+            FINAL_COUNTDOWN_SAMPLE_FAST_INTERVAL
+        }
+        Some(_) => FINAL_COUNTDOWN_SAMPLE_NORMAL_INTERVAL,
+        None => FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL,
     }
+}
+fn strict_server_deadline(server_time: ServerTime, target_time: SystemTime) -> Result<Instant> {
+    let target_delta = target_time.duration_since(server_time.anchor_time)?;
+    server_time
+        .anchor_instant
+        .checked_add(target_delta)
+        .ok_or_else(|| TimeError::parse("서버 deadline 계산 범위 오류"))
 }
 fn trigger_instant_for_target(
     server_time: ServerTime,
     target_time: SystemTime,
     one_way_delay: Duration,
-    now: Instant,
-) -> Option<Instant> {
-    let Ok(target_delta) = target_time.duration_since(server_time.anchor_time) else {
-        return Some(now);
-    };
-    let target_instant = server_time.anchor_instant.checked_add(target_delta)?;
-    Some(target_instant.checked_sub(one_way_delay).unwrap_or(now))
+) -> Result<Instant> {
+    strict_server_deadline(server_time, target_time)?
+        .checked_sub(one_way_delay)
+        .ok_or_else(|| TimeError::parse("액션 실행 deadline 계산 범위 오류"))
 }
 fn append_fmt(target: &mut String, args: fmt::Arguments<'_>) {
     assert!(
