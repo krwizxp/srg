@@ -35,12 +35,12 @@ jobs:
       - name: Install latest stable Rust
         run: rustup toolchain install stable --profile minimal --no-self-update
       - name: Install Linux native dependencies
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Release Build
-        run: cargo +stable build --release --frozen --bin srg --example package_artifact
+        run: cargo +stable build --release --frozen --bin srg
       - name: Prepare binary artifact with Rust
-        run: ${{ runner.os == 'Windows' && 'target/release/examples/package_artifact.exe' || 'target/release/examples/package_artifact' }} "${{ matrix.binary_name }}"
+        run: cargo +stable run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
       - name: Upload Release Binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
