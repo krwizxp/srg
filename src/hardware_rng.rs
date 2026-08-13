@@ -24,10 +24,9 @@ pub(super) enum HardwareRandomSource {
 impl HardwareRng {
     pub(super) fn new() -> Self {
         let rdseed_supported = is_x86_feature_detected!("rdseed");
-        let rdrand_supported = is_x86_feature_detected!("rdrand");
         Self {
             fallback_notice_pending: AtomicBool::new(false),
-            rdrand_supported,
+            rdrand_supported: is_x86_feature_detected!("rdrand"),
             rdseed_active: AtomicBool::new(rdseed_supported),
             stop_pending: AtomicBool::new(false),
         }

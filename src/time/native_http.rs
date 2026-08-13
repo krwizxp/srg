@@ -31,11 +31,10 @@ impl FreshTimeHeaders {
                 Err("Age 헤더 값이 비어 있습니다.")
             } else {
                 let mut nonzero = false;
-                let valid = trimmed.bytes().all(|byte| {
+                if !trimmed.bytes().all(|byte| {
                     nonzero |= byte != b'0';
                     byte.is_ascii_digit()
-                });
-                if !valid {
+                }) {
                     Err("Age 헤더 값이 숫자가 아닙니다.")
                 } else if nonzero {
                     Err("Age 헤더가 0보다 커 캐시된 응답입니다.")

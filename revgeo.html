@@ -92,7 +92,7 @@
         line-height: 1.6;
 
         &::selection {
-          background: color-mix(in oklch, var(--accent) 25%, var(--card-surface));
+          background: color-mix(in oklch, var(--accent) 25%, var(--surface-panel));
           color: var(--fg);
         }
       }
@@ -379,7 +379,7 @@
           }
 
           &:is(#parse, #start):focus-visible {
-            outline: 2px solid color-mix(in oklch, var(--tone-base) 90%, var(--accent));
+            outline: 2px solid color-mix(in oklch, var(--panel-bg) 90%, var(--accent));
             outline-offset: -2px;
           }
         }
@@ -674,7 +674,6 @@
         }
 
         :scope .supp-dialog-form h2 {
-          color: var(--fg);
           font-size: 1.05rem;
         }
 
@@ -717,10 +716,6 @@
 
       .table-wrap[aria-busy="true"] .loading-rows {
         display: table-footer-group;
-      }
-
-      .loading-row td {
-        padding-block: 14px;
       }
 
       .skeleton-bar {
@@ -875,7 +870,7 @@
             gap: 10px;
             padding-block: 16px;
             padding-inline: 16px;
-            background: color-mix(in oklch, var(--surface-panel) 86%, var(--card-surface));
+            background: var(--surface-panel);
             border-radius: 16px;
             box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
 
@@ -985,11 +980,9 @@
       --site-header-gap: 20px;
       --page-pad-block-end: 20px;
       --page-bg: light-dark(oklch(100% 0 0), oklch(13.4824% 0.03772 255.32));
-      --card-surface: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32));
       --surface-panel: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32));
       --panel-bg: light-dark(oklch(98.1449% 0.00453 258.32), oklch(17.3147% 0.03443 259.54));
       --fg: light-dark(oklch(23.2073% 0.03283 265.79), oklch(100% 0 0));
-      --tone-base: light-dark(oklch(98.1449% 0.00453 258.32), oklch(17.3147% 0.03443 259.54));
       --muted: light-dark(oklch(55.1732% 0.02965 266.41), oklch(68.4542% 0.04287 269.76));
       --muted-strong: light-dark(oklch(27.6759% 0.0319 263.84), oklch(92.6985% 0.02464 265.59));
       --line-soft: light-dark(oklch(94.4327% 0.01086 256.7), oklch(25.767% 0.05772 259.88));
@@ -1102,7 +1095,7 @@
 
     .card,
     .map-popover {
-      background: var(--card-surface);
+      background: var(--surface-panel);
       box-shadow: var(--shadow);
     }
 
@@ -1165,8 +1158,6 @@
     }
 
     button {
-      background: var(--surface-panel);
-      border-radius: 14px;
       font-weight: 700;
 
       &.theme-toggle {
@@ -1214,9 +1205,7 @@
       box-shadow: var(--shadow-soft);
       font-size: 14px;
       line-height: 1.05;
-      position: relative;
       overflow: hidden;
-      isolation: isolate;
       transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 
       .action-btn__icon {
@@ -1290,7 +1279,6 @@
       min-inline-size: 38px;
       min-block-size: 38px;
       padding: 0;
-      gap: 0;
       border-radius: 12px;
       box-shadow: none;
 
@@ -1318,7 +1306,6 @@
 
     .results-card {
       gap: 0;
-      padding-block-end: clamp(20px, 2.5vw, 32px);
 
       search {
         margin-block: 14px 8px;
@@ -1368,10 +1355,7 @@
           display: grid;
         }
 
-        &.has-results .empty-hint {
-          display: none;
-        }
-
+        &.has-results .empty-hint,
         &:not(.has-results:not(:has(tbody > tr))) .filter-empty-hint {
           display: none;
         }
@@ -1727,10 +1711,10 @@
               <p id="supp-dialog-help" class="manual-rng-meta">10진수 또는 0x로 시작하는 16진수 값을 여러 개 입력할 수 있습니다.</p>
               <output id="supp-dialog-error" class="manual-rng-meta" role="alert" aria-atomic="true"></output>
               <div class="manual-rng-actions">
-                <button type="button" id="supp-dialog-cancel" class="action-btn action-btn--danger">
+                <button type="button" id="supp-dialog-cancel" class="action-btn">
                   <span class="action-btn__label">현재까지 결과를 유지하고 중단</span>
                 </button>
-                <button type="submit" class="action-btn action-btn--primary">
+                <button type="submit" class="action-btn">
                   <span class="action-btn__label">입력 후 계속</span>
                 </button>
               </div>
@@ -1769,7 +1753,7 @@
         <h2 class="sr-only">주소 조회 결과</h2>
       </header>
       <search aria-label="주소 조회 결과 필터">
-        <div id="filters" class="filters">
+        <form id="filters" class="filters">
           <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
             aria-label="전체검색" aria-keyshortcuts="Control+F Meta+F">
           <select id="filter-kind" aria-label="구분">
@@ -1796,7 +1780,7 @@
             </svg>
             <span class="action-btn__label">필터 초기화</span>
           </button>
-        </div>
+        </form>
       </search>
       <div class="table-wrap">
         <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
@@ -1824,7 +1808,7 @@
           </thead>
           <tbody></tbody>
           <tfoot class="loading-rows" aria-hidden="true">
-            <tr class="loading-row">
+            <tr>
               <td data-label="구분"><span class="skeleton-bar"></span></td>
               <td data-label="순번"></td>
               <td data-label="좌표 (위도,경도)"><span class="skeleton-bar"></span></td>
@@ -1839,10 +1823,10 @@
         </table>
       </div>
       <nav id="result-pages" class="result-pages" aria-label="결과 페이지" hidden>
-        <button type="button" id="page-prev" class="action-btn action-btn--soft action-btn--compact" commandfor="app"
+        <button type="button" id="page-prev" class="action-btn action-btn--compact" commandfor="app"
           command="--page-prev">이전</button>
         <output id="page-status" aria-live="polite"></output>
-        <button type="button" id="page-next" class="action-btn action-btn--soft action-btn--compact" commandfor="app"
+        <button type="button" id="page-next" class="action-btn action-btn--compact" commandfor="app"
           command="--page-next">다음</button>
       </nav>
       <p class="result-attribution">
@@ -1915,7 +1899,7 @@
       }
       return needsQuote ? `"${s}"` : s;
     };
-    const lower = (s) => String(s || "").toLowerCase();
+    const lower = (s) => (s || "").toLowerCase();
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -1938,13 +1922,6 @@
     };
     class InputValidationError extends Error { }
     const GeocodeParser = (() => {
-      const SI = 1;
-      const GUN = 2;
-      const GU = 4;
-      const EUP = 8;
-      const MYEON = 16;
-      const DONG = 32;
-      const RI = 64;
       const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
         CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
       const isBoundedText = (value) =>
@@ -1952,35 +1929,21 @@
         value.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
       function text(value) {
         if (typeof value !== "string") return "";
-        if (!isBoundedText(value)) {
+        if (value.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
           throw new InputValidationError(TEXT_LIMIT_MESSAGE);
         }
         return value;
       }
-      const firstText = (a, b, c, d) =>
-        text(a) || text(b) || text(c) || text(d);
-      function adminSuffix(name) {
-        if (!name) return 0;
-        switch (name.at(-1)) {
-          case "시": return SI;
-          case "군": return GUN;
-          case "구": return GU;
-          case "읍": return EUP;
-          case "면": return MYEON;
-          case "동": return DONG;
-          case "리": return RI;
-          default: return 0;
-        }
-      }
+      const firstText = (a, b, c, d) => a || b || c || d || "";
       function pickAdminName(
-        candidates, suffixMask, excludedA = "", excludedB = "",
+        candidates, suffixes, excludedA = "", excludedB = "",
         excludedC = "",
         rejectSpecialCity = false,
       ) {
         for (const name of candidates) {
           if (!name || name === excludedA || name === excludedB ||
             name === excludedC) continue;
-          if (suffixMask && !(adminSuffix(name) & suffixMask)) continue;
+          if (suffixes && !suffixes.includes(name.at(-1))) continue;
           if (rejectSpecialCity && CONFIG.SPECIAL_CITIES.test(name)) continue;
           return name;
         }
@@ -2000,6 +1963,8 @@
           level10: text(admin?.level10),
           country: text(gc.country),
           name: text(gc.name),
+          street: text(gc.street),
+          type: text(gc.type),
           cityDistrict: text(gc.city_district),
           district: text(gc.district),
           suburb: text(gc.suburb),
@@ -2030,44 +1995,41 @@
         let sigungu = "";
         const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
         if (!sido && cityIsSpecial) sido = city;
-        const sidoIsSpecial = !!sido && (sido === city
+        if (!!sido && (sido === city
           ? cityIsSpecial
-          : CONFIG.SPECIAL_CITIES.test(sido));
-        if (sidoIsSpecial) {
+          : CONFIG.SPECIAL_CITIES.test(sido))) {
           const candidates = [cityDistrict, level6, county, primaryName, p0, p1];
-          sigungu = pickAdminName(candidates, GU | GUN, sido) ||
-            pickAdminName(candidates, SI, sido, "", "", true);
+          sigungu = pickAdminName(candidates, "구군", sido) ||
+            pickAdminName(candidates, "시", sido, "", "", true);
         } else {
           const cityLike = pickAdminName(
-            [city, county, level6, primaryName, p1, p0], SI | GUN, sido,
+            [city, county, level6, primaryName, p1, p0], "시군", sido,
           );
           const districtLike = pickAdminName(
             [
               cityDistrict, fields.level8, fields.level9,
               fields.town, fields.locality, fields.village,
             ],
-            GU, sido, cityLike,
+            "구", sido, cityLike,
           );
           sigungu = cityLike && districtLike && districtLike !== cityLike
             ? cityLike + " " + districtLike
             : cityLike || districtLike || "";
           sigungu ||= pickAdminName(
             [county, level6, cityDistrict, primaryName, p0, p1],
-            SI | GU | GUN, sido,
+            "시구군", sido,
           );
         }
         const eupmyeon = [];
-        const emdSuffixes = EUP | MYEON | DONG | RI;
         for (const name of [
           fields.level8, fields.level9, fields.level10, fields.town,
           fields.village, fields.locality, fields.suburb, primaryName, p0, p1,
         ]) {
           if (!name || name === sido || name === sigungu) continue;
           if (eupmyeon.includes(name)) continue;
-          const suffix = adminSuffix(name);
           const last = name.length - 1;
           if (
-            suffix & emdSuffixes ||
+            "읍면동리".includes(name.at(-1)) ||
             (
               name.charCodeAt(last) === 0xac00 &&
               name.charCodeAt(last - 1) >= 48 &&
@@ -2090,7 +2052,7 @@
           .replaceAll(` ${normalizedDistrict} `, " ")
           .trim();
       }
-      function parseGlobalAdmin(gc, fields, p0, p1) {
+      function parseGlobalAdmin(fields, p0, p1) {
         const primaryName = firstText(fields.name, p0);
         const cityDistrict = firstText(
           fields.cityDistrict, fields.district, fields.suburb,
@@ -2116,7 +2078,7 @@
           city || fields.town || county || fields.district ||
           fields.municipality || "";
         if ((!sigungu || sigungu === sido) &&
-          (gc.type === "city" || gc.type === "county")) {
+          (fields.type === "city" || fields.type === "county")) {
           sigungu = primaryName || city || county || "";
         }
         let eupmyeon = pickAdminName(
@@ -2134,8 +2096,7 @@
         }
         return { sido, sigungu, eupmyeon };
       }
-      function getAdmin(gc, countryCode, p0, p1) {
-        const fields = readFields(gc);
+      function getAdmin(fields, countryCode, p0, p1) {
         const adminCountry = fields.level2;
         const countryName = fields.country || adminCountry;
         let lowerCountryName = "";
@@ -2154,7 +2115,7 @@
           lowerAdminCountry.includes("korea");
         const result = korean
           ? parseKoreanAdmin(fields, p0, p1)
-          : parseGlobalAdmin(gc, fields, p0, p1);
+          : parseGlobalAdmin(fields, p0, p1);
         if (!korean) {
           for (const key of ["sido", "sigungu", "eupmyeon"]) {
             const value = lower(result[key]);
@@ -2189,6 +2150,7 @@
         }
         const label = text(gc.label);
         const countryCode = text(gc.country_code).toLowerCase();
+        const fields = readFields(gc);
         let firstLabelPart = "";
         let p0 = "";
         let p1 = "";
@@ -2205,10 +2167,12 @@
           start = comma + 1;
         }
         const { sido, sigungu, eupmyeon } = getAdmin(
-          gc, countryCode, p0, p1,
+          fields, countryCode, p0, p1,
         );
-        let tag = firstText(gc.name, firstLabelPart, gc.street, gc.city);
-        const tagType = text(gc.type);
+        let tag = firstText(
+          fields.name, firstLabelPart, fields.street, fields.city,
+        );
+        const tagType = fields.type;
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
         const kind = countryCode === "kr" ? "KR" :
           countryCode === "kp" ? "KP" :
@@ -2307,17 +2271,16 @@
     const normalizeCoordText = (s) => s === "-0" ? "0" : s;
     const fmtCoord6 = (v) => {
       if (typeof v === "string") {
-        const s0 = v;
-        if (!s0) return "";
-        const dot = s0.indexOf(".");
-        if (dot === -1) return normalizeCoordText(s0);
-        if (!s0.includes("e") && !s0.includes("E")) {
-          if (s0.length - dot - 1 <= COORD_DECIMALS) {
-            let end = s0.length;
-            while (end && s0.charCodeAt(end - 1) === 48) end--;
-            if (end && s0.charCodeAt(end - 1) === 46) end--;
+        if (!v) return "";
+        const dot = v.indexOf(".");
+        if (dot === -1) return normalizeCoordText(v);
+        if (!v.includes("e") && !v.includes("E")) {
+          if (v.length - dot - 1 <= COORD_DECIMALS) {
+            let end = v.length;
+            while (end && v.charCodeAt(end - 1) === 48) end--;
+            if (end && v.charCodeAt(end - 1) === 46) end--;
             return normalizeCoordText(
-              end === s0.length ? s0 : s0.slice(0, end),
+              end === v.length ? v : v.slice(0, end),
             );
           }
         }
@@ -2417,9 +2380,7 @@
       const emd = norm(domElements.filterEmd.value);
       const tag = norm(domElements.filterTag.value);
       const fullAddr = norm(domElements.filterFullAddr.value);
-      let qMode = 0;
-      let q1 = "";
-      let qTokens = null;
+      let query = null;
       if (q) {
         const isOr = q.includes("|");
         const tokens = new Set();
@@ -2428,49 +2389,48 @@
           if (token) tokens.add(token);
         }
         if (tokens.size === 1) {
-          qMode = 1;
-          q1 = tokens.values().next().value;
+          query = tokens.values().next().value;
         } else if (tokens.size > 1) {
-          qMode = isOr ? 2 : 1;
-          qTokens = isOr ? tokens : [...tokens].sort((a, b) => b.length - a.length);
+          query = isOr ? tokens : [...tokens].sort((a, b) => b.length - a.length);
         }
       }
-      const active =
-        !!(kind || sido || sigungu || emd || tag || fullAddr || qMode);
-      if (!active) return { active: false };
+      if (!(kind || sido || sigungu || emd || tag || fullAddr || query)) {
+        return null;
+      }
       return {
-        active: true,
         kind,
         sido,
         sigungu,
         emd,
         tag,
         fullAddr,
-        qMode,
-        q1,
-        qTokens,
+        query,
       };
     }
     let FILTER_SNAP = buildFilterSnapshot();
     const Q_SEARCH_SEP = "\u0000";
-    const getSearchFields = (r) => {
-      let fields = r._search;
-      if (fields) return fields;
-      const result = r.result;
-      const addr = result.addr;
-      fields = [
-        lower(result.kind || r.set),
-        norm(addr?.sido),
-        norm(addr?.sigungu),
-        norm(addr?.eupmyeon),
-        norm(addr?.tag),
-        norm(result.error || addr?.fullAddr),
+    function matchesFilter(r, f) {
+      if (!r.result) return false;
+      if (!f) return true;
+      const fields = r._search ??= [
+        lower(r.result.kind || r.set),
+        norm(r.result.addr?.sido),
+        norm(r.result.addr?.sigungu),
+        norm(r.result.addr?.eupmyeon),
+        norm(r.result.addr?.tag),
+        norm(r.result.error || r.result.addr?.fullAddr),
         undefined,
       ];
-      r._search = fields;
-      return fields;
-    };
-    function matchesQuery(r, fields, qMode, q1, qTokens) {
+      if (!((!f.kind || fields[0] === f.kind) &&
+        (!f.sido || fields[1].includes(f.sido)) &&
+        (!f.sigungu || fields[2].includes(f.sigungu)) &&
+        (!f.emd || fields[3].includes(f.emd)) &&
+        (!f.tag || fields[4].includes(f.tag)) &&
+        (!f.fullAddr || fields[5].includes(f.fullAddr)))) {
+        return false;
+      }
+      const query = f.query;
+      if (!query) return true;
       let hay = fields[6];
       if (hay === undefined) {
         hay = fields[5] +
@@ -2490,29 +2450,17 @@
           r.lonStr;
         fields[6] = hay;
       }
-      if (!qTokens) return hay.includes(q1);
-      if (qMode === 2) {
-        for (const token of qTokens) {
+      if (typeof query === "string") return hay.includes(query);
+      if (query instanceof Set) {
+        for (const token of query) {
           if (hay.includes(token)) return true;
         }
         return false;
       }
-      for (const token of qTokens) {
+      for (const token of query) {
         if (!hay.includes(token)) return false;
       }
       return true;
-    }
-    function matchesFilter(r, f) {
-      if (!r.result) return false;
-      if (!f.active) return true;
-      const fields = getSearchFields(r);
-      return (!f.kind || fields[0] === f.kind) &&
-        (!f.sido || fields[1].includes(f.sido)) &&
-        (!f.sigungu || fields[2].includes(f.sigungu)) &&
-        (!f.emd || fields[3].includes(f.emd)) &&
-        (!f.tag || fields[4].includes(f.tag)) &&
-        (!f.fullAddr || fields[5].includes(f.fullAddr)) &&
-        (!f.qMode || matchesQuery(r, fields, f.qMode, f.q1, f.qTokens));
     }
     const RESULT_PAGE_SIZE = 100;
     let filterTimer = null;
@@ -2525,12 +2473,12 @@
     }
     function rebuildVisibleIndices() {
       const f = FILTER_SNAP;
-      const indices = [];
+      const indices = AppState.visibleIndices;
+      indices.length = 0;
       const records = AppState.records;
       for (let i = 0; i < records.length; i++) {
         if (matchesFilter(records[i], f)) indices.push(i);
       }
-      AppState.visibleIndices = indices;
       AppState.page = 0;
       renderCurrentPage(true);
     }
@@ -2549,8 +2497,7 @@
         fragment.append(createResultRow(AppState.records[recordIndex], recordIndex));
       }
       domElements.tbody.replaceChildren(fragment);
-      const hasResults = AppState.processed > 0;
-      domElements.tableWrap.classList.toggle("has-results", hasResults);
+      domElements.tableWrap.classList.toggle("has-results", AppState.processed > 0);
       domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
       domElements.pagePrev.disabled = AppState.page === 0;
       domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
@@ -2569,15 +2516,10 @@
         rebuildVisibleIndices();
       }, 80);
     }
-    function clearFilters({ keepQuery = false } = {}) {
+    function clearFilters(keepQuery = false) {
       const query = keepQuery ? domElements.filterQ.value : "";
+      domElements.filters.reset();
       domElements.filterQ.value = query;
-      domElements.filterKind.value = "";
-      domElements.filterSido.value = "";
-      domElements.filterSigungu.value = "";
-      domElements.filterEmd.value = "";
-      domElements.filterTag.value = "";
-      domElements.filterFullAddr.value = "";
       scheduleApplyFilterAll();
     }
     const CSV_HEADER =
@@ -2648,11 +2590,10 @@
         this.task = status === "idle"
           ? null
           : {
-            status,
-            controller: new AbortController(),
-            resume: null,
-            inFlight: false,
-          };
+             status,
+             controller: new AbortController(),
+             resume: null,
+           };
         if (this.renderReq !== null) {
           cancelAnimationFrame(this.renderReq);
           this.renderReq = null;
@@ -2694,25 +2635,22 @@
       domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
       domElements.pauseBtn.disabled = s !== "running";
       domElements.resumeBtn.disabled = s !== "paused";
-      const stopDisabled = !(AppState.isRunning || s === "parsing") ||
+      domElements.stopBtn.disabled = !(AppState.isRunning || s === "parsing") ||
         s === "stopping";
-      domElements.stopBtn.disabled = stopDisabled;
       domElements.file.disabled = isBusy;
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     let statusLiveTimer = 0;
-    function setStatusLiveText(text) {
-      clearTimeout(statusLiveTimer);
-      domElements.statusLive.textContent = "";
-      if (!text) return;
-      statusLiveTimer = setTimeout(() => {
-        domElements.statusLive.textContent = text;
-      }, 24);
-    }
     function announceStatusText(text) {
       if (SR_STATUS_CACHE.msg === text) return;
       SR_STATUS_CACHE.msg = text;
-      setStatusLiveText(text);
+      clearTimeout(statusLiveTimer);
+      domElements.statusLive.textContent = "";
+      if (text) {
+        statusLiveTimer = setTimeout(() => {
+          domElements.statusLive.textContent = text;
+        }, 24);
+      }
     }
     function setStatusVisual(msg, type) {
       const el = domElements.status;
@@ -2726,12 +2664,7 @@
       setStatusVisual(nextMsg, type);
       const text = nextMsg.trim();
       SR_STATUS_CACHE.progressBucket = -1;
-      if (!text) {
-        SR_STATUS_CACHE.msg = null;
-        setStatusLiveText("");
-        return;
-      }
-      announceStatusText(text);
+      announceStatusText(text || null);
     }
     function setProgressStatus(processed, total, totalDisp) {
       setStatusVisual(`처리 중… (${fmt(processed)}/${totalDisp})`, "info");
@@ -2748,30 +2681,6 @@
       );
     }
     const FILE_READY_HINT = "파일 업로드 완료! 좌표 추출을 눌러주세요.";
-    function ensureNominatimRequestOrigin() {
-      if (location.protocol === "https:" || location.protocol === "http:") {
-        return true;
-      }
-      setStatusMessage(
-        "Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.",
-        "warn",
-      );
-      return false;
-    }
-    function confirmBulkNominatimUse() {
-      const count = AppState.records.length;
-      if (count <= CONFIG.BULK_CONFIRM_THRESHOLD || AppState.bulkAcknowledged) {
-        return true;
-      }
-      const ok = window.confirm(
-        `공용 Nominatim은 대량 역지오코딩이 권장되지 않습니다.\n\n${fmt(count)}건을 단일 브라우저에서 초당 1회 이하로 일회성 조회하고, 결과를 이 브라우저에 캐시합니다. 반복/정기 실행이나 격자형 좌표 수집이 아니라는 점을 확인해야 계속 진행합니다.\n\n사용 정책: ${NOMINATIM_POLICY_URL}`,
-      );
-      AppState.bulkAcknowledged = ok;
-      if (!ok) {
-        setStatusMessage("대량 조회 확인이 취소되었습니다.", "warn");
-      }
-      return ok;
-    }
     const RENDER_CACHE = {
       total: -1,
       processed: -1,
@@ -2878,26 +2787,7 @@
         { signal },
       );
       const reader = decodedStream.getReader();
-      const parts = [];
-      let lineLength = 0;
-      let pendingCR = false;
-      const appendPart = (chunk, start, end) => {
-        const length = end - start;
-        ensureInputLineLength(lineLength + length);
-        if (length > 0) parts.push(chunk.substring(start, end));
-        lineLength += length;
-      };
-      const takeLine = (chunk, start, end) => {
-        if (parts.length === 0) {
-          ensureInputLineLength(end - start);
-          return chunk.substring(start, end);
-        }
-        appendPart(chunk, start, end);
-        const line = parts.join("");
-        parts.length = 0;
-        lineLength = 0;
-        return line;
-      };
+      let pending = "";
       try {
         for (; ;) {
           let read;
@@ -2914,40 +2804,25 @@
             throw err;
           }
           if (read.done) break;
-          const chunk = read.value;
           signal.throwIfAborted();
+          const chunk = pending + read.value;
           let start = 0;
-          if (pendingCR) {
-            if (chunk[0] === "\n") start = 1;
-            pendingCR = false;
+          const end = chunk.endsWith("\r") ? chunk.length - 1 : chunk.length;
+          for (let pos = 0; pos < end; pos++) {
+            const code = chunk.charCodeAt(pos);
+            if (code !== 10 && code !== 13) continue;
+            ensureInputLineLength(pos - start);
+            yield chunk.slice(start, pos);
+            if (code === 13 && chunk.charCodeAt(pos + 1) === 10) pos++;
+            start = pos + 1;
           }
-          while (start < chunk.length) {
-            const nl = chunk.indexOf("\n", start);
-            const cr = chunk.indexOf("\r", start);
-            let pos;
-            if (nl === -1) pos = cr;
-            else if (cr === -1) pos = nl;
-            else pos = nl < cr ? nl : cr;
-            if (pos === -1) {
-              appendPart(chunk, start, chunk.length);
-              start = chunk.length;
-              break;
-            }
-            yield takeLine(chunk, start, pos);
-            if (chunk[pos] === "\r") {
-              if (pos + 1 === chunk.length) {
-                pendingCR = true;
-                start = pos + 1;
-                break;
-              }
-              start = chunk[pos + 1] === "\n" ? pos + 2 : pos + 1;
-            } else {
-              start = pos + 1;
-            }
-          }
+          pending = chunk.slice(start);
+          ensureInputLineLength(
+            pending.endsWith("\r") ? pending.length - 1 : pending.length,
+          );
         }
-        if (lineLength > 0) {
-          yield parts.join("");
+        if (pending) {
+          yield pending.endsWith("\r") ? pending.slice(0, -1) : pending;
         }
       } finally {
         await cancelReadableBestEffort(reader);
@@ -2992,7 +2867,6 @@
             lonStr: lon,
             cacheKey: fLat + "," + fLon,
             result: null,
-            _search: null,
           });
         }
       }
@@ -3410,13 +3284,10 @@
           persistentCache.getOrInsert(record.cacheKey, null);
         }
       }
-      task.inFlight = true;
       try {
         await readPersistentReverseCache(persistentCache, signal);
       } catch (err) {
         if (!signal.aborted) throw err;
-      } finally {
-        task.inFlight = false;
       }
       for (let i = 0; i < total && !signal.aborted; i++) {
         const r = records[i];
@@ -3457,7 +3328,6 @@
             if (!AppState.isStopping) setStatusMessage("재개합니다…");
           }
           if (AppState.task !== task || !AppState.isRunning) break;
-          task.inFlight = true;
           const r = records[i];
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
@@ -3478,7 +3348,6 @@
           } catch (err) {
             if (signal.aborted && err?.name === "AbortError") break;
             if (!navigator.onLine) {
-              task.inFlight = false;
               await pauseProcessing(
                 task,
                 '네트워크 연결이 끊겼습니다. 연결 후 "재개"를 눌러주세요.',
@@ -3523,8 +3392,6 @@
             "error",
           );
           break;
-        } finally {
-          task.inFlight = false;
         }
       }
       await flushCacheWrites();
@@ -3568,16 +3435,9 @@
         cells[SIGUNGU_COL_INDEX].textContent = addr.sigungu;
         cells[EMD_COL_INDEX].textContent = addr.eupmyeon;
         cells[TAG_COL_INDEX].textContent = addr.tag;
-      } else {
-        cells[SIDO_COL_INDEX].textContent =
-          cells[SIGUNGU_COL_INDEX].textContent =
-          cells[EMD_COL_INDEX].textContent =
-          cells[TAG_COL_INDEX].textContent =
-          "";
       }
       cells[FULLADDR_COL_INDEX].textContent = result.error || addr.fullAddr;
-      const td = cells[MAPS_COL_INDEX];
-      const btn = td.lastElementChild;
+      const btn = cells[MAPS_COL_INDEX].lastElementChild;
       btn.disabled = false;
       btn.dataset.idx = String(index);
       btn.setAttribute("aria-label", `지도 링크 열기: ${latStr}, ${lonStr}`);
@@ -3601,37 +3461,26 @@
       for (let i = 0; i < AppState.records.length; i++) {
         if (AppState.records[i].result) resultIndices.push(i);
       }
-      const exportTask = {
-        appGeneration: AppState.generation,
-        file: AppState.droppedFile,
-        records: AppState.records,
-        resultIndices,
-        promise: null,
-      };
+      const totalRows = resultIndices.length;
+      if (totalRows <= 0) {
+        return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
+      }
+      const sourceFile = AppState.droppedFile;
+      if (!sourceFile) {
+        return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
+      }
+      const appGeneration = AppState.generation;
+      const records = AppState.records;
       const ensureCurrent = () => {
-        if (
-          AppState.generation !== exportTask.appGeneration ||
-          AppState.records !== exportTask.records ||
-          AppState.droppedFile !== exportTask.file
-        ) {
+        if (AppState.generation !== appGeneration) {
           throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
         }
       };
+      const exportTask = { promise: null };
       EXPORT_TASK = exportTask;
       domElements.exportBtn.disabled = true;
       exportTask.promise = (async () => {
         try {
-          const records = exportTask.records;
-          const resultIndices = exportTask.resultIndices;
-          const totalRows = resultIndices.length;
-          const sourceFile = exportTask.file;
-          if (totalRows <= 0) {
-            return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
-          }
-          if (!sourceFile) {
-            return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
-          }
-          const escCell = csvEsc;
           setStatusMessage("CSV 생성 중…");
           await yieldToMain();
           ensureCurrent();
@@ -3652,33 +3501,33 @@
             const lon = r.lonStr;
             const coords = lat + ", " + lon;
             const result = r.result;
-            let line = escCell(result.kind || r.set) +
+            let line = csvEsc(result.kind || r.set) +
               "," +
-              escCell(recordIndex + 1) +
+              csvEsc(recordIndex + 1) +
               "," +
-              escCell(coords) +
+              csvEsc(coords) +
               ",";
             const addr = result.addr;
             if (addr) {
-              line += escCell(addr.sido) +
+              line += csvEsc(addr.sido) +
                 "," +
-                escCell(addr.sigungu) +
+                csvEsc(addr.sigungu) +
                 "," +
-                escCell(addr.eupmyeon) +
+                csvEsc(addr.eupmyeon) +
                 "," +
-                escCell(addr.tag) +
+                csvEsc(addr.tag) +
                 ",";
             } else {
               line += ",,,,";
             }
-            line += escCell(result.error || addr.fullAddr);
-            line += "," + escCell(CSV_SOURCE_TEXT);
-            line += "," + escCell(CSV_LICENSE_TEXT);
-            line += "," + escCell(CSV_GEOCODER_TEXT);
+            line += csvEsc(result.error || addr.fullAddr);
+            line += "," + csvEsc(CSV_SOURCE_TEXT);
+            line += "," + csvEsc(CSV_LICENSE_TEXT);
+            line += "," + csvEsc(CSV_GEOCODER_TEXT);
             const lat6 = fmtCoord6(lat);
             const lon6 = fmtCoord6(lon);
             for (let k = 0; k < MAP_LINKS.length; k++) {
-              line += "," + escCell(MAP_LINKS[k].build(lat, lon, lat6, lon6));
+              line += "," + csvEsc(MAP_LINKS[k].build(lat, lon, lat6, lon6));
             }
             chunkLines.push(line);
             chunkChars += line.length + 1;
@@ -3718,7 +3567,6 @@
       const task = AppState.setRecords([], "parsing");
       domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
       setStatusMessage("파일 분석 중…");
-      task.inFlight = true;
       try {
         const records = await parseFileToRecords(
           file,
@@ -3766,10 +3614,9 @@
         }
         console.error(err);
         setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
-      } finally {
-        task.inFlight = false;
       }
     }
+    domElements.filters.addEventListener("submit", (e) => e.preventDefault());
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
     domElements.filterClear.addEventListener("click", () => {
       clearFilters();
@@ -3785,7 +3632,7 @@
         e.code !== "KeyF"
       ) return;
       e.preventDefault();
-      clearFilters({ keepQuery: true });
+      clearFilters(true);
       domElements.filterQ.focus();
       domElements.filterQ.select();
     });
@@ -3798,8 +3645,22 @@
     const COMMANDS = {
       "--parse": handleParse,
       "--start": () => {
-        if (!ensureNominatimRequestOrigin() || !confirmBulkNominatimUse()) {
+        if (location.protocol !== "https:" && location.protocol !== "http:") {
+          setStatusMessage(
+            "Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.",
+            "warn",
+          );
           return;
+        }
+        const count = AppState.records.length;
+        if (count > CONFIG.BULK_CONFIRM_THRESHOLD && !AppState.bulkAcknowledged) {
+          AppState.bulkAcknowledged = window.confirm(
+            `공용 Nominatim은 대량 역지오코딩이 권장되지 않습니다.\n\n${fmt(count)}건을 단일 브라우저에서 초당 1회 이하로 일회성 조회하고, 결과를 이 브라우저에 캐시합니다. 반복/정기 실행이나 격자형 좌표 수집이 아니라는 점을 확인해야 계속 진행합니다.\n\n사용 정책: ${NOMINATIM_POLICY_URL}`,
+          );
+          if (!AppState.bulkAcknowledged) {
+            setStatusMessage("대량 조회 확인이 취소되었습니다.", "warn");
+            return;
+          }
         }
         const task = AppState.reset("running");
         clearTable();
@@ -3815,14 +3676,11 @@
       },
       "--pause": () => {
         if (!AppState.isRunning) return;
-        const task = AppState.task;
         AppState.setStatus("pausing");
-        if (task.inFlight) {
-          setStatusMessage(
-            "일시정지 요청됨. 현재 작업을 마치고 멈춥니다…",
-            "warn",
-          );
-        }
+        setStatusMessage(
+          "일시정지 요청됨. 현재 작업을 마치고 멈춥니다…",
+          "warn",
+        );
       },
       "--resume": () => {
         if (AppState.status !== "paused") return;
@@ -3855,17 +3713,17 @@
         renderCurrentPage(true);
       },
     };
-    function handleCommandError(err) {
-      if (err?.name === "AbortError") return;
-      console.error(err);
-      setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
-    }
     domElements.app.addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
-      Promise.try(cmd).catch(handleCommandError);
+      Promise.try(cmd).catch((err) => {
+        if (err?.name === "AbortError") return;
+        console.error(err);
+        setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
+      });
     });
-    function handleFile(file) {
+    domElements.file.addEventListener("change", () => {
+      const file = domElements.file.files?.[0];
       if (!file) return;
       domElements.file.value = "";
       if (
@@ -3897,11 +3755,7 @@
         strong.textContent = file.name;
         el.replaceChildren("선택된 파일: ", strong);
       }
-    }
-    domElements.file.addEventListener(
-      "change",
-      () => handleFile(domElements.file.files?.[0] || null),
-    );
+    });
     function loadManualRng() {
       const U64_MAX = (1n << 64n) - 1n;
       const U32_MAX_INV = 1 / 4294967295;
@@ -3933,35 +3787,31 @@
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
       const U64_TOKEN_HARD_LIMIT = 64;
       const U64_TOKEN = /^(?:0[xX][0-9a-fA-F]+|\+?\d+)$/u;
+      const createUniqueNumbers = (length) => ({
+        count: 0,
+        seen: 0n,
+        values: new Array(length),
+      });
       function createDataSet(num64) {
         return {
           num_64: num64,
-          seen_lotto: 0n,
-          seen_lotto7: 0n,
-          seen_euro_millions_main: 0n,
-          seen_euro_millions_lucky: 0n,
-          lotto_next_idx: 0,
-          lotto7_next_idx: 0,
-          euro_main_next_idx: 0,
-          euro_lucky_next_idx: 0,
+          lotto: createUniqueNumbers(6),
+          lotto7: createUniqueNumbers(7),
+          euroMain: createUniqueNumbers(5),
+          euroLucky: createUniqueNumbers(2),
           numeric_password: 0,
-          glyph_string: new Array(12).fill("\0"),
-          password: new Array(8).fill("\0"),
-          lotto7_numbers: new Array(7).fill(0),
-          lotto_numbers: new Array(6).fill(0),
-          euro_millions_main_numbers: new Array(5).fill(0),
-          euro_millions_lucky_stars: new Array(2).fill(0),
+          glyph_string: new Array(12),
+          password: [],
           numeric_password_digits: 0,
-          password_len: 0,
         };
       }
       function isComplete(data) {
         return (
           data.numeric_password_digits >= 6 &&
-          data.lotto_next_idx >= 6 &&
-          data.lotto7_next_idx >= 7 &&
-          data.password_len >= 8 &&
-          data.euro_main_next_idx >= 5
+          data.lotto.count === data.lotto.values.length &&
+          data.lotto7.count === data.lotto7.values.length &&
+          data.password.length >= 8 &&
+          data.euroMain.count === data.euroMain.values.length
         );
       }
       function parseU64(raw) {
@@ -4001,11 +3851,10 @@
         const negative = integer < 0n;
         const magnitude = negative ? -integer : integer;
         const magnitudeHex = magnitude.toString(16);
-        const firstNibble = Number.parseInt(magnitudeHex.charAt(0), 16);
         let shift =
           (magnitudeHex.length - 1) * 4 +
           32 -
-          Math.clz32(firstNibble) -
+          Math.clz32(Number.parseInt(magnitudeHex.charAt(0), 16)) -
           53;
         let significand;
         if (shift > 0) {
@@ -4115,20 +3964,17 @@
           ((x & 0x0000_ffff_0000_ffffn) << 16n);
         return (x >> 32n) | ((x & 0xffff_ffffn) << 32n);
       }
-      function processLottoNumber(byte, modulus, numbers, seen, nextIdx) {
-        if (nextIdx >= numbers.length) {
-          return null;
-        }
+      function pushUniqueNumber(byte, modulus, numbers) {
+        if (numbers.count >= numbers.values.length) return false;
         const number = (byte % modulus) + 1;
         const mask = 1n << BigInt(number);
-        if ((seen & mask) !== 0n) {
-          return null;
+        if ((numbers.seen & mask) !== 0n) return false;
+        numbers.seen |= mask;
+        numbers.values[numbers.count++] = number;
+        if (numbers.count === numbers.values.length) {
+          numbers.values.sort((a, b) => a - b);
         }
-        numbers[nextIdx] = number;
-        if (nextIdx + 1 === numbers.length) {
-          numbers.sort((a, b) => a - b);
-        }
-        return seen | mask;
+        return true;
       }
       function fillDataFieldsFromU64(v, data) {
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
@@ -4140,51 +3986,14 @@
             data.numeric_password = data.numeric_password * 10 + (byte % 10);
             data.numeric_password_digits += 1;
           }
-          if (data.euro_main_next_idx < 5) {
-            const updatedSeen = processLottoNumber(
-              byte,
-              50,
-              data.euro_millions_main_numbers,
-              data.seen_euro_millions_main,
-              data.euro_main_next_idx,
-            );
-            if (updatedSeen !== null) {
-              data.seen_euro_millions_main = updatedSeen;
-              data.euro_main_next_idx += 1;
-            }
-          }
+          pushUniqueNumber(byte, 50, data.euroMain);
           if (byte <= 224) {
-            if (data.lotto_next_idx < 6) {
-              const updatedSeen = processLottoNumber(
-                byte,
-                45,
-                data.lotto_numbers,
-                data.seen_lotto,
-                data.lotto_next_idx,
-              );
-              if (updatedSeen !== null) {
-                data.seen_lotto = updatedSeen;
-                data.lotto_next_idx += 1;
-              }
-            }
-            if (byte <= 221 && data.lotto7_next_idx < 7) {
-              const updatedSeen = processLottoNumber(
-                byte,
-                37,
-                data.lotto7_numbers,
-                data.seen_lotto7,
-                data.lotto7_next_idx,
-              );
-              if (updatedSeen !== null) {
-                data.seen_lotto7 = updatedSeen;
-                data.lotto7_next_idx += 1;
-              }
-            }
-            if (byte <= 187 && data.password_len < 8) {
-              data.password[data.password_len] = String.fromCodePoint(
+            pushUniqueNumber(byte, 45, data.lotto);
+            if (byte <= 221) pushUniqueNumber(byte, 37, data.lotto7);
+            if (byte <= 187 && data.password.length < 8) {
+              data.password.push(String.fromCodePoint(
                 (byte % 94) + 33,
-              );
-              data.password_len += 1;
+              ));
             }
           }
           if (isComplete(data)) return;
@@ -4246,7 +4055,6 @@
         let luckyStarSource = supplementalRef.current !== null
           ? reverseBitsU64(supplementalRef.current.value)
           : reverseBitsU64(num);
-        let luckyStarComplete = false;
         luckyStarLoop: for (
           let attempt = 0;
           attempt < SUPPLEMENTAL_RETRY_LIMIT;
@@ -4257,20 +4065,9 @@
             if (byte > 251) {
               continue;
             }
-            const updatedSeen = processLottoNumber(
-              byte,
-              12,
-              data.euro_millions_lucky_stars,
-              data.seen_euro_millions_lucky,
-              data.euro_lucky_next_idx,
-            );
-            if (updatedSeen !== null) {
-              data.seen_euro_millions_lucky = updatedSeen;
-              data.euro_lucky_next_idx += 1;
-              if (data.euro_lucky_next_idx >= 2) {
-                luckyStarComplete = true;
-                break luckyStarLoop;
-              }
+            if (pushUniqueNumber(byte, 12, data.euroLucky) &&
+              data.euroLucky.count === data.euroLucky.values.length) {
+              break luckyStarLoop;
             }
           }
           if (attempt + 1 >= SUPPLEMENTAL_RETRY_LIMIT) {
@@ -4280,7 +4077,7 @@
           luckyStarSource = reverseBitsU64(newSupp.value);
           supplementalRef.current = newSupp;
         }
-        if (!luckyStarComplete) {
+        if (data.euroLucky.count !== data.euroLucky.values.length) {
           throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
         }
         const hangul = new Array(4);
@@ -4326,10 +4123,9 @@
         data.hangul_syllables = hangul;
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, num, false);
         const upper32 = NUMERIC_SCRATCH_VIEW.getUint32(0, false);
-        const lower32 = NUMERIC_SCRATCH_VIEW.getUint32(4, false);
         const portalBits = NUMERIC_SCRATCH_VIEW.getUint32(3, false);
         const upperRatio = upper32 * U32_MAX_INV;
-        const lowerRatio = lower32 * U32_MAX_INV;
+        const lowerRatio = NUMERIC_SCRATCH_VIEW.getUint32(4, false) * U32_MAX_INV;
         data.kor_coords = [
           affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
           affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
@@ -4371,8 +4167,9 @@
         data.glyph_string[2] = GLYPHS[(data.solar_system_index >> 4) & 0xf];
         data.glyph_string[3] = GLYPHS[data.solar_system_index & 0xf];
         for (let i = 4; i < data.glyph_string.length; i += 1) {
-          const nibble = (portalBits >>> (28 - (i - 4) * 4)) & 0xf;
-          data.glyph_string[i] = GLYPHS[nibble];
+          data.glyph_string[i] = GLYPHS[
+            (portalBits >>> (28 - (i - 4) * 4)) & 0xf
+          ];
         }
         return data;
       }
@@ -4390,7 +4187,6 @@
         const v = data.num_64;
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
         const bytes = NUMERIC_SCRATCH_BYTES;
-        const b0 = bytes[0];
         const binaryBytes = new Array(bytes.length);
         const hexBytes = new Array(bytes.length);
         for (let i = 0; i < bytes.length; i += 1) {
@@ -4408,14 +4204,14 @@
           `바이트 배열: ${bytes.join(" ")}`,
           `6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}`,
           `8자리 비밀번호: ${data.password.join("")}`,
-          `로또 번호: ${data.lotto_numbers.join(" ")}`,
-          `일본 로또 7 번호: ${data.lotto7_numbers.join(" ")}`,
-          `유로밀리언 번호: ${data.euro_millions_main_numbers.join(" ")} + ${data.euro_millions_lucky_stars.join(" ")
+          `로또 번호: ${data.lotto.values.join(" ")}`,
+          `일본 로또 7 번호: ${data.lotto7.values.join(" ")}`,
+          `유로밀리언 번호: ${data.euroMain.values.join(" ")} + ${data.euroLucky.values.join(" ")
           }`,
           `한글 음절 4글자: ${data.hangul_syllables.join("")}`,
           `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
           `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
-          `NMS 은하 번호: ${(b0 + 1).toString(10)}`,
+          `NMS 은하 번호: ${(bytes[0] + 1).toString(10)}`,
           `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
           } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
           } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")
@@ -4576,34 +4372,24 @@
           setManualBusy(true);
           try {
             const suppTokens = iterU64Tokens(suppInput.value);
-            const dialogSuppValues = [];
-            let dialogSuppIndex = 0;
+            const supplementValues = [];
             const previewParts = [];
             let omittedPreviewCount = 0;
             let processedCount = 0;
             let suppInputCount = 0;
             let queuedSuppCount = 0;
             let renderedPreviewCount = -1;
-            const supplementReplay = [];
-            let supplementReplayIndex = 0;
+            let supplementIndex = 0;
             let preloadedCount = 0;
             const nextSupplement = (reason) => {
-              let value;
-              if (supplementReplayIndex < supplementReplay.length) {
-                value = supplementReplay[supplementReplayIndex];
-              } else {
+              if (supplementIndex === supplementValues.length) {
                 const queued = suppTokens.next();
-                if (!queued.done) {
-                  value = parseU64(queued.value);
-                  preloadedCount += 1;
-                } else if (dialogSuppIndex < dialogSuppValues.length) {
-                  value = dialogSuppValues[dialogSuppIndex++];
-                } else {
-                  throw new SupplementRequired(reason);
-                }
-                supplementReplay.push(value);
+                if (queued.done) throw new SupplementRequired(reason);
+                supplementValues.push(parseU64(queued.value));
+                preloadedCount += 1;
               }
-              supplementReplayIndex += 1;
+              const value = supplementValues[supplementIndex];
+              supplementIndex += 1;
               return { value, bitsRemaining: 64 };
             };
             const updateManualProgress = (state) => {
@@ -4632,20 +4418,24 @@
                 );
               }
               const num = parseU64(token);
-              supplementReplay.length = 0;
               preloadedCount = 0;
               let generated;
               for (; ;) {
-                supplementReplayIndex = 0;
+                supplementIndex = 0;
                 try {
                   generated = generateRandomDataFromNum(num, nextSupplement);
-                  suppInputCount += supplementReplay.length;
+                  suppInputCount += supplementIndex;
                   queuedSuppCount += preloadedCount;
+                  if (supplementIndex === supplementValues.length) {
+                    supplementValues.length = 0;
+                  } else {
+                    supplementValues.splice(0, supplementIndex);
+                  }
                   break;
                 } catch (err) {
                   if (!(err instanceof SupplementRequired)) throw err;
                   const values = await requestSupplementBatch(
-                    suppInputCount + supplementReplay.length + 1,
+                    suppInputCount + supplementIndex + 1,
                     err.message,
                     processedCount,
                   );
@@ -4654,7 +4444,7 @@
                     cancelled = true;
                     break;
                   }
-                  for (const value of values) dialogSuppValues.push(value);
+                  supplementValues.push(...values);
                 }
               }
               if (cancelled) break;

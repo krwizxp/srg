@@ -1,21 +1,24 @@
 use crate::{
     FILE_NAME,
-    diagnostic::{Result, is_unexpected_eof},
+    diagnostic::Result,
     file_output::OutputFile,
     input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
     random_data::RandomDataSet,
-    time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TimeError, TriggerAction},
+    time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TriggerAction},
 };
 #[cfg(target_arch = "x86_64")]
 use crate::{
     batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
     hardware_rng::{HardwareRandomSource, HardwareRng},
-    input::{LadderEntryMode, read_ladder_entries},
+    input::{LadderEntryMode, parse_regular_f64, read_ladder_entries, read_parsed_value},
     ladder::write_ladder_results,
-    random_number::{RandomNumberMode, generate_random_number},
+    random_number::{
+        FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float,
+        generate_random_integer,
+    },
 };
 use alloc::borrow::Cow;
-use core::result::Result as CoreResult;
+use core::{error::Error, iter::successors, result::Result as CoreResult};
 use std::io::{self, Write, stderr, stdout};
 #[cfg(target_arch = "x86_64")]
 const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
@@ -227,26 +230,73 @@ impl MenuApp {
         )?;
         match selection.as_bytes() {
             b"1" => {
-                generate_random_number(
-                    RandomNumberMode::Integer,
-                    num_64,
-                    input_buffer,
+                writeln!(
                     out,
-                    err,
-                    &self.rng,
+                    "\n무작위 정수 생성기(지원 범위: -9223372036854775807 ~ 9223372036854775807)"
                 )?;
+                let min_value = loop {
+                    let value = read_parsed_value(
+                        format_args!("최솟값을 입력해 주세요 ({MIN_ALLOWED_INTEGER_VALUE} 이상): "),
+                        input_buffer,
+                        out,
+                        err,
+                        "유효한 정수 형식이 아닙니다.",
+                        |line| line.parse::<i64>().ok(),
+                    )?;
+                    if value >= MIN_ALLOWED_INTEGER_VALUE {
+                        break value;
+                    }
+                    writeln!(
+                        err,
+                        "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요."
+                    )?;
+                };
+                let max_value = loop {
+                    let value = read_parsed_value(
+                        format_args!("최댓값을 입력해 주세요: "),
+                        input_buffer,
+                        out,
+                        err,
+                        "유효한 정수 형식이 아닙니다.",
+                        |line| line.parse::<i64>().ok(),
+                    )?;
+                    if value >= min_value {
+                        break value;
+                    }
+                    writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
+                };
+                generate_random_integer(min_value, max_value, num_64, out, &self.rng)?;
             }
             b"2" => {
-                generate_random_number(
-                    RandomNumberMode::Float,
-                    num_64,
+                writeln!(out, "\n무작위 실수 생성기")?;
+                let min_value = read_parsed_value(
+                    format_args!("최솟값을 입력해 주세요: "),
                     input_buffer,
                     out,
                     err,
-                    &self.rng,
+                    FLOAT_INPUT_ERROR,
+                    parse_regular_f64,
                 )?;
+                let max_value = loop {
+                    let value = read_parsed_value(
+                        format_args!("최댓값을 입력해 주세요: "),
+                        input_buffer,
+                        out,
+                        err,
+                        FLOAT_INPUT_ERROR,
+                        parse_regular_f64,
+                    )?;
+                    if value >= min_value {
+                        break value;
+                    }
+                    writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
+                };
+                generate_random_float(min_value, max_value, num_64, out, &self.rng)?;
             }
-            _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
+            _ => {
+                writeln!(out, "무작위 숫자 생성을 취소합니다.")?;
+                return self.rng.write_rdseed_fallback_notice(err);
+            }
         }
         self.rng.write_rdseed_fallback_notice(err)
     }
@@ -255,94 +305,88 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let time_run_result = (|| -> CoreResult<(), TimeError> {
-            let host = get_validated_input(
-                "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
-                &mut self.input_buffer,
-                &mut *out,
-                |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
-                    if raw_input.is_empty() {
-                        return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
-                    }
-                    raw_input.parse::<ParsedServer>().map_err(|source| {
-                        Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
-                    })
-                },
-            )?;
-            let requested_target_time = get_validated_input(
-                "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
-                &mut self.input_buffer,
-                &mut *out,
-                |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
-                    if raw_input.is_empty() {
-                        return Ok(None);
-                    }
-                    raw_input.parse::<TargetTimeOfDay>().map(Some)
-                },
-            )?;
-            let scheduled_trigger = match requested_target_time {
-                Some(target_time) => Some((
-                    target_time,
-                    get_validated_input(
-                        "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
-                        &mut self.input_buffer,
-                        &mut *out,
-                        |selection| -> CoreResult<TriggerAction, &'static str> {
-                            match selection.as_bytes() {
-                                b"1" => Ok(TriggerAction::LeftClick),
-                                b"2" => Ok(TriggerAction::F5Press),
-                                _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
-                            }
-                        },
-                    )?,
-                )),
-                None => None,
-            };
-            ServerTimeSession {
-                host,
-                scheduled_trigger,
-                stop_after: None,
-            }
-            .run_loop(out, err)?;
-            writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
-            Ok(())
-        })();
-        match time_run_result {
-            Ok(()) => {}
-            Err(time_err) if is_unexpected_eof(&time_err) => {}
-            Err(time_err) => return Err(time_err.into()),
+        let host = get_validated_input(
+            "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
+            &mut self.input_buffer,
+            &mut *out,
+            |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
+                if raw_input.is_empty() {
+                    return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
+                }
+                raw_input.parse::<ParsedServer>().map_err(|source| {
+                    Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
+                })
+            },
+        )?;
+        let requested_target_time = get_validated_input(
+            "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
+            &mut self.input_buffer,
+            &mut *out,
+            |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
+                if raw_input.is_empty() {
+                    return Ok(None);
+                }
+                raw_input.parse::<TargetTimeOfDay>().map(Some)
+            },
+        )?;
+        let scheduled_trigger = match requested_target_time {
+            Some(target_time) => Some((
+                target_time,
+                get_validated_input(
+                    "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
+                    &mut self.input_buffer,
+                    &mut *out,
+                    |selection| -> CoreResult<TriggerAction, &'static str> {
+                        match selection.as_bytes() {
+                            b"1" => Ok(TriggerAction::LeftClick),
+                            b"2" => Ok(TriggerAction::F5Press),
+                            _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
+                        }
+                    },
+                )?,
+            )),
+            None => None,
+        };
+        ServerTimeSession {
+            host,
+            scheduled_trigger,
+            stop_after: None,
         }
+        .run_loop(out, err)?;
+        writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
         Ok(())
     }
     pub(super) fn run(&mut self) -> Result<()> {
         let menu_prompt = format_args!("{MENU}");
+        let mut out = stdout().lock();
+        let mut err = stderr();
         loop {
-            let command = {
-                let mut prompt_out = stdout().lock();
-                match read_line_reuse_limited(
-                    menu_prompt,
-                    &mut self.input_buffer,
-                    &mut prompt_out,
-                    MENU_SELECTION_INPUT_MAX_BYTES,
-                ) {
-                    Ok(command_str) if let &[command @ b'1'..=b'7'] = command_str.as_bytes() => {
-                        command
-                    }
-                    Ok(_) => 0,
-                    Err(read_err) if read_err.kind() == io::ErrorKind::UnexpectedEof => {
-                        return Ok(());
-                    }
-                    Err(read_err) => return Err(read_err.into()),
-                }
+            let command = match read_line_reuse_limited(
+                menu_prompt,
+                &mut self.input_buffer,
+                &mut out,
+                MENU_SELECTION_INPUT_MAX_BYTES,
+            ) {
+                Ok(command_str) if let &[command @ b'1'..=b'7'] = command_str.as_bytes() => command,
+                Ok(_) => 0,
+                Err(read_err) if read_err.kind() == io::ErrorKind::UnexpectedEof => return Ok(()),
+                Err(read_err) => return Err(read_err.into()),
             };
-            let mut out = stdout();
-            let mut err = stderr();
             let keep_running = match self.execute_command(command, &mut out, &mut err) {
                 Ok(keep_running) => keep_running,
-                Err(command_err) if is_unexpected_eof(&command_err) => {
-                    return Ok(());
+                Err(command_err) => {
+                    let root_error: &(dyn Error + 'static) = &command_err;
+                    let unexpected_eof = successors(Some(root_error), |error| (*error).source())
+                        .any(|error| {
+                            error.downcast_ref::<io::Error>().is_some_and(|io_error| {
+                                io_error.kind() == io::ErrorKind::UnexpectedEof
+                            })
+                        });
+                    if unexpected_eof {
+                        return Ok(());
+                    }
+                    return Err(command_err);
                 }
-                Err(command_err) => return Err(command_err),
             };
             if !keep_running {
                 return Ok(());
@@ -352,14 +396,12 @@ impl MenuApp {
 }
 #[cfg(target_arch = "x86_64")]
 fn prepare_hw_rng_menu_command(rng: &HardwareRng, out: &mut dyn Write) -> Result<bool> {
-    match rng.source() {
-        HardwareRandomSource::None => {
-            writeln!(
-                out,
-                "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-            )?;
-            Ok(false)
-        }
-        HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => Ok(true),
+    if rng.source() != HardwareRandomSource::None {
+        return Ok(true);
     }
+    writeln!(
+        out,
+        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
+    )?;
+    Ok(false)
 }

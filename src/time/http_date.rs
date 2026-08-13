@@ -76,8 +76,7 @@ impl FromStr for HttpDate {
                 .div_euclid(SECS_PER_DAY_U64)
                 .cast_signed(),
             Err(err) => {
-                let secs_before_epoch = err.duration().as_secs();
-                let days_before_epoch = secs_before_epoch.div_ceil(SECS_PER_DAY_U64);
+                let days_before_epoch = err.duration().as_secs().div_ceil(SECS_PER_DAY_U64);
                 parse_result_with_context(i64::try_from(days_before_epoch), ERR_LOCAL_YEAR)?
                     .strict_neg()
             }
@@ -91,12 +90,10 @@ fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
     if !(d0.is_ascii_digit() && d1.is_ascii_digit()) {
         return None;
     }
-    let tens = d0.strict_sub(b'0');
-    let ones = d1.strict_sub(b'0');
     Some(
-        u32::from(tens)
+        u32::from(d0.strict_sub(b'0'))
             .strict_mul(DECIMAL_BASE_U32)
-            .strict_add(u32::from(ones)),
+            .strict_add(u32::from(d1.strict_sub(b'0'))),
     )
 }
 fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
@@ -342,8 +339,7 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
                 .div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32)
                 .strict_mul(LEAP_YEAR_CENTURY_DIVISOR_I32);
             let mut year = century_base.strict_add(year2.cast_signed());
-            let cutoff = current_year.strict_add(RFC850_CENTURY_CUTOFF_OFFSET);
-            if year > cutoff {
+            if year > current_year.strict_add(RFC850_CENTURY_CUTOFF_OFFSET) {
                 year = year.strict_sub(LEAP_YEAR_CENTURY_DIVISOR_I32);
             }
             parse_http_date_time(day, month, year, weekday, time_token)

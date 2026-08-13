@@ -48,30 +48,27 @@ impl<'buffer> ByteCursor<'buffer> {
             index = index
                 .checked_sub(TWO_DIGIT_WIDTH)
                 .ok_or_else(write_zero_err)?;
-            let digits = buffer
+            *buffer
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
-                .ok_or_else(write_zero_err)?;
-            *digits = two_digits(remainder);
+                .ok_or_else(write_zero_err)? = two_digits(remainder);
         }
         if value >= U64_TWO_DIGIT_THRESHOLD {
             index = index
                 .checked_sub(TWO_DIGIT_WIDTH)
                 .ok_or_else(write_zero_err)?;
-            let digits = buffer
+            *buffer
                 .get_mut(index..)
                 .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
-                .ok_or_else(write_zero_err)?;
-            *digits = two_digits(low_u8_from_u64(value));
+                .ok_or_else(write_zero_err)? = two_digits(low_u8_from_u64(value));
         } else {
             index = index.checked_sub(1).ok_or_else(write_zero_err)?;
-            let slot = buffer.get_mut(index).ok_or_else(write_zero_err)?;
-            *slot = digit_byte(low_u8_from_u64(value));
+            *buffer.get_mut(index).ok_or_else(write_zero_err)? = digit_byte(low_u8_from_u64(value));
         }
         self.write_bytes(buffer.get(index..).ok_or_else(write_zero_err)?)
     }
-    pub(super) fn written_slice(&self) -> io::Result<&[u8]> {
-        self.buf.get(..self.pos).ok_or_else(write_zero_err)
+    pub(super) const fn written_slice(&self) -> &[u8] {
+        self.buf.split_at(self.pos).0
     }
 }
 impl fmt::Write for ByteCursor<'_> {

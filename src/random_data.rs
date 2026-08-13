@@ -140,8 +140,7 @@ impl<const N: usize> UniqueNumbers<N> {
         Self { count: 0, seen: 0 }
     }
     const fn push(&mut self, byte: u8, modulus: u8) {
-        let number = byte.rem_euclid(modulus).strict_add(1);
-        let mask = 1_u64 << number;
+        let mask = 1_u64 << byte.rem_euclid(modulus).strict_add(1);
         if (self.seen & mask) != 0 {
             return;
         }
@@ -187,11 +186,10 @@ where
                 } else {
                     self.supplemental.value
                 };
-                let candidate_value = HANGUL_SHIFTS.into_iter().find_map(|supp_shift| {
+                if let Some(candidate) = HANGUL_SHIFTS.into_iter().find_map(|supp_shift| {
                     let candidate = u32::from(low_u16_from_u64(supp_value >> supp_shift));
                     (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
-                });
-                if let Some(candidate) = candidate_value {
+                }) {
                     syllable_index = candidate;
                     break;
                 }
@@ -238,30 +236,32 @@ where
     }
     fn fill_nms_fields(&mut self) -> Result<()> {
         let num = self.data.num_64;
-        let planet_number_base = extract_valid_bits_for_nms(
-            num,
-            &[52, 4, 0],
-            NMS_PLANET_FIELD,
-            NMS_PLANET_MAX_VALUE,
-            "NMS 행성 번호 보완",
-            &mut self.supplemental,
-            self.next_supp,
-        )?
-        .rem_euclid(NMS_PLANET_MODULUS);
-        let planet_number = planet_number_base.strict_add(1);
-        self.data.planet_number = low_u8_from_u64(planet_number);
-        let solar_system_index_base = extract_valid_bits_for_nms(
-            num,
-            &[40],
-            NMS_SOLAR_SYSTEM_FIELD,
-            NMS_SOLAR_SYSTEM_MAX_VALUE,
-            "NMS 태양계 번호 보완",
-            &mut self.supplemental,
-            self.next_supp,
-        )?
-        .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS);
-        let solar_system_index = solar_system_index_base.strict_add(1);
-        self.data.solar_system_index = low_u16_from_u64(solar_system_index);
+        self.data.planet_number = low_u8_from_u64(
+            extract_valid_bits_for_nms(
+                num,
+                &[52, 4, 0],
+                NMS_PLANET_FIELD,
+                NMS_PLANET_MAX_VALUE,
+                "NMS 행성 번호 보완",
+                &mut self.supplemental,
+                self.next_supp,
+            )?
+            .rem_euclid(NMS_PLANET_MODULUS)
+            .strict_add(1),
+        );
+        self.data.solar_system_index = low_u16_from_u64(
+            extract_valid_bits_for_nms(
+                num,
+                &[40],
+                NMS_SOLAR_SYSTEM_FIELD,
+                NMS_SOLAR_SYSTEM_MAX_VALUE,
+                "NMS 태양계 번호 보완",
+                &mut self.supplemental,
+                self.next_supp,
+            )?
+            .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS)
+            .strict_add(1),
+        );
         let glyph_sources = [
             u64::from(self.data.planet_number),
             u64::from(self.data.solar_system_index >> 8_u32),
@@ -278,10 +278,7 @@ where
         ];
         for (slot, nibble_source) in self.data.glyph_string.iter_mut().zip(glyph_sources) {
             let index = usize::from(low_u8_from_u64(nibble_source & NIBBLE_MASK_U64));
-            let Some(&glyph) = NMS_GLYPHS.get(index) else {
-                return Err("NMS 글리프 인덱스 계산 실패".into());
-            };
-            *slot = glyph;
+            *slot = *NMS_GLYPHS.get(index).ok_or("NMS 글리프 인덱스 계산 실패")?;
         }
         Ok(())
     }
@@ -330,18 +327,16 @@ where
                     }
                 }
             }
-            if self.is_complete() {
+            if self.numeric_password_digits >= LOTTO_COUNT_U8
+                && self.lotto.is_full()
+                && self.lotto7.is_full()
+                && usize::from(self.password_len) >= PASSWORD_BYTE_LEN
+                && self.euro_main.is_full()
+            {
                 return true;
             }
         }
         false
-    }
-    fn is_complete(&self) -> bool {
-        self.numeric_password_digits >= LOTTO_COUNT_U8
-            && self.lotto.is_full()
-            && self.lotto7.is_full()
-            && usize::from(self.password_len) >= PASSWORD_BYTE_LEN
-            && self.euro_main.is_full()
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
         let value = (self.next_supp)(reason)?;
@@ -360,13 +355,12 @@ const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
 }
 #[cfg(target_arch = "x86_64")]
 pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomDataSet> {
-    let num = rng.next_u64()?;
     let mut next_supp = |reason: &'static str| -> Result<u64> {
         rng.next_u64()
             .map_err(|source| AppError::context(reason, source))
     };
     RandomDataSet {
-        num_64: num,
+        num_64: rng.next_u64()?,
         ..Default::default()
     }
     .populate(&mut next_supp)

@@ -258,13 +258,13 @@ impl OutputFile {
     pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
-        self.file.write_all(prefix_slice(&buffer, file_len)?)?;
+        self.file.write_all(prefix_slice(&buffer, file_len))?;
         let output_len = if *IS_TERMINAL {
             format_data_into_buffer(data, &mut buffer, OutputTarget::Console)?
         } else {
             file_len
         };
-        write_slice_to_console(prefix_slice(&buffer, output_len)?)?;
+        write_slice_to_console(prefix_slice(&buffer, output_len))?;
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]

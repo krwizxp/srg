@@ -272,8 +272,8 @@ impl EiSession {
         let mut pong = None;
         loop {
             // SAFETY: context is live and ei_get_event returns an owned event reference or null.
-            let event_ptr = unsafe { (self.api.get_event)(self.context.as_ptr()) };
-            let Some(event) = NonNull::new(event_ptr) else {
+            let Some(event) = NonNull::new(unsafe { (self.api.get_event)(self.context.as_ptr()) })
+            else {
                 return Ok(pong);
             };
             let result = self.handle_event(event);
@@ -295,7 +295,10 @@ impl EiSession {
     ) -> InputResult<()> {
         match event_type {
             DeviceEventType::Added => {
-                let required_capability = self.action.required_capability();
+                let required_capability = match self.action {
+                    TriggerAction::F5Press => EI_DEVICE_CAP_KEYBOARD,
+                    TriggerAction::LeftClick => EI_DEVICE_CAP_BUTTON,
+                };
                 // SAFETY: device came from EI_EVENT_DEVICE_ADDED and is live for this event.
                 let has_required_capability = unsafe {
                     (self.api.device_has_capability)(device.as_ptr(), required_capability)
@@ -308,8 +311,7 @@ impl EiSession {
                     return Ok(());
                 }
                 // SAFETY: device came from a live event and is retained for the session.
-                let retained_ptr = unsafe { (self.api.device_ref)(device.as_ptr()) };
-                let retained = NonNull::new(retained_ptr)
+                let retained = NonNull::new(unsafe { (self.api.device_ref)(device.as_ptr()) })
                     .ok_or(Cow::Borrowed("libei device 참조에 실패했습니다."))?;
                 self.device = Some(DeviceState {
                     active: false,
@@ -363,15 +365,13 @@ impl EiSession {
             }
             EI_EVENT_PONG => {
                 // SAFETY: event is an EI_EVENT_PONG event.
-                let ping_ptr = unsafe { (self.api.event_pong_get_ping)(event.as_ptr()) };
-                let ping = NonNull::new(ping_ptr)
+                let ping = NonNull::new(unsafe { (self.api.event_pong_get_ping)(event.as_ptr()) })
                     .ok_or(Cow::Borrowed("libei PONG 이벤트에 ping이 없습니다."))?;
                 return Ok(Some(ping));
             }
             EI_EVENT_SEAT_ADDED => {
                 // SAFETY: event is an EI_EVENT_SEAT_ADDED event.
-                let seat_ptr = unsafe { (self.api.event_get_seat)(event.as_ptr()) };
-                let seat = NonNull::new(seat_ptr)
+                let seat = NonNull::new(unsafe { (self.api.event_get_seat)(event.as_ptr()) })
                     .ok_or(Cow::Borrowed("libei seat 추가 이벤트에 seat가 없습니다."))?;
                 self.api.bind_action(self.action, seat);
                 return Ok(None);
@@ -379,8 +379,7 @@ impl EiSession {
             _ => return Ok(None),
         };
         // SAFETY: device event types carry an ei_device pointer.
-        let device_ptr = unsafe { (self.api.event_get_device)(event.as_ptr()) };
-        let device = NonNull::new(device_ptr)
+        let device = NonNull::new(unsafe { (self.api.event_get_device)(event.as_ptr()) })
             .ok_or(Cow::Borrowed("libei device 이벤트에 device가 없습니다."))?;
         self.handle_device_event(device_event_type, device)?;
         Ok(None)
@@ -406,9 +405,8 @@ impl EiSession {
                 "Wayland 입력 전달 제한 시간 계산 실패",
             )))?;
         // SAFETY: context is a live libei sender context.
-        let ping_ptr = unsafe { (self.api.new_ping)(self.context.as_ptr()) };
-        let ping =
-            NonNull::new(ping_ptr).ok_or(SendError::Before(Cow::Borrowed("ei_new_ping 실패")))?;
+        let ping = NonNull::new(unsafe { (self.api.new_ping)(self.context.as_ptr()) })
+            .ok_or(SendError::Before(Cow::Borrowed("ei_new_ping 실패")))?;
         self.api.send_action(self.action, self.context, device.raw);
         // SAFETY: ping is a live synchronization object owned by this send operation.
         unsafe {
@@ -450,32 +448,15 @@ impl EiSession {
                 slice::from_mut(&mut poll_fd),
                 poll_timeout_until(deadline, now),
             )?;
-            if poll_fd.is_invalid() {
-                return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
-            }
+            poll_fd.ensure_valid("libei poll descriptor가 무효화되었습니다.")?;
             connection_closed = poll_fd.has_terminal_error();
-        }
-    }
-}
-impl TriggerAction {
-    const fn portal_devices(self) -> c_uint {
-        match self {
-            Self::F5Press => OEFFIS_DEVICE_KEYBOARD,
-            Self::LeftClick => OEFFIS_DEVICE_POINTER,
-        }
-    }
-    const fn required_capability(self) -> c_int {
-        match self {
-            Self::F5Press => EI_DEVICE_CAP_KEYBOARD,
-            Self::LeftClick => EI_DEVICE_CAP_BUTTON,
         }
     }
 }
 impl Library {
     fn load(name: &CStr, label: &str) -> InputResult<Self> {
         // SAFETY: name is NUL-terminated and remains valid for the call.
-        let handle_ptr = unsafe { sys::dlopen(name.as_ptr(), DL_NOW) };
-        let Some(handle) = NonNull::new(handle_ptr) else {
+        let Some(handle) = NonNull::new(unsafe { sys::dlopen(name.as_ptr(), DL_NOW) }) else {
             let source = dl_error_message();
             return Err(format!("{label} 로드 실패: {source}").into());
         };
@@ -497,8 +478,8 @@ impl Library {
             sys::dlerror();
         }
         // SAFETY: self.handle is live and name is NUL-terminated.
-        let symbol_ptr = unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) };
-        let symbol = NonNull::new(symbol_ptr).ok_or_else(dl_error_message)?;
+        let symbol = NonNull::new(unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) })
+            .ok_or_else(dl_error_message)?;
         // SAFETY: each symbol name is paired with its exact C function pointer type, ABI size and
         // alignment are checked above, and the owning API keeps this library loaded.
         Ok(unsafe {
@@ -510,14 +491,25 @@ impl Library {
     }
 }
 impl PollFd {
+    const fn ensure_open(self, error: &'static str) -> InputResult<()> {
+        if self.has_terminal_error() {
+            Err(Cow::Borrowed(error))
+        } else {
+            Ok(())
+        }
+    }
+    const fn ensure_valid(self, error: &'static str) -> InputResult<()> {
+        if self.revents & POLLNVAL != 0 {
+            Err(Cow::Borrowed(error))
+        } else {
+            Ok(())
+        }
+    }
     const fn has_events(self) -> bool {
         self.revents & POLL_READ_EVENTS != 0
     }
     const fn has_terminal_error(self) -> bool {
         self.revents & (POLLERR | POLLHUP) != 0
-    }
-    const fn is_invalid(self) -> bool {
-        self.revents & POLLNVAL != 0
     }
     const fn new(fd: c_int) -> Self {
         Self {
@@ -606,23 +598,17 @@ impl PortalSession {
                 slice::from_mut(&mut poll_fd),
                 poll_timeout_until(deadline, now),
             )?;
-            if poll_fd.is_invalid() {
-                return Err(Cow::Borrowed(
-                    "liboeffis poll descriptor가 무효화되었습니다.",
-                ));
-            }
+            poll_fd.ensure_valid("liboeffis poll descriptor가 무효화되었습니다.")?;
             if should_cancel() {
                 return Ok(None);
             }
             if poll_fd.has_events() {
                 let connected = self.dispatch()?;
-                if poll_fd.has_terminal_error() {
-                    return Err(Cow::Borrowed("liboeffis poll 연결이 종료되었습니다."));
-                }
                 if connected {
                     return self.eis_fd().map(Some);
                 }
             }
+            poll_fd.ensure_open("liboeffis poll 연결이 종료되었습니다.")?;
         }
     }
 }
@@ -664,17 +650,20 @@ impl PreparedInput {
                 .checked_add(PREPARE_TIMEOUT)
                 .ok_or(Cow::Borrowed("Wayland 입력 준비 제한 시간 계산 실패"))?;
             // SAFETY: null user data is permitted by oeffis_new.
-            let portal_context_ptr = unsafe { (portal_api.new)(null_mut()) };
-            let portal_context =
-                NonNull::new(portal_context_ptr).ok_or(Cow::Borrowed("oeffis_new 실패"))?;
+            let portal_context = NonNull::new(unsafe { (portal_api.new)(null_mut()) })
+                .ok_or(Cow::Borrowed("oeffis_new 실패"))?;
             let mut portal = PortalSession {
                 api: portal_api,
                 context: portal_context,
             };
             portal.poll_fd()?;
+            let portal_devices = match input_action {
+                TriggerAction::F5Press => OEFFIS_DEVICE_KEYBOARD,
+                TriggerAction::LeftClick => OEFFIS_DEVICE_POINTER,
+            };
             // SAFETY: context is new and the requested device mask is defined by liboeffis.
             unsafe {
-                (portal.api.create_session)(portal.context.as_ptr(), input_action.portal_devices());
+                (portal.api.create_session)(portal.context.as_ptr(), portal_devices);
             }
             let Some(portal_eis_fd) = portal.wait_for_eis_fd(deadline, &mut should_cancel)? else {
                 return Ok(None);
@@ -682,8 +671,7 @@ impl PreparedInput {
             // SAFETY: liboeffis returned a new caller-owned duplicated descriptor.
             let eis_fd = unsafe { OwnedFd::from_raw_fd(portal_eis_fd) };
             // SAFETY: null user data is permitted by ei_new_sender.
-            let ei_context_ptr = unsafe { (ei_api.new_sender)(null_mut()) };
-            let Some(ei_context) = NonNull::new(ei_context_ptr) else {
+            let Some(ei_context) = NonNull::new(unsafe { (ei_api.new_sender)(null_mut()) }) else {
                 return Err(Cow::Borrowed("ei_new_sender 실패"));
             };
             let ei = EiSession {
@@ -773,34 +761,24 @@ impl WaylandInput {
         ];
         poll_fds(&mut fds, timeout)?;
         let [portal_poll, ei_poll] = fds;
-        if portal_poll.is_invalid() {
-            return Err(Cow::Borrowed(
-                "liboeffis poll descriptor가 무효화되었습니다.",
-            ));
-        }
-        if ei_poll.is_invalid() {
-            return Err(Cow::Borrowed("libei poll descriptor가 무효화되었습니다."));
-        }
+        portal_poll.ensure_valid("liboeffis poll descriptor가 무효화되었습니다.")?;
+        ei_poll.ensure_valid("libei poll descriptor가 무효화되었습니다.")?;
         if portal_poll.has_events() {
             let connected = self.portal.dispatch()?;
-            if portal_poll.has_terminal_error() {
-                return Err(Cow::Borrowed("liboeffis poll 연결이 종료되었습니다."));
-            }
             if connected {
                 return Err(Cow::Borrowed("예상하지 못한 추가 EIS 연결이 발생했습니다."));
             }
         }
+        portal_poll.ensure_open("liboeffis poll 연결이 종료되었습니다.")?;
         if ei_poll.has_events() {
             let pong = self.ei.dispatch()?;
-            if ei_poll.has_terminal_error() {
-                return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
-            }
             if pong.is_some() {
                 return Err(Cow::Borrowed(
                     "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
                 ));
             }
         }
+        ei_poll.ensure_open("libei poll 연결이 종료되었습니다.")?;
         Ok(())
     }
     fn wait_until_ready<F>(&mut self, deadline: Instant, should_cancel: &mut F) -> InputResult<bool>

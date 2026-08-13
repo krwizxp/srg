@@ -66,15 +66,13 @@ impl ProgressBuffers {
         }
         cur.write_byte(b']')?;
         cur.write_byte(b' ')?;
-        let percent_width = if percent >= 100 {
+        for _ in 0..PERCENT_WIDTH.strict_sub(if percent >= 100 {
             3
         } else if percent >= 10 {
             2
         } else {
             1
-        };
-        let padding = PERCENT_WIDTH.strict_sub(percent_width);
-        for _ in 0..padding {
+        }) {
             cur.write_byte(b' ')?;
         }
         buf_write_u8_dec(&mut cur, percent)?;
@@ -86,7 +84,7 @@ impl ProgressBuffers {
         cur.write_bytes(b" | ETA: ")?;
         cur.write_bytes(&self.eta)?;
         cur.write_bytes(b" \x1b[K")?;
-        IoWrite::write_all(out, cur.written_slice()?)?;
+        IoWrite::write_all(out, cur.written_slice())?;
         IoWrite::flush(out)?;
         Ok(())
     }

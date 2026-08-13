@@ -104,9 +104,10 @@ fn main() -> Result<()> {
             let rng = HardwareRng::new();
             let num_64 = match rng.source() {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
-                    rng.write_initial_source_notice(&mut stderr().lock())?;
+                    let mut err = stderr().lock();
+                    rng.write_initial_source_notice(&mut err)?;
                     let data = generate_random_data_with_rng(&rng)?;
-                    rng.write_rdseed_fallback_notice(&mut stderr().lock())?;
+                    rng.write_rdseed_fallback_notice(&mut err)?;
                     let num_64 = data.num_64;
                     output_file.persist_and_print(&data)?;
                     num_64

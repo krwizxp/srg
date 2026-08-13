@@ -4,6 +4,15 @@ use std::fs::{self, File};
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+macro_rules! required_pair_args {
+    ($command:literal, $first_env:literal, $second_env:literal) => {
+        vec![
+            OsString::from($command),
+            required_env($first_env)?,
+            required_env($second_env)?,
+        ]
+    };
+}
 fn invalid_input(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
@@ -20,35 +29,19 @@ fn main() -> io::Result<()> {
             None,
         ),
         Some("ladder") => (
-            vec![
-                OsString::from("ladder"),
-                required_env("SRG_PLAYERS")?,
-                required_env("SRG_RESULTS")?,
-            ],
+            required_pair_args!("ladder", "SRG_PLAYERS", "SRG_RESULTS"),
             Some("사다리타기 결과:"),
         ),
         Some("random-integer") => (
-            vec![
-                OsString::from("random-integer"),
-                required_env("SRG_INT_MIN")?,
-                required_env("SRG_INT_MAX")?,
-            ],
+            required_pair_args!("random-integer", "SRG_INT_MIN", "SRG_INT_MAX"),
             Some("무작위 정수("),
         ),
         Some("random-float") => (
-            vec![
-                OsString::from("random-float"),
-                required_env("SRG_FLOAT_MIN")?,
-                required_env("SRG_FLOAT_MAX")?,
-            ],
+            required_pair_args!("random-float", "SRG_FLOAT_MIN", "SRG_FLOAT_MAX"),
             Some("무작위 실수("),
         ),
         Some("time-sync-observe") => (
-            vec![
-                OsString::from("time-observe"),
-                required_env("SRG_TIME_HOST")?,
-                required_env("SRG_OBSERVE_SECONDS")?,
-            ],
+            required_pair_args!("time-observe", "SRG_TIME_HOST", "SRG_OBSERVE_SECONDS"),
             Some("서버 시간:"),
         ),
         Some(_) | None => return Err(invalid_input("unsupported SRG workflow action")),

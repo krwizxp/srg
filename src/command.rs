@@ -51,42 +51,31 @@ pub(super) enum CliCommand {
 impl CliCommand {
     pub(super) fn execute(self) -> Result<()> {
         let mut out = io::stdout().lock();
-        let mut err = io::stderr().lock();
+        let mut err = io::stderr();
         match self {
             #[cfg(target_arch = "x86_64")]
-            Self::Generate { count } => {
-                Self::run_with_rng(&mut err, |rng| {
-                    let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
-                    let _completion =
-                        regenerate_with_count(&mut output_file, rng, count, false, &mut out)?;
-                    Ok(())
-                })?;
-            }
+            Self::Generate { count } => Self::run_with_rng(&mut err, |rng| {
+                let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+                regenerate_with_count(&mut output_file, rng, count, false, &mut out).map(|_| ())
+            }),
             #[cfg(target_arch = "x86_64")]
-            Self::Ladder { players, results } => {
-                Self::run_with_rng(&mut err, |rng| {
-                    let seed = rng.next_u64()?;
-                    write_ladder_results(
-                        players.split(',').map(str::trim),
-                        results.split(',').map(str::trim),
-                        seed,
-                        rng,
-                        &mut out,
-                    )
-                })?;
-            }
+            Self::Ladder { players, results } => Self::run_with_rng(&mut err, |rng| {
+                write_ladder_results(
+                    players.split(',').map(str::trim),
+                    results.split(',').map(str::trim),
+                    rng.next_u64()?,
+                    rng,
+                    &mut out,
+                )
+            }),
             #[cfg(target_arch = "x86_64")]
-            Self::RandomFloat { max, min } => {
-                Self::run_with_rng(&mut err, |rng| {
-                    generate_random_float(min, max, rng.next_u64()?, &mut out, rng)
-                })?;
-            }
+            Self::RandomFloat { max, min } => Self::run_with_rng(&mut err, |rng| {
+                generate_random_float(min, max, rng.next_u64()?, &mut out, rng)
+            }),
             #[cfg(target_arch = "x86_64")]
-            Self::RandomInteger { max, min } => {
-                Self::run_with_rng(&mut err, |rng| {
-                    generate_random_integer(min, max, rng.next_u64()?, &mut out, rng)
-                })?;
-            }
+            Self::RandomInteger { max, min } => Self::run_with_rng(&mut err, |rng| {
+                generate_random_integer(min, max, rng.next_u64()?, &mut out, rng)
+            }),
             Self::TimeObserve { host, seconds } => {
                 ServerTimeSession {
                     host,
@@ -94,10 +83,9 @@ impl CliCommand {
                     stop_after: Some(Duration::from_secs(seconds)),
                 }
                 .run_loop(&mut out, &mut err)?;
-                writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
+                writeln!(out, "\n서버 시간 확인을 종료합니다.").map_err(AppError::from)
             }
         }
-        Ok(())
     }
     #[cfg(target_arch = "x86_64")]
     fn owned_text(arg: OsString, label: &str) -> Result<String> {
@@ -122,8 +110,7 @@ impl CliCommand {
         run: impl FnOnce(&HardwareRng) -> Result<()>,
     ) -> Result<()> {
         let rng = HardwareRng::new();
-        let source = rng.source();
-        if source == HardwareRandomSource::None {
+        if rng.source() == HardwareRandomSource::None {
             return Err("RDSEED·RDRAND를 지원하지 않는 CPU입니다.".into());
         }
         rng.write_initial_source_notice(err)?;
@@ -138,7 +125,6 @@ where
     type Error = AppError;
     fn try_from((raw_command, mut args): (OsString, I)) -> Result<Self> {
         const INVALID_COMMAND_NAME: &str = "명령 이름은 유효한 Unicode여야 합니다.";
-        let command = raw_command.to_str().ok_or(INVALID_COMMAND_NAME)?;
         let take_two_args = |iterator: &mut I, usage: &str| -> Result<(OsString, OsString)> {
             let (Some(first), Some(second), None) =
                 (iterator.next(), iterator.next(), iterator.next())
@@ -147,7 +133,7 @@ where
             };
             Ok((first, second))
         };
-        match command {
+        match raw_command.to_str().ok_or(INVALID_COMMAND_NAME)? {
             #[cfg(target_arch = "x86_64")]
             "generate" => {
                 let (Some(count_arg), None) = (args.next(), args.next()) else {

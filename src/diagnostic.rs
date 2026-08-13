@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Display, Write as _},
     result::Result as CoreResult,
 };
-use std::io::{self, Error as IoError};
+use std::io::Error as IoError;
 type BoxError = Box<dyn Error + Send + Sync>;
 pub(super) type Result<T> = CoreResult<T, AppError>;
 pub(super) struct AppError {
@@ -93,19 +93,6 @@ impl From<TimeError> for AppError {
     fn from(source: TimeError) -> Self {
         Self::context("시간 처리 오류", source)
     }
-}
-pub(super) fn is_unexpected_eof(error: &(dyn Error + 'static)) -> bool {
-    let mut current = Some(error);
-    while let Some(source) = current {
-        if source
-            .downcast_ref::<IoError>()
-            .is_some_and(|io_error| io_error.kind() == io::ErrorKind::UnexpectedEof)
-        {
-            return true;
-        }
-        current = source.source();
-    }
-    false
 }
 fn write_control_escaped(formatter: &mut fmt::Formatter<'_>, text: &str) -> fmt::Result {
     for character in text.chars() {

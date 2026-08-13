@@ -25,6 +25,12 @@ impl ByteCursor<'_> {
         *self.take_array::<2>()? = two_digits(low_u8_from_u32(value));
         Ok(())
     }
+    fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
+        let hundreds = low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD));
+        let [tens, ones] = two_digits(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
+        *self.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
+        Ok(())
+    }
     fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
         if year >= 0_i32 {
             let year_value = year.cast_unsigned();
@@ -41,11 +47,7 @@ impl ByteCursor<'_> {
         self.write_byte(b'-')?;
         let abs = year.unsigned_abs();
         if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
-            let hundreds = low_u8_from_u32(abs.div_euclid(U32_THREE_DIGIT_THRESHOLD));
-            let rem = low_u8_from_u32(abs.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
-            let [tens, ones] = two_digits(rem);
-            *self.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
-            return Ok(());
+            return self.write_u32_3digits(abs);
         }
         self.write_u32_dec(abs)
     }
@@ -123,10 +125,6 @@ impl ServerTime {
         cur.write_byte(b':')?;
         cur.write_u32_2digits(second)?;
         cur.write_byte(b'.')?;
-        let hundreds = low_u8_from_u32(millis.div_euclid(U32_THREE_DIGIT_THRESHOLD));
-        let rem = low_u8_from_u32(millis.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
-        let [tens, ones] = two_digits(rem);
-        *cur.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
-        Ok(())
+        cur.write_u32_3digits(millis).map_err(Into::into)
     }
 }

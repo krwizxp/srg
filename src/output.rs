@@ -1,6 +1,6 @@
 use crate::{
     BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_START,
-    buffmt::{ByteCursor, digit_byte, two_digits, write_zero_err},
+    buffmt::{ByteCursor, digit_byte, two_digits},
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
@@ -55,8 +55,7 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            let galaxy_number = u16::from(galaxy_number_byte).strict_add(1);
-            buffer_cur.write_u32_dec(u32::from(galaxy_number))
+            buffer_cur.write_u32_dec(u32::from(galaxy_number_byte).strict_add(1))
         })?;
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number)?;
@@ -116,14 +115,15 @@ impl OutputFormatter<'_, '_, '_> {
             let mut tmp = [0_u8; OCTAL_TMP_LEN];
             let mut index = tmp.len();
             let mut octal_number = number64;
-            while octal_number != 0 {
-                index = index.checked_sub(1).ok_or_else(write_zero_err)?;
-                let oct_digit = low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK);
-                let slot = tmp.get_mut(index).ok_or_else(write_zero_err)?;
-                *slot = digit_byte(oct_digit);
+            for slot in tmp.iter_mut().rev() {
+                if octal_number == 0 {
+                    break;
+                }
+                *slot = digit_byte(low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK));
                 octal_number >>= OCTAL_SHIFT_BITS;
+                index = index.strict_sub(1);
             }
-            buffer_cur.write_bytes(tmp.get(index..).ok_or_else(write_zero_err)?)
+            buffer_cur.write_bytes(tmp.split_at(index).1)
         })?;
         self.write_prefixed_byte_groups("16진수: ", hex_byte)?;
         self.write_labeled_line("Hex 코드: ".as_bytes(), |buffer_cur| {
@@ -159,17 +159,10 @@ impl OutputFormatter<'_, '_, '_> {
         let prefix_bytes = prefix.as_bytes();
         let prefix_len = prefix_bytes.len();
         let line_len = prefix_len
-            .checked_add(
-                WIDTH
-                    .checked_mul(BYTE_GROUP_COUNT)
-                    .ok_or_else(write_zero_err)?,
-            )
-            .and_then(|value| value.checked_add(BYTE_GROUP_COUNT))
-            .ok_or_else(write_zero_err)?;
+            .strict_add(WIDTH.strict_mul(BYTE_GROUP_COUNT))
+            .strict_add(BYTE_GROUP_COUNT);
         let head = self.cursor.take(line_len)?;
-        let Some((prefix_out, groups)) = head.split_at_mut_checked(prefix_len) else {
-            return Err(write_zero_err());
-        };
+        let (prefix_out, groups) = head.split_at_mut(prefix_len);
         prefix_out.copy_from_slice(prefix_bytes);
         let last_index = BYTE_GROUP_COUNT.strict_sub(1);
         for (index, (group_out, byte)) in groups
@@ -178,14 +171,9 @@ impl OutputFormatter<'_, '_, '_> {
             .enumerate()
         {
             let group = render_group(byte);
-            let Some((value_out, separator_out)) = group_out.split_at_mut_checked(WIDTH) else {
-                return Err(write_zero_err());
-            };
+            let (value_out, separator_out) = group_out.split_at_mut(WIDTH);
             value_out.copy_from_slice(&group);
-            let Some(separator) = separator_out.first_mut() else {
-                return Err(write_zero_err());
-            };
-            *separator = if index == last_index { b'\n' } else { b' ' };
+            separator_out.fill(if index == last_index { b'\n' } else { b' ' });
         }
         Ok(())
     }
@@ -252,13 +240,10 @@ pub(super) fn format_data_into_buffer(
     formatter.write_number_lines()?;
     formatter.write_random_lines()?;
     formatter.write_nms_lines()?;
-    Ok(cur.written_slice()?.len())
+    Ok(cur.written_slice().len())
 }
-fn checked_add_index(value: usize, amount: usize) -> IoResult<usize> {
-    value.checked_add(amount).ok_or_else(write_zero_err)
-}
-pub(super) fn prefix_slice(slice: &[u8], len: usize) -> IoResult<&[u8]> {
-    slice.get(..len).ok_or_else(write_zero_err)
+pub(super) const fn prefix_slice(slice: &[u8], len: usize) -> &[u8] {
+    slice.split_at(len).0
 }
 const fn bit(byte: u8, mask: u8) -> u8 {
     if byte & mask == 0 { b'0' } else { b'1' }
@@ -282,49 +267,28 @@ const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
 fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) -> IoResult<()> {
     let total = chars
         .iter()
-        .try_fold(0_usize, |total, ch| checked_add_index(total, ch.len_utf8()))?;
-    let head = cur.take(total)?;
-    let mut pos = 0_usize;
+        .fold(0_usize, |sum, ch| sum.strict_add(ch.len_utf8()));
+    let mut tail = cur.take(total)?;
     for &ch in chars {
-        let tail = head.get_mut(pos..).ok_or_else(write_zero_err)?;
         let written = ch.encode_utf8(tail).len();
-        pos = checked_add_index(pos, written)?;
+        tail = tail.split_at_mut(written).1;
     }
     Ok(())
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) -> IoResult<()> {
-    let target = cur.take(if n >= U8_THREE_DIGIT_THRESHOLD {
-        3
-    } else if n >= U8_TWO_DIGIT_THRESHOLD {
-        2
-    } else {
-        1
-    })?;
     if n >= U8_THREE_DIGIT_THRESHOLD {
-        let hundreds = n.div_euclid(U8_THREE_DIGIT_THRESHOLD);
-        let rem = n.rem_euclid(U8_THREE_DIGIT_THRESHOLD);
-        let Some((digit_slot, remaining_tail)) = target.split_first_mut() else {
-            return Err(write_zero_err());
-        };
-        *digit_slot = digit_byte(hundreds);
-        let Some(remaining_digits) = remaining_tail.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-            return Err(write_zero_err());
-        };
-        *remaining_digits = two_digits(rem);
+        let &mut [ref mut hundreds, ref mut tens, ref mut ones] = cur.take_array::<3>()?;
+        *hundreds = digit_byte(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
+        let [tens_value, ones_value] = two_digits(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
+        *tens = tens_value;
+        *ones = ones_value;
         return Ok(());
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {
-        let Some(digits) = target.first_chunk_mut::<TWO_DIGIT_WIDTH>() else {
-            return Err(write_zero_err());
-        };
-        *digits = two_digits(n);
+        *cur.take_array::<TWO_DIGIT_WIDTH>()? = two_digits(n);
         return Ok(());
     }
-    let Some(slot) = target.first_mut() else {
-        return Err(write_zero_err());
-    };
-    *slot = digit_byte(n);
-    Ok(())
+    cur.write_byte(digit_byte(n))
 }
 fn buf_write_u8_array_spaced<const N: usize>(
     cur: &mut ByteCursor<'_>,
@@ -345,25 +309,13 @@ fn buf_write_prefixed_hex24(
     b1: u8,
     b2: u8,
 ) -> IoResult<()> {
-    let width = checked_add_index(prefix.len(), 6)?;
-    let head = cur.take(width)?;
-    let Some((prefix_out, hex_bytes)) = head.split_at_mut_checked(prefix.len()) else {
-        return Err(write_zero_err());
-    };
+    let head = cur.take(prefix.len().strict_add(6))?;
+    let (prefix_out, hex_bytes) = head.split_at_mut(prefix.len());
     prefix_out.copy_from_slice(prefix);
-    let Some((first_hex, remaining_hex_bytes)) =
-        hex_bytes.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-    else {
-        return Err(write_zero_err());
-    };
-    first_hex.copy_from_slice(&hex_byte(b0));
-    let Some((second_hex, third_hex)) =
-        remaining_hex_bytes.split_first_chunk_mut::<TWO_DIGIT_WIDTH>()
-    else {
-        return Err(write_zero_err());
-    };
-    second_hex.copy_from_slice(&hex_byte(b1));
-    third_hex.copy_from_slice(&hex_byte(b2));
+    let [b00, b01] = hex_byte(b0);
+    let [b10, b11] = hex_byte(b1);
+    let [b20, b21] = hex_byte(b2);
+    hex_bytes.copy_from_slice(&[b00, b01, b10, b11, b20, b21]);
     Ok(())
 }
 fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) -> IoResult<()> {

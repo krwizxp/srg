@@ -64,12 +64,7 @@ fn write_worker_chunk(
     }
     output
         .writer
-        .write_all(
-            chunk
-                .bytes
-                .get(..chunk.written_len)
-                .ok_or_else(|| AppError::message("작업자 출력 범위 손상"))?,
-        )
+        .write_all(output::prefix_slice(&chunk.bytes, chunk.written_len))
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
     output.last = chunk.last.take();
     drop(output);

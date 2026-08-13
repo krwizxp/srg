@@ -476,11 +476,10 @@ unsafe extern "C" fn write_callback(
     let bytes = unsafe { slice::from_raw_parts(payload_head.as_ptr(), len) };
     // SAFETY: userdata is the CurlWriteTarget pointer configured before curl_easy_perform.
     let target = unsafe { target_ptr.as_mut() };
-    let accepted = match *target {
+    if !match *target {
         CurlWriteTarget::Body(ref mut buffer) => (*buffer).append(bytes),
         CurlWriteTarget::Header(ref mut capture) => (*capture).append(bytes),
-    };
-    if !accepted {
+    } {
         return 0;
     }
     len
