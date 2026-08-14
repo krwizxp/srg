@@ -2472,6 +2472,18 @@
         filterTimer = null;
       }
     }
+    function updatePageNavigation(visibleCount) {
+      const pageCount = Math.max(
+        1,
+        Math.ceil(visibleCount / RESULT_PAGE_SIZE),
+      );
+      if (AppState.page >= pageCount) AppState.page = pageCount - 1;
+      domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
+      domElements.pagePrev.disabled = AppState.page === 0;
+      domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
+      domElements.pageStatus.textContent =
+        `${fmt(AppState.page + 1)} / ${fmt(pageCount)} 페이지 · ${fmt(visibleCount)}건`;
+    }
     function rebuildVisibleIndices() {
       const f = FILTER_SNAP;
       const indices = AppState.visibleIndices;
@@ -2488,8 +2500,7 @@
       closeMapPopover();
       const indices = AppState.visibleIndices;
       const visibleCount = indices.length;
-      const pageCount = Math.max(1, Math.ceil(visibleCount / RESULT_PAGE_SIZE));
-      if (AppState.page >= pageCount) AppState.page = pageCount - 1;
+      updatePageNavigation(visibleCount);
       const start = AppState.page * RESULT_PAGE_SIZE;
       const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
       const fragment = document.createDocumentFragment();
@@ -2499,12 +2510,27 @@
       }
       domElements.tbody.replaceChildren(fragment);
       domElements.tableWrap.classList.toggle("has-results", AppState.processed > 0);
-      domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
-      domElements.pagePrev.disabled = AppState.page === 0;
-      domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
-      domElements.pageStatus.textContent =
-        `${fmt(AppState.page + 1)} / ${fmt(pageCount)} 페이지 · ${fmt(visibleCount)}건`;
       if (resetScroll) domElements.tableWrap.scrollTop = 0;
+    }
+    function renderCommittedResult(index, visiblePosition) {
+      if (pageRenderReq !== null || filterTimer !== null) return;
+      const visibleCount = AppState.visibleIndices.length;
+      updatePageNavigation(visibleCount);
+      domElements.tableWrap.classList.toggle(
+        "has-results",
+        AppState.processed > 0,
+      );
+      const start = AppState.page * RESULT_PAGE_SIZE;
+      const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
+      if (visiblePosition < start || visiblePosition >= end) return;
+      const expectedRows = visiblePosition - start;
+      if (domElements.tbody.children.length !== expectedRows) {
+        schedulePageRender();
+        return;
+      }
+      domElements.tbody.append(
+        createResultRow(AppState.records[index], index),
+      );
     }
     function schedulePageRender() {
       pageRenderReq ??= requestAnimationFrame(() => renderCurrentPage());
@@ -2591,10 +2617,10 @@
         this.task = status === "idle"
           ? null
           : {
-             status,
-             controller: new AbortController(),
-             resume: null,
-           };
+            status,
+            controller: new AbortController(),
+            resume: null,
+          };
         if (this.renderReq !== null) {
           cancelAnimationFrame(this.renderReq);
           this.renderReq = null;
@@ -3397,8 +3423,10 @@
       }
       await flushCacheWrites();
       if (AppState.task !== task) return;
-      if (pageRenderReq !== null) cancelAnimationFrame(pageRenderReq);
-      renderCurrentPage();
+      if (pageRenderReq !== null) {
+        cancelAnimationFrame(pageRenderReq);
+        renderCurrentPage();
+      }
       if (AppState.isStopping) {
         setControlsIdle("중지되었습니다.", "stopped");
       } else if (AppState.processed >= AppState.records.length) {
@@ -3450,11 +3478,13 @@
       r._search = null;
       AppState.processed++;
       if (parsed.error) AppState.cntFail++;
+      let visiblePosition = -1;
       if (matchesFilter(r, FILTER_SNAP)) {
+        visiblePosition = AppState.visibleIndices.length;
         AppState.visibleIndices.push(index);
       }
       scheduleRender();
-      if (render) schedulePageRender();
+      if (render) renderCommittedResult(index, visiblePosition);
     }
     async function handleExport() {
       if (EXPORT_TASK) return EXPORT_TASK.promise;
