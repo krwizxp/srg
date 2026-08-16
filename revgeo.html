@@ -2514,12 +2514,13 @@
     }
     function renderCommittedResult(index, visiblePosition) {
       if (pageRenderReq !== null || filterTimer !== null) return;
-      const visibleCount = AppState.visibleIndices.length;
-      updatePageNavigation(visibleCount);
       domElements.tableWrap.classList.toggle(
         "has-results",
         AppState.processed > 0,
       );
+      if (visiblePosition < 0) return;
+      const visibleCount = AppState.visibleIndices.length;
+      updatePageNavigation(visibleCount);
       const start = AppState.page * RESULT_PAGE_SIZE;
       const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
       if (visiblePosition < start || visiblePosition >= end) return;
