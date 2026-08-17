@@ -447,11 +447,11 @@
           background-size: 220% 100%, 100% 100%;
         }
 
-        &:not([value="0"]):not([value="100"])::-webkit-progress-value {
+        &[data-running]:not([value="0"]):not([value="100"])::-webkit-progress-value {
           animation: loading-shimmer 1.4s linear infinite;
         }
 
-        &:not([value="0"]):not([value="100"])::-moz-progress-bar {
+        &[data-running]:not([value="0"]):not([value="100"])::-moz-progress-bar {
           animation: loading-shimmer 1.4s linear infinite;
         }
       }
@@ -714,7 +714,7 @@
         display: none;
       }
 
-      .table-wrap[aria-busy="true"] .loading-rows {
+      .table-wrap[data-running]:not(.has-results) .loading-rows {
         display: table-footer-group;
       }
 
@@ -734,13 +734,15 @@
           inset: 0;
           background: linear-gradient(in oklch 90deg, transparent, light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h), oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)), transparent);
           transform: translateX(-120%);
-          animation: skeleton-shimmer-x 1.5s linear infinite;
           will-change: transform;
         }
       }
+      .table-wrap[data-running]:not(.has-results) .skeleton-bar::after {
+        animation: skeleton-shimmer-x 1.5s linear infinite;
+      }
 
       @container (inline-size <=900px) {
-        .table-wrap[aria-busy="true"] .loading-rows {
+        .table-wrap[data-running]:not(.has-results) .loading-rows {
           display: block;
           padding: 16px;
         }
@@ -2658,6 +2660,8 @@
     function updateUIState() {
       const s = AppState.status;
       const isBusy = AppState.isBusy;
+      domElements.tableWrap.toggleAttribute("data-running", s === "running");
+      domElements.prog.toggleAttribute("data-running", s === "running");
       domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
       domElements.parseBtn.disabled = isBusy;
       domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
@@ -4411,17 +4415,18 @@
             let suppInputCount = 0;
             let queuedSuppCount = 0;
             let renderedPreviewCount = -1;
-            let supplementIndex = 0;
+            let supplementHead = 0;
+            let supplementCursor = 0;
             let preloadedCount = 0;
             const nextSupplement = (reason) => {
-              if (supplementIndex === supplementValues.length) {
+              if (supplementCursor === supplementValues.length) {
                 const queued = suppTokens.next();
                 if (queued.done) throw new SupplementRequired(reason);
                 supplementValues.push(parseU64(queued.value));
                 preloadedCount += 1;
               }
-              const value = supplementValues[supplementIndex];
-              supplementIndex += 1;
+              const value = supplementValues[supplementCursor];
+              supplementCursor += 1;
               return { value, bitsRemaining: 64 };
             };
             const updateManualProgress = (state) => {
@@ -4453,21 +4458,21 @@
               preloadedCount = 0;
               let generated;
               for (; ;) {
-                supplementIndex = 0;
+                supplementCursor = supplementHead;
                 try {
                   generated = generateRandomDataFromNum(num, nextSupplement);
-                  suppInputCount += supplementIndex;
+                  suppInputCount += supplementCursor - supplementHead;
                   queuedSuppCount += preloadedCount;
-                  if (supplementIndex === supplementValues.length) {
+                  supplementHead = supplementCursor;
+                  if (supplementHead === supplementValues.length) {
                     supplementValues.length = 0;
-                  } else {
-                    supplementValues.splice(0, supplementIndex);
+                    supplementHead = 0;
                   }
                   break;
                 } catch (err) {
                   if (!(err instanceof SupplementRequired)) throw err;
                   const values = await requestSupplementBatch(
-                    suppInputCount + supplementIndex + 1,
+                    suppInputCount + supplementCursor - supplementHead + 1,
                     err.message,
                     processedCount,
                   );
