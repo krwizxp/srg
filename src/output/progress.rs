@@ -87,7 +87,8 @@ impl ProgressBuffers {
         cur.write_bytes(b" | ETA: ");
         cur.write_bytes(&self.eta);
         cur.write_bytes(b" \x1b[K");
-        IoWrite::write_all(out, cur.written_slice())?;
+        let written_len = cur.written_len();
+        IoWrite::write_all(out, self.line.split_at(written_len).0)?;
         IoWrite::flush(out)?;
         Ok(())
     }

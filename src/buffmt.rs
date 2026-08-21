@@ -1,28 +1,25 @@
-use core::{
-    fmt::{self, NumBuffer},
-    range::Range,
-};
+use core::fmt::{self, NumBuffer};
 use std::process;
 pub(super) struct ByteCursor<'buffer> {
-    buf: &'buffer mut [u8],
-    pos: usize,
+    initial_len: usize,
+    remaining: &'buffer mut [u8],
 }
 impl<'buffer> ByteCursor<'buffer> {
-    pub(super) const fn new(buf: &'buffer mut [u8]) -> Self {
-        Self { buf, pos: 0 }
+    pub(super) const fn new(remaining: &'buffer mut [u8]) -> Self {
+        Self {
+            initial_len: remaining.len(),
+            remaining,
+        }
     }
     pub(super) fn take(&mut self, len: usize) -> &mut [u8] {
-        let start = self.pos;
-        let end = start.strict_add(len);
-        let slice = self
-            .buf
-            .get_mut(Range { start, end })
-            .unwrap_or_else(|| process::abort());
-        self.pos = end;
-        slice
+        self.remaining
+            .split_off_mut(..len)
+            .unwrap_or_else(|| process::abort())
     }
     pub(super) fn take_array<const N: usize>(&mut self) -> &mut [u8; N] {
-        self.take(N).try_into().unwrap_or_else(|_| process::abort())
+        self.take(N)
+            .as_mut_array()
+            .unwrap_or_else(|| process::abort())
     }
     pub(super) fn write_byte(&mut self, byte: u8) {
         self.write_bytes(&[byte]);
@@ -43,8 +40,8 @@ impl<'buffer> ByteCursor<'buffer> {
         let mut buffer = NumBuffer::new();
         self.write_bytes(value.format_into(&mut buffer).as_bytes());
     }
-    pub(super) const fn written_slice(&self) -> &[u8] {
-        self.buf.split_at(self.pos).0
+    pub(super) const fn written_len(self) -> usize {
+        self.initial_len.strict_sub(self.remaining.len())
     }
 }
 impl fmt::Write for ByteCursor<'_> {

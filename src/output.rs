@@ -232,10 +232,7 @@ pub(super) fn format_data_into_buffer(
     formatter.write_number_lines();
     formatter.write_random_lines();
     formatter.write_nms_lines();
-    cur.written_slice().len()
-}
-pub(super) const fn prefix_slice(slice: &[u8], len: usize) -> &[u8] {
-    slice.split_at(len).0
+    cur.written_len()
 }
 const fn bit(byte: u8, mask: u8) -> u8 {
     if byte & mask == 0 { b'0' } else { b'1' }

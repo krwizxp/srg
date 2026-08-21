@@ -65,7 +65,7 @@ fn write_worker_chunk(
     }
     output
         .writer
-        .write_all(output::prefix_slice(&chunk.bytes, chunk.written_len))
+        .write_all(chunk.bytes.split_at(chunk.written_len).0)
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
     output.last = chunk.last.take();
     drop(output);

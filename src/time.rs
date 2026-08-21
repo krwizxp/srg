@@ -1328,7 +1328,8 @@ impl AppState<'_> {
             cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes());
             server_time.write_current_display_time_buf_at(&mut cur, now)?;
             cur.write_bytes(b" \r");
-            output.write_all(cur.written_slice())?;
+            let written_len = cur.written_len();
+            output.write_all(buffer.split_at(written_len).0)?;
             output.flush()?;
             *last_update = now;
         }

@@ -128,8 +128,7 @@ fn parse_http_weekday(weekday_str: &str) -> Option<u32> {
     }
 }
 fn parse_i32_token(raw: &str, err: &'static str) -> Result<i32> {
-    let value = parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))?;
-    parse_result_with_context(i32::try_from(value), err)
+    parse_result_with_context(i32::try_from(parse_u32_token(raw, err)?), err)
 }
 fn parse_u32_token(raw: &str, err: &'static str) -> Result<u32> {
     parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))
@@ -139,14 +138,6 @@ fn next_date_part<'part>(
     err: &'static str,
 ) -> Result<&'part str> {
     parts.next().ok_or_else(|| TimeError::parse(err))
-}
-fn strip_date_suffix<'date>(
-    raw: &'date str,
-    suffix: char,
-    err: &'static str,
-) -> Result<&'date str> {
-    raw.strip_suffix(suffix)
-        .ok_or_else(|| TimeError::parse(err))
 }
 fn ensure_parts_exhausted(parts: &mut SplitAsciiWhitespace<'_>, err: &'static str) -> Result<()> {
     parts.next().is_none().ok_or_else(|| TimeError::parse(err))
@@ -291,7 +282,9 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             {
                 return Err(TimeError::parse(ERR_IMF_FORMAT));
             }
-            let weekday_name = strip_date_suffix(weekday_token, ',', ERR_IMF_FORMAT)?;
+            let weekday_name = weekday_token
+                .strip_suffix(',')
+                .ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
             let weekday =
                 parse_http_weekday(weekday_name).ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
             let day = parse_u32_token(day_token, ERR_IMF_NUM)?;
@@ -311,7 +304,9 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             if tz_token != "GMT" {
                 return Err(TimeError::parse(ERR_RFC850_FORMAT));
             }
-            let weekday_name = strip_date_suffix(weekday_token, ',', ERR_RFC850_FORMAT)?;
+            let weekday_name = weekday_token
+                .strip_suffix(',')
+                .ok_or_else(|| TimeError::parse(ERR_RFC850_FORMAT))?;
             let weekday = parse_http_weekday(weekday_name)
                 .ok_or_else(|| TimeError::parse(ERR_RFC850_FORMAT))?;
             let mut date_parts = date_token.split('-');

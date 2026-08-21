@@ -2,7 +2,7 @@ use crate::diagnostic::{AppError, Result};
 use crate::{
     BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_LINE_COUNT, FILE_RECORD_START, IS_TERMINAL,
     UTF8_BOM,
-    output::{OutputTarget, format_data_into_buffer, prefix_slice, write_slice_to_console},
+    output::{OutputTarget, format_data_into_buffer, write_slice_to_console},
     random_data::RandomDataSet,
 };
 use core::str;
@@ -249,13 +249,13 @@ impl OutputFile {
     pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
         let mut buffer = [0_u8; BUFFER_SIZE];
         let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File);
-        self.file.write_all(prefix_slice(&buffer, file_len))?;
+        self.file.write_all(buffer.split_at(file_len).0)?;
         let output_len = if *IS_TERMINAL {
             format_data_into_buffer(data, &mut buffer, OutputTarget::Console)
         } else {
             file_len
         };
-        write_slice_to_console(prefix_slice(&buffer, output_len))?;
+        write_slice_to_console(buffer.split_at(output_len).0)?;
         Ok(())
     }
     #[cfg(target_arch = "x86_64")]
