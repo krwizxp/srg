@@ -99,10 +99,7 @@ impl FromStr for ParsedServer {
         };
         #[cfg(target_os = "windows")]
         let host_wide = {
-            let capacity = host_part
-                .len()
-                .checked_add(1)
-                .ok_or_else(|| TimeError::parse("서버 host UTF-16 용량 계산 실패"))?;
+            let capacity = host_part.len().strict_add(1);
             let mut value = Vec::new();
             value.try_reserve_exact(capacity).map_err(|source| {
                 TimeError::parse_with_source("서버 host UTF-16 메모리 확보 실패", source)

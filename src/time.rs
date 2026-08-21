@@ -11,7 +11,7 @@ use core::{
     error::Error,
     fmt::{self, Write as FmtWrite},
     hint::spin_loop,
-    ops::Mul as NumericMul,
+    ops::{Div as NumericDiv, Mul as NumericMul},
     result::Result as CoreResult,
     str::FromStr,
     time::Duration,
@@ -86,7 +86,6 @@ const HTTP_MAX_TOTAL_DEADLINE_SHIFT: Duration = Duration::from_secs(2);
 const HTTP_SAMPLE_FRESHNESS: Duration = Duration::from_secs(2);
 const MAX_ACTION_LATENESS: Duration = Duration::from_secs(1);
 const MESSAGE_BUFFER_CAPACITY: usize = 256;
-const MILLIS_PER_SECOND_F64: f64 = 1000.0;
 const MIN_TRANSFER_TIME: Duration = Duration::from_micros(1);
 const RTT_TRIM_DIVISOR: usize = 5;
 type BoxError = Box<dyn Error + Send + Sync>;
@@ -355,8 +354,7 @@ impl TriggerTimingPolicy {
         Ok(())
     }
     fn one_way_delay(self, rtt: Duration) -> Duration {
-        let delay =
-            Duration::from_nanos_u128(rtt.as_nanos().div_euclid(u128::from(HALF_RTT_DIVISOR)));
+        let delay = NumericDiv::div(rtt, HALF_RTT_DIVISOR);
         match self {
             Self::AuthenticatedHttps => delay,
             Self::UnauthenticatedHttp(_) => delay.min(HTTP_MAX_ONE_WAY_DELAY),
@@ -372,10 +370,8 @@ impl TriggerTimingPolicy {
         let sample_age = now
             .checked_duration_since(last_sample_at)
             .ok_or_else(|| TimeError::parse("HTTP 샘플 단조 시각 순서가 유효하지 않습니다."))?;
-        if sample_age > HTTP_SAMPLE_FRESHNESS {
-            return Err(TimeError::parse("HTTP 최신 샘플이 만료되었습니다."));
-        }
-        Ok(())
+        (sample_age <= HTTP_SAMPLE_FRESHNESS)
+            .ok_or_else(|| TimeError::parse("HTTP 최신 샘플이 만료되었습니다."))
     }
     fn validate_server_deadline(
         self,
@@ -391,12 +387,9 @@ impl TriggerTimingPolicy {
         } else {
             guard.reference_server_deadline.duration_since(deadline)
         };
-        if shift > HTTP_MAX_TOTAL_DEADLINE_SHIFT {
-            return Err(TimeError::parse(
-                "HTTP 서버 deadline 누적 이동량이 허용 범위를 초과했습니다.",
-            ));
-        }
-        Ok(())
+        (shift <= HTTP_MAX_TOTAL_DEADLINE_SHIFT).ok_or_else(|| {
+            TimeError::parse("HTTP 서버 deadline 누적 이동량이 허용 범위를 초과했습니다.")
+        })
     }
 }
 impl FromStr for TargetTimeOfDay {
@@ -508,10 +501,7 @@ impl SampleWorker {
         if pending_generation.is_some() {
             return Ok(());
         }
-        let generation = self
-            .generation
-            .checked_add(1)
-            .ok_or_else(|| TimeError::parse("시간 샘플 요청 세대 번호가 소진되었습니다."))?;
+        let generation = self.generation.strict_add(1);
         match self.command_sender.try_send(generation) {
             Ok(()) => {
                 self.generation = generation;
@@ -640,7 +630,9 @@ impl ServerTimeSession {
             sample_worker: &mut sample_worker,
             scheduled_trigger,
         };
-        app_state.run_loop(self.stop_after, out, err)
+        app_state.run_loop(self.stop_after, out, err)?;
+        writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
+        Ok(())
     }
 }
 impl AppState<'_> {
@@ -1333,9 +1325,9 @@ impl AppState<'_> {
             && let Some(server_time) = display_activity.server_time()
         {
             let mut cur = ByteCursor::new(buffer);
-            cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes())?;
+            cur.write_bytes(DISPLAY_STATUS_PREFIX.as_bytes());
             server_time.write_current_display_time_buf_at(&mut cur, now)?;
-            cur.write_bytes(b" \r")?;
+            cur.write_bytes(b" \r");
             output.write_all(cur.written_slice())?;
             output.flush()?;
             *last_update = now;
@@ -1552,7 +1544,7 @@ fn sample_worker_channels(
     Ok((command_sender, response_receiver))
 }
 fn duration_millis_f64(duration: Duration) -> f64 {
-    NumericMul::mul(duration.as_secs_f64(), MILLIS_PER_SECOND_F64)
+    NumericMul::mul(duration.as_secs_f64(), 1_000.0)
 }
 fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display) {
     append_fmt(target, format_args!("{prefix}{err}"));

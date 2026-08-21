@@ -1,8 +1,8 @@
 [package]
 name = "srg"
-version = "1.5.8"
+version = "1.5.9"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.98.0"
 description = """\
 Hardware RNG-based random data generator with high-precision server time sync \
 utility\

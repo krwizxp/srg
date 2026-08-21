@@ -36,13 +36,12 @@ impl HighResTimerGuard {
             // SAFETY: handle remains valid while waiting.
             let wait_status =
                 unsafe { sys::wait_for_single_object(self.handle.as_ptr(), INFINITE) };
-            if wait_status != WAIT_OBJECT_0 {
-                return Err(io::Error::other(format!(
+            (wait_status == WAIT_OBJECT_0).ok_or_else(|| {
+                io::Error::other(format!(
                     "WaitForSingleObject 상태 {wait_status:#010x}: {}",
                     io::Error::last_os_error()
-                )));
-            }
-            Ok(())
+                ))
+            })
         })()
         .inspect_err(|_| sleep(duration.saturating_sub(started_at.elapsed())))
     }

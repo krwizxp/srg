@@ -1,10 +1,8 @@
-use crate::numeric::low_u8_from_u64;
-use core::{fmt, range::Range};
-use std::io;
-const TWO_DIGIT_WIDTH: usize = 2;
-const U64_DEC_BUF_LEN: usize = 20;
-const U64_THREE_DIGIT_THRESHOLD: u64 = 100;
-const U64_TWO_DIGIT_THRESHOLD: u64 = 10;
+use core::{
+    fmt::{self, NumBuffer},
+    range::Range,
+};
+use std::process;
 pub(super) struct ByteCursor<'buffer> {
     buf: &'buffer mut [u8],
     pos: usize,
@@ -13,59 +11,37 @@ impl<'buffer> ByteCursor<'buffer> {
     pub(super) const fn new(buf: &'buffer mut [u8]) -> Self {
         Self { buf, pos: 0 }
     }
-    pub(super) fn take(&mut self, len: usize) -> io::Result<&mut [u8]> {
+    pub(super) fn take(&mut self, len: usize) -> &mut [u8] {
         let start = self.pos;
-        let end = start.checked_add(len).ok_or_else(write_zero_err)?;
+        let end = start.strict_add(len);
         let slice = self
             .buf
             .get_mut(Range { start, end })
-            .ok_or_else(write_zero_err)?;
+            .unwrap_or_else(|| process::abort());
         self.pos = end;
-        Ok(slice)
+        slice
     }
-    pub(super) fn take_array<const N: usize>(&mut self) -> io::Result<&mut [u8; N]> {
-        self.take(N)?.try_into().map_err(|_slice| write_zero_err())
+    pub(super) fn take_array<const N: usize>(&mut self) -> &mut [u8; N] {
+        self.take(N).try_into().unwrap_or_else(|_| process::abort())
     }
-    pub(super) fn write_byte(&mut self, byte: u8) -> io::Result<()> {
-        self.write_bytes(&[byte])
+    pub(super) fn write_byte(&mut self, byte: u8) {
+        self.write_bytes(&[byte]);
     }
-    pub(super) fn write_bytes(&mut self, bytes: &[u8]) -> io::Result<()> {
-        self.take(bytes.len())?.copy_from_slice(bytes);
-        Ok(())
+    pub(super) fn write_bytes(&mut self, bytes: &[u8]) {
+        self.take(bytes.len()).copy_from_slice(bytes);
     }
-    pub(super) fn write_format(&mut self, args: fmt::Arguments<'_>) -> io::Result<()> {
-        fmt::Write::write_fmt(self, args).map_err(|_error| write_zero_err())
-    }
-    pub(super) fn write_u32_dec(&mut self, value: u32) -> io::Result<()> {
-        self.write_u64_dec(u64::from(value))
-    }
-    pub(super) fn write_u64_dec(&mut self, mut value: u64) -> io::Result<()> {
-        let mut buffer = [0_u8; U64_DEC_BUF_LEN];
-        let mut index = buffer.len();
-        while value >= U64_THREE_DIGIT_THRESHOLD {
-            let remainder = low_u8_from_u64(value.rem_euclid(U64_THREE_DIGIT_THRESHOLD));
-            value = value.div_euclid(U64_THREE_DIGIT_THRESHOLD);
-            index = index
-                .checked_sub(TWO_DIGIT_WIDTH)
-                .ok_or_else(write_zero_err)?;
-            *buffer
-                .get_mut(index..)
-                .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
-                .ok_or_else(write_zero_err)? = two_digits(remainder);
+    pub(super) fn write_format(&mut self, args: fmt::Arguments<'_>) {
+        if fmt::Write::write_fmt(self, args).is_err() {
+            process::abort();
         }
-        if value >= U64_TWO_DIGIT_THRESHOLD {
-            index = index
-                .checked_sub(TWO_DIGIT_WIDTH)
-                .ok_or_else(write_zero_err)?;
-            *buffer
-                .get_mut(index..)
-                .and_then(|tail| tail.first_chunk_mut::<TWO_DIGIT_WIDTH>())
-                .ok_or_else(write_zero_err)? = two_digits(low_u8_from_u64(value));
-        } else {
-            index = index.checked_sub(1).ok_or_else(write_zero_err)?;
-            *buffer.get_mut(index).ok_or_else(write_zero_err)? = digit_byte(low_u8_from_u64(value));
-        }
-        self.write_bytes(buffer.get(index..).ok_or_else(write_zero_err)?)
+    }
+    pub(super) fn write_u32_dec(&mut self, value: u32) {
+        let mut buffer = NumBuffer::new();
+        self.write_bytes(value.format_into(&mut buffer).as_bytes());
+    }
+    pub(super) fn write_u64_dec(&mut self, value: u64) {
+        let mut buffer = NumBuffer::new();
+        self.write_bytes(value.format_into(&mut buffer).as_bytes());
     }
     pub(super) const fn written_slice(&self) -> &[u8] {
         self.buf.split_at(self.pos).0
@@ -73,11 +49,8 @@ impl<'buffer> ByteCursor<'buffer> {
 }
 impl fmt::Write for ByteCursor<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        if self.write_bytes(s.as_bytes()).is_ok() {
-            Ok(())
-        } else {
-            Err(fmt::Error)
-        }
+        self.write_bytes(s.as_bytes());
+        Ok(())
     }
 }
 pub(super) const fn two_digits(value: u8) -> [u8; 2] {
@@ -88,9 +61,4 @@ pub(super) const fn two_digits(value: u8) -> [u8; 2] {
 }
 pub(super) const fn digit_byte(value: u8) -> u8 {
     b'0'.strict_add(value)
-}
-#[inline(never)]
-#[cold]
-pub(super) fn write_zero_err() -> io::Error {
-    io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer")
 }

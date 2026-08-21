@@ -25,12 +25,9 @@ pub(super) fn read_line_reuse_limited<'buffer>(
     loop {
         let available = stdin_lock.fill_buf()?;
         if available.is_empty() {
-            if bytes.is_empty() {
-                return Err(IoError::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "표준 입력이 종료되었습니다.",
-                ));
-            }
+            (!bytes.is_empty()).ok_or_else(|| {
+                IoError::new(io::ErrorKind::UnexpectedEof, "표준 입력이 종료되었습니다.")
+            })?;
             break;
         }
         let line_end = available.iter().position(|&byte| byte == b'\n');

@@ -1,5 +1,5 @@
 use super::{NativeInputSendStatus, TriggerAction};
-use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
+use crate::{diagnostic::terminal_safe, write_line_best_effort};
 use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_short, c_uint, c_ulong, c_void},
@@ -622,7 +622,7 @@ impl PreparedInput {
                 err,
                 format_args!(
                     "[경고] Wayland 입력 세션 유지 실패: {}",
-                    TerminalSafeDisplay::from(&source)
+                    terminal_safe(&source)
                 ),
             );
             self.prepared = None;
@@ -709,7 +709,7 @@ impl PreparedInput {
                     err,
                     format_args!(
                         "[경고] Wayland 입력 사전 준비 실패: {}",
-                        TerminalSafeDisplay::from(&source)
+                        terminal_safe(&source)
                     ),
                 );
                 false
@@ -733,10 +733,7 @@ impl PreparedInput {
             Err(SendError::Before(source)) => {
                 write_line_best_effort(
                     err,
-                    format_args!(
-                        "[경고] Wayland 입력 실패: {}",
-                        TerminalSafeDisplay::from(&source)
-                    ),
+                    format_args!("[경고] Wayland 입력 실패: {}", terminal_safe(&source)),
                 );
                 NativeInputSendStatus::FailedBeforeSend
             }
@@ -745,7 +742,7 @@ impl PreparedInput {
                     err,
                     format_args!(
                         "[경고] Wayland 입력 전송 상태 불확실: {}",
-                        TerminalSafeDisplay::from(&source)
+                        terminal_safe(&source)
                     ),
                 );
                 NativeInputSendStatus::PartialOrUnknown

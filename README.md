@@ -17,7 +17,7 @@ SRG는 하드웨어 난수를 활용해 다양한 데이터를 생성하고, 서
 
 ## 지원 환경
 
-- Rust 1.97.1 이상
+- Rust 1.98.0 이상
 - Windows 10 22H2 이상 또는 Windows 11
 - Linux 및 macOS
 - Linux/macOS의 libcurl 7.85.0 이상

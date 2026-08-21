@@ -1,13 +1,12 @@
 use super::{
     CivilDate, KST_OFFSET_SECS, Result, ServerTime, TimeError, http_date::civil_from_days,
-    util::parse_result_with_context,
 };
 use crate::{
     buffmt::{ByteCursor, digit_byte, two_digits},
     numeric::low_u8_from_u32,
 };
 use std::{
-    io::Result as IoResult,
+    process,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 const DAY_SECONDS_I64: i64 = 86_400;
@@ -21,17 +20,15 @@ const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 impl ByteCursor<'_> {
-    fn write_u32_2digits(&mut self, value: u32) -> IoResult<()> {
-        *self.take_array::<2>()? = two_digits(low_u8_from_u32(value));
-        Ok(())
+    fn write_u32_2digits(&mut self, value: u32) {
+        *self.take_array::<2>() = two_digits(low_u8_from_u32(value));
     }
-    fn write_u32_3digits(&mut self, value: u32) -> IoResult<()> {
+    fn write_u32_3digits(&mut self, value: u32) {
         let hundreds = low_u8_from_u32(value.div_euclid(U32_THREE_DIGIT_THRESHOLD));
         let [tens, ones] = two_digits(low_u8_from_u32(value.rem_euclid(U32_THREE_DIGIT_THRESHOLD)));
-        *self.take_array::<3>()? = [digit_byte(hundreds), tens, ones];
-        Ok(())
+        *self.take_array::<3>() = [digit_byte(hundreds), tens, ones];
     }
-    fn write_year_padded4(&mut self, year: i32) -> IoResult<()> {
+    fn write_year_padded4(&mut self, year: i32) {
         if year >= 0_i32 {
             let year_value = year.cast_unsigned();
             if year_value < U32_FOUR_DIGIT_THRESHOLD {
@@ -39,17 +36,19 @@ impl ByteCursor<'_> {
                 let lo = low_u8_from_u32(year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
                 let [h0, h1] = two_digits(hi);
                 let [l0, l1] = two_digits(lo);
-                *self.take_array::<4>()? = [h0, h1, l0, l1];
-                return Ok(());
+                *self.take_array::<4>() = [h0, h1, l0, l1];
+                return;
             }
-            return self.write_u32_dec(year_value);
+            self.write_u32_dec(year_value);
+            return;
         }
-        self.write_byte(b'-')?;
+        self.write_byte(b'-');
         let abs = year.unsigned_abs();
         if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
-            return self.write_u32_3digits(abs);
+            self.write_u32_3digits(abs);
+            return;
         }
-        self.write_u32_dec(abs)
+        self.write_u32_dec(abs);
     }
 }
 impl ServerTime {
@@ -68,63 +67,51 @@ impl ServerTime {
     ) -> Result<()> {
         let current_time = self.current_server_time_at(now)?;
         let since_epoch = current_time.duration_since(UNIX_EPOCH)?;
-        let total_seconds = parse_result_with_context(
-            i64::try_from(since_epoch.as_secs()),
-            "초 계산 중 범위 오류",
-        )?;
-        let total_seconds_kst = total_seconds
-            .checked_add(KST_OFFSET_SECS)
-            .ok_or_else(|| TimeError::parse("초 계산 중 범위 오류"))?;
+        let total_seconds =
+            i64::try_from(since_epoch.as_secs()).unwrap_or_else(|_| process::abort());
+        let total_seconds_kst = total_seconds.strict_add(KST_OFFSET_SECS);
         let millis = since_epoch.subsec_millis();
         let days_since_epoch = total_seconds_kst.div_euclid(DAY_SECONDS_I64);
         let day_of_week_num = days_since_epoch
-            .checked_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
-            .ok_or_else(|| TimeError::parse("요일 계산 중 범위 오류"))?
+            .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
             .rem_euclid(DAYS_PER_WEEK_I64);
-        let day_of_week_idx =
-            parse_result_with_context(usize::try_from(day_of_week_num), "요일 계산 중 범위 오류")?;
+        let day_of_week_idx = usize::try_from(day_of_week_num).unwrap_or_else(|_| process::abort());
         let day_of_week_str = DAY_OF_WEEK_KO
             .get(day_of_week_idx)
             .copied()
-            .ok_or_else(|| TimeError::parse("요일 계산 중 범위 오류"))?;
+            .unwrap_or_else(|| process::abort());
         let sec_of_day = total_seconds_kst.rem_euclid(DAY_SECONDS_I64);
-        let hour = parse_result_with_context(
-            u32::try_from(sec_of_day.div_euclid(HOUR_SECONDS_I64)),
-            "시 계산 중 범위 오류",
-        )?;
-        let minute = parse_result_with_context(
-            u32::try_from(
-                sec_of_day
-                    .rem_euclid(HOUR_SECONDS_I64)
-                    .div_euclid(MINUTE_SECONDS_I64),
-            ),
-            "분 계산 중 범위 오류",
-        )?;
-        let second = parse_result_with_context(
-            u32::try_from(sec_of_day.rem_euclid(MINUTE_SECONDS_I64)),
-            "초 계산 중 범위 오류",
-        )?;
-        let day_index =
-            parse_result_with_context(i32::try_from(days_since_epoch), "일자 계산 중 범위 오류")?;
+        let hour = u32::try_from(sec_of_day.div_euclid(HOUR_SECONDS_I64))
+            .unwrap_or_else(|_| process::abort());
+        let minute = u32::try_from(
+            sec_of_day
+                .rem_euclid(HOUR_SECONDS_I64)
+                .div_euclid(MINUTE_SECONDS_I64),
+        )
+        .unwrap_or_else(|_| process::abort());
+        let second = u32::try_from(sec_of_day.rem_euclid(MINUTE_SECONDS_I64))
+            .unwrap_or_else(|_| process::abort());
+        let day_index = i32::try_from(days_since_epoch).unwrap_or_else(|_| process::abort());
         let CivilDate {
             day: day_of_month,
             month,
             year,
         } = civil_from_days(day_index);
-        cur.write_year_padded4(year)?;
-        cur.write_byte(b'-')?;
-        cur.write_u32_2digits(month)?;
-        cur.write_byte(b'-')?;
-        cur.write_u32_2digits(day_of_month)?;
-        cur.write_byte(b'(')?;
-        cur.write_bytes(day_of_week_str.as_bytes())?;
-        cur.write_bytes(b") ")?;
-        cur.write_u32_2digits(hour)?;
-        cur.write_byte(b':')?;
-        cur.write_u32_2digits(minute)?;
-        cur.write_byte(b':')?;
-        cur.write_u32_2digits(second)?;
-        cur.write_byte(b'.')?;
-        cur.write_u32_3digits(millis).map_err(Into::into)
+        cur.write_year_padded4(year);
+        cur.write_byte(b'-');
+        cur.write_u32_2digits(month);
+        cur.write_byte(b'-');
+        cur.write_u32_2digits(day_of_month);
+        cur.write_byte(b'(');
+        cur.write_bytes(day_of_week_str.as_bytes());
+        cur.write_bytes(b") ");
+        cur.write_u32_2digits(hour);
+        cur.write_byte(b':');
+        cur.write_u32_2digits(minute);
+        cur.write_byte(b':');
+        cur.write_u32_2digits(second);
+        cur.write_byte(b'.');
+        cur.write_u32_3digits(millis);
+        Ok(())
     }
 }

@@ -1,31 +1,19 @@
-use super::{FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeSample, error};
 use super::super::{ParsedServer, TimeError, UrlScheme};
+use super::{FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeSample, error};
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
-    mem::offset_of,
     ptr::{NonNull, null_mut},
-    slice,
-    str,
+    slice, str,
 };
-use std::{
-    sync::LazyLock,
-    time::Instant,
-};
+use std::{sync::LazyLock, time::Instant};
 mod sys;
 macro_rules! curl_setopt {
     ($handle:expr, $option:expr, $value:expr, $context:expr) => {{
         // SAFETY: call sites pair each option with a wrapper using its documented libcurl ABI type.
         let code = unsafe { sys::curl_easy_setopt($handle.as_ptr(), $option, $value) };
-        if code == CURLE_OK {
-            Ok(())
-        } else {
-            Err(error(
-                $context,
-                curl_error("curl_easy_setopt", code),
-            ))
-        }
+        (code == CURLE_OK).ok_or_else(|| error($context, curl_error("curl_easy_setopt", code)))
     }};
 }
 const AGE_HEADER_NAME: &[u8; 3] = b"age";
@@ -33,8 +21,6 @@ const CURLE_OK: CurlCode = 0;
 const CURL_ERROR_SIZE: usize = 256;
 const CURL_GLOBAL_DEFAULT: c_long = 3;
 const CURLINFO_SCHEME: CurlInfo = 0x10_0031;
-const CURL_MIN_PROTOCOLS_STR_VERSION: c_uint = 0x07_55_00;
-const CURLVERSION_NOW: CurlVersion = 11;
 const CURLOPT_CONNECTTIMEOUT_MS: CurlOption = 156;
 const CURLOPT_ERRORBUFFER: CurlOption = 10_010;
 const CURLOPT_FOLLOWLOCATION: CurlOption = 52;
@@ -53,16 +39,13 @@ const CURLOPT_WRITEFUNCTION: CurlOption = 20_011;
 const CURL_SSLVERSION_MAX_DEFAULT: c_long = 1 << 16;
 const CURL_SSLVERSION_TLSV1_2: c_long = 6;
 const DATE_HEADER_NAME: &[u8; 4] = b"date";
-const CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX: &str =
-    "은 HTTP protocol 제한 최신 API를 지원하지 않습니다. libcurl 7.85.0 이상이 필요합니다.";
 const HTTP_PROTOCOL: &CStr = c"http";
 const HTTP_USER_AGENT: &CStr = c"Rust-Time-Sync";
 const HTTP_HEAD_MAX_BODY_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_PLAIN_HEADER_BYTES: usize = 64 * 1024;
 const HTTPS_PROTOCOL: &CStr = c"https";
-const HTTPS_USER_AGENT_C_BYTES: &[u8] =
-    concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
+const HTTPS_USER_AGENT_C_BYTES: &[u8] = concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
 const HTTPS_USER_AGENT: &CStr = {
     // SAFETY: concat! emits exactly one trailing NUL here, and Cargo package versions cannot
     // contain interior NUL bytes.
@@ -74,34 +57,6 @@ static CURL_INIT: LazyLock<CurlCode> = LazyLock::new(|| {
     // SAFETY: LazyLock runs this initializer once before any easy handles are used.
     unsafe { sys::curl_global_init(CURL_GLOBAL_DEFAULT) }
 });
-static CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION: LazyLock<Option<Cow<'static, str>>> =
-    LazyLock::new(|| {
-        // SAFETY: callers force this after curl_global_init has completed, and libcurl returns a
-        // process-wide immutable version info pointer.
-        NonNull::new(unsafe { sys::curl_version_info(CURLVERSION_NOW) }).map_or(
-            Some(Cow::Borrowed("unknown")),
-            |version_info| {
-                // SAFETY: version_info is non-null and points to libcurl's version info.
-                let version_info_ref = unsafe { version_info.as_ref() };
-                if version_info_ref.version_num >= CURL_MIN_PROTOCOLS_STR_VERSION {
-                    None
-                } else {
-                    let version_ptr = version_info_ref.version;
-                    let version = if version_ptr.is_null() {
-                        Cow::Borrowed("unknown")
-                    } else {
-                        // SAFETY: libcurl documents version as an ASCII NUL-terminated string.
-                        Cow::Owned(
-                            unsafe { CStr::from_ptr(version_ptr) }
-                                .to_string_lossy()
-                                .into_owned(),
-                        )
-                    };
-                    Some(version)
-                }
-            },
-        )
-    });
 #[repr(C)]
 struct Curl {
     _data: (),
@@ -110,21 +65,6 @@ struct Curl {
 type CurlCode = c_uint;
 type CurlInfo = c_uint;
 type CurlOption = c_uint;
-type CurlVersion = c_uint;
-#[repr(C)]
-struct CurlVersionInfoData {
-    age: CurlVersion,
-    version: *const c_char,
-    version_num: c_uint,
-}
-const _: () = assert!(
-    size_of::<CurlVersionInfoData>() == size_of::<[*const c_char; 3]>()
-        && align_of::<CurlVersionInfoData>() == align_of::<*const c_char>()
-        && offset_of!(CurlVersionInfoData, age) == 0
-        && offset_of!(CurlVersionInfoData, version) == size_of::<*const c_char>()
-        && offset_of!(CurlVersionInfoData, version_num) == size_of::<[*const c_char; 2]>(),
-    "libcurl version info prefix ABI mismatch"
-);
 #[derive(Default)]
 pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
@@ -163,27 +103,27 @@ impl EasyHandle {
     fn ensure_scheme(&self, expected_scheme: &CStr, context: &str) -> Result<()> {
         let mut scheme = null_mut::<c_char>();
         // SAFETY: scheme is a valid output pointer for CURLINFO_SCHEME.
-        let code = unsafe { sys::curl_easy_getinfo(self.as_ptr(), CURLINFO_SCHEME, &raw mut scheme) };
-        if code != CURLE_OK {
-            return Err(error(context, curl_error("curl_easy_getinfo scheme", code)));
-        }
+        let code =
+            unsafe { sys::curl_easy_getinfo(self.as_ptr(), CURLINFO_SCHEME, &raw mut scheme) };
+        (code == CURLE_OK)
+            .ok_or_else(|| error(context, curl_error("curl_easy_getinfo scheme", code)))?;
         let Some(scheme_ptr) = NonNull::new(scheme) else {
             return Err(error(context, "curl 최종 scheme이 비어 있습니다."));
         };
         // SAFETY: libcurl returns a NUL-terminated scheme string owned by the easy handle.
         let scheme_bytes = unsafe { CStr::from_ptr(scheme_ptr.as_ptr()) }.to_bytes();
-        if scheme_bytes.eq_ignore_ascii_case(expected_scheme.to_bytes()) {
-            Ok(())
-        } else {
-            Err(error(
-                context,
-                format!(
-                    "curl 최종 scheme이 {}가 아닙니다: {}",
-                    expected_scheme.to_string_lossy(),
-                    String::from_utf8_lossy(scheme_bytes)
-                ),
-            ))
-        }
+        scheme_bytes
+            .eq_ignore_ascii_case(expected_scheme.to_bytes())
+            .ok_or_else(|| {
+                error(
+                    context,
+                    format!(
+                        "curl 최종 scheme이 {}가 아닙니다: {}",
+                        expected_scheme.to_string_lossy(),
+                        String::from_utf8_lossy(scheme_bytes)
+                    ),
+                )
+            })
     }
     fn perform(&self) -> CurlCode {
         // SAFETY: self.0 is configured with callbacks and buffers that live until the call returns.
@@ -234,18 +174,11 @@ impl Client {
             pending_line: &mut self.header_line_buffer,
         };
         let init_code = *CURL_INIT;
-        if init_code != CURLE_OK {
-            return Err(error(context, curl_error("curl_global_init", init_code)));
-        }
+        (init_code == CURLE_OK)
+            .ok_or_else(|| error(context, curl_error("curl_global_init", init_code)))?;
         let handle = match &mut self.easy_handle {
             &mut Some(ref mut handle) => handle,
             empty @ &mut None => {
-                if let Some(version) = CURL_PROTOCOLS_STR_UNSUPPORTED_VERSION.as_ref() {
-                    return Err(error(
-                        context,
-                        format!("libcurl {version}{CURL_PROTOCOLS_STR_UNSUPPORTED_SUFFIX}"),
-                    ));
-                }
                 // SAFETY: curl_easy_init has no preconditions after global init.
                 let raw_handle = NonNull::new(unsafe { sys::curl_easy_init() })
                     .ok_or_else(|| error(context, "curl_easy_init 실패"))?;
@@ -307,18 +240,18 @@ impl Client {
         }
         if perform_code != CURLE_OK {
             let error_bytes = error_buffer.map(|ch| ch.to_le_bytes()[0]);
-            let perform_error: Cow<'static, str> =
-                if let Ok(message_cstr) = CStr::from_bytes_until_nul(&error_bytes)
-                    && !message_cstr.to_bytes().is_empty()
-                {
-                    Cow::Owned(format!(
-                        "curl_easy_perform 실패: {} ({})",
-                        message_cstr.to_string_lossy(),
-                        perform_code
-                    ))
-                } else {
-                    Cow::Owned(curl_error("curl_easy_perform", perform_code))
-                };
+            let perform_error: Cow<'static, str> = if let Ok(message_cstr) =
+                CStr::from_bytes_until_nul(&error_bytes)
+                && !message_cstr.is_empty()
+            {
+                Cow::Owned(format!(
+                    "curl_easy_perform 실패: {} ({})",
+                    message_cstr.to_string_lossy(),
+                    perform_code
+                ))
+            } else {
+                Cow::Owned(curl_error("curl_easy_perform", perform_code))
+            };
             self.easy_handle = None;
             return Err(error(context, perform_error));
         }

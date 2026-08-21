@@ -737,6 +737,7 @@
           will-change: transform;
         }
       }
+
       .table-wrap[data-running]:not(.has-results) .skeleton-bar::after {
         animation: skeleton-shimmer-x 1.5s linear infinite;
       }
@@ -1876,8 +1877,6 @@
   <script type="module">
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
-    const RX_STAMP = /[:.]/g;
-    const RX_FILE_EXT = /\.[^.]+$/;
     const csvEsc = (s) => {
       s = String(s ?? "");
       if (s) {
@@ -2191,44 +2190,28 @@
     })();
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
-    const REVERSE_CACHE_VARIANT =
-      `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko`;
-    const REVERSE_CACHE_KEY_PREFIX = REVERSE_CACHE_VARIANT + ":" +
-      CONFIG.REVERSE_CACHE_PARSER_VERSION + ":";
+    const REVERSE_CACHE_KEY_PREFIX =
+      `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.REVERSE_CACHE_PARSER_VERSION}:`;
     const NOMINATIM_POLICY_URL =
       "https://operations.osmfoundation.org/policies/nominatim/";
-    const CSV_SOURCE_TEXT =
-      "\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)";
-    const CSV_LICENSE_TEXT =
-      "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)";
-    const CSV_GEOCODER_TEXT =
+    const CSV_ATTRIBUTION_COLUMNS =
+      ",\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)," +
+      "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)," +
       "Reverse geocoding by Nominatim (https://nominatim.org/)";
     const mapPopover = document.getElementById("map-popover");
     const mapAnchors = document.querySelectorAll("#map-popover-links a");
-    const MAP_LINKS = [
-      {
-        key: "Google",
-        build: (lat, lon) => "https://www.google.com/maps?q=" + lat + "," + lon,
-      },
-      {
-        key: "OSM",
-        build: (lat, lon) =>
-          "https://www.openstreetmap.org/search?query=" + lat + "," + lon +
-          "&zoom=16#map=16/" + lat + "/" + lon,
-      },
-      {
-        key: "Naver",
-        build: (_lat, _lon, lat6, lon6) =>
-          "https://map.naver.com/?lng=" + lon6 + "&lat=" + lat6 + "&title=" +
-          lat6 + "%2C%20" + lon6,
-      },
-      {
-        key: "Kakao",
-        build: (lat, lon) =>
-          "https://map.kakao.com/link/map/" + lat + "%20" + lon + "," + lat +
-          "," + lon,
-      },
-    ];
+    const MAP_LINK_KEYS = ["Google", "OSM", "Naver", "Kakao"];
+    function buildMapLink(index, lat, lon, lat6, lon6) {
+      switch (index) {
+        case 0: return "https://www.google.com/maps?q=" + lat + "," + lon;
+        case 1: return "https://www.openstreetmap.org/search?query=" + lat +
+          "," + lon + "&zoom=16#map=16/" + lat + "/" + lon;
+        case 2: return "https://map.naver.com/?lng=" + lon6 + "&lat=" + lat6 +
+          "&title=" + lat6 + "%2C%20" + lon6;
+        default: return "https://map.kakao.com/link/map/" + lat + "%20" +
+          lon + "," + lat + "," + lon;
+      }
+    }
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
     mapPopover.addEventListener("beforetoggle", (e) => {
@@ -2244,12 +2227,7 @@
         e.preventDefault();
         return;
       }
-      const indexText = btn.dataset.idx;
-      const recordIndex = Number(indexText);
-      const r = String(recordIndex) === indexText &&
-        Number.isSafeInteger(recordIndex) && recordIndex >= 0
-        ? AppState.records[recordIndex]
-        : null;
+      const r = AppState.records[Number(btn.dataset.idx)];
       if (!r) {
         e.preventDefault();
         return;
@@ -2259,8 +2237,8 @@
       const lon = r.lonStr;
       const lat6 = fmtCoord6(lat);
       const lon6 = fmtCoord6(lon);
-      for (let i = 0; i < MAP_LINKS.length; i++) {
-        mapAnchors[i].href = MAP_LINKS[i].build(lat, lon, lat6, lon6);
+      for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
+        mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
       }
     });
     function closeMapPopover() {
@@ -2301,7 +2279,6 @@
     const domElements = {
       file: document.getElementById("file"),
       themeToggle: document.getElementById("theme-toggle"),
-      app: document.getElementById("app"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
       statusLive: document.getElementById("status-live"),
@@ -2315,8 +2292,6 @@
       emptyHint: document.querySelector(".table-wrap .empty-hint"),
       tbody: document.getElementById("tbl").tBodies[0],
       coordsContent: document.querySelector("#coords .coords-content"),
-      manualOutput: document.getElementById("output"),
-      manualOutputContent: document.querySelector("#output .coords-content"),
       parseBtn: document.getElementById("parse"),
       startBtn: document.getElementById("start"),
       pauseBtn: document.getElementById("pause"),
@@ -2324,7 +2299,6 @@
       stopBtn: document.getElementById("stop"),
       filterQ: document.getElementById("filter-q"),
       filters: document.getElementById("filters"),
-      filterClear: document.getElementById("filter-clear"),
       filterKind: document.getElementById("filter-kind"),
       filterSido: document.getElementById("filter-sido"),
       filterSigungu: document.getElementById("filter-sigungu"),
@@ -2554,7 +2528,7 @@
     }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
-      MAP_LINKS.map(({ key }) => "," + csvEsc(`지도링크(${key})`)).join("");
+      MAP_LINK_KEYS.map((key) => "," + csvEsc(`지도링크(${key})`)).join("");
     let ACTIVE_DOWNLOAD_URL = null;
     let EXPORT_TASK = null;
     function revokeActiveDownloadUrl() {
@@ -3480,7 +3454,6 @@
     function commitResult(index, parsed, render) {
       const r = AppState.records[index];
       r.result = parsed;
-      r._search = null;
       AppState.processed++;
       if (parsed.error) AppState.cntFail++;
       let visiblePosition = -1;
@@ -3492,19 +3465,12 @@
       if (render) renderCommittedResult(index, visiblePosition);
     }
     async function handleExport() {
-      if (EXPORT_TASK) return EXPORT_TASK.promise;
-      const resultIndices = [];
-      for (let i = 0; i < AppState.records.length; i++) {
-        if (AppState.records[i].result) resultIndices.push(i);
-      }
-      const totalRows = resultIndices.length;
+      if (EXPORT_TASK) return EXPORT_TASK;
+      const totalRows = AppState.processed;
       if (totalRows <= 0) {
         return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
       }
       const sourceFile = AppState.droppedFile;
-      if (!sourceFile) {
-        return setStatusMessage("원본 파일 정보를 찾을 수 없습니다.", "error");
-      }
       const appGeneration = AppState.generation;
       const records = AppState.records;
       const ensureCurrent = () => {
@@ -3512,10 +3478,8 @@
           throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
         }
       };
-      const exportTask = { promise: null };
-      EXPORT_TASK = exportTask;
       domElements.exportBtn.disabled = true;
-      exportTask.promise = (async () => {
+      EXPORT_TASK = (async () => {
         try {
           setStatusMessage("CSV 생성 중…");
           await yieldToMain();
@@ -3530,19 +3494,23 @@
             chunkChars = 0;
             chunkLines.length = 0;
           };
-          for (let i = 0; i < totalRows; i++) {
-            const recordIndex = resultIndices[i];
+          let exportedRows = 0;
+          for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
             const r = records[recordIndex];
+            if (!r.result) continue;
             const lat = r.latStr;
             const lon = r.lonStr;
-            const coords = lat + ", " + lon;
             const result = r.result;
+            const firstLat = lat.charCodeAt(0);
             let line = csvEsc(result.kind || r.set) +
               "," +
-              csvEsc(recordIndex + 1) +
-              "," +
-              csvEsc(coords) +
-              ",";
+              (recordIndex + 1) +
+              ",\"" +
+              (firstLat === 43 || firstLat === 45 ? "'" : "") +
+              lat +
+              ", " +
+              lon +
+              "\",";
             const addr = result.addr;
             if (addr) {
               line += csvEsc(addr.sido) +
@@ -3557,19 +3525,19 @@
               line += ",,,,";
             }
             line += csvEsc(result.error || addr.fullAddr);
-            line += "," + csvEsc(CSV_SOURCE_TEXT);
-            line += "," + csvEsc(CSV_LICENSE_TEXT);
-            line += "," + csvEsc(CSV_GEOCODER_TEXT);
+            line += CSV_ATTRIBUTION_COLUMNS;
             const lat6 = fmtCoord6(lat);
             const lon6 = fmtCoord6(lon);
-            for (let k = 0; k < MAP_LINKS.length; k++) {
-              line += "," + csvEsc(MAP_LINKS[k].build(lat, lon, lat6, lon6));
+            for (let k = 0; k < MAP_LINK_KEYS.length; k++) {
+              const link = buildMapLink(k, lat, lon, lat6, lon6);
+              line += k === 2 ? "," + link : ",\"" + link + "\"";
             }
             chunkLines.push(line);
             chunkChars += line.length + 1;
+            exportedRows++;
             if (chunkChars >= 1_000_000) {
               flushChunk();
-              setStatusMessage(`CSV 생성 중… (${fmt(i + 1)}/${totalDisp})`);
+              setStatusMessage(`CSV 생성 중… (${fmt(exportedRows)}/${totalDisp})`);
               await yieldToMain();
               ensureCurrent();
             }
@@ -3578,8 +3546,8 @@
           ensureCurrent();
           downloadBlob(
             new Blob(parts, { type: "text/csv;charset=utf-8" }),
-            `${sourceFile.name.replace(RX_FILE_EXT, "")
-            }_${new Date().toISOString().replace(RX_STAMP, "-")}.csv`,
+            `${sourceFile.name.replace(/\.[^.]+$/, "")
+            }_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`,
           );
           setStatusMessage("CSV 파일을 다운로드했습니다.");
         } catch (err) {
@@ -3587,13 +3555,11 @@
           console.error(err);
           setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
         } finally {
-          if (EXPORT_TASK === exportTask) {
-            EXPORT_TASK = null;
-            domElements.exportBtn.disabled = AppState.processed === 0;
-          }
+          EXPORT_TASK = null;
+          domElements.exportBtn.disabled = AppState.processed === 0;
         }
       })();
-      return exportTask.promise;
+      return EXPORT_TASK;
     }
     async function handleParse() {
       const file = AppState.droppedFile;
@@ -3654,7 +3620,7 @@
     }
     domElements.filters.addEventListener("submit", (e) => e.preventDefault());
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
-    domElements.filterClear.addEventListener("click", () => {
+    document.getElementById("filter-clear").addEventListener("click", () => {
       clearFilters();
     });
     document.addEventListener("keydown", (e) => {
@@ -3749,7 +3715,7 @@
         renderCurrentPage(true);
       },
     };
-    domElements.app.addEventListener("command", (e) => {
+    document.getElementById("app").addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
       Promise.try(cmd).catch((err) => {
@@ -3801,24 +3767,7 @@
       const HANGUL_SYLLABLE_MAX = 55859;
       const HANGUL_SYLLABLE_MODULUS = 11172;
       const SUPPLEMENTAL_RETRY_LIMIT = 1024;
-      const GLYPHS = [
-        "🌅",
-        "🐦",
-        "👫",
-        "🦕",
-        "🌘",
-        "🎈",
-        "⛵",
-        "🕷",
-        "🦋",
-        "🌀",
-        "🧊",
-        "🐟",
-        "⛺",
-        "🚀",
-        "🌳",
-        "🔯",
-      ];
+      const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
       const MAX_U64_DEC = U64_MAX.toString(10);
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
       const U64_TOKEN_HARD_LIMIT = 64;
@@ -4308,8 +4257,8 @@
         const clearBtn = document.getElementById("clearBtn");
         const saveBtn = document.getElementById("saveOutput");
         const copyBtn = document.getElementById("copyOutput");
-        const output = domElements.manualOutput;
-        const outputContent = domElements.manualOutputContent;
+        const output = document.getElementById("output");
+        const outputContent = output.querySelector(".coords-content");
         const manualBody = runBtn.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");

@@ -30,10 +30,7 @@ pub(super) fn validate_random_integer_range(min_value: i64, max_value: i64) -> R
             "최솟값은 {MIN_ALLOWED_INTEGER_VALUE} 이상이어야 합니다."
         )));
     }
-    if max_value < min_value {
-        return Err("최댓값은 최솟값보다 크거나 같아야 합니다.".into());
-    }
-    Ok(())
+    (max_value >= min_value).ok_or_else(|| "최댓값은 최솟값보다 크거나 같아야 합니다.".into())
 }
 pub(super) fn generate_random_float(
     min_value: f64,
@@ -69,10 +66,9 @@ pub(super) fn validate_random_float_range(min_value: f64, max_value: f64) -> Res
     if max_value < min_value {
         return Err("최댓값은 최솟값보다 크거나 같아야 합니다.".into());
     }
-    if !NumericSub::sub(max_value, min_value).is_finite() {
-        return Err("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.".into());
-    }
-    Ok(())
+    NumericSub::sub(max_value, min_value)
+        .is_finite()
+        .ok_or_else(|| "실수 범위가 너무 커서 안전하게 계산할 수 없습니다.".into())
 }
 pub(super) fn random_bounded_inclusive(
     inclusive_max: u64,

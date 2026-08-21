@@ -14,6 +14,7 @@ use core::{
 use std::{
     fs::File,
     io::{IsTerminal as _, Write, stdin},
+    process,
     sync::Mutex,
     thread::{self, available_parallelism, scope},
     time::Instant,
@@ -152,20 +153,15 @@ pub(super) fn regenerate_with_count(
                             }
                             let record = generate_random_data_with_rng(rng)
                                 .map_err(|source| AppError::context("난수 생성 실패", source))
-                                .and_then(|data| {
+                                .map(|data| {
                                     let buffer = chunk
                                         .bytes
                                         .get_mut(chunk.written_len..)
                                         .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>())
-                                        .ok_or_else(|| {
-                                            AppError::message("작업자 출력 버퍼 범위 손상")
-                                        })?;
+                                        .unwrap_or_else(|| process::abort());
                                     let len =
-                                        format_data_into_buffer(&data, buffer, OutputTarget::File)
-                                            .map_err(|source| {
-                                                AppError::context("난수 데이터 포맷 실패", source)
-                                            })?;
-                                    Ok((data.num_64, len))
+                                        format_data_into_buffer(&data, buffer, OutputTarget::File);
+                                    (data.num_64, len)
                                 });
                             let (num_64, len) = match record {
                                 Ok(generated) => generated,
@@ -258,7 +254,7 @@ pub(super) fn regenerate_with_count(
         })?;
     let last_recorded_data = writer_lock
         .into_inner()
-        .map_err(|_poison| AppError::message("output writer lock 손상"))?
+        .unwrap_or_else(|_| process::abort())
         .last;
     if let Some(failure) = worker_outcome {
         return Err(AppError::context(

@@ -10,6 +10,7 @@ use std::{
     fs::File,
     io::{Read as _, Seek as _, SeekFrom, Write as IoWrite},
     path::Path,
+    process,
 };
 cfg_select! {
     windows => {
@@ -167,30 +168,22 @@ impl TryFrom<&Path> for OutputFile {
                     "기존 출력 파일은 SRG UTF-8 형식이어야 합니다.",
                 ));
             }
-            let bom_len = u64::try_from(UTF8_BOM.len())
-                .map_err(|source| AppError::context("UTF-8 BOM 길이 변환 실패", source))?;
+            let bom_len = u64::try_from(UTF8_BOM.len()).unwrap_or_else(|_| process::abort());
             if len != bom_len {
-                let max_tail_len = u64::try_from(BUFFER_SIZE)
-                    .map_err(|source| AppError::context("출력 버퍼 길이 변환 실패", source))?;
-                let tail_len = usize::try_from(len.min(max_tail_len)).map_err(|source| {
-                    AppError::context("기존 출력 파일 tail 길이 변환 실패", source)
-                })?;
+                let max_tail_len = u64::try_from(BUFFER_SIZE).unwrap_or_else(|_| process::abort());
+                let tail_len_u64 = len.min(max_tail_len);
+                let tail_len = usize::try_from(tail_len_u64).unwrap_or_else(|_| process::abort());
                 let mut tail = [0_u8; BUFFER_SIZE];
-                let tail_start = len.strict_sub(u64::try_from(tail_len).map_err(|source| {
-                    AppError::context("기존 출력 파일 tail offset 변환 실패", source)
-                })?);
+                let tail_start = len.strict_sub(tail_len_u64);
                 file.seek(SeekFrom::Start(tail_start))?;
-                file.read_exact(
-                    tail.get_mut(..tail_len)
-                        .ok_or_else(|| AppError::message("기존 출력 파일 tail 범위 손상"))?,
-                )?;
+                file.read_exact(tail.get_mut(..tail_len).unwrap_or_else(|| process::abort()))?;
                 file.seek(SeekFrom::End(0))?;
                 let content_start = if tail_start == 0 { UTF8_BOM.len() } else { 0 };
                 let content = tail
                     .get(content_start..tail_len)
-                    .ok_or_else(|| AppError::message("기존 출력 파일 tail 내용 범위 손상"))?;
+                    .unwrap_or_else(|| process::abort());
                 let record_start = content
-                    .windows(FILE_RECORD_START.len())
+                    .array_windows::<{ FILE_RECORD_START.len() }>()
                     .rposition(|window| window == FILE_RECORD_START)
                     .ok_or_else(|| {
                         AppError::message("기존 출력 파일의 마지막 SRG 레코드를 찾지 못했습니다.")
@@ -204,9 +197,9 @@ impl TryFrom<&Path> for OutputFile {
                         "기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.",
                     ));
                 }
-                let record = content.get(record_start..).ok_or_else(|| {
-                    AppError::message("기존 출력 파일의 마지막 SRG 레코드 범위 손상")
-                })?;
+                let record = content
+                    .get(record_start..)
+                    .unwrap_or_else(|| process::abort());
                 str::from_utf8(record).map_err(|source| {
                     AppError::context("기존 출력 파일이 올바른 UTF-8이 아닙니다.", source)
                 })?;
@@ -214,9 +207,7 @@ impl TryFrom<&Path> for OutputFile {
                     AppError::message("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")
                 })?;
                 let mut lines = body.split(|&byte| byte == b'\n');
-                let first = lines.next().ok_or_else(|| {
-                    AppError::message("기존 출력 파일의 마지막 SRG 레코드가 비어 있습니다.")
-                })?;
+                let first = lines.next().unwrap_or_else(|| process::abort());
                 let mut record_line_count = 1_usize;
                 let mut last = first;
                 for line in lines {
@@ -257,10 +248,10 @@ impl OutputFile {
     }
     pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
         let mut buffer = [0_u8; BUFFER_SIZE];
-        let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File)?;
+        let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File);
         self.file.write_all(prefix_slice(&buffer, file_len))?;
         let output_len = if *IS_TERMINAL {
-            format_data_into_buffer(data, &mut buffer, OutputTarget::Console)?
+            format_data_into_buffer(data, &mut buffer, OutputTarget::Console)
         } else {
             file_len
         };
@@ -273,11 +264,8 @@ impl OutputFile {
         len: usize,
         buffer: &'buffer mut [u8],
     ) -> Result<&'buffer [u8]> {
-        let tail = buffer
-            .get_mut(..len)
-            .ok_or_else(|| AppError::message("마지막 출력 데이터가 읽기 버퍼보다 큽니다."))?;
-        let offset = i64::try_from(len)
-            .map_err(|source| AppError::context("마지막 출력 데이터 길이 변환 실패", source))?;
+        let tail = buffer.get_mut(..len).unwrap_or_else(|| process::abort());
+        let offset = i64::try_from(len).unwrap_or_else(|_| process::abort());
         self.file.seek(SeekFrom::End(offset.strict_neg()))?;
         self.file.read_exact(tail)?;
         self.file.seek(SeekFrom::End(0))?;

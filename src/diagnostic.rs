@@ -13,7 +13,6 @@ pub(super) struct AppError {
     source: Option<BoxError>,
 }
 struct ControlEscapingWriter<'formatter, 'output>(&'formatter mut fmt::Formatter<'output>);
-pub(super) struct TerminalSafeDisplay<'value, T: ?Sized>(&'value T);
 impl AppError {
     pub(super) fn context(
         context: impl Into<Cow<'static, str>>,
@@ -33,33 +32,35 @@ impl AppError {
 }
 impl Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_control_escaped(f, self.message.as_ref())?;
+        write!(f, "{}", terminal_safe(self.message.as_ref()))?;
         if let Some(source) = self.source.as_ref() {
             f.write_str(": ")?;
-            write!(f, "{}", TerminalSafeDisplay::from(source))?;
+            write!(f, "{}", terminal_safe(source))?;
         }
         Ok(())
     }
 }
-impl<'value, T> From<&'value T> for TerminalSafeDisplay<'value, T>
-where
-    T: ?Sized,
-{
-    fn from(value: &'value T) -> Self {
-        Self(value)
-    }
-}
 impl fmt::Write for ControlEscapingWriter<'_, '_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        write_control_escaped(self.0, s)
-    }
-}
-impl<T> Display for TerminalSafeDisplay<'_, T>
-where
-    T: Display + ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(&mut ControlEscapingWriter(f), "{}", self.0)
+        for character in s.chars() {
+            if character.is_control()
+                || matches!(
+                    character,
+                    '\u{061c}'
+                        | '\u{200e}'
+                        | '\u{200f}'
+                        | '\u{202a}'..='\u{202e}'
+                        | '\u{2066}'..='\u{2069}'
+                )
+            {
+                for escaped in character.escape_debug() {
+                    self.0.write_char(escaped)?;
+                }
+            } else {
+                self.0.write_char(character)?;
+            }
+        }
+        Ok(())
     }
 }
 impl fmt::Debug for AppError {
@@ -94,24 +95,9 @@ impl From<TimeError> for AppError {
         Self::context("시간 처리 오류", source)
     }
 }
-fn write_control_escaped(formatter: &mut fmt::Formatter<'_>, text: &str) -> fmt::Result {
-    for character in text.chars() {
-        if character.is_control()
-            || matches!(
-                character,
-                '\u{061c}'
-                    | '\u{200e}'
-                    | '\u{200f}'
-                    | '\u{202a}'..='\u{202e}'
-                    | '\u{2066}'..='\u{2069}'
-            )
-        {
-            for escaped in character.escape_debug() {
-                formatter.write_char(escaped)?;
-            }
-        } else {
-            formatter.write_char(character)?;
-        }
-    }
-    Ok(())
+pub(super) const fn terminal_safe<T>(value: &T) -> impl Display + '_
+where
+    T: Display + ?Sized,
+{
+    fmt::from_fn(move |formatter| write!(&mut ControlEscapingWriter(formatter), "{value}"))
 }

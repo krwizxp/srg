@@ -1,6 +1,4 @@
-use super::{
-    Curl, CurlCode, CurlInfo, CurlOption, CurlVersion, CurlVersionInfoData, c_char, c_long,
-};
+use super::{Curl, CurlCode, CurlInfo, CurlOption, c_char, c_long};
 #[link(name = "curl")]
 unsafe extern "C" {
     pub(super) fn curl_easy_cleanup(curl: *mut Curl);
@@ -11,5 +9,4 @@ unsafe extern "C" {
     pub(super) fn curl_easy_setopt(curl: *mut Curl, option: CurlOption, ...) -> CurlCode;
     pub(super) fn curl_easy_strerror(code: CurlCode) -> *const c_char;
     pub(super) fn curl_global_init(flags: c_long) -> CurlCode;
-    pub(super) fn curl_version_info(age: CurlVersion) -> *mut CurlVersionInfoData;
 }

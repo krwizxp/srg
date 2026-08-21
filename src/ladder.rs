@@ -1,5 +1,5 @@
 use crate::{
-    diagnostic::{Result, TerminalSafeDisplay},
+    diagnostic::{Result, terminal_safe},
     hardware_rng::HardwareRng,
     random_number::random_bounded_inclusive,
 };
@@ -39,8 +39,8 @@ pub(super) fn write_ladder_results<'player, 'result>(
         writeln!(
             out,
             "{} -> {}",
-            TerminalSafeDisplay::from(player),
-            TerminalSafeDisplay::from(result)
+            terminal_safe(player),
+            terminal_safe(result)
         )?;
     }
     Ok(())

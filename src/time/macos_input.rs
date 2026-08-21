@@ -1,5 +1,5 @@
 use super::{NativeInputSendStatus, TriggerAction};
-use crate::{diagnostic::TerminalSafeDisplay, write_line_best_effort};
+use crate::{diagnostic::terminal_safe, write_line_best_effort};
 use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
@@ -127,10 +127,7 @@ impl TriggerAction {
             Err(source) => {
                 write_line_best_effort(
                     err,
-                    format_args!(
-                        "[경고] macOS native 입력 실패: {}",
-                        TerminalSafeDisplay::from(&source)
-                    ),
+                    format_args!("[경고] macOS native 입력 실패: {}", terminal_safe(&source)),
                 );
                 NativeInputSendStatus::FailedBeforeSend
             }

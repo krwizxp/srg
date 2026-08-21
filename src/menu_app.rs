@@ -74,13 +74,19 @@ impl MenuApp {
         }
         cfg_select! {
             target_arch = "x86_64" => {
+                if matches!(command, b'1'..=b'4')
+                    && self.rng.source() == HardwareRandomSource::None
+                {
+                    writeln!(
+                        out,
+                        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
+                    )?;
+                    return Ok(true);
+                }
                 match command {
                     b'1' => self.handle_ladder_command(out, err)?,
                     b'2' => self.handle_random_number_command(out, err)?,
                     b'3' | b'4' => {
-                        if !prepare_hw_rng_menu_command(&self.rng, out)? {
-                            return Ok(true);
-                        }
                         let requested_count = if command == b'3' {
                             1
                         } else {
@@ -114,13 +120,13 @@ impl MenuApp {
                             command == b'4',
                             out,
                         )?;
-                        self.rng.write_rdseed_fallback_notice(err)?;
                         if let Some(next_num_64) = completion {
                             self.num_64 = next_num_64;
                         }
                     }
                     _ => return Ok(false),
                 }
+                self.rng.write_rdseed_fallback_notice(err)?;
                 Ok(true)
             }
             _ => {
@@ -138,9 +144,6 @@ impl MenuApp {
     }
     #[cfg(target_arch = "x86_64")]
     fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
-        if !prepare_hw_rng_menu_command(&self.rng, out)? {
-            return Ok(());
-        }
         let players_storage = &mut self.input_buffer;
         let results_storage = &mut self.ladder_results_storage;
         let n = read_ladder_entries(
@@ -161,8 +164,7 @@ impl MenuApp {
             self.num_64,
             &self.rng,
             out,
-        )?;
-        self.rng.write_rdseed_fallback_notice(err)
+        )
     }
     fn handle_manual_input_command(
         &mut self,
@@ -216,9 +218,6 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        if !prepare_hw_rng_menu_command(&self.rng, out)? {
-            return Ok(());
-        }
         let num_64 = self.num_64;
         let input_buffer = &mut self.input_buffer;
         writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
@@ -295,10 +294,9 @@ impl MenuApp {
             }
             _ => {
                 writeln!(out, "무작위 숫자 생성을 취소합니다.")?;
-                return self.rng.write_rdseed_fallback_notice(err);
             }
         }
-        self.rng.write_rdseed_fallback_notice(err)
+        Ok(())
     }
     fn handle_server_time_command(
         &mut self,
@@ -353,7 +351,6 @@ impl MenuApp {
             stop_after: None,
         }
         .run_loop(out, err)?;
-        writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
         Ok(())
     }
     pub(super) fn run(&mut self) -> Result<()> {
@@ -393,15 +390,4 @@ impl MenuApp {
             }
         }
     }
-}
-#[cfg(target_arch = "x86_64")]
-fn prepare_hw_rng_menu_command(rng: &HardwareRng, out: &mut dyn Write) -> Result<bool> {
-    if rng.source() != HardwareRandomSource::None {
-        return Ok(true);
-    }
-    writeln!(
-        out,
-        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-    )?;
-    Ok(false)
 }

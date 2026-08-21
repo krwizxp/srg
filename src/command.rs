@@ -14,9 +14,7 @@ cfg_select! {
         };
         use std::{io::Write, path::Path};
     }
-    _ => {
-        use std::io::Write as _;
-    }
+    _ => {}
 }
 use core::{fmt::Display, str::FromStr, time::Duration};
 use std::{
@@ -83,7 +81,7 @@ impl CliCommand {
                     stop_after: Some(Duration::from_secs(seconds)),
                 }
                 .run_loop(&mut out, &mut err)?;
-                writeln!(out, "\n서버 시간 확인을 종료합니다.").map_err(AppError::from)
+                Ok(())
             }
         }
     }
@@ -160,23 +158,13 @@ where
                     )));
                 }
                 let csv_shape = |value: &str| {
-                    let mut count = 1_usize;
-                    let mut entry_has_text = false;
-                    let mut has_empty = false;
-                    let mut has_line_break = false;
-                    for character in value.chars() {
-                        match character {
-                            ',' => {
-                                count = count.strict_add(1);
-                                has_empty |= !entry_has_text;
-                                entry_has_text = false;
-                            }
-                            '\r' | '\n' => has_line_break = true,
-                            _ if !character.is_whitespace() => entry_has_text = true,
-                            _ => {}
-                        }
-                    }
-                    (count, has_empty || !entry_has_text, has_line_break)
+                    let (count, has_empty) =
+                        value
+                            .split(',')
+                            .fold((0_usize, false), |(count, has_empty), entry| {
+                                (count.strict_add(1), has_empty || entry.trim().is_empty())
+                            });
+                    (count, has_empty, value.contains(['\r', '\n']))
                 };
                 let (player_count, players_have_empty, players_have_line_break) =
                     csv_shape(&players);

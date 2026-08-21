@@ -59,14 +59,11 @@ fn main() -> io::Result<()> {
         }
     }
     let log = File::create(&console_log)?;
-    let binary = env::var_os("CARGO_TARGET_DIR")
+    let mut binary = env::var_os("CARGO_TARGET_DIR")
         .map_or_else(|| PathBuf::from("target"), PathBuf::from)
         .join("release")
-        .join(format!(
-            "{}{}",
-            env!("CARGO_PKG_NAME"),
-            env::consts::EXE_SUFFIX
-        ));
+        .join(env!("CARGO_PKG_NAME"));
+    binary.add_extension(env::consts::EXE_EXTENSION);
     let status = Command::new(binary)
         .args(args)
         .stdout(Stdio::from(log.try_clone()?))
@@ -88,8 +85,8 @@ fn main() -> io::Result<()> {
             "selected SRG action produced no expected output",
         ));
     }
-    let mut random_data_file = match File::open(random_data) {
-        Ok(file) => file,
+    let source_len = match fs::metadata(random_data) {
+        Ok(metadata) => metadata.len(),
         Err(source) if source.kind() == io::ErrorKind::NotFound => {
             return output_check.map_or_else(
                 || Err(io::Error::other("SRG created no random data output file")),
@@ -98,13 +95,10 @@ fn main() -> io::Result<()> {
         }
         Err(source) => return Err(source),
     };
-    let source_len = random_data_file.metadata()?.len();
     if output_check.is_none() && source_len <= 3 {
         return Err(io::Error::other("SRG generated no random data"));
     }
-    let mut copied_file = File::create(copied_random_data)?;
-    let copied = io::copy(&mut random_data_file, &mut copied_file)?;
-    if copied != source_len {
+    if fs::copy(random_data, copied_random_data)? != source_len {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
             "workflow output changed while copying",

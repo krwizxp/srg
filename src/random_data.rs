@@ -7,6 +7,7 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
 use core::{array, ops::Mul as NumericMul};
+use std::process;
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
 const BYTE_BITS: u8 = 64;
@@ -203,7 +204,7 @@ where
             }
             let code_point = HANGUL_BASE_CODE_POINT
                 .strict_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
-            *slot = char::from_u32(code_point).ok_or("한글 음절 변환 실패")?;
+            *slot = char::from_u32(code_point).unwrap_or_else(|| process::abort());
         }
         self.data.hangul_syllables = hangul;
         Ok(())
@@ -278,7 +279,7 @@ where
         ];
         for (slot, nibble_source) in self.data.glyph_string.iter_mut().zip(glyph_sources) {
             let index = usize::from(low_u8_from_u64(nibble_source & NIBBLE_MASK_U64));
-            *slot = *NMS_GLYPHS.get(index).ok_or("NMS 글리프 인덱스 계산 실패")?;
+            *slot = *NMS_GLYPHS.get(index).unwrap_or_else(|| process::abort());
         }
         Ok(())
     }

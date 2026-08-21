@@ -4,7 +4,7 @@ use crate::{
     diagnostic::Result,
     numeric::{low_u8_from_u128, low_u8_from_usize, u128_from_usize},
 };
-use core::time::Duration;
+use core::{fmt::NumBuffer, time::Duration};
 use std::io::Write as IoWrite;
 const BAR_WIDTH: usize = 10;
 const DECI_PER_MINUTE: u128 = 600;
@@ -56,16 +56,16 @@ impl ProgressBuffers {
         let percent_value = scaled_progress_value(completed, total, PERCENT_SCALE);
         let percent = low_u8_from_usize(percent_value.min(PERCENT_SCALE));
         let mut cur = ByteCursor::new(&mut self.line);
-        cur.write_byte(b'\r')?;
-        cur.write_byte(b'[')?;
+        cur.write_byte(b'\r');
+        cur.write_byte(b'[');
         for _ in 0..filled {
-            cur.write_bytes("█".as_bytes())?;
+            cur.write_bytes("█".as_bytes());
         }
         for _ in filled..BAR_WIDTH {
-            cur.write_byte(b' ')?;
+            cur.write_byte(b' ');
         }
-        cur.write_byte(b']')?;
-        cur.write_byte(b' ')?;
+        cur.write_byte(b']');
+        cur.write_byte(b' ');
         for _ in 0..PERCENT_WIDTH.strict_sub(if percent >= 100 {
             3
         } else if percent >= 10 {
@@ -73,17 +73,20 @@ impl ProgressBuffers {
         } else {
             1
         }) {
-            cur.write_byte(b' ')?;
+            cur.write_byte(b' ');
         }
-        buf_write_u8_dec(&mut cur, percent)?;
-        cur.write_byte(b'%')?;
-        cur.write_bytes(b" (")?;
-        cur.write_format(format_args!("{completed}/{total}"))?;
-        cur.write_bytes(") | 소요: ".as_bytes())?;
-        cur.write_bytes(&self.elapsed)?;
-        cur.write_bytes(b" | ETA: ")?;
-        cur.write_bytes(&self.eta)?;
-        cur.write_bytes(b" \x1b[K")?;
+        buf_write_u8_dec(&mut cur, percent);
+        cur.write_byte(b'%');
+        cur.write_bytes(b" (");
+        let mut count_buffer = NumBuffer::new();
+        cur.write_bytes(completed.format_into(&mut count_buffer).as_bytes());
+        cur.write_byte(b'/');
+        cur.write_bytes(total.format_into(&mut count_buffer).as_bytes());
+        cur.write_bytes(") | 소요: ".as_bytes());
+        cur.write_bytes(&self.elapsed);
+        cur.write_bytes(b" | ETA: ");
+        cur.write_bytes(&self.eta);
+        cur.write_bytes(b" \x1b[K");
         IoWrite::write_all(out, cur.written_slice())?;
         IoWrite::flush(out)?;
         Ok(())

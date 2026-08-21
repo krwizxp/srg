@@ -149,11 +149,7 @@ fn strip_date_suffix<'date>(
         .ok_or_else(|| TimeError::parse(err))
 }
 fn ensure_parts_exhausted(parts: &mut SplitAsciiWhitespace<'_>, err: &'static str) -> Result<()> {
-    if parts.next().is_none() {
-        Ok(())
-    } else {
-        Err(TimeError::parse(err))
-    }
+    parts.next().is_none().ok_or_else(|| TimeError::parse(err))
 }
 fn parse_http_date_time(
     day: u32,
