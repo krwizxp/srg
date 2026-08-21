@@ -56,16 +56,13 @@ pub(super) fn generate_random_float(
     Ok(())
 }
 pub(super) fn validate_random_float_range(min_value: f64, max_value: f64) -> Result<()> {
-    if !min_value.is_finite()
-        || min_value.is_subnormal()
-        || !max_value.is_finite()
-        || max_value.is_subnormal()
-    {
-        return Err(FLOAT_INPUT_ERROR.into());
-    }
-    if max_value < min_value {
-        return Err("최댓값은 최솟값보다 크거나 같아야 합니다.".into());
-    }
+    (min_value.is_finite()
+        && !min_value.is_subnormal()
+        && max_value.is_finite()
+        && !max_value.is_subnormal())
+    .ok_or_else(|| AppError::message(FLOAT_INPUT_ERROR))?;
+    (max_value >= min_value)
+        .ok_or_else(|| AppError::message("최댓값은 최솟값보다 크거나 같아야 합니다."))?;
     NumericSub::sub(max_value, min_value)
         .is_finite()
         .ok_or_else(|| "실수 범위가 너무 커서 안전하게 계산할 수 없습니다.".into())
