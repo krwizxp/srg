@@ -70,7 +70,7 @@ const HELP_TEXT: &str = concat!(
     "  --version                버전\n"
 );
 fn unknown_option(label: &str, option: &OsStr) -> AppError {
-    format!("{label}: {}", option.to_string_lossy()).into()
+    format!("{label}: {}", option.display()).into()
 }
 fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
     match writeln!(output, "{args}") {

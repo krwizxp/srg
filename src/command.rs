@@ -218,7 +218,7 @@ where
             }
             _ => Err(AppError::message(format!(
                 "알 수 없는 옵션: {}",
-                raw_command.to_string_lossy()
+                raw_command.display()
             ))),
         }
     }

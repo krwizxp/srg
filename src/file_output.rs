@@ -5,7 +5,6 @@ use crate::{
     output::{OutputTarget, format_data_into_buffer, write_slice_to_console},
     random_data::RandomDataSet,
 };
-use core::str;
 use std::{
     fs::File,
     io::{Read as _, Seek as _, SeekFrom, Write as IoWrite},
