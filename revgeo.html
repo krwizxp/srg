@@ -2214,32 +2214,8 @@
     }
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
-    mapPopover.addEventListener("beforetoggle", (e) => {
-      if (e.newState !== "open") {
-        LAST_MAP_INVOKER = null;
-        return;
-      }
-      const btn = e.source;
-      if (
-        !(btn instanceof HTMLButtonElement) ||
-        !btn.matches("button.map-btn")
-      ) {
-        e.preventDefault();
-        return;
-      }
-      const r = AppState.records[Number(btn.dataset.idx)];
-      if (!r) {
-        e.preventDefault();
-        return;
-      }
-      LAST_MAP_INVOKER = btn;
-      const lat = r.latStr;
-      const lon = r.lonStr;
-      const lat6 = fmtCoord6(lat);
-      const lon6 = fmtCoord6(lon);
-      for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
-        mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
-      }
+    mapPopover.addEventListener("toggle", () => {
+      if (!isMapPopoverOpen()) LAST_MAP_INVOKER = null;
     });
     function closeMapPopover() {
       if (!isMapPopoverOpen()) return;
@@ -3338,7 +3314,6 @@
           const cacheKey = r.cacheKey;
           let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
           const cacheHit = parsed !== undefined;
-          let rowError = null;
           try {
             if (!cacheHit) {
               const url = `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
@@ -3362,7 +3337,6 @@
               i--;
               continue;
             }
-            rowError = err;
             parsed = {
               addr: null,
               error: getErrorMessage(err),
@@ -3378,9 +3352,9 @@
             lastStatusUpdate = now;
             setProgressStatus(AppState.processed, total, totalDisp);
           }
-          if (rowError && !AppState.isStopping) {
+          if (parsed.error && !AppState.isStopping) {
             setStatusMessage(
-              `에러 발생: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(rowError)}`,
+              `에러 발생: (${fmt(i1)}/${totalDisp}) ${parsed.error}`,
               "error",
             );
           }
@@ -3639,10 +3613,22 @@
       domElements.filterQ.select();
     });
     domElements.tbody.addEventListener("click", (e) => {
-      if (!isMapPopoverOpen()) return;
       const btn = e.target?.closest?.("button.map-btn");
-      if (!btn || btn === LAST_MAP_INVOKER) return;
-      closeMapPopover();
+      if (!btn) return;
+      if (isMapPopoverOpen() && btn !== LAST_MAP_INVOKER) closeMapPopover();
+      const r = AppState.records[Number(btn.dataset.idx)];
+      if (!r) {
+        e.preventDefault();
+        return;
+      }
+      LAST_MAP_INVOKER = btn;
+      const lat = r.latStr;
+      const lon = r.lonStr;
+      const lat6 = fmtCoord6(lat);
+      const lon6 = fmtCoord6(lon);
+      for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
+        mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
+      }
     }, { capture: true });
     const COMMANDS = {
       "--parse": handleParse,

@@ -347,9 +347,7 @@ impl CurlHeaderCapture<'_> {
         let Some(colon) = line.iter().position(|byte| *byte == b':') else {
             return true;
         };
-        let Some((name, value_with_colon)) = line.split_at_checked(colon) else {
-            return true;
-        };
+        let (name, value_with_colon) = line.split_at(colon);
         let is_age_header = match name.len() {
             3 if name.eq_ignore_ascii_case(AGE_HEADER_NAME) => true,
             4 if name.eq_ignore_ascii_case(DATE_HEADER_NAME) => false,

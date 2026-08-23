@@ -130,7 +130,7 @@ impl<const N: usize> UniqueNumbers<N> {
         let mut seen = self.seen;
         array::from_fn(|_| {
             let number = low_u8_from_u32(seen.trailing_zeros());
-            seen &= seen.strict_sub(1);
+            seen ^= seen.isolate_lowest_one();
             number
         })
     }
