@@ -175,12 +175,10 @@ fn parse_http_date_time(
         parse_two_digits(minute_tens, minute_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
         parse_two_digits(second_tens, second_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
     );
-    if hour > MAX_HTTP_HOUR
-        || minute > MAX_HTTP_MINUTE_OR_SECOND
-        || second > MAX_HTTP_MINUTE_OR_SECOND
-    {
-        return Err(TimeError::parse(ERR_TIME_RANGE));
-    }
+    (hour <= MAX_HTTP_HOUR
+        && minute <= MAX_HTTP_MINUTE_OR_SECOND
+        && second <= MAX_HTTP_MINUTE_OR_SECOND)
+        .ok_or_else(|| TimeError::parse(ERR_TIME_RANGE))?;
     let leap_year = (year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
         && year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32)
         || year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32;
@@ -191,9 +189,7 @@ fn parse_http_date_time(
     if month_number == 2 && leap_year {
         max_day = FEBRUARY_DAY_LEAP;
     }
-    if day == 0 || day > max_day {
-        return Err(TimeError::parse(ERR_DAY));
-    }
+    (day != 0 && day <= max_day).ok_or_else(|| TimeError::parse(ERR_DAY))?;
     let year_i64 = i64::from(year);
     let adjusted_year = if month_number <= MARCH_MONTH_THRESHOLD {
         year_i64.strict_sub(1_i64)
@@ -228,9 +224,7 @@ fn parse_http_date_time(
         .rem_euclid(DAYS_PER_WEEK_I64)
         .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
         .rem_euclid(DAYS_PER_WEEK_I64);
-    if actual_weekday != i64::from(weekday) {
-        return Err(TimeError::parse(ERR_WEEKDAY));
-    }
+    (actual_weekday == i64::from(weekday)).ok_or_else(|| TimeError::parse(ERR_WEEKDAY))?;
     let timestamp_secs = days
         .strict_mul(SECS_PER_DAY_I64)
         .strict_add(i64::from(hour).strict_mul(SECS_PER_HOUR_I64))
@@ -256,10 +250,8 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             let time_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
             let year_token = next_date_part(&mut parts, ERR_ASCTIME_FORMAT)?;
             ensure_parts_exhausted(&mut parts, ERR_ASCTIME_FORMAT)?;
-            if !(1..=TWO_DIGIT_LEN).contains(&day_token.len()) || year_token.len() != FOUR_DIGIT_LEN
-            {
-                return Err(TimeError::parse(ERR_ASCTIME_FORMAT));
-            }
+            ((1..=TWO_DIGIT_LEN).contains(&day_token.len()) && year_token.len() == FOUR_DIGIT_LEN)
+                .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT))?;
             let weekday = parse_http_weekday(weekday_token)
                 .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT))?;
             let day = parse_u32_token(day_token, ERR_ASCTIME_NUM)?;
@@ -276,12 +268,10 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             let time_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
             let tz_token = next_date_part(&mut parts, ERR_IMF_FORMAT)?;
             ensure_parts_exhausted(&mut parts, ERR_IMF_FORMAT)?;
-            if day_token.len() != TWO_DIGIT_LEN
-                || year_token.len() != FOUR_DIGIT_LEN
-                || tz_token != "GMT"
-            {
-                return Err(TimeError::parse(ERR_IMF_FORMAT));
-            }
+            (day_token.len() == TWO_DIGIT_LEN
+                && year_token.len() == FOUR_DIGIT_LEN
+                && tz_token == "GMT")
+                .ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
             let weekday_name = weekday_token
                 .strip_suffix(',')
                 .ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
@@ -301,9 +291,7 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
                 next_date_part(&mut parts, ERR_RFC850_FORMAT)?,
             );
             ensure_parts_exhausted(&mut parts, ERR_RFC850_FORMAT)?;
-            if tz_token != "GMT" {
-                return Err(TimeError::parse(ERR_RFC850_FORMAT));
-            }
+            (tz_token == "GMT").ok_or_else(|| TimeError::parse(ERR_RFC850_FORMAT))?;
             let weekday_name = weekday_token
                 .strip_suffix(',')
                 .ok_or_else(|| TimeError::parse(ERR_RFC850_FORMAT))?;
@@ -318,9 +306,8 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
             ) else {
                 return Err(TimeError::parse(ERR_RFC850_FORMAT));
             };
-            if day_token.len() != TWO_DIGIT_LEN || year2_token.len() != TWO_DIGIT_LEN {
-                return Err(TimeError::parse(ERR_RFC850_FORMAT));
-            }
+            (day_token.len() == TWO_DIGIT_LEN && year2_token.len() == TWO_DIGIT_LEN)
+                .ok_or_else(|| TimeError::parse(ERR_RFC850_FORMAT))?;
             let (day, month, year2) = (
                 parse_u32_token(day_token, ERR_RFC850_NUM)?,
                 parse_http_month(month_token)?,

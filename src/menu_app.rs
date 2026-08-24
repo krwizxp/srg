@@ -308,9 +308,7 @@ impl MenuApp {
             &mut self.input_buffer,
             &mut *out,
             |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
-                if raw_input.is_empty() {
-                    return Err(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."));
-                }
+                (!raw_input.is_empty()).ok_or(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."))?;
                 raw_input.parse::<ParsedServer>().map_err(|source| {
                     Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
                 })

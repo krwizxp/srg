@@ -93,12 +93,9 @@ pub(super) fn regenerate_with_count(
     cancel_on_enter: bool,
     out: &mut dyn Write,
 ) -> Result<Option<u64>> {
-    if requested_count > MAX_BATCH_GENERATE_COUNT {
-        return Err(format!("최대 {MAX_BATCH_GENERATE_COUNT}건까지 생성할 수 있습니다.").into());
-    }
-    if requested_count == 0 {
-        return Err(AppError::message("생성 개수는 1 이상이어야 합니다."));
-    }
+    (requested_count <= MAX_BATCH_GENERATE_COUNT)
+        .ok_or_else(|| format!("최대 {MAX_BATCH_GENERATE_COUNT}건까지 생성할 수 있습니다."))?;
+    (requested_count != 0).ok_or("생성 개수는 1 이상이어야 합니다.")?;
     if requested_count == 1 {
         let final_data = generate_random_data_with_rng(rng)?;
         output_file.persist_and_print(&final_data)?;

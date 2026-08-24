@@ -140,13 +140,17 @@ impl<const N: usize> UniqueNumbers<N> {
     const fn new() -> Self {
         Self { count: 0, seen: 0 }
     }
-    const fn push(&mut self, byte: u8, modulus: u8) {
+    fn push(&mut self, byte: u8, modulus: u8) -> bool {
+        if self.is_full() {
+            return true;
+        }
         let mask = 1_u64 << byte.rem_euclid(modulus).strict_add(1);
         if (self.seen & mask) != 0 {
-            return;
+            return false;
         }
         self.seen |= mask;
         self.count = self.count.strict_add(1);
+        self.is_full()
     }
 }
 impl<F> RandomDataBuildState<'_, F>
@@ -199,9 +203,8 @@ where
                 }
                 self.next_supplemental("한글 음절 보완 재시도")?;
             }
-            if syllable_index > HANGUL_SYLLABLE_MAX {
-                return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
-            }
+            (syllable_index <= HANGUL_SYLLABLE_MAX)
+                .ok_or("한글 음절 보완 난수 시도 횟수를 초과했습니다.")?;
             let code_point = HANGUL_BASE_CODE_POINT
                 .strict_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
             *slot = char::from_u32(code_point).unwrap_or_else(|| process::abort());
@@ -221,8 +224,7 @@ where
                 if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
                     continue;
                 }
-                self.euro_lucky.push(byte, EURO_LUCKY_MODULUS);
-                if self.euro_lucky.is_full() {
+                if self.euro_lucky.push(byte, EURO_LUCKY_MODULUS) {
                     return Ok(());
                 }
             }
@@ -306,17 +308,11 @@ where
                     self.data.numeric_password.strict_mul(10).strict_add(digit);
                 self.numeric_password_digits = self.numeric_password_digits.strict_add(1);
             }
-            if !self.euro_main.is_full() {
-                self.euro_main.push(byte, EURO_MAIN_MODULUS);
-            }
+            self.euro_main.push(byte, EURO_MAIN_MODULUS);
             if byte <= INPUT_BYTE_MAX_FOR_LOTTO {
-                if !self.lotto.is_full() {
-                    self.lotto.push(byte, LOTTO_MODULUS);
-                }
+                self.lotto.push(byte, LOTTO_MODULUS);
                 if byte <= INPUT_BYTE_MAX_FOR_LOTTO7 {
-                    if !self.lotto7.is_full() {
-                        self.lotto7.push(byte, LOTTO7_MODULUS);
-                    }
+                    self.lotto7.push(byte, LOTTO7_MODULUS);
                     if byte <= INPUT_BYTE_MAX_FOR_PASSWORD
                         && let Some(slot) =
                             self.data.password.get_mut(usize::from(self.password_len))

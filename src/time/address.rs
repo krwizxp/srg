@@ -16,9 +16,7 @@ impl FromStr for ParsedServer {
     type Err = TimeError;
     fn from_str(host: &str) -> Result<Self> {
         let trimmed_input = host.trim();
-        if trimmed_input.is_empty() {
-            return Err(TimeError::parse(ERR_EMPTY));
-        }
+        (!trimmed_input.is_empty()).ok_or_else(|| TimeError::parse(ERR_EMPTY))?;
         let (scheme, after_scheme) = if let Some((prefix, rest)) =
             trimmed_input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
             && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
@@ -44,12 +42,9 @@ impl FromStr for ParsedServer {
                 )
             },
         );
-        if has_path {
-            return Err(TimeError::parse(ERR_PATH));
-        }
-        if after_scheme.is_empty() || invalid_host_char {
-            return Err(TimeError::parse(ERR_HOST));
-        }
+        (!has_path).ok_or_else(|| TimeError::parse(ERR_PATH))?;
+        (!after_scheme.is_empty() && !invalid_host_char)
+            .ok_or_else(|| TimeError::parse(ERR_HOST))?;
         let (host_part, explicit_port, bracketed) =
             if let Some(bracketed_host) = after_scheme.strip_prefix('[') {
                 let (host_part, rem) = bracketed_host
@@ -74,9 +69,8 @@ impl FromStr for ParsedServer {
             UrlScheme::Http => DEFAULT_HTTP_PORT,
             UrlScheme::Https => DEFAULT_HTTPS_PORT,
         });
-        if host_part.is_empty() || host_part.contains(['[', ']']) {
-            return Err(TimeError::parse(ERR_HOST));
-        }
+        (!host_part.is_empty() && !host_part.contains(['[', ']']))
+            .ok_or_else(|| TimeError::parse(ERR_HOST))?;
         let host_is_ipv6 = matches!(host_part.parse(), Ok(net::IpAddr::V6(_)));
         if (bracketed || (explicit_port.is_none() && colon_count > 0)) && !host_is_ipv6 {
             return Err(TimeError::parse(ERR_HOST));
@@ -120,14 +114,11 @@ impl FromStr for ParsedServer {
     }
 }
 fn parse_port(port_part: &str) -> Result<u16> {
-    if port_part.is_empty() || !port_part.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(TimeError::parse(ERR_PORT));
-    }
+    (!port_part.is_empty() && port_part.bytes().all(|byte| byte.is_ascii_digit()))
+        .ok_or_else(|| TimeError::parse(ERR_PORT))?;
     let port = port_part
         .parse::<u16>()
         .map_err(|source| TimeError::parse_with_source(ERR_PORT, source))?;
-    if port == 0 {
-        return Err(TimeError::parse(ERR_PORT));
-    }
+    (port != 0).ok_or_else(|| TimeError::parse(ERR_PORT))?;
     Ok(port)
 }

@@ -47,11 +47,11 @@ fn main() -> io::Result<()> {
         Some(_) | None => return Err(invalid_input("unsupported SRG workflow action")),
     };
     let artifacts = Path::new("artifacts");
-    let random_data = Path::new("random_data.txt");
     let console_log = artifacts.join("srg-result-console.log");
-    let copied_random_data = artifacts.join("srg-result-random_data.txt");
+    let random_data = artifacts.join("random_data.txt");
+    let published_random_data = artifacts.join("srg-result-random_data.txt");
     fs::create_dir_all(artifacts)?;
-    for path in [random_data, copied_random_data.as_path()] {
+    for path in [&random_data, &published_random_data] {
         match fs::remove_file(path) {
             Ok(()) => {}
             Err(source) if source.kind() == io::ErrorKind::NotFound => {}
@@ -64,8 +64,9 @@ fn main() -> io::Result<()> {
         .join("release")
         .join(env!("CARGO_PKG_NAME"));
     binary.add_extension(env::consts::EXE_EXTENSION);
-    let status = Command::new(binary)
+    let status = Command::new(fs::canonicalize(binary)?)
         .args(args)
+        .current_dir(artifacts)
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log))
         .status()?;
@@ -73,36 +74,20 @@ fn main() -> io::Result<()> {
     let mut stdout = io::stdout().lock();
     stdout.write_all(&log_bytes)?;
     stdout.flush()?;
-    if !status.success() {
-        return Err(io::Error::other("selected SRG action failed"));
-    }
-    if let Some(expected) = output_check
-        && !log_bytes
-            .windows(expected.len())
-            .any(|window| window == expected.as_bytes())
-    {
-        return Err(io::Error::other(
-            "selected SRG action produced no expected output",
-        ));
-    }
-    let source_len = match fs::metadata(random_data) {
-        Ok(metadata) => metadata.len(),
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {
-            return output_check.map_or_else(
-                || Err(io::Error::other("SRG created no random data output file")),
-                |_| Ok(()),
-            );
-        }
-        Err(source) => return Err(source),
-    };
-    if output_check.is_none() && source_len <= 3 {
-        return Err(io::Error::other("SRG generated no random data"));
-    }
-    if fs::copy(random_data, copied_random_data)? != source_len {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "workflow output changed while copying",
-        ));
+    status
+        .success()
+        .ok_or_else(|| io::Error::other("selected SRG action failed"))?;
+    output_check
+        .is_none_or(|expected| {
+            log_bytes
+                .windows(expected.len())
+                .any(|window| window == expected.as_bytes())
+        })
+        .ok_or_else(|| io::Error::other("selected SRG action produced no expected output"))?;
+    if output_check.is_none() {
+        (fs::metadata(&random_data)?.len() > 3)
+            .ok_or_else(|| io::Error::other("SRG generated no random data"))?;
+        fs::rename(random_data, published_random_data)?;
     }
     Ok(())
 }

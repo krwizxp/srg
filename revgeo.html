@@ -295,21 +295,9 @@
             color: var(--accent-ink);
           }
 
-          .mobile-msg {
-            display: none;
-          }
-
           @media (pointer: coarse) {
             @container page (inline-size <=800px) {
               padding-block: 16px;
-
-              .desktop-msg {
-                display: none;
-              }
-
-              .mobile-msg {
-                display: inline;
-              }
             }
           }
 
@@ -431,14 +419,7 @@
           background: oklch(from var(--fg) l c h / 0.12);
         }
 
-        &::-webkit-progress-value {
-          border-radius: inherit;
-          background: var(--progress-shimmer), var(--progress-fill);
-          background-position: 110% 0, 0 0;
-          background-repeat: no-repeat;
-          background-size: 220% 100%, 100% 100%;
-        }
-
+        &::-webkit-progress-value,
         &::-moz-progress-bar {
           border-radius: inherit;
           background: var(--progress-shimmer), var(--progress-fill);
@@ -447,10 +428,7 @@
           background-size: 220% 100%, 100% 100%;
         }
 
-        &[data-running]:not([value="0"]):not([value="100"])::-webkit-progress-value {
-          animation: loading-shimmer 1.4s linear infinite;
-        }
-
+        &[data-running]:not([value="0"]):not([value="100"])::-webkit-progress-value,
         &[data-running]:not([value="0"]):not([value="100"])::-moz-progress-bar {
           animation: loading-shimmer 1.4s linear infinite;
         }
@@ -1530,10 +1508,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .progress-shell::-webkit-progress-value {
-        animation: none;
-      }
-
+      .progress-shell::-webkit-progress-value,
       .progress-shell::-moz-progress-bar {
         animation: none;
       }
@@ -1566,13 +1541,8 @@
     <section class="card input-card">
       <div class="left-pane-scroll">
         <header class="card-intro">
-          <div class="card-label reverse">
-            <span class="dot"></span>
-            <span>좌표 추출 및 조회</span>
-          </div>
-          <h1 class="sr-only">좌표 추출 및 조회</h1>
+          <h1 class="card-label reverse"><span class="dot"></span>좌표 추출 및 조회</h1>
         </header>
-        <h2 class="sr-only">파일 업로드 및 실행</h2>
         <fieldset class="row">
           <legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
@@ -1582,11 +1552,7 @@
               <path
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
-            <span class="drop-text">
-              <span class="desktop-msg">클릭(드래그 앤 드롭)하여 <strong>random_data.txt</strong>
-                업로드</span>
-              <span class="mobile-msg">터치하여 <strong>random_data.txt</strong> 업로드</span>
-            </span>
+            <span class="drop-text">선택하거나 드래그하여 <strong id="drop-filename">random_data.txt</strong> 업로드</span>
             <input type="file" id="file" accept=".txt,text/plain">
           </label>
           <div class="row">
@@ -1749,11 +1715,7 @@
     </section>
     <section class="card results-card">
       <header class="card-intro">
-        <div class="card-label geo">
-          <span class="dot"></span>
-          <span>주소 조회 결과</span>
-        </div>
-        <h2 class="sr-only">주소 조회 결과</h2>
+        <h2 class="card-label geo"><span class="dot"></span>주소 조회 결과</h2>
       </header>
       <search aria-label="주소 조회 결과 필터">
         <form id="filters" class="filters">
@@ -2286,8 +2248,6 @@
       pageNext: document.getElementById("page-next"),
       pageStatus: document.getElementById("page-status"),
     };
-    const setCoordsText = (text) =>
-      domElements.coordsContent.textContent = text;
     const root = document.documentElement;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const currentTheme = () =>
@@ -2553,9 +2513,6 @@
           this.status === "paused" ||
           this.status === "pausing";
       },
-      get isBusy() {
-        return this.task !== null;
-      },
       get isStopping() {
         return this.status === "stopping";
       },
@@ -2596,12 +2553,6 @@
         if (status === "idle") {
           this.task = null;
         } else {
-          if (!this.task) {
-            throw new DOMException(
-              `작업이 없는 상태에서 ${status}(으)로 전환할 수 없습니다.`,
-              "InvalidStateError",
-            );
-          }
           this.task.status = status;
         }
         updateUIState();
@@ -2609,7 +2560,7 @@
     };
     function updateUIState() {
       const s = AppState.status;
-      const isBusy = AppState.isBusy;
+      const isBusy = AppState.task !== null;
       domElements.tableWrap.toggleAttribute("data-running", s === "running");
       domElements.prog.toggleAttribute("data-running", s === "running");
       domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
@@ -2873,17 +2824,6 @@
         if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
       }
     }
-    function isFreshReverseCacheRow(row, now) {
-      if (
-        !row ||
-        !Number.isFinite(row.savedAt) ||
-        !GeocodeParser.isValid(row.parsed)
-      ) {
-        return false;
-      }
-      const age = now - row.savedAt;
-      return age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS;
-    }
     function openReverseCacheDb() {
       if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
       if (Date.now() < REVERSE_CACHE_RETRY_AT) {
@@ -3021,9 +2961,13 @@
             const cacheKey = persistentKey.slice(
               REVERSE_CACHE_KEY_PREFIX.length,
             );
+            const age = now - row.savedAt;
             if (
               results.has(cacheKey) &&
-              isFreshReverseCacheRow(row, now)
+              Number.isFinite(row.savedAt) &&
+              age >= 0 &&
+              age <= CONFIG.REVERSE_CACHE_TTL_MS &&
+              GeocodeParser.isValid(row.parsed)
             ) results.set(cacheKey, row.parsed);
           };
           if (results.size <= REVERSE_CACHE_KEYED_READ_LIMIT) {
@@ -3538,7 +3482,7 @@
     async function handleParse() {
       const file = AppState.droppedFile;
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
-      setCoordsText("");
+      domElements.coordsContent.textContent = "";
       clearTable();
       const task = AppState.setRecords([], "parsing");
       domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
@@ -3558,19 +3502,13 @@
         domElements.emptyHint.textContent =
           "좌표 추출 완료. 조회 시작을 눌러주세요.";
         const MAX_DISP = 200;
-        const disp = [];
-        for (
-          let i = 0, dispLen = Math.min(records.length, MAX_DISP);
-          i < dispLen;
-          i++
-        ) {
-          const r = records[i];
-          disp.push(`${r.latStr}, ${r.lonStr}`);
-        }
+        const disp = records
+          .slice(0, MAX_DISP)
+          .map((record) => `${record.latStr}, ${record.lonStr}`);
         if (records.length > MAX_DISP) {
           disp.push(`… 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
-        setCoordsText(disp.join("\n"));
+        domElements.coordsContent.textContent = disp.join("\n");
         setStatusMessage(
           records.length > CONFIG.BULK_CONFIRM_THRESHOLD
             ? `분석 완료: ${fmt(records.length)}개 좌표. 대량 조회 확인 후 시작할 수 있습니다.`
@@ -3617,10 +3555,6 @@
       if (!btn) return;
       if (isMapPopoverOpen() && btn !== LAST_MAP_INVOKER) closeMapPopover();
       const r = AppState.records[Number(btn.dataset.idx)];
-      if (!r) {
-        e.preventDefault();
-        return;
-      }
       LAST_MAP_INVOKER = btn;
       const lat = r.latStr;
       const lon = r.lonStr;
@@ -3721,14 +3655,14 @@
         setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
         return;
       }
-      if (AppState.isBusy) {
+      if (AppState.task !== null) {
         setStatusMessage(
           "조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.",
           "warn",
         );
         return;
       }
-      setCoordsText("");
+      domElements.coordsContent.textContent = "";
       clearTable();
       AppState.setRecords([]);
       AppState.droppedFile = file;
@@ -3736,13 +3670,7 @@
       setStatusMessage(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
-      for (const el of document.querySelectorAll(
-        ".drop-text .desktop-msg, .drop-text .mobile-msg",
-      )) {
-        const strong = document.createElement("strong");
-        strong.textContent = file.name;
-        el.replaceChildren("선택된 파일: ", strong);
-      }
+      document.getElementById("drop-filename").textContent = file.name;
     });
     function loadManualRng() {
       const U64_MAX = (1n << 64n) - 1n;
@@ -4193,7 +4121,7 @@
         ].join("\n");
       }
       const MANUAL_GENERATION_HARD_LIMIT = 10_000;
-      const MANUAL_PREVIEW_BLOCK_LIMIT = 100;
+      const MANUAL_PREVIEW_LIMIT = 100;
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
       const RX_U64_TOKEN_SCAN = /[^\s,]+/gu;
@@ -4201,16 +4129,6 @@
         for (const match of raw.matchAll(RX_U64_TOKEN_SCAN)) {
           yield match[0];
         }
-      }
-      function manualPreviewText(parts, omittedCount) {
-        if (parts.length === 0) {
-          return "";
-        }
-        const preview = parts.join("");
-        if (omittedCount <= 0) {
-          return preview;
-        }
-        return `${preview}\n\n… 외 ${fmt(omittedCount)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
       }
       class SupplementRequired extends Error { }
       function randomDataBlob(chunks, includeBom) {
@@ -4254,8 +4172,6 @@
         const suppDialogValues = document.getElementById("supp-dialog-values");
         const suppDialogError = document.getElementById("supp-dialog-error");
         const suppDialogCancel = document.getElementById("supp-dialog-cancel");
-        const setManualOutputText = (text) =>
-          outputContent.textContent = text;
         let supplementRequest = null;
         let supplementReturnFocus = null;
         function finishSupplementRequest(values) {
@@ -4339,17 +4255,15 @@
           error.textContent = "";
           meta.textContent = "기본 난수 변환 준비 중…";
           lastGeneratedChunks = [];
-          setManualOutputText("");
+          outputContent.textContent = "";
           setManualBusy(true);
           try {
             const suppTokens = iterU64Tokens(suppInput.value);
             const supplementValues = [];
-            const previewParts = [];
-            let omittedPreviewCount = 0;
             let processedCount = 0;
             let suppInputCount = 0;
             let queuedSuppCount = 0;
-            let renderedPreviewCount = -1;
+            let renderedCount = -1;
             let supplementHead = 0;
             let supplementCursor = 0;
             let preloadedCount = 0;
@@ -4365,14 +4279,16 @@
               return { value, bitsRemaining: 64 };
             };
             const updateManualProgress = (state) => {
+              const count = Math.min(lastGeneratedChunks.length, MANUAL_PREVIEW_LIMIT);
               if (
                 state !== "처리 중" ||
-                renderedPreviewCount !== previewParts.length
+                renderedCount !== count
               ) {
-                setManualOutputText(
-                  manualPreviewText(previewParts, omittedPreviewCount),
-                );
-                renderedPreviewCount = previewParts.length;
+                let preview = lastGeneratedChunks.slice(0, count).join("");
+                const omitted = lastGeneratedChunks.length - count;
+                if (omitted > 0) preview += `\n\n… 외 ${fmt(omitted)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
+                outputContent.textContent = preview;
+                renderedCount = count;
               }
               meta.textContent =
                 `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 대화상자 ${fmt(suppInputCount - queuedSuppCount)}개)`;
@@ -4425,11 +4341,6 @@
                 ? outputBlock
                 : `\n${outputBlock}`;
               lastGeneratedChunks.push(outputChunk);
-              if (processedCount < MANUAL_PREVIEW_BLOCK_LIMIT) {
-                previewParts.push(outputChunk);
-              } else {
-                omittedPreviewCount += 1;
-              }
               processedCount += 1;
               const now = performance.now();
               if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
@@ -4454,7 +4365,7 @@
             if (generationId === manualGenerationId) {
               lastGeneratedChunks = [];
               meta.textContent = "";
-              setManualOutputText("");
+              outputContent.textContent = "";
               error.textContent = getErrorMessage(err);
             }
           } finally {
@@ -4520,7 +4431,7 @@
           lastGeneratedChunks = [];
           error.textContent = "";
           meta.textContent = "";
-          setManualOutputText("");
+          outputContent.textContent = "";
           setManualBusy(false);
         });
       }

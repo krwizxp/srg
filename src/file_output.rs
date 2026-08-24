@@ -99,9 +99,9 @@ impl TryFrom<&Path> for OutputFile {
                 "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
             ));
         }
-        if !metadata.is_file() {
-            return Err(AppError::message("출력 경로는 일반 파일이어야 합니다."));
-        }
+        metadata
+            .is_file()
+            .ok_or_else(|| AppError::message("출력 경로는 일반 파일이어야 합니다."))?;
         let link_count = cfg_select! {
             target_os = "windows" => {{
                 let mut standard_info = FileStandardInfo::default();
@@ -126,11 +126,8 @@ impl TryFrom<&Path> for OutputFile {
                 compile_error!("Output file validation supports only Windows, Linux, and macOS.")
             }
         };
-        if link_count != 1 {
-            return Err(AppError::message(
-                "출력 파일의 하드 링크 수는 1이어야 합니다.",
-            ));
-        }
+        (link_count == 1)
+            .ok_or_else(|| AppError::message("출력 파일의 하드 링크 수는 1이어야 합니다."))?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         match file.try_lock() {
             Ok(()) => {}
@@ -162,11 +159,9 @@ impl TryFrom<&Path> for OutputFile {
             file.rewind()?;
             file.read_exact(&mut bom)
                 .map_err(|source| AppError::context("기존 출력 파일 BOM 읽기 실패", source))?;
-            if &bom != UTF8_BOM {
-                return Err(AppError::message(
-                    "기존 출력 파일은 SRG UTF-8 형식이어야 합니다.",
-                ));
-            }
+            (&bom == UTF8_BOM).ok_or_else(|| {
+                AppError::message("기존 출력 파일은 SRG UTF-8 형식이어야 합니다.")
+            })?;
             let bom_len = u64::try_from(UTF8_BOM.len()).unwrap_or_else(|_| process::abort());
             if len != bom_len {
                 let max_tail_len = u64::try_from(BUFFER_SIZE).unwrap_or_else(|_| process::abort());

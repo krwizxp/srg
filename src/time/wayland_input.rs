@@ -92,13 +92,6 @@ struct DeviceState {
     active: bool,
     raw: NonNull<EiDevice>,
 }
-#[derive(Clone, Copy)]
-enum DeviceEventType {
-    Added,
-    Paused,
-    Removed,
-    Resumed,
-}
 #[repr(C)]
 union DlsymSymbol<F: Copy> {
     raw: *mut c_void,
@@ -233,33 +226,22 @@ impl EiApi {
             }
         }
     }
-    fn button(&self, device: NonNull<EiDevice>, is_press: bool) {
-        // SAFETY: device is a retained active device with button capability.
-        unsafe {
-            (self.device_button_button)(device.as_ptr(), BTN_LEFT, is_press);
-        }
-    }
-    fn frame(&self, context: NonNull<Ei>, device: NonNull<EiDevice>) {
-        // SAFETY: context is the live context that owns device.
-        let timestamp = unsafe { (self.now)(context.as_ptr()) };
-        // SAFETY: device is active and timestamp comes from its live context.
-        unsafe {
-            (self.device_frame)(device.as_ptr(), timestamp);
-        }
-    }
-    fn keyboard_key(&self, device: NonNull<EiDevice>, is_press: bool) {
-        // SAFETY: device is a retained active device with keyboard capability.
-        unsafe {
-            (self.device_keyboard_key)(device.as_ptr(), F5_KEY_CODE, is_press);
-        }
-    }
     fn send_action(&self, action: TriggerAction, context: NonNull<Ei>, device: NonNull<EiDevice>) {
+        let (emit, code) = match action {
+            TriggerAction::F5Press => (self.device_keyboard_key, F5_KEY_CODE),
+            TriggerAction::LeftClick => (self.device_button_button, BTN_LEFT),
+        };
         for pressed in [true, false] {
-            match action {
-                TriggerAction::F5Press => self.keyboard_key(device, pressed),
-                TriggerAction::LeftClick => self.button(device, pressed),
+            // SAFETY: device is active and has the capability corresponding to emit.
+            unsafe {
+                emit(device.as_ptr(), code, pressed);
             }
-            self.frame(context, device);
+            // SAFETY: context is the live context that owns device.
+            let timestamp = unsafe { (self.now)(context.as_ptr()) };
+            // SAFETY: device is active and timestamp comes from its live context.
+            unsafe {
+                (self.device_frame)(device.as_ptr(), timestamp);
+            }
         }
     }
 }
@@ -288,13 +270,17 @@ impl EiSession {
             }
         }
     }
-    fn handle_device_event(
-        &mut self,
-        event_type: DeviceEventType,
-        device: NonNull<EiDevice>,
-    ) -> InputResult<()> {
+    fn handle_event(&mut self, event: NonNull<EiEvent>) -> InputResult<Option<NonNull<EiPing>>> {
+        // SAFETY: event is live for this call.
+        let event_type = unsafe { (self.api.event_get_type)(event.as_ptr()) };
+        let event_device = || {
+            // SAFETY: the closure is called only for event types that carry an ei_device pointer.
+            NonNull::new(unsafe { (self.api.event_get_device)(event.as_ptr()) })
+                .ok_or(Cow::Borrowed("libei device 이벤트에 device가 없습니다."))
+        };
         match event_type {
-            DeviceEventType::Added => {
+            EI_EVENT_DEVICE_ADDED => {
+                let device = event_device()?;
                 let required_capability = match self.action {
                     TriggerAction::F5Press => EI_DEVICE_CAP_KEYBOARD,
                     TriggerAction::LeftClick => EI_DEVICE_CAP_BUTTON,
@@ -308,7 +294,7 @@ impl EiSession {
                     unsafe {
                         (self.api.device_close)(device.as_ptr());
                     }
-                    return Ok(());
+                    return Ok(None);
                 }
                 // SAFETY: device came from a live event and is retained for the session.
                 let retained = NonNull::new(unsafe { (self.api.device_ref)(device.as_ptr()) })
@@ -317,26 +303,26 @@ impl EiSession {
                     active: false,
                     raw: retained,
                 });
-                Ok(())
             }
-            DeviceEventType::Paused => {
+            EI_EVENT_DEVICE_PAUSED => {
+                let device = event_device()?;
                 if let Some(current) = self.device.as_mut()
                     && current.raw == device
                 {
                     current.active = false;
                 }
-                Ok(())
             }
-            DeviceEventType::Removed => {
+            EI_EVENT_DEVICE_REMOVED => {
+                let device = event_device()?;
                 if let Some(current) = self.device.take_if(|current| current.raw == device) {
                     // SAFETY: current is the retained reference corresponding to the removed device.
                     unsafe {
                         (self.api.device_unref)(current.raw.as_ptr());
                     }
                 }
-                Ok(())
             }
-            DeviceEventType::Resumed => {
+            EI_EVENT_DEVICE_RESUMED => {
+                let device = event_device()?;
                 if let Some(current) = self.device.as_mut()
                     && current.raw == device
                     && !current.active
@@ -348,18 +334,7 @@ impl EiSession {
                     }
                     current.active = true;
                 }
-                Ok(())
             }
-        }
-    }
-    fn handle_event(&mut self, event: NonNull<EiEvent>) -> InputResult<Option<NonNull<EiPing>>> {
-        // SAFETY: event is live for this call.
-        let event_type = unsafe { (self.api.event_get_type)(event.as_ptr()) };
-        let device_event_type = match event_type {
-            EI_EVENT_DEVICE_ADDED => DeviceEventType::Added,
-            EI_EVENT_DEVICE_PAUSED => DeviceEventType::Paused,
-            EI_EVENT_DEVICE_REMOVED => DeviceEventType::Removed,
-            EI_EVENT_DEVICE_RESUMED => DeviceEventType::Resumed,
             EI_EVENT_DISCONNECT => {
                 return Err(Cow::Borrowed("libei 연결이 종료되었습니다."));
             }
@@ -374,24 +349,17 @@ impl EiSession {
                 let seat = NonNull::new(unsafe { (self.api.event_get_seat)(event.as_ptr()) })
                     .ok_or(Cow::Borrowed("libei seat 추가 이벤트에 seat가 없습니다."))?;
                 self.api.bind_action(self.action, seat);
-                return Ok(None);
             }
-            _ => return Ok(None),
-        };
-        // SAFETY: device event types carry an ei_device pointer.
-        let device = NonNull::new(unsafe { (self.api.event_get_device)(event.as_ptr()) })
-            .ok_or(Cow::Borrowed("libei device 이벤트에 device가 없습니다."))?;
-        self.handle_device_event(device_event_type, device)?;
+            _ => {}
+        }
         Ok(None)
     }
     fn poll_fd(&self) -> InputResult<c_int> {
         // SAFETY: context is a live libei sender context.
         let fd = unsafe { (self.api.get_fd)(self.context.as_ptr()) };
-        if fd < 0 {
-            Err(Cow::Borrowed("ei_get_fd 실패"))
-        } else {
-            Ok(fd)
-        }
+        (fd >= 0)
+            .then_some(fd)
+            .ok_or(Cow::Borrowed("ei_get_fd 실패"))
     }
     fn send(&mut self) -> Result<(), SendError> {
         let Some(device) = self.device.filter(|device| device.active) else {
@@ -491,19 +459,15 @@ impl Library {
     }
 }
 impl PollFd {
-    const fn ensure_open(self, error: &'static str) -> InputResult<()> {
-        if self.has_terminal_error() {
-            Err(Cow::Borrowed(error))
-        } else {
-            Ok(())
-        }
+    fn ensure_open(self, error: &'static str) -> InputResult<()> {
+        (!self.has_terminal_error())
+            .then_some(())
+            .ok_or(Cow::Borrowed(error))
     }
-    const fn ensure_valid(self, error: &'static str) -> InputResult<()> {
-        if self.revents & POLLNVAL != 0 {
-            Err(Cow::Borrowed(error))
-        } else {
-            Ok(())
-        }
+    fn ensure_valid(self, error: &'static str) -> InputResult<()> {
+        (self.revents & POLLNVAL == 0)
+            .then_some(())
+            .ok_or(Cow::Borrowed(error))
     }
     const fn has_events(self) -> bool {
         self.revents & POLL_READ_EVENTS != 0
@@ -548,11 +512,9 @@ impl PortalSession {
     fn eis_fd(&self) -> InputResult<c_int> {
         // SAFETY: this is called after OEFFIS_EVENT_CONNECTED_TO_EIS.
         let fd = unsafe { (self.api.get_eis_fd)(self.context.as_ptr()) };
-        if fd < 0 {
-            Err(format!("oeffis_get_eis_fd 실패: {}", io::Error::last_os_error()).into())
-        } else {
-            Ok(fd)
-        }
+        (fd >= 0)
+            .then_some(fd)
+            .ok_or_else(|| format!("oeffis_get_eis_fd 실패: {}", io::Error::last_os_error()).into())
     }
     fn error_message(&self) -> InputError {
         // SAFETY: context is live and owns the returned NUL-terminated error string.
@@ -569,11 +531,9 @@ impl PortalSession {
     fn poll_fd(&self) -> InputResult<c_int> {
         // SAFETY: context is a live liboeffis context.
         let fd = unsafe { (self.api.get_fd)(self.context.as_ptr()) };
-        if fd < 0 {
-            Err(Cow::Borrowed("oeffis_get_fd 실패"))
-        } else {
-            Ok(fd)
-        }
+        (fd >= 0)
+            .then_some(fd)
+            .ok_or(Cow::Borrowed("oeffis_get_fd 실패"))
     }
     fn wait_for_eis_fd<F>(
         &mut self,

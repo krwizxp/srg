@@ -108,9 +108,8 @@ impl CliCommand {
         run: impl FnOnce(&HardwareRng) -> Result<()>,
     ) -> Result<()> {
         let rng = HardwareRng::new();
-        if rng.source() == HardwareRandomSource::None {
-            return Err("RDSEED·RDRAND를 지원하지 않는 CPU입니다.".into());
-        }
+        (rng.source() != HardwareRandomSource::None)
+            .ok_or("RDSEED·RDRAND를 지원하지 않는 CPU입니다.")?;
         rng.write_initial_source_notice(err)?;
         run(&rng)?;
         rng.write_rdseed_fallback_notice(err)
@@ -138,11 +137,11 @@ where
                     return Err(AppError::message("사용법: srg generate <count>"));
                 };
                 let count = Self::parse_arg::<usize>(&count_arg, "count")?;
-                if !(1..=MAX_BATCH_GENERATE_COUNT).contains(&count) {
-                    return Err(AppError::message(format!(
-                        "count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다."
-                    )));
-                }
+                (1..=MAX_BATCH_GENERATE_COUNT)
+                    .contains(&count)
+                    .ok_or_else(|| {
+                        format!("count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다.")
+                    })?;
                 Ok(Self::Generate { count })
             }
             #[cfg(target_arch = "x86_64")]
@@ -170,20 +169,15 @@ where
                     csv_shape(&players);
                 let (result_count, results_have_empty, results_have_line_break) =
                     csv_shape(&results);
-                if players_have_line_break || results_have_line_break {
-                    return Err("플레이어와 결과값은 한 줄로 입력해야 합니다.".into());
-                }
-                if !(2..=MAX_LADDER_ENTRIES).contains(&player_count) {
-                    return Err(AppError::message(format!(
-                        "플레이어는 2~{MAX_LADDER_ENTRIES}명이어야 합니다."
-                    )));
-                }
-                if player_count != result_count {
-                    return Err("결과값 개수는 플레이어 수와 같아야 합니다.".into());
-                }
-                if players_have_empty || results_have_empty {
-                    return Err("플레이어와 결과값은 비워둘 수 없습니다.".into());
-                }
+                (!players_have_line_break && !results_have_line_break)
+                    .ok_or("플레이어와 결과값은 한 줄로 입력해야 합니다.")?;
+                (2..=MAX_LADDER_ENTRIES)
+                    .contains(&player_count)
+                    .ok_or_else(|| format!("플레이어는 2~{MAX_LADDER_ENTRIES}명이어야 합니다."))?;
+                (player_count == result_count)
+                    .ok_or("결과값 개수는 플레이어 수와 같아야 합니다.")?;
+                (!players_have_empty && !results_have_empty)
+                    .ok_or("플레이어와 결과값은 비워둘 수 없습니다.")?;
                 Ok(Self::Ladder { players, results })
             }
             #[cfg(target_arch = "x86_64")]
@@ -211,9 +205,9 @@ where
                     take_two_args(&mut args, "time-observe <host> <seconds>")?;
                 let host = Self::parse_arg::<ParsedServer>(&host_arg, "host")?;
                 let seconds = Self::parse_arg::<u64>(&seconds_arg, "seconds")?;
-                if !(1..=60).contains(&seconds) {
-                    return Err("seconds는 1~60 범위여야 합니다.".into());
-                }
+                (1..=60)
+                    .contains(&seconds)
+                    .ok_or("seconds는 1~60 범위여야 합니다.")?;
                 Ok(Self::TimeObserve { host, seconds })
             }
             _ => Err(AppError::message(format!(

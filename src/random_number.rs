@@ -25,11 +25,8 @@ pub(super) fn generate_random_integer(
     Ok(())
 }
 pub(super) fn validate_random_integer_range(min_value: i64, max_value: i64) -> Result<()> {
-    if min_value < MIN_ALLOWED_INTEGER_VALUE {
-        return Err(AppError::message(format!(
-            "최솟값은 {MIN_ALLOWED_INTEGER_VALUE} 이상이어야 합니다."
-        )));
-    }
+    (min_value >= MIN_ALLOWED_INTEGER_VALUE)
+        .ok_or_else(|| format!("최솟값은 {MIN_ALLOWED_INTEGER_VALUE} 이상이어야 합니다."))?;
     (max_value >= min_value).ok_or_else(|| "최댓값은 최솟값보다 크거나 같아야 합니다.".into())
 }
 pub(super) fn generate_random_float(
