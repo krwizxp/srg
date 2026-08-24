@@ -1552,7 +1552,7 @@
               <path
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
-            <span class="drop-text">선택하거나 드래그하여 <strong id="drop-filename">random_data.txt</strong> 업로드</span>
+            <span class="drop-text"><strong id="drop-filename">random_data.txt</strong><span id="drop-state"> · 선택하거나 드래그하여 업로드</span></span>
             <input type="file" id="file" accept=".txt,text/plain">
           </label>
           <div class="row">
@@ -3508,6 +3508,7 @@
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
+        document.getElementById("drop-state").textContent = ` · ${fmt(records.length)}개 좌표 추출 완료`;
         domElements.emptyHint.textContent =
           "좌표 추출 완료. 조회 시작을 눌러주세요.";
         const MAX_DISP = 200;
@@ -3670,6 +3671,7 @@
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
       document.getElementById("drop-filename").textContent = file.name;
+      document.getElementById("drop-state").textContent = " · 선택됨 · 좌표 추출을 눌러주세요";
     });
     function loadManualRng() {
       const U64_MAX = (1n << 64n) - 1n;
