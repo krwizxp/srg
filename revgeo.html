@@ -2176,8 +2176,17 @@
     }
     const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
-    mapPopover.addEventListener("toggle", () => {
-      if (!isMapPopoverOpen()) LAST_MAP_INVOKER = null;
+    mapPopover.addEventListener("beforetoggle", (e) => {
+      if (e.newState !== "open") return void (LAST_MAP_INVOKER = null);
+      const btn = e.source;
+      if (!btn?.matches("button.map-btn")) return;
+      const r = AppState.records[Number(btn.dataset.idx)];
+      LAST_MAP_INVOKER = btn;
+      const { latStr: lat, lonStr: lon } = r;
+      const lat6 = fmtCoord6(lat), lon6 = fmtCoord6(lon);
+      for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
+        mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
+      }
     });
     function closeMapPopover() {
       if (!isMapPopoverOpen()) return;
@@ -3552,17 +3561,7 @@
     });
     domElements.tbody.addEventListener("click", (e) => {
       const btn = e.target?.closest?.("button.map-btn");
-      if (!btn) return;
-      if (isMapPopoverOpen() && btn !== LAST_MAP_INVOKER) closeMapPopover();
-      const r = AppState.records[Number(btn.dataset.idx)];
-      LAST_MAP_INVOKER = btn;
-      const lat = r.latStr;
-      const lon = r.lonStr;
-      const lat6 = fmtCoord6(lat);
-      const lon6 = fmtCoord6(lon);
-      for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
-        mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
-      }
+      if (btn && isMapPopoverOpen() && btn !== LAST_MAP_INVOKER) closeMapPopover();
     }, { capture: true });
     const COMMANDS = {
       "--parse": handleParse,
