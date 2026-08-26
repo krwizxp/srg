@@ -348,8 +348,8 @@ impl MenuApp {
             scheduled_trigger,
             stop_after: None,
         }
-        .run_loop(out, err)?;
-        Ok(())
+        .run_loop(out, err)
+        .map_err(Into::into)
     }
     pub(super) fn run(&mut self) -> Result<()> {
         let menu_prompt = format_args!("{MENU}");

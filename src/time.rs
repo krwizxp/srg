@@ -631,8 +631,7 @@ impl ServerTimeSession {
             scheduled_trigger,
         };
         app_state.run_loop(self.stop_after, out, err)?;
-        writeln!(out, "\n서버 시간 확인을 종료합니다.")?;
-        Ok(())
+        writeln!(out, "\n서버 시간 확인을 종료합니다.").map_err(Into::into)
     }
 }
 impl AppState<'_> {

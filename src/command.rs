@@ -74,15 +74,13 @@ impl CliCommand {
             Self::RandomInteger { max, min } => Self::run_with_rng(&mut err, |rng| {
                 generate_random_integer(min, max, rng.next_u64()?, &mut out, rng)
             }),
-            Self::TimeObserve { host, seconds } => {
-                ServerTimeSession {
-                    host,
-                    scheduled_trigger: None,
-                    stop_after: Some(Duration::from_secs(seconds)),
-                }
-                .run_loop(&mut out, &mut err)?;
-                Ok(())
+            Self::TimeObserve { host, seconds } => ServerTimeSession {
+                host,
+                scheduled_trigger: None,
+                stop_after: Some(Duration::from_secs(seconds)),
             }
+            .run_loop(&mut out, &mut err)
+            .map_err(Into::into),
         }
     }
     #[cfg(target_arch = "x86_64")]

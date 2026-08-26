@@ -735,8 +735,7 @@ impl WaylandInput {
                 ));
             }
         }
-        ei_poll.ensure_open("libei poll 연결이 종료되었습니다.")?;
-        Ok(())
+        ei_poll.ensure_open("libei poll 연결이 종료되었습니다.")
     }
     fn wait_until_ready<F>(&mut self, deadline: Instant, should_cancel: &mut F) -> InputResult<bool>
     where

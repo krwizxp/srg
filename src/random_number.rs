@@ -21,8 +21,8 @@ pub(super) fn generate_random_integer(
     writeln!(
         out,
         "무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})"
-    )?;
-    Ok(())
+    )
+    .map_err(Into::into)
 }
 pub(super) fn validate_random_integer_range(min_value: i64, max_value: i64) -> Result<()> {
     (min_value >= MIN_ALLOWED_INTEGER_VALUE)
@@ -49,8 +49,7 @@ pub(super) fn generate_random_float(
     } else {
         scale.mul_add(NumericSub::sub(max_value, min_value), min_value)
     };
-    writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}")?;
-    Ok(())
+    writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}").map_err(Into::into)
 }
 pub(super) fn validate_random_float_range(min_value: f64, max_value: f64) -> Result<()> {
     (min_value.is_finite()

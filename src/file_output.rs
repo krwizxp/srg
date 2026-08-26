@@ -237,8 +237,7 @@ impl OutputFile {
     pub(super) fn clear(&mut self) -> Result<()> {
         self.file.set_len(0)?;
         self.file.rewind()?;
-        self.file.write_all(UTF8_BOM)?;
-        Ok(())
+        self.file.write_all(UTF8_BOM).map_err(Into::into)
     }
     pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
         let mut buffer = [0_u8; BUFFER_SIZE];
@@ -249,8 +248,7 @@ impl OutputFile {
         } else {
             file_len
         };
-        write_slice_to_console(buffer.split_at(output_len).0)?;
-        Ok(())
+        write_slice_to_console(buffer.split_at(output_len).0).map_err(Into::into)
     }
     #[cfg(target_arch = "x86_64")]
     pub(super) fn read_tail_into<'buffer>(
