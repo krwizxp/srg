@@ -14,7 +14,6 @@ const INVALID_TIME: &[u8; 7] = b"--:--.-";
 const MAX_TIME_MINUTES: u128 = 99;
 const PERCENT_SCALE: usize = 100;
 const PERCENT_SCALE_U128: u128 = 100;
-const PERCENT_WIDTH: usize = 3;
 const SECONDS_PER_MINUTE_U128: u128 = 60;
 const TIME_BUF_LEN: usize = 7;
 pub(crate) struct ProgressBuffers {
@@ -66,13 +65,10 @@ impl ProgressBuffers {
         }
         cur.write_byte(b']');
         cur.write_byte(b' ');
-        for _ in 0..PERCENT_WIDTH.strict_sub(if percent >= 100 {
-            3
-        } else if percent >= 10 {
-            2
-        } else {
-            1
-        }) {
+        if percent < 100 {
+            cur.write_byte(b' ');
+        }
+        if percent < 10 {
             cur.write_byte(b' ');
         }
         buf_write_u8_dec(&mut cur, percent);

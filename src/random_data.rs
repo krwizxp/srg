@@ -336,12 +336,11 @@ where
         false
     }
     fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
-        let value = (self.next_supp)(reason)?;
         self.supplemental = RandomBitBuffer {
             bits_remaining: BYTE_BITS,
-            value,
+            value: (self.next_supp)(reason)?,
         };
-        Ok(value)
+        Ok(self.supplemental.value)
     }
 }
 const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {

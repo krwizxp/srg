@@ -87,14 +87,11 @@ impl FromStr for HttpDate {
     }
 }
 fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
-    if !(d0.is_ascii_digit() && d1.is_ascii_digit()) {
-        return None;
-    }
-    Some(
+    (d0.is_ascii_digit() && d1.is_ascii_digit()).then(|| {
         u32::from(d0.strict_sub(b'0'))
             .strict_mul(DECIMAL_BASE_U32)
-            .strict_add(u32::from(d1.strict_sub(b'0'))),
-    )
+            .strict_add(u32::from(d1.strict_sub(b'0')))
+    })
 }
 fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
     const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
@@ -176,9 +173,9 @@ fn parse_http_date_time(
         && minute <= MAX_HTTP_MINUTE_OR_SECOND
         && second <= MAX_HTTP_MINUTE_OR_SECOND)
         .ok_or_else(|| TimeError::parse(ERR_TIME_RANGE))?;
-    let leap_year = (year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
-        && year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32)
-        || year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32;
+    let leap_year = year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
+        && (year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32
+            || year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32);
     let HttpMonth {
         mut max_day,
         number: month_number,
@@ -187,12 +184,8 @@ fn parse_http_date_time(
         max_day = FEBRUARY_DAY_LEAP;
     }
     (day != 0 && day <= max_day).ok_or_else(|| TimeError::parse(ERR_DAY))?;
-    let year_i64 = i64::from(year);
-    let adjusted_year = if month_number <= MARCH_MONTH_THRESHOLD {
-        year_i64.strict_sub(1_i64)
-    } else {
-        year_i64
-    };
+    let adjusted_year =
+        i64::from(year).strict_sub(i64::from(month_number <= MARCH_MONTH_THRESHOLD));
     let (era, year_of_era) = (
         adjusted_year.div_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
         adjusted_year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
@@ -345,12 +338,9 @@ pub(super) fn civil_from_days(z: i32) -> CivilDate {
     let mp = 5_i32.strict_mul(doy).strict_add(2).div_euclid(153);
     let month_term = 153_i32.strict_mul(mp).strict_add(2).div_euclid(5);
     let day = doy.strict_sub(month_term).strict_add(1).cast_unsigned();
-    let month_i32 = if mp < 10_i32 {
-        mp.strict_add(3)
-    } else {
-        mp.strict_sub(9)
-    };
-    let month = month_i32.cast_unsigned();
+    let month = mp
+        .strict_add(if mp < 10_i32 { 3 } else { -9 })
+        .cast_unsigned();
     let year = y.strict_add(i32::from(month <= MARCH_MONTH_THRESHOLD));
     CivilDate { day, month, year }
 }
