@@ -151,7 +151,7 @@
           inset-block-start: var(--scroll-shadow-top, 0);
           margin-block-end: calc(-1 * var(--scroll-shadow-size));
           background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
-          animation-name: scroll-shadow-top;
+          animation-name: scroll-shadow;
           animation-range: 0% 90%;
         }
 
@@ -159,27 +159,18 @@
           inset-block-end: 0;
           margin-block-start: calc(-1 * var(--scroll-shadow-size));
           background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
-          animation-name: scroll-shadow-bottom;
+          animation-name: scroll-shadow;
+          animation-direction: reverse;
           animation-range: 10% 100%;
         }
 
-        @keyframes scroll-shadow-top {
+        @keyframes scroll-shadow {
           from {
             opacity: 0;
           }
 
           to {
             opacity: 1;
-          }
-        }
-
-        @keyframes scroll-shadow-bottom {
-          from {
-            opacity: 1;
-          }
-
-          to {
-            opacity: 0;
           }
         }
       }
