@@ -202,23 +202,20 @@ impl TryFrom<&Path> for OutputFile {
                 })?;
                 let mut lines = body.split(|&byte| byte == b'\n');
                 let first = lines.next().unwrap_or_else(|| process::abort());
-                let mut record_line_count = 1_usize;
-                let mut last = first;
-                for line in lines {
-                    record_line_count = record_line_count.strict_add(1);
-                    last = line;
-                }
+                let (record_line_count, last) = lines.fold((1_usize, first), |(count, _), line| {
+                    (count.strict_add(1), line)
+                });
                 let final_value_is_valid =
                     last.strip_prefix(FILE_RECORD_FINAL_LABEL)
                         .is_some_and(|value| {
-                            let mut coordinate_count = 0_usize;
-                            value.split(|&byte| byte == b':').all(|coordinate| {
-                                coordinate_count = coordinate_count.strict_add(1);
-                                coordinate.len() == 4
-                                    && coordinate.iter().all(|&byte| {
+                            value.len() == 19
+                                && value.iter().enumerate().all(|(index, &byte)| {
+                                    if matches!(index, 4 | 9 | 14) {
+                                        byte == b':'
+                                    } else {
                                         byte.is_ascii_digit() || matches!(byte, b'A'..=b'F')
-                                    })
-                            }) && coordinate_count == 4
+                                    }
+                                })
                         });
                 if !first.starts_with(FILE_RECORD_START)
                     || record_line_count != FILE_RECORD_LINE_COUNT

@@ -241,11 +241,8 @@ const fn hex_byte(byte: u8) -> [u8; 2] {
     [hex_digit(byte >> 4_u8), hex_digit(byte & 0x0F)]
 }
 const fn hex_digit(nibble: u8) -> u8 {
-    if nibble < 10 {
-        b'0'.strict_add(nibble)
-    } else {
-        b'A'.strict_add(nibble.strict_sub(10))
-    }
+    b'0'.strict_add(nibble)
+        .strict_add(nibble.strict_add(6).wrapping_shr(4).strict_mul(7))
 }
 const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
     let [upper, lower] = value.to_be_bytes();

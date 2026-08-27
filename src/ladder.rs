@@ -16,13 +16,9 @@ pub(super) fn write_ladder_results<'player, 'result>(
     let mut result_entries = [""; MAX_LADDER_ENTRIES];
     let mut remaining_results = results;
     let mut entry_count = 0_usize;
-    for (index, (slot, result)) in result_entries
-        .iter_mut()
-        .zip(&mut remaining_results)
-        .enumerate()
-    {
+    for (slot, result) in result_entries.iter_mut().zip(&mut remaining_results) {
         *slot = result;
-        entry_count = index.strict_add(1);
+        entry_count = entry_count.strict_add(1);
     }
     if remaining_results.next().is_some() {
         return Err("사다리 결과 배열 범위 초과".into());

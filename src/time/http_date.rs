@@ -127,9 +127,6 @@ fn parse_http_weekday(weekday_str: &str) -> Option<u32> {
         _ => None,
     }
 }
-fn parse_i32_token(raw: &str, err: &'static str) -> Result<i32> {
-    parse_result_with_context(i32::try_from(parse_u32_token(raw, err)?), err)
-}
 fn parse_u32_token(raw: &str, err: &'static str) -> Result<u32> {
     parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))
 }
@@ -256,7 +253,7 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
                 .ok_or_else(|| TimeError::parse(ERR_ASCTIME_FORMAT))?;
             let day = parse_u32_token(day_token, ERR_ASCTIME_NUM)?;
             let month = parse_http_month(month_token)?;
-            let year = parse_i32_token(year_token, ERR_ASCTIME_NUM)?;
+            let year = parse_u32_token(year_token, ERR_ASCTIME_NUM)?.cast_signed();
             parse_http_date_time(day, month, year, weekday, time_token)
         }
         HttpDateFormat::ImfFixdate => {
@@ -279,7 +276,7 @@ fn parse_date(raw: &str, format: HttpDateFormat) -> Result<SystemTime> {
                 parse_http_weekday(weekday_name).ok_or_else(|| TimeError::parse(ERR_IMF_FORMAT))?;
             let day = parse_u32_token(day_token, ERR_IMF_NUM)?;
             let month = parse_http_month(month_token)?;
-            let year = parse_i32_token(year_token, ERR_IMF_NUM)?;
+            let year = parse_u32_token(year_token, ERR_IMF_NUM)?.cast_signed();
             parse_http_date_time(day, month, year, weekday, time_token)
         }
         HttpDateFormat::Rfc850 { current_year } => {
