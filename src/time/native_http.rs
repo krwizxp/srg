@@ -29,16 +29,12 @@ impl FreshTimeHeaders {
             let trimmed = raw.trim_ascii();
             if trimmed.is_empty() {
                 Err("Age 헤더 값이 비어 있습니다.")
+            } else if let Some(nonzero) = trimmed.bytes().try_fold(false, |nonzero, byte| {
+                byte.is_ascii_digit().then_some(nonzero || byte != b'0')
+            }) {
+                (!nonzero).ok_or("Age 헤더가 0보다 커 캐시된 응답입니다.")
             } else {
-                let mut nonzero = false;
-                if trimmed.bytes().all(|byte| {
-                    nonzero |= byte != b'0';
-                    byte.is_ascii_digit()
-                }) {
-                    (!nonzero).ok_or("Age 헤더가 0보다 커 캐시된 응답입니다.")
-                } else {
-                    Err("Age 헤더 값이 숫자가 아닙니다.")
-                }
+                Err("Age 헤더 값이 숫자가 아닙니다.")
             }
         });
     }
