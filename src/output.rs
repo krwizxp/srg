@@ -159,15 +159,14 @@ impl OutputFormatter<'_, '_, '_> {
         let head = self.cursor.take(line_len);
         let (prefix_out, groups) = head.split_at_mut(prefix_len);
         prefix_out.copy_from_slice(prefix_bytes);
-        let last_index = BYTE_GROUP_COUNT.strict_sub(1);
         let mut remaining = groups;
-        for (index, byte) in self.bytes.into_iter().enumerate() {
+        for byte in self.bytes {
             let (group_out, tail) = remaining.split_at_mut(WIDTH.strict_add(1));
             remaining = tail;
             let group = render_group(byte);
             let (value_out, separator_out) = group_out.split_at_mut(WIDTH);
             value_out.copy_from_slice(&group);
-            separator_out.fill(if index == last_index { b'\n' } else { b' ' });
+            separator_out.fill(if remaining.is_empty() { b'\n' } else { b' ' });
         }
     }
     fn write_random_lines(&mut self) {
