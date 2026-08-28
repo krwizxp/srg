@@ -64,7 +64,9 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_hex_u16_min3(buffer_cur, data.nms_portal_xxx);
             buffer_cur.write_byte(b' ');
             buffer_cur.write_byte(b'(');
-            buf_write_chars(buffer_cur, &data.glyph_string);
+            for &ch in &data.glyph_string {
+                ch.encode_utf8(buffer_cur.take(ch.len_utf8()));
+            }
             buffer_cur.write_bytes(b")");
         });
         self.write_labeled_line(FILE_RECORD_FINAL_LABEL, |buffer_cur| {
@@ -202,7 +204,10 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_u8_array_spaced(buffer_cur, &data.euro_millions_lucky_stars);
         });
         self.write_labeled_line("한글 음절 4글자: ".as_bytes(), |buffer_cur| {
-            buf_write_chars(buffer_cur, &data.hangul_syllables);
+            let (chunks, _) = buffer_cur.take(12).as_chunks_mut::<3>();
+            for (&ch, chunk) in data.hangul_syllables.iter().zip(chunks) {
+                ch.encode_utf8(chunk);
+            }
         });
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes());
         let kor_latitude = data.kor_coords.latitude;
@@ -248,11 +253,6 @@ const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
     let [h0, h1] = hex_byte(upper);
     let [h2, h3] = hex_byte(lower);
     [h0, h1, h2, h3]
-}
-fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) {
-    for &ch in chars {
-        ch.encode_utf8(cur.take(ch.len_utf8()));
-    }
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) {
     if n >= U8_THREE_DIGIT_THRESHOLD {
