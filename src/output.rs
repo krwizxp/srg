@@ -250,13 +250,8 @@ const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
     [h0, h1, h2, h3]
 }
 fn buf_write_chars<const N: usize>(cur: &mut ByteCursor<'_>, chars: &[char; N]) {
-    let total = chars
-        .iter()
-        .fold(0_usize, |sum, ch| sum.strict_add(ch.len_utf8()));
-    let mut tail = cur.take(total);
     for &ch in chars {
-        let written = ch.encode_utf8(tail).len();
-        tail = tail.split_at_mut(written).1;
+        ch.encode_utf8(cur.take(ch.len_utf8()));
     }
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) {

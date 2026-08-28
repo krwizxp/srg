@@ -3695,7 +3695,7 @@
           euroMain: createUniqueNumbers(5),
           euroLucky: createUniqueNumbers(2),
           numeric_password: 0,
-          glyph_string: new Array(12),
+          glyph_string: "",
           password: [],
           numeric_password_digits: 0,
         };
@@ -4057,12 +4057,13 @@
         data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x801, 0x7ff);
         data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x81, 0x7f);
         data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x801, 0x7ff);
-        data.glyph_string[0] = GLYPHS[data.planet_number & 0xf];
-        data.glyph_string[1] = GLYPHS[(data.solar_system_index >> 8) & 0xf];
-        data.glyph_string[2] = GLYPHS[(data.solar_system_index >> 4) & 0xf];
-        data.glyph_string[3] = GLYPHS[data.solar_system_index & 0xf];
-        for (let i = 4; i < data.glyph_string.length; i += 1) {
-          data.glyph_string[i] = GLYPHS[
+        data.glyph_string =
+          GLYPHS[data.planet_number & 0xf] +
+          GLYPHS[(data.solar_system_index >> 8) & 0xf] +
+          GLYPHS[(data.solar_system_index >> 4) & 0xf] +
+          GLYPHS[data.solar_system_index & 0xf];
+        for (let i = 4; i < 12; i += 1) {
+          data.glyph_string += GLYPHS[
             (portalBits >>> (28 - (i - 4) * 4)) & 0xf
           ];
         }
@@ -4082,15 +4083,12 @@
         const v = data.num_64;
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
         const bytes = NUMERIC_SCRATCH_BYTES;
-        const binaryBytes = new Array(bytes.length);
+        const binary = v.toString(2).padStart(64, "0");
         const hex = bytes.toHex().toUpperCase();
-        for (let i = 0; i < bytes.length; i += 1) {
-          binaryBytes[i] = bytes[i].toString(2).padStart(8, "0");
-        }
         return [
           `64비트 난수: ${v.toString(10)} (유부호 정수: ${BigInt.asIntN(64, v).toString(10)
           })`,
-          `2진수: ${binaryBytes.join(" ")}`,
+          `2진수: ${binary.slice(0, 8)} ${binary.slice(8, 16)} ${binary.slice(16, 24)} ${binary.slice(24, 32)} ${binary.slice(32, 40)} ${binary.slice(40, 48)} ${binary.slice(48, 56)} ${binary.slice(56)}`,
           `8진수: ${v.toString(8)}`,
           `16진수: ${hex.slice(0, 2)} ${hex.slice(2, 4)} ${hex.slice(4, 6)} ${hex.slice(6, 8)} ${hex.slice(8, 10)} ${hex.slice(10, 12)} ${hex.slice(12, 14)} ${hex.slice(14)}`,
           `Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}`,
@@ -4107,7 +4105,7 @@
           `NMS 은하 번호: ${(bytes[0] + 1).toString(10)}`,
           `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
           } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
-          } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string.join("")
+          } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string
           })`,
           `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)
           }:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)
