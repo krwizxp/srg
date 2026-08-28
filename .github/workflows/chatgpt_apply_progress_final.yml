@@ -1,0 +1,52 @@
+name: Apply validated progress styling
+
+on:
+  push:
+    branches:
+      - chatgpt-progress-final-apply-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+      - name: Apply final validated progress implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('revgeo.html')
+          s = p.read_text()
+          old_css = '''      .progress-shell {\n        --progress-fill: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 68%, white));\n        --progress-shimmer: linear-gradient(110deg, transparent 30%, oklch(from white l c h / 0.42) 50%, transparent 70%);\n        appearance: none;\n        display: block;\n        inline-size: 100%;\n        border: 0;\n        border-radius: 999px;\n        overflow: hidden;\n        contain: paint;\n        block-size: 8px;\n        background: oklch(from var(--fg) l c h / 0.12);\n\n        &::-webkit-progress-bar {\n          border-radius: inherit;\n          background: oklch(from var(--fg) l c h / 0.12);\n        }\n\n        &::-webkit-progress-value,\n        &::-moz-progress-bar {\n          border-radius: inherit;\n          background: var(--progress-shimmer), var(--progress-fill);\n          background-position: 110% 0, 0 0;\n          background-repeat: no-repeat;\n          background-size: 220% 100%, 100% 100%;\n        }\n\n        &[data-running]:not([value=\"0\"]):not([value=\"100\"])::-webkit-progress-value,\n        &[data-running]:not([value=\"0\"]):not([value=\"100\"])::-moz-progress-bar {\n          animation: loading-shimmer 1.4s linear infinite;\n        }\n      }\n'''
+          new_css = '''      .progress-shell {\n        --pct: 0;\n        --progress-fill: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 68%, white));\n        --progress-shimmer: linear-gradient(110deg, transparent 30%, oklch(from white l c h / 0.42) 50%, transparent 70%);\n        position: relative;\n        inline-size: 100%;\n        border-radius: 999px;\n        overflow: hidden;\n        contain: paint;\n        block-size: 8px;\n        background: oklch(from var(--fg) l c h / 0.12);\n\n        >progress {\n          position: absolute;\n          inset: 0;\n          inline-size: 100%;\n          block-size: 100%;\n          opacity: 0;\n        }\n\n        >.progress-fill {\n          position: absolute;\n          inset-block: 0;\n          inset-inline-start: 0;\n          inline-size: calc(var(--pct) * 1%);\n          border-radius: inherit;\n          overflow: hidden;\n          background: var(--progress-fill);\n          pointer-events: none;\n\n          &::after {\n            content: \"\";\n            position: absolute;\n            inset: 0;\n            background: var(--progress-shimmer);\n            transform: translateX(-120%);\n            will-change: transform;\n          }\n        }\n\n        &:has(>progress[data-running]:not([value=\"0\"]):not([value=\"100\"]))>.progress-fill::after {\n          animation: loading-shimmer 1.4s linear infinite;\n        }\n      }\n'''
+          old_keyframes = '''      @keyframes loading-shimmer {\n        to {\n          background-position: -110% 0, 0 0;\n        }\n      }\n'''
+          new_keyframes = '''      @keyframes loading-shimmer {\n        to {\n          transform: translateX(120%);\n        }\n      }\n'''
+          old_html = '''            <progress id=\"prog\" class=\"progress-shell\" value=\"0\" max=\"100\" aria-labelledby=\"prog-label\"></progress>'''
+          new_html = '''            <div class=\"progress-shell\">\n              <progress id=\"prog\" value=\"0\" max=\"100\" aria-labelledby=\"prog-label\"></progress>\n              <span class=\"progress-fill\" aria-hidden=\"true\"></span>\n            </div>'''
+          old_js = '''        domElements.prog.value = pct;\n        domElements.progLabel.textContent = `진행 상황 ${pct}%`;'''
+          new_js = '''        domElements.prog.value = pct;\n        domElements.prog.parentElement.style.setProperty(\"--pct\", pct);\n        domElements.progLabel.textContent = `진행 상황 ${pct}%`;'''
+          for old, new, name in ((old_css, new_css, 'css'), (old_keyframes, new_keyframes, 'keyframes'), (old_html, new_html, 'html'), (old_js, new_js, 'js')):
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one {name} match, got {count}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = "revgeo.html"
+      - name: Commit clean source change
+        shell: bash
+        run: |
+          rm .github/workflows/chatgpt_apply_progress_final.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Align progress styling across browsers'
+          git push origin HEAD:chatgpt-progress-final-apply-20260828
