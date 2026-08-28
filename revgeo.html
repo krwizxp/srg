@@ -394,41 +394,53 @@
       }
 
       .progress-shell {
+        --pct: 0;
         --progress-fill: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 68%, white));
         --progress-shimmer: linear-gradient(110deg, transparent 30%, oklch(from white l c h / 0.42) 50%, transparent 70%);
-        appearance: none;
-        display: block;
+        position: relative;
         inline-size: 100%;
-        border: 0;
         border-radius: 999px;
         overflow: hidden;
         contain: paint;
         block-size: 8px;
         background: oklch(from var(--fg) l c h / 0.12);
 
-        &::-webkit-progress-bar {
-          border-radius: inherit;
-          background: oklch(from var(--fg) l c h / 0.12);
+        >progress {
+          position: absolute;
+          inset: 0;
+          inline-size: 100%;
+          block-size: 100%;
+          opacity: 0;
         }
 
-        &::-webkit-progress-value,
-        &::-moz-progress-bar {
+        >.progress-fill {
+          position: absolute;
+          inset-block: 0;
+          inset-inline-start: 0;
+          inline-size: calc(var(--pct) * 1%);
           border-radius: inherit;
-          background: var(--progress-shimmer), var(--progress-fill);
-          background-position: 110% 0, 0 0;
-          background-repeat: no-repeat;
-          background-size: 220% 100%, 100% 100%;
+          overflow: hidden;
+          background: var(--progress-fill);
+          pointer-events: none;
+
+          &::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: var(--progress-shimmer);
+            transform: translateX(-120%);
+            will-change: transform;
+          }
         }
 
-        &[data-running]:not([value="0"]):not([value="100"])::-webkit-progress-value,
-        &[data-running]:not([value="0"]):not([value="100"])::-moz-progress-bar {
+        &:has(>progress[data-running]:not([value="0"]):not([value="100"]))>.progress-fill::after {
           animation: loading-shimmer 1.4s linear infinite;
         }
       }
 
       @keyframes loading-shimmer {
         to {
-          background-position: -110% 0, 0 0;
+          transform: translateX(120%);
         }
       }
 
@@ -1677,7 +1689,10 @@
         <div class="row-progress">
           <div class="sp">
             <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
-            <progress id="prog" class="progress-shell" value="0" max="100" aria-labelledby="prog-label"></progress>
+            <div class="progress-shell">
+              <progress id="prog" value="0" max="100" aria-labelledby="prog-label"></progress>
+              <span class="progress-fill" aria-hidden="true"></span>
+            </div>
           </div>
           <output id="counts">총 <strong id="cnt-total">0</strong>건 중
             <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
@@ -2637,6 +2652,7 @@
         domElements.cntRemain.textContent = fmt(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
+        domElements.prog.parentElement.style.setProperty("--pct", pct);
         domElements.progLabel.textContent = `진행 상황 ${pct}%`;
       }
       if (processedChanged) {
