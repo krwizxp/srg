@@ -171,7 +171,6 @@ impl TryFrom<&Path> for OutputFile {
                 let tail_start = len.strict_sub(tail_len_u64);
                 file.seek(SeekFrom::Start(tail_start))?;
                 file.read_exact(tail.get_mut(..tail_len).unwrap_or_else(|| process::abort()))?;
-                file.seek(SeekFrom::End(0))?;
                 let content_start = if tail_start == 0 { UTF8_BOM.len() } else { 0 };
                 let content = tail
                     .get(content_start..tail_len)
@@ -257,7 +256,6 @@ impl OutputFile {
         let offset = i64::try_from(len).unwrap_or_else(|_| process::abort());
         self.file.seek(SeekFrom::End(offset.strict_neg()))?;
         self.file.read_exact(tail)?;
-        self.file.seek(SeekFrom::End(0))?;
         Ok(tail)
     }
     #[cfg(target_arch = "x86_64")]
