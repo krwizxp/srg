@@ -2724,7 +2724,23 @@
         { signal },
       );
       const reader = decodedStream.getReader();
-      let pending = "";
+      const pendingParts = [];
+      let pendingLength = 0;
+      let pendingCr = false;
+      const appendPending = (part) => {
+        if (!part) return;
+        pendingParts.push(part);
+        pendingLength += part.length;
+        ensureInputLineLength(pendingLength);
+      };
+      const takePending = () => {
+        const line = pendingParts.length === 1
+          ? pendingParts[0]
+          : pendingParts.join("");
+        pendingParts.length = 0;
+        pendingLength = 0;
+        return line;
+      };
       try {
         for (; ;) {
           let read;
@@ -2742,25 +2758,30 @@
           }
           if (read.done) break;
           signal.throwIfAborted();
-          const chunk = pending + read.value;
+          const chunk = read.value;
+          if (chunk.length === 0) continue;
           let start = 0;
-          const end = chunk.endsWith("\r") ? chunk.length - 1 : chunk.length;
-          for (let pos = 0; pos < end; pos++) {
+          if (pendingCr) {
+            yield takePending();
+            pendingCr = false;
+            if (chunk.charCodeAt(0) === 10) start = 1;
+          }
+          for (let pos = start; pos < chunk.length; pos++) {
             const code = chunk.charCodeAt(pos);
             if (code !== 10 && code !== 13) continue;
-            ensureInputLineLength(pos - start);
-            yield chunk.slice(start, pos);
+            appendPending(chunk.slice(start, pos));
+            if (code === 13 && pos + 1 === chunk.length) {
+              pendingCr = true;
+              start = chunk.length;
+              break;
+            }
+            yield takePending();
             if (code === 13 && chunk.charCodeAt(pos + 1) === 10) pos++;
             start = pos + 1;
           }
-          pending = chunk.slice(start);
-          ensureInputLineLength(
-            pending.endsWith("\r") ? pending.length - 1 : pending.length,
-          );
+          appendPending(chunk.slice(start));
         }
-        if (pending) {
-          yield pending.endsWith("\r") ? pending.slice(0, -1) : pending;
-        }
+        if (pendingCr || pendingLength !== 0) yield takePending();
       } finally {
         await cancelReadableBestEffort(reader);
         reader.releaseLock();

@@ -403,9 +403,6 @@ impl FromStr for TargetTimeOfDay {
         let Some((minute_str, second_str)) = minute_second.split_once(':') else {
             return Err(INVALID_TIME_INPUT_ERR);
         };
-        if second_str.contains(':') {
-            return Err(INVALID_TIME_INPUT_ERR);
-        }
         let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
             if component.len() != CLOCK_COMPONENT_LEN {
                 return Err(INVALID_TIME_INPUT_ERR);
