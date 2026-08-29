@@ -21,7 +21,7 @@ use std::{
 };
 pub(super) const MAX_BATCH_GENERATE_COUNT: usize = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
-const WORKER_CHUNK_CAPACITY: usize = 0x0020_0000_usize.strict_add(BUFFER_SIZE);
+const WORKER_CHUNK_CAPACITY: usize = 0x0008_0000_usize.strict_add(BUFFER_SIZE);
 struct WorkerFailure {
     count: usize,
     first_error: AppError,
