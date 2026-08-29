@@ -1870,7 +1870,7 @@
       INPUT_FILE_HARD_LIMIT: 64 * 1024 * 1024,
       INPUT_LINE_HARD_LIMIT: 1_000_000,
       REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
-      REVERSE_CACHE_DB_VERSION: 3,
+      REVERSE_CACHE_DB_VERSION: 4,
       REVERSE_CACHE_STORE: "nominatim-reverse",
       REVERSE_CACHE_PARSER_VERSION: 2,
       REVERSE_CACHE_MAX: 10_000,
@@ -2833,14 +2833,36 @@
     const REVERSE_PARSED_CACHE = new Map();
     const REVERSE_PARSED_CACHE_MAX = 5_000;
     const REVERSE_CACHE_KEYED_READ_LIMIT = 2_000;
+    const REVERSE_CACHE_ADAPTIVE_READ_MIN = 1_000;
+    const REVERSE_CACHE_SCAN_RATIO = 2;
     const REVERSE_CACHE_WRITE_LIMIT = 8;
     const REVERSE_CACHE_PRUNE_INTERVAL = 32;
+    const REVERSE_CACHE_EXTERNAL_WRITES = new Set();
+    const REVERSE_CACHE_TAB_ID =
+      `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`;
+    const REVERSE_CACHE_SYNC_CHANNEL = new BroadcastChannel(
+      `${CONFIG.REVERSE_CACHE_DB_NAME}:v${CONFIG.REVERSE_CACHE_DB_VERSION}`,
+    );
+    let REVERSE_CACHE_WRITE_SEQUENCE = 0;
+    let REVERSE_CACHE_ROWS_UPPER_BOUND = null;
     let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
     let LAST_REVERSE_FETCH_AT = 0;
     let REVERSE_CACHE_DB_PROMISE = null;
     let REVERSE_CACHE_RETRY_AT = 0;
     const REVERSE_CACHE_OPEN_RETRY_MS = 5_000;
     const NO_REVERSE_CACHE_DB = Promise.resolve(null);
+    REVERSE_CACHE_SYNC_CHANNEL.onmessage = ({ data }) => {
+      if (!Array.isArray(data) || data.length !== 2) return;
+      const [phase, token] = data;
+      if (typeof token !== "string") return;
+      if (phase === 0) {
+        REVERSE_CACHE_EXTERNAL_WRITES.add(token);
+        REVERSE_CACHE_ROWS_UPPER_BOUND = null;
+      } else if (phase === 1) {
+        REVERSE_CACHE_EXTERNAL_WRITES.delete(token);
+        REVERSE_CACHE_ROWS_UPPER_BOUND = null;
+      }
+    };
     function putReverseMemoryCache(cacheKey, parsed) {
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
@@ -2995,7 +3017,13 @@
               GeocodeParser.isValid(row.parsed)
             ) results.set(cacheKey, row.parsed);
           };
-          if (results.size <= REVERSE_CACHE_KEYED_READ_LIMIT) {
+          const scanCache =
+            results.size > REVERSE_CACHE_KEYED_READ_LIMIT ||
+            (results.size >= REVERSE_CACHE_ADAPTIVE_READ_MIN &&
+              REVERSE_CACHE_ROWS_UPPER_BOUND !== null &&
+              REVERSE_CACHE_ROWS_UPPER_BOUND <=
+              results.size * REVERSE_CACHE_SCAN_RATIO);
+          if (!scanCache) {
             for (const cacheKey of results.keys()) {
               const req = store.get(REVERSE_CACHE_KEY_PREFIX + cacheKey);
               req.onsuccess = () => acceptRow(req.result);
@@ -3016,12 +3044,16 @@
       }
     }
     async function writePersistentReverseCacheBatch(entries, signal) {
+      let syncToken = null;
       try {
         const db = await openReverseCacheDb();
         if (!db || signal.aborted) return;
+        syncToken = `${REVERSE_CACHE_TAB_ID}:${++REVERSE_CACHE_WRITE_SEQUENCE}`;
+        REVERSE_CACHE_SYNC_CHANNEL.postMessage([0, syncToken]);
         const pendingWrites =
           REVERSE_CACHE_WRITES_SINCE_PRUNE + entries.length;
         const maintain = pendingWrites >= REVERSE_CACHE_PRUNE_INTERVAL;
+        let maintainedRows = null;
         await runReverseCacheTransaction(
           db,
           "readwrite",
@@ -3035,9 +3067,20 @@
                 parsed,
               });
             }
-            if (maintain) maintainReverseCacheRows(store);
+            if (maintain) {
+              maintainReverseCacheRows(store, (rows) => {
+                maintainedRows = rows;
+              });
+            }
           },
         );
+        if (REVERSE_CACHE_EXTERNAL_WRITES.size === 0) {
+          if (maintainedRows !== null) {
+            REVERSE_CACHE_ROWS_UPPER_BOUND = maintainedRows;
+          } else if (REVERSE_CACHE_ROWS_UPPER_BOUND !== null) {
+            REVERSE_CACHE_ROWS_UPPER_BOUND += entries.length;
+          }
+        }
         REVERSE_CACHE_WRITES_SINCE_PRUNE = maintain
           ? pendingWrites % REVERSE_CACHE_PRUNE_INTERVAL
           : pendingWrites;
@@ -3045,23 +3088,41 @@
         if (!signal.aborted) {
           console.warn("Reverse geocoding cache write failed.", err);
         }
+      } finally {
+        if (syncToken !== null) {
+          REVERSE_CACHE_SYNC_CHANNEL.postMessage([1, syncToken]);
+        }
       }
     }
     function startReverseCacheMaintenance(db) {
       try {
         const tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+        let maintainedRows = null;
+        tx.oncomplete = () => {
+          if (
+            maintainedRows !== null &&
+            REVERSE_CACHE_EXTERNAL_WRITES.size === 0
+          ) {
+            REVERSE_CACHE_ROWS_UPPER_BOUND = maintainedRows;
+          }
+        };
         tx.onabort = () => {
           console.warn(
             "Reverse geocoding cache maintenance failed.",
             tx.error ?? new Error("Reverse geocoding cache maintenance failed."),
           );
         };
-        maintainReverseCacheRows(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
+        maintainReverseCacheRows(
+          tx.objectStore(CONFIG.REVERSE_CACHE_STORE),
+          (rows) => {
+            maintainedRows = rows;
+          },
+        );
       } catch (err) {
         console.warn("Reverse geocoding cache maintenance failed.", err);
       }
     }
-    function maintainReverseCacheRows(store) {
+    function maintainReverseCacheRows(store, onRows = null) {
       const expiredReq = store.index("savedAt").openKeyCursor(
         IDBKeyRange.upperBound(
           Date.now() - CONFIG.REVERSE_CACHE_TTL_MS,
@@ -3077,13 +3138,21 @@
         }
         const countReq = store.count();
         countReq.onsuccess = () => {
-          let excess = countReq.result - CONFIG.REVERSE_CACHE_MAX;
-          if (excess <= 0) return;
+          let remaining = countReq.result;
+          let excess = remaining - CONFIG.REVERSE_CACHE_MAX;
+          if (excess <= 0) {
+            onRows?.(remaining);
+            return;
+          }
           const oldestReq = store.index("savedAt").openKeyCursor();
           oldestReq.onsuccess = () => {
             const oldest = oldestReq.result;
-            if (!oldest || excess <= 0) return;
+            if (!oldest || excess <= 0) {
+              onRows?.(remaining);
+              return;
+            }
             store.delete(oldest.primaryKey);
+            remaining--;
             excess--;
             oldest.continue();
           };
@@ -3682,6 +3751,7 @@
       clearTable();
       AppState.setRecords([]);
       AppState.droppedFile = file;
+      void openReverseCacheDb();
       domElements.emptyHint.textContent = FILE_READY_HINT;
       setStatusMessage(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
