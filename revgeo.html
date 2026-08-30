@@ -3478,13 +3478,19 @@
     }
     async function handleExport() {
       if (EXPORT_TASK) return EXPORT_TASK;
-      const totalRows = AppState.processed;
+      const records = AppState.records;
+      const rows = [];
+      for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+        const record = records[recordIndex];
+        const result = record.result;
+        if (result) rows.push({ recordIndex, record, result });
+      }
+      const totalRows = rows.length;
       if (totalRows <= 0) {
         return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
       }
       const sourceFile = AppState.droppedFile;
       const appGeneration = AppState.generation;
-      const records = AppState.records;
       const ensureCurrent = () => {
         if (AppState.generation !== appGeneration) {
           throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
@@ -3507,12 +3513,9 @@
             chunkLines.length = 0;
           };
           let exportedRows = 0;
-          for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
-            const r = records[recordIndex];
-            if (!r.result) continue;
+          for (const { recordIndex, record: r, result } of rows) {
             const lat = r.latStr;
             const lon = r.lonStr;
-            const result = r.result;
             const firstLat = lat.charCodeAt(0);
             let line = csvEsc(result.kind || r.set) +
               "," +

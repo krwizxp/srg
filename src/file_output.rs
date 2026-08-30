@@ -216,10 +216,7 @@ impl TryFrom<&Path> for OutputFile {
                                     }
                                 })
                         });
-                if !first.starts_with(FILE_RECORD_START)
-                    || record_line_count != FILE_RECORD_LINE_COUNT
-                    || !final_value_is_valid
-                {
+                if record_line_count != FILE_RECORD_LINE_COUNT || !final_value_is_valid {
                     return Err(AppError::message(
                         "기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.",
                     ));
