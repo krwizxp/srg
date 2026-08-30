@@ -14,7 +14,6 @@ pub(super) fn generate_random_integer(
     out: &mut dyn Write,
     rng: &HardwareRng,
 ) -> Result<()> {
-    validate_random_integer_range(min_value, max_value)?;
     let rand_offset = random_bounded_inclusive(max_value.abs_diff(min_value), seed_modifier, rng)?;
     let result = min_value.strict_add_unsigned(rand_offset);
     writeln!(
@@ -22,11 +21,6 @@ pub(super) fn generate_random_integer(
         "무작위 정수({min_value} ~ {max_value}): {result} (0x{result:X})"
     )
     .map_err(Into::into)
-}
-pub(super) fn validate_random_integer_range(min_value: i64, max_value: i64) -> Result<()> {
-    (min_value >= MIN_ALLOWED_INTEGER_VALUE)
-        .ok_or_else(|| format!("최솟값은 {MIN_ALLOWED_INTEGER_VALUE} 이상이어야 합니다."))?;
-    (max_value >= min_value).ok_or_else(|| "최댓값은 최솟값보다 크거나 같아야 합니다.".into())
 }
 pub(super) fn generate_random_float(
     min_value: f64,

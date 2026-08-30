@@ -4,7 +4,7 @@ use super::{
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
-use core::str::FromStr;
+use core::{num::IntErrorKind, str::FromStr};
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
@@ -114,11 +114,16 @@ impl FromStr for ParsedServer {
     }
 }
 fn parse_port(port_part: &str) -> Result<u16> {
-    (!port_part.is_empty() && port_part.bytes().all(|byte| byte.is_ascii_digit()))
-        .ok_or_else(|| TimeError::parse(ERR_PORT))?;
-    let port = port_part
-        .parse::<u16>()
-        .map_err(|source| TimeError::parse_with_source(ERR_PORT, source))?;
+    let port = match port_part.parse::<u16>() {
+        Ok(port) if port_part.as_bytes().first().is_some_and(u8::is_ascii_digit) => port,
+        Err(source)
+            if matches!(source.kind(), IntErrorKind::PosOverflow)
+                && port_part.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            return Err(TimeError::parse_with_source(ERR_PORT, source));
+        }
+        Ok(_) | Err(_) => return Err(TimeError::parse(ERR_PORT)),
+    };
     (port != 0).ok_or_else(|| TimeError::parse(ERR_PORT))?;
     Ok(port)
 }
