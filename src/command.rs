@@ -9,7 +9,7 @@ cfg_select! {
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
             ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
-            random_number::{generate_random_float, generate_random_integer, validate_random_float_range, MIN_ALLOWED_INTEGER_VALUE},
+            random_number::{FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float, generate_random_integer},
             FILE_NAME,
         };
         use std::{io::Write, path::Path};
@@ -183,7 +183,12 @@ where
                 let (min_arg, max_arg) = take_two_args(&mut args, "random-float <min> <max>")?;
                 let min = Self::parse_arg::<f64>(&min_arg, "min")?;
                 let max = Self::parse_arg::<f64>(&max_arg, "max")?;
-                validate_random_float_range(min, max)?;
+                (min.is_finite() && !min.is_subnormal() && max.is_finite() && !max.is_subnormal())
+                    .ok_or(FLOAT_INPUT_ERROR)?;
+                (max >= min).ok_or("최댓값은 최솟값보다 크거나 같아야 합니다.")?;
+                (max - min)
+                    .is_finite()
+                    .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
                 Ok(Self::RandomFloat { max, min })
             }
             #[cfg(target_arch = "x86_64")]

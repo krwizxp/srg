@@ -1,5 +1,5 @@
 use super::hardware_rng::HardwareRng;
-use crate::diagnostic::{AppError, Result};
+use crate::diagnostic::Result;
 use std::io::Write;
 pub(super) const FLOAT_INPUT_ERROR: &str =
     "유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).";
@@ -29,7 +29,6 @@ pub(super) fn generate_random_float(
     out: &mut dyn Write,
     rng: &HardwareRng,
 ) -> Result<()> {
-    validate_random_float_range(min_value, max_value)?;
     let [b0, b1, b2, b3, b4, b5, b6, b7] = (rng.next_u64()? ^ seed_modifier).to_be_bytes();
     let upper_32 = u32::from_be_bytes([b0, b1, b2, b3]);
     let lower_32 = u32::from_be_bytes([b4, b5, b6, b7]);
@@ -40,18 +39,6 @@ pub(super) fn generate_random_float(
         scale.mul_add(max_value - min_value, min_value)
     };
     writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}").map_err(Into::into)
-}
-pub(super) fn validate_random_float_range(min_value: f64, max_value: f64) -> Result<()> {
-    (min_value.is_finite()
-        && !min_value.is_subnormal()
-        && max_value.is_finite()
-        && !max_value.is_subnormal())
-    .ok_or_else(|| AppError::message(FLOAT_INPUT_ERROR))?;
-    (max_value >= min_value)
-        .ok_or_else(|| AppError::message("최댓값은 최솟값보다 크거나 같아야 합니다."))?;
-    (max_value - min_value)
-        .is_finite()
-        .ok_or_else(|| "실수 범위가 너무 커서 안전하게 계산할 수 없습니다.".into())
 }
 pub(super) fn random_bounded_inclusive(
     inclusive_max: u64,

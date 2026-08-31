@@ -290,6 +290,9 @@ impl MenuApp {
                     }
                     writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
                 };
+                (max_value - min_value)
+                    .is_finite()
+                    .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
                 generate_random_float(min_value, max_value, num_64, out, &self.rng)?;
             }
             _ => {

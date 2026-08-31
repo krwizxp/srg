@@ -3775,7 +3775,6 @@
       const MAX_U64_DEC = U64_MAX.toString(10);
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
       const U64_TOKEN_HARD_LIMIT = 64;
-      const U64_TOKEN = /^(?:0[xX][0-9a-fA-F]+|\+?\d+)$/u;
       const createUniqueNumbers = (length) => ({
         count: 0,
         seen: 0n,
@@ -3813,12 +3812,21 @@
             `u64 입력값이 허용 길이 ${U64_TOKEN_HARD_LIMIT}자를 초과했습니다.`,
           );
         }
-        if (!U64_TOKEN.test(input)) {
+        const first = input.charCodeAt(0);
+        const second = input.charCodeAt(1) | 32;
+        if (first === 45 || (first === 48 && (second === 98 || second === 111))) {
           throw new Error(
             `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
           );
         }
-        const value = BigInt(input);
+        let value;
+        try {
+          value = BigInt(input);
+        } catch {
+          throw new Error(
+            `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+          );
+        }
         if (value > U64_MAX) {
           throw new Error(
             `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
@@ -3954,16 +3962,17 @@
         return (x >> 32n) | ((x & 0xffff_ffffn) << 32n);
       }
       function pushUniqueNumber(byte, modulus, numbers) {
-        if (numbers.count >= numbers.values.length) return false;
+        if (numbers.count >= numbers.values.length) return true;
         const number = (byte % modulus) + 1;
         const mask = 1n << BigInt(number);
         if ((numbers.seen & mask) !== 0n) return false;
         numbers.seen |= mask;
         numbers.values[numbers.count++] = number;
-        if (numbers.count === numbers.values.length) {
+        const complete = numbers.count === numbers.values.length;
+        if (complete) {
           numbers.values.sort((a, b) => a - b);
         }
-        return true;
+        return complete;
       }
       function fillDataFieldsFromU64(v, data) {
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
@@ -3985,8 +3994,9 @@
               ));
             }
           }
-          if (isComplete(data)) return;
+          if (isComplete(data)) return true;
         }
+        return false;
       }
       function extractValidBitsForNms(
         bits,
@@ -4027,18 +4037,18 @@
       }
       function generateRandomDataFromNum(num, nextSupp) {
         const data = createDataSet(num);
-        fillDataFieldsFromU64(num, data);
+        let complete = fillDataFieldsFromU64(num, data);
         const supplementalRef = { current: null };
         for (
           let attempt = 0;
-          !isComplete(data) && attempt < SUPPLEMENTAL_RETRY_LIMIT;
+          !complete && attempt < SUPPLEMENTAL_RETRY_LIMIT;
           attempt++
         ) {
           const newSupp = nextSupp("기본 필드 보완");
-          fillDataFieldsFromU64(newSupp.value, data);
+          complete = fillDataFieldsFromU64(newSupp.value, data);
           supplementalRef.current = newSupp;
         }
-        if (!isComplete(data)) {
+        if (!complete) {
           throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
         }
         let luckyStarSource = supplementalRef.current !== null
@@ -4054,8 +4064,7 @@
             if (byte > 251) {
               continue;
             }
-            if (pushUniqueNumber(byte, 12, data.euroLucky) &&
-              data.euroLucky.count === data.euroLucky.values.length) {
+            if (pushUniqueNumber(byte, 12, data.euroLucky)) {
               break luckyStarLoop;
             }
           }
