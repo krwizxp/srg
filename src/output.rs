@@ -270,10 +270,12 @@ fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) {
     cur.write_byte(digit_byte(n));
 }
 fn buf_write_u8_array_spaced<const N: usize>(cur: &mut ByteCursor<'_>, nums: &[u8; N]) {
-    for (index, &n) in nums.iter().enumerate() {
-        if index != 0 {
-            cur.write_byte(b' ');
-        }
+    let Some((&first, rest)) = nums.split_first() else {
+        return;
+    };
+    buf_write_u8_dec(cur, first);
+    for &n in rest {
+        cur.write_byte(b' ');
         buf_write_u8_dec(cur, n);
     }
 }
