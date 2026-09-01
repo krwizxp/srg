@@ -2205,24 +2205,15 @@
     const COORD_POW = 10 ** COORD_DECIMALS;
     const normalizeCoordText = (s) => s === "-0" ? "0" : s;
     const fmtCoord6 = (v) => {
-      if (typeof v === "string") {
-        if (!v) return "";
-        const dot = v.indexOf(".");
-        if (dot === -1) return normalizeCoordText(v);
-        if (!v.includes("e") && !v.includes("E")) {
-          if (v.length - dot - 1 <= COORD_DECIMALS) {
-            let end = v.length;
-            while (end && v.charCodeAt(end - 1) === 48) end--;
-            if (end && v.charCodeAt(end - 1) === 46) end--;
-            return normalizeCoordText(
-              end === v.length ? v : v.slice(0, end),
-            );
-          }
-        }
+      const dot = v.indexOf(".");
+      if (dot === -1) return normalizeCoordText(v);
+      if (v.length - dot - 1 <= COORD_DECIMALS) {
+        let end = v.length;
+        while (end && v.charCodeAt(end - 1) === 48) end--;
+        if (end && v.charCodeAt(end - 1) === 46) end--;
+        return normalizeCoordText(end === v.length ? v : v.slice(0, end));
       }
-      const n = (typeof v === "number") ? v : Number(v);
-      if (!Number.isFinite(n)) return String(v ?? "");
-      let s = (Math.round(n * COORD_POW) * (1 / COORD_POW)).toFixed(
+      let s = (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(
         COORD_DECIMALS,
       );
       let end = s.length;
@@ -3310,11 +3301,24 @@
         cacheWriteBatch.length = 0;
       };
       const persistentCache = new Map();
-      for (const record of records) {
+      for (let i = 0; i < total && !signal.aborted; i++) {
+        const record = records[i];
         record.result = null;
         record._search = null;
-        if (!REVERSE_PARSED_CACHE.has(record.cacheKey)) {
+        const parsed = REVERSE_PARSED_CACHE.get(record.cacheKey);
+        if (parsed === undefined) {
           persistentCache.getOrInsert(record.cacheKey, null);
+          continue;
+        }
+        commitResult(i, parsed, false);
+        const now = performance.now();
+        if (now - lastStatusUpdate >= 200) {
+          lastStatusUpdate = now;
+          setProgressStatus(AppState.processed, total, totalDisp);
+        }
+        if (now - lastYield >= 8) {
+          await yieldToMain();
+          lastYield = performance.now();
         }
       }
       try {
@@ -3324,9 +3328,9 @@
       }
       for (let i = 0; i < total && !signal.aborted; i++) {
         const r = records[i];
+        if (r.result) continue;
         const cacheKey = r.cacheKey;
-        const parsed = REVERSE_PARSED_CACHE.get(cacheKey) ??
-          persistentCache.get(cacheKey);
+        const parsed = persistentCache.get(cacheKey);
         if (!parsed) continue;
         putReverseMemoryCache(cacheKey, parsed);
         commitResult(i, parsed, false);
@@ -3494,9 +3498,7 @@
       const records = AppState.records;
       const rows = [];
       for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
-        const record = records[recordIndex];
-        const result = record.result;
-        if (result) rows.push({ recordIndex, record, result });
+        if (records[recordIndex].result) rows.push(recordIndex);
       }
       const totalRows = rows.length;
       if (totalRows <= 0) {
@@ -3526,7 +3528,9 @@
             chunkLines.length = 0;
           };
           let exportedRows = 0;
-          for (const { recordIndex, record: r, result } of rows) {
+          for (const recordIndex of rows) {
+            const r = records[recordIndex];
+            const result = r.result;
             const lat = r.latStr;
             const lon = r.lonStr;
             const firstLat = lat.charCodeAt(0);
