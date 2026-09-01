@@ -1957,8 +1957,18 @@
           ? cityIsSpecial
           : CONFIG.SPECIAL_CITIES.test(sido))) {
           const candidates = [cityDistrict, level6, county, primaryName, p0, p1];
-          sigungu = pickAdminName(candidates, "구군", sido) ||
-            pickAdminName(candidates, "시", sido, "", "", true);
+          let fallback = "";
+          for (const name of candidates) {
+            if (!name || name === sido) continue;
+            const suffix = name.at(-1);
+            if ("구군".includes(suffix)) {
+              sigungu = name;
+              break;
+            }
+            if (!fallback && suffix === "시" &&
+              !CONFIG.SPECIAL_CITIES.test(name)) fallback = name;
+          }
+          sigungu ||= fallback;
         } else {
           const cityLike = pickAdminName(
             [city, county, level6, primaryName, p1, p0], "시군", sido,
@@ -2135,12 +2145,15 @@
         const kind = countryCode === "kr" ? "KR" :
           countryCode === "kp" ? "KP" :
             countryCode ? "WORLD" : undefined;
-        const parsed = {
+        if (sigungu.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
+          eupmyeon.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
+          tag.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
+          throw new InputValidationError(TEXT_LIMIT_MESSAGE);
+        }
+        return {
           addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
           kind,
         };
-        if (!isValid(parsed)) throw new InputValidationError(TEXT_LIMIT_MESSAGE);
-        return parsed;
       }
       return Object.freeze({ isValid, parse });
     })();
