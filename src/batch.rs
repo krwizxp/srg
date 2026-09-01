@@ -26,6 +26,7 @@ struct WorkerFailure {
     count: usize,
     first_error: AppError,
 }
+#[derive(Clone, Copy, Default)]
 struct RecordedData {
     len: usize,
     num_64: u64,
@@ -33,7 +34,7 @@ struct RecordedData {
 #[derive(Default)]
 struct WorkerChunk {
     bytes: Vec<u8>,
-    last: Option<RecordedData>,
+    last: RecordedData,
     record_count: usize,
     written_len: usize,
 }
@@ -67,7 +68,7 @@ fn write_worker_chunk(
         .writer
         .write_all(chunk.bytes.split_at(chunk.written_len).0)
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
-    output.last = chunk.last.take();
+    output.last = Some(chunk.last);
     drop(output);
     processed.fetch_add(chunk.record_count, Ordering::Relaxed);
     chunk.record_count = 0;
@@ -145,29 +146,27 @@ pub(super) fn regenerate_with_count(
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            let record = generate_random_data_with_rng(rng)
-                                .map_err(|source| AppError::context("난수 생성 실패", source))
-                                .map(|data| {
-                                    let buffer = chunk
-                                        .bytes
-                                        .get_mut(chunk.written_len..)
-                                        .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>())
-                                        .unwrap_or_else(|| process::abort());
-                                    let len =
-                                        format_data_into_buffer(&data, buffer, OutputTarget::File);
-                                    (data.num_64, len)
-                                });
-                            let (num_64, len) = match record {
-                                Ok(generated) => generated,
-                                Err(error) => {
+                            let data = match generate_random_data_with_rng(rng) {
+                                Ok(data) => data,
+                                Err(source) => {
+                                    let error = AppError::context("난수 생성 실패", source);
                                     record_failure(&mut outcome, 1, error);
                                     done.fetch_add(1, Ordering::Relaxed);
                                     continue;
                                 }
                             };
+                            let buffer = chunk
+                                .bytes
+                                .get_mut(chunk.written_len..)
+                                .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>())
+                                .unwrap_or_else(|| process::abort());
+                            let len = format_data_into_buffer(&data, buffer, OutputTarget::File);
                             chunk.written_len = chunk.written_len.strict_add(len);
                             chunk.record_count = chunk.record_count.strict_add(1);
-                            chunk.last = Some(RecordedData { len, num_64 });
+                            chunk.last = RecordedData {
+                                len,
+                                num_64: data.num_64,
+                            };
                         }
                         write_worker_chunk(writer, stop, done, &mut chunk)?;
                         Ok(outcome)
