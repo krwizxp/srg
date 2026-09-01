@@ -2,7 +2,7 @@ use super::buf_write_u8_dec;
 use crate::{
     buffmt::ByteCursor,
     diagnostic::Result,
-    numeric::{low_u8_from_u128, low_u8_from_usize, u128_from_usize},
+    numeric::{low_u8_from_u128, u128_from_usize},
 };
 use core::{fmt::NumBuffer, time::Duration};
 use std::io::Write as IoWrite;
@@ -50,10 +50,16 @@ impl ProgressBuffers {
         };
         format_time_into(Some(elapsed_deci), &mut self.elapsed);
         format_time_into(eta_deci, &mut self.eta);
-        let filled_value = scaled_progress_value(completed, total, BAR_WIDTH);
-        let filled = usize::from(low_u8_from_usize(filled_value.min(BAR_WIDTH)));
-        let percent_value = scaled_progress_value(completed, total, PERCENT_SCALE);
-        let percent = low_u8_from_usize(percent_value.min(PERCENT_SCALE));
+        let percent_value = if total == 0 {
+            PERCENT_SCALE
+        } else {
+            completed
+                .strict_mul(PERCENT_SCALE)
+                .div_euclid(total)
+                .min(PERCENT_SCALE)
+        };
+        let filled = percent_value.div_euclid(PERCENT_SCALE.div_euclid(BAR_WIDTH));
+        let [percent, ..] = percent_value.to_le_bytes();
         let mut cur = ByteCursor::new(&mut self.line);
         cur.write_byte(b'\r');
         cur.write_byte(b'[');
@@ -108,10 +114,4 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
         b'.',
         b'0'.strict_add(tenths),
     ];
-}
-const fn scaled_progress_value(completed: usize, total: usize, scale: usize) -> usize {
-    if total == 0 {
-        return scale;
-    }
-    completed.strict_mul(scale).div_euclid(total)
 }
