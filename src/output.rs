@@ -4,7 +4,10 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
-use std::io::{Result as IoResult, Write as IoWrite, stdout};
+use std::{
+    io::{Result as IoResult, Write as IoWrite, stdout},
+    process,
+};
 #[cfg(target_arch = "x86_64")]
 pub(super) mod progress;
 #[cfg(target_arch = "x86_64")]
@@ -21,6 +24,10 @@ const PASSWORD_WIDTH: usize = 6;
 const TWO_DIGIT_WIDTH: usize = 2;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
+static BINARY_NIBBLES: [[u8; 4]; 16] = [
+    *b"0000", *b"0001", *b"0010", *b"0011", *b"0100", *b"0101", *b"0110", *b"0111", *b"1000",
+    *b"1001", *b"1010", *b"1011", *b"1100", *b"1101", *b"1110", *b"1111",
+];
 #[derive(Clone, Copy)]
 pub(super) enum OutputTarget {
     Console,
@@ -93,16 +100,15 @@ impl OutputFormatter<'_, '_, '_> {
         self.cursor.write_u64_dec(signed_number.unsigned_abs());
         self.cursor.write_bytes(b")\n");
         self.write_prefixed_byte_groups("2진수: ", |byte| {
-            [
-                bit(byte, 0b1000_0000),
-                bit(byte, 0b0100_0000),
-                bit(byte, 0b0010_0000),
-                bit(byte, 0b0001_0000),
-                bit(byte, 0b0000_1000),
-                bit(byte, 0b0000_0100),
-                bit(byte, 0b0000_0010),
-                bit(byte, 0b0000_0001),
-            ]
+            let [h0, h1, h2, h3] = BINARY_NIBBLES
+                .get(usize::from(byte >> 4_u8))
+                .copied()
+                .unwrap_or_else(|| process::abort());
+            let [l0, l1, l2, l3] = BINARY_NIBBLES
+                .get(usize::from(byte & 0x0f))
+                .copied()
+                .unwrap_or_else(|| process::abort());
+            [h0, h1, h2, h3, l0, l1, l2, l3]
         });
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
             if number64 == 0 {
@@ -237,9 +243,6 @@ pub(super) fn format_data_into_buffer(
     formatter.write_random_lines();
     formatter.write_nms_lines();
     cur.written_len()
-}
-const fn bit(byte: u8, mask: u8) -> u8 {
-    if byte & mask == 0 { b'0' } else { b'1' }
 }
 const fn hex_byte(byte: u8) -> [u8; 2] {
     [hex_digit(byte >> 4_u8), hex_digit(byte & 0x0F)]
