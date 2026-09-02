@@ -15,6 +15,7 @@ pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
 const HEX_U16_FULL_WIDTH: usize = 4;
 const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
+static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
 const OCTAL_TMP_LEN: usize = 22;
@@ -100,14 +101,12 @@ impl OutputFormatter<'_, '_, '_> {
         self.cursor.write_u64_dec(signed_number.unsigned_abs());
         self.cursor.write_bytes(b")\n");
         self.write_prefixed_byte_groups("2진수: ", |byte| {
-            let [h0, h1, h2, h3] = BINARY_NIBBLES
-                .get(usize::from(byte >> 4_u8))
-                .copied()
-                .unwrap_or_else(|| process::abort());
-            let [l0, l1, l2, l3] = BINARY_NIBBLES
-                .get(usize::from(byte & 0x0f))
-                .copied()
-                .unwrap_or_else(|| process::abort());
+            let [[h0, h1, h2, h3], [l0, l1, l2, l3]] = [byte >> 4_u8, byte & 0x0f].map(|nibble| {
+                BINARY_NIBBLES
+                    .get(usize::from(nibble))
+                    .copied()
+                    .unwrap_or_else(|| process::abort())
+            });
             [h0, h1, h2, h3, l0, l1, l2, l3]
         });
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
@@ -244,14 +243,15 @@ pub(super) fn format_data_into_buffer(
     formatter.write_nms_lines();
     cur.written_len()
 }
-const fn hex_byte(byte: u8) -> [u8; 2] {
-    [hex_digit(byte >> 4_u8), hex_digit(byte & 0x0F)]
+fn hex_byte(byte: u8) -> [u8; 2] {
+    [byte >> 4_u8, byte & 0x0f].map(|nibble| {
+        HEX_DIGITS
+            .get(usize::from(nibble))
+            .copied()
+            .unwrap_or_else(|| process::abort())
+    })
 }
-const fn hex_digit(nibble: u8) -> u8 {
-    b'0'.strict_add(nibble)
-        .strict_add(nibble.strict_add(6).wrapping_shr(4).strict_mul(7))
-}
-const fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
+fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
     let [upper, lower] = value.to_be_bytes();
     let [h0, h1] = hex_byte(upper);
     let [h2, h3] = hex_byte(lower);
