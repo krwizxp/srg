@@ -22,7 +22,7 @@ use core::{
     ptr::{NonNull, null},
 };
 use std::{
-    io,
+    io, process,
     sync::mpsc,
     thread,
     time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
@@ -991,10 +991,7 @@ impl AppState<'_> {
             Ok(sample) => {
                 if sample.rtt > Duration::ZERO {
                     let Some(slot) = baseline.samples.get_mut(attempt_index) else {
-                        return transition_to_retry(
-                            "RTT 샘플 인덱스 계산 실패.",
-                            baseline.had_previous_sample,
-                        );
+                        process::abort();
                     };
                     *slot = Some(sample);
                     baseline.had_previous_sample = true;

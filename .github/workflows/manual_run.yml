@@ -86,7 +86,6 @@ jobs:
         with:
           path: artifacts/srg-result-console.log
           archive: false
-          if-no-files-found: error
           retention-days: 14
       - name: Upload generated data artifact
         if: always() && hashFiles('artifacts/srg-result-random_data.txt') != ''
@@ -94,5 +93,4 @@ jobs:
         with:
           path: artifacts/srg-result-random_data.txt
           archive: false
-          if-no-files-found: error
           retention-days: 14
