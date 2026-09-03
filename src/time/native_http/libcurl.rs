@@ -7,7 +7,7 @@ use core::{
     ptr::{NonNull, null_mut},
     slice, str,
 };
-use std::{sync::LazyLock, time::Instant};
+use std::{process, sync::LazyLock, time::Instant};
 mod sys;
 macro_rules! curl_setopt {
     ($handle:expr, $option:expr, $value:expr, $context:expr) => {{
@@ -341,15 +341,13 @@ impl CurlHeaderCapture<'_> {
         let Some(colon) = line.iter().position(|byte| *byte == b':') else {
             return true;
         };
-        let (name, value_with_colon) = line.split_at(colon);
+        let (name, tail) = line.split_at(colon);
         let is_age_header = match name.len() {
             3 if name.eq_ignore_ascii_case(AGE_HEADER_NAME) => true,
             4 if name.eq_ignore_ascii_case(DATE_HEADER_NAME) => false,
             _ => return true,
         };
-        let Some((_, value_bytes)) = value_with_colon.split_first() else {
-            return true;
-        };
+        let value_bytes = tail.get(1..).unwrap_or_else(|| process::abort());
         let header_raw = match str::from_utf8(value_bytes).map(str::trim_ascii) {
             Ok(header_raw) => header_raw,
             Err(source) => {
