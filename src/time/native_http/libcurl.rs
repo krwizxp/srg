@@ -304,13 +304,7 @@ impl CurlHeaderCapture<'_> {
             return false;
         }
         self.bytes_seen = next_len;
-        let Some(pending_capacity) = self.pending_line.len().checked_add(bytes.len()) else {
-            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 line 길이 계산 실패"));
-            return false;
-        };
-        if self.pending_line.capacity() < pending_capacity
-            && self.pending_line.try_reserve(bytes.len()).is_err()
-        {
+        if self.pending_line.try_reserve(bytes.len()).is_err() {
             self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 메모리 확보 실패"));
             return false;
         }

@@ -340,11 +340,9 @@ impl Client {
             }
             let units = header_bytes.div_euclid(2);
             wide_buffer.clear();
-            if wide_buffer.capacity() < units {
-                wide_buffer.try_reserve_exact(units).map_err(|source| {
-                    error_with_source(context, "응답 헤더 메모리 확보 실패", source)
-                })?;
-            }
+            wide_buffer.try_reserve_exact(units).map_err(|source| {
+                error_with_source(context, "응답 헤더 메모리 확보 실패", source)
+            })?;
             wide_buffer.resize(units, 0_u16);
             index = current_index;
             // SAFETY: wide_buffer has the probed size and request is valid.
@@ -368,13 +366,11 @@ impl Client {
             }
             while wide_buffer.pop_if(|unit| *unit == 0).is_some() {}
             ascii_buffer.clear();
-            if ascii_buffer.capacity() < wide_buffer.len() {
-                ascii_buffer
-                    .try_reserve_exact(wide_buffer.len())
-                    .map_err(|source| {
-                        error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
-                    })?;
-            }
+            ascii_buffer
+                .try_reserve_exact(wide_buffer.len())
+                .map_err(|source| {
+                    error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
+                })?;
             for &unit in wide_buffer.iter() {
                 ascii_buffer.push(u8::try_from(unit).map_err(|source| {
                     error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
