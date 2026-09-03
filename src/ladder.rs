@@ -20,9 +20,6 @@ pub(super) fn write_ladder_results<'player, 'result>(
         *slot = result;
         entry_count = entry_count.strict_add(1);
     }
-    if remaining_results.next().is_some() {
-        return Err("사다리 결과 배열 범위 초과".into());
-    }
     for index in (1..entry_count).rev() {
         seed ^= rng.next_u64()?;
         let upper_bound = u64::from_le_bytes(index.to_le_bytes());
