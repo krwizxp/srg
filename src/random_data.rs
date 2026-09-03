@@ -135,7 +135,7 @@ impl<const N: usize> UniqueNumbers<N> {
         })
     }
     fn is_full(&self) -> bool {
-        usize::from(self.count) >= N
+        usize::from(self.count) == N
     }
     const fn new() -> Self {
         Self { count: 0, seen: 0 }
