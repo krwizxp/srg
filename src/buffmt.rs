@@ -1,6 +1,6 @@
 use core::fmt::{self, NumBuffer};
 use std::process;
-static TWO_DIGITS: &[u8; 200] = b"00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899";
+const TWO_DIGITS: &[[u8; 2]] = b"00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899".as_chunks::<2>().0;
 pub(super) struct ByteCursor<'buffer> {
     initial_len: usize,
     remaining: &'buffer mut [u8],
@@ -52,10 +52,8 @@ impl fmt::Write for ByteCursor<'_> {
     }
 }
 pub(super) fn two_digits(value: u8) -> [u8; 2] {
-    let start = usize::from(value).strict_mul(2);
     *TWO_DIGITS
-        .get(start..)
-        .and_then(|tail| tail.first_chunk())
+        .get(usize::from(value))
         .unwrap_or_else(|| process::abort())
 }
 pub(super) const fn digit_byte(value: u8) -> u8 {
