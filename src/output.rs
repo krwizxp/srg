@@ -4,6 +4,7 @@ use crate::{
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
     random_data::RandomDataSet,
 };
+use core::fmt::NumBuffer;
 use std::{
     io::{Result as IoResult, Write as IoWrite, stdout},
     process,
@@ -93,12 +94,18 @@ impl OutputFormatter<'_, '_, '_> {
         let bytes = self.bytes;
         let use_colors = self.use_colors;
         self.cursor.write_bytes(FILE_RECORD_START);
-        self.cursor.write_u64_dec(number64);
-        self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
         if signed_number < 0 {
+            self.cursor.write_u64_dec(number64);
+            self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
             self.cursor.write_byte(b'-');
+            self.cursor.write_u64_dec(signed_number.unsigned_abs());
+        } else {
+            let mut number_buffer = NumBuffer::new();
+            let number_text = number64.format_into(&mut number_buffer).as_bytes();
+            self.cursor.write_bytes(number_text);
+            self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
+            self.cursor.write_bytes(number_text);
         }
-        self.cursor.write_u64_dec(signed_number.unsigned_abs());
         self.cursor.write_bytes(b")\n");
         self.write_prefixed_byte_groups("2진수: ", |byte| {
             let [[h0, h1, h2, h3], [l0, l1, l2, l3]] = [byte >> 4_u8, byte & 0x0f].map(|nibble| {
