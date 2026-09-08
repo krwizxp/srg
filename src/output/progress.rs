@@ -1,9 +1,5 @@
 use super::buf_write_u8_dec;
-use crate::{
-    buffmt::ByteCursor,
-    diagnostic::Result,
-    numeric::{low_u8_from_u128, u128_from_usize},
-};
+use crate::{buffmt::ByteCursor, diagnostic::Result, numeric::low_u8_from_u128};
 use core::{fmt::NumBuffer, time::Duration};
 use std::io::Write as IoWrite;
 const BAR_WIDTH: usize = 10;
@@ -43,8 +39,8 @@ impl ProgressBuffers {
         } else if completed == 0 {
             None
         } else {
-            let completed_scaled = u128_from_usize(completed).strict_mul(PERCENT_SCALE_U128);
-            let remaining_wide = u128_from_usize(total.strict_sub(completed));
+            let completed_scaled = (completed as u128).strict_mul(PERCENT_SCALE_U128);
+            let remaining_wide = total.strict_sub(completed) as u128;
             let eta_numerator = elapsed_millis.strict_mul(remaining_wide);
             Some(eta_numerator.div_euclid(completed_scaled))
         };

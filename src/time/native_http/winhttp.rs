@@ -9,10 +9,7 @@ use core::{
     result::Result as CoreResult,
     str,
 };
-use std::{
-    process,
-    time::{Instant, SystemTime},
-};
+use std::time::{Instant, SystemTime};
 mod sys;
 const DWORD_BYTE_SIZE: u32 = 4;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
@@ -323,7 +320,7 @@ impl Client {
                     context,
                 ));
             }
-            let header_bytes = usize::try_from(bytes).unwrap_or_else(|_| process::abort());
+            let header_bytes = bytes as usize;
             if header_bytes > HTTP_HEAD_MAX_HEADER_BYTES {
                 return Err(error(
                     context,

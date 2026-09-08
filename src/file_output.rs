@@ -162,10 +162,8 @@ impl TryFrom<&Path> for OutputFile {
             (&bom == UTF8_BOM).ok_or_else(|| {
                 AppError::message("기존 출력 파일은 SRG UTF-8 형식이어야 합니다.")
             })?;
-            let bom_len = u64::try_from(UTF8_BOM.len()).unwrap_or_else(|_| process::abort());
-            if len != bom_len {
-                let max_tail_len = u64::try_from(BUFFER_SIZE).unwrap_or_else(|_| process::abort());
-                let tail_len_u64 = len.min(max_tail_len);
+            if len != UTF8_BOM.len() as u64 {
+                let tail_len_u64 = len.min(BUFFER_SIZE as u64);
                 let tail_len = usize::try_from(tail_len_u64).unwrap_or_else(|_| process::abort());
                 let mut tail = [0_u8; BUFFER_SIZE];
                 let tail_start = len.strict_sub(tail_len_u64);

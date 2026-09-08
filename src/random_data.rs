@@ -6,7 +6,7 @@ use crate::{
     diagnostic::Result,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
-use core::{array, ops::Mul as NumericMul};
+use core::array;
 use std::process;
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
@@ -161,8 +161,8 @@ where
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
-        let upper_ratio = NumericMul::mul(f64::from(upper_32_bits), U32_MAX_INV);
-        let lower_ratio = NumericMul::mul(f64::from(lower_32_bits), U32_MAX_INV);
+        let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
+        let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
         self.data.kor_coords = Coordinates {
             latitude: 5.504_167_f64.mul_add(upper_ratio, 33.112_500),
             longitude: 7.263_056_f64.mul_add(lower_ratio, 124.609_722),

@@ -11,7 +11,7 @@ use core::{
     error::Error,
     fmt::{self, Write as FmtWrite},
     hint::spin_loop,
-    ops::{Div as NumericDiv, Mul as NumericMul},
+    ops::Div as NumericDiv,
     result::Result as CoreResult,
     str::FromStr,
     time::Duration,
@@ -1537,8 +1537,8 @@ fn sample_worker_channels(
     );
     Ok((command_sender, response_receiver))
 }
-fn duration_millis_f64(duration: Duration) -> f64 {
-    NumericMul::mul(duration.as_secs_f64(), 1_000.0)
+const fn duration_millis_f64(duration: Duration) -> f64 {
+    duration.as_secs_f64().algebraic_mul(1_000.0)
 }
 fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display) {
     append_fmt(target, format_args!("{prefix}{err}"));
