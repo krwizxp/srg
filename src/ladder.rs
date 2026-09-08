@@ -14,9 +14,8 @@ pub(super) fn write_ladder_results<'player, 'result>(
     out: &mut dyn Write,
 ) -> Result<()> {
     let mut result_entries = [""; MAX_LADDER_ENTRIES];
-    let mut remaining_results = results;
     let mut entry_count = 0_usize;
-    for (slot, result) in result_entries.iter_mut().zip(&mut remaining_results) {
+    for (slot, result) in result_entries.iter_mut().zip(results) {
         *slot = result;
         entry_count = entry_count.strict_add(1);
     }
