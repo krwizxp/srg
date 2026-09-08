@@ -1,6 +1,6 @@
 use super::super::{ParsedServer, TimeError, UrlScheme};
 use super::{FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeSample, error};
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
@@ -68,7 +68,6 @@ type CurlOption = c_uint;
 #[derive(Default)]
 pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
-    header_line_buffer: Vec<u8>,
 }
 struct EasyHandle(NonNull<Curl>);
 #[derive(Default)]
@@ -76,17 +75,16 @@ struct CurlBodySink {
     bytes_seen: usize,
     error: Option<Cow<'static, str>>,
 }
-struct CurlHeaderCapture<'line> {
+struct CurlHeaderCapture {
     bytes_seen: usize,
     completed_block: Option<FreshTimeHeaders>,
     current_block: Option<FreshTimeHeaders>,
     error: Option<Cow<'static, str>>,
     limit: usize,
-    pending_line: &'line mut Vec<u8>,
 }
-enum CurlWriteTarget<'target, 'line> {
+enum CurlWriteTarget<'target> {
     Body(&'target mut CurlBodySink),
-    Header(&'target mut CurlHeaderCapture<'line>),
+    Header(&'target mut CurlHeaderCapture),
 }
 impl Drop for EasyHandle {
     fn drop(&mut self) {
@@ -161,7 +159,6 @@ impl Client {
     ) -> Result<TimeSample> {
         let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
         let mut body_sink = CurlBodySink::default();
-        self.header_line_buffer.clear();
         let mut header_capture = CurlHeaderCapture {
             bytes_seen: 0,
             completed_block: None,
@@ -171,7 +168,6 @@ impl Client {
                 UrlScheme::Http => HTTP_HEAD_MAX_PLAIN_HEADER_BYTES,
                 UrlScheme::Https => HTTP_HEAD_MAX_HEADER_BYTES,
             },
-            pending_line: &mut self.header_line_buffer,
         };
         let init_code = *CURL_INIT;
         (init_code == CURLE_OK)
@@ -230,10 +226,6 @@ impl Client {
             let code = handle.perform();
             (code, request_start)
         };
-        if !header_capture.pending_line.is_empty() {
-            header_capture.capture_pending();
-            header_capture.pending_line.clear();
-        }
         if let Some(callback_error) = body_sink.error.or(header_capture.error) {
             self.easy_handle = None;
             return Err(error(context, callback_error));
@@ -290,7 +282,7 @@ impl CurlBodySink {
         true
     }
 }
-impl CurlHeaderCapture<'_> {
+impl CurlHeaderCapture {
     fn append(&mut self, bytes: &[u8]) -> bool {
         let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
             self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 크기 계산 실패"));
@@ -304,26 +296,7 @@ impl CurlHeaderCapture<'_> {
             return false;
         }
         self.bytes_seen = next_len;
-        if self.pending_line.try_reserve(bytes.len()).is_err() {
-            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 메모리 확보 실패"));
-            return false;
-        }
-        for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
-            self.pending_line.extend_from_slice(segment);
-            if segment.ends_with(b"\n") {
-                if !self.capture_pending() {
-                    return false;
-                }
-                self.pending_line.clear();
-            }
-        }
-        true
-    }
-    fn capture_pending(&mut self) -> bool {
-        let without_lf = self
-            .pending_line
-            .strip_suffix(b"\n")
-            .unwrap_or(self.pending_line.as_slice());
+        let without_lf = bytes.strip_suffix(b"\n").unwrap_or(bytes);
         let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
         if line.starts_with(b"HTTP/") {
             self.current_block = Some(FreshTimeHeaders::default());
@@ -391,7 +364,7 @@ unsafe extern "C" fn write_callback(
     let Some(payload_head) = NonNull::new(ptr.cast::<u8>()) else {
         return 0;
     };
-    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_, '_>>()) else {
+    let Some(mut target_ptr) = NonNull::new(userdata.cast::<CurlWriteTarget<'_>>()) else {
         return 0;
     };
     // SAFETY: len is non-zero, payload_head is non-null, and libcurl passes a readable buffer with
