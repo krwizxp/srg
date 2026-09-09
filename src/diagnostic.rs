@@ -42,7 +42,9 @@ impl Display for AppError {
 }
 impl fmt::Write for ControlEscapingWriter<'_, '_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for character in s.chars() {
+        let mut remaining = s;
+        let mut consumed = 0;
+        for (index, character) in s.char_indices() {
             if character.is_control()
                 || matches!(
                     character,
@@ -53,14 +55,21 @@ impl fmt::Write for ControlEscapingWriter<'_, '_> {
                         | '\u{2066}'..='\u{2069}'
                 )
             {
-                for escaped in character.escape_debug() {
-                    self.0.write_char(escaped)?;
+                let (plain, escaped_tail) = remaining.split_at(index.strict_sub(consumed));
+                if !plain.is_empty() {
+                    self.0.write_str(plain)?;
                 }
-            } else {
-                self.0.write_char(character)?;
+                write!(self.0, "{}", character.escape_debug())?;
+                let char_len = character.len_utf8();
+                remaining = escaped_tail.split_at(char_len).1;
+                consumed = index.strict_add(char_len);
             }
         }
-        Ok(())
+        if remaining.is_empty() {
+            Ok(())
+        } else {
+            self.0.write_str(remaining)
+        }
     }
 }
 impl fmt::Debug for AppError {
