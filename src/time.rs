@@ -1031,14 +1031,12 @@ impl AppState<'_> {
         rtt_nanos.sort_unstable();
         let trim = sample_count.div_euclid(RTT_TRIM_DIVISOR);
         let trimmed_sample_count = sample_count.strict_sub(trim.strict_mul(2));
-        let (sum_nanos, averaged_sample_count) = rtt_nanos
+        let sum_nanos = rtt_nanos
             .iter()
             .skip(trim)
             .take(trimmed_sample_count)
-            .fold((0_u128, 0_u128), |(sum, count), &sample_nanos| {
-                (sum.strict_add(sample_nanos), count.strict_add(1))
-            });
-        let avg_nanos = sum_nanos.div_euclid(averaged_sample_count);
+            .fold(0_u128, |sum, &sample_nanos| sum.strict_add(sample_nanos));
+        let avg_nanos = sum_nanos.div_euclid(trimmed_sample_count as u128);
         let baseline_rtt = Duration::from_nanos_u128(avg_nanos);
         append_fmt(
             msg_buf,
