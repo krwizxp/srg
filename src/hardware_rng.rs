@@ -108,8 +108,14 @@ impl HardwareRng {
         false
     }
     pub(super) fn write_initial_source_notice(&self, err: &mut dyn Write) -> Result<()> {
-        if self.source() == HardwareRandomSource::RdRand {
-            writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
+        match self.source() {
+            HardwareRandomSource::RdSeed => {
+                writeln!(err, "CPU가 RDSEED를 지원하여 RDSEED를 사용합니다.")?;
+            }
+            HardwareRandomSource::RdRand => {
+                writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
+            }
+            HardwareRandomSource::None => {}
         }
         Ok(())
     }

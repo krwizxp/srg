@@ -1,5 +1,6 @@
 use crate::{
     diagnostic::{AppError, Result},
+    input::{DEFAULT_INPUT_LINE_MAX_BYTES, validate_input_line},
     time::{ParsedServer, ServerTimeSession},
 };
 cfg_select! {
@@ -8,6 +9,7 @@ cfg_select! {
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
+            input::BATCH_COUNT_INPUT_MAX_BYTES,
             ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
             random_number::{FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float, generate_random_integer},
             FILE_NAME,
@@ -88,7 +90,7 @@ impl CliCommand {
         arg.into_string()
             .map_err(|_arg| AppError::message(format!("{label} 값은 유효한 Unicode여야 합니다.")))
     }
-    fn parse_arg<T>(arg: &OsStr, label: &str) -> Result<T>
+    fn parse_arg<T>(arg: &OsStr, label: &str, max_bytes: usize) -> Result<T>
     where
         T: FromStr,
         T::Err: Display,
@@ -96,9 +98,11 @@ impl CliCommand {
         let text = arg
             .to_str()
             .ok_or_else(|| AppError::message(format!("{label} 값은 유효한 Unicode여야 합니다.")))?;
-        text.parse::<T>().map_err(|source| {
-            AppError::message(format!("{label} 값이 올바르지 않습니다: {source}"))
-        })
+        validate_input_line(text, max_bytes)?
+            .parse::<T>()
+            .map_err(|source| {
+                AppError::message(format!("{label} 값이 올바르지 않습니다: {source}"))
+            })
     }
     #[cfg(target_arch = "x86_64")]
     fn run_with_rng(
@@ -134,7 +138,8 @@ where
                 let (Some(count_arg), None) = (args.next(), args.next()) else {
                     return Err(AppError::message("사용법: srg generate <count>"));
                 };
-                let count = Self::parse_arg::<usize>(&count_arg, "count")?;
+                let count =
+                    Self::parse_arg::<usize>(&count_arg, "count", BATCH_COUNT_INPUT_MAX_BYTES)?;
                 (1..=MAX_BATCH_GENERATE_COUNT)
                     .contains(&count)
                     .ok_or_else(|| {
@@ -148,12 +153,8 @@ where
                     take_two_args(&mut args, "ladder <players-csv> <results-csv>")?;
                 let players = Self::owned_text(players_arg, "players-csv")?;
                 let results = Self::owned_text(results_arg, "results-csv")?;
-                if players.len() > MAX_LADDER_INPUT_BYTES || results.len() > MAX_LADDER_INPUT_BYTES
-                {
-                    return Err(AppError::message(format!(
-                        "입력이 너무 깁니다. 최대 {MAX_LADDER_INPUT_BYTES} bytes까지 입력할 수 있습니다."
-                    )));
-                }
+                validate_input_line(&players, MAX_LADDER_INPUT_BYTES)?;
+                validate_input_line(&results, MAX_LADDER_INPUT_BYTES)?;
                 let csv_shape = |value: &str| {
                     let (count, has_empty) =
                         value
@@ -161,14 +162,10 @@ where
                             .fold((0_usize, false), |(count, has_empty), entry| {
                                 (count.strict_add(1), has_empty || entry.trim().is_empty())
                             });
-                    (count, has_empty, value.contains(['\r', '\n']))
+                    (count, has_empty)
                 };
-                let (player_count, players_have_empty, players_have_line_break) =
-                    csv_shape(&players);
-                let (result_count, results_have_empty, results_have_line_break) =
-                    csv_shape(&results);
-                (!players_have_line_break && !results_have_line_break)
-                    .ok_or("플레이어와 결과값은 한 줄로 입력해야 합니다.")?;
+                let (player_count, players_have_empty) = csv_shape(&players);
+                let (result_count, results_have_empty) = csv_shape(&results);
                 (2..=MAX_LADDER_ENTRIES)
                     .contains(&player_count)
                     .ok_or_else(|| format!("플레이어는 2~{MAX_LADDER_ENTRIES}명이어야 합니다."))?;
@@ -181,8 +178,8 @@ where
             #[cfg(target_arch = "x86_64")]
             "random-float" => {
                 let (min_arg, max_arg) = take_two_args(&mut args, "random-float <min> <max>")?;
-                let min = Self::parse_arg::<f64>(&min_arg, "min")?;
-                let max = Self::parse_arg::<f64>(&max_arg, "max")?;
+                let min = Self::parse_arg::<f64>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
+                let max = Self::parse_arg::<f64>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 (min.is_finite() && !min.is_subnormal() && max.is_finite() && !max.is_subnormal())
                     .ok_or(FLOAT_INPUT_ERROR)?;
                 (max >= min).ok_or("최댓값은 최솟값보다 크거나 같아야 합니다.")?;
@@ -194,8 +191,8 @@ where
             #[cfg(target_arch = "x86_64")]
             "random-integer" => {
                 let (min_arg, max_arg) = take_two_args(&mut args, "random-integer <min> <max>")?;
-                let min = Self::parse_arg::<i64>(&min_arg, "min")?;
-                let max = Self::parse_arg::<i64>(&max_arg, "max")?;
+                let min = Self::parse_arg::<i64>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
+                let max = Self::parse_arg::<i64>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 (min >= MIN_ALLOWED_INTEGER_VALUE).ok_or_else(|| {
                     format!("최솟값은 {MIN_ALLOWED_INTEGER_VALUE} 이상이어야 합니다.")
                 })?;
@@ -209,8 +206,13 @@ where
             "time-observe" => {
                 let (host_arg, seconds_arg) =
                     take_two_args(&mut args, "time-observe <host> <seconds>")?;
-                let host = Self::parse_arg::<ParsedServer>(&host_arg, "host")?;
-                let seconds = Self::parse_arg::<u64>(&seconds_arg, "seconds")?;
+                let host = Self::parse_arg::<ParsedServer>(
+                    &host_arg,
+                    "host",
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                )?;
+                let seconds =
+                    Self::parse_arg::<u64>(&seconds_arg, "seconds", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 (1..=60)
                     .contains(&seconds)
                     .ok_or("seconds는 1~60 범위여야 합니다.")?;

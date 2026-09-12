@@ -10,7 +10,10 @@ use crate::{
 use crate::{
     batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
     hardware_rng::{HardwareRandomSource, HardwareRng},
-    input::{LadderEntryMode, parse_regular_f64, read_ladder_entries, read_parsed_value},
+    input::{
+        BATCH_COUNT_INPUT_MAX_BYTES, LadderEntryMode, parse_regular_f64, read_ladder_entries,
+        read_parsed_value,
+    },
     ladder::write_ladder_results,
     random_number::{
         FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float,
@@ -20,8 +23,6 @@ use crate::{
 use alloc::borrow::Cow;
 use core::{error::Error, iter::successors, result::Result as CoreResult};
 use std::io::{self, Write, stderr, stdout};
-#[cfg(target_arch = "x86_64")]
-const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
 const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {

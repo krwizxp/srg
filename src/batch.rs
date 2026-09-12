@@ -122,11 +122,12 @@ pub(super) fn regenerate_with_count(
             worker_handles
                 .try_reserve_exact(thread_count)
                 .map_err(|source| AppError::context("작업 스레드 목록 확보 실패", source))?;
+            let mut progress_error = None;
             for worker_idx in 0..thread_count {
                 let loop_count = base_count.strict_add(usize::from(worker_idx < remainder));
                 let (writer, stop, done) = (&writer_lock, &cancelled, &processed);
                 let wake = &coordinator;
-                worker_handles.push(scope_ctx.spawn(move || {
+                let worker = thread::Builder::new().spawn_scoped(scope_ctx, move || {
                     let result = (|| {
                         let mut chunk = WorkerChunk::default();
                         let chunk_capacity =
@@ -174,10 +175,17 @@ pub(super) fn regenerate_with_count(
                     .inspect_err(|_| stop.store(true, Ordering::Relaxed));
                     wake.unpark();
                     result
-                }));
+                });
+                match worker {
+                    Ok(handle) => worker_handles.push(handle),
+                    Err(source) => {
+                        cancelled.store(true, Ordering::Relaxed);
+                        progress_error = Some(AppError::context("작업 스레드 생성 실패", source));
+                        break;
+                    }
+                }
             }
             let mut progress_buffers = output::progress::ProgressBuffers::new();
-            let mut progress_error = None;
             let mut last_progress = start_time;
             let mut user_cancelled = false;
             while !cancelled.load(Ordering::Relaxed)

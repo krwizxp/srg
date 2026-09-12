@@ -3,13 +3,30 @@ use crate::diagnostic::Result;
 use crate::ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES};
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
-const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
+#[cfg(target_arch = "x86_64")]
+pub(super) const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
+pub(super) const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
 const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
 #[cfg(target_arch = "x86_64")]
 #[derive(Clone, Copy)]
 pub(super) enum LadderEntryMode {
     Players,
     Results { expected_count: usize },
+}
+pub(super) fn validate_input_line(text: &str, max_bytes: usize) -> IoResult<&str> {
+    if text.len() > max_bytes {
+        return Err(IoError::new(
+            io::ErrorKind::InvalidInput,
+            format!("입력이 너무 깁니다. 최대 {max_bytes} bytes까지 입력할 수 있습니다."),
+        ));
+    }
+    if text.contains(['\r', '\n']) {
+        return Err(IoError::new(
+            io::ErrorKind::InvalidInput,
+            "값은 한 줄로 입력해야 합니다.",
+        ));
+    }
+    Ok(text.trim())
 }
 pub(super) fn read_line_reuse_limited<'buffer>(
     prompt: Arguments<'_>,
@@ -34,7 +51,7 @@ pub(super) fn read_line_reuse_limited<'buffer>(
         let reached_line_end = line_end.is_some();
         let take_len = line_end.map_or(available.len(), |index| index.strict_add(1));
         let (segment, _) = available.split_at(take_len);
-        if segment.len() > max_bytes.strict_sub(bytes.len()) {
+        if segment.len() > max_bytes.strict_add(2).strict_sub(bytes.len()) {
             stdin_lock.consume(take_len);
             if !reached_line_end {
                 stdin_lock.skip_until(b'\n')?;
@@ -52,9 +69,15 @@ pub(super) fn read_line_reuse_limited<'buffer>(
         }
     }
     drop(stdin_lock);
+    if bytes.last() == Some(&b'\n') {
+        bytes.pop();
+        if bytes.last() == Some(&b'\r') {
+            bytes.pop();
+        }
+    }
     *buffer = String::from_utf8(bytes)
         .map_err(|source| IoError::new(io::ErrorKind::InvalidData, source))?;
-    Ok(buffer.trim())
+    validate_input_line(buffer, max_bytes)
 }
 pub(super) fn read_u64_hex_input(
     prompt: Arguments<'_>,
