@@ -15,12 +15,10 @@ pub(super) mod progress;
 pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
 const HEX_U16_FULL_WIDTH: usize = 4;
-const HEX_U16_SHORT_THRESHOLD: u16 = 0x1000;
 static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
 const OCTAL_TMP_LEN: usize = 22;
-const PASSWORD_FULL_WIDTH_THRESHOLD: u32 = 1_000_000;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
 const TWO_DIGIT_WIDTH: usize = 2;
@@ -64,13 +62,13 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number);
             buffer_cur.write_byte(b' ');
-            buf_write_hex_u16_min3(buffer_cur, data.solar_system_index);
+            buf_write_hex_u16_3(buffer_cur, data.solar_system_index);
             buffer_cur.write_byte(b' ');
             buffer_cur.write_bytes(&hex_byte(data.nms_portal_yy));
             buffer_cur.write_byte(b' ');
-            buf_write_hex_u16_min3(buffer_cur, data.nms_portal_zzz);
+            buf_write_hex_u16_3(buffer_cur, data.nms_portal_zzz);
             buffer_cur.write_byte(b' ');
-            buf_write_hex_u16_min3(buffer_cur, data.nms_portal_xxx);
+            buf_write_hex_u16_3(buffer_cur, data.nms_portal_xxx);
             buffer_cur.write_byte(b' ');
             buffer_cur.write_byte(b'(');
             for &ch in &data.glyph_string {
@@ -188,10 +186,6 @@ impl OutputFormatter<'_, '_, '_> {
         let data = self.data;
         self.write_labeled_u8_array_line("바이트 배열: ".as_bytes(), &bytes);
         self.write_labeled_line("6자리 숫자 비밀번호: ".as_bytes(), |buffer_cur| {
-            if data.numeric_password >= PASSWORD_FULL_WIDTH_THRESHOLD {
-                buffer_cur.write_u32_dec(data.numeric_password);
-                return;
-            }
             let hi = low_u8_from_u32(data.numeric_password.div_euclid(PASSWORD_HIGH_DIVISOR));
             let rem = low_u16_from_u64(u64::from(
                 data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR),
@@ -298,13 +292,9 @@ fn buf_write_prefixed_hex24(cur: &mut ByteCursor<'_>, prefix: &[u8], b0: u8, b1:
     let [b20, b21] = hex_byte(b2);
     hex_bytes.copy_from_slice(&[b00, b01, b10, b11, b20, b21]);
 }
-fn buf_write_hex_u16_min3(cur: &mut ByteCursor<'_>, value: u16) {
-    if value < HEX_U16_SHORT_THRESHOLD {
-        let [_, h1, h2, h3] = hex_u16(value);
-        cur.write_bytes(&[h1, h2, h3]);
-    } else {
-        cur.write_bytes(&hex_u16(value));
-    }
+fn buf_write_hex_u16_3(cur: &mut ByteCursor<'_>, value: u16) {
+    let [_, h1, h2, h3] = hex_u16(value);
+    cur.write_bytes(&[h1, h2, h3]);
 }
 pub(super) fn write_slice_to_console(data_slice: &[u8]) -> IoResult<()> {
     let mut stdout_lock = stdout().lock();
