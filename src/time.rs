@@ -182,7 +182,8 @@ struct BaselineRttState {
     had_previous_sample: bool,
     next_sample_at: Instant,
     pending_generation: Option<u64>,
-    samples: [Option<TimeSample>; NUM_SAMPLES],
+    previous_sample: Option<TimeSample>,
+    rtt_nanos: [u128; NUM_SAMPLES],
     started: bool,
 }
 struct CalibrationState {
@@ -256,7 +257,8 @@ impl Activity {
             had_previous_sample,
             next_sample_at: now,
             pending_generation: None,
-            samples: [None; NUM_SAMPLES],
+            previous_sample: None,
+            rtt_nanos: [u128::MAX; NUM_SAMPLES],
             started: false,
         }))
     }
@@ -990,10 +992,11 @@ impl AppState<'_> {
         let next_sample_base = match result {
             Ok(sample) => {
                 if sample.rtt > Duration::ZERO {
-                    let Some(slot) = baseline.samples.get_mut(attempt_index) else {
+                    let Some(slot) = baseline.rtt_nanos.get_mut(attempt_index) else {
                         process::abort();
                     };
-                    *slot = Some(sample);
+                    *slot = sample.rtt.as_nanos();
+                    baseline.previous_sample = Some(sample);
                     baseline.had_previous_sample = true;
                 }
                 sample.response_received_inst
@@ -1014,24 +1017,18 @@ impl AppState<'_> {
         if baseline.attempts < NUM_SAMPLES {
             return ActivityTransition::stay(Activity::MeasureBaselineRtt(baseline));
         }
-        let mut latest_sample = None;
-        let mut sample_count = 0_usize;
-        let mut rtt_nanos = [u128::MAX; NUM_SAMPLES];
-        for (slot, sample) in rtt_nanos.iter_mut().zip(baseline.samples.iter().flatten()) {
-            *slot = sample.rtt.as_nanos();
-            latest_sample = Some(*sample);
-            sample_count = sample_count.strict_add(1);
-        }
-        let Some(previous_sample) = latest_sample else {
+        let Some(previous_sample) = baseline.previous_sample else {
             return transition_to_retry(
                 "유효한 RTT 샘플을 얻지 못했습니다.",
                 baseline.had_previous_sample,
             );
         };
-        rtt_nanos.sort_unstable();
+        baseline.rtt_nanos.sort_unstable();
+        let sample_count = baseline.rtt_nanos.partition_point(|&rtt| rtt != u128::MAX);
         let trim = sample_count.div_euclid(RTT_TRIM_DIVISOR);
         let trimmed_sample_count = sample_count.strict_sub(trim.strict_mul(2));
-        let sum_nanos = rtt_nanos
+        let sum_nanos = baseline
+            .rtt_nanos
             .iter()
             .skip(trim)
             .take(trimmed_sample_count)
