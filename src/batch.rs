@@ -14,6 +14,7 @@ use core::{
 use std::{
     fs::File,
     io::{IsTerminal as _, Write, stdin},
+    panic::resume_unwind,
     process,
     sync::Mutex,
     thread::{self, available_parallelism, scope},
@@ -223,7 +224,7 @@ pub(super) fn regenerate_with_count(
             }
             rng.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
             let mut combined = None;
-            let mut join_error = None;
+            let mut worker_panic = None;
             let mut worker_error = None;
             for handle in worker_handles {
                 match handle.join() {
@@ -233,22 +234,17 @@ pub(super) fn regenerate_with_count(
                     Ok(Err(error)) if worker_error.is_none() => {
                         worker_error = Some(error);
                     }
-                    Err(panic_payload) if join_error.is_none() => {
-                        let panic_detail = panic_payload
-                            .downcast_ref::<String>()
-                            .map(String::as_str)
-                            .or_else(|| panic_payload.downcast_ref::<&str>().copied())
-                            .unwrap_or("non-string thread payload");
-                        join_error = Some(AppError::message(format!(
-                            "작업 스레드 패닉 발생: {panic_detail}"
-                        )));
+                    Err(panic_payload) if worker_panic.is_none() => {
+                        worker_panic = Some(panic_payload);
                     }
                     Ok(Ok(None) | Err(_)) | Err(_) => {}
                 }
             }
-            let error = join_error.or(progress_error).or(worker_error);
             rng.set_pending_read_interruption(false);
-            if let Some(outcome_error) = error {
+            if let Some(panic_payload) = worker_panic {
+                resume_unwind(panic_payload);
+            }
+            if let Some(outcome_error) = progress_error.or(worker_error) {
                 return Err(outcome_error);
             }
             Ok((combined, user_cancelled))
