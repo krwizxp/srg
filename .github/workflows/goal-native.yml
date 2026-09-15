@@ -1,0 +1,53 @@
+name: Temporary Goal native verification
+on:
+  push:
+    branches:
+      - optimize/goal-20260915-native-audit
+permissions:
+  contents: read
+jobs:
+  native:
+    name: ${{ matrix.os }} native and package verification
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: srg-linux-x64
+          - os: windows-latest
+            artifact: srg-windows-x64
+          - os: macos-26-intel
+            artifact: srg-macos-x64
+          - os: macos-26
+            artifact: srg-macos-arm64
+    env:
+      GOAL_ARTIFACT: ${{ matrix.artifact }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install reference compiler
+        run: rustup toolchain install 1.98.1 --profile minimal --no-self-update
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Build native release
+        run: cargo +1.98.1 build --release --frozen --bin srg
+      - name: Package release
+        run: cargo +1.98.1 run --frozen --example package_artifact -- "${{ matrix.artifact }}"
+      - name: Verify actual CLI, package and native loopback HTTP
+        run: python goal-verify/srg-native.py
+      - name: Verify isolated release batch performance
+        if: runner.os == 'Linux'
+        run: python goal-verify/batch-perf.py
+      - name: Preserve result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: goal-native-${{ matrix.artifact }}
+          path: ${{ runner.temp }}/goal-*.json
+          retention-days: 1

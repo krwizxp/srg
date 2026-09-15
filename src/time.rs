@@ -22,7 +22,9 @@ use core::{
     ptr::{NonNull, null},
 };
 use std::{
-    io, process,
+    io,
+    panic::resume_unwind,
+    process,
     sync::mpsc,
     thread,
     time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
@@ -51,7 +53,6 @@ const FULL_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const ADAPTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const PASSIVE_POLL_INTERVAL: Duration = Duration::from_millis(45);
 const RETRY_DELAY: Duration = Duration::from_secs(10);
-const SAMPLE_WORKER_RESTARTED_MESSAGE: &str = "서버 시간 샘플 worker가 종료되어 다시 시작했습니다.";
 const ENTER_BUFFER_CAPACITY: usize = 8;
 const NUM_SAMPLES: usize = 10;
 const CALIBRATION_TIMEOUT: Duration = Duration::from_secs(5);
@@ -496,51 +497,44 @@ impl Error for TimeError {
     }
 }
 impl SampleWorker {
-    fn ensure_fetch(&mut self, pending_generation: &mut Option<u64>) -> Result<()> {
+    fn ensure_fetch(&mut self, pending_generation: &mut Option<u64>) {
         if pending_generation.is_some() {
-            return Ok(());
+            return;
         }
         let generation = self.generation.strict_add(1);
         match self.command_sender.try_send(generation) {
             Ok(()) => {
                 self.generation = generation;
                 *pending_generation = Some(generation);
-                Ok(())
             }
-            Err(mpsc::TrySendError::Full(_)) => Ok(()),
+            Err(mpsc::TrySendError::Full(_)) => {}
             Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.respawn()?;
-                Err(TimeError::parse(SAMPLE_WORKER_RESTARTED_MESSAGE))
+                self.resume_panic();
             }
         }
     }
-    fn poll_fetch(
-        &mut self,
-        pending_generation: &mut Option<u64>,
-    ) -> Result<Option<Result<TimeSample>>> {
+    fn poll_fetch(&mut self, pending_generation: &mut Option<u64>) -> Option<Result<TimeSample>> {
         let expected_generation = *pending_generation;
         loop {
             match self.response_receiver.try_recv() {
                 Ok((generation, result)) if Some(generation) == expected_generation => {
                     *pending_generation = None;
-                    return Ok(Some(result));
+                    return Some(result);
                 }
                 Ok(_) => {}
-                Err(mpsc::TryRecvError::Empty) => return Ok(None),
+                Err(mpsc::TryRecvError::Empty) => return None,
                 Err(mpsc::TryRecvError::Disconnected) => {
-                    *pending_generation = None;
-                    self.respawn()?;
-                    return Err(TimeError::parse(SAMPLE_WORKER_RESTARTED_MESSAGE));
+                    self.resume_panic();
                 }
             }
         }
     }
-    fn respawn(&mut self) -> Result<()> {
-        let (command_sender, response_receiver) = sample_worker_channels(Arc::clone(&self.host))?;
-        self.command_sender = command_sender;
-        self.generation = 0;
-        self.response_receiver = response_receiver;
-        Ok(())
+    fn resume_panic(&mut self) -> ! {
+        let worker = self.worker.take().unwrap_or_else(|| process::abort());
+        match worker.join() {
+            Ok(()) => process::abort(),
+            Err(payload) => resume_unwind(payload),
+        }
     }
 }
 struct AppState<'worker> {
@@ -580,17 +574,36 @@ struct SampleWorker {
     generation: u64,
     host: Arc<ParsedServer>,
     response_receiver: mpsc::Receiver<SampleWorkerResponse>,
+    worker: Option<thread::JoinHandle<()>>,
 }
 impl ServerTimeSession {
     pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         let now = Instant::now();
         let shared_host = Arc::new(self.host);
-        let (command_sender, response_receiver) = sample_worker_channels(Arc::clone(&shared_host))?;
+        let host = Arc::clone(&shared_host);
+        let (command_sender, command_receiver) = mpsc::sync_channel(1);
+        let (response_sender, response_receiver) = mpsc::sync_channel(1);
+        let worker = thread::Builder::new()
+            .name(String::from("srg-sample-worker"))
+            .spawn(move || {
+                let mut native_http = native_http::Client::default();
+                let context = match host.scheme {
+                    UrlScheme::Http => "HTTP",
+                    UrlScheme::Https => "HTTPS",
+                };
+                while let Ok(generation) = command_receiver.recv() {
+                    let result = native_http.fetch_head(&host, context);
+                    if response_sender.send((generation, result)).is_err() {
+                        return;
+                    }
+                }
+            })?;
         let mut sample_worker = SampleWorker {
             command_sender,
             generation: 0,
             host: shared_host,
             response_receiver,
+            worker: Some(worker),
         };
         let scheduled_trigger =
             self.scheduled_trigger
@@ -689,14 +702,14 @@ impl AppState<'_> {
         }
         let latest_sample = self
             .sample_worker
-            .poll_fetch(&mut countdown.pending_sample_generation)?
+            .poll_fetch(&mut countdown.pending_sample_generation)
             .transpose()?;
         if latest_sample.is_some() {
             countdown.next_sample_at = next_sample_at;
         }
         if countdown.pending_sample_generation.is_none() && now >= countdown.next_sample_at {
             self.sample_worker
-                .ensure_fetch(&mut countdown.pending_sample_generation)?;
+                .ensure_fetch(&mut countdown.pending_sample_generation);
         }
         Ok(latest_sample)
     }
@@ -709,16 +722,9 @@ impl AppState<'_> {
         if now.saturating_duration_since(calibration.started_at) >= CALIBRATION_TIMEOUT {
             return transition_to_retry(CALIBRATION_TIMEOUT_MESSAGE, true);
         }
-        let sample_poll = match self
+        let sample_poll = self
             .sample_worker
-            .poll_fetch(&mut calibration.pending_generation)
-        {
-            Ok(sample) => sample,
-            Err(worker_err) => {
-                append_error_detail(msg_buf, "서버 시간 샘플 worker 오류: ", worker_err);
-                return transition_to_retry(msg_buf, true);
-            }
-        };
+            .poll_fetch(&mut calibration.pending_generation);
         if let Some(sample_result) = sample_poll {
             let completed_at = Instant::now();
             if completed_at.saturating_duration_since(calibration.started_at) >= CALIBRATION_TIMEOUT
@@ -821,13 +827,8 @@ impl AppState<'_> {
             }
             calibration.previous_sample = current_sample;
         }
-        if let Err(start_err) = self
-            .sample_worker
-            .ensure_fetch(&mut calibration.pending_generation)
-        {
-            append_error_detail(msg_buf, "정밀 보정 샘플 요청 실패: ", start_err);
-            return transition_to_retry(msg_buf, true);
-        }
+        self.sample_worker
+            .ensure_fetch(&mut calibration.pending_generation);
         ActivityTransition::stay(Activity::CalibrateOnTick(calibration))
     }
     fn handle_final_countdown<'message>(
@@ -965,27 +966,15 @@ impl AppState<'_> {
             }
         }
         let had_pending_request = baseline.pending_generation.is_some();
-        let sample_poll = match self
+        let sample_poll = self
             .sample_worker
-            .poll_fetch(&mut baseline.pending_generation)
-        {
-            Ok(sample) => sample,
-            Err(worker_err) => {
-                append_error_detail(msg_buf, "서버 시간 샘플 worker 오류: ", worker_err);
-                return transition_to_retry(msg_buf, baseline.had_previous_sample);
-            }
-        };
+            .poll_fetch(&mut baseline.pending_generation);
         let Some(result) = sample_poll else {
             if had_pending_request || now < baseline.next_sample_at {
                 return ActivityTransition::stay(Activity::MeasureBaselineRtt(baseline));
             }
-            if let Err(start_err) = self
-                .sample_worker
-                .ensure_fetch(&mut baseline.pending_generation)
-            {
-                append_error_detail(msg_buf, "RTT 샘플 요청 실패: ", start_err);
-                return transition_to_retry(msg_buf, baseline.had_previous_sample);
-            }
+            self.sample_worker
+                .ensure_fetch(&mut baseline.pending_generation);
             return ActivityTransition::stay(Activity::MeasureBaselineRtt(baseline));
         };
         let attempt_index = baseline.attempts;
@@ -1507,30 +1496,6 @@ impl AppState<'_> {
         }
         ActivityTransition::message(Activity::Predicting { server_time }, msg_buf)
     }
-}
-fn sample_worker_channels(
-    host: Arc<ParsedServer>,
-) -> Result<(mpsc::SyncSender<u64>, mpsc::Receiver<SampleWorkerResponse>)> {
-    let (command_sender, command_receiver) = mpsc::sync_channel(1);
-    let (response_sender, response_receiver) = mpsc::sync_channel(1);
-    drop(
-        thread::Builder::new()
-            .name(String::from("srg-sample-worker"))
-            .spawn(move || {
-                let mut native_http = native_http::Client::default();
-                let context = match host.scheme {
-                    UrlScheme::Http => "HTTP",
-                    UrlScheme::Https => "HTTPS",
-                };
-                while let Ok(generation) = command_receiver.recv() {
-                    let result = native_http.fetch_head(&host, context);
-                    if response_sender.send((generation, result)).is_err() {
-                        return;
-                    }
-                }
-            })?,
-    );
-    Ok((command_sender, response_receiver))
 }
 const fn duration_millis_f64(duration: Duration) -> f64 {
     duration.as_secs_f64().algebraic_mul(1_000.0)
