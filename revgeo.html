@@ -3805,9 +3805,8 @@
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
       const U64_TOKEN_HARD_LIMIT = 64;
       const createUniqueNumbers = (length) => ({
-        count: 0,
-        seen: 0n,
-        values: new Array(length),
+        limit: length,
+        values: [],
       });
       function createDataSet(num64) {
         return {
@@ -3825,10 +3824,10 @@
       function isComplete(data) {
         return (
           data.numeric_password_digits >= 6 &&
-          data.lotto.count === data.lotto.values.length &&
-          data.lotto7.count === data.lotto7.values.length &&
+          data.lotto.values.length === data.lotto.limit &&
+          data.lotto7.values.length === data.lotto7.limit &&
           data.password.length >= 8 &&
-          data.euroMain.count === data.euroMain.values.length
+          data.euroMain.values.length === data.euroMain.limit
         );
       }
       function parseU64(raw) {
@@ -3991,13 +3990,13 @@
         return (x >> 32n) | ((x & 0xffff_ffffn) << 32n);
       }
       function pushUniqueNumber(byte, modulus, numbers) {
-        if (numbers.count >= numbers.values.length) return true;
+        if (numbers.values.length >= numbers.limit) return true;
         const number = (byte % modulus) + 1;
-        const mask = 1n << BigInt(number);
-        if ((numbers.seen & mask) !== 0n) return false;
-        numbers.seen |= mask;
-        numbers.values[numbers.count++] = number;
-        const complete = numbers.count === numbers.values.length;
+        for (const value of numbers.values) {
+          if (value === number) return false;
+        }
+        numbers.values.push(number);
+        const complete = numbers.values.length === numbers.limit;
         if (complete) {
           numbers.values.sort((a, b) => a - b);
         }
@@ -4104,7 +4103,7 @@
           luckyStarSource = reverseBitsU64(newSupp.value);
           supplementalRef.current = newSupp;
         }
-        if (data.euroLucky.count !== data.euroLucky.values.length) {
+        if (data.euroLucky.values.length !== data.euroLucky.limit) {
           throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
         }
         const hangul = new Array(4);
