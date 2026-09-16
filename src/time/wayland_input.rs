@@ -434,12 +434,12 @@ impl Library {
     where
         F: Copy,
     {
-        if size_of::<F>() != size_of::<*mut c_void>()
-            || align_of::<F>() != align_of::<*mut c_void>()
-        {
-            return Err(Cow::Borrowed(
-                "dynamic loader symbol ABI가 함수 포인터와 다릅니다.",
-            ));
+        const {
+            assert!(
+                size_of::<F>() == size_of::<*mut c_void>()
+                    && align_of::<F>() == align_of::<*mut c_void>(),
+                "dynamic loader symbol ABI가 함수 포인터와 다릅니다."
+            );
         }
         // SAFETY: dlerror has no preconditions and clears any previous loader error.
         unsafe {
@@ -449,7 +449,7 @@ impl Library {
         let symbol = NonNull::new(unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) })
             .ok_or_else(dl_error_message)?;
         // SAFETY: each symbol name is paired with its exact C function pointer type, ABI size and
-        // alignment are checked above, and the owning API keeps this library loaded.
+        // alignment are checked at compile time, and the owning API keeps this library loaded.
         Ok(unsafe {
             DlsymSymbol::<F> {
                 raw: symbol.as_ptr(),
