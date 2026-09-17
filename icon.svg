@@ -1,12 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 44 44" preserveAspectRatio="xMidYMid meet">
-  <title>SRG</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" fill="none">
+  <title>SRG GeoHex</title>
+  <desc>A white G-shaped location pin on a rounded blue hexagon, for the SRG reverse-geocoding tool.</desc>
   <defs>
-    <linearGradient id="brand-gradient" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#369eff"/>
-      <stop offset="1" stop-color="#156aff"/>
+    <linearGradient id="srg-blue" x1="72" y1="60" x2="422" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5AA2FF"/>
+      <stop offset=".44" stop-color="#2286FF"/>
+      <stop offset="1" stop-color="#1475FB"/>
     </linearGradient>
   </defs>
-  <path d="M22 1 40 11v22L22 43 4 33V11Z" fill="url(#brand-gradient)"/>
-  <path d="m22 10 10 6v12l-10 6-10-6V16Z" fill="#74c0ff" opacity=".52"/>
-  <path d="m22 10 10 6v12l-10 6Z" fill="#1671f2" opacity=".75"/>
+  <path d="M228.28 31.99Q256 16 283.72 31.99L436.28 120.01Q464 136 464 168V344Q464 376 436.28 391.99L283.72 480.01Q256 496 228.28 480.01L75.72 391.99Q48 376 48 344V168Q48 136 75.72 120.01Z" fill="url(#srg-blue)"/>
+  <path d="M335 179C315 154 288 142 256 142C196 142 150 189 150 247C150 298 207 354 247 390Q256 398 265 390C303 356 359 301 359 252H267" stroke="#FFFFFF" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
