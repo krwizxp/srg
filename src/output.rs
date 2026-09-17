@@ -1,7 +1,7 @@
 use crate::{
     BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_START,
     buffmt::{ByteCursor, digit_byte, two_digits},
-    numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
+    numeric::{low_u8_from_u32, low_u8_from_u64},
     random_data::RandomDataSet,
 };
 use core::fmt::NumBuffer;
@@ -187,15 +187,13 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_u8_array_line("바이트 배열: ".as_bytes(), &bytes);
         self.write_labeled_line("6자리 숫자 비밀번호: ".as_bytes(), |buffer_cur| {
             let hi = low_u8_from_u32(data.numeric_password.div_euclid(PASSWORD_HIGH_DIVISOR));
-            let rem = low_u16_from_u64(u64::from(
-                data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR),
-            ));
+            let rem = data.numeric_password.rem_euclid(PASSWORD_HIGH_DIVISOR);
             let [h0, h1] = two_digits(hi);
             let [m0, m1] = two_digits(low_u8_from_u32(
-                u32::from(rem).div_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
+                rem.div_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
             ));
             let [l0, l1] = two_digits(low_u8_from_u32(
-                u32::from(rem).rem_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
+                rem.rem_euclid(u32::from(U8_THREE_DIGIT_THRESHOLD)),
             ));
             *buffer_cur.take_array::<PASSWORD_WIDTH>() = [h0, h1, m0, m1, l0, l1];
         });
