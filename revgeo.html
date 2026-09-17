@@ -1,24 +1,29 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme-storage-key="srg-theme">
 
+<html data-theme-storage-key="srg-theme" lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>SRG 데이터 역지오코딩 도구</title>
-  <meta name="description" content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다.">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="SRG 데이터 역지오코딩 도구">
-  <meta property="og:description" content="좌표 데이터를 주소로 변환합니다.">
-  <meta property="og:locale" content="ko_KR">
-  <link rel="icon" href="./icon.svg?v=4" type="image/svg+xml" sizes="any">
-  <link rel="manifest" href="./site.webmanifest?v=4">
-  <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" crossorigin="anonymous"
-    integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg"
-    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-  <script>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
+<meta content="strict-origin-when-cross-origin" name="referrer">
+<title>SRG 데이터 역지오코딩 도구</title>
+<meta content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다." name="description">
+<meta content="website" property="og:type">
+<meta content="SRG 데이터 역지오코딩 도구" property="og:title">
+<meta content="좌표 데이터를 주소로 변환합니다." property="og:description">
+<meta content="ko_KR" property="og:locale">
+<link href="./favicon.ico?v=5" rel="icon" sizes="16x16 32x32 48x48" type="image/x-icon">
+<link href="./favicon-32x32.png?v=5" rel="icon" sizes="32x32" type="image/png">
+<link href="./icon.svg?v=5" rel="icon" sizes="any" type="image/svg+xml">
+<link href="./apple-touch-icon.png?v=5" rel="apple-touch-icon" sizes="180x180">
+<link href="./apple-touch-icon-167x167.png?v=5" rel="apple-touch-icon" sizes="167x167">
+<link href="./apple-touch-icon-152x152.png?v=5" rel="apple-touch-icon" sizes="152x152">
+<link href="./revgeo.webmanifest?v=5" rel="manifest">
+<meta name="application-name" content="SRG 역지오코딩">
+<meta name="apple-mobile-web-app-title" content="SRG 역지오코딩">
+<link crossorigin href="https://nominatim.openstreetmap.org" rel="preconnect">
+<link crossorigin href="https://cdn.jsdelivr.net" rel="preconnect">
+<link crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg" rel="stylesheet">
+<script>
     (() => {
       const root = document.documentElement;
       try {
@@ -32,1807 +37,664 @@
       }
     })();
   </script>
-  <style>
-    @layer reset {
-
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-      }
-
-      :is(body, fieldset, h1, h2, p, pre) {
-        margin-block: 0;
-        margin-inline: 0;
-      }
-
-      fieldset {
-        padding: 0;
-        border: 0;
-      }
-
-      :is(input, button, select, textarea) {
-        font: inherit;
-      }
-
-      body {
-        word-break: keep-all;
-        min-block-size: 100dvh;
-        text-wrap: pretty;
-        container-type: inline-size;
-        container-name: page;
-        overscroll-behavior: none;
-      }
-    }
-
-    @layer theme {
-      :root {
-        color-scheme: light dark;
-        --focus-ring: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.68) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.7) h));
-        --fs-sm: 14px;
-        --results-pane-mobile-height: 70dvh;
-        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-        scrollbar-width: thin;
-        scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
-
-        &[data-theme="light"] {
-          color-scheme: light;
-        }
-
-        &[data-theme="dark"] {
-          color-scheme: dark;
-        }
-      }
-
-      body {
-        color: var(--fg);
-        padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
-        font-variant-numeric: tabular-nums;
-        font-size: 15px;
-        line-height: 1.6;
-
-        &::selection {
-          background: color-mix(in oklch, var(--accent) 25%, var(--surface-panel));
-          color: var(--fg);
-        }
-      }
-    }
-
-    @layer layout {
-      main {
-        inline-size: min(1600px, 100%);
-        margin-inline: auto;
-        display: grid;
-        grid-template-columns: clamp(380px, 28vw, 440px) 1fr;
-        gap: 20px;
-        min-block-size: 0;
-        block-size: calc(100dvh - var(--site-header-height) - var(--site-header-gap) - var(--page-pad-block-end));
-
-        @container (inline-size <=900px) {
-          grid-template-columns: 1fr;
-          block-size: auto;
-        }
-      }
-    }
-
-    @layer components {
-
-      .coords-view,
-      .table-wrap {
-        flex: 1;
-        scrollbar-width: thin;
-        overflow: auto;
-        --scroll-shadow-size: 20px;
-        --scroll-shadow-color: light-dark(oklch(20.7682% 0.03982 265.75 / 0.24), oklch(0% 0 0 / 0.92));
-      }
-
-      .coords-view {
-        white-space: pre-wrap;
-      }
-
-      @supports (animation-timeline: scroll()) {
-
-        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::before,
-        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::after {
-          content: "";
-          display: block;
-          position: sticky;
-          block-size: var(--scroll-shadow-size);
-          pointer-events: none;
-          z-index: 11;
-          opacity: 0;
-          animation-duration: 1s;
-          animation-timing-function: linear;
-          animation-fill-mode: both;
-          animation-timeline: scroll(nearest);
-        }
-
-        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::before {
-          inset-block-start: var(--scroll-shadow-top, 0);
-          margin-block-end: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(180deg, var(--scroll-shadow-color), transparent);
-          animation-name: scroll-shadow;
-          animation-range: 0% 90%;
-        }
-
-        :is(.coords-view:has(.coords-content:not(:empty)), .table-wrap.has-results)::after {
-          inset-block-end: 0;
-          margin-block-start: calc(-1 * var(--scroll-shadow-size));
-          background: linear-gradient(0deg, var(--scroll-shadow-color), transparent);
-          animation-name: scroll-shadow;
-          animation-direction: reverse;
-          animation-range: 10% 100%;
-        }
-
-        @keyframes scroll-shadow {
-          from {
-            opacity: 0;
-          }
-
-          to {
-            opacity: 1;
-          }
-        }
-      }
-
-      #app>.input-card {
-        overflow-inline: hidden;
-        overflow-block: auto;
-        overscroll-behavior: contain;
-        scrollbar-width: thin;
-      }
-
-      #app>section.card>.left-pane-scroll {
-        display: flex;
-        flex-direction: column;
-        flex: 1 1 auto;
-        gap: 14px;
-        block-size: 100%;
-        min-block-size: 0;
-        overflow: visible;
-
-        >* {
-          flex-shrink: 0;
-        }
-      }
-
-      .card {
-        --card-pad-inline: clamp(20px, 2.5vw, 32px);
-        --control-pad-block: 10px;
-        --control-pad-inline: 12px;
-        border: 1px solid var(--line-soft);
-        border-radius: 24px;
-        overflow: hidden;
-        padding-block: clamp(20px, 2.5vw, 32px);
-        padding-inline: var(--card-pad-inline);
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        position: relative;
-        container-type: inline-size;
-        min-block-size: 0;
-
-        .left-pane-scroll>.coords-section {
-          flex: 1 1 180px;
-          display: flex;
-          flex-direction: column;
-          min-block-size: 140px;
-          gap: 6px;
-          margin-inline-end: calc(-1 * var(--card-pad-inline));
-          padding-inline-end: var(--card-pad-inline);
-        }
-
-        .left-pane-scroll:has(.manual-rng:open) #coords {
-          max-block-size: none;
-        }
-
-        footer {
-          text-align: start;
-          font-size: var(--fs-sm);
-          color: var(--muted);
-          line-height: 1.3;
-        }
-
-        fieldset.row {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-
-          .row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-            gap: 10px;
-          }
-
-          @media (380px <=width <=700px) {
-            .row {
-              grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
-          }
-        }
-
-        .drop-zone {
-          position: relative;
-          border-radius: 18px;
-          min-block-size: 112px;
-          padding: 12px 16px;
-          transition: 0.2s ease;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          color: var(--muted);
-          font-weight: 500;
-          font-size: var(--fs-sm);
-          text-align: center;
-
-          input[type="file"] {
-            position: absolute;
-            inset-block: 0;
-            inset-inline: 0;
-            opacity: 0;
-            cursor: pointer;
-          }
-
-          .drop-icon {
-            inline-size: 36px;
-            block-size: 36px;
-            transition: 0.2s ease;
-            stroke-width: 1.5;
-          }
-
-          .drop-text strong,
-          &:is(:hover, :focus-within) .drop-icon {
-            color: var(--accent-ink);
-          }
-
-          @media (pointer: coarse) {
-            @container page (inline-size <=800px) {
-              padding-block: 16px;
-            }
-          }
-
-          &:has(input[type="file"]:disabled) {
-            opacity: 0.5;
-          }
-        }
-
-        :where(.drop-icon) {
-          fill: none;
-          stroke: currentColor;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-        }
-
-        :where(.coords-view, .manual-rng > summary, .filters input[type="search"], .filters select, .manual-rng textarea) {
-          border-radius: 12px;
-          transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        :where(.filters input[type="search"], .filters select, .manual-rng textarea) {
-          color: var(--fg);
-        }
-
-        .coords-view {
-          font: inherit;
-          min-block-size: 100px;
-          line-height: 1.5;
-          font-size: 14px;
-
-          .coords-content {
-            display: block;
-            padding: 12px;
-            font: inherit;
-          }
-
-          .coords-content:empty::before {
-            content: attr(data-placeholder);
-            color: var(--muted-strong);
-            white-space: nowrap;
-          }
-
-          @container page (inline-size <=900px) {
-            max-block-size: 30dvh;
-          }
-        }
-
-        :where(button, .filters input[type="search"], .filters select, .manual-rng textarea):focus-visible,
-        :where(.coords-view, .manual-rng > summary):focus-visible,
-        .drop-zone:has(input[type="file"]:focus-visible) {
-          outline: 2px solid var(--focus-ring);
-          outline-offset: -2px;
-        }
-
-        button {
-          cursor: pointer;
-          display: inline-flex;
-          justify-content: center;
-          min-inline-size: 0;
-          white-space: nowrap;
-          padding-block: 12px;
-
-          &:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            filter: grayscale(0.8);
-          }
-
-          &:is(#parse, #start):focus-visible {
-            outline: 2px solid color-mix(in oklch, var(--panel-bg) 90%, var(--accent));
-            outline-offset: -2px;
-          }
-        }
-      }
-
-      .row-progress {
-        display: flex;
-        align-items: flex-end;
-        gap: 12px;
-        margin-block-start: 8px;
-        line-height: 1.15;
-
-        >.sp {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          min-inline-size: 0;
-        }
-
-        #counts {
-          flex: 0 0 auto;
-          font-size: var(--fs-sm);
-          text-align: end;
-          white-space: nowrap;
-          color: var(--muted);
-
-          strong {
-            color: var(--fg);
-          }
-        }
-      }
-
-      .progress-shell {
-        --pct: 0;
-        --progress-fill: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 68%, white));
-        --progress-shimmer: linear-gradient(110deg, transparent 30%, oklch(from white l c h / 0.42) 50%, transparent 70%);
-        position: relative;
-        inline-size: 100%;
-        border-radius: 999px;
-        overflow: hidden;
-        contain: paint;
-        block-size: 8px;
-        background: oklch(from var(--fg) l c h / 0.12);
-
-        >progress {
-          position: absolute;
-          inset: 0;
-          inline-size: 100%;
-          block-size: 100%;
-          opacity: 0;
-        }
-
-        >.progress-fill {
-          position: absolute;
-          inset-block: 0;
-          inset-inline-start: 0;
-          inline-size: calc(var(--pct) * 1%);
-          border-radius: inherit;
-          overflow: hidden;
-          background: var(--progress-fill);
-          pointer-events: none;
-
-          &::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: var(--progress-shimmer);
-            transform: translateX(-120%);
-            will-change: transform;
-          }
-        }
-
-        &:has(>progress[data-running]:not([value="0"]):not([value="100"]))>.progress-fill::after {
-          animation: loading-shimmer 1.4s linear infinite;
-        }
-      }
-
-      @keyframes loading-shimmer {
-        to {
-          transform: translateX(120%);
-        }
-      }
-
-      @keyframes skeleton-shimmer-x {
-        to {
-          transform: translateX(120%);
-        }
-      }
-
-      .status {
-        padding: 12px 16px;
-        border-radius: 12px;
-        background: var(--panel-bg);
-        border: 1px solid var(--line-soft);
-        flex-shrink: 0;
-        font-weight: 500;
-        font-size: var(--fs-sm);
-        transition: opacity 0.3s, transform 0.3s, display 0.3s allow-discrete;
-
-        @starting-style {
-          opacity: 0;
-          transform: translateY(5px);
-        }
-
-        &:empty {
-          display: none;
-          opacity: 0;
-          transform: translateY(5px);
-        }
-
-        &.err {
-          color: light-dark(oklch(from var(--err) calc(l - 0.18) calc(c * 0.82) h), oklch(from var(--err) calc(l + 0.12) calc(c * 0.72) h));
-          border-inline-start-color: light-dark(oklch(from var(--err) calc(l + 0.1) calc(c * 0.74) h), oklch(from var(--err) calc(l - 0.06) calc(c * 0.82) h));
-          background: oklch(from var(--err) l calc(c * 0.45) h / 0.1);
-        }
-
-        &.warn {
-          color: light-dark(oklch(from var(--warn) calc(l - 0.22) calc(c * 0.8) h), oklch(from var(--warn) calc(l + 0.1) calc(c * 0.7) h));
-          border-inline-start-color: light-dark(oklch(from var(--warn) calc(l - 0.04) calc(c * 0.82) h), oklch(from var(--warn) l calc(c * 0.78) h));
-          background: oklch(from var(--warn) l calc(c * 0.42) h / 0.1);
-        }
-
-        &.stopped {
-          color: var(--muted-strong);
-          background: light-dark(color-mix(in oklch, var(--muted) 12%, var(--surface-panel)), color-mix(in oklch, var(--muted) 16%, var(--surface-panel)));
-        }
-      }
-
-      @scope (.manual-rng) {
-        :scope {
-          margin-block-start: 2px;
-          border-radius: 18px;
-          max-inline-size: 100%;
-          min-inline-size: 0;
-          padding: 16px;
-          container-type: inline-size;
-          container-name: manual-rng;
-        }
-
-        :scope summary {
-          cursor: pointer;
-          font-weight: 700;
-          color: var(--accent-ink);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          user-select: none;
-
-          &::marker {
-            content: "";
-          }
-
-          &::before {
-            content: "▸";
-            transition: transform 0.2s ease;
-            color: var(--muted-strong);
-          }
-        }
-
-        :scope:open summary::before {
-          transform: rotate(90deg);
-        }
-
-        :scope .manual-rng-body {
-          margin-block-start: 10px;
-          display: grid;
-          align-content: start;
-          gap: 10px;
-          max-inline-size: 100%;
-          min-block-size: 0;
-          min-inline-size: 0;
-        }
-
-        :scope:open .manual-rng-body {
-          max-block-size: min(52dvh, 420px);
-          overflow-block: auto;
-          padding-inline-end: 4px;
-          scrollbar-width: thin;
-          scrollbar-color: color-mix(in oklch, color-mix(in oklch, var(--line-soft) 75%, var(--surface-panel)) 82%, var(--accent) 18%) oklch(0% 0 0 / 0);
-        }
-
-        :scope .manual-rng-help {
-          color: var(--muted);
-          font-size: var(--fs-sm);
-          line-height: 1.35;
-        }
-
-        :scope .manual-rng-field {
-          display: grid;
-          gap: 6px;
-        }
-
-        :scope textarea {
-          inline-size: 100%;
-          min-block-size: 90px;
-          padding-block: var(--control-pad-block, 10px);
-          padding-inline: var(--control-pad-inline, 12px);
-          font-size: var(--fs-sm);
-          font-weight: 500;
-          line-height: 1.45;
-          resize: vertical;
-          scrollbar-width: thin;
-          caret-color: var(--accent-ink);
-
-          &::placeholder {
-            color: var(--muted-strong);
-            opacity: 1;
-          }
-        }
-
-        :scope .manual-rng-label {
-          font-size: var(--fs-sm);
-          font-weight: 600;
-          color: var(--muted-strong);
-        }
-
-        :scope .manual-rng-meta {
-          color: var(--muted);
-          font-size: var(--fs-sm);
-          line-height: 1.35;
-          white-space: pre-wrap;
-        }
-
-        :scope .manual-rng-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-
-          .action-btn {
-            min-inline-size: 124px;
-          }
-
-          #copyOutput {
-            min-inline-size: 148px;
-          }
-
-          @container manual-rng (inline-size <=420px) {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            align-items: stretch;
-
-            .action-btn {
-              min-inline-size: 0;
-              inline-size: 100%;
-              block-size: 52px;
-              justify-content: center;
-              white-space: normal;
-            }
-
-            .action-btn__label {
-              text-align: center;
-              line-height: 1.08;
-              text-wrap: balance;
-            }
-
-            #saveOutput .action-btn__label--savefile {
-              flex-direction: column;
-              justify-content: center;
-              gap: 1px;
-              font-size: 11px;
-              line-height: 0.98;
-
-              >span:last-child {
-                font-size: 12px;
-              }
-            }
-          }
-        }
-
-        :scope #supp-dialog {
-          inline-size: min(560px, calc(100vw - 24px));
-          max-block-size: calc(100dvh - 24px);
-          padding: 0;
-          overflow: auto;
-          color: var(--fg);
-          font: inherit;
-          background: var(--surface-panel);
-          border: 1px solid var(--line-soft);
-          border-radius: 18px;
-          box-shadow: var(--shadow);
-          scrollbar-width: thin;
-        }
-
-        :scope #supp-dialog::backdrop {
-          background: oklch(10% 0.02 260 / 0.48);
-          backdrop-filter: blur(2px);
-        }
-
-        :scope .supp-dialog-form {
-          display: grid;
-          gap: 12px;
-          padding: 20px;
-        }
-
-        :scope .supp-dialog-form h2 {
-          font-size: 1.05rem;
-        }
-
-        :scope .supp-dialog-form textarea {
-          min-block-size: 140px;
-          max-block-size: min(40dvh, 300px);
-        }
-
-        :scope #supp-dialog-error {
-          min-block-size: 1.35em;
-        }
-
-        :scope #output.coords-view {
-          inline-size: 100%;
-          max-inline-size: 100%;
-          max-block-size: 260px;
-          min-inline-size: 0;
-          white-space: pre;
-        }
-
-        :scope section[aria-label="변환 결과"] {
-          max-inline-size: 100%;
-          min-inline-size: 0;
-        }
-
-        :scope :is(#error, #supp-dialog-error) {
-          color: light-dark(oklch(from var(--err) calc(l - 0.1) calc(c * 0.95) h), oklch(from var(--err) calc(l + 0.08) calc(c * 0.85) h));
-        }
-      }
-
-      .table-wrap {
-        --scroll-shadow-top: 50px;
-        border-radius: 18px;
-        scrollbar-gutter: stable;
-      }
-
-      .loading-rows {
-        display: none;
-      }
-
-      .table-wrap[data-running]:not(.has-results) .loading-rows {
-        display: table-footer-group;
-      }
-
-      .skeleton-bar {
-        display: block;
-        position: relative;
-        overflow: hidden;
-        block-size: 1.1em;
-        margin-block: 4px;
-        border-radius: 999px;
-        contain: paint;
-        background: light-dark(oklch(from var(--fg) calc(l + 0.292) calc(c * 0.62) h), oklch(from var(--surface-panel) calc(l + 0.447) calc(c * 0.45) h));
-
-        &::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(in oklch 90deg, transparent, light-dark(oklch(from var(--accent) calc(l + 0.303) calc(c * 0.18) h), oklch(from var(--accent) calc(l - 0.381) calc(c * 0.35) h)), transparent);
-          transform: translateX(-120%);
-          will-change: transform;
-        }
-      }
-
-      .table-wrap[data-running]:not(.has-results) .skeleton-bar::after {
-        animation: skeleton-shimmer-x 1.5s linear infinite;
-      }
-
-      @container (inline-size <=900px) {
-        .table-wrap[data-running]:not(.has-results) .loading-rows {
-          display: block;
-          padding: 16px;
-        }
-      }
-
-      .filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin: 0;
-
-        :is(input[type="search"], select) {
-          padding-block: var(--control-pad-block, 10px);
-          padding-inline: var(--control-pad-inline, 12px);
-          min-block-size: 44px;
-        }
-
-        input[type="search"] {
-          min-inline-size: 220px;
-          flex: 1 1 220px;
-
-          &::placeholder {
-            color: var(--muted-strong);
-            opacity: 1;
-          }
-        }
-
-        select,
-        #filter-clear {
-          flex: 0 0 auto;
-        }
-
-        @container page (inline-size >=1550px) {
-          flex-wrap: nowrap;
-          align-items: center;
-          overflow-inline: auto;
-          max-inline-size: 100%;
-
-          input[type="search"] {
-            min-inline-size: 120px;
-            flex: 0 1 140px;
-          }
-        }
-      }
-
-      :is(th, td) {
-        padding: 14px 12px;
-        font-size: var(--fs-sm);
-      }
-
-      table {
-        inline-size: 100%;
-        border-spacing: 0;
-
-        thead th {
-          position: sticky;
-          inset-block-start: 0;
-          z-index: 10;
-          background: light-dark(oklch(98.3678% 0.00398 258.32), oklch(17.4973% 0.03507 259.82));
-          text-align: start;
-          font-weight: 600;
-          color: var(--muted-strong);
-          white-space: nowrap;
-
-          &:nth-child(-n+2) {
-            text-align: center;
-          }
-
-          &:nth-child(8) {
-            inline-size: 100%;
-          }
-        }
-
-        tbody td {
-          vertical-align: top;
-
-          &:nth-child(-n+2) {
-            color: var(--muted);
-          }
-
-          &:nth-child(3) {
-            color: var(--accent-ink);
-            font-weight: 500;
-          }
-        }
-
-        tbody tr {
-          content-visibility: auto;
-          contain-intrinsic-block-size: auto 73px;
-
-          @media (any-hover: hover) {
-            &:hover {
-              background: color-mix(in oklch, var(--accent) 4%, var(--surface-panel));
-            }
-          }
-        }
-
-        @container (inline-size > 900px) {
-          tbody td:nth-child(-n+2) {
-            text-align: center;
-          }
-        }
-
-        @container (inline-size <=900px) {
-          display: block;
-          min-inline-size: 0;
-
-          thead {
-            display: none;
-          }
-
-          tbody {
-            display: flex;
-            flex-direction: column;
-            padding-block: 16px;
-            padding-inline: 16px;
-
-            tr:not([hidden])+tr:not([hidden]) {
-              margin-block-start: 16px;
-            }
-          }
-
-          :is(tbody, tfoot) tr {
-            contain-intrinsic-block-size: auto 375px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding-block: 16px;
-            padding-inline: 16px;
-            background: var(--surface-panel);
-            border-radius: 16px;
-            box-shadow: 0 1px 2px oklch(from var(--fg) l c h / 0.12), 0 1px 1px oklch(from var(--fg) l c h / 0.08);
-
-            td {
-              display: grid;
-              grid-template-columns: 64px 1fr;
-              gap: 10px;
-              align-items: baseline;
-              padding-block: 2px;
-              padding-inline: 0;
-
-              &::before {
-                content: attr(data-label);
-                font-weight: 600;
-                color: var(--muted);
-                text-transform: uppercase;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    @layer utilities {
-      .caps {
-        text-transform: uppercase;
-        font-size: var(--fs-sm);
-        font-weight: 700;
-        color: var(--muted);
-      }
-
-      .sr-only {
-        position: absolute;
-        inline-size: 1px;
-        block-size: 1px;
-        overflow: hidden;
-        white-space: nowrap;
-        clip-path: inset(50%);
-      }
-
-      .nowrap {
-        white-space: nowrap;
-      }
-
-      .map-btn {
-        justify-self: center;
-      }
-
-      td[data-label="지도링크"] .map-btn:disabled {
-        display: none;
-      }
-
-      .map-popover {
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 0;
-        max-inline-size: min(360px, 92vw);
-        transition: opacity 0s linear 16ms;
-
-        @starting-style {
-          opacity: 0;
-        }
-
-        position-area: block-end span-inline-start;
-        position-try-fallbacks: flip-inline,
-        flip-block,
-        flip-block flip-inline;
-
-        .map-links {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px 8px;
-          min-inline-size: 85px;
-          color: var(--accent-ink);
-          font-weight: 700;
-          white-space: nowrap;
-
-          a {
-            color: inherit;
-            text-decoration: none;
-            transition: color 0.2s;
-
-            &:focus {
-              outline: none;
-            }
-
-            &:focus-visible {
-              outline: none;
-              box-shadow: inset 0 0 0 2px var(--focus-ring);
-              border-radius: 8px;
-            }
-
-            @media (any-hover: hover) {
-              &:hover {
-                color: light-dark(oklch(from var(--accent) calc(l - 0.12) calc(c * 0.8) h), oklch(from var(--accent) calc(l + 0.12) calc(c * 0.75) h));
-                text-decoration: underline;
-                text-underline-offset: 3px;
-              }
-            }
-          }
-        }
-      }
-    }
-
+<style>
+    /* SRG reverse geocoding: reference-matched dashboard shell. */
     :root {
-      --site-header-height: 72px;
-      --site-header-gap: 20px;
-      --page-pad-block-end: 20px;
-      --page-bg: light-dark(oklch(100% 0 0), oklch(13.4824% 0.03772 255.32));
-      --surface-panel: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32));
-      --panel-bg: light-dark(oklch(98.1449% 0.00453 258.32), oklch(17.3147% 0.03443 259.54));
-      --fg: light-dark(oklch(23.2073% 0.03283 265.79), oklch(100% 0 0));
-      --muted: light-dark(oklch(55.1732% 0.02965 266.41), oklch(68.4542% 0.04287 269.76));
-      --muted-strong: light-dark(oklch(27.6759% 0.0319 263.84), oklch(92.6985% 0.02464 265.59));
-      --line-soft: light-dark(oklch(94.4327% 0.01086 256.7), oklch(25.767% 0.05772 259.88));
-      --accent: light-dark(oklch(62.9919% 0.2104 261.11), oklch(65.3229% 0.1969 258.23));
-      --accent-ink: light-dark(oklch(62.9919% 0.2104 261.11), oklch(71.8796% 0.1599 251.87));
-      --accent-border: light-dark(oklch(from var(--accent) calc(l + 0.28) calc(c * 0.21) h), oklch(from var(--accent) calc(l - 0.35) calc(c * 0.75) h));
-      --accent-wash: light-dark(oklch(from var(--accent) calc(l + 0.34) calc(c * 0.08) h), oklch(from var(--accent) l c h / 0.12));
-      --warn: light-dark(oklch(73.5214% 0.1698 78.98), oklch(80.9396% 0.1868 79.23));
-      --err: light-dark(oklch(60.0856% 0.2631 15.86), oklch(71.6163% 0.2181 13.83));
-      --header-bg: light-dark(oklch(100% 0 0 / 0.96), oklch(13.4824% 0.03772 255.32 / 0.96));
-      --header-border: light-dark(oklch(95.654% 0.00797 253.85), oklch(46.12% 0.0851 264.23 / 0.22));
-      --shadow: 0 16px 36px oklch(20.7682% 0.03982 265.75 / 0.05);
-      --shadow-soft: 0 8px 24px oklch(20.7682% 0.03982 265.75 / 0.04);
-      --toggle-bg: light-dark(oklch(100% 0 0), oklch(18.8135% 0.03978 261.32 / 0.88));
-      --toggle-border: light-dark(oklch(92.8761% 0.01262 255.51), oklch(30.3242% 0.06705 260.4));
-      --toggle-text: light-dark(oklch(27.6759% 0.0319 263.84), oklch(100% 0 0));
-      --brand-text: light-dark(oklch(22.4879% 0.0368 267.24), oklch(100% 0 0));
-
-      &[data-theme="dark"] {
-        --shadow: 0 18px 40px oklch(0% 0 0 / 0.2);
-        --shadow-soft: 0 10px 24px oklch(0% 0 0 / 0.18);
-      }
-
-      @media (prefers-color-scheme: dark) {
-        &:not([data-theme="light"]) {
-          --shadow: 0 18px 40px oklch(0% 0 0 / 0.2);
-          --shadow-soft: 0 10px 24px oklch(0% 0 0 / 0.18);
-        }
-      }
+      color-scheme: light dark;
+      --page-bg: light-dark(#f5f9ff, #0c1425);
+      --surface-panel: light-dark(#ffffff, #141f34);
+      --panel-bg: light-dark(#f8faff, #17243c);
+      --input-bg: light-dark(#ffffff, #101c30);
+      --fg: light-dark(#263563, #dce7ff);
+      --heading: light-dark(#092163, #edf3ff);
+      --muted: light-dark(#7280a7, #99abce);
+      --muted-strong: light-dark(#65749b, #b7c6e3);
+      --line-soft: light-dark(#e3ebf7, #293a55);
+      --line-control: light-dark(#d2dcef, #354b6d);
+      --accent: light-dark(#2286ff, #5aa2ff);
+      --accent-ink: light-dark(#1475fb, #7bb7ff);
+      --accent-wash: light-dark(#edf5ff, #1b3557);
+      --accent-border: light-dark(#b9d7ff, #365d91);
+      --danger-bg: light-dark(#fff0f3, #382131);
+      --danger: light-dark(#ed4f72, #ff8ba4);
+      --success: light-dark(#18815b, #69d9ad);
+      --shadow: 0 5px 24px light-dark(#648bd10b, #00000024);
+      --focus-ring: light-dark(#126bea, #a1c9ff);
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK KR", sans-serif;
+      --font-caption: .875rem;
+      --font-label: .9375rem;
+      --font-control: 1rem;
+      --font-section: 1.5rem;
+      font-size: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: light-dark(#b9c4d9, #415774) transparent;
     }
-
-    html,
+    :root[data-theme="light"] { color-scheme: light; }
+    :root[data-theme="dark"] { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body, h1, h2, h3, p, pre, fieldset { margin: 0; }
+    fieldset { border: 0; padding: 0; min-width: 0; }
+    button, input, select, textarea { font: inherit; }
+    button, select { cursor: pointer; }
+    button { color: inherit; }
+    a { color: var(--accent-ink); text-underline-offset: 3px; }
+    svg { flex-shrink: 0; vertical-align: middle; }
+    .ui-icon { width: 18px; height: 18px; }
+    [hidden] { display: none !important; }
+    :is(button, input, textarea, select, summary, a, [tabindex]):focus-visible {
+      outline: 2px solid var(--focus-ring); outline-offset: 3px;
+    }
+    ::selection { background: var(--accent-border); color: var(--heading); }
+    html { min-width: 320px; background: var(--page-bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body {
-      background: var(--page-bg);
+      color: var(--fg); font-size: 1rem; line-height: 1.55;
+      font-variant-numeric: tabular-nums; word-break: keep-all;
+      min-height: 100dvh; padding: 76px 20px 18px;
+      background: radial-gradient(ellipse at 58% 0, light-dark(#e6effe99, #17325d44), transparent 58%), var(--page-bg);
     }
-
-    body {
-      letter-spacing: 0;
-      padding-block-start: calc(var(--site-header-height) + var(--site-header-gap));
-      padding-block-end: max(var(--page-pad-block-end), env(safe-area-inset-bottom));
-    }
-
-    @media (min-width: 941px) {
-
-      html,
-      body {
-        overflow: hidden;
-      }
-    }
-
-    #app {
-      scroll-margin-block-start: calc(var(--site-header-height) + var(--site-header-gap));
-
-      >* {
-        min-block-size: 0;
-      }
-
-      >section.card {
-        block-size: 100%;
-      }
-    }
-
     .site-header {
-      position: fixed;
-      inset-block-start: 0;
-      inset-inline: 0;
-      z-index: 40;
-      background: var(--header-bg);
-      border-block-end: 1px solid var(--header-border);
-
-      .header-inner {
-        inline-size: min(1600px, calc(100% - 48px));
-        margin-inline: auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        block-size: var(--site-header-height);
-      }
+      position: fixed; inset: 0 0 auto; z-index: 40; height: 60px;
+      border-bottom: 1px solid var(--line-soft);
+      background: linear-gradient(105deg, var(--surface-panel), light-dark(#edf4ff, #182943));
     }
-
-    .site-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      min-inline-size: 0;
-      color: inherit;
-      text-decoration: none;
-
-      &:focus-visible {
-        outline: none;
-        box-shadow: 0 0 0 2px var(--accent-border);
-        border-radius: 14px;
-      }
-
-      .brand-mark {
-        inline-size: clamp(36px, 3vw, 44px);
-        block-size: clamp(36px, 3vw, 44px);
-        flex: 0 0 auto;
-      }
-
-      strong {
-        min-inline-size: 0;
-        color: var(--brand-text);
-        font-size: 24px;
-        line-height: 1;
-        font-weight: 800;
-      }
+    .site-header::after {
+      content: ""; position: absolute; pointer-events: none; inset: 0 22% 0 57%; opacity: .5;
+      background: light-dark(#dce8ff, #233e65);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0 60 C56 56 123 16 174 18 S251 52 302 57 L400 60Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
     }
-
-    .card,
-    .map-popover {
-      background: var(--surface-panel);
-      box-shadow: var(--shadow);
+    .header-inner {
+      position: relative; z-index: 1; height: 100%; max-width: 1680px; margin: auto;
+      padding: 0 12px; width: calc(100% - 40px); display: flex; align-items: center; justify-content: space-between; gap: 16px;
     }
-
-    .card .card-intro {
-      display: grid;
-      gap: 12px;
-      padding-block-end: 2px;
+    .brand-cluster, .site-brand, .header-tools { display: flex; align-items: center; min-width: 0; }
+    .brand-cluster { gap: 16px; }
+    .site-brand { gap: 12px; text-decoration: none; white-space: nowrap; }
+    .brand-mark { display: block; width: 38px; height: 38px; aspect-ratio: 1; object-fit: contain; flex: 0 0 auto; }
+    .site-brand strong { color: var(--heading); font-size: 1.875rem; line-height: 1; letter-spacing: -.7px; font-weight: 800; }
+    .header-tools { gap: 18px; color: var(--heading); }
+    .theme-toggle { display: flex; align-items: center; gap: 10px; border: 0; padding: 5px 0; background: none; }
+    .theme-toggle .ui-icon { width: 21px; height: 21px; }
+    .theme-track { display: block; width: 46px; height: 24px; padding: 3px; border-radius: 999px; background: #2286ff; box-shadow: 0 2px 8px #2385ff25; }
+    .theme-track > span { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateX(22px); transition: transform .2s; box-shadow: 0 1px 3px #10336b22; }
+    .theme-toggle[aria-pressed="true"] .theme-track > span { transform: translateX(0); }
+    .theme-toggle .theme-moon, .theme-toggle[aria-pressed="true"] .theme-sun { display: none; }
+    .theme-toggle[aria-pressed="true"] .theme-moon { display: block; }
+    .settings-button { border: 0; background: none; padding: 5px; display: grid; place-items: center; border-radius: 6px; }
+    .settings-button .ui-icon { width: 22px; height: 22px; }
+    .settings-button:hover { background: var(--accent-wash); }
+    .settings-popover {
+      position: fixed; inset: 68px 28px auto auto; margin: 0; padding: 20px; width: 260px;
+      color: var(--fg); background: var(--surface-panel); border: 1px solid var(--line-control); border-radius: 12px; box-shadow: var(--shadow);
     }
-
-    .card .card-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.98rem;
-      font-weight: 700;
-      line-height: 1.2;
+    .settings-popover h2 { font-size: 1.25rem; color: var(--heading); margin-bottom: 16px; }
+    .settings-popover label { display: block; margin-bottom: 6px; font-weight: 600; }
+    .settings-popover select { width: 100%; border: 1px solid var(--line-control); border-radius: 6px; padding: 8px; color: var(--fg); background: var(--input-bg); }
+    #app { max-width: 1680px; margin: auto; display: grid; grid-template-columns: 36% minmax(0, 1fr); gap: 14px; height: calc(100dvh - 94px); min-height: 840px; scroll-margin-top: 76px; }
+    .card { background: var(--surface-panel); border: 1px solid var(--line-soft); border-radius: 12px; box-shadow: var(--shadow); min-width: 0; }
+    .input-card { container: input-pane / inline-size; padding: 16px 14px; overflow: auto; scrollbar-width: thin; }
+    .left-pane-scroll { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
+    .left-pane-scroll > :not(.coords-section) { flex-shrink: 0; }
+    .card-intro { position: relative; padding: 1px 3px 0; }
+    .card-label { display: flex; align-items: center; gap: 14px; color: var(--heading); font-size: var(--font-section); font-weight: 750; line-height: 1.45; letter-spacing: -.45px; }
+    .section-icon { width: 30px; height: 30px; color: var(--accent); }
+    fieldset.row { display: flex; flex-direction: column; gap: 12px; }
+    .drop-zone {
+      position: relative; min-height: 90px; padding: 12px; border: 1px dashed var(--accent-border); border-radius: 8px;
+      background: linear-gradient(120deg, var(--accent-wash), var(--panel-bg)); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px; text-align: center; color: var(--muted-strong);
     }
-
-    .card .card-label .dot {
-      inline-size: 8px;
-      block-size: 8px;
-      border-radius: 999px;
-      background: currentColor;
-      flex: 0 0 auto;
-    }
-
-    .card .card-label.geo {
-      color: var(--accent);
-    }
-
-    .card .card-label.reverse {
-      color: oklch(74.1537% 0.204 163.16);
-    }
-
-    .drop-zone,
-    .coords-view,
-    .table-wrap,
-    .manual-rng,
-    .filters input[type="search"],
-    .filters select,
-    .manual-rng textarea {
-      border: 1px solid var(--line-soft);
-      box-shadow: none;
-      background: var(--panel-bg);
-    }
-
-    .drop-zone:is(:hover, :focus-within) {
-      border-color: var(--accent-border);
-      background: var(--accent-wash);
-    }
-
-    button {
-      border: 1px solid var(--line-soft);
-      box-shadow: none;
-      font-weight: 700;
-
-      &.theme-toggle {
-        inline-size: 46px;
-        block-size: 46px;
-        padding: 0;
-        border-radius: 14px;
-        border: 1px solid var(--toggle-border);
-        background: var(--toggle-bg);
-        color: var(--toggle-text);
-        box-shadow: var(--shadow-soft);
-        font-size: 1.35rem;
-        line-height: 1;
-        flex: 0 0 auto;
-        transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-
-        &::before {
-          content: "☀️";
-        }
-
-        &[aria-pressed="true"]::before {
-          content: "🌙";
-        }
-
-        &:hover {
-          border-color: var(--accent);
-          transform: translateY(-1px);
-        }
-      }
-    }
-
+    .drop-zone:hover, .drop-zone:focus-within { background: var(--accent-wash); border-color: var(--accent); }
+    .drop-zone:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+    .drop-zone:has(input:disabled) { opacity: .65; }
+    .drop-zone input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .drop-zone input:disabled { cursor: not-allowed; }
+    .drop-text { font-size: var(--font-label); font-weight: 600; max-width: 100%; }
+    .drop-text > .ui-icon { color: var(--heading); width: 17px; height: 17px; margin-right: 6px; }
+    #drop-filename { color: var(--heading); font-size: 1.0625rem; overflow-wrap: anywhere; }
+    #drop-state { display: block; margin-top: 3px; }
+    .drop-hint { color: var(--muted); font-size: .8125rem; }
+    .input-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .action-btn {
-      --action-bg: var(--surface-panel);
-      --action-hover-bg: var(--accent-wash);
-      --action-border: var(--line-soft);
-      --action-color: var(--fg);
-      align-items: center;
-      gap: 8px;
-      min-block-size: 46px;
-      padding-inline: 12px;
-      border-radius: 18px;
-      border-color: var(--action-border);
-      background: var(--action-bg);
-      color: var(--action-color);
-      box-shadow: var(--shadow-soft);
-      font-size: 14px;
-      line-height: 1.05;
-      overflow: hidden;
-      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
-
-      .action-btn__icon {
-        inline-size: 16px;
-        block-size: 16px;
-        flex: 0 0 auto;
-        fill: none;
-        stroke: currentColor;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 1.9;
-      }
-
-      .action-btn__label {
-        min-inline-size: 0;
-      }
-
-      .action-btn__label--savefile {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25em;
-
-        >span:first-child {
-          white-space: nowrap;
-        }
-      }
-
-      @media (any-hover: hover) {
-        &:not(:disabled):hover {
-          background: var(--action-hover-bg);
-          transform: translateY(-1px);
-        }
-      }
-
-      &:disabled {
-        box-shadow: none;
-        transform: none;
-      }
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 44px; padding: 8px 10px;
+      border: 1px solid var(--accent-border); border-radius: 6px; color: var(--heading); background: linear-gradient(var(--surface-panel),var(--accent-wash));
+      font-size: var(--font-caption); font-weight: 650; line-height: 1.35; white-space: normal; text-decoration: none;
+      transition: background .15s, border-color .15s, box-shadow .15s;
     }
-
-    :is(#parse, #start, #export, #runBtn).action-btn--primary {
-      --action-bg: linear-gradient(135deg, light-dark(oklch(59.5615% 0.2385 280.75), oklch(56.1461% 0.2584 277.61)), light-dark(oklch(74.638% 0.1563 238.96), oklch(73.0225% 0.1669 239.11)));
-      --action-hover-bg: linear-gradient(135deg, light-dark(oklch(56.4017% 0.259 280.04), oklch(59.3616% 0.2381 279)), light-dark(oklch(72.1505% 0.1672 242.95), oklch(76.8225% 0.1515 232.73)));
-      --action-border: light-dark(oklch(86.2548% 0.077 288.32), oklch(44.3794% 0.2586 262.87));
-      --action-color: oklch(100% 0 0);
-      box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.24), 0 14px 24px -18px light-dark(oklch(62.9919% 0.2104 261.11 / 0.58), oklch(70.4516% 0.1751 245.52 / 0.44));
+    .action-btn:hover:not(:disabled) { background: var(--accent-wash); border-color: var(--accent); box-shadow: 0 2px 6px #2286ff12; }
+    .action-btn:active:not(:disabled) { transform: translateY(1px); }
+    .action-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .action-btn--primary { background: linear-gradient(110deg,#2389ff,#187aff); color: #fff; border-color: #2987fc; box-shadow: 0 2px 5px #2786ff14; }
+    .action-btn--primary:hover:not(:disabled) { background: #096beb; color: #fff; }
+    .action-btn--danger { background: var(--danger-bg); color: var(--danger); border-color: light-dark(#ffbaca,#693646); }
+    .action-btn--danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-bg); }
+    .action-btn__icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .input-actions .action-btn { padding-inline: 7px; gap: 6px; }
+    .input-actions .action-btn__icon { width: 15px; height: 15px; }
+    .workflow-panel { border: 1px solid var(--line-soft); border-radius: 8px; padding: 0 14px 12px; background: linear-gradient(115deg,var(--panel-bg),var(--surface-panel)); }
+    .manual-rng { min-width: 0; }
+    .manual-rng > summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 0; color: var(--heading); min-height: 46px; }
+    .manual-rng > summary::-webkit-details-marker { display: none; }
+    .manual-title { font-size: var(--font-control); font-weight: 750; white-space: nowrap; }
+    .summary-chevron { margin-left: auto; width: 15px; height: 15px; transition: transform .2s; }
+    .manual-rng[open] > summary .summary-chevron { transform: rotate(180deg); }
+    .manual-rng-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px 14px; padding: 2px 0 0; }
+    .manual-rng-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .manual-rng-label, .field-heading, .caps { color: var(--heading); font-size: var(--font-label); font-weight: 700; }
+    .manual-rng textarea { width: 100%; min-width: 0; min-height: 103px; height: 103px; max-height: 350px; resize: vertical; padding: 8px 10px; color: var(--fg); border: 1px solid var(--line-control); border-radius: 6px; background: var(--input-bg); line-height: 1.5; font-size: var(--font-control); }
+    textarea::placeholder, input::placeholder { color: var(--muted); opacity: 1; }
+    .manual-rng-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .manual-rng-actions .action-btn { padding-inline: 8px; }
+    .manual-rng-meta { color: var(--muted-strong); font-size: var(--font-caption); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .manual-rng-body > .manual-rng-meta { grid-column: 1 / -1; }
+    .manual-rng-body > .manual-rng-meta:empty { display: none; }
+    #error, #supp-dialog-error { color: var(--danger); }
+    .manual-rng-body > section { grid-column: 1 / -1; min-width: 0; }
+    .field-heading { margin-bottom: 5px; }
+    .coords-view { overflow: auto; scrollbar-width: thin; font: inherit; line-height: 1.6; }
+    .coords-content { display: block; font: inherit; padding: 9px 11px; white-space: pre; }
+    #output { height: 70px; min-width: 0; border: 1px solid var(--line-control); border-radius: 6px; background: var(--panel-bg); font-size: var(--font-caption); }
+    #output:has(.coords-content:not(:empty)) { height: 115px; }
+    .row-progress { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+    .sp { width: 100%; }
+    .progress-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; line-height: 1.4; }
+    #progress-percent { color: var(--accent-ink); font-size: 1.25rem; font-weight: 750; }
+    .progress-shell { --pct: 0; height: 12px; background: light-dark(#e2e8f2,#293c59); border-radius: 999px; position: relative; overflow: hidden; }
+    .progress-shell > progress { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; }
+    .progress-fill { display: block; width: calc(var(--pct) * 1%); height: 100%; border-radius: inherit; background: linear-gradient(90deg,#53a5ff,#1c7fff); transition: width .18s; }
+    #counts { font-size: var(--font-label); color: var(--fg); }
+    #counts strong { font-weight: 650; }
+    .status-row { flex-wrap: wrap; margin-top: 13px; min-height: 36px; border: 1px solid var(--line-soft); border-radius: 6px; padding: 7px 8px; display: flex; align-items: center; gap: 8px; background: linear-gradient(90deg,light-dark(#f1f8f5,#172d30),var(--panel-bg)); }
+    .status { font-size: var(--font-caption); font-weight: 650; color: var(--success); flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+    .status::before { content: ""; display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #24ae7c; vertical-align: -2px; margin-right: 6px; }
+    .status:empty::before { display: none; }
+    .status.err { color: var(--danger); }
+    .status.err::before { background: var(--danger); }
+    .status.warn { color: light-dark(#9a6c16,#f0c472); }
+    .status.warn::before { background: #d5a446; }
+    .status.stopped { color: var(--muted); }
+    .status.stopped::before, .status-row[data-state="idle"] .status:not(.err):not(.warn)::before { background: var(--muted); }
+    .elapsed-time { margin-left: auto; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .8125rem; white-space: nowrap; }
+    .elapsed-time .ui-icon { width: 15px; height: 15px; }
+    .coords-section { border: 1px solid var(--line-soft); border-radius: 8px; background: var(--panel-bg); min-height: 160px; flex: 1 0 160px; display: flex; flex-direction: column; overflow: hidden; }
+    .coords-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); font-size: .8125rem; color: var(--muted); }
+    .coords-heading .caps { display: flex; gap: 8px; align-items: center; font-size: var(--font-label); }
+    .coords-heading .ui-icon { color: var(--accent); width: 16px; height: 18px; }
+    #coords { display: grid; grid-template-columns: 36px minmax(0,1fr); align-items: start; flex: 1; min-height: 120px; height: 120px; font-size: var(--font-label); background: var(--input-bg); }
+    #coords .coords-content { min-width: max-content; padding: 5px 8px; line-height: 24px; }
+    #coord-line-numbers { display: block; min-height: 100%; background: var(--panel-bg); border-right: 1px solid var(--line-soft); color: var(--muted); text-align: center; padding: 5px 0; line-height: 24px; user-select: none; }
+    .results-column { display: flex; flex-direction: column; gap: 20px; min-width: 0; min-height: 0; }
+    .results-card { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; padding: 16px 14px 18px; }
+    .results-card .card-intro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+    .result-summary { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0; color: var(--muted-strong); font-size: var(--font-caption); font-weight: 500; }
+    .result-summary > span { padding: 0 8px; border-right: 1px solid var(--line-soft); line-height: 1.5; white-space: nowrap; }
+    .result-summary > span:last-child { border: 0; padding-right: 0; }
+    .summary-success { color: var(--accent-ink); }
+    .summary-fail { color: var(--danger); }
+    /* The form follows its own panel width, not the viewport width. */
+    search { container: result-filters / inline-size; display: block; padding: 10px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--panel-bg); }
+    .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+    .filters > * { min-width: 0; }
+    .filters :is(input, select) {
+      width: 100%; min-width: 0; height: 2.75rem; border: 1px solid var(--line-control); border-radius: 6px;
+      background: var(--input-bg); color: var(--fg); padding: 8px 10px; font-size: var(--font-control); line-height: 1.5;
+      box-shadow: inset 0 1px 2px #1b397503;
     }
-
-    :is(#pause, #resume, #filter-clear, #saveOutput, #copyOutput, #clearBtn, .map-btn).action-btn--soft {
-      --action-bg: light-dark(oklch(98.4152% 0.00341 247.86), color-mix(in oklch, var(--surface-panel) 78%, oklch(24% 0.03 268)));
-      --action-hover-bg: light-dark(oklch(96.826% 0.00685 247.9), color-mix(in oklch, var(--surface-panel) 72%, oklch(28% 0.03 268)));
-      --action-border: light-dark(oklch(92.8761% 0.01262 255.51), oklch(30.3242% 0.06705 260.4));
-      --action-color: light-dark(oklch(20.7682% 0.03982 265.75), oklch(94.4326% 0.01785 261.34));
+    .search-field { position: relative; min-width: 0; }
+    .search-field > .ui-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--muted-strong); pointer-events: none; }
+    .search-field > input { padding-left: 2.125rem; }
+    .filters select { padding-right: 4px; font-weight: 600; }
+    #filter-clear { width: 100%; margin: 0; color: var(--accent-ink); padding: 8px 6px; gap: 5px; min-height: 2.75rem; font-size: var(--font-control); line-height: 1.5; white-space: nowrap; }
+    @container result-filters (min-width: 42rem) {
+      .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
-
-    #stop.action-btn--danger {
-      --action-bg: light-dark(oklch(96.941% 0.0187 12.42), oklch(from var(--err) l calc(c * 0.55) h / 0.18));
-      --action-hover-bg: light-dark(oklch(94.1918% 0.0371 7.52), oklch(from var(--err) l calc(c * 0.65) h / 0.24));
-      --action-border: light-dark(oklch(90.8442% 0.0603 7.08), oklch(from var(--err) l calc(c * 0.85) h / 0.44));
-      --action-color: light-dark(oklch(58.5838% 0.2568 17.58), oklch(from var(--err) calc(l + 0.06) calc(c * 0.78) h));
-      box-shadow: 0 12px 22px -20px light-dark(oklch(58.5838% 0.2568 17.58 / 0.42), oklch(71.6163% 0.2181 13.83 / 0.34));
+    @container result-filters (max-width: 17rem) {
+      .filters :is(input, select) { padding-inline: 6px; }
+      .search-field > input { padding-left: 1.875rem; }
+      .search-field > .ui-icon { left: 7px; }
     }
-
-    .action-btn--compact {
-      padding-inline: 14px;
+    .table-wrap { position: relative; flex: 1; min-height: 320px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--input-bg); scrollbar-width: thin; }
+    .table-wrap:not(.has-results) { min-height: 320px; }
+    table { width: 100%; min-width: 58rem; border-spacing: 0; table-layout: fixed; }
+    /* Preserve column proportions without inline styles. */
+    #tbl col:nth-child(1) { width: 7%; }
+    #tbl col:nth-child(2) { width: 4.5%; }
+    #tbl col:nth-child(3) { width: 16%; }
+    #tbl col:nth-child(4) { width: 10%; }
+    #tbl col:nth-child(5) { width: 10.5%; }
+    #tbl col:nth-child(6) { width: 11.5%; }
+    #tbl col:nth-child(7) { width: 12.5%; }
+    #tbl col:nth-child(8) { width: 20%; }
+    #tbl col:nth-child(9) { width: 8%; }
+    th { position: sticky; top: 0; z-index: 2; background: light-dark(#f1f6fd,#1e2e49); color: var(--heading); font-size: var(--font-caption); font-weight: 700; height: 44px; padding: 9px; text-align: left; white-space: nowrap; }
+    td { font-size: var(--font-label); line-height: 1.5; height: 56px; padding: 9px; color: var(--fg); font-weight: 500; vertical-align: middle; overflow-wrap: anywhere; }
+    th, td { border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft); }
+    :is(th,td):last-child { border-right: 0; }
+    tbody tr:last-child td { border-bottom: 0; }
+    :is(th,td):nth-child(1), :is(th,td):nth-child(2), :is(th,td):nth-child(9) { text-align: center; padding-inline: 5px; }
+    tbody tr:nth-child(even) { background: var(--panel-bg); }
+    tbody tr:hover { background: var(--accent-wash); }
+    td:nth-child(3) { font-size: var(--font-caption); padding-inline: 7px; overflow-wrap: anywhere; }
+    td:nth-child(4) { font-size: var(--font-caption); padding-inline: 7px; overflow-wrap: anywhere; }
+    .kind-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 52px; min-height: 26px; padding: 3px 5px; border-radius: 4px; background: linear-gradient(105deg,#246bff,#4383ff); color: #fff; font-size: .8125rem; font-weight: 700; }
+    .kind-badge[data-kind="WORLD"] { background: linear-gradient(105deg,#1ba777,#2cbf8a); font-size: .75rem; }
+    .kind-badge[data-kind="KP"] { background: #7959ce; }
+    .kind-badge[data-kind="\c5d0\b7ec"] { background: linear-gradient(105deg,#f65679,#ff7397); }
+    .map-btn { width: 38px; height: 38px; min-height: 38px; padding: 0; color: var(--accent-ink); }
+    .map-btn .action-btn__icon { width: 18px; height: 18px; }
+    .table-hint { display: none; color: var(--muted); position: absolute; inset: 44px 0 0; align-items: center; justify-content: center; padding: 24px; text-align: center; pointer-events: none; }
+    .table-wrap:not(.has-results):not([data-running]) .empty-hint { display: flex; }
+    .table-wrap.has-results:not(:has(tbody > tr)) .filter-empty-hint { display: flex; }
+    .loading-rows { display: none; }
+    .table-wrap[data-running]:not(.has-results) .loading-rows { display: table-footer-group; }
+    .skeleton-bar { display: block; height: 12px; margin-block: 10px; border-radius: 5px; background: linear-gradient(90deg,var(--line-soft) 20%,var(--panel-bg) 45%,var(--line-soft) 70%); background-size: 200% 100%; animation: skeleton 1.4s linear infinite; }
+    @keyframes skeleton { to { background-position: -200% 0; } }
+    .results-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 5px; min-height: 43px; flex-wrap: wrap; }
+    #results-count { color: var(--muted); font-size: var(--font-caption); }
+    .result-pages, .page-numbers { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .result-pages .action-btn { height: 34px; min-height: 34px; border-color: var(--line-control); background: var(--input-bg); color: var(--muted-strong); padding: 6px 9px; }
+    .result-pages .ui-icon { width: 14px; height: 14px; }
+    .result-pages .page-number { min-width: 29px; padding-inline: 8px; }
+    .result-pages .page-number[aria-current="page"] { color: #fff; background: linear-gradient(120deg,#2492ff,#1475ff); border-color: #2185ff; box-shadow: 0 2px 5px #2386ff1a; }
+    .page-ellipsis { padding: 0 5px; color: var(--muted); }
+    .page-footer { position: relative; display: flex; align-items: flex-start; gap: 9px; padding: 7px 11px 0; min-height: 40px; color: var(--muted); font-size: .8125rem; line-height: 1.5; isolation: isolate; }
+    .page-footer::before { content: ""; position: absolute; z-index: -1; inset: -12px 0 -18px 21%; background: linear-gradient(150deg,light-dark(#e4edff,#183151),light-dark(#c8dafe,#204371)); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 100' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0 100 C70 100 115 70 148 78 S196 94 236 69 S276 78 314 83 S383 55 417 46 S469 66 497 82 S529 64 552 77 S604 90 634 84 L700 100Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+    .footer-info { color: #657fc4; margin-top: 2px; width: 19px; height: 19px; }
+    .footer-credit a { text-decoration: none; }
+    .footer-credit a:hover { text-decoration: underline; }
+    .usage-policy { font-size: .8125rem; margin-top: 3px; }
+    .map-popover { padding: 8px; border: 1px solid var(--line-control); border-radius: 8px; color: var(--fg); background: var(--surface-panel); box-shadow: 0 6px 20px #18346d22; max-width: min(360px,92vw); position-area: block-end span-inline-start; position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline; }
+    .map-links { display: flex; flex-wrap: wrap; gap: 6px; }
+    .map-links a { display: inline-flex; align-items: center; min-height: 34px; padding: 5px 8px; font-size: var(--font-caption); font-weight: 600; border-radius: 4px; text-decoration: none; }
+    .map-links a:hover { background: var(--accent-wash); }
+    #supp-dialog { width: min(560px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); border: 1px solid var(--line-control); border-radius: 12px; padding: 0; color: var(--fg); background: var(--surface-panel); box-shadow: 0 20px 60px #0003; }
+    #supp-dialog::backdrop { background: #0d204866; backdrop-filter: blur(3px); }
+    .supp-dialog-form { display: grid; gap: 14px; padding: 22px; }
+    .supp-dialog-form h2 { font-size: 1.375rem; color: var(--heading); }
+    .supp-dialog-form textarea { height: 140px; }
+    .supp-dialog-form .manual-rng-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; }
+    .supp-dialog-form .action-btn { min-height: 40px; }
+    .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip-path: inset(50%); white-space: nowrap !important; border: 0 !important; }
+    .nowrap { white-space: nowrap; }
+    @container input-pane (min-width: 44rem) {
+      .input-actions { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+      .manual-rng-actions { grid-template-columns: .9fr 1.4fr 1.1fr 1fr; }
     }
-
-    .map-btn.action-btn--icononly {
-      inline-size: 38px;
-      block-size: 38px;
-      min-inline-size: 38px;
-      min-block-size: 38px;
-      padding: 0;
-      border-radius: 12px;
-      box-shadow: none;
-
-      .action-btn__icon {
-        inline-size: 17px;
-        block-size: 17px;
-      }
+    @container input-pane (max-width: 26rem) {
+      .manual-rng-body { grid-template-columns: 1fr; }
     }
-
-    #export.action-btn {
-      gap: 5px;
-      padding-block: 8px;
+    @container input-pane (max-width: 23rem) {
+      .input-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-
-    .action-btn__label--stacked {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      font-size: 12px;
-      line-height: 0.96;
-      text-align: center;
+    @container input-pane (max-width: 19rem) {
+      .manual-rng-actions { grid-template-columns: 1fr; }
     }
-
-    .results-card {
-      gap: 0;
-
-      search {
-        margin-block: 14px 8px;
-      }
-
-      .table-wrap {
-        position: relative;
-        min-block-size: 0;
-
-        &:not(.has-results) {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex: 1 1 auto;
-          min-block-size: 280px;
-          overflow: hidden;
-
-          table {
-            display: none;
-          }
-
-          &[aria-busy="true"] {
-            display: block;
-
-            .empty-hint {
-              display: none;
-            }
-
-            table {
-              display: table;
-            }
-          }
-        }
-
-        .table-hint {
-          display: grid;
-          place-items: center;
-          position: absolute;
-          inset: 0;
-          padding: 24px;
-          color: var(--muted);
-          pointer-events: none;
-          text-align: center;
-        }
-
-        &.has-results:not(:has(tbody > tr)) .filter-empty-hint {
-          display: grid;
-        }
-
-        &.has-results .empty-hint,
-        &:not(.has-results:not(:has(tbody > tr))) .filter-empty-hint {
-          display: none;
-        }
-
-        @media (prefers-reduced-motion: no-preference) {
-          &.has-results table {
-            opacity: 1;
-            transform: translateY(0);
-            transition: opacity 180ms ease-out, transform 180ms ease-out;
-
-            @starting-style {
-              opacity: 0;
-              transform: translateY(8px);
-            }
-          }
-        }
-      }
-
-      .result-attribution {
-        margin-block-start: 10px;
-        color: var(--muted);
-        font-size: var(--fs-sm);
-        line-height: 1.35;
-        text-align: end;
-
-        a {
-          color: inherit;
-          text-underline-offset: 0.18em;
-
-          &:hover {
-            color: var(--fg);
-          }
-        }
-      }
-
-      .result-pages {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        margin-block-start: 10px;
-
-        output {
-          min-inline-size: 9em;
-          text-align: center;
-          color: var(--muted);
-          font-size: var(--fs-sm);
-        }
-
-        &[hidden] {
-          display: none;
-        }
-      }
+    @media (max-width: 1535px) and (min-width: 1101px) {
+      .result-summary > span { padding-inline: 6px; }
+      .results-footer { justify-content: flex-end; }
+      #results-count { margin-right: auto; }
+      #app { min-height: 920px; }
     }
-
-    @media (max-width: 940px) {
-      html {
-        overflow: auto;
-      }
-
-      body,
-      #app>.input-card {
-        overflow: visible;
-        overscroll-behavior: auto;
-      }
-
-      main,
-      #app>section.card {
-        block-size: auto;
-      }
-
-      .results-card .table-wrap.has-results {
-        block-size: var(--results-pane-mobile-height);
-        flex: 0 0 var(--results-pane-mobile-height);
-        overscroll-behavior: contain;
-      }
-
-      .results-card .table-wrap:not(.has-results) {
-        min-block-size: 220px;
-      }
+    @media (max-width: 1100px) {
+      body { padding: 76px 16px 20px; }
+      #app { height: auto; min-height: 0; grid-template-columns: 1fr; gap: 18px; }
+      .header-inner { width: calc(100% - 24px); padding-inline: 4px; }
+      .input-card { overflow: visible; padding: 18px; }
+      .left-pane-scroll { height: auto; }
+      .results-column { gap: 14px; }
+      .results-card { min-height: 640px; padding: 18px; }
+      .coords-section { min-height: 170px; }
+      #coords { max-height: 200px; }
+      .table-wrap { flex: none; height: 540px; }
     }
-
-    @container page (inline-size <=900px) {
-      .table-wrap {
-        --scroll-shadow-top: 0px;
-      }
+    @media (max-width: 700px) {
+      body { padding: 70px 10px 16px; }
+      .site-header { height: 56px; }
+      .header-inner { width: calc(100% - 24px); padding: 0; gap: 8px; }
+      .site-brand { gap: 8px; }
+      .brand-mark { width: 32px; height: 32px; }
+      .site-brand strong { font-size: var(--font-section); letter-spacing: -.6px; }
+      .header-tools { gap: 12px; }
+      .theme-toggle { gap: 6px; }
+      .theme-toggle .ui-icon { width: 18px; height: 18px; }
+      .theme-track { width: 38px; height: 22px; }
+      .theme-track > span { width: 16px; height: 16px; transform: translateX(16px); }
+      .settings-button { padding: 3px; }
+      .input-card, .results-card { padding: 14px; }
+      .card-label { gap: 10px; }
+      .section-icon { width: 26px; height: 26px; }
+      .workflow-panel { padding-inline: 11px; }
+      .manual-rng-body { gap: 12px; }
+      .manual-rng textarea { height: 110px; }
+      .status-row { flex-wrap: wrap; }
+      .status { flex-basis: 100%; }
+      .elapsed-time { margin-left: auto; }
+      .results-card .card-intro { gap: 8px; }
+      .result-summary { width: 100%; margin-left: 0; justify-content: flex-start; }
+      .result-summary > span { padding-inline: 7px; }
+      .result-summary > span:first-child { padding-left: 0; }
+      .results-footer { justify-content: center; padding-top: 0; }
+      #results-count { width: 100%; text-align: center; }
+      .result-pages, .page-numbers { gap: 4px; }
+      .result-pages .action-btn { min-width: 28px; padding-inline: 7px; min-height: 36px; height: 36px; }
+      #page-prev, #page-next { padding-inline: 6px; gap: 2px; }
+      .page-ellipsis { padding: 0 2px; }
+      .page-footer { padding-inline: 4px; flex-wrap: wrap; gap: 6px; }
+      .footer-credit { flex: 1; min-width: 0; }
+      .usage-policy { display: block; margin: 5px 0 0; }
+      .map-btn { min-height: 36px; }
     }
-
-    @media (max-width: 900px) {
-      .results-card search .filters {
-        display: grid;
-        grid-template-columns: repeat(8, minmax(0, 1fr));
-        align-items: stretch;
-
-        :is(input[type="search"], select, #filter-clear) {
-          min-inline-size: 0;
-          inline-size: 100%;
-        }
-
-        :is(#filter-q, #filter-fulladdr) {
-          grid-column: 1 / span 5;
-        }
-
-        :is(#filter-kind, #filter-clear) {
-          grid-column: 6 / span 3;
-        }
-
-        :is(#filter-sido, #filter-emd) {
-          grid-column: 1 / span 4;
-        }
-
-        :is(#filter-sigungu, #filter-tag) {
-          grid-column: 5 / span 4;
-        }
-
-        #filter-clear {
-          justify-self: stretch;
-        }
-      }
+    @media (max-width: 380px) {
+      .site-brand strong { font-size: 1.25rem; }
+      .header-tools { gap: 7px; }
+      .theme-toggle .ui-icon { display: none !important; }
+      .input-card, .results-card { padding: 11px; }
+      .result-pages .action-btn { min-width: 24px; padding-inline: 5px; }
+      #page-prev > span, #page-next > span { display: none; }
+      #page-prev::after { content: ""; }
     }
-
-    @media (max-width: 360px) {
-      .results-card search .filters #filter-fulladdr {
-        grid-column: 1 / span 4;
-      }
-
-      .results-card search .filters #filter-clear {
-        grid-column: 5 / span 4;
-      }
-    }
-
-    @media (max-width: 640px) {
-      :root {
-        --site-header-height: 62px;
-        --site-header-gap: 12px;
-        --page-pad-block-end: 12px;
-      }
-
-      .site-header .header-inner {
-        inline-size: min(1600px, calc(100% - 28px));
-      }
-
-      .site-brand .brand-mark {
-        inline-size: 32px;
-        block-size: 32px;
-      }
-
-      .site-brand strong {
-        font-size: 1.55rem;
-      }
-
-      button.theme-toggle {
-        inline-size: 42px;
-        block-size: 42px;
-        border-radius: 12px;
-        font-size: 1.2rem;
-      }
-
-      .manual-rng {
-        padding: 14px;
-      }
-    }
-
-    @media (pointer: coarse),
-    (width <=700px) {
-      :is(input, select, textarea) {
-        font-size: 16px;
-      }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-
-      :root:root:root,
-      :root:root:root::before,
-      :root:root:root::after,
-      :root:root:root *,
-      :root:root:root *::before,
-      :root:root:root *::after {
-        animation: none;
-        transition: none;
-      }
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
     }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .site-header, .input-card, search, .results-footer, .settings-popover, .map-popover { display: none; }
+      #app { display: block; height: auto; min-height: 0; }
+      .results-card { border: 0; padding: 0; box-shadow: none; }
+      .table-wrap { height: auto; overflow: visible; border: 0; }
+      table { min-width: 0 !important; }
+      .page-footer::before { display: none; }
+    }
+
   </style>
 </head>
-
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <a class="site-brand" href="#app" aria-label="SRG 역지오코딩 상단으로 이동">
-        <img class="brand-mark" src="./icon.svg?v=4" alt="">
-        <strong>SRG 역지오코딩</strong>
-      </a>
-      <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="테마 전환"
-        title="테마 전환"></button>
-    </div>
-  </header>
-  <main id="app">
-    <section class="card input-card">
-      <div class="left-pane-scroll">
-        <header class="card-intro">
-          <h1 class="card-label reverse"><span class="dot"></span>좌표 추출 및 조회</h1>
-        </header>
-        <fieldset class="row">
-          <legend class="sr-only">
+<header class="site-header">
+<div class="header-inner">
+<div class="brand-cluster"><a aria-label="SRG 역지오코딩 상단으로 이동" class="site-brand" href="#app">
+<img class="brand-mark" src="./icon.svg?v=5" width="38" height="38" alt="" aria-hidden="true" decoding="async">
+<strong>SRG 역지오코딩</strong>
+</a></div>
+<div class="header-tools"><button aria-label="어두운 테마" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="밝은 / 어두운 테마 전환" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" fill="currentColor" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"></path></svg><svg aria-hidden="true" class="theme-moon ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"></path></svg><span aria-hidden="true" class="theme-track"><span></span></span></button><button aria-label="화면 설정" class="settings-button" popovertarget="display-settings" title="화면 설정" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z"></path><circle cx="11" cy="12" r="3"></circle></svg></button></div>
+</div>
+</header>
+<main id="app">
+<section class="card input-card">
+<div class="left-pane-scroll">
+<header class="card-intro">
+<h1 class="card-label reverse"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M7 18H5a4 4 0 0 1-.5-7.97A7 7 0 0 1 18 8a5 5 0 0 1 1 9.9h-2"></path><path d="M12 21V11m-4 4 4-4 4 4"></path></svg>좌표 추출 및 조회</h1>
+</header>
+<fieldset class="row">
+<legend class="sr-only">
             random_data.txt 파일 업로드 및 조회 제어
           </legend>
-          <label class="drop-zone">
-            <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-            </svg>
-            <span class="drop-text"><strong id="drop-filename">random_data.txt</strong><span id="drop-state"> · 선택하거나
-                드래그하여 업로드</span></span>
-            <input type="file" id="file" accept=".txt,text/plain">
-          </label>
-          <div class="row">
-            <button type="button" id="parse" class="action-btn action-btn--primary" commandfor="app" command="--parse">
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="3.25"></circle>
-                <path d="M12 2.75v3.5M12 17.75v3.5M2.75 12h3.5M17.75 12h3.5">
-                </path>
-              </svg>
-              <span class="action-btn__label">좌표 추출</span>
-            </button>
-            <button type="button" id="start" class="action-btn action-btn--primary" commandfor="app" command="--start"
-              disabled>
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M8.5 7.5 16 12l-7.5 4.5z"></path>
-              </svg>
-              <span class="action-btn__label">조회 시작</span>
-            </button>
-            <button type="button" id="pause" class="action-btn action-btn--soft" commandfor="app" command="--pause"
-              disabled>
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 7.5v9M15 7.5v9"></path>
-              </svg>
-              <span class="action-btn__label">일시정지</span>
-            </button>
-            <button type="button" id="resume" class="action-btn action-btn--soft" commandfor="app" command="--resume"
-              disabled>
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 12h9"></path>
-                <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
-              </svg>
-              <span class="action-btn__label">재개</span>
-            </button>
-            <button type="button" id="stop" class="action-btn action-btn--danger" commandfor="app" command="--stop"
-              disabled>
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="8" y="8" width="8" height="8" rx="1.5"></rect>
-              </svg>
-              <span class="action-btn__label">중지</span>
-            </button>
-            <button type="button" id="export" class="action-btn action-btn--primary" commandfor="app" command="--export"
-              disabled>
-              <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 4.5v10"></path>
-                <path d="m8 10.75 4 4 4-4"></path>
-                <path d="M5.5 18.5h13"></path>
-              </svg>
-              <span class="action-btn__label action-btn__label--stacked"><span>CSV</span><span>내보내기</span></span>
-            </button>
-          </div>
-        </fieldset>
-        <details class="manual-rng">
-          <summary>직접 입력 난수 변환</summary>
-          <div class="manual-rng-body">
-            <p class="manual-rng-help">
-              기본 난수값과 보조 난수값을 직접 입력해 변환 결과를 확인합니다.
-            </p>
-            <div class="manual-rng-field">
-              <label class="manual-rng-label" for="num64">기본 난수값 목록</label>
-              <textarea id="num64" aria-describedby="num64-help" placeholder="쉼표/공백/줄바꿈 구분
-예) 123456789
-0x1122334455667788"></textarea>
-              <span class="manual-rng-meta" id="num64-help"><span class="nowrap">입력 범위: 0 ~
-                  18446744073709551615</span><br><span class="nowrap">(0x0&nbsp;~&nbsp;0xFFFFFFFFFFFFFFFF)</span></span>
-            </div>
-            <div class="manual-rng-field">
-              <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
-              <textarea id="suppValues" aria-describedby="suppValues-help" placeholder="쉼표/공백/줄바꿈 구분
-예) 0x123456789ABCDEF0
-18446744073709551615"></textarea>
-              <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다.</span>
-            </div>
-            <div class="manual-rng-actions">
-              <button id="runBtn" class="action-btn action-btn--primary" type="button">
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7 12h9"></path>
-                  <path d="m12.5 7.75 4.5 4.25-4.5 4.25"></path>
-                </svg>
-                <span class="action-btn__label">변환 실행</span>
-              </button>
-              <button id="saveOutput" class="action-btn action-btn--soft" type="button" disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4.5v10"></path>
-                  <path d="m8 10.75 4 4 4-4"></path>
-                  <path d="M5.5 18.5h13"></path>
-                </svg>
-                <span
-                  class="action-btn__label action-btn__label--savefile"><span>random_data.txt</span><span>저장</span></span>
-              </button>
-              <button id="copyOutput" class="action-btn action-btn--soft" type="button" title="클립보드 복사"
-                aria-label="클립보드 복사" disabled>
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
-                  </path>
-                </svg>
-                <span class="action-btn__label">클립보드 복사</span>
-              </button>
-              <button id="clearBtn" class="action-btn action-btn--soft" type="button">
-                <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m7.5 7.5 9 9"></path>
-                  <path d="m16.5 7.5-9 9"></path>
-                </svg>
-                <span class="action-btn__label">출력 지우기</span>
-              </button>
-            </div>
-            <div id="meta" class="manual-rng-meta" role="status" aria-atomic="true"></div>
-            <div id="error" class="manual-rng-meta" role="alert" aria-atomic="true"></div>
-            <section aria-label="변환 결과">
-              <pre id="output" class="coords-view"><code class="coords-content"
-                  data-placeholder="여기에 결과가 표시됩니다."></code></pre>
-            </section>
-          </div>
-          <dialog id="supp-dialog" aria-labelledby="supp-dialog-title"
-            aria-describedby="supp-dialog-context supp-dialog-help">
-            <form id="supp-dialog-form" class="supp-dialog-form" novalidate>
-              <h2 id="supp-dialog-title">보조 난수값 추가</h2>
-              <p id="supp-dialog-context" class="manual-rng-meta"></p>
-              <div class="manual-rng-field">
-                <label class="manual-rng-label" for="supp-dialog-values">보조 난수값</label>
-                <textarea id="supp-dialog-values" required inputmode="text" autocomplete="off"
-                  aria-describedby="supp-dialog-help supp-dialog-error" placeholder="공백이나 줄바꿈으로 여러 값을 구분하세요."
-                  autofocus></textarea>
-              </div>
-              <p id="supp-dialog-help" class="manual-rng-meta">10진수 또는 0x로 시작하는 16진수 값을 여러 개 입력할 수 있습니다.</p>
-              <output id="supp-dialog-error" class="manual-rng-meta" role="alert" aria-atomic="true"></output>
-              <div class="manual-rng-actions">
-                <button type="button" commandfor="supp-dialog" command="request-close" class="action-btn">
-                  <span class="action-btn__label">현재까지 결과를 유지하고 중단</span>
-                </button>
-                <button type="submit" class="action-btn">
-                  <span class="action-btn__label">입력 후 계속</span>
-                </button>
-              </div>
-            </form>
-          </dialog>
-        </details>
-        <div class="row-progress">
-          <div class="sp">
-            <label class="caps" id="prog-label" for="prog">진행 상황 0%</label>
-            <div class="progress-shell">
-              <progress id="prog" value="0" max="100" aria-labelledby="prog-label"></progress>
-              <span class="progress-fill" aria-hidden="true"></span>
-            </div>
-          </div>
-          <output id="counts">총 <strong id="cnt-total">0</strong>건 중
-            <strong id="cnt-success">0</strong>건 완료,<br><strong id="cnt-fail">0</strong>건 실패, <strong
-              id="cnt-remain">0</strong>건 미처리</output>
-        </div>
-        <output id="status" class="status"></output>
-        <div id="status-live" class="sr-only" role="status" aria-atomic="true">
-        </div>
-        <footer>
-          <p>• 공용 Nominatim은 초당 1회 이하로 사용합니다. <a href="https://operations.osmfoundation.org/policies/nominatim/"
-              target="_blank" rel="noopener noreferrer">사용 정책</a></p>
-        </footer>
-        <section class="coords-section" aria-labelledby="coords-label">
-          <span class="caps" id="coords-label">추출된 좌표 (lat,lon)</span>
-          <pre id="coords" class="coords-view"><code class="coords-content"
-              data-placeholder="좌표가 이곳에 표시됩니다."></code></pre>
-        </section>
-      </div>
-    </section>
-    <section class="card results-card">
-      <header class="card-intro">
-        <h2 class="card-label geo"><span class="dot"></span>주소 조회 결과</h2>
-      </header>
-      <search aria-label="주소 조회 결과 필터">
-        <form id="filters" class="filters">
-          <input id="filter-q" type="search" inputmode="search" enterkeyhint="search" placeholder="전체검색"
-            aria-label="전체검색" aria-keyshortcuts="Control+F Meta+F">
-          <select id="filter-kind" aria-label="구분">
-            <option value="">구분(전체)</option>
-            <option value="kr">KR</option>
-            <option value="kp">KP</option>
-            <option value="world">WORLD</option>
-            <option value="에러">에러</option>
-          </select>
-          <input id="filter-sido" type="search" inputmode="search" enterkeyhint="search" placeholder="시·도"
-            aria-label="시·도">
-          <input id="filter-sigungu" type="search" inputmode="search" enterkeyhint="search" placeholder="시·군·구"
-            aria-label="시·군·구">
-          <input id="filter-emd" type="search" inputmode="search" enterkeyhint="search" placeholder="읍·면·동·리"
-            aria-label="읍·면·동·리">
-          <input id="filter-tag" type="search" inputmode="search" enterkeyhint="search" placeholder="지물 태그"
-            aria-label="지물 태그">
-          <input id="filter-fulladdr" type="search" inputmode="search" enterkeyhint="search" placeholder="전체주소"
-            aria-label="전체주소">
-          <button type="button" id="filter-clear" class="action-btn action-btn--soft action-btn--compact">
-            <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6.5 7.5h7a4.25 4.25 0 1 1 0 8.5h-7"></path>
-              <path d="m9.75 4.5-3.25 3 3.25 3"></path>
-            </svg>
-            <span class="action-btn__label">필터 초기화</span>
-          </button>
-          <button type="submit" class="sr-only">필터 적용</button>
-        </form>
-      </search>
-      <div class="table-wrap">
-        <p class="table-hint empty-hint" aria-live="polite" aria-atomic="true">
+<label class="drop-zone">
+
+<span class="drop-text"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg><strong id="drop-filename">random_data.txt</strong><span id="drop-state">선택하거나 드래그하여 업로드하세요.</span></span>
+<input accept=".txt,text/plain" id="file" type="file">
+<span class="drop-hint">TXT 파일만 지원합니다.</span></label>
+<div class="input-actions">
+<button class="action-btn action-btn--primary" command="--parse" commandfor="app" id="parse" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg>
+<span class="action-btn__label">좌표 추출</span>
+</button>
+<button class="action-btn action-btn--primary" command="--start" commandfor="app" disabled id="start" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path></svg>
+<span class="action-btn__label">조회 시작</span>
+</button>
+<button class="action-btn action-btn--soft" command="--pause" commandfor="app" disabled id="pause" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none"></path></svg>
+<span class="action-btn__label">일시정지</span>
+</button>
+<button class="action-btn action-btn--soft" command="--resume" commandfor="app" disabled id="resume" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path></svg>
+<span class="action-btn__label">재개</span>
+</button>
+<button class="action-btn action-btn--danger" command="--stop" commandfor="app" disabled id="stop" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5"></rect></svg>
+<span class="action-btn__label">중지</span>
+</button>
+<button class="action-btn action-btn--soft" command="--export" commandfor="app" disabled id="export" type="button">
+<svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
+<path d="M12 4.5v10"></path>
+<path d="m8 10.75 4 4 4-4"></path>
+<path d="M5.5 18.5h13"></path>
+</svg>
+<span class="action-btn__label">CSV 내보내기</span>
+</button>
+</div>
+</fieldset>
+<div class="workflow-panel"><details class="manual-rng" open>
+<summary><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0 0-3l-1-1a2 2 0 0 0-3 0L5 15l-1 5ZM5 15l4 4"></path></svg><span class="manual-title">직접 입력 난수 변환</span><svg aria-hidden="true" class="summary-chevron ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></summary>
+<div class="manual-rng-body">
+
+<div class="manual-rng-field">
+<label class="manual-rng-label" for="num64">기본 난수값 목록</label>
+<textarea aria-describedby="num64-help" id="num64" placeholder="예)
+123456789
+0x1122334455667788" title="입력 범위: 0 ~
+                  18446744073709551615 (0x0 ~ 0xFFFFFFFFFFFFFFFF)"></textarea>
+<span class="manual-rng-meta sr-only" id="num64-help"><span class="nowrap">입력 범위: 0 ~
+                  18446744073709551615</span><br><span class="nowrap">(0x0 ~ 0xFFFFFFFFFFFFFFFF)</span></span>
+</div>
+<div class="manual-rng-field">
+<label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
+<textarea aria-describedby="suppValues-help" id="suppValues" placeholder="예)
+0x123456789ABCDEF0
+18446744073709551615" title="사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다."></textarea>
+<span class="manual-rng-meta sr-only" id="suppValues-help">사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다.</span>
+</div>
+<div class="manual-rng-actions">
+<button class="action-btn action-btn--primary" id="runBtn" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z"></path><circle cx="11" cy="12" r="3"></circle></svg>
+<span class="action-btn__label">변환 실행</span>
+</button>
+<button class="action-btn action-btn--soft" disabled id="saveOutput" type="button">
+<svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
+<path d="M12 4.5v10"></path>
+<path d="m8 10.75 4 4 4-4"></path>
+<path d="M5.5 18.5h13"></path>
+</svg>
+<span class="action-btn__label action-btn__label--savefile">random_data.txt 저장</span>
+</button>
+<button aria-label="클립보드 복사" class="action-btn action-btn--soft" disabled id="copyOutput" title="클립보드 복사" type="button">
+<svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
+<rect height="10" rx="2" width="10" x="9" y="9"></rect>
+<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
+</path>
+</svg>
+<span class="action-btn__label">클립보드 복사</span>
+</button>
+<button class="action-btn action-btn--soft" id="clearBtn" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"></path></svg>
+<span class="action-btn__label">출력 지우기</span>
+</button>
+</div>
+<div aria-atomic="true" class="manual-rng-meta" id="meta" role="status"></div>
+<div aria-atomic="true" class="manual-rng-meta" id="error" role="alert"></div>
+<section aria-label="변환 결과"><h2 class="field-heading">변환 결과</h2>
+<pre class="coords-view" id="output" tabindex="0"><code class="coords-content"></code></pre>
+</section>
+</div>
+<dialog aria-describedby="supp-dialog-context supp-dialog-help" aria-labelledby="supp-dialog-title" id="supp-dialog">
+<form class="supp-dialog-form" id="supp-dialog-form" novalidate>
+<h2 id="supp-dialog-title">보조 난수값 추가</h2>
+<p class="manual-rng-meta" id="supp-dialog-context"></p>
+<div class="manual-rng-field">
+<label class="manual-rng-label" for="supp-dialog-values">보조 난수값</label>
+<textarea aria-describedby="supp-dialog-help supp-dialog-error" autocomplete="off" autofocus id="supp-dialog-values" inputmode="text" placeholder="공백이나 줄바꿈으로 여러 값을 구분하세요." required></textarea>
+</div>
+<p class="manual-rng-meta" id="supp-dialog-help">10진수 또는 0x로 시작하는 16진수 값을 여러 개 입력할 수 있습니다.</p>
+<output aria-atomic="true" class="manual-rng-meta" id="supp-dialog-error" role="alert"></output>
+<div class="manual-rng-actions">
+<button class="action-btn" command="request-close" commandfor="supp-dialog" type="button">
+<span class="action-btn__label">현재까지 결과를 유지하고 중단</span>
+</button>
+<button class="action-btn" type="submit">
+<span class="action-btn__label">입력 후 계속</span>
+</button>
+</div>
+</form>
+</dialog>
+</details><div class="row-progress">
+<div class="sp">
+<div class="progress-heading"><label class="caps" for="prog" id="prog-label">진행 상황</label><span aria-hidden="true" id="progress-percent">0%</span></div>
+<div class="progress-shell">
+<progress aria-labelledby="prog-label" id="prog" max="100" value="0"></progress>
+<span aria-hidden="true" class="progress-fill"></span>
+</div>
+</div>
+<output id="counts">총 <strong id="cnt-total">0</strong>건 중
+            <strong id="cnt-success">0</strong>건 완료, <strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
+</div><div class="status-row" data-state="idle"><output class="status" id="status">파일을 업로드해 주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div><div aria-atomic="true" class="sr-only" id="status-live" role="status">
+</div></div>
+
+
+
+
+<section aria-labelledby="coords-label" class="coords-section">
+<div class="coords-heading"><span class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path><circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle></svg>추출된 좌표 (lat,lon)</span><span>총 <strong id="coords-count">0</strong>개</span></div>
+<pre class="coords-view" id="coords" tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="coords-content"></code></pre>
+</section>
+</div>
+</section>
+<div class="results-column"><section class="card results-card">
+<header class="card-intro">
+<h2 class="card-label geo"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path><circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle></svg>주소 조회 결과</h2><div role="group" aria-label="전체 처리 현황" class="result-summary">
+<span>총 <strong id="summary-total">0</strong>건</span><span class="summary-success"><strong id="summary-success">0</strong>건 완료</span><span class="summary-fail"><strong id="summary-fail">0</strong>건 실패</span><span><strong id="summary-remain">0</strong>건 미처리</span>
+</div>
+</header>
+<search aria-labelledby="filter-label"><span class="sr-only" id="filter-label">주소 조회 결과 필터</span>
+<form class="filters" id="filters">
+ <div class="search-field">
+  <svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
+   <circle cx="10.5" cy="10.5" r="6.5">
+   </circle>
+   <path d="m16 16 4.5 4.5">
+   </path>
+  </svg>
+  <input aria-keyshortcuts="Control+F Meta+F" aria-label="전체검색" enterkeyhint="search" id="filter-q" inputmode="search" placeholder="전체검색" type="search">
+ </div>
+ <select aria-label="구분" id="filter-kind">
+  <option value="">
+   구분 (전체)
+  </option>
+  <option value="kr">
+   KR
+  </option>
+  <option value="kp">
+   KP
+  </option>
+  <option value="world">
+   WORLD
+  </option>
+  <option value="에러">
+   에러
+  </option>
+ </select>
+ <input aria-label="시·도" enterkeyhint="search" id="filter-sido" inputmode="search" placeholder="시·도" type="search">
+ <input aria-label="시·군·구" enterkeyhint="search" id="filter-sigungu" inputmode="search" placeholder="시·군·구" type="search">
+ <input aria-label="읍·면·동·리" enterkeyhint="search" id="filter-emd" inputmode="search" placeholder="읍·면·동·리" type="search">
+ <input aria-label="지물 태그" enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그" type="search">
+ <input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소" type="search">
+ <button class="action-btn action-btn--soft action-btn--compact" id="filter-clear" type="button">
+  <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
+   <path d="M20 7v5h-5M4 17v-5h5">
+   </path>
+   <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18">
+   </path>
+  </svg>
+  <span class="action-btn__label">
+   필터 초기화
+  </span>
+ </button>
+ <button class="sr-only" type="submit">
+  필터 적용
+ </button>
+</form>
+
+</search>
+<section aria-label="주소 조회 결과 표" class="table-wrap" tabindex="0">
+<p aria-atomic="true" aria-live="polite" class="table-hint empty-hint">
           random_data.txt 파일을 업로드해 주세요.
         </p>
-        <p class="table-hint filter-empty-hint" aria-live="polite" aria-atomic="true">
+<p aria-atomic="true" aria-live="polite" class="table-hint filter-empty-hint">
           필터 결과가 없습니다.
         </p>
-        <table id="tbl">
-          <caption class="sr-only">
+<table id="tbl">
+<caption class="sr-only">
             역지오코딩 결과 표
           </caption>
-          <thead>
-            <tr>
-              <th>구분</th>
-              <th>순번</th>
-              <th>좌표 (위도,경도)</th>
-              <th>시·도</th>
-              <th>시·군·구</th>
-              <th>읍·면·동·리</th>
-              <th>지물 태그</th>
-              <th>전체주소</th>
-              <th>지도링크</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-          <tfoot class="loading-rows" aria-hidden="true">
-            <tr>
-              <td data-label="구분"><span class="skeleton-bar"></span></td>
-              <td data-label="순번"></td>
-              <td data-label="좌표 (위도,경도)"><span class="skeleton-bar"></span></td>
-              <td data-label="시·도"><span class="skeleton-bar"></span></td>
-              <td data-label="시·군·구"><span class="skeleton-bar"></span></td>
-              <td data-label="읍·면·동·리"><span class="skeleton-bar"></span></td>
-              <td data-label="지물 태그"><span class="skeleton-bar"></span></td>
-              <td data-label="전체주소"><span class="skeleton-bar"></span></td>
-              <td data-label="지도링크"><span class="skeleton-bar"></span></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <nav id="result-pages" class="result-pages" aria-label="결과 페이지" hidden>
-        <button type="button" id="page-prev" class="action-btn action-btn--compact" commandfor="app"
-          command="--page-prev">이전</button>
-        <output id="page-status" aria-live="polite"></output>
-        <button type="button" id="page-next" class="action-btn action-btn--compact" commandfor="app"
-          command="--page-next">다음</button>
-      </nav>
-      <p class="result-attribution">
-        &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap
-          contributors</a>
-        / data under <a href="https://opendatacommons.org/licenses/odbl/" target="_blank"
-          rel="noopener noreferrer">ODbL</a>
-        / reverse geocoding by <a href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">Nominatim</a>
-      </p>
-    </section>
-  </main>
-  <nav id="map-popover" popover="auto" class="map-popover" aria-label="지도 링크">
-    <div class="map-links" id="map-popover-links">
-      <a href="about:blank" target="_blank" rel="noopener noreferrer">Google</a>
-      <a href="about:blank" target="_blank" rel="noopener noreferrer">OSM</a>
-      <a href="about:blank" target="_blank" rel="noopener noreferrer">Naver</a>
-      <a href="about:blank" target="_blank" rel="noopener noreferrer">Kakao</a>
-    </div>
-  </nav>
-  <template id="tmpl-row">
-    <tr>
-      <td data-label="구분"></td>
-      <td data-label="순번"></td>
-      <td data-label="좌표 (위도,경도)"></td>
-      <td data-label="시·도"></td>
-      <td data-label="시·군·구"></td>
-      <td data-label="읍·면·동·리"></td>
-      <td data-label="지물 태그"></td>
-      <td data-label="전체주소"></td>
-      <td data-label="지도링크">
-        <button type="button" class="map-btn action-btn action-btn--soft action-btn--icononly"
-          popovertarget="map-popover" popovertargetaction="show" disabled>
-          <svg class="action-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 20s5.5-4.9 5.5-9.25a5.5 5.5 0 1 0-11 0C6.5 15.1 12 20 12 20Z">
-            </path>
-            <circle cx="12" cy="10.75" r="1.8"></circle>
-          </svg>
-          <span class="sr-only">지도</span>
-        </button>
-      </td>
-    </tr>
-  </template>
-  <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
-  <script type="module">
+<colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead>
+<tr>
+<th scope="col">구분</th>
+<th scope="col">순번</th>
+<th scope="col">좌표 (위도,경도)</th>
+<th scope="col">시·도</th>
+<th scope="col">시·군·구</th>
+<th scope="col">읍·면·동·리</th>
+<th scope="col">지물 태그</th>
+<th scope="col">전체주소</th>
+<th scope="col">지도링크</th>
+</tr>
+</thead>
+<tbody></tbody>
+<tfoot aria-hidden="true" class="loading-rows">
+<tr>
+<td data-label="구분"><span class="skeleton-bar"></span></td>
+<td data-label="순번"></td>
+<td data-label="좌표 (위도,경도)"><span class="skeleton-bar"></span></td>
+<td data-label="시·도"><span class="skeleton-bar"></span></td>
+<td data-label="시·군·구"><span class="skeleton-bar"></span></td>
+<td data-label="읍·면·동·리"><span class="skeleton-bar"></span></td>
+<td data-label="지물 태그"><span class="skeleton-bar"></span></td>
+<td data-label="전체주소"><span class="skeleton-bar"></span></td>
+<td data-label="지도링크"><span class="skeleton-bar"></span></td>
+</tr>
+</tfoot>
+</table>
+</section>
+<div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span><nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
+<button aria-label="이전 페이지" class="action-btn action-btn--compact" command="--page-prev" commandfor="app" id="page-prev" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"></path></svg><span>이전</span></button>
+<output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers" id="page-numbers"></span>
+<button aria-label="다음 페이지" class="action-btn action-btn--compact" command="--page-next" commandfor="app" id="page-next" type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"></path></svg></button>
+</nav></div>
+
+</section><footer class="page-footer"><svg aria-hidden="true" class="footer-info ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6m0-10h.01"></path></svg><div class="footer-credit"><p>&copy; <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> &middot; <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a> &middot; <a href="https://nominatim.org/" rel="noopener noreferrer" target="_blank">Nominatim</a></p><p class="usage-policy"><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a> &middot; 초당 1회 이하</p></div></footer></div>
+</main>
+<section aria-labelledby="settings-title" class="settings-popover" id="display-settings" popover="auto">
+<h2 id="settings-title">화면 설정</h2>
+<label for="page-size">페이지당 결과</label>
+<select id="page-size"><option value="10">10개</option><option value="25">25개</option><option value="50">50개</option><option value="100">100개</option></select>
+
+</section>
+<nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
+<div class="map-links" id="map-popover-links">
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Google</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">OSM</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Naver</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Kakao</a>
+</div>
+</nav>
+<template id="tmpl-row">
+<tr>
+<td data-label="구분"></td>
+<td data-label="순번"></td>
+<td data-label="좌표 (위도,경도)"></td>
+<td data-label="시·도"></td>
+<td data-label="시·군·구"></td>
+<td data-label="읍·면·동·리"></td>
+<td data-label="지물 태그"></td>
+<td data-label="전체주소"></td>
+<td data-label="지도링크">
+<button class="map-btn action-btn action-btn--soft action-btn--icononly" disabled popovertarget="map-popover" popovertargetaction="show" type="button">
+<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3V5Z" fill="currentColor" stroke="none"></path><path d="M9 2v17m6-14v17" stroke="white" stroke-width="1.7"></path></svg>
+<span class="sr-only">지도</span>
+</button>
+</td>
+</tr>
+</template>
+<noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
+<script type="module">
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
     const csvEsc = (s) => {
@@ -2235,6 +1097,17 @@
       cntRemain: document.getElementById("cnt-remain"),
       prog: document.getElementById("prog"),
       progLabel: document.getElementById("prog-label"),
+      progressPercent: document.getElementById("progress-percent"),
+      summaryTotal: document.getElementById("summary-total"),
+      summarySuccess: document.getElementById("summary-success"),
+      summaryFail: document.getElementById("summary-fail"),
+      summaryRemain: document.getElementById("summary-remain"),
+      coordsCount: document.getElementById("coords-count"),
+      coordLineNumbers: document.getElementById("coord-line-numbers"),
+      resultsCount: document.getElementById("results-count"),
+      pageNumbers: document.getElementById("page-numbers"),
+      elapsed: document.getElementById("elapsed"),
+      statusRow: document.querySelector(".status-row"),
       tableWrap: document.querySelector(".table-wrap"),
       emptyHint: document.querySelector(".table-wrap .empty-hint"),
       tbody: document.getElementById("tbl").tBodies[0],
@@ -2384,7 +1257,7 @@
       }
       return true;
     }
-    const RESULT_PAGE_SIZE = 100;
+    let resultPageSize = 10;
     let filterTimer = null;
     let pageRenderReq = null;
     function cancelActiveFilterTask() {
@@ -2393,17 +1266,47 @@
         filterTimer = null;
       }
     }
+    // Render at most seven page controls, regardless of the result count.
+    let pageNavigationKey = "";
     function updatePageNavigation(visibleCount) {
-      const pageCount = Math.max(
-        1,
-        Math.ceil(visibleCount / RESULT_PAGE_SIZE),
-      );
+      const pageCount = Math.max(1, Math.ceil(visibleCount / resultPageSize));
       if (AppState.page >= pageCount) AppState.page = pageCount - 1;
-      domElements.pageNav.hidden = visibleCount <= RESULT_PAGE_SIZE;
+      domElements.pageNav.hidden = visibleCount === 0;
       domElements.pagePrev.disabled = AppState.page === 0;
       domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
       domElements.pageStatus.textContent =
         `${fmt(AppState.page + 1)} / ${fmt(pageCount)} 페이지 · ${fmt(visibleCount)}건`;
+      const shown = Math.min(resultPageSize, Math.max(0, visibleCount - AppState.page * resultPageSize));
+      domElements.resultsCount.textContent =
+        `${fmt(shown)}개의 항목을 표시 중 (총 ${fmt(visibleCount)}개)`;
+      const key = `${AppState.page}:${pageCount}`;
+      if (key === pageNavigationKey) return;
+      pageNavigationKey = key;
+      const current = AppState.page + 1;
+      const numbers = pageCount <= 7
+        ? Array.from({ length: pageCount }, (_, i) => i + 1)
+        : current <= 4 ? [1, 2, 3, 4, 5, 0, pageCount]
+        : current >= pageCount - 3
+          ? [1, 0, pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
+          : [1, 0, current - 1, current, current + 1, 0, pageCount];
+      const fragment = document.createDocumentFragment();
+      for (const page of numbers) {
+        const el = document.createElement(page ? "button" : "span");
+        if (page) {
+          el.type = "button";
+          el.className = "page-number action-btn";
+          el.dataset.page = String(page - 1);
+          el.textContent = fmt(page);
+          el.setAttribute("aria-label", `${fmt(page)} 페이지`);
+          if (page === current) el.setAttribute("aria-current", "page");
+        } else {
+          el.className = "page-ellipsis";
+          el.textContent = "…";
+          el.setAttribute("aria-hidden", "true");
+        }
+        fragment.append(el);
+      }
+      domElements.pageNumbers.replaceChildren(fragment);
     }
     function rebuildVisibleIndices() {
       const f = FILTER_SNAP;
@@ -2422,8 +1325,8 @@
       const indices = AppState.visibleIndices;
       const visibleCount = indices.length;
       updatePageNavigation(visibleCount);
-      const start = AppState.page * RESULT_PAGE_SIZE;
-      const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
+      const start = AppState.page * resultPageSize;
+      const end = Math.min(visibleCount, start + resultPageSize);
       const fragment = document.createDocumentFragment();
       for (let position = start; position < end; position++) {
         const recordIndex = indices[position];
@@ -2442,8 +1345,8 @@
       if (visiblePosition < 0) return;
       const visibleCount = AppState.visibleIndices.length;
       updatePageNavigation(visibleCount);
-      const start = AppState.page * RESULT_PAGE_SIZE;
-      const end = Math.min(visibleCount, start + RESULT_PAGE_SIZE);
+      const start = AppState.page * resultPageSize;
+      const end = Math.min(visibleCount, start + resultPageSize);
       if (visiblePosition < start || visiblePosition >= end) return;
       const expectedRows = visiblePosition - start;
       if (domElements.tbody.children.length !== expectedRows) {
@@ -2503,6 +1406,31 @@
         if (ACTIVE_DOWNLOAD_URL === url) ACTIVE_DOWNLOAD_URL = null;
       }, 60_000);
     }
+    let elapsedStart = 0;
+    let elapsedTimer = 0;
+    function updateElapsed() {
+      const seconds = elapsedStart ? Math.floor((performance.now() - elapsedStart) / 1000) : 0;
+      domElements.elapsed.textContent = [
+        Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60,
+      ].map((value) => String(value).padStart(2, "0")).join(":");
+    }
+    function stopElapsed() {
+      if (!elapsedTimer) return;
+      clearInterval(elapsedTimer);
+      elapsedTimer = 0;
+      updateElapsed();
+    }
+    function resetElapsed() {
+      stopElapsed();
+      elapsedStart = 0;
+      updateElapsed();
+    }
+    function startElapsed() {
+      resetElapsed();
+      elapsedStart = performance.now();
+      elapsedTimer = setInterval(updateElapsed, 1000);
+    }
+    window.addEventListener("pagehide", stopElapsed);
     const AppState = {
       records: [],
       droppedFile: null,
@@ -2553,6 +1481,7 @@
         return this.task;
       },
       setRecords(records, status = "idle") {
+        resetElapsed();
         this.records = records;
         this.bulkAcknowledged =
           records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
@@ -2569,6 +1498,8 @@
     };
     function updateUIState() {
       const s = AppState.status;
+      domElements.statusRow.dataset.state = s;
+      if (s === "idle") stopElapsed();
       const isBusy = AppState.task !== null;
       domElements.tableWrap.toggleAttribute("data-running", s === "running");
       domElements.prog.toggleAttribute("data-running", s === "running");
@@ -2644,17 +1575,24 @@
       const remaining = total - processed;
       if (totalChanged) {
         domElements.cntTotal.textContent = fmt(total);
+        domElements.summaryTotal.textContent = fmt(total);
+        domElements.coordsCount.textContent = fmt(total);
       }
       if (processedChanged || failChanged) {
         domElements.cntSuccess.textContent = fmt(success);
+        domElements.summarySuccess.textContent = fmt(success);
       }
-      if (failChanged) domElements.cntFail.textContent = fmt(fail);
+      if (failChanged) {
+        domElements.cntFail.textContent = fmt(fail);
+        domElements.summaryFail.textContent = fmt(fail);
+      }
       if (totalChanged || processedChanged) {
         domElements.cntRemain.textContent = fmt(remaining);
+        domElements.summaryRemain.textContent = fmt(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
         domElements.prog.parentElement.style.setProperty("--pct", pct);
-        domElements.progLabel.textContent = `진행 상황 ${pct}%`;
+        domElements.progressPercent.textContent = `${pct}%`;
       }
       if (processedChanged) {
         domElements.exportBtn.disabled = processed === 0 || EXPORT_TASK !== null;
@@ -2673,6 +1611,7 @@
       wrap.scrollLeft = 0;
       wrap.classList.remove("has-results");
       domElements.pageNav.hidden = true;
+      domElements.resultsCount.textContent = "표시할 결과가 없습니다.";
     }
     function sleep(ms, signal) {
       if (ms <= 0 || signal.aborted) {
@@ -3319,7 +2258,7 @@
         record._search = null;
         const parsed = REVERSE_PARSED_CACHE.get(record.cacheKey);
         if (parsed === undefined) {
-          persistentCache.getOrInsert(record.cacheKey, null);
+          if (!persistentCache.has(record.cacheKey)) persistentCache.set(record.cacheKey, null);
           continue;
         }
         commitResult(i, parsed, false);
@@ -3476,8 +2415,13 @@
       const lonStr = r.lonStr;
       const result = r.result;
       cells[IDX_COL_INDEX].textContent = String(index + 1);
-      cells[KIND_COL_INDEX].textContent = result.kind || r.set;
+      const badge = document.createElement("span");
+      badge.className = "kind-badge";
+      badge.dataset.kind = result.kind || r.set;
+      badge.textContent = result.kind || r.set;
+      cells[KIND_COL_INDEX].append(badge);
       cells[COORDS_COL_INDEX].textContent = latStr + ", " + lonStr;
+      cells[COORDS_COL_INDEX].title = latStr + ", " + lonStr;
       const addr = result.addr;
       if (addr) {
         cells[SIDO_COL_INDEX].textContent = addr.sido;
@@ -3609,6 +2553,7 @@
       const file = AppState.droppedFile;
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
       domElements.coordsContent.textContent = "";
+      domElements.coordLineNumbers.textContent = "";
       clearTable();
       const task = AppState.setRecords([], "parsing");
       domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
@@ -3636,6 +2581,8 @@
           disp.push(`… 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
         domElements.coordsContent.textContent = disp.join("\n");
+        domElements.coordLineNumbers.textContent = disp.map((_, i) =>
+          i < MAX_DISP ? String(i + 1) : "…").join("\n");
         setStatusMessage(
           records.length > CONFIG.BULK_CONFIRM_THRESHOLD
             ? `분석 완료: ${fmt(records.length)}개 좌표. 대량 조회 확인 후 시작할 수 있습니다.`
@@ -3657,6 +2604,23 @@
         setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
       }
     }
+    domElements.pageNumbers.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-page]");
+      if (!button) return;
+      const page = Number(button.dataset.page);
+      const count = Math.ceil(AppState.visibleIndices.length / resultPageSize);
+      if (!Number.isInteger(page) || page < 0 || page >= count || page === AppState.page) return;
+      AppState.page = page;
+      renderCurrentPage(true);
+      domElements.pageNumbers.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
+    });
+    document.getElementById("page-size").addEventListener("change", (event) => {
+      const size = Number(event.target.value);
+      if (![10, 25, 50, 100].includes(size)) return;
+      resultPageSize = size;
+      AppState.page = 0;
+      renderCurrentPage(true);
+    });
     domElements.filters.addEventListener("submit", (e) => e.preventDefault());
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
     document.getElementById("filter-clear").addEventListener("click", () => {
@@ -3702,6 +2666,7 @@
           }
         }
         const task = AppState.reset("running");
+        startElapsed();
         clearTable();
         setStatusMessage("조회 시작…");
         void runProcessingLoop(task).catch((err) => {
@@ -3745,7 +2710,7 @@
       },
       "--page-next": () => {
         const pages = Math.ceil(
-          AppState.visibleIndices.length / RESULT_PAGE_SIZE,
+          AppState.visibleIndices.length / resultPageSize,
         );
         if (AppState.page + 1 >= pages) return;
         AppState.page++;
@@ -3780,6 +2745,7 @@
         return;
       }
       domElements.coordsContent.textContent = "";
+      domElements.coordLineNumbers.textContent = "";
       clearTable();
       AppState.setRecords([]);
       AppState.droppedFile = file;
@@ -4555,12 +3521,9 @@
       }
       initializeManualRng();
     }
-    document.querySelector(".manual-rng").addEventListener(
-      "toggle",
-      loadManualRng,
-      { once: true },
-    );
+    const manualPanel = document.querySelector(".manual-rng");
+    if (manualPanel.open) loadManualRng();
+    else manualPanel.addEventListener("toggle", loadManualRng, { once: true });
   </script>
 </body>
-
 </html>
