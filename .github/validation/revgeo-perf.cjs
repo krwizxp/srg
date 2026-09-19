@@ -33,10 +33,15 @@ async function openPage(context, port, count) {
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
   await page.goto(`http://127.0.0.1:${port}/revgeo.html`, {waitUntil:"domcontentloaded"});
-  await page.locator("#num64").scrollIntoViewIfNeeded();
-  await page.locator("#num64").fill(inputs.slice(0,count).join("\n"));
-  await page.locator("#suppValues").scrollIntoViewIfNeeded();
-  await page.locator("#suppValues").fill(supplements);
+  // Fixture preparation is excluded from timing. Assign the large buffers
+  // directly instead of exercising the automation paste/clipboard path.
+  const raw = inputs.slice(0,count).join("\n");
+  await page.evaluate(([raw, supplements]) => {
+    document.querySelector("#num64").value = raw;
+    document.querySelector("#suppValues").value = supplements;
+  }, [raw, supplements]);
+  assert.equal(await page.locator("#num64").inputValue(), raw);
+  assert.equal(await page.locator("#suppValues").inputValue(), supplements);
   await page.locator("#runBtn").scrollIntoViewIfNeeded();
   return page;
 }
