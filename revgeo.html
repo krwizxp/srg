@@ -4512,9 +4512,11 @@
           if (value === number) return false;
         }
         numbers.values.push(number);
-        if (numbers.values.length !== numbers.limit) return false;
-        numbers.values.sort((a, b) => a - b);
-        return true;
+        const complete = numbers.values.length === numbers.limit;
+        if (complete) {
+          numbers.values.sort((a, b) => a - b);
+        }
+        return complete;
       }
       function fillDataFieldsFromU64(v, data) {
         NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
