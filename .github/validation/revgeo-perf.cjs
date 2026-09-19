@@ -33,8 +33,11 @@ async function openPage(context, port, count) {
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
   await page.goto(`http://127.0.0.1:${port}/revgeo.html`, {waitUntil:"domcontentloaded"});
+  await page.locator("#num64").scrollIntoViewIfNeeded();
   await page.locator("#num64").fill(inputs.slice(0,count).join("\n"));
+  await page.locator("#suppValues").scrollIntoViewIfNeeded();
   await page.locator("#suppValues").fill(supplements);
+  await page.locator("#runBtn").scrollIntoViewIfNeeded();
   return page;
 }
 async function generate(page, count) {
