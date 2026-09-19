@@ -1,0 +1,27 @@
+name: Goal browser performance verification
+on:
+  push:
+    branches: [codex/goal-perf-20260919]
+permissions:
+  contents: read
+jobs:
+  browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - run: |
+          npm install --no-save --no-package-lock --ignore-scripts @playwright/test@latest
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Paired cold and warm UI timing with fixed inputs
+        run: |
+          mkdir -p /tmp/srg-perf-baseline
+          git archive 0c51a994556df94ee89c6f81c778c7612b68a785 revgeo.html icon.svg site.webmanifest | tar -x -C /tmp/srg-perf-baseline
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory /tmp/srg-perf-baseline >/tmp/srg-perf-baseline.log 2>&1 &
+          BASELINE_SERVER=$!
+          python3 -m http.server 4174 --bind 127.0.0.1 >/tmp/srg-perf-candidate.log 2>&1 &
+          CANDIDATE_SERVER=$!
+          trap 'kill "$BASELINE_SERVER" "$CANDIDATE_SERVER"' EXIT
+          timeout 900 node .github/validation/revgeo-perf.cjs
