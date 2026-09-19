@@ -24,12 +24,13 @@ async function waitForText(page, selector, pattern) {
 
 async function exercise(browserType, baseUrl) {
   const browser = await browserType.launch({ headless: true });
+  try {
   const context = await browser.newContext({ locale: "ko-KR" });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", error => errors.push(`page: ${error.message}`));
   page.on("console", message => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+    if (message.type() === "error") errors.push(`console: ${message.text()} ${message.location().url}`);
   });
   await page.goto(`${baseUrl}/revgeo.html`, { waitUntil: "load" });
   assert.equal(await page.title(), "SRG 데이터 역지오코딩 도구");
@@ -69,8 +70,10 @@ async function exercise(browserType, baseUrl) {
   );
   assert.ok(horizontalOverflow <= 1, `horizontal overflow: ${horizontalOverflow}`);
   assert.deepEqual(errors, []);
-  await browser.close();
   return manualOutput;
+  } finally {
+    await browser.close();
+  }
 }
 
 (async () => {

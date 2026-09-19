@@ -64,9 +64,11 @@ jobs:
         run: |
           mkdir -p /tmp/srg-revgeo-baseline
           git show "$BASELINE_SHA:revgeo.html" > /tmp/srg-revgeo-baseline/revgeo.html
+          git show "$BASELINE_SHA:icon.svg" > /tmp/srg-revgeo-baseline/icon.svg
+          git show "$BASELINE_SHA:site.webmanifest" > /tmp/srg-revgeo-baseline/site.webmanifest
           python3 -m http.server 4173 --bind 127.0.0.1 --directory /tmp/srg-revgeo-baseline >/tmp/srg-baseline-http.log 2>&1 &
           BASELINE_SERVER=$!
           python3 -m http.server 4174 --bind 127.0.0.1 >/tmp/srg-candidate-http.log 2>&1 &
           CANDIDATE_SERVER=$!
           trap 'kill "$BASELINE_SERVER" "$CANDIDATE_SERVER"' EXIT
-          node .github/validation/revgeo-verify.cjs
+          timeout 180 node .github/validation/revgeo-verify.cjs
