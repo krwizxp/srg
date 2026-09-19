@@ -1,0 +1,72 @@
+name: Goal temporary verification
+on:
+  push:
+    branches:
+      - codex/goal-opt-20260919
+permissions:
+  contents: read
+concurrency:
+  group: goal-temp-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  target-clippy:
+    name: Clippy ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-pc-windows-msvc
+          - aarch64-pc-windows-msvc
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: rustup toolchain install 1.98.1 --profile minimal --no-self-update --target "${{ matrix.target }}"
+      - run: cargo +1.98.1 clippy --all-targets --target "${{ matrix.target }}" --frozen -- -D warnings
+  native-release:
+    name: Release ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-26-intel
+          - macos-26
+          - windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: rustup toolchain install 1.98.1 --profile minimal --no-self-update
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - run: cargo +1.98.1 build --release --frozen
+  browsers:
+    name: Chromium, Firefox and WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Install current Playwright browsers
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts @playwright/test@latest
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Compare baseline and candidate behavior
+        env:
+          BASELINE_SHA: 0c51a994556df94ee89c6f81c778c7612b68a785
+        run: |
+          mkdir -p /tmp/srg-revgeo-baseline
+          git show "$BASELINE_SHA:revgeo.html" > /tmp/srg-revgeo-baseline/revgeo.html
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory /tmp/srg-revgeo-baseline >/tmp/srg-baseline-http.log 2>&1 &
+          BASELINE_SERVER=$!
+          python3 -m http.server 4174 --bind 127.0.0.1 >/tmp/srg-candidate-http.log 2>&1 &
+          CANDIDATE_SERVER=$!
+          trap 'kill "$BASELINE_SERVER" "$CANDIDATE_SERVER"' EXIT
+          node .github/validation/revgeo-verify.cjs
