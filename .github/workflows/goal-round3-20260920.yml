@@ -1,0 +1,69 @@
+name: Goal round 3 validation
+on:
+  push:
+    branches:
+      - codex/goal-round3-20260920
+permissions:
+  contents: read
+jobs:
+  target-clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-pc-windows-msvc
+          - aarch64-pc-windows-msvc
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.98.1 --profile minimal --component clippy --target ${{ matrix.target }} --no-self-update
+      - run: cargo +1.98.1 clippy --all-targets --target ${{ matrix.target }} --frozen -- -D warnings
+      - run: git diff --check
+  native-release:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            probe_args: ""
+          - os: macos-26-intel
+            probe_args: --native-only
+          - os: macos-26
+            probe_args: --native-only
+          - os: windows-latest
+            probe_args: --native-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --no-self-update
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - if: runner.os == 'Linux'
+        run: cargo +1.98.1 fmt --all -- --check --config newline_style=Unix
+      - run: python3 .github/validation/round3_verify.py srg 97fa00aa6ae0510ae7c5695fdb7a9b17e35f2861 ${{ matrix.probe_args }} --unchanged-source
+  browser-and-output:
+    needs: [target-clippy, native-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup toolchain install 1.98.1 --profile minimal --no-self-update
+      - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - run: npm install --no-save --package-lock=false --ignore-scripts @playwright/test@latest
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: python3 .github/validation/round3-srg-e2e.py 97fa00aa6ae0510ae7c5695fdb7a9b17e35f2861
+      - run: python3 .github/validation/round3-browser-server.py 97fa00aa6ae0510ae7c5695fdb7a9b17e35f2861
