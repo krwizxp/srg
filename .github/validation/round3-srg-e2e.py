@@ -22,7 +22,7 @@ archive = subprocess.check_output(["git", "archive", sys.argv[1]])
 with tarfile.open(fileobj=io.BytesIO(archive)) as contents:
     contents.extractall(source, filter="data")
 injection = '''
-fn goal_round3_output(count: &std::ffi::OsStr) -> Result<()> {
+fn goal_round3_output(count: &OsStr) -> Result<()> {
     let count: usize = count.to_str().unwrap().parse().unwrap();
     assert!(count <= 4096);
     let mut file = OutputFile::try_from(Path::new(FILE_NAME))?;
