@@ -43,7 +43,6 @@ const MARCH_MONTH_THRESHOLD: u32 = 2;
 const MONTH_TERM_DIVISOR_I64: i64 = 5;
 const MONTH_TERM_MULTIPLIER_I64: i64 = 153;
 const MONTH_TERM_OFFSET_I64: i64 = 2;
-const TIME_COMPONENT_LEN: usize = 8;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 pub(super) struct HttpDate(pub SystemTime);
 #[derive(Clone, Copy)]
@@ -157,10 +156,7 @@ fn parse_http_date_time(
         b':',
         second_tens,
         second_ones,
-    ] = time_token
-        .as_bytes()
-        .as_array::<TIME_COMPONENT_LEN>()
-        .ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?
+    ] = time_token.as_bytes()
     else {
         return Err(TimeError::parse(ERR_TIME_FMT));
     };
