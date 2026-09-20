@@ -1,0 +1,31 @@
+name: Goal round 3 cleanup
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/goal-round3-cleanup-20260920.yml
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Remove verified temporary branch and validation runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLEANUP_REPOSITORY: krwizxp/srg
+          CLEANUP_BRANCH: codex/goal-round3-20260920
+          CLEANUP_SOURCE_SHA: 152656dc666ebbd549c1b8f56318e6793d912980
+          CLEANUP_MERGED_SHA: 77870d7ab3625cb19adfcde5b8583a09970d6181
+          CLEANUP_CI_ID: "35517138019"
+          CLEANUP_RUNS: '[[35501350873,"46aa17e9c9fe5de4986b579bf7ae16eb6913be38"],[35501596349,"152656dc666ebbd549c1b8f56318e6793d912980"]]'
+        run: python3 .github/validation/round3-cleanup.py
