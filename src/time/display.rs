@@ -39,7 +39,7 @@ impl ByteCursor<'_> {
                 *self.take_array::<4>() = [h0, h1, l0, l1];
                 return;
             }
-            self.write_u32_dec(year_value);
+            self.write_u64_dec(u64::from(year_value));
             return;
         }
         self.write_byte(b'-');
@@ -48,7 +48,7 @@ impl ByteCursor<'_> {
             self.write_u32_3digits(abs);
             return;
         }
-        self.write_u32_dec(abs);
+        self.write_u64_dec(u64::from(abs));
     }
 }
 impl ServerTime {

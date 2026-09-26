@@ -33,10 +33,6 @@ impl<'buffer> ByteCursor<'buffer> {
             process::abort();
         }
     }
-    pub(super) fn write_u32_dec(&mut self, value: u32) {
-        let mut buffer = NumBuffer::new();
-        self.write_bytes(value.format_into(&mut buffer).as_bytes());
-    }
     pub(super) fn write_u64_dec(&mut self, value: u64) {
         let mut buffer = NumBuffer::new();
         self.write_bytes(value.format_into(&mut buffer).as_bytes());

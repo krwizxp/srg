@@ -57,7 +57,7 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            buffer_cur.write_u32_dec(u32::from(galaxy_number_byte).strict_add(1));
+            buffer_cur.write_u64_dec(u64::from(galaxy_number_byte).strict_add(1));
         });
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number);
