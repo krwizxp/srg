@@ -174,9 +174,9 @@ where
         self.data.nms_portal_yy = low_u8_from_u32(upper_32_bits);
         self.data.nms_portal_zzz = low_u16_from_u64((self.data.num_64 >> 20) & NMS_COORD_MASK);
         self.data.nms_portal_xxx = low_u16_from_u64((self.data.num_64 >> 8) & NMS_COORD_MASK);
-        self.data.galaxy_x = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_xxx);
-        self.data.galaxy_y = galaxy_coord::<0x81, 0x7F>(u16::from(self.data.nms_portal_yy));
-        self.data.galaxy_z = galaxy_coord::<0x801, 0x7FF>(self.data.nms_portal_zzz);
+        self.data.galaxy_x = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_xxx);
+        self.data.galaxy_y = galaxy_coord::<0x7F, 0xFF>(u16::from(self.data.nms_portal_yy));
+        self.data.galaxy_z = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_zzz);
     }
     fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
@@ -343,11 +343,9 @@ where
         Ok(self.supplemental.value)
     }
 }
-const fn galaxy_coord<const SUB: u16, const ADD: u16>(value: u16) -> u16 {
-    if value >= SUB {
-        return value.strict_sub(SUB);
-    }
-    value.strict_add(ADD)
+const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
+    // Callers supply 8-bit or 12-bit fields; shift the origin within that field.
+    value.strict_add(OFFSET) & MASK
 }
 #[cfg(target_arch = "x86_64")]
 pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomDataSet> {
