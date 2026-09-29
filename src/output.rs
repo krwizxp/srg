@@ -92,16 +92,14 @@ impl OutputFormatter<'_, '_, '_> {
         let bytes = self.bytes;
         let use_colors = self.use_colors;
         self.cursor.write_bytes(FILE_RECORD_START);
+        let mut number_buffer = NumBuffer::new();
+        let number_text = number64.format_into(&mut number_buffer).as_bytes();
+        self.cursor.write_bytes(number_text);
+        self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
         if signed_number < 0 {
-            self.cursor.write_u64_dec(number64);
-            self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
             self.cursor.write_byte(b'-');
             self.cursor.write_u64_dec(signed_number.unsigned_abs());
         } else {
-            let mut number_buffer = NumBuffer::new();
-            let number_text = number64.format_into(&mut number_buffer).as_bytes();
-            self.cursor.write_bytes(number_text);
-            self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
             self.cursor.write_bytes(number_text);
         }
         self.cursor.write_bytes(b")\n");
@@ -115,20 +113,16 @@ impl OutputFormatter<'_, '_, '_> {
             [h0, h1, h2, h3, l0, l1, l2, l3]
         });
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
-            if number64 == 0 {
-                buffer_cur.write_byte(b'0');
-                return;
-            }
             let mut tmp = [0_u8; OCTAL_TMP_LEN];
             let mut index = tmp.len();
             let mut octal_number = number64;
             for slot in tmp.iter_mut().rev() {
-                if octal_number == 0 {
-                    break;
-                }
                 *slot = digit_byte(low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK));
                 octal_number >>= OCTAL_SHIFT_BITS;
                 index = index.strict_sub(1);
+                if octal_number == 0 {
+                    break;
+                }
             }
             buffer_cur.write_bytes(tmp.split_at(index).1);
         });
