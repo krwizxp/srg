@@ -156,13 +156,11 @@ where
                 validate_input_line(&players, MAX_LADDER_INPUT_BYTES)?;
                 validate_input_line(&results, MAX_LADDER_INPUT_BYTES)?;
                 let csv_shape = |value: &str| {
-                    let (count, has_empty) =
-                        value
-                            .split(',')
-                            .fold((0_usize, false), |(count, has_empty), entry| {
-                                (count.strict_add(1), has_empty || entry.trim().is_empty())
-                            });
-                    (count, has_empty)
+                    value
+                        .split(',')
+                        .fold((0_usize, false), |(count, has_empty), entry| {
+                            (count.strict_add(1), has_empty || entry.trim().is_empty())
+                        })
                 };
                 let (player_count, players_have_empty) = csv_shape(&players);
                 let (result_count, results_have_empty) = csv_shape(&results);
