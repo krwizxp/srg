@@ -54,7 +54,8 @@ permissions:
   contents: read
 jobs:
   run:
-    runs-on: ubuntu-latest
+    # Match the Linux image used by CI.
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: Checkout
