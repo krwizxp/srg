@@ -26,25 +26,22 @@ jobs:
             binary_name: srg-macos-x64
           - os: macos-26
             binary_name: srg-macos-arm64
-          # Windows 11 runners are ARM64; keep the published executable x64.
-          - os: windows-11-arm
+          - os: windows-latest
             binary_name: srg-windows-x64
-            rust_toolchain: stable-x86_64-pc-windows-msvc
-            rust_install_args: --force-non-host
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Install latest stable Rust
-        run: rustup toolchain install ${{ matrix.rust_toolchain || 'stable' }} --profile minimal --no-self-update ${{ matrix.rust_install_args }}
+        run: rustup toolchain install stable --profile minimal --no-self-update
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Release Build
-        run: cargo +${{ matrix.rust_toolchain || 'stable' }} build --release --frozen --bin srg
+        run: cargo +stable build --release --frozen --bin srg
       - name: Prepare binary artifact with Rust
-        run: cargo +${{ matrix.rust_toolchain || 'stable' }} run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
+        run: cargo +stable run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
       - name: Upload Release Binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
