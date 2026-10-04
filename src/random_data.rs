@@ -382,9 +382,8 @@ fn extract_valid_bits_for_nms(
                 value: next_supp(reason)?,
             };
         }
-        let shift = supplemental.bits_remaining.strict_sub(bits);
-        supplemental.bits_remaining = shift;
-        let extracted = (supplemental.value >> shift) & mask;
+        supplemental.bits_remaining = supplemental.bits_remaining.strict_sub(bits);
+        let extracted = (supplemental.value >> supplemental.bits_remaining) & mask;
         if extracted <= max_value {
             return Ok(extracted);
         }

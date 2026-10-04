@@ -1,5 +1,9 @@
 use super::buf_write_u8_dec;
-use crate::{buffmt::ByteCursor, diagnostic::Result, numeric::low_u8_from_u128};
+use crate::{
+    buffmt::{ByteCursor, digit_byte, two_digits},
+    diagnostic::Result,
+    numeric::low_u8_from_u128,
+};
 use core::{fmt::NumBuffer, time::Duration};
 use std::io::Write as IoWrite;
 const BAR_WIDTH: usize = 10;
@@ -57,16 +61,14 @@ impl ProgressBuffers {
         let filled = percent_value.div_euclid(PERCENT_SCALE.div_euclid(BAR_WIDTH));
         let [percent, ..] = percent_value.to_le_bytes();
         let mut cur = ByteCursor::new(&mut self.line);
-        cur.write_byte(b'\r');
-        cur.write_byte(b'[');
+        cur.write_bytes(b"\r[");
         for _ in 0..filled {
             cur.write_bytes("█".as_bytes());
         }
         for _ in filled..BAR_WIDTH {
             cur.write_byte(b' ');
         }
-        cur.write_byte(b']');
-        cur.write_byte(b' ');
+        cur.write_bytes(b"] ");
         if percent < 100 {
             cur.write_byte(b' ');
         }
@@ -74,8 +76,7 @@ impl ProgressBuffers {
             cur.write_byte(b' ');
         }
         buf_write_u8_dec(&mut cur, percent);
-        cur.write_byte(b'%');
-        cur.write_bytes(b" (");
+        cur.write_bytes(b"% (");
         let mut count_buffer = NumBuffer::new();
         cur.write_bytes(completed.format_into(&mut count_buffer).as_bytes());
         cur.write_byte(b'/');
@@ -101,13 +102,7 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
             .rem_euclid(SECONDS_PER_MINUTE_U128),
     );
     let tenths = low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND));
-    *buf = [
-        b'0'.strict_add(minutes.div_euclid(10)),
-        b'0'.strict_add(minutes.rem_euclid(10)),
-        b':',
-        b'0'.strict_add(sec_whole.div_euclid(10)),
-        b'0'.strict_add(sec_whole.rem_euclid(10)),
-        b'.',
-        b'0'.strict_add(tenths),
-    ];
+    let [m0, m1] = two_digits(minutes);
+    let [s0, s1] = two_digits(sec_whole);
+    *buf = [m0, m1, b':', s0, s1, b'.', digit_byte(tenths)];
 }

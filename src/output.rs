@@ -245,9 +245,7 @@ fn hex_byte(byte: u8) -> [u8; 2] {
     })
 }
 fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
-    let [upper, lower] = value.to_be_bytes();
-    let [h0, h1] = hex_byte(upper);
-    let [h2, h3] = hex_byte(lower);
+    let [[h0, h1], [h2, h3]] = value.to_be_bytes().map(hex_byte);
     [h0, h1, h2, h3]
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) {

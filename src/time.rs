@@ -405,12 +405,10 @@ impl FromStr for TargetTimeOfDay {
     fn from_str(raw_input: &str) -> CoreResult<Self, Self::Err> {
         const INVALID_TIME_INPUT_ERR: &str =
             "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
-        let Some((hour_str, minute_second)) = raw_input.split_once(':') else {
-            return Err(INVALID_TIME_INPUT_ERR);
-        };
-        let Some((minute_str, second_str)) = minute_second.split_once(':') else {
-            return Err(INVALID_TIME_INPUT_ERR);
-        };
+        let (hour_str, minute_second) = raw_input.split_once(':').ok_or(INVALID_TIME_INPUT_ERR)?;
+        let (minute_str, second_str) = minute_second
+            .split_once(':')
+            .ok_or(INVALID_TIME_INPUT_ERR)?;
         let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
             if component.len() != CLOCK_COMPONENT_LEN {
                 return Err(INVALID_TIME_INPUT_ERR);
