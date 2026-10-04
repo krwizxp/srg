@@ -279,10 +279,8 @@ fn buf_write_prefixed_hex24(cur: &mut ByteCursor<'_>, prefix: &[u8], b0: u8, b1:
     let head = cur.take(prefix.len().strict_add(6));
     let (prefix_out, hex_bytes) = head.split_at_mut(prefix.len());
     prefix_out.copy_from_slice(prefix);
-    let [b00, b01] = hex_byte(b0);
-    let [b10, b11] = hex_byte(b1);
-    let [b20, b21] = hex_byte(b2);
-    hex_bytes.copy_from_slice(&[b00, b01, b10, b11, b20, b21]);
+    let hex = [b0, b1, b2].map(hex_byte);
+    hex_bytes.copy_from_slice(hex.as_flattened());
 }
 fn buf_write_hex_u16_3(cur: &mut ByteCursor<'_>, value: u16) {
     let [_, h1, h2, h3] = hex_u16(value);
