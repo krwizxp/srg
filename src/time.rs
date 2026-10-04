@@ -267,7 +267,12 @@ impl Activity {
         match *self {
             Self::FinalCountdown(state) => Some(state.server_time),
             Self::Predicting { server_time } => Some(server_time),
-            Self::CalibrateOnTick(_) | Self::MeasureBaselineRtt(_) | Self::Retrying { .. } => None,
+            Self::CalibrateOnTick(_)
+            | Self::MeasureBaselineRtt(_)
+            | Self::Retrying {
+                had_previous_sample: _,
+                started_at: _,
+            } => None,
         }
     }
 }
@@ -1184,7 +1189,11 @@ impl AppState<'_> {
                 Activity::CalibrateOnTick(_)
                 | Activity::FinalCountdown(_)
                 | Activity::MeasureBaselineRtt(_) => ADAPTIVE_POLL_INTERVAL,
-                Activity::Predicting { .. } | Activity::Retrying { .. } => PASSIVE_POLL_INTERVAL,
+                Activity::Predicting { server_time: _ }
+                | Activity::Retrying {
+                    had_previous_sample: _,
+                    started_at: _,
+                } => PASSIVE_POLL_INTERVAL,
             };
             let mut poll_timeout = if Self::should_update_display(&activity, pre_wait_now) {
                 let elapsed = pre_wait_now.saturating_duration_since(last_display_update);
@@ -1206,8 +1215,12 @@ impl AppState<'_> {
             } else if let (
                 &Activity::Predicting { server_time },
                 Some(ScheduledTrigger {
-                    target: ScheduledTarget::Confirmed { target_time, .. },
-                    ..
+                    action: _,
+                    target:
+                        ScheduledTarget::Confirmed {
+                            target_time,
+                            timing_policy: _,
+                        },
                 }),
             ) = (&activity, scheduled_trigger)
             {
@@ -1379,10 +1392,14 @@ impl AppState<'_> {
         let FinalCountdownState {
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             action,
+            last_sample_error_message_at: _,
+            live_rtt: _,
+            next_sample_at: _,
+            pending_sample_generation: _,
+            sample_interval: _,
             server_time,
             target_time,
             timing_policy,
-            ..
         } = countdown;
         let now = Instant::now();
         if trigger_instant > now {

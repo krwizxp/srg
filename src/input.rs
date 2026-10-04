@@ -160,12 +160,14 @@ pub(super) fn read_ladder_entries(
                     continue 'read;
                 }
                 LadderEntryMode::Results { expected_count } if count > expected_count => break,
-                LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
+                LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
             }
             if part.trim().is_empty() {
                 let message = match mode {
                     LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
-                    LadderEntryMode::Results { .. } => "결과값은 비워둘 수 없습니다.",
+                    LadderEntryMode::Results { expected_count: _ } => {
+                        "결과값은 비워둘 수 없습니다."
+                    }
                 };
                 writeln!(err, "{message}")?;
                 continue 'read;
@@ -183,7 +185,7 @@ pub(super) fn read_ladder_entries(
                 )?;
                 continue;
             }
-            LadderEntryMode::Players | LadderEntryMode::Results { .. } => {}
+            LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
         }
         break count;
     })
