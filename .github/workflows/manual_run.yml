@@ -62,14 +62,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Install latest stable Rust
-        run: rustup toolchain install stable --profile minimal --no-self-update
+      - name: Install Rust 1.99.0
+        run: rustup toolchain install 1.99.0 --profile minimal --no-self-update
       - name: Install Linux native dependencies
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Build release binary
-        run: cargo +stable build --release --frozen --bin srg --example manual_workflow
+        run: |
+          cargo +1.99.0 build-pgo
+          cargo +1.99.0 build --release --frozen --example manual_workflow
       - name: Run selected SRG action
         env:
+          CARGO_TARGET_DIR: target/x86_64-unknown-linux-gnu
           SRG_ACTION: ${{ inputs.action }}
           SRG_COUNT: ${{ inputs.count }}
           SRG_PLAYERS: ${{ inputs.players }}

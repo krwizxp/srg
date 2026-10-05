@@ -1,0 +1,22 @@
+{
+  "source_commit": "3a43155d2241ade933154d0e5dfabca8daa3dbb8",
+  "rustc": "1.99.0",
+  "rustc_commit": "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4",
+  "LLVM": "23.1.1",
+  "release": "opt3, fat LTO, codegen-units=1, panic=abort, strip=true; default CPU",
+  "profiles": {
+    "x86_64-unknown-linux-gnu": {
+      "file": "x86_64-unknown-linux-gnu.profdata",
+      "sha256": "e099b7589595d025d55b5e1f352033368e2818517cbeea9eb65dfad2483f0df6",
+      "bytes": 112184,
+      "windows_validation_run": null
+    },
+    "x86_64-pc-windows-msvc": {
+      "file": "x86_64-pc-windows-msvc.profdata",
+      "sha256": "0aff369d3b17918c8dfb530d13b1ecd9c366d94416c4c2343a0b820ecfadb382",
+      "bytes": 97952,
+      "windows_validation_run": 37253479758
+    }
+  },
+  "diagnostic_profile_applied": false
+}
