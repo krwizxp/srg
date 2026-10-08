@@ -2092,7 +2092,8 @@
               type="search">
             <input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소"
               type="search">
-            <button class="action-btn action-btn--soft action-btn--compact" id="filter-clear" type="button">
+            <button class="action-btn action-btn--soft action-btn--compact" command="--filter-clear" commandfor="app"
+              id="filter-clear" type="button">
               <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round"
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="M20 7v5h-5M4 17v-5h5">
@@ -4170,9 +4171,6 @@
     });
     domElements.filters.addEventListener("submit", (e) => e.preventDefault());
     domElements.filters.addEventListener("input", scheduleApplyFilterAll);
-    document.getElementById("filter-clear").addEventListener("click", () => {
-      clearFilters();
-    });
     document.addEventListener("keydown", (e) => {
       if (
         AppState.processed === 0 ||
@@ -4250,6 +4248,7 @@
         setStatusMessage("중지 요청됨. 취소 중…", "warn");
       },
       "--export": handleExport,
+      "--filter-clear": () => clearFilters(),
       "--page-prev": () => {
         if (AppState.page === 0) return;
         AppState.page--;
