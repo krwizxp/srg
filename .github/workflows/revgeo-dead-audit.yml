@@ -31,7 +31,7 @@ jobs:
           curl --fail --location --retry 2 https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/linux64/chrome-headless-shell-linux64.zip -o /tmp/revgeo-chrome.zip
           unzip -q /tmp/revgeo-chrome.zip -d /tmp/revgeo-chrome
           chmod 755 /tmp/revgeo-chrome/chrome-headless-shell-linux64/chrome-headless-shell
-          git show 081f3c8326104dd74060924f69cb29f2c4a48557:revgeo.html > /tmp/revgeo-baseline.html
+          git show a18ebee17609efef342bb726ff98f3f23abecc84:revgeo.html > /tmp/revgeo-baseline.html
       - name: Full static, behavior, browser and paired performance audit
         env:
           AUDIT_NODE_MODULES: /tmp/revgeo-audit-deps/node_modules
@@ -43,7 +43,7 @@ jobs:
         run: |
           node .revgeo-audit/run.cjs
           python3 .revgeo-audit/summarize.py
-          git diff --check 081f3c8326104dd74060924f69cb29f2c4a48557 -- revgeo.html
+          git diff --check a18ebee17609efef342bb726ff98f3f23abecc84 -- revgeo.html
       - name: Preserve bounded audit evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
