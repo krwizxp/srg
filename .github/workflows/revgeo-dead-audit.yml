@@ -1,0 +1,53 @@
+name: Temporary revgeo dead-code validation
+on:
+  pull_request:
+    branches: [revgeo-baseline-20261008]
+    paths:
+      - revgeo.html
+      - .revgeo-audit/**
+      - .github/workflows/revgeo-dead-audit.yml
+permissions:
+  contents: read
+concurrency:
+  group: revgeo-dead-audit-${{ github.head_ref }}
+  cancel-in-progress: true
+jobs:
+  browser-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Provision audit tools outside product
+        run: |
+          node --version
+          python3 --version
+          npm install --prefix /tmp/revgeo-audit-deps --ignore-scripts --save-exact --no-audit --no-fund playwright@1.64.0 acorn@8.19.0 acorn-walk@8.3.5 eslint@10.12.0 parse5@8.0.1 postcss@8.5.29 postcss-selector-parser@7.1.6
+          node /tmp/revgeo-audit-deps/node_modules/playwright/cli.js install --with-deps firefox webkit
+          curl --fail --location --retry 2 https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/linux64/chrome-headless-shell-linux64.zip -o /tmp/revgeo-chrome.zip
+          unzip -q /tmp/revgeo-chrome.zip -d /tmp/revgeo-chrome
+          chmod 755 /tmp/revgeo-chrome/chrome-headless-shell-linux64/chrome-headless-shell
+          git show 081f3c8326104dd74060924f69cb29f2c4a48557:revgeo.html > /tmp/revgeo-baseline.html
+      - name: Full static, behavior, browser and paired performance audit
+        env:
+          AUDIT_NODE_MODULES: /tmp/revgeo-audit-deps/node_modules
+          AUDIT_CHROME: /tmp/revgeo-chrome/chrome-headless-shell-linux64/chrome-headless-shell
+          AUDIT_BASELINE: /tmp/revgeo-baseline.html
+          MOZ_DISABLE_CONTENT_SANDBOX: "1"
+          MOZ_DISABLE_RDD_SANDBOX: "1"
+          MOZ_DISABLE_GMP_SANDBOX: "1"
+        run: |
+          node .revgeo-audit/run.cjs
+          python3 .revgeo-audit/summarize.py
+          git diff --check 081f3c8326104dd74060924f69cb29f2c4a48557 -- revgeo.html
+      - name: Preserve bounded audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: /tmp/revgeo-audit-evidence/
+          if-no-files-found: error
+          retention-days: 14
