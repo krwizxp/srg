@@ -2640,6 +2640,7 @@
       cntFail: document.getElementById("cnt-fail"),
       cntRemain: document.getElementById("cnt-remain"),
       prog: document.getElementById("prog"),
+      progLabel: document.getElementById("prog-label"),
       progressPercent: document.getElementById("progress-percent"),
       summaryTotal: document.getElementById("summary-total"),
       summarySuccess: document.getElementById("summary-success"),
@@ -3045,6 +3046,7 @@
       if (s === "idle") stopElapsed();
       const isBusy = AppState.task !== null;
       domElements.tableWrap.toggleAttribute("data-running", s === "running");
+      domElements.prog.toggleAttribute("data-running", s === "running");
       domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
       domElements.parseBtn.disabled = isBusy;
       domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
