@@ -523,6 +523,7 @@
 
     .action-btn--primary:hover:not(:disabled) {
       background: #096beb;
+      color: #fff;
     }
 
     .action-btn--danger {
@@ -548,6 +549,7 @@
 
     .input-actions .action-btn {
       padding-inline: 7px;
+      gap: 6px;
     }
 
     .input-actions .action-btn__icon {
@@ -999,6 +1001,7 @@
 
     .search-field {
       position: relative;
+      min-width: 0;
     }
 
     .search-field>.ui-icon {
@@ -1062,6 +1065,10 @@
       border-radius: 8px;
       background: var(--input-bg);
       scrollbar-width: thin;
+    }
+
+    .table-wrap:not(.has-results) {
+      min-height: 320px;
     }
 
     table {
@@ -1165,11 +1172,13 @@
     td:nth-child(3) {
       font-size: var(--font-caption);
       padding-inline: 7px;
+      overflow-wrap: anywhere;
     }
 
     td:nth-child(4) {
       font-size: var(--font-caption);
       padding-inline: 7px;
+      overflow-wrap: anywhere;
     }
 
     .kind-badge {
@@ -1548,6 +1557,7 @@
       }
 
       .header-inner {
+        width: calc(100% - 24px);
         padding: 0;
         gap: 8px;
       }
@@ -1620,8 +1630,16 @@
         height: 110px;
       }
 
+      .status-row {
+        flex-wrap: wrap;
+      }
+
       .status {
         flex-basis: 100%;
+      }
+
+      .elapsed-time {
+        margin-left: auto;
       }
 
       .results-card .card-intro {
