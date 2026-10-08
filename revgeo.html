@@ -3808,7 +3808,7 @@
         record._search = null;
         const parsed = REVERSE_PARSED_CACHE.get(record.cacheKey);
         if (parsed === undefined) {
-          if (!persistentCache.has(record.cacheKey)) persistentCache.set(record.cacheKey, null);
+          persistentCache.getOrInsert(record.cacheKey, null);
           continue;
         }
         commitResult(i, parsed, false);
@@ -4764,10 +4764,8 @@
       const MANUAL_YIELD_INTERVAL_MS = 12;
       const MANUAL_META_UPDATE_INTERVAL_MS = 150;
       const RX_U64_TOKEN_SCAN = /[^\s,]+/gu;
-      function* iterU64Tokens(raw) {
-        for (const match of raw.matchAll(RX_U64_TOKEN_SCAN)) {
-          yield match[0];
-        }
+      function iterU64Tokens(raw) {
+        return raw.matchAll(RX_U64_TOKEN_SCAN).map((match) => match[0]);
       }
       class SupplementRequired extends Error { }
       function randomDataBlob(chunks, includeBom) {
