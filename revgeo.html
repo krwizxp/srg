@@ -570,7 +570,6 @@
     }
 
     .manual-rng>summary {
-      list-style: none;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -578,10 +577,6 @@
       padding: 12px 0;
       color: var(--heading);
       min-height: 46px;
-    }
-
-    .manual-rng>summary::-webkit-details-marker {
-      display: none;
     }
 
     .manual-title {
@@ -597,7 +592,7 @@
       transition: transform .2s;
     }
 
-    .manual-rng[open]>summary .summary-chevron {
+    .manual-rng:open>summary .summary-chevron {
       transform: rotate(180deg);
     }
 
