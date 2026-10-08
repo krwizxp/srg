@@ -3063,15 +3063,17 @@
       domElements.file.disabled = isBusy;
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
+    const STATUS_ARIA_NOTIFY = typeof document.ariaNotify === "function";
     let statusLiveTimer = 0;
     function announceStatusText(text) {
       if (SR_STATUS_CACHE.msg === text) return;
       SR_STATUS_CACHE.msg = text;
       clearTimeout(statusLiveTimer);
-      domElements.statusLive.textContent = "";
+      if (!STATUS_ARIA_NOTIFY) domElements.statusLive.textContent = "";
       if (text) {
         statusLiveTimer = setTimeout(() => {
-          domElements.statusLive.textContent = text;
+          if (STATUS_ARIA_NOTIFY) document.ariaNotify(text);
+          else domElements.statusLive.textContent = text;
         }, 24);
       }
     }
