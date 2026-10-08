@@ -1833,7 +1833,7 @@
     <section class="card input-card">
       <div class="left-pane-scroll">
         <header class="card-intro">
-          <h1 class="card-label reverse"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor"
+          <h1 class="card-label"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor"
               stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
               <path d="M7 18H5a4 4 0 0 1-.5-7.97A7 7 0 0 1 18 8a5 5 0 0 1 1 9.9h-2"></path>
               <path d="M12 21V11m-4 4 4-4 4 4"></path>
@@ -1860,7 +1860,7 @@
                 <path d="M6 3h8l4 4v14H6z"></path>
                 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
               </svg>
-              <span class="action-btn__label">좌표 추출</span>
+              <span>좌표 추출</span>
             </button>
             <button class="action-btn action-btn--primary" command="--start" commandfor="app" disabled id="start"
               type="button">
@@ -1868,23 +1868,23 @@
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
               </svg>
-              <span class="action-btn__label">조회 시작</span>
+              <span>조회 시작</span>
             </button>
-            <button class="action-btn action-btn--soft" command="--pause" commandfor="app" disabled id="pause"
+            <button class="action-btn" command="--pause" commandfor="app" disabled id="pause"
               type="button">
               <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round"
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none"></path>
               </svg>
-              <span class="action-btn__label">일시정지</span>
+              <span>일시정지</span>
             </button>
-            <button class="action-btn action-btn--soft" command="--resume" commandfor="app" disabled id="resume"
+            <button class="action-btn" command="--resume" commandfor="app" disabled id="resume"
               type="button">
               <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round"
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
               </svg>
-              <span class="action-btn__label">재개</span>
+              <span>재개</span>
             </button>
             <button class="action-btn action-btn--danger" command="--stop" commandfor="app" disabled id="stop"
               type="button">
@@ -1892,16 +1892,16 @@
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5"></rect>
               </svg>
-              <span class="action-btn__label">중지</span>
+              <span>중지</span>
             </button>
-            <button class="action-btn action-btn--soft" command="--export" commandfor="app" disabled id="export"
+            <button class="action-btn" command="--export" commandfor="app" disabled id="export"
               type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
                 <path d="M12 4.5v10"></path>
                 <path d="m8 10.75 4 4 4-4"></path>
                 <path d="M5.5 18.5h13"></path>
               </svg>
-              <span class="action-btn__label">CSV 내보내기</span>
+              <span>CSV 내보내기</span>
             </button>
           </div>
         </fieldset>
@@ -1943,31 +1943,31 @@
                     </path>
                     <circle cx="11" cy="12" r="3"></circle>
                   </svg>
-                  <span class="action-btn__label">변환 실행</span>
+                  <span>변환 실행</span>
                 </button>
-                <button class="action-btn action-btn--soft" disabled id="saveOutput" type="button">
+                <button class="action-btn" disabled id="saveOutput" type="button">
                   <svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
                     <path d="M12 4.5v10"></path>
                     <path d="m8 10.75 4 4 4-4"></path>
                     <path d="M5.5 18.5h13"></path>
                   </svg>
-                  <span class="action-btn__label action-btn__label--savefile">random_data.txt 저장</span>
+                  <span>random_data.txt 저장</span>
                 </button>
-                <button aria-label="클립보드 복사" class="action-btn action-btn--soft" disabled id="copyOutput"
+                <button aria-label="클립보드 복사" class="action-btn" disabled id="copyOutput"
                   title="클립보드 복사" type="button">
                   <svg aria-hidden="true" class="action-btn__icon" viewBox="0 0 24 24">
                     <rect height="10" rx="2" width="10" x="9" y="9"></rect>
                     <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
                     </path>
                   </svg>
-                  <span class="action-btn__label">클립보드 복사</span>
+                  <span>클립보드 복사</span>
                 </button>
-                <button class="action-btn action-btn--soft" id="clearBtn" type="button">
+                <button class="action-btn" id="clearBtn" type="button">
                   <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor"
                     stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                     <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"></path>
                   </svg>
-                  <span class="action-btn__label">출력 지우기</span>
+                  <span>출력 지우기</span>
                 </button>
               </div>
               <div aria-atomic="true" class="manual-rng-meta" id="meta" role="status"></div>
@@ -1991,10 +1991,10 @@
                 <output aria-atomic="true" class="manual-rng-meta" id="supp-dialog-error" role="alert"></output>
                 <div class="manual-rng-actions">
                   <button class="action-btn" command="request-close" commandfor="supp-dialog" type="button">
-                    <span class="action-btn__label">현재까지 결과를 유지하고 중단</span>
+                    <span>현재까지 결과를 유지하고 중단</span>
                   </button>
                   <button class="action-btn" type="submit">
-                    <span class="action-btn__label">입력 후 계속</span>
+                    <span>입력 후 계속</span>
                   </button>
                 </div>
               </form>
@@ -2041,7 +2041,7 @@
     <div class="results-column">
       <section class="card results-card">
         <header class="card-intro">
-          <h2 class="card-label geo"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor"
+          <h2 class="card-label"><svg aria-hidden="true" class="section-icon" fill="none" stroke="currentColor"
               stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
               <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path>
               <circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle>
@@ -2092,7 +2092,7 @@
               type="search">
             <input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소"
               type="search">
-            <button class="action-btn action-btn--soft action-btn--compact" command="--filter-clear" commandfor="app"
+            <button class="action-btn" command="--filter-clear" commandfor="app"
               id="filter-clear" type="button">
               <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round"
                 stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
@@ -2101,7 +2101,7 @@
                 <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18">
                 </path>
               </svg>
-              <span class="action-btn__label">
+              <span>
                 필터 초기화
               </span>
             </button>
@@ -2164,14 +2164,14 @@
         </section>
         <div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
           <nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
-            <button aria-label="이전 페이지" class="action-btn action-btn--compact" command="--page-prev" commandfor="app"
+            <button aria-label="이전 페이지" class="action-btn" command="--page-prev" commandfor="app"
               id="page-prev" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
                 stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="m14 6-6 6 6 6"></path>
               </svg><span>이전</span></button>
             <output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers"
               id="page-numbers"></span>
-            <button aria-label="다음 페이지" class="action-btn action-btn--compact" command="--page-next" commandfor="app"
+            <button aria-label="다음 페이지" class="action-btn" command="--page-next" commandfor="app"
               id="page-next" type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" fill="none"
                 stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                 viewBox="0 0 24 24">
