@@ -2306,13 +2306,11 @@
       function pickAdminName(
         candidates, suffixes, excludedA = "", excludedB = "",
         excludedC = "",
-        rejectSpecialCity = false,
       ) {
         for (const name of candidates) {
           if (!name || name === excludedA || name === excludedB ||
             name === excludedC) continue;
           if (suffixes && !suffixes.includes(name.at(-1))) continue;
-          if (rejectSpecialCity && CONFIG.SPECIAL_CITIES.test(name)) continue;
           return name;
         }
         return "";
@@ -2999,7 +2997,7 @@
       get isStopping() {
         return this.status === "stopping";
       },
-      reset(status = "idle") {
+      reset(status) {
         this.generation += 1;
         this.task?.resume?.();
         this.task?.controller.abort();
@@ -3625,7 +3623,7 @@
         console.warn("Reverse geocoding cache maintenance failed.", err);
       }
     }
-    function maintainReverseCacheRows(store, onRows = null) {
+    function maintainReverseCacheRows(store, onRows) {
       const expiredReq = store.index("savedAt").openKeyCursor(
         IDBKeyRange.upperBound(
           Date.now() - CONFIG.REVERSE_CACHE_TTL_MS,
@@ -3644,14 +3642,14 @@
           let remaining = countReq.result;
           let excess = remaining - CONFIG.REVERSE_CACHE_MAX;
           if (excess <= 0) {
-            onRows?.(remaining);
+            onRows(remaining);
             return;
           }
           const oldestReq = store.index("savedAt").openKeyCursor();
           oldestReq.onsuccess = () => {
             const oldest = oldestReq.result;
             if (!oldest || excess <= 0) {
-              onRows?.(remaining);
+              onRows(remaining);
               return;
             }
             store.delete(oldest.primaryKey);
