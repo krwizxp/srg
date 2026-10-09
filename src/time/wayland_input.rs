@@ -395,22 +395,15 @@ impl EiSession {
         let mut connection_closed = false;
         loop {
             if let Some(pong) = self.dispatch()? {
-                if pong == expected_ping {
-                    return Ok(());
-                }
-                return Err(Cow::Borrowed(
+                return (pong == expected_ping).ok_or(Cow::Borrowed(
                     "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
                 ));
             }
-            if connection_closed {
-                return Err(Cow::Borrowed("libei poll 연결이 종료되었습니다."));
-            }
+            (!connection_closed).ok_or(Cow::Borrowed("libei poll 연결이 종료되었습니다."))?;
             let now = Instant::now();
-            if now >= deadline {
-                return Err(Cow::Borrowed(
-                    "Wayland 입력 전달 확인 시간이 초과되었습니다.",
-                ));
-            }
+            (now < deadline).ok_or(Cow::Borrowed(
+                "Wayland 입력 전달 확인 시간이 초과되었습니다.",
+            ))?;
             let mut poll_fd = PollFd::new(self.poll_fd()?);
             poll_fds(
                 slice::from_mut(&mut poll_fd),
@@ -492,9 +485,7 @@ impl PortalSession {
             match event {
                 OEFFIS_EVENT_NONE => return Ok(connected),
                 OEFFIS_EVENT_CONNECTED_TO_EIS => {
-                    if connected {
-                        return Err(Cow::Borrowed("중복 EIS 연결 이벤트가 발생했습니다."));
-                    }
+                    (!connected).ok_or(Cow::Borrowed("중복 EIS 연결 이벤트가 발생했습니다."))?;
                     connected = true;
                 }
                 OEFFIS_EVENT_CLOSED => {
@@ -544,11 +535,9 @@ impl PortalSession {
                 return Ok(None);
             }
             let now = Instant::now();
-            if now >= deadline {
-                return Err(Cow::Borrowed(
-                    "Wayland 입력 권한 준비 시간이 초과되었습니다.",
-                ));
-            }
+            (now < deadline).ok_or(Cow::Borrowed(
+                "Wayland 입력 권한 준비 시간이 초과되었습니다.",
+            ))?;
             let mut poll_fd = PollFd::new(self.poll_fd()?);
             poll_fds(
                 slice::from_mut(&mut poll_fd),
@@ -718,18 +707,14 @@ impl WaylandInput {
         ei_poll.ensure_valid("libei poll descriptor가 무효화되었습니다.")?;
         if portal_poll.has_events() {
             let connected = self.portal.dispatch()?;
-            if connected {
-                return Err(Cow::Borrowed("예상하지 못한 추가 EIS 연결이 발생했습니다."));
-            }
+            (!connected).ok_or(Cow::Borrowed("예상하지 못한 추가 EIS 연결이 발생했습니다."))?;
         }
         portal_poll.ensure_open("liboeffis poll 연결이 종료되었습니다.")?;
         if ei_poll.has_events() {
             let pong = self.ei.dispatch()?;
-            if pong.is_some() {
-                return Err(Cow::Borrowed(
-                    "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
-                ));
-            }
+            (pong.is_none()).ok_or(Cow::Borrowed(
+                "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
+            ))?;
         }
         ei_poll.ensure_open("libei poll 연결이 종료되었습니다.")
     }

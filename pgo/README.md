@@ -1,18 +1,22 @@
 # 적용된 PGO 프로파일
 
-각 플랫폼의 실제 제품 실행 파일에서 수집한 프로파일만 적용합니다. SRG 진단용 프로파일은 포함하지 않습니다. 프로파일을 만든 제품 소스 commit과 SHA256은 manifest.json에 기록했습니다. 제품 Rust 소스, Cargo.lock 및 release의 opt3/fat-LTO/CGU1/panic-abort/strip 설정은 유지합니다. 새 Cargo 설정은 build-pgo 명령에서만 로드되며 일반 개발·테스트 빌드는 영향을 받지 않습니다.
+각 플랫폼의 실제 제품 실행 파일에서 수집한 프로파일만 적용합니다. 진단용 프로파일은 포함하지 않습니다. 프로파일을 만든 제품 소스 commit과 SHA256은 manifest.json에 기록했습니다. 제품 Rust 소스, Cargo.lock 및 release의 opt3/fat-LTO/CGU1/panic-abort/strip 설정은 유지합니다. PGO Cargo 설정은 build-pgo 명령에서만 로드되며 일반 개발·테스트 빌드는 영향을 받지 않습니다.
 
 학습은 실제 제품 CLI의 정상/오류 경로, 난수 생성 및 메뉴의 수동 변환 경로를 사용했습니다. 검증에는 학습에서 제외한 입력, 난수 범위·사다리 순열 불변조건 및 결정적 변환 결과 비교도 포함했습니다. Windows와 Linux 프로파일을 공유하거나 합치지 않습니다. 프로파일이 없는 타깃에 다른 타깃의 프로파일을 대입하지 않습니다.
 
-Windows 프로파일을 검증한 실행:
-https://github.com/krwizxp/fcupdater/actions/runs/37253479758
+## 2026-10-09 재학습과 검증
 
-Windows 실제 네트워크 후속 검사:
-https://github.com/krwizxp/fcupdater/actions/runs/37254632980
+Rust 1.99.0 / LLVM 23.1.1의 일반 release 비교로 API 치환을 결정한 뒤, 변경된 실제 제품 CLI에서 Linux·Windows 프로파일을 각각 다시 수집했습니다. 진단용 프로브·고정 응답 재생 도구는 제품과 프로파일 학습 실행 파일에 포함하지 않습니다. 기존 release·타깃·보안 설정은 유지합니다.
 
-## 측정 결과와 남은 한계
+128개 무작위 paired 표본(표본당 실제 CLI 4회)의 8/2048개 생성 경로에서 새 PGO의 성능 비퇴행을 확인했습니다. 일반 release 코드 검증은 Linux·Windows·macOS x64/ARM64 모두 통과했습니다. Linux 새 PGO 실행 파일은 기존 PGO보다 520바이트 커졌고, 일반 release 기준 파일보다 약 20 KB 작습니다. Windows 새 PGO 실행 파일은 기존 PGO보다 10,240바이트 작습니다. 이 결과는 각 네이티브 호스트 안의 비교이며 실서비스 시간 관측 지연의 개선을 주장하지 않습니다.
 
-Linux 진단용 data/format/parse는 약 3.9~5.6%, Windows는 약 2.1~16.2% 개선됐습니다. 이 진단용 함수 결과는 실제 제품 전체의 개선을 보장하지 않습니다. 실제 난수 생성 CPU 개선은 확정하지 못했고, Windows 작은 배치 CPU는 60쌍 중 10쌍에서 0이 기록되어 +3% 비회귀 기준도 확정하지 못했습니다. Linux 작은 배치 wall time 역시 비회귀가 미확정입니다. 따라서 PGO 적용을 전체 성능 검증 통과로 설명하지 않습니다. 실제 서버 시간 관찰 및 독립 CLI/난수/결정적 출력 비교는 통과했습니다.
+검증 실행:
+https://github.com/krwizxp/srg/actions/runs/37940320572
+https://github.com/krwizxp/srg/actions/runs/37942412401
+
+## 이전 프로파일의 측정 이력과 한계
+
+Linux 진단용 data/format/parse는 약 3.9~5.6%, Windows는 약 2.1~16.2% 개선됐습니다. 이 진단용 함수 결과는 실제 제품 전체의 개선을 보장하지 않습니다. 실제 난수 생성 CPU 개선은 확정하지 못했고, Windows 작은 배치 CPU는 60쌍 중 10쌍에서 0이 기록되어 +3% 비회귀 기준도 확정하지 못했습니다. Linux 작은 배치 wall time 역시 비회귀가 미확정입니다. 당시 PGO 적용을 전체 성능 검증 통과로 설명하지 않았습니다. 실제 서버 시간 관찰 및 독립 CLI/난수/결정적 출력 비교는 통과했습니다.
 
 성능 비교는 각 호스트 안에서 기준/PGO 순서를 무작위로 섞은 paired 측정입니다. CPU·파일시스템·플랫폼이 달라 동일한 개선율을 보장하지 않습니다. 공개 입력의 고정 응답 재생은 학습·측정에만 사용했습니다. 재생 DLL/SO, 진단 실행 파일과 고정 응답을 제품에 포함하지 않습니다.
 

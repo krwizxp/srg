@@ -16,7 +16,7 @@ impl FromStr for ParsedServer {
     type Err = TimeError;
     fn from_str(host: &str) -> Result<Self> {
         let trimmed_input = host.trim();
-        (!trimmed_input.is_empty()).ok_or_else(|| TimeError::parse(ERR_EMPTY))?;
+        (!trimmed_input.is_empty()).ok_or(TimeError::parse(ERR_EMPTY))?;
         let (scheme, after_scheme) = if let Some((prefix, rest)) =
             trimmed_input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
             && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
@@ -70,11 +70,10 @@ impl FromStr for ParsedServer {
             UrlScheme::Https => DEFAULT_HTTPS_PORT,
         });
         (!host_part.is_empty() && !host_part.contains(['[', ']']))
-            .ok_or_else(|| TimeError::parse(ERR_HOST))?;
+            .ok_or(TimeError::parse(ERR_HOST))?;
         let host_is_ipv6 = matches!(host_part.parse(), Ok(net::IpAddr::V6(_)));
-        if (bracketed || (explicit_port.is_none() && colon_count > 0)) && !host_is_ipv6 {
-            return Err(TimeError::parse(ERR_HOST));
-        }
+        (!bracketed && (explicit_port.is_some() || colon_count == 0) || host_is_ipv6)
+            .ok_or(TimeError::parse(ERR_HOST))?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         let request_target = {
             let prefix = match scheme {
@@ -124,6 +123,6 @@ fn parse_port(port_part: &str) -> Result<u16> {
         }
         Ok(_) | Err(_) => return Err(TimeError::parse(ERR_PORT)),
     };
-    (port != 0).ok_or_else(|| TimeError::parse(ERR_PORT))?;
+    (port != 0).ok_or(TimeError::parse(ERR_PORT))?;
     Ok(port)
 }

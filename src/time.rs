@@ -334,16 +334,12 @@ impl TriggerTimingPolicy {
         effective_rtt: Duration,
         server_time: ServerTime,
     ) -> Result<()> {
-        if sample.rtt == Duration::ZERO || sample.rtt > MAX_FINAL_SAMPLE_RTT {
-            return Err(TimeError::parse(
-                "최종 샘플 RTT가 허용 범위를 벗어났습니다.",
-            ));
-        }
-        if effective_rtt == Duration::ZERO || effective_rtt > MAX_FINAL_SAMPLE_RTT {
-            return Err(TimeError::parse(
-                "액션에 사용하는 RTT가 허용 범위를 벗어났습니다.",
-            ));
-        }
+        (sample.rtt != Duration::ZERO && sample.rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(
+            TimeError::parse("최종 샘플 RTT가 허용 범위를 벗어났습니다."),
+        )?;
+        (effective_rtt != Duration::ZERO && effective_rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(
+            TimeError::parse("액션에 사용하는 RTT가 허용 범위를 벗어났습니다."),
+        )?;
         let &mut Self::UnauthenticatedHttp(ref mut guard) = self else {
             return Ok(());
         };
@@ -379,7 +375,7 @@ impl TriggerTimingPolicy {
             .checked_duration_since(last_sample_at)
             .ok_or_else(|| TimeError::parse("HTTP 샘플 단조 시각 순서가 유효하지 않습니다."))?;
         (sample_age <= HTTP_SAMPLE_FRESHNESS)
-            .ok_or_else(|| TimeError::parse("HTTP 최신 샘플이 만료되었습니다."))
+            .ok_or(TimeError::parse("HTTP 최신 샘플이 만료되었습니다."))
     }
     fn validate_server_deadline(
         self,
@@ -395,9 +391,9 @@ impl TriggerTimingPolicy {
         } else {
             guard.reference_server_deadline.duration_since(deadline)
         };
-        (shift <= HTTP_MAX_TOTAL_DEADLINE_SHIFT).ok_or_else(|| {
-            TimeError::parse("HTTP 서버 deadline 누적 이동량이 허용 범위를 초과했습니다.")
-        })
+        (shift <= HTTP_MAX_TOTAL_DEADLINE_SHIFT).ok_or(TimeError::parse(
+            "HTTP 서버 deadline 누적 이동량이 허용 범위를 초과했습니다.",
+        ))
     }
 }
 impl FromStr for TargetTimeOfDay {
@@ -410,9 +406,7 @@ impl FromStr for TargetTimeOfDay {
             .split_once(':')
             .ok_or(INVALID_TIME_INPUT_ERR)?;
         let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
-            if component.len() != CLOCK_COMPONENT_LEN {
-                return Err(INVALID_TIME_INPUT_ERR);
-            }
+            (component.len() == CLOCK_COMPONENT_LEN).ok_or(INVALID_TIME_INPUT_ERR)?;
             parse_u32_digits(component).ok_or(INVALID_TIME_INPUT_ERR)
         };
         let (hour, minute, second) = (
@@ -420,9 +414,7 @@ impl FromStr for TargetTimeOfDay {
             parse_component(minute_str)?,
             parse_component(second_str)?,
         );
-        if !(hour <= 23 && minute <= 59 && second <= 59) {
-            return Err(INVALID_TIME_INPUT_ERR);
-        }
+        (hour <= 23 && minute <= 59 && second <= 59).ok_or(INVALID_TIME_INPUT_ERR)?;
         let seconds_after_midnight = hour
             .strict_mul(KST_SECONDS_PER_HOUR_U32)
             .strict_add(minute.strict_mul(KST_SECONDS_PER_MINUTE_U32))
