@@ -2019,8 +2019,6 @@
                 <circle cx="12" cy="12" r="9"></circle>
                 <path d="M12 7v5l3 2"></path>
               </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
-          <div aria-atomic="true" class="sr-only" id="status-live" role="status">
-          </div>
         </div>
 
 
@@ -2244,7 +2242,6 @@
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
     const csvEsc = (s) => {
-      s = String(s ?? "");
       if (s) {
         const c0 = s.charCodeAt(0);
         if (
@@ -2254,20 +2251,10 @@
           s = "'" + s;
         }
       }
-      let needsQuote = false;
-      for (let i = 0; i < s.length; i++) {
-        const c = s.charCodeAt(i);
-        if (c === 34) {
-          s = s.replaceAll('"', '""');
-          return `"${s}"`;
-        }
-        if (!needsQuote && (c === 44 || c === 10 || c === 13)) {
-          needsQuote = true;
-        }
-      }
-      return needsQuote ? `"${s}"` : s;
+      return /[",\r\n]/.test(s)
+        ? `"${s.replaceAll('"', '""')}"`
+        : s;
     };
-    const lower = (s) => (s || "").toLowerCase();
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -2302,7 +2289,6 @@
         }
         return value;
       }
-      const firstText = (a, b, c, d) => a || b || c || d || "";
       function pickAdminName(
         candidates, suffixes, excludedA = "", excludedB = "",
         excludedC = "",
@@ -2351,13 +2337,12 @@
         };
       }
       function parseKoreanAdmin(fields, p0, p1) {
-        const primaryName = firstText(fields.name, p0);
-        const cityDistrict = firstText(
-          fields.cityDistrict, fields.district, fields.suburb,
-        );
+        const primaryName = fields.name || p0;
+        const cityDistrict = fields.cityDistrict || fields.district ||
+          fields.suburb;
         const level6 = fields.level6 || fields.level7;
         const { city, county } = fields;
-        let sido = fields.level4 || fields.state || "";
+        let sido = fields.level4 || fields.state;
         let sigungu = "";
         const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
         if (!sido && cityIsSpecial) sido = city;
@@ -2388,9 +2373,9 @@
             ],
             "구", sido, cityLike,
           );
-          sigungu = cityLike && districtLike && districtLike !== cityLike
+          sigungu = cityLike && districtLike
             ? cityLike + " " + districtLike
-            : cityLike || districtLike || "";
+            : cityLike || districtLike;
           sigungu ||= pickAdminName(
             [county, level6, cityDistrict, primaryName, p0, p1],
             "시구군", sido,
@@ -2429,13 +2414,12 @@
           .trim();
       }
       function parseGlobalAdmin(fields, p0, p1) {
-        const primaryName = firstText(fields.name, p0);
-        const cityDistrict = firstText(
-          fields.cityDistrict, fields.district, fields.suburb,
-        );
+        const primaryName = fields.name || p0;
+        const cityDistrict = fields.cityDistrict || fields.district ||
+          fields.suburb;
         const { city, county } = fields;
         const sido = fields.level4 || fields.state || fields.region ||
-          fields.province || county || city || "";
+          fields.province || county || city;
         const cityLike = pickAdminName(
           [city, county, fields.level6, fields.level7, primaryName, p1, p0],
           0, sido,
@@ -2448,14 +2432,14 @@
           ],
           0, sido, cityLike,
         );
-        let sigungu = cityLike && districtLike && cityLike !== districtLike
+        let sigungu = cityLike && districtLike
           ? cityLike + " " + districtLike
           : cityLike || districtLike || fields.level6 || fields.level8 ||
           city || fields.town || county || fields.district ||
-          fields.municipality || "";
+          fields.municipality;
         if ((!sigungu || sigungu === sido) &&
           (fields.type === "city" || fields.type === "county")) {
-          sigungu = primaryName || city || county || "";
+          sigungu = primaryName || city || county;
         }
         let eupmyeon = pickAdminName(
           [
@@ -2465,8 +2449,8 @@
           ],
           0, sido, cityLike, districtLike,
         );
-        if (eupmyeon === sigungu || eupmyeon === sido) eupmyeon = "";
-        if (!eupmyeon && districtLike && districtLike !== sido) {
+        if (eupmyeon === sigungu) eupmyeon = "";
+        if (!eupmyeon && districtLike) {
           eupmyeon = districtLike;
           sigungu = removeDistrict(sigungu, districtLike);
         }
@@ -2483,8 +2467,8 @@
           countryName === "대한민국" ||
           countryName === "조선민주주의인민공화국";
         if (!explicitKorean) {
-          lowerCountryName = lower(countryName);
-          lowerAdminCountry = lower(adminCountry);
+          lowerCountryName = countryName.toLowerCase();
+          lowerAdminCountry = adminCountry.toLowerCase();
         }
         const korean = explicitKorean ||
           lowerCountryName.includes("korea") ||
@@ -2494,7 +2478,7 @@
           : parseGlobalAdmin(fields, p0, p1);
         if (!korean) {
           for (const key of ["sido", "sigungu", "eupmyeon"]) {
-            const value = lower(result[key]);
+            const value = result[key].toLowerCase();
             if (value && (
               value === lowerCountryName || value === lowerAdminCountry
             )) result[key] = "";
@@ -2515,10 +2499,10 @@
           (parsed.kind === undefined || isBoundedText(parsed.kind));
       }
       function parse(data) {
-        const gc = (data && typeof data === "object" &&
+        const gc = data && typeof data === "object" &&
           Array.isArray(data.features)
           ? data.features[0]?.properties?.geocoding
-          : null) || null;
+          : null;
         if (!gc) {
           return {
             addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
@@ -2545,9 +2529,7 @@
         const { sido, sigungu, eupmyeon } = getAdmin(
           fields, countryCode, p0, p1,
         );
-        let tag = firstText(
-          fields.name, firstLabelPart, fields.street, fields.city,
-        );
+        let tag = fields.name || firstLabelPart || fields.street || fields.city;
         const tagType = fields.type;
         if (tagType) tag = tag ? tag + ", " + tagType : tagType;
         const kind = countryCode === "kr" ? "KR" :
@@ -2589,7 +2571,6 @@
           lon + "," + lat + "," + lon;
       }
     }
-    const isMapPopoverOpen = () => mapPopover.matches(":popover-open");
     let LAST_MAP_INVOKER = null;
     mapPopover.addEventListener("beforetoggle", (e) => {
       if (e.newState !== "open") return void (LAST_MAP_INVOKER = null);
@@ -2603,10 +2584,6 @@
         mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
       }
     });
-    function closeMapPopover() {
-      if (!isMapPopoverOpen()) return;
-      mapPopover.hidePopover();
-    }
     const fmt =
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
@@ -2615,15 +2592,12 @@
     const fmtCoord6 = (v) => {
       const dot = v.indexOf(".");
       if (dot === -1) return normalizeCoordText(v);
-      if (v.length - dot - 1 <= COORD_DECIMALS) {
-        let end = v.length;
-        while (end && v.charCodeAt(end - 1) === 48) end--;
-        if (end && v.charCodeAt(end - 1) === 46) end--;
-        return normalizeCoordText(end === v.length ? v : v.slice(0, end));
+      let s = v;
+      if (v.length - dot - 1 > COORD_DECIMALS) {
+        s = (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(
+          COORD_DECIMALS,
+        );
       }
-      let s = (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(
-        COORD_DECIMALS,
-      );
       let end = s.length;
       while (end && s.charCodeAt(end - 1) === 48) end--;
       if (end && s.charCodeAt(end - 1) === 46) end--;
@@ -2634,7 +2608,6 @@
       themeToggle: document.getElementById("theme-toggle"),
       exportBtn: document.getElementById("export"),
       status: document.getElementById("status"),
-      statusLive: document.getElementById("status-live"),
       cntTotal: document.getElementById("cnt-total"),
       cntSuccess: document.getElementById("cnt-success"),
       cntFail: document.getElementById("cnt-fail"),
@@ -2705,10 +2678,7 @@
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => {
       if (s == null) return "";
-      if (typeof s !== "string") s = String(s);
-      s = s.trim();
-      if (!s) return "";
-      s = s.toLowerCase();
+      s = s.trim().toLowerCase();
       return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
     };
     function buildFilterSnapshot() {
@@ -2752,7 +2722,7 @@
       if (!r.result) return false;
       if (!f) return true;
       const fields = r._search ??= [
-        lower(r.result.kind || r.set),
+        (r.result.kind || r.set).toLowerCase(),
         norm(r.result.addr?.sido),
         norm(r.result.addr?.sigungu),
         norm(r.result.addr?.eupmyeon),
@@ -2865,7 +2835,7 @@
     }
     function renderCurrentPage(resetScroll = false) {
       pageRenderReq = null;
-      closeMapPopover();
+      mapPopover.hidePopover();
       const indices = AppState.visibleIndices;
       const visibleCount = indices.length;
       updatePageNavigation(visibleCount);
@@ -2936,14 +2906,11 @@
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
-      document.body.appendChild(a);
       try {
         a.click();
       } catch (err) {
         revokeActiveDownloadUrl();
         throw err;
-      } finally {
-        a.remove();
       }
       setTimeout(() => {
         URL.revokeObjectURL(url);
@@ -2990,9 +2957,7 @@
         return this.task?.status ?? "idle";
       },
       get isRunning() {
-        return this.status === "running" ||
-          this.status === "paused" ||
-          this.status === "pausing";
+        return ["running", "paused", "pausing"].includes(this.status);
       },
       get isStopping() {
         return this.status === "stopping";
@@ -3057,17 +3022,14 @@
       domElements.file.disabled = isBusy;
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
-    const STATUS_ARIA_NOTIFY = typeof document.ariaNotify === "function";
-    let statusLiveTimer = 0;
+    let statusNotifyTimer = 0;
     function announceStatusText(text) {
       if (SR_STATUS_CACHE.msg === text) return;
       SR_STATUS_CACHE.msg = text;
-      clearTimeout(statusLiveTimer);
-      if (!STATUS_ARIA_NOTIFY) domElements.statusLive.textContent = "";
+      clearTimeout(statusNotifyTimer);
       if (text) {
-        statusLiveTimer = setTimeout(() => {
-          if (STATUS_ARIA_NOTIFY) document.ariaNotify(text);
-          else domElements.statusLive.textContent = text;
+        statusNotifyTimer = setTimeout(() => {
+          document.ariaNotify(text);
         }, 24);
       }
     }
@@ -3120,21 +3082,25 @@
       const success = processed - fail;
       const remaining = total - processed;
       if (totalChanged) {
-        domElements.cntTotal.textContent = fmt(total);
-        domElements.summaryTotal.textContent = fmt(total);
-        domElements.coordsCount.textContent = fmt(total);
+        const totalText = fmt(total);
+        domElements.cntTotal.textContent = totalText;
+        domElements.summaryTotal.textContent = totalText;
+        domElements.coordsCount.textContent = totalText;
       }
       if (processedChanged || failChanged) {
-        domElements.cntSuccess.textContent = fmt(success);
-        domElements.summarySuccess.textContent = fmt(success);
+        const successText = fmt(success);
+        domElements.cntSuccess.textContent = successText;
+        domElements.summarySuccess.textContent = successText;
       }
       if (failChanged) {
-        domElements.cntFail.textContent = fmt(fail);
-        domElements.summaryFail.textContent = fmt(fail);
+        const failText = fmt(fail);
+        domElements.cntFail.textContent = failText;
+        domElements.summaryFail.textContent = failText;
       }
       if (totalChanged || processedChanged) {
-        domElements.cntRemain.textContent = fmt(remaining);
-        domElements.summaryRemain.textContent = fmt(remaining);
+        const remainingText = fmt(remaining);
+        domElements.cntRemain.textContent = remainingText;
+        domElements.summaryRemain.textContent = remainingText;
         const pct = total ? Math.round((processed / total) * 100) : 0;
         domElements.prog.value = pct;
         domElements.prog.parentElement.style.setProperty("--pct", pct);
@@ -3145,13 +3111,12 @@
       }
     }
     function scheduleRender() {
-      if (AppState.renderReq !== null) return;
-      AppState.renderReq = requestAnimationFrame(renderFrame);
+      AppState.renderReq ??= requestAnimationFrame(renderFrame);
     }
     function clearTable() {
       cancelActiveFilterTask();
       const wrap = domElements.tableWrap;
-      closeMapPopover();
+      mapPopover.hidePopover();
       domElements.tbody.replaceChildren();
       wrap.scrollTop = 0;
       wrap.scrollLeft = 0;
@@ -3193,7 +3158,7 @@
       : (() => {
         const channel = new MessageChannel();
         const queue = [];
-        channel.port1.onmessage = () => queue.shift()?.();
+        channel.port1.onmessage = () => queue.shift()();
         return () => {
           const { promise, resolve } = Promise.withResolvers();
           queue.push(resolve);
@@ -3368,8 +3333,7 @@
       REVERSE_PARSED_CACHE.delete(cacheKey);
       REVERSE_PARSED_CACHE.set(cacheKey, parsed);
       if (REVERSE_PARSED_CACHE.size > REVERSE_PARSED_CACHE_MAX) {
-        const oldest = REVERSE_PARSED_CACHE.keys().next();
-        if (!oldest.done) REVERSE_PARSED_CACHE.delete(oldest.value);
+        REVERSE_PARSED_CACHE.delete(REVERSE_PARSED_CACHE.keys().next().value);
       }
     }
     function openReverseCacheDb() {
@@ -4186,7 +4150,7 @@
     });
     domElements.tbody.addEventListener("click", (e) => {
       const btn = e.target?.closest?.("button.map-btn");
-      if (btn && isMapPopoverOpen() && btn !== LAST_MAP_INVOKER) closeMapPopover();
+      if (btn && mapPopover.matches(":popover-open") && btn !== LAST_MAP_INVOKER) mapPopover.hidePopover();
     }, { capture: true });
     const COMMANDS = {
       "--parse": handleParse,
@@ -4271,7 +4235,7 @@
       });
     });
     domElements.file.addEventListener("change", () => {
-      const file = domElements.file.files?.[0];
+      const file = domElements.file.files[0];
       if (!file) return;
       domElements.file.value = "";
       if (
@@ -4313,6 +4277,8 @@
       const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
       const MAX_U64_DEC = U64_MAX.toString(10);
       const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
+      const U64_FORMAT_ERROR_MESSAGE =
+        `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`;
       const U64_TOKEN_HARD_LIMIT = 64;
       const createUniqueNumbers = (length) => ({
         limit: length,
@@ -4353,17 +4319,13 @@
         const first = input.charCodeAt(0);
         const second = input.charCodeAt(1) | 32;
         if (first === 45 || (first === 48 && (second === 98 || second === 111))) {
-          throw new Error(
-            `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-          );
+          throw new Error(U64_FORMAT_ERROR_MESSAGE);
         }
         let value;
         try {
           value = BigInt(input);
         } catch {
-          throw new Error(
-            `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-          );
+          throw new Error(U64_FORMAT_ERROR_MESSAGE);
         }
         if (value > U64_MAX) {
           throw new Error(
@@ -4502,9 +4464,7 @@
       function pushUniqueNumber(byte, modulus, numbers) {
         if (numbers.values.length >= numbers.limit) return true;
         const number = (byte % modulus) + 1;
-        for (const value of numbers.values) {
-          if (value === number) return false;
-        }
+        if (numbers.values.includes(number)) return false;
         numbers.values.push(number);
         const complete = numbers.values.length === numbers.limit;
         if (complete) {
@@ -4589,9 +4549,9 @@
         if (!complete) {
           throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
         }
-        let luckyStarSource = supplementalRef.current !== null
-          ? reverseBitsU64(supplementalRef.current.value)
-          : reverseBitsU64(num);
+        let luckyStarSource = reverseBitsU64(
+          supplementalRef.current?.value ?? num,
+        );
         luckyStarLoop: for (
           let attempt = 0;
           attempt < SUPPLEMENTAL_RETRY_LIMIT;
@@ -4717,8 +4677,7 @@
         return (value & 0xffff).toString(16).toUpperCase().padStart(4, "0");
       }
       function hexU16Min3(value) {
-        const v = value & 0xffff;
-        return v.toString(16).toUpperCase().padStart(3, "0");
+        return value.toString(16).toUpperCase().padStart(3, "0");
       }
       function formatOutput(data) {
         const v = data.num_64;
@@ -4727,11 +4686,11 @@
         const binary = v.toString(2).padStart(64, "0");
         const hex = bytes.toHex().toUpperCase();
         return [
-          `64비트 난수: ${v.toString(10)} (유부호 정수: ${BigInt.asIntN(64, v).toString(10)
+          `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
           })`,
-          `2진수: ${binary.slice(0, 8)} ${binary.slice(8, 16)} ${binary.slice(16, 24)} ${binary.slice(24, 32)} ${binary.slice(32, 40)} ${binary.slice(40, 48)} ${binary.slice(48, 56)} ${binary.slice(56)}`,
+          `2진수: ${binary.match(/.{8}/g).join(" ")}`,
           `8진수: ${v.toString(8)}`,
-          `16진수: ${hex.slice(0, 2)} ${hex.slice(2, 4)} ${hex.slice(4, 6)} ${hex.slice(6, 8)} ${hex.slice(8, 10)} ${hex.slice(10, 12)} ${hex.slice(12, 14)} ${hex.slice(14)}`,
+          `16진수: ${hex.match(/../g).join(" ")}`,
           `Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}`,
           `바이트 배열: ${bytes.join(" ")}`,
           `6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}`,
@@ -4743,7 +4702,7 @@
           `한글 음절 4글자: ${data.hangul_syllables.join("")}`,
           `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
           `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
-          `NMS 은하 번호: ${(bytes[0] + 1).toString(10)}`,
+          `NMS 은하 번호: ${bytes[0] + 1}`,
           `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
           } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
           } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string
@@ -4763,19 +4722,16 @@
       }
       class SupplementRequired extends Error { }
       function randomDataBlob(chunks, includeBom) {
-        const parts = includeBom ? ["\uFEFF"] : [];
-        for (const chunk of chunks) {
-          parts.push(chunk);
-        }
+        const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
         if (chunks.length > 0 && !chunks[chunks.length - 1].endsWith("\n")) {
           parts.push("\n");
         }
         return new Blob(parts, {
-          type: "text/plain;charset=utf-8",
+          type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
         });
       }
       async function copyRandomDataChunksToClipboard(chunks) {
-        if (!navigator.clipboard || !window.isSecureContext) {
+        if (!window.isSecureContext) {
           throw new Error(
             "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
           );
