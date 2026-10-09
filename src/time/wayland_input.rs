@@ -460,14 +460,10 @@ impl Library {
 }
 impl PollFd {
     fn ensure_open(self, error: &'static str) -> InputResult<()> {
-        (!self.has_terminal_error())
-            .then_some(())
-            .ok_or(Cow::Borrowed(error))
+        (!self.has_terminal_error()).ok_or(Cow::Borrowed(error))
     }
     fn ensure_valid(self, error: &'static str) -> InputResult<()> {
-        (self.revents & POLLNVAL == 0)
-            .then_some(())
-            .ok_or(Cow::Borrowed(error))
+        (self.revents & POLLNVAL == 0).ok_or(Cow::Borrowed(error))
     }
     const fn has_events(self) -> bool {
         self.revents & POLL_READ_EVENTS != 0
