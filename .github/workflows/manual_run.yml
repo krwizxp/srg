@@ -68,7 +68,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Build release binary
         run: |
-          cargo +stable build-pgo
+          cargo +stable build --release --frozen --bin srg --target x86_64-unknown-linux-gnu
           cargo +stable build --release --frozen --example manual_workflow
       - name: Run selected SRG action
         env:

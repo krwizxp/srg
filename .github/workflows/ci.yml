@@ -43,7 +43,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Release Build
-        run: cargo +stable build-pgo
+        run: cargo +stable build --release --frozen --bin srg --target "${{ matrix.target }}"
       - name: Prepare binary artifact with Rust
         env:
           CARGO_TARGET_DIR: target/${{ matrix.target }}

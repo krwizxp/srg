@@ -1,2 +1,0 @@
-[alias]
-build-pgo = ["build", "--release", "--frozen", "--bin", "srg", "--config", ".cargo/pgo.toml"]

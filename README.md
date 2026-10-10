@@ -30,12 +30,10 @@ x86_64 환경에서는 RDSEED와 RDRAND를 활용한 생성 기능을 제공합�
 
 ```bash
 rustup update stable
-cargo +stable build-pgo
-# Linux x64
-./target/x86_64-unknown-linux-gnu/release/srg
-# macOS Intel: ./target/x86_64-apple-darwin/release/srg
-# macOS Apple Silicon: ./target/aarch64-apple-darwin/release/srg
-# Windows PowerShell: .\target\x86_64-pc-windows-msvc\release\srg.exe
+cargo +stable build --release --frozen
+# Linux / macOS
+./target/release/srg
+# Windows PowerShell: .\target\release\srg.exe
 ```
 
 프로그램을 실행하면 현재 환경에서 사용할 수 있는 기능을 메뉴로 안내합니다.
@@ -95,11 +93,3 @@ srg time-observe <host> <seconds>
 - **CI**: `main` 브랜치와 태그에서 Windows, Linux, Intel Mac, Apple Silicon Mac용 release Artifact를 제공합니다.
 - **Run SRG Manually**: 데이터 생성, 사다리타기, 범위형 난수 생성과 서버 시간 관찰을 선택해 실행합니다. 실행 결과와 생성 파일은 Workflow run의 Artifact에서 내려받을 수 있습니다.
 - **pages build and deployment**: `revgeo.html`을 GitHub Pages 웹페이지로 빌드하고 배포합니다.
-
-## PGO 릴리스 빌드
-
-저장소 루트에서 `cargo +stable build-pgo`를 실행하면 Linux x64 GNU 또는 Windows x64 MSVC의 전용 프로파일을 적용합니다. CI 배포 바이너리와 수동 실행 워크플로도 같은 명령을 사용합니다. macOS 등 프로파일이 없는 타깃은 기존 release 설정으로 빌드합니다. 학습 때와 동일하게 호스트 타깃을 명시하므로 실행 파일은 `target/<host-triple>/release/`에 생성됩니다. 다른 타깃은 `--target <triple>`로 선택합니다.
-
-`rust-toolchain.toml`은 `stable` 채널을 선택합니다. CI와 수동 실행 워크플로는 실행할 때마다 최신 stable을 설치·업데이트합니다. 로컬에서는 먼저 `rustup update stable`을 실행하십시오. 저장된 프로파일은 Rust 1.99.0 / LLVM 23.1.1에서 학습한 데이터이며, 해당 버전 표기는 학습 이력입니다. `cargo build --release --frozen --target <triple>`은 PGO 없이 빌드하는 비교·재학습 경로입니다. PGO 빌드에서는 외부 `RUSTFLAGS`/`CARGO_ENCODED_RUSTFLAGS`가 Cargo 설정을 덮어쓰지 않도록 확인하십시오. stable 업데이트로 컴파일러가 바뀌거나 타깃, 최적화 옵션 또는 제품 소스가 바뀌면 프로파일의 호환성·동작·성능을 다시 검증하고 필요하면 재학습해야 합니다. 프로파일은 CI에서 자동 재학습하지 않습니다.
-
-프로파일의 출처·해시는 [pgo/manifest.json](pgo/manifest.json), 학습·측정 범위와 한계는 [pgo/README.md](pgo/README.md)에 기록했습니다.
