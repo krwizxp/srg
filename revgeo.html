@@ -4448,18 +4448,15 @@
           digits.slice(decimalIndex);
       }
       function reverseBitsU64(v) {
-        let x = v;
-        x = ((x >> 1n) & 0x5555_5555_5555_5555n) |
-          ((x & 0x5555_5555_5555_5555n) << 1n);
-        x = ((x >> 2n) & 0x3333_3333_3333_3333n) |
-          ((x & 0x3333_3333_3333_3333n) << 2n);
-        x = ((x >> 4n) & 0x0f0f_0f0f_0f0f_0f0fn) |
-          ((x & 0x0f0f_0f0f_0f0f_0f0fn) << 4n);
-        x = ((x >> 8n) & 0x00ff_00ff_00ff_00ffn) |
-          ((x & 0x00ff_00ff_00ff_00ffn) << 8n);
-        x = ((x >> 16n) & 0x0000_ffff_0000_ffffn) |
-          ((x & 0x0000_ffff_0000_ffffn) << 16n);
-        return (x >> 32n) | ((x & 0xffff_ffffn) << 32n);
+        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
+        for (let offset = 0; offset < 8; offset += 4) {
+          let x = NUMERIC_SCRATCH_VIEW.getUint32(offset, false);
+          x = ((x >>> 1) & 0x5555_5555) | ((x & 0x5555_5555) << 1);
+          x = ((x >>> 2) & 0x3333_3333) | ((x & 0x3333_3333) << 2);
+          x = ((x >>> 4) & 0x0f0f_0f0f) | ((x & 0x0f0f_0f0f) << 4);
+          NUMERIC_SCRATCH_VIEW.setUint32(offset, x, false);
+        }
+        return NUMERIC_SCRATCH_VIEW.getBigUint64(0, true);
       }
       function pushUniqueNumber(byte, modulus, numbers) {
         if (numbers.values.length >= numbers.limit) return true;
@@ -4530,8 +4527,8 @@
         }
         throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
       }
-      function galaxyCoord(value, sub, add) {
-        return value >= sub ? value - sub : value + add;
+      function galaxyCoord(value, offset, mask) {
+        return (value + offset) & mask;
       }
       function generateRandomDataFromNum(num, nextSupp) {
         const data = createDataSet(num);
@@ -4655,29 +4652,21 @@
         data.nms_portal_yy = upper32 & 0xff;
         data.nms_portal_zzz = (portalBits >>> 12) & 0xfff;
         data.nms_portal_xxx = portalBits & 0xfff;
-        data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x801, 0x7ff);
-        data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x81, 0x7f);
-        data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x801, 0x7ff);
+        data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x7ff, 0xfff);
+        data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x7f, 0xff);
+        data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x7ff, 0xfff);
         data.glyph_string =
           GLYPHS[data.planet_number & 0xf] +
           GLYPHS[(data.solar_system_index >> 8) & 0xf] +
           GLYPHS[(data.solar_system_index >> 4) & 0xf] +
           GLYPHS[data.solar_system_index & 0xf];
-        for (let i = 4; i < 12; i += 1) {
-          data.glyph_string += GLYPHS[
-            (portalBits >>> (28 - (i - 4) * 4)) & 0xf
-          ];
+        for (let shift = 28; shift >= 0; shift -= 4) {
+          data.glyph_string += GLYPHS[(portalBits >>> shift) & 0xf];
         }
         return data;
       }
-      function hexByte(value) {
-        return value.toString(16).toUpperCase().padStart(2, "0");
-      }
-      function hexU16Pad4(value) {
-        return (value & 0xffff).toString(16).toUpperCase().padStart(4, "0");
-      }
-      function hexU16Min3(value) {
-        return value.toString(16).toUpperCase().padStart(3, "0");
+      function paddedHex(value, width) {
+        return value.toString(16).toUpperCase().padStart(width, "0");
       }
       function formatOutput(data) {
         const v = data.num_64;
@@ -4703,12 +4692,12 @@
           `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
           `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
           `NMS 은하 번호: ${bytes[0] + 1}`,
-          `NMS 포탈 주소: ${data.planet_number} ${hexU16Min3(data.solar_system_index)
-          } ${hexByte(data.nms_portal_yy)} ${hexU16Min3(data.nms_portal_zzz)
-          } ${hexU16Min3(data.nms_portal_xxx)} (${data.glyph_string
+          `NMS 포탈 주소: ${data.planet_number} ${paddedHex(data.solar_system_index, 3)
+          } ${paddedHex(data.nms_portal_yy, 2)} ${paddedHex(data.nms_portal_zzz, 3)
+          } ${paddedHex(data.nms_portal_xxx, 3)} (${data.glyph_string
           })`,
-          `NMS 은하 좌표: ${hexU16Pad4(data.galaxy_x)}:${hexU16Pad4(data.galaxy_y)
-          }:${hexU16Pad4(data.galaxy_z)}:${hexU16Pad4(data.solar_system_index)
+          `NMS 은하 좌표: ${paddedHex(data.galaxy_x, 4)}:${paddedHex(data.galaxy_y, 4)
+          }:${paddedHex(data.galaxy_z, 4)}:${paddedHex(data.solar_system_index, 4)
           }`,
         ].join("\n");
       }
