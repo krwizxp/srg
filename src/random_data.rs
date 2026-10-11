@@ -265,23 +265,13 @@ where
             .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS)
             .strict_add(1),
         );
-        let glyph_sources = [
-            u64::from(self.data.planet_number),
-            u64::from(self.data.solar_system_index >> 8_u32),
-            u64::from(self.data.solar_system_index >> 4_u32),
-            u64::from(self.data.solar_system_index),
-            num >> 36_u32,
-            num >> 32_u32,
-            num >> 28_u32,
-            num >> 24_u32,
-            num >> 20_u32,
-            num >> 16_u32,
-            num >> 12_u32,
-            num >> 8_u32,
-        ];
-        for (slot, nibble_source) in self.data.glyph_string.iter_mut().zip(glyph_sources) {
-            let index = usize::from(low_u8_from_u64(nibble_source & NIBBLE_MASK_U64));
+        let mut glyph_bits = (u64::from(self.data.planet_number) << 44_u32)
+            | (u64::from(self.data.solar_system_index) << 32_u32)
+            | ((num >> 8_u32) & u64::from(u32::MAX));
+        for slot in self.data.glyph_string.iter_mut().rev() {
+            let index = usize::from(low_u8_from_u64(glyph_bits & NIBBLE_MASK_U64));
             *slot = *NMS_GLYPHS.get(index).unwrap_or_else(|| process::abort());
+            glyph_bits >>= 4_u32;
         }
         Ok(())
     }
