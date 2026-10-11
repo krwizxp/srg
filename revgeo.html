@@ -3029,7 +3029,7 @@
       clearTimeout(statusNotifyTimer);
       if (text) {
         statusNotifyTimer = setTimeout(() => {
-          document.ariaNotify(text);
+          document.ariaNotify?.(text);
         }, 24);
       }
     }
