@@ -97,7 +97,7 @@ class NativeValidation:
                 assert archive.extractfile(entries[0]).read() == data
         shutil.copyfile(artifact, self.out / artifact.name)
         return {'binary_bytes': len(data), 'binary_sha256': hashlib.sha256(data).hexdigest(),
-                'package_bytes': artifact.stat().st_size(), 'package_name': artifact.name}
+                'package_bytes': artifact.stat().st_size, 'package_name': artifact.name}
 
     def cli(self, binary):
         cases = [['--help'], ['-h'], ['--version'], ['--bad'], ['--version', '--bad'],
@@ -153,6 +153,8 @@ class NativeValidation:
         args = [binary, mode]
         if workbook:
             args.append(workbook)
+        if mode == 'roundtrip':
+            args.append(self.root / (binary.parent.parent.parent.name + '-roundtrip.xlsx'))
         r = subprocess.run(list(map(str, args)), capture_output=True, timeout=120, env=self.base_env)
         if r.returncode:
             raise RuntimeError(r.stderr.decode(errors='replace'))
@@ -315,9 +317,6 @@ class NativeValidation:
             assert cli['baseline'] == cli[variant]
             assert outputs['baseline'] == outputs[variant]
             for mode in ['bench', 'parse-bench', 'intern-plain', 'intern-escaped', 'roundtrip']:
-                if mode == 'roundtrip':
-                    # roundtrip needs an independent output path for each process; use main benchmark below.
-                    continue
                 self.paired(variant, probes['baseline'], probes[variant], mode,
                             self.root / 'baseline/fuel_cost_chungcheong.xlsx')
         self.result['equivalence'] = {'fixed_workbook_xml_parts_equal': True,
