@@ -165,15 +165,12 @@ impl OutputFormatter<'_, '_, '_> {
         let head = self.cursor.take(line_len);
         let (prefix_out, groups) = head.split_at_mut(prefix_len);
         prefix_out.copy_from_slice(prefix_bytes);
-        let mut remaining = groups;
-        for byte in self.bytes {
-            let (group_out, tail) = remaining.split_at_mut(WIDTH.strict_add(1));
-            remaining = tail;
-            let group = render_group(byte);
+        for (group_out, byte) in groups.chunks_exact_mut(WIDTH.strict_add(1)).zip(self.bytes) {
             let (value_out, separator_out) = group_out.split_at_mut(WIDTH);
-            value_out.copy_from_slice(&group);
-            separator_out.fill(if remaining.is_empty() { b'\n' } else { b' ' });
+            value_out.copy_from_slice(&render_group(byte));
+            separator_out.fill(b' ');
         }
+        *groups.last_mut().unwrap_or_else(|| process::abort()) = b'\n';
     }
     fn write_random_lines(&mut self) {
         let bytes = self.bytes;
