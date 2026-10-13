@@ -45,8 +45,8 @@ def install_probe():
 try:
     if kind=='chrome':
         binary=str(root/'chrome-linux64/chrome'); executable=str(root/'chromedriver-linux64/chromedriver')
-        options={'browserName':'chrome','goog:chromeOptions':{'binary':binary,'args':['--headless=new','--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--window-size=1440,1200']}}
-        launch=[executable,'--port=4444']
+        options={'browserName':'chrome','goog:chromeOptions':{'binary':binary,'args':['--headless=new','--no-sandbox','--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--window-size=1440,1200']}}
+        launch=[executable,'--port=4444','--verbose']
     elif kind=='firefox':
         executable=shutil.which('geckodriver') or str(P(os.environ['GECKOWEBDRIVER'])/'geckodriver')
         prefs={'datareporting.healthreport.uploadEnabled':False,'datareporting.policy.dataSubmissionEnabled':False,'toolkit.telemetry.enabled':False,'toolkit.telemetry.unified':False,'geo.enabled':False,'geo.provider.network.url':'','network.proxy.type':1,'network.proxy.http':'127.0.0.1','network.proxy.http_port':9,'network.proxy.ssl':'127.0.0.1','network.proxy.ssl_port':9,'network.proxy.no_proxies_on':'localhost, 127.0.0.1'}

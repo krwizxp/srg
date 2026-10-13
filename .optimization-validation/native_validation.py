@@ -419,7 +419,7 @@ class NativeValidation:
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
                 try:
-                    observed = self.run([binary, 'time-observe', f'127.0.0.1:{server.server_port}', '1'], label=f'{variant}-http-{case}')
+                    observed = self.run([binary, 'time-observe', f'http://127.0.0.1:{server.server_port}', '1'], label=f'{variant}-http-{case}')
                     stdout = observed.stdout.decode()
                     assert Handler.calls > 0
                     if case == 'fresh': assert '샘플 수집 실패' not in stdout
