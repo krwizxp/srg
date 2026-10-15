@@ -3745,7 +3745,9 @@
         await sleep(retryDelay(res, attempt), userSignal);
       }
     }
-    async function pauseProcessing(task, message) {
+    async function pauseProcessing(
+      task, message = '일시정지됨. "재개"를 눌러 이어서 진행',
+    ) {
       AppState.setStatus("paused");
       setStatusMessage(message, "warn");
       const { promise, resolve } = Promise.withResolvers();
@@ -3769,6 +3771,10 @@
       };
       const persistentCache = new Map();
       for (let i = 0; i < total && !signal.aborted; i++) {
+        if (AppState.status === "pausing") {
+          await pauseProcessing(task);
+          if (signal.aborted) break;
+        }
         const record = records[i];
         record.result = null;
         record._search = null;
@@ -3788,27 +3794,33 @@
           lastYield = performance.now();
         }
       }
-      try {
-        await readPersistentReverseCache(persistentCache, signal);
-      } catch (err) {
-        if (!signal.aborted) throw err;
-      }
-      for (let i = 0; i < total && !signal.aborted; i++) {
-        const r = records[i];
-        if (r.result) continue;
-        const cacheKey = r.cacheKey;
-        const row = persistentCache.get(cacheKey);
-        if (!row) continue;
-        putReverseMemoryCache(cacheKey, row.parsed, row.savedAt);
-        commitResult(i, row.parsed, false);
-        const now = performance.now();
-        if (now - lastStatusUpdate >= 200) {
-          lastStatusUpdate = now;
-          setProgressStatus(AppState.processed, total, totalDisp);
+      if (persistentCache.size && !signal.aborted) {
+        try {
+          await readPersistentReverseCache(persistentCache, signal);
+        } catch (err) {
+          if (!signal.aborted) throw err;
         }
-        if (now - lastYield >= 8) {
-          await yieldToMain();
-          lastYield = performance.now();
+        for (let i = 0; i < total && !signal.aborted; i++) {
+          if (AppState.status === "pausing") {
+            await pauseProcessing(task);
+            if (signal.aborted) break;
+          }
+          const r = records[i];
+          if (r.result) continue;
+          const cacheKey = r.cacheKey;
+          const row = persistentCache.get(cacheKey);
+          if (!row) continue;
+          putReverseMemoryCache(cacheKey, row.parsed, row.savedAt);
+          commitResult(i, row.parsed, false);
+          const now = performance.now();
+          if (now - lastStatusUpdate >= 200) {
+            lastStatusUpdate = now;
+            setProgressStatus(AppState.processed, total, totalDisp);
+          }
+          if (now - lastYield >= 8) {
+            await yieldToMain();
+            lastYield = performance.now();
+          }
         }
       }
       schedulePageRender();
@@ -3822,7 +3834,7 @@
               task,
               offline
                 ? '네트워크가 오프라인입니다. 연결 후 "재개"를 눌러주세요.'
-                : '일시정지됨. "재개"를 눌러 이어서 진행',
+                : undefined,
             );
             if (signal.aborted) break;
             if (offline && !navigator.onLine) {
@@ -3865,6 +3877,7 @@
               kind: "에러",
             };
           }
+          if (signal.aborted) break;
           commitResult(i, parsed, true);
           const now = performance.now();
           if (
