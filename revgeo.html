@@ -2240,7 +2240,7 @@
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
   <script type="module">
     const COORD_REGEX =
-      /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)/g;
+      /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])/g;
     const csvEsc = (s) => {
       if (s) {
         const c0 = s.charCodeAt(0);
@@ -2941,7 +2941,6 @@
       elapsedStart = performance.now();
       elapsedTimer = setInterval(updateElapsed, 1000);
     }
-    window.addEventListener("pagehide", stopElapsed);
     const AppState = {
       records: [],
       droppedFile: null,
@@ -3329,9 +3328,16 @@
         REVERSE_CACHE_ROWS_UPPER_BOUND = null;
       }
     };
-    function putReverseMemoryCache(cacheKey, parsed) {
+    function getReverseMemoryCache(cacheKey) {
+      const row = REVERSE_PARSED_CACHE.get(cacheKey);
+      if (!row) return;
+      const age = Date.now() - row.savedAt;
+      if (age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS) return row.parsed;
       REVERSE_PARSED_CACHE.delete(cacheKey);
-      REVERSE_PARSED_CACHE.set(cacheKey, parsed);
+    }
+    function putReverseMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
+      REVERSE_PARSED_CACHE.delete(cacheKey);
+      REVERSE_PARSED_CACHE.set(cacheKey, { parsed, savedAt });
       if (REVERSE_PARSED_CACHE.size > REVERSE_PARSED_CACHE_MAX) {
         REVERSE_PARSED_CACHE.delete(REVERSE_PARSED_CACHE.keys().next().value);
       }
@@ -3480,7 +3486,7 @@
               age >= 0 &&
               age <= CONFIG.REVERSE_CACHE_TTL_MS &&
               GeocodeParser.isValid(row.parsed)
-            ) results.set(cacheKey, row.parsed);
+            ) results.set(cacheKey, row);
           };
           const scanCache =
             results.size > REVERSE_CACHE_KEYED_READ_LIMIT ||
@@ -3766,7 +3772,7 @@
         const record = records[i];
         record.result = null;
         record._search = null;
-        const parsed = REVERSE_PARSED_CACHE.get(record.cacheKey);
+        const parsed = getReverseMemoryCache(record.cacheKey);
         if (parsed === undefined) {
           persistentCache.getOrInsert(record.cacheKey, null);
           continue;
@@ -3791,10 +3797,10 @@
         const r = records[i];
         if (r.result) continue;
         const cacheKey = r.cacheKey;
-        const parsed = persistentCache.get(cacheKey);
-        if (!parsed) continue;
-        putReverseMemoryCache(cacheKey, parsed);
-        commitResult(i, parsed, false);
+        const row = persistentCache.get(cacheKey);
+        if (!row) continue;
+        putReverseMemoryCache(cacheKey, row.parsed, row.savedAt);
+        commitResult(i, row.parsed, false);
         const now = performance.now();
         if (now - lastStatusUpdate >= 200) {
           lastStatusUpdate = now;
@@ -3828,7 +3834,7 @@
           if (AppState.task !== task || !AppState.isRunning) break;
           const r = records[i];
           const cacheKey = r.cacheKey;
-          let parsed = REVERSE_PARSED_CACHE.get(cacheKey);
+          let parsed = getReverseMemoryCache(cacheKey);
           const cacheHit = parsed !== undefined;
           try {
             if (!cacheHit) {
