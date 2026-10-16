@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 
-<html data-theme-storage-key="srg-theme" lang="ko">
+<html lang="ko">
 
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
+  <meta content="light dark" name="color-scheme">
   <meta content="strict-origin-when-cross-origin" name="referrer">
   <title>SRG 데이터 역지오코딩 도구</title>
   <meta content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다." name="description">
@@ -22,20 +23,6 @@
   <link crossorigin="anonymous"
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
     integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg" rel="stylesheet">
-  <script>
-    (() => {
-      const root = document.documentElement;
-      try {
-        const storedTheme = localStorage.getItem(root.dataset.themeStorageKey);
-        if (storedTheme === "light" || storedTheme === "dark") {
-          root.dataset.theme = storedTheme;
-        } else if (storedTheme !== null) {
-          localStorage.removeItem(root.dataset.themeStorageKey);
-        }
-      } catch {
-      }
-    })();
-  </script>
   <style>
     /* Content stays opaque; translucency is reserved for navigation. */
     :root {
@@ -1186,6 +1173,7 @@
     };
     const root = document.documentElement;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
     const updateThemeToggle = () => {
@@ -1197,10 +1185,6 @@
     themeMedia.addEventListener("change", updateThemeToggle);
     domElements.themeToggle.addEventListener("click", () => {
       const next = currentTheme() === "dark" ? "light" : "dark";
-      try {
-        localStorage.setItem(root.dataset.themeStorageKey, next);
-      } catch {
-      }
       root.dataset.theme = next;
       updateThemeToggle();
     });
