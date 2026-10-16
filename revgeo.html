@@ -199,7 +199,6 @@
       border: 1px solid var(--line-control); border-radius: 15px;
       font-size: 1rem; line-height: 1.75;
     }
-    #suppValues { min-height: 88px; }
     textarea::placeholder, input::placeholder { color: var(--muted); opacity: 1; }
     .manual-rng-meta { font-size: .75rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
     .manual-rng-meta:empty { display: none; }
@@ -381,16 +380,16 @@
       .mobile-bottom {
         position: fixed; z-index: 25; bottom: 0; left: 0; right: 0; display: flex;
         justify-content: center; align-items: center; gap: 12px;
-        padding: 16px 20px max(16px, env(safe-area-inset-bottom));
+        padding: 6px 20px max(6px, env(safe-area-inset-bottom));
         background: var(--page-bg);
       }
-      .mobile-nav { display: flex; flex: 1; max-width: 300px; gap: 3px; padding: 4px; border-radius: 99px; border: 1px solid var(--line-control); background: var(--glass); box-shadow: 0 4px 20px #0000000a; backdrop-filter: blur(16px); }
-      .mobile-nav button { flex: 1; min-height: 48px; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: .8125rem; border: 0; border-radius: 99px; color: var(--muted); background: transparent; }
+      .mobile-nav { display: flex; flex: 1; max-width: 300px; gap: 3px; padding: 3px; border-radius: 99px; border: 1px solid var(--line-control); background: var(--glass); box-shadow: 0 4px 20px #0000000a; backdrop-filter: blur(16px); }
+      .mobile-nav button { flex: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: .8125rem; border: 0; border-radius: 99px; color: var(--muted); background: transparent; }
       .mobile-nav [aria-pressed="true"] { color: var(--accent); background: var(--surface-panel); font-weight: 650; }
-      .mobile-bottom #export { min-height: 56px; font-size: .8125rem; padding-inline: 14px; }
+      .mobile-bottom #export { min-height: 52px; font-size: .8125rem; padding-inline: 14px; }
       body[data-mobiletab="input"] #mobile-export-slot { display: none; }
-      .page-footer { padding: 22px 20px calc(112px + env(safe-area-inset-bottom)); }
-      .ui-notice { bottom: calc(106px + env(safe-area-inset-bottom)); }
+      .page-footer { padding: 22px 20px calc(86px + env(safe-area-inset-bottom)); }
+      .ui-notice { bottom: calc(80px + env(safe-area-inset-bottom)); }
       .mobile-job-slot:not(:empty) { display: block; }
       .mobile-job-slot .workflow-panel { margin: 0 0 18px; }
       .mobile-job-slot .workflow-panel:has([data-state="idle"]) { display: none; }
@@ -497,8 +496,8 @@
 <div class="manual-rng-field">
 <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
 <textarea aria-describedby="suppValues-help" id="suppValues" placeholder="예)
-0x123456789ABCDEF0
-18446744073709551615" title="사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다."></textarea>
+123456789
+0x1122334455667788" title="사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다."></textarea>
 <span class="manual-rng-meta" id="suppValues-help">사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가
                   입력합니다.</span>
 </div>
