@@ -134,7 +134,6 @@
     }
     .input-card { min-width: 0; }
     .card-label { font-size: 1.5rem; font-weight: 720; letter-spacing: -.04em; }
-    .pane-subtitle { color: var(--muted); font-size: .8125rem; margin: 6px 0 20px; }
     .segmented {
       display: flex; align-items: stretch; gap: 3px; padding: 4px;
       border-radius: 15px; background: light-dark(#e9e9ee, #2c2c30);
@@ -147,7 +146,7 @@
       background: var(--surface-panel); color: var(--fg);
       font-weight: 650; box-shadow: 0 1px 5px #00000010;
     }
-    .input-tabs { margin-bottom: 18px; }
+    .input-tabs { margin: 18px 0; }
     .drop-zone {
       position: relative; display: flex; flex-direction: column; align-items: center;
       text-align: center; justify-content: center; gap: 10px; padding: 24px 18px;
@@ -162,7 +161,6 @@
     .drop-text > .ui-icon { display: block; width: 30px; height: 30px; margin: 0 auto 14px; color: var(--accent); }
     #drop-filename { font-size: 1rem; overflow-wrap: anywhere; }
     #drop-state { display: block; margin-top: 6px; font-size: .8125rem; color: var(--muted); }
-    .drop-hint { color: var(--muted); font-size: .75rem; }
     .action-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       min-width: 44px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line-control);
@@ -207,7 +205,6 @@
     .elapsed-time .ui-icon { width: 14px; height: 14px; }
     .input-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     .input-actions .action-btn { flex: 1; }
-    .privacy-note { margin: 16px 8px; color: var(--muted); font-size: .75rem; line-height: 1.7; }
     .manual-rng-body { display: grid; gap: 16px; }
     .manual-rng-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
     textarea {
@@ -229,7 +226,6 @@
     .results-card { background: var(--surface-panel); border: 1px solid var(--line-soft); border-radius: 24px; box-shadow: var(--shadow); }
     .workspace-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 26px 28px 18px; }
     .workspace-heading .card-label { font-size: 1.875rem; }
-    .workspace-heading p { margin-top: 6px; font-size: .8125rem; color: var(--muted); }
     #export { border-radius: 99px; }
     .result-filterbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 0 28px 18px; }
     .result-filterbar .segmented { min-width: 300px; background: var(--panel-bg); }
@@ -363,11 +359,9 @@
       .tool-capsule { background: transparent; border: 0; padding: 0; }
       #app { display: block; margin-top: 10px; padding-inline: 20px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
-      .pane-subtitle { font-size: .875rem; }
       body[data-mobiletab="input"] .results-column, body[data-mobiletab="results"] .input-card { display: none; }
       .results-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
       .workspace-heading { display: block; padding: 0 0 18px; }
-      .workspace-heading p { font-size: .875rem; }
       .result-filterbar { padding: 0 0 16px; gap: 8px; }
       .result-filterbar .segmented { min-width: 0; width: 100%; }
       .remaining-note { font-size: .75rem; }
@@ -488,8 +482,7 @@
 </header>
 <main id="app">
 <section aria-labelledby="input-title" class="input-card" data-mode="file" id="input-view">
-<h2 class="card-label" id="input-title" tabindex="-1">데이터</h2>
-<p class="pane-subtitle">파일 또는 난수값으로 시작하세요.</p>
+<h2 class="card-label" id="input-title" tabindex="-1">좌표 입력</h2>
 <div aria-label="데이터 입력 방법" class="segmented input-tabs" role="tablist">
 <button aria-controls="file-pane" aria-selected="true" data-mode="file" id="file-tab" role="tab" type="button">파일 업로드</button>
 <button aria-controls="manual-pane" aria-selected="false" data-mode="manual" id="manual-tab" role="tab" tabindex="-1" type="button">난수 직접 입력</button>
@@ -500,7 +493,7 @@
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
 </svg><strong id="drop-filename">random_data.txt</strong><span id="drop-state">파일을 선택하거나 끌어 놓으세요.</span></span>
 <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file"/>
-<span class="drop-hint">TXT 파일만 지원합니다.</span></label><button class="action-btn" command="--parse" commandfor="app" id="parse" type="button">
+</label><button class="action-btn" command="--parse" commandfor="app" id="parse" type="button">
 <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="M6 3h8l4 4v14H6z"></path>
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
@@ -612,12 +605,11 @@
 </button></div>
 </section>
 </div>
-<p class="privacy-note">주소 조회 시 좌표가 Nominatim에 전송됩니다. 파일 분석과 난수 변환은 이 브라우저에서 처리합니다.</p>
 </section>
 <section aria-labelledby="results-title" class="results-column" id="results-view">
 <div class="results-card">
 <header class="workspace-heading">
-<div><h1 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h1><p>좌표의 주소를 확인하고, 조회 결과를 저장하세요.</p></div>
+<div><h1 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h1></div>
 <div id="desktop-export-slot"><button class="action-btn action-btn--primary" command="--export" commandfor="app" disabled="" id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
 <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M12 4.5v10"></path>
@@ -710,6 +702,15 @@
 <div class="detail-tags"><p class="detail-label">지물 태그</p><p id="detail-tag"></p></div>
 <p id="detail-coordinates"></p>
 <button class="map-btn action-btn open-map" id="detail-map-links" popovertarget="map-popover" popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z"></path><path d="M9 2v17m6-14v17"></path></svg>지도에서 열기</button>
+<!-- Modal controls must stay inside the content moved into detail-sheet. -->
+<nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
+<div class="map-links" id="map-popover-links">
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Google</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">OSM</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Naver</a>
+<a href="about:blank" rel="noopener noreferrer" target="_blank">Kakao</a>
+</div>
+</nav>
 <p class="details-source">주소: OpenStreetMap · Nominatim<br/>미리보기를 불러오면 좌표가 OpenStreetMap에 전송됩니다.</p>
 </div>
 </aside>
@@ -724,7 +725,7 @@
 <div class="footer-credit">
 <p>© <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a>
             · <a href="https://nominatim.org/" rel="noopener noreferrer" target="_blank">Nominatim</a></p>
-<p class="usage-policy"><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a> · 초당 1회 이하</p>
+<p class="usage-policy"><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a></p>
 </div>
 </footer>
 <div class="mobile-bottom">
@@ -743,14 +744,7 @@
 <option value="50">50개</option>
 <option value="100">100개</option>
 </select>
-</section><nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
-<div class="map-links" id="map-popover-links">
-<a href="about:blank" rel="noopener noreferrer" target="_blank">Google</a>
-<a href="about:blank" rel="noopener noreferrer" target="_blank">OSM</a>
-<a href="about:blank" rel="noopener noreferrer" target="_blank">Naver</a>
-<a href="about:blank" rel="noopener noreferrer" target="_blank">Kakao</a>
-</div>
-</nav><dialog aria-describedby="supp-dialog-context supp-dialog-help" aria-labelledby="supp-dialog-title" id="supp-dialog">
+</section><dialog aria-describedby="supp-dialog-context supp-dialog-help" aria-labelledby="supp-dialog-title" id="supp-dialog">
 <form class="supp-dialog-form" id="supp-dialog-form" novalidate="">
 <h2 id="supp-dialog-title">보조 난수값 추가</h2>
 <p class="manual-rng-meta" id="supp-dialog-context"></p>
@@ -3803,6 +3797,7 @@
     });
     document.getElementById("close-detail").addEventListener("click", () => detailSheet.close());
     detailSheet.addEventListener("close", () => {
+      mapPopover.hidePopover();
       unloadDetailMap();
       inspector.append(inspectorContent);
     });
