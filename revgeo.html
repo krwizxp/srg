@@ -107,7 +107,6 @@
     .brand-mark { width: 42px; height: 42px; flex: none; }
     .site-brand > div { min-width: 0; }
     .site-brand strong { font-size: 1.2rem; letter-spacing: -.035em; overflow-wrap: anywhere; }
-    .brand-sub { font-size: .75rem; color: var(--muted); margin-top: 2px; }
     .workflow-steps { display: flex; gap: 24px; padding: 0; margin: 0; list-style: none; }
     .workflow-steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .8125rem; }
     .workflow-steps span {
@@ -205,7 +204,7 @@
     .elapsed-time .ui-icon { width: 14px; height: 14px; }
     .input-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     .input-actions .action-btn { flex: 1; }
-    .manual-rng-body { display: grid; gap: 16px; }
+    .manual-rng-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
     .manual-rng-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
     textarea {
       display: block; width: 100%; resize: vertical; min-height: 120px; max-height: 420px;
@@ -287,7 +286,6 @@
     .result-pages .action-btn { min-width: 44px; min-height: 44px; padding: 8px; border-color: transparent; border-radius: 10px; font-size: .75rem; }
     .page-number[aria-current="page"] { background: var(--accent-wash); color: var(--accent); font-weight: 650; }
     .page-ellipsis { color: var(--muted); }
-    .list-hint { text-align: center; color: var(--muted); font-size: .75rem; padding: 0 16px 18px; }
     .inspector { min-width: 0; padding: 20px; border-left: 1px solid var(--line-soft); background: var(--panel-bg); border-bottom-right-radius: 24px; }
     .inspector-eyebrow { color: var(--muted); font-size: .75rem; margin-bottom: 12px; }
     #detail-title { font-size: 1.25rem; font-weight: 670; letter-spacing: -.04em; overflow-wrap: anywhere; }
@@ -309,7 +307,6 @@
     #detail-tag { margin-top: 7px; font-size: .8125rem; overflow-wrap: anywhere; }
     #detail-coordinates { margin-top: 12px; font: .75rem/1.7 ui-monospace, monospace; overflow-wrap: anywhere; color: var(--muted); }
     .open-map { width: 100%; margin-top: 18px; }
-    .details-source { color: var(--muted); font-size: .6875rem; margin-top: 12px; }
     .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding: 18px 28px 24px; margin: auto; color: var(--muted); font-size: .75rem; }
     .footer-info { width: 16px; height: 16px; margin-top: 2px; }
     .usage-policy { margin-top: 4px; }
@@ -355,7 +352,7 @@
       .site-header { border: 0; }
       .brand-mark { width: 32px; height: 32px; }
       .site-brand strong { font-size: 1rem; }
-      .brand-sub, .help-button { display: none; }
+      .help-button { display: none; }
       .tool-capsule { background: transparent; border: 0; padding: 0; }
       #app { display: block; margin-top: 10px; padding-inline: 20px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
@@ -394,7 +391,6 @@
       .results-footer { padding: 16px 0; justify-content: center; }
       #results-count { text-align: center; width: 100%; }
       #page-prev > span, #page-next > span { display: none; }
-      .list-hint { padding-bottom: 0; }
       .mobile-bottom {
         position: fixed; z-index: 25; bottom: 0; left: 0; right: 0; display: flex;
         justify-content: center; align-items: center; gap: 12px;
@@ -438,7 +434,7 @@
     @media print {
       :root { color-scheme: light; }
       body { background: white; }
-      .site-header, .input-card, search, .result-filterbar, .mobile-bottom, .inspector, .results-footer, .list-hint, .ui-notice, #export, .mobile-job-slot { display: none !important; }
+      .site-header, .input-card, search, .result-filterbar, .mobile-bottom, .inspector, .results-footer, .ui-notice, #export, .mobile-job-slot { display: none !important; }
       #app, .results-column, body[data-mobiletab="input"] .results-column, .results-grid { display: block; margin: 0; padding: 0; }
       .results-card { border: 0; box-shadow: none; }
       .table-wrap { overflow: visible; max-height: none; }
@@ -459,7 +455,7 @@
 <div class="header-inner">
 <a aria-label="SRG 역지오코딩 상단으로 이동" class="site-brand" href="#app">
 <img alt="" aria-hidden="true" class="brand-mark" decoding="async" height="38" src="./icon.svg?v=7" width="38"/>
-<div><strong>SRG 역지오코딩</strong><p class="brand-sub">좌표를 주소로, 한눈에.</p></div></a>
+<div><strong>SRG 역지오코딩</strong></div></a>
 <ol aria-label="작업 단계" class="workflow-steps">
 <li aria-current="step" data-step="input"><span>1</span>데이터 입력</li>
 <li data-step="lookup"><span>2</span>주소 조회</li>
@@ -684,7 +680,7 @@
 </svg></button>
 </nav>
 </div>
-<p class="list-hint">주소를 선택하면 위치 상세를 볼 수 있습니다.</p>
+
 </div>
 <aside aria-label="선택한 위치" class="inspector" id="inspector">
 <p class="inspector-empty" id="inspector-empty">결과에서 주소를 선택하세요.</p>
@@ -711,7 +707,7 @@
 <a href="about:blank" rel="noopener noreferrer" target="_blank">Kakao</a>
 </div>
 </nav>
-<p class="details-source">주소: OpenStreetMap · Nominatim<br/>미리보기를 불러오면 좌표가 OpenStreetMap에 전송됩니다.</p>
+
 </div>
 </aside>
 </div>
@@ -769,6 +765,7 @@
 </dialog>
 <dialog aria-labelledby="help-title" id="help-dialog">
 <div class="sheet-heading"><h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></svg></button></div>
+<p class="manual-rng-meta">주소 조회는 Nominatim, 지도 미리보기는 OpenStreetMap에 좌표를 전송합니다.</p>
 <ol><li>TXT 파일을 불러와 좌표를 추출하거나, 난수를 직접 변환합니다.</li><li>주소 조회를 시작합니다. 입력 화면에서 일시정지, 재개, 중지할 수 있습니다.</li><li>결과에서 주소를 선택하면 상세 정보와 지도 링크를 확인할 수 있습니다.</li><li>CSV에는 필터와 관계없이 조회된 전체 결과가 포함됩니다.</li></ol>
 <p class="manual-rng-meta">공용 Nominatim은 초당 1회 이하로 조회합니다. 클립보드는 HTTPS 또는 localhost에서 사용할 수 있습니다.</p>
 </dialog>
