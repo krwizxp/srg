@@ -36,7 +36,7 @@
       --muted: light-dark(#68686e, #aeaeb6);
       --muted-strong: var(--muted);
       --line-soft: light-dark(#e5e5eb, #38383d);
-      --line-control: light-dark(#d4d4dc, #52525b);
+      --line-control: light-dark(#8b8b92, #777780);
       --accent: light-dark(#0068df, #7ab6ff);
       --accent-ink: var(--accent);
       --accent-wash: light-dark(#edf4ff, #25354b);
@@ -45,7 +45,12 @@
       --danger-bg: light-dark(#fff3e6, #392d22);
       --success: light-dark(#19733f, #78d89c);
       --success-bg: light-dark(#eaf5ee, #20372a);
-      --glass: light-dark(#ffffffe6, #27272aeb);
+      --glass: light-dark(#ffffffc7, #27272acc);
+      --glass-edge: light-dark(#ffffffd9, #ffffff38);
+      --glass-sheen: light-dark(#ffffffb3, #ffffff14);
+      --glass-shadow: 0 4px 20px #00000012, inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 #0000000a;
+      --press-bg: light-dark(#dce7f7, #35455b);
+      --page-gutter: 28px;
       --shadow: 0 1px 3px #151e3105, 0 8px 28px #151e3108;
       --focus-ring: var(--accent);
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", "Noto Sans CJK KR", sans-serif;
@@ -61,6 +66,13 @@
     button, input, select, textarea { font: inherit; }
     button, select, summary { cursor: pointer; }
     button { color: inherit; }
+    button, summary, .map-links a {
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color .15s, box-shadow .15s, transform .25s cubic-bezier(.2, .8, .2, 1.2);
+    }
+    :is(button, summary, .map-links a):active:not(:disabled) {
+      background-color: var(--press-bg); transform: scale(.97);
+    }
     a { color: var(--accent); text-underline-offset: 3px; }
     svg { flex-shrink: 0; vertical-align: middle; }
     [hidden] { display: none !important; }
@@ -87,7 +99,7 @@
     .site-header { border-bottom: 1px solid var(--line-soft); }
     .header-inner {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 24px; min-height: 88px; max-width: 1680px; margin: auto; padding: 16px 28px;
+      gap: 24px; min-height: 88px; max-width: 1680px; margin: auto; padding: max(16px, env(safe-area-inset-top)) 28px 16px;
     }
     .site-brand, .header-tools { display: flex; align-items: center; gap: 10px; }
     .site-brand { text-decoration: none; color: var(--fg); min-width: 0; }
@@ -104,15 +116,24 @@
     .workflow-steps [aria-current="step"] span { background: var(--accent); color: var(--surface-panel); border-color: var(--accent); }
     .tool-capsule {
       display: flex; padding: 3px; border-radius: 99px;
-      background: var(--glass); border: 1px solid var(--line-soft);
+    }
+    .tool-capsule, .mobile-nav {
+      isolation: isolate; border: 1px solid var(--glass-edge);
+      background: linear-gradient(145deg, var(--glass-sheen), transparent 55%), var(--glass);
+      box-shadow: var(--glass-shadow);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
     }
     .theme-toggle, .settings-button, .icon-button {
       border: 0; border-radius: 50%; background: transparent;
-      display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0;
+      display: grid; place-items: center; width: 44px; min-width: 44px; min-height: 44px; padding: 0;
     }
-    .theme-toggle .theme-sun, .theme-toggle[aria-pressed="true"] .theme-moon { display: none; }
-    .theme-toggle[aria-pressed="true"] .theme-sun { display: block; }
+    .theme-toggle .theme-moon, .theme-toggle[aria-pressed="true"] .theme-sun { display: none; }
+    .theme-toggle[aria-pressed="true"] .theme-moon { display: block; }
     .theme-toggle:hover, .settings-button:hover, .icon-button:hover { background: var(--panel-bg); }
+    :is(.theme-toggle, .settings-button, .icon-button, .segmented button):active:not(:disabled) {
+      background: var(--press-bg); box-shadow: inset 0 1px 3px #00000018;
+    }
     .help-button { font-size: .8125rem; }
     #app {
       display: grid; grid-template-columns: 304px minmax(0, 1fr);
@@ -156,6 +177,7 @@
     }
     .action-btn:hover:not(:disabled) { background: var(--panel-bg); border-color: var(--accent); }
     .action-btn:active:not(:disabled) { transform: translateY(1px); }
+    .action-btn--primary:active:not(:disabled) { background: #004ca6; color: #fff; }
     .action-btn:disabled { opacity: .45; cursor: not-allowed; }
     .action-btn--primary { background: #0068df; color: #fff; border-color: #0068df; }
     .action-btn--primary:hover:not(:disabled) { background: #0057bc; color: #fff; }
@@ -187,6 +209,7 @@
     .status { flex-basis: 100%; overflow-wrap: anywhere; color: var(--success); }
     .status.err, .status.warn { color: var(--danger); }
     .status.stopped, [data-state="idle"] .status:not(.err):not(.warn) { color: var(--muted); }
+    .privacy-note { margin-top: 12px; color: var(--muted); font-size: .8125rem; overflow-wrap: anywhere; }
     .elapsed-time { color: var(--muted); display: flex; align-items: center; gap: 5px; }
     .elapsed-time .ui-icon { width: 14px; height: 14px; }
     .input-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -217,7 +240,7 @@
     .segmented strong { font-weight: 500; margin-left: 3px; }
     .remaining-note { margin-left: auto; font-size: .8125rem; color: var(--muted); }
     search { display: block; padding: 0 28px 20px; }
-    .filters { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 115px auto; gap: 10px; align-items: start; }
+    .filters { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto; gap: 10px; align-items: start; }
     .filters :is(input, select) {
       width: 100%; min-height: 44px; height: auto; line-height: 1.5; min-width: 0; border: 1px solid var(--line-control); border-radius: 12px;
       background: var(--surface-panel); color: var(--fg); padding: 8px 12px; font-size: 1rem;
@@ -229,7 +252,7 @@
     .advanced-filters > summary::-webkit-details-marker { display: none; }
     .advanced-filters[open] > summary { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
     .filter-grid {
-      position: absolute; right: 0; top: 56px; z-index: 15; display: grid; gap: 12px;
+      position: absolute; right: 0; top: calc(100% + 8px); z-index: 15; display: grid; gap: 12px;
       width: min(340px, 100%); padding: 20px; max-height: 65dvh; overflow: auto;
       background: var(--surface-panel); border: 1px solid var(--line-control); border-radius: 18px; box-shadow: 0 12px 40px #0002;
     }
@@ -254,7 +277,7 @@
       display: block; border: 0; border-radius: 6px; background: transparent; color: inherit;
       width: 100%; min-height: 44px; padding: 0; text-align: left; line-height: 1.6;
     }
-    .address-main, .address-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .address-main, .address-sub { display: block; overflow-wrap: anywhere; }
     .address-main { font-weight: 650; }
     .address-sub { color: var(--muted); font-size: .75rem; margin-top: 3px; }
     .coordinate-cell { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .75rem; color: var(--muted); }
@@ -286,7 +309,7 @@
     #detail-full { flex: 1; min-width: 0; }
     #copy-address { flex: none; margin-top: -9px; margin-right: -8px; }
     .detail-fields { margin-top: 18px; padding: 12px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
-    .detail-fields > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; margin: 10px 0; font-size: .75rem; }
+    .detail-fields > div { display: grid; grid-template-columns: 4.75rem minmax(0, 1fr); gap: 8px; margin: 10px 0; font-size: .75rem; }
     dt { color: var(--muted); }
     dd { text-align: right; overflow-wrap: anywhere; }
     .detail-tags { margin-top: 18px; }
@@ -297,14 +320,16 @@
     .footer-info { width: 16px; height: 16px; margin-top: 2px; }
     .usage-policy { margin-top: 4px; }
     .settings-popover, .map-popover, dialog {
-      max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow: auto;
+      max-width: calc(100vw - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
+      max-height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom))); overflow: auto;
       padding: 22px; color: var(--fg); background: var(--surface-panel);
       border: 1px solid var(--line-control); border-radius: 22px; box-shadow: 0 20px 60px #0003;
     }
     .settings-popover { width: 300px; }
     .settings-popover h2 { font-size: 1.25rem; margin-bottom: 18px; }
-    .settings-popover label { display: block; margin-bottom: 8px; }
+    .settings-popover label { display: block; margin: 16px 0 8px; }
     .settings-popover select { min-height: 44px; width: 100%; color: var(--fg); background: var(--panel-bg); border: 1px solid var(--line-control); border-radius: 12px; padding: 8px; }
+    #settings-help { width: 100%; margin-top: 18px; }
     .map-links { display: flex; flex-wrap: wrap; gap: 8px; }
     .map-links a { display: flex; align-items: center; min-height: 44px; min-width: 64px; padding: 10px; text-decoration: none; border-radius: 10px; }
     .map-links a:hover { background: var(--accent-wash); }
@@ -321,10 +346,12 @@
     #help-dialog ol { padding-left: 24px; line-height: 1.9; }
     .ui-notice { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px); width: max-content; padding: 14px 20px; border-radius: 16px; background: var(--fg); color: var(--surface-panel); font-size: .875rem; box-shadow: 0 8px 25px #0002; }
     .mobile-bottom, .mobile-job-slot { display: none; }
+    .mobile-job-slot:not(:empty) { display: block; }
     .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip-path: inset(50%); white-space: nowrap !important; border: 0 !important; }
     .nowrap { white-space: nowrap; }
     .manual-rng-meta .nowrap { white-space: normal; overflow-wrap: anywhere; }
     @media (max-width: 1230px) {
+      :root { --page-gutter: 20px; }
       .workflow-steps { display: none; }
       #app { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; padding-inline: 20px; }
       .results-grid { grid-template-columns: 1fr; }
@@ -339,7 +366,6 @@
       .brand-mark { width: 32px; height: 32px; }
       .site-brand h1 { font-size: 1rem; }
       .help-button { display: none; }
-      .tool-capsule { background: transparent; border: 0; padding: 0; }
       #app { display: block; margin-top: 10px; padding-inline: 20px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
       body[data-mobiletab="input"] .results-column, body[data-mobiletab="results"] .input-card { display: none; }
@@ -349,8 +375,8 @@
       .result-filterbar .segmented { min-width: 0; width: 100%; }
       .remaining-note { font-size: .75rem; }
       search { padding: 0 0 18px; }
-      .filters { grid-template-columns: minmax(0, 1fr) 92px 44px; gap: 8px; }
-      .filters select { font-size: .8125rem; padding-inline: 6px; }
+      .filters { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
+      .search-field { grid-column: 1 / -1; }
       .advanced-filters > summary { padding: 10px; }
       .advanced-filters > summary span { display: none; }
       .filter-grid { width: 100%; }
@@ -370,7 +396,7 @@
       td:nth-child(5) { grid-column: 2; grid-row: 2; text-align: right; align-self: end; }
       .address-main { font-size: .9375rem; }
       .address-sub { font-size: .8125rem; }
-      .coordinate-cell { font-size: .6875rem; }
+      .coordinate-cell { font-size: .75rem; }
       .coordinate-cell span { display: inline; }
       .coordinate-cell span:first-child::after { content: ", "; }
       .table-hint { inset: 0; }
@@ -379,23 +405,31 @@
       #page-prev > span, #page-next > span { display: none; }
       .mobile-bottom {
         position: fixed; z-index: 25; bottom: 0; left: 0; right: 0; display: flex;
-        justify-content: center; align-items: center; gap: 12px;
+        justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px;
         padding: 6px 20px max(6px, env(safe-area-inset-bottom));
-        background: var(--page-bg);
+        isolation: isolate;
       }
-      .mobile-nav { display: flex; flex: 1; max-width: 300px; gap: 3px; padding: 3px; border-radius: 99px; border: 1px solid var(--line-control); background: var(--glass); box-shadow: 0 4px 20px #0000000a; backdrop-filter: blur(16px); }
-      .mobile-nav button { flex: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: .8125rem; border: 0; border-radius: 99px; color: var(--muted); background: transparent; }
-      .mobile-nav [aria-pressed="true"] { color: var(--accent); background: var(--surface-panel); font-weight: 650; }
+      .mobile-bottom::before { content: ""; position: absolute; inset: -18px 0 0; z-index: -1; pointer-events: none; background: linear-gradient(transparent, var(--page-bg)); }
+      .mobile-nav { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: 300px; gap: 3px; padding: 3px; border-radius: 99px; }
+      .mobile-nav::before {
+        content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 9px) / 2);
+        border-radius: inherit; background: var(--surface-panel); box-shadow: 0 1px 5px #00000014, inset 0 1px 0 var(--glass-edge);
+        transition: transform .28s cubic-bezier(.2, .8, .2, 1.1);
+      }
+      .mobile-nav:has([data-mobile="results"][aria-pressed="true"])::before { transform: translateX(calc(100% + 3px)); }
+      .mobile-nav button { position: relative; flex: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: .8125rem; border: 0; border-radius: 99px; color: var(--muted); background: transparent; }
+      .mobile-nav [aria-pressed="true"] { color: var(--accent); font-weight: 650; }
+      .mobile-nav button:active, .tool-capsule button:active { background: var(--press-bg); }
       .mobile-bottom #export { min-height: 52px; font-size: .8125rem; padding-inline: 14px; }
       body[data-mobiletab="input"] #mobile-export-slot { display: none; }
-      .page-footer { padding: 22px 20px calc(86px + env(safe-area-inset-bottom)); }
-      .ui-notice { bottom: calc(80px + env(safe-area-inset-bottom)); }
-      .mobile-job-slot:not(:empty) { display: block; }
+      .page-footer { padding: 22px 20px calc(7rem + env(safe-area-inset-bottom)); }
+      .ui-notice { bottom: calc(7rem + env(safe-area-inset-bottom)); }
       .mobile-job-slot .workflow-panel { margin: 0 0 18px; }
-      .mobile-job-slot .workflow-panel:has([data-state="idle"]) { display: none; }
+      .mobile-job-slot .workflow-panel:has([data-state="idle"]):has(#start:disabled) { display: none; }
       .settings-popover { margin-inline: auto; }
     }
     @media (max-width: 374px) {
+      :root { --page-gutter: 12px; }
       .header-inner { padding-inline: 12px; }
       #app { padding-inline: 12px; }
       .site-brand { gap: 6px; }
@@ -407,13 +441,28 @@
       .result-pages, .page-numbers { gap: 1px; }
       .result-pages .action-btn { min-width: 44px; }
     }
+    .header-inner, #app, .page-footer, .mobile-bottom {
+      padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+      padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+    }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .tool-capsule, .mobile-nav { background: var(--surface-panel); }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      :is(button, summary, .map-links a):active:not(:disabled) { transform: none; }
     }
     @media (prefers-reduced-transparency: reduce) {
-      .tool-capsule, .mobile-nav { background: var(--surface-panel); backdrop-filter: none; }
+      .tool-capsule, .mobile-nav { background: var(--surface-panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    }
+    @media (prefers-contrast: more) {
+      :root { --line-soft: var(--line-control); --line-control: var(--fg); --muted: var(--fg); }
+      .tool-capsule, .mobile-nav { background: var(--surface-panel); border-color: var(--fg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+      .mobile-nav::before { border: 2px solid var(--accent); }
     }
     @media (forced-colors: active) {
+      .tool-capsule, .mobile-nav { border-color: ButtonText; }
+      .mobile-nav::before { border: 2px solid Highlight; }
       .progress-fill { background: Highlight; }
       .segmented :is([aria-selected="true"], [aria-pressed="true"]), tr[data-selected="true"] { outline: 2px solid Highlight; }
     }
@@ -449,7 +498,7 @@
 </ol>
 <div class="header-tools">
 <button class="action-btn help-button" id="show-help" type="button">도움말</button>
-<div class="tool-capsule"><button aria-label="어두운 테마" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="밝은 / 어두운 테마 전환" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <circle cx="12" cy="12" fill="currentColor" r="4"></circle>
 <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"></path>
 </svg><svg aria-hidden="true" class="theme-moon ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
@@ -559,11 +608,12 @@
 </div>
 <output id="counts">총 <strong id="cnt-total">0</strong>건 중
               <strong id="cnt-success">0</strong>건 완료, <strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
-</div><div class="status-row" data-state="idle"><output class="status" id="status">파일을 업로드해 주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+</div><div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해 주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <circle cx="12" cy="12" r="9"></circle>
 <path d="M12 7v5l3 2"></path>
 </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
-<div class="input-actions"><button class="action-btn action-btn--primary" command="--start" commandfor="app" disabled id="start" type="button">
+<p class="privacy-note" id="lookup-privacy">주소 조회 시 좌표를 Nominatim에 전송하며, 조회 결과는 이 브라우저에 캐시합니다.</p>
+<div class="input-actions"><button aria-describedby="lookup-privacy" class="action-btn action-btn--primary" command="--start" commandfor="app" disabled id="start" type="button">
 <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
 </svg>
@@ -672,7 +722,8 @@
 <div hidden id="inspector-content">
 <p class="inspector-eyebrow">선택한 위치</p>
 <h2 id="detail-title">선택한 위치</h2><p id="detail-town"></p>
-<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg><span>지도 미리보기 불러오기</span></button><iframe hidden id="detail-map" referrerpolicy="strict-origin-when-cross-origin" title="선택한 좌표의 OpenStreetMap 지도"></iframe></div>
+<div class="map-preview"><button aria-describedby="map-privacy" class="map-load" id="load-map" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg><span>지도 미리보기 불러오기</span></button><iframe hidden id="detail-map" referrerpolicy="strict-origin-when-cross-origin" title="선택한 좌표의 OpenStreetMap 지도"></iframe></div>
+<p class="privacy-note" id="map-privacy">미리보기를 불러오면 좌표를 OpenStreetMap에 전송합니다.</p>
 <p class="detail-label">전체 주소</p>
 <div class="full-address"><span id="detail-full"></span><button aria-label="주소 복사" class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><rect height="11" rx="2" width="11" x="9" y="9"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg></button></div>
 <dl class="detail-fields">
@@ -718,6 +769,12 @@
 </div>
 <section aria-labelledby="settings-title" class="settings-popover" id="display-settings" popover="auto">
 <h2 id="settings-title">화면 설정</h2>
+<label for="appearance">화면 모드</label>
+<select id="appearance">
+<option value="system">시스템 설정</option>
+<option value="light">라이트 모드</option>
+<option value="dark">다크 모드</option>
+</select>
 <label for="page-size">페이지당 결과</label>
 <select id="page-size">
 <option value="10">10개</option>
@@ -725,6 +782,7 @@
 <option value="50">50개</option>
 <option value="100">100개</option>
 </select>
+<button class="action-btn" id="settings-help" type="button">사용 방법</button>
 </section><dialog aria-describedby="supp-dialog-context supp-dialog-help" aria-labelledby="supp-dialog-title" id="supp-dialog">
 <form class="supp-dialog-form" id="supp-dialog-form" novalidate>
 <h2 id="supp-dialog-title">보조 난수값 추가</h2>
@@ -1171,20 +1229,26 @@
     };
     const root = document.documentElement;
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const appearance = document.getElementById("appearance");
     // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
     const updateThemeToggle = () => {
       const dark = currentTheme() === "dark";
       domElements.themeToggle.ariaPressed = String(dark);
-      domElements.themeToggle.ariaLabel = dark ? "밝은 테마" : "어두운 테마";
+      domElements.themeToggle.title = dark ? "다크 모드 끄기" : "다크 모드 켜기";
+      appearance.value = root.dataset.theme || "system";
     };
+    function setTheme(theme) {
+      if (theme === "system") delete root.dataset.theme;
+      else root.dataset.theme = theme;
+      updateThemeToggle();
+    }
     updateThemeToggle();
     themeMedia.addEventListener("change", updateThemeToggle);
+    appearance.addEventListener("change", () => setTheme(appearance.value));
     domElements.themeToggle.addEventListener("click", () => {
-      const next = currentTheme() === "dark" ? "light" : "dark";
-      root.dataset.theme = next;
-      updateThemeToggle();
+      setTheme(currentTheme() === "dark" ? "light" : "dark");
     });
     let statusFilter = "all";
     const ROW_TEMPLATE = document.getElementById("tmpl-row").content
@@ -1525,6 +1589,10 @@
       },
     };
     function updateUIState() {
+      const active = document.activeElement;
+      const controls = [domElements.parseBtn, domElements.startBtn, domElements.pauseBtn,
+        domElements.resumeBtn, domElements.stopBtn, domElements.file, document.getElementById("useOutput")];
+      const ownedFocus = controls.includes(active);
       const s = AppState.status;
       domElements.statusRow.dataset.state = s;
       if (s === "idle") stopElapsed();
@@ -1545,6 +1613,13 @@
       domElements.stopBtn.hidden = !isBusy;
       document.getElementById("useOutput").disabled = isBusy || !manualOutputReady;
       updateWorkflowStep();
+      if (ownedFocus && (active.disabled || active.hidden)) {
+        const next = s === "running" ? domElements.pauseBtn
+          : s === "paused" ? domElements.resumeBtn
+          : isBusy ? domElements.stopBtn
+          : AppState.records.length ? domElements.startBtn : domElements.parseBtn;
+        (next.disabled ? domElements.status : next).focus({ preventScroll: true });
+      }
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
     let statusNotifyTimer = 0;
@@ -3612,6 +3687,14 @@
     let selectedRecordIndex = -1;
     let selectedRecord = null;
     let noticeTimer = 0;
+    let detailReturnFocus = null;
+    // A media-query change can hide a focused slot before its change event runs.
+    let layoutFocus = null;
+    document.addEventListener("focusin", ({ target }) => {
+      layoutFocus = jobPanel.contains(target) || target === domElements.exportBtn ? target : null;
+    });
+    document.addEventListener("pointerdown", () => { layoutFocus = null; }, { passive: true });
+    window.addEventListener("blur", () => { layoutFocus = null; });
 
     function setInputMode(mode) {
       const manual = mode === "manual";
@@ -3644,20 +3727,32 @@
     });
 
     function adaptLayout() {
+      const active = document.activeElement === document.body ? layoutFocus : document.activeElement;
+      const restoreFocus = active && (jobPanel.contains(active) || active === domElements.exportBtn);
       const exportSlot = mobileMedia.matches ? mobileExportSlot : desktopExportSlot;
       if (domElements.exportBtn.parentElement !== exportSlot) exportSlot.append(domElements.exportBtn);
       const jobSlot = mobileMedia.matches && document.body.dataset.mobiletab === "results"
         ? mobileJobSlot : inputJobSlot;
       if (jobPanel.parentElement !== jobSlot) jobSlot.append(jobPanel);
       if (!compactMedia.matches && detailSheet.open) detailSheet.close();
+      if (restoreFocus && active.getClientRects().length && !active.disabled) active.focus({ preventScroll: true });
     }
     function setMobileView(view) {
+      const active = document.activeElement;
+      const focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .workflow-panel");
       document.body.dataset.mobiletab = view === "results" ? "results" : "input";
       for (const button of mobileButtons) {
         button.ariaPressed = String(button.dataset.mobile === document.body.dataset.mobiletab);
       }
       adaptLayout();
-      if (mobileMedia.matches) window.scrollTo(0, 0);
+      if (mobileMedia.matches) {
+        window.scrollTo(0, 0);
+        if (focusInView) {
+          const next = active.getClientRects().length && !active.disabled ? active
+            : document.getElementById(view === "results" ? "results-title" : "input-title");
+          next.focus({ preventScroll: true });
+        }
+      }
     }
     for (const button of mobileButtons) {
       button.addEventListener("click", () => setMobileView(button.dataset.mobile));
@@ -3749,6 +3844,7 @@
         row.querySelector(".location-button").ariaPressed = String(selected);
       }
       if (reveal && compactMedia.matches && !detailSheet.open) {
+        detailReturnFocus = domElements.tbody.querySelector(`.location-button[data-record="${index}"]`);
         detailSheet.append(inspectorContent);
         detailSheet.showModal();
       }
@@ -3779,6 +3875,10 @@
       mapPopover.hidePopover();
       unloadDetailMap();
       inspector.append(inspectorContent);
+      if (detailReturnFocus?.isConnected && detailReturnFocus.getClientRects().length) {
+        detailReturnFocus.focus({ preventScroll: true });
+      }
+      detailReturnFocus = null;
     });
     copyAddress.addEventListener("click", async () => {
       const record = selectedRecord;
@@ -3827,8 +3927,19 @@
       acceptInputFile(event.dataTransfer?.files[0]);
     });
     const helpDialog = document.getElementById("help-dialog");
-    document.getElementById("show-help").addEventListener("click", () => helpDialog.showModal());
+    let helpReturnFocus = null;
+    for (const id of ["show-help", "settings-help"]) {
+      document.getElementById(id).addEventListener("click", () => {
+        helpReturnFocus = id === "settings-help" ? document.querySelector(".settings-button") : document.getElementById(id);
+        document.getElementById("display-settings").hidePopover();
+        helpDialog.showModal();
+      });
+    }
     document.getElementById("close-help").addEventListener("click", () => helpDialog.close());
+    helpDialog.addEventListener("close", () => {
+      if (helpReturnFocus?.getClientRects().length) helpReturnFocus.focus({ preventScroll: true });
+      helpReturnFocus = null;
+    });
     window.addEventListener("pagehide", () => {
       clearTimeout(noticeTimer);
       unloadDetailMap();
