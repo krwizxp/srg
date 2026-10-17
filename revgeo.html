@@ -413,9 +413,11 @@
         position: fixed; z-index: 25; bottom: 0; left: 0; right: 0; display: flex;
         justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px;
         padding: 6px 20px max(6px, env(safe-area-inset-bottom));
+        /* Safari can cache edge samples when this fixed container is transparent. */
+        background-color: var(--page-bg);
         isolation: isolate;
       }
-      .mobile-bottom::before { content: ""; position: absolute; inset: -18px 0 0; z-index: -1; pointer-events: none; background: linear-gradient(transparent, var(--page-bg)); }
+      .mobile-bottom::before { content: ""; position: absolute; bottom: 100%; left: 0; right: 0; height: 18px; z-index: -1; pointer-events: none; background: linear-gradient(transparent, var(--page-bg)); }
       .mobile-nav { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: 300px; gap: 3px; padding: 3px; border-radius: 99px; }
       .mobile-nav::before {
         content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 9px) / 2);
