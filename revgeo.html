@@ -6,6 +6,8 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
   <meta content="light dark" name="color-scheme">
+  <meta content="#f5f5f7" media="(prefers-color-scheme: light)" name="theme-color">
+  <meta content="#111113" media="(prefers-color-scheme: dark)" name="theme-color">
   <meta content="strict-origin-when-cross-origin" name="referrer">
   <title>SRG 데이터 역지오코딩 도구</title>
   <meta content="SRG가 생성하는 random_data.txt 파일의 위경도 좌표를 주소로 변환(역지오코딩)해주는 웹 도구입니다." name="description">
@@ -27,7 +29,7 @@
     /* Content stays opaque; translucency is reserved for navigation. */
     :root {
       color-scheme: light dark;
-      --page-bg: light-dark(#f5f5f7, #111113);
+      --page-bg: #f5f5f7;
       --surface-panel: light-dark(#ffffff, #1c1c1e);
       --panel-bg: light-dark(#f6f6f8, #252528);
       --input-bg: var(--surface-panel);
@@ -58,8 +60,12 @@
       scrollbar-width: thin;
       scrollbar-color: var(--line-control) transparent;
     }
-    :root[data-theme="light"] { color-scheme: light; }
-    :root[data-theme="dark"] { color-scheme: dark; }
+    /* Use explicit canvas colors for browser-edge background sampling. */
+    @media (prefers-color-scheme: dark) {
+      :root { --page-bg: #111113; }
+    }
+    :root[data-theme="light"] { color-scheme: light; --page-bg: #f5f5f7; }
+    :root[data-theme="dark"] { color-scheme: dark; --page-bg: #111113; }
     *, *::before, *::after { box-sizing: border-box; }
     body, h1, h2, h3, p, pre, fieldset, dl, dd { margin: 0; }
     fieldset { border: 0; padding: 0; min-width: 0; }
@@ -467,7 +473,7 @@
       .segmented :is([aria-selected="true"], [aria-pressed="true"]), tr[data-selected="true"] { outline: 2px solid Highlight; }
     }
     @media print {
-      :root { color-scheme: light; }
+      :root, :root[data-theme] { color-scheme: light; --page-bg: #fff; }
       body { background: white; }
       .site-header, .input-card, search, .result-filterbar, .mobile-bottom, .inspector, .results-footer, .ui-notice, #export, .mobile-job-slot { display: none !important; }
       #app, .results-column, body[data-mobiletab="input"] .results-column, .results-grid { display: block; margin: 0; padding: 0; }
@@ -1228,13 +1234,18 @@
       pageStatus: document.getElementById("page-status"),
     };
     const root = document.documentElement;
+    const pageColorScheme = document.querySelector('meta[name="color-scheme"]');
+    const themeColors = document.querySelectorAll('meta[name="theme-color"]');
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const appearance = document.getElementById("appearance");
     // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
     const updateThemeToggle = () => {
+      pageColorScheme.content = root.dataset.theme || "light dark";
       const dark = currentTheme() === "dark";
+      const background = getComputedStyle(root).backgroundColor;
+      for (const meta of themeColors) meta.content = background;
       domElements.themeToggle.ariaPressed = String(dark);
       domElements.themeToggle.title = dark ? "다크 모드 끄기" : "다크 모드 켜기";
       appearance.value = root.dataset.theme || "system";
