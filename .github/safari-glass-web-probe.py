@@ -24,7 +24,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 def channel_medians(path, box):
     with Image.open(path).convert('RGB') as image:
         region = image.crop(tuple(round(v) for v in box))
-        pixels = list(region.getdata())
+        pixels = list(region.get_flattened_data())
         return [statistics.median(pixel[channel] for pixel in pixels) for channel in range(3)]
 
 def main():
@@ -120,8 +120,10 @@ def main():
                         page.locator('#optical-underlay').evaluate('(el) => el.remove()')
                         page.evaluate('window.scrollTo(0,document.body.scrollHeight)')
                         assert page.locator('.mobile-nav').is_visible()
+                        page.set_viewport_size({'width':740,'height':393})
+                        snapshot('mobile-landscape',system,34)
                         page.set_viewport_size({'width':852,'height':393})
-                        snapshot('landscape',system,34)
+                        snapshot('wide-landscape',system,34,False)
                         page.set_viewport_size({'width':1440,'height':900})
                         snapshot('desktop',system,34,False)
                         context.close()
