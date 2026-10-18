@@ -1,0 +1,94 @@
+name: Temporary Safari real-gesture validation
+on:
+  push:
+    branches: [fix/safari-gesture-scroll-20261018]
+    paths:
+      - .github/workflows/safari-gesture.yml
+      - .github/safari-gesture.py
+      - .github/run-safari-gesture.sh
+permissions:
+  contents: read
+jobs:
+  safari:
+    strategy:
+      fail-fast: false
+      matrix:
+        appearance: [dark, light]
+    runs-on: xcode-27
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Prepare iOS 27 simulator and pristine-source fixtures
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          python3 .github/safari-gesture.py prepare
+          xcodebuild -version > safari27-evidence/xcode.txt
+          sw_vers > safari27-evidence/macos.txt
+          xcrun simctl list runtimes -j > safari27-evidence/runtimes.json
+          PROBE_UDID=$(python3 .github/safari-gesture.py device)
+          printf '%s\n' "PROBE_UDID=$PROBE_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$PROBE_UDID"
+          xcrun simctl bootstatus "$PROBE_UDID" -b
+          xcrun simctl status_bar "$PROBE_UDID" override --time '9:41' --batteryState charged --batteryLevel 100
+          cd safari27-work
+          xcodegen generate
+      - name: Capture baseline with actual touch scrolling
+        run: bash .github/run-safari-gesture.sh baseline ${{ matrix.appearance }}
+      - name: Upload baseline native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gesture-baseline-${{ matrix.appearance }}
+          path: |
+            safari27-evidence/baseline-${{ matrix.appearance }}-attachments/
+            safari27-evidence/baseline-${{ matrix.appearance }}.log
+            safari27-evidence/source-identities.json
+            safari27-evidence/selected-device.json
+            safari27-evidence/xcode.txt
+            safari27-evidence/macos.txt
+            safari27-evidence/fixture-scope.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Capture inset8 with actual touch scrolling
+        run: bash .github/run-safari-gesture.sh inset8 ${{ matrix.appearance }}
+      - name: Upload inset8 native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gesture-inset8-${{ matrix.appearance }}
+          path: |
+            safari27-evidence/inset8-${{ matrix.appearance }}-attachments/
+            safari27-evidence/inset8-${{ matrix.appearance }}.log
+            safari27-evidence/source-identities.json
+            safari27-evidence/selected-device.json
+            safari27-evidence/xcode.txt
+            safari27-evidence/macos.txt
+            safari27-evidence/fixture-scope.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Capture inset24 with actual touch scrolling
+        run: bash .github/run-safari-gesture.sh inset24 ${{ matrix.appearance }}
+      - name: Upload inset24 native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gesture-inset24-${{ matrix.appearance }}
+          path: |
+            safari27-evidence/inset24-${{ matrix.appearance }}-attachments/
+            safari27-evidence/inset24-${{ matrix.appearance }}.log
+            safari27-evidence/source-identities.json
+            safari27-evidence/selected-device.json
+            safari27-evidence/xcode.txt
+            safari27-evidence/macos.txt
+            safari27-evidence/fixture-scope.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove task-owned simulator
+        if: always() && env.PROBE_UDID != ''
+        run: |
+          xcrun simctl shutdown "$PROBE_UDID" || true
+          xcrun simctl delete "$PROBE_UDID"
