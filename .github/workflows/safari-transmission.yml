@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   safari:
+    if: ${{ !contains(github.event.head_commit.message, '[web-only]') }}
     runs-on: xcode-27
     timeout-minutes: 40
     steps:
@@ -84,3 +85,42 @@ jobs:
         run: |
           xcrun simctl shutdown "$PROBE_UDID" || true
           xcrun simctl delete "$PROBE_UDID"
+
+  web:
+    if: ${{ contains(github.event.head_commit.message, '[web-only]') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install pinned browser tooling
+        run: |
+          python3 -m venv /tmp/srg-transmission-venv
+          /tmp/srg-transmission-venv/bin/pip install playwright==1.64.0 Pillow==12.3.0
+          /tmp/srg-transmission-venv/bin/python -m playwright install --with-deps chromium firefox webkit
+      - name: Check candidate markup and browser rendering
+        run: |
+          python3 .github/safari-transmission.py prepare
+          npx --yes html-validate@11.16.2 --preset=recommended,document --max-warnings=0 safari27-work/www/clear/revgeo.html
+          cp -a safari27-work/www/clear safari27-work/www/candidate
+          /tmp/srg-transmission-venv/bin/python .github/safari-web.py \
+            safari27-work/www/baseline safari27-work/www/candidate web-evidence
+      - name: Run unchanged application lifecycle tests
+        run: |
+          /tmp/srg-transmission-venv/bin/python tests/browser_lifecycle.py \
+            safari27-work/www/baseline safari27-work/www/candidate lifecycle-evidence \
+            > lifecycle-evidence.log 2>&1
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: safari-transmission-web-evidence
+          path: |
+            web-evidence/
+            lifecycle-evidence/browser-results.json
+            lifecycle-evidence.log
+            safari27-evidence/source-identities.json
+          if-no-files-found: error
+          retention-days: 7
