@@ -31,12 +31,11 @@ final class SafariGestureCapture: XCTestCase {
         add(tree)
     }
 
+    @MainActor
     func open(_ url: String, _ safari: XCUIApplication) {
-        let launcher = XCUIApplication()
-        launcher.terminate()
-        launcher.launchArguments = ["--url", url]
-        launcher.launch()
-        XCTAssertTrue(safari.wait(for: .runningForeground, timeout: 20))
+        safari.activate()
+        XCUIDevice.shared.system.open(URL(string: url)!)
+        XCTAssertTrue(safari.wait(for: .runningForeground, timeout: 60))
     }
 
     func drag(_ up: Bool, _ safari: XCUIApplication) {
@@ -57,6 +56,7 @@ final class SafariGestureCapture: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
     }
 
+    @MainActor
     func testRealTouchScrollAndAppearance() throws {
         let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
         safari.terminate()

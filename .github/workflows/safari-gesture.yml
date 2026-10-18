@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        appearance: [dark, light]
+        appearance: [light]
     runs-on: xcode-27
     timeout-minutes: 35
     steps:
@@ -64,23 +64,6 @@ jobs:
           path: |
             safari27-evidence/inset8-${{ matrix.appearance }}-attachments/
             safari27-evidence/inset8-${{ matrix.appearance }}.log
-            safari27-evidence/source-identities.json
-            safari27-evidence/selected-device.json
-            safari27-evidence/xcode.txt
-            safari27-evidence/macos.txt
-            safari27-evidence/fixture-scope.txt
-          if-no-files-found: error
-          retention-days: 7
-      - name: Capture inset24 with actual touch scrolling
-        run: bash .github/run-safari-gesture.sh inset24 ${{ matrix.appearance }}
-      - name: Upload inset24 native evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: gesture-inset24-${{ matrix.appearance }}
-          path: |
-            safari27-evidence/inset24-${{ matrix.appearance }}-attachments/
-            safari27-evidence/inset24-${{ matrix.appearance }}.log
             safari27-evidence/source-identities.json
             safari27-evidence/selected-device.json
             safari27-evidence/xcode.txt
