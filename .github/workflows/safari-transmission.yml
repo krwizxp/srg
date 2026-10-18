@@ -1,0 +1,86 @@
+name: Temporary native Safari transmission verification
+
+on:
+  push:
+    branches: [fix/safari-native-transmission-20261018]
+    paths:
+      - .github/workflows/safari-transmission.yml
+      - .github/safari-transmission.py
+
+permissions:
+  contents: read
+
+jobs:
+  safari:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Prepare isolated native Safari probe
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          python3 .github/safari-transmission.py prepare
+          xcodebuild -version > safari27-evidence/xcode.txt
+          sw_vers > safari27-evidence/macos.txt
+          xcrun simctl list runtimes -j > safari27-evidence/runtimes.json
+          xcrun simctl list devicetypes -j > safari27-evidence/device-types.json
+          PROBE_UDID=$(python3 .github/safari-transmission.py device)
+          printf '%s\n' "PROBE_UDID=$PROBE_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$PROBE_UDID"
+          xcrun simctl bootstatus "$PROBE_UDID" -b
+          xcrun simctl status_bar "$PROBE_UDID" override --time '9:41' --batteryState charged --batteryLevel 100
+          cd safari27-work
+          xcodegen generate
+      - name: Capture Safari app chrome in both system appearances
+        run: |
+          set -euo pipefail
+          python3 .github/safari-transmission.py serve > safari27-evidence/http.log 2>&1 &
+          PROBE_SERVER_PID=$!
+          trap 'kill "$PROBE_SERVER_PID"' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent http://127.0.0.1:8000/clear/revgeo.html > /dev/null; then break; fi
+            sleep 1
+          done
+          result=0
+          for appearance in dark light; do
+            for variant in baseline clear inset; do
+              name="$variant-$appearance"
+              xcrun simctl ui "$PROBE_UDID" appearance "$appearance"
+              python3 .github/safari-transmission.py configure "$variant" "$appearance"
+              if ! xcodebuild test -project safari27-work/SafariProbe.xcodeproj -scheme SafariProbe \
+                -destination "id=$PROBE_UDID" -parallel-testing-enabled NO \
+                -collect-test-diagnostics never \
+                -derivedDataPath safari27-work/DerivedData \
+                -resultBundlePath "safari27-evidence/$name.xcresult" \
+                CODE_SIGNING_ALLOWED=NO > "safari27-evidence/$name.log" 2>&1; then
+                result=1
+              fi
+              if ! xcrun xcresulttool export attachments --path "safari27-evidence/$name.xcresult" \
+                --output-path "safari27-evidence/$name-attachments"; then
+                result=1
+              fi
+              tail -n 50 "safari27-evidence/$name.log"
+              if [ "$result" -ne 0 ]; then break 2; fi
+            done
+          done
+          exit "$result"
+      - name: Upload native UI evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: safari-native-transmission-evidence
+          path: |
+            safari27-evidence/
+            !safari27-evidence/**/*.xcresult/**
+            !safari27-evidence/**/*.mp4
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove task-owned simulator
+        if: always() && env.PROBE_UDID != ''
+        run: |
+          xcrun simctl shutdown "$PROBE_UDID" || true
+          xcrun simctl delete "$PROBE_UDID"
