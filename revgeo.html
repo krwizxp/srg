@@ -43,8 +43,8 @@
       --accent-ink: var(--accent);
       --accent-wash: light-dark(#edf4ff, #25354b);
       --accent-border: light-dark(#a8c8f2, #46638a);
-      --danger: light-dark(#ad4600, #f1b77a);
-      --danger-bg: light-dark(#fff3e6, #392d22);
+      --danger: light-dark(#c62836, #ff6961);
+      --danger-bg: light-dark(#fff0f1, #402428);
       --success: light-dark(#19733f, #78d89c);
       --success-bg: light-dark(#eaf5ee, #20372a);
       --glass: light-dark(#ffffffc7, #27272acc);
@@ -97,7 +97,10 @@
       background: var(--page-bg);
       min-height: 100dvh;
     }
-    .ui-icon, .action-btn__icon { width: 20px; height: 20px; }
+    .ui-icon, .action-btn__icon {
+      width: 20px; height: 20px;
+      stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8;
+    }
     .action-btn__icon {
       fill: none; stroke: currentColor; stroke-width: 1.8;
       stroke-linecap: round; stroke-linejoin: round;
@@ -189,7 +192,13 @@
     .action-btn--primary:hover:not(:disabled) { background: #0057bc; color: #fff; }
     .action-btn--tinted { background: var(--accent-wash); border-color: transparent; color: var(--accent); font-weight: 650; }
     .action-btn--tinted:hover:not(:disabled) { background: var(--accent-wash); border-color: var(--accent-border); }
-    .action-btn--danger { color: var(--danger); border-color: var(--line-control); }
+    .action-btn--danger {
+      color: var(--danger); background: var(--danger-bg);
+      border-color: transparent; font-weight: 650;
+    }
+    .action-btn--danger:hover:not(:disabled) {
+      background: var(--danger-bg); border-color: var(--danger);
+    }
     #parse { width: 100%; margin-top: 12px; }
     .coords-section {
       min-width: 0; margin-top: 20px; overflow: hidden;
@@ -291,8 +300,9 @@
     col:nth-child(1) { width: 44px; }
     col:nth-child(2) { width: auto; }
     col:nth-child(3) { width: 26%; }
-    col:nth-child(4) { width: 76px; }
+    col:nth-child(4) { width: 102px; }
     col:nth-child(5) { width: 78px; }
+    td:nth-child(4) { white-space: nowrap; }
     tr[data-record]:hover { background: var(--panel-bg); }
     tr[data-selected="true"] { background: var(--accent-wash); }
     tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--accent); color: var(--accent); }
@@ -305,7 +315,12 @@
     .address-sub { color: var(--muted); font-size: .875rem; margin-top: 3px; }
     .coordinate-cell { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .8125rem; color: var(--muted); }
     .coordinate-cell span { display: block; }
-    .kind-badge { display: inline-flex; align-items: center; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line-control); background: var(--panel-bg); font-size: .8125rem; font-weight: 600; }
+    .kind-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line-control);
+      background: var(--panel-bg); font-size: .8125rem; font-weight: 600;
+      white-space: nowrap; word-break: normal; overflow-wrap: normal;
+    }
     .result-state { color: var(--success); font-size: .8125rem; white-space: nowrap; }
     .result-state[data-error="true"] { color: var(--danger); }
     .table-hint { display: none; position: absolute; inset: 44px 0 0; padding: 32px; align-items: center; justify-content: center; text-align: center; font-size: .875rem; color: var(--muted); }
@@ -340,12 +355,22 @@
     #detail-coordinates { margin-top: 12px; font: .875rem/1.7 ui-monospace, monospace; overflow-wrap: anywhere; color: var(--muted); }
     .open-map { width: 100%; margin-top: 18px; }
     .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding: 18px 28px 24px; margin: auto; color: var(--muted); font-size: .875rem; }
-    .footer-copyright { display: inline-flex; flex: none; min-width: 1em; min-height: 32px; align-items: center; justify-content: center; font-size: 1rem; line-height: 1.5; }
-    .footer-credit a { display: inline-flex; align-items: center; min-height: 32px; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); text-decoration-color: var(--line-control); }
+    .footer-copyright {
+      display: inline-flex; flex: none; min-width: 1em; min-height: 44px;
+      align-items: center; justify-content: center; font-size: 1rem; line-height: 1.5;
+    }
+    .footer-credit a {
+      display: inline-flex; align-items: center; min-height: 44px; max-width: 100%;
+      overflow-wrap: anywhere; color: var(--muted); text-decoration-color: var(--line-control);
+    }
     .footer-credit a:hover, .footer-credit a:focus-visible { color: var(--accent); text-decoration-color: currentColor; }
-    .footer-credit { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .65rem; row-gap: 0; min-width: 0; }
+    .footer-credit {
+      display: flex; flex-wrap: wrap; align-items: baseline;
+      column-gap: .65rem; row-gap: 0; min-width: 0;
+    }
     .usage-policy { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: .35em; }
-    .usage-policy > a, .usage-policy > span { white-space: nowrap; }
+    .usage-policy > a { white-space: nowrap; }
+    .usage-policy > span, .usage-policy > span > a { white-space: normal; }
     .settings-popover, .map-popover, dialog {
       max-width: calc(100vw - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
       max-height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom))); overflow: auto;
@@ -390,6 +415,7 @@
       .remaining-note { margin-left: 0; }
     }
     @media (max-width: 800px) {
+      :root { font-size: 106.25%; }
       .header-inner { min-height: 68px; padding: max(10px, env(safe-area-inset-top)) 20px 10px; gap: 10px; }
       .site-header { border: 0; }
       .brand-mark { width: 32px; height: 32px; }
@@ -452,14 +478,33 @@
         border: 0; border-radius: 18px; color: var(--muted); background: transparent;
       }
       .mobile-nav button .ui-icon { width: 23px; height: 23px; }
-      .mobile-nav [aria-pressed="true"] { color: var(--accent); background: var(--accent-wash); font-weight: 650; }
+      .mobile-nav [aria-selected="true"] { color: var(--accent); background: var(--accent-wash); font-weight: 650; }
       .mobile-nav button:active, .tool-capsule button:active { background: var(--press-bg); }
       .page-footer { padding: 22px 20px calc(7rem + env(safe-area-inset-bottom)); }
       .ui-notice { bottom: calc(7rem + env(safe-area-inset-bottom)); }
       .mobile-job-slot .workflow-panel { margin: 0 0 18px; }
       .mobile-job-slot .workflow-panel:has([data-state="idle"]):has(#start:disabled) { display: none; }
       .settings-popover, .map-popover { inset: auto 0 0; left: 0; top: auto; right: 0; width: auto; max-width: none; max-height: calc(100dvh - max(16px, env(safe-area-inset-top))); margin: 0; padding: 22px max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; }
-      #detail-sheet { position: fixed; inset: auto 0 0; width: 100%; max-width: 100%; max-height: calc(100dvh - max(16px, env(safe-area-inset-top))); margin: 0; padding: 22px max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; }
+      #detail-sheet, #help-dialog, #supp-dialog {
+        position: fixed; inset: auto 0 0; width: 100%; max-width: 100%;
+        max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
+        margin: 0; border-radius: 24px 24px 0 0;
+        padding: 22px max(20px, env(safe-area-inset-right))
+          max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+        overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+      }
+      .advanced-filters[open] .filter-grid {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%; max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
+        z-index: 45; border-radius: 24px 24px 0 0;
+        padding: 22px max(20px, env(safe-area-inset-right))
+          max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+        overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+      }
+      body:has(.advanced-filters[open])::before {
+        content: ""; position: fixed; inset: 0; z-index: 30;
+        background: #0006;
+      }
     }
     @media (max-width: 374px) {
       :root { --page-gutter: 12px; }
@@ -554,7 +599,7 @@
 <span class="drop-text"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="M6 3h8l4 4v14H6z"></path>
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
-</svg><strong id="drop-filename">random_data.txt</strong><span id="drop-state">파일을 선택하거나 끌어 놓으세요.</span></span>
+</svg><strong id="drop-filename">좌표 TXT 파일 선택</strong><span id="drop-state">TXT 파일을 선택하거나 이곳에 끌어 놓으세요.</span></span>
 <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file">
 </label><button class="action-btn action-btn--tinted" command="--parse" commandfor="app" id="parse" type="button">
 <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
@@ -606,7 +651,7 @@
 </svg>
 <span>결과 복사</span>
 </button>
-<button class="action-btn" id="clearBtn" type="button">
+<button class="action-btn action-btn--danger" id="clearBtn" type="button">
 <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"></path>
 </svg>
@@ -790,10 +835,10 @@
 </div>
 </footer>
 <div class="mobile-bottom">
-<nav aria-label="작업 화면" class="mobile-nav">
-<button aria-controls="input-view" aria-pressed="true" data-mobile="input" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg>입력</button>
-<button aria-controls="results-view" aria-pressed="false" data-mobile="results" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path></svg>결과</button>
-</nav>
+<div aria-label="작업 화면" class="mobile-nav" role="tablist">
+<button aria-controls="input-view" aria-selected="true" data-mobile="input" id="mobile-input-tab" role="tab" tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg>입력</button>
+<button aria-controls="results-view" aria-selected="false" data-mobile="results" id="mobile-results-tab" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path></svg>결과</button>
+</div>
 </div>
 <section aria-labelledby="settings-title" class="settings-popover" id="display-settings" popover="auto">
 <h2 id="settings-title">화면 설정</h2>
@@ -3762,6 +3807,18 @@
     });
 
     function adaptLayout() {
+      for (const [panel, tab, heading] of [
+        [inputView, "mobile-input-tab", "input-title"],
+        [document.getElementById("results-view"), "mobile-results-tab", "results-title"],
+      ]) {
+        if (mobileMedia.matches) {
+          panel.setAttribute("role", "tabpanel");
+          panel.setAttribute("aria-labelledby", tab);
+        } else {
+          panel.removeAttribute("role");
+          panel.setAttribute("aria-labelledby", heading);
+        }
+      }
       const active = document.activeElement === document.body ? layoutFocus : document.activeElement;
       const restoreFocus = active && jobPanel.contains(active);
       const jobSlot = mobileMedia.matches && document.body.dataset.mobiletab === "results"
@@ -3810,7 +3867,9 @@
       const focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .workflow-panel");
       document.body.dataset.mobiletab = nextView;
       for (const button of mobileButtons) {
-        button.ariaPressed = String(button.dataset.mobile === document.body.dataset.mobiletab);
+        const selected = button.dataset.mobile === document.body.dataset.mobiletab;
+        button.ariaSelected = String(selected);
+        button.tabIndex = selected ? 0 : -1;
       }
       adaptLayout();
       if (mobileMedia.matches) {
@@ -3827,8 +3886,22 @@
     for (const button of mobileButtons) {
       button.addEventListener("click", () => setMobileView(button.dataset.mobile));
     }
+    document.querySelector(".mobile-nav").addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (!event.target.closest('[role="tab"]')) return;
+      event.preventDefault();
+      const view = event.key === "Home" ? "input" : event.key === "End" ? "results" :
+        event.key === "ArrowRight" ? "results" : "input";
+      setMobileView(view);
+      document.getElementById(`mobile-${view}-tab`).focus({ preventScroll: true });
+    });
     mobileMedia.addEventListener("change", adaptLayout);
     compactMedia.addEventListener("change", adaptLayout);
+    document.addEventListener("pointerdown", event => {
+      if (mobileMedia.matches && advancedFilters.open && !advancedFilters.contains(event.target)) {
+        advancedFilters.open = false;
+      }
+    });
 
     function updateWorkflowStep() {
       const step = AppState.isRunning || AppState.isStopping ? "lookup" :
