@@ -340,10 +340,10 @@
     #detail-coordinates { margin-top: 12px; font: .875rem/1.7 ui-monospace, monospace; overflow-wrap: anywhere; color: var(--muted); }
     .open-map { width: 100%; margin-top: 18px; }
     .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding: 18px 28px 24px; margin: auto; color: var(--muted); font-size: .875rem; }
-    .footer-info { width: 16px; height: 16px; margin-top: 2px; }
-    .footer-credit a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); text-decoration-color: var(--line-control); }
+    .footer-copyright { display: inline-flex; flex: none; min-width: 1em; min-height: 32px; align-items: center; justify-content: center; font-size: 1rem; line-height: 1.5; }
+    .footer-credit a { display: inline-flex; align-items: center; min-height: 32px; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); text-decoration-color: var(--line-control); }
     .footer-credit a:hover, .footer-credit a:focus-visible { color: var(--accent); text-decoration-color: currentColor; }
-    .footer-credit { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .65rem; row-gap: .25rem; min-width: 0; }
+    .footer-credit { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .65rem; row-gap: 0; min-width: 0; }
     .usage-policy { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: .35em; }
     .usage-policy > a, .usage-policy > span { white-space: nowrap; }
     .settings-popover, .map-popover, dialog {
@@ -783,12 +783,9 @@
 </div>
 </section>
 </main>
-<footer class="page-footer"><svg aria-hidden="true" class="footer-info ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
-<circle cx="12" cy="12" r="9"></circle>
-<path d="M12 11v6m0-10h.01"></path>
-</svg>
+<footer class="page-footer"><span class="footer-copyright">©</span>
 <div class="footer-credit">
-<p>© <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a></p>
+<p><a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a></p>
 <p class="usage-policy"><a href="https://nominatim.org/" rel="noopener noreferrer" target="_blank">Nominatim</a><span>· <a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a></span></p>
 </div>
 </footer>
