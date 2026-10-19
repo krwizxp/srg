@@ -64,7 +64,7 @@
     :root[data-theme="light"] { color-scheme: light; --page-bg: #f5f5f7; }
     :root[data-theme="dark"] { color-scheme: dark; --page-bg: #111113; }
     *, *::before, *::after { box-sizing: border-box; }
-    body, h1, h2, h3, p, pre, dl, dd { margin: 0; }
+    body, h1, h2, p, pre, dl, dd { margin: 0; }
     button, input, select, textarea { font: inherit; }
     button, select { cursor: pointer; }
     button { color: inherit; }
@@ -101,7 +101,7 @@
     .site-header { border-bottom: 1px solid var(--line-soft); }
     .header-inner {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 24px; min-height: 88px; max-width: 1680px; margin: auto; padding: max(16px, env(safe-area-inset-top)) 28px 16px;
+      gap: 24px; min-height: 88px; max-width: 1680px; margin: auto; padding-block: max(16px, env(safe-area-inset-top)) 16px;
     }
     .site-brand, .header-tools { display: flex; align-items: center; gap: 10px; }
     .site-brand { text-decoration: none; color: var(--fg); min-width: 44px; min-height: 44px; }
@@ -140,7 +140,7 @@
     .help-button { font-size: .8125rem; }
     #app {
       display: grid; grid-template-columns: 304px minmax(0, 1fr);
-      align-items: start; gap: 24px; max-width: 1680px; margin: 26px auto 0; padding: 0 28px;
+      align-items: start; gap: 24px; max-width: 1680px; margin: 26px auto 0;
     }
     .input-card { min-width: 0; }
     .card-label { font-size: 1.5rem; font-weight: 720; letter-spacing: -.04em; }
@@ -219,8 +219,7 @@
     .coords-view { overflow: auto; scrollbar-width: thin; font-size: .875rem; }
     .coords-tools { display: none; gap: 8px; padding: 8px 16px 14px; }
     .coords-tools .action-btn { flex: 1; font-size: .8125rem; }
-    .coords-section[data-empty="true"] .coords-tools { display: none; }
-    .coords-content { display: block; padding: 12px; white-space: pre; font: inherit; }
+    .coords-content { display: block; padding: 12px; font: inherit; }
     #coords { display: grid; grid-template-columns: 34px minmax(0, 1fr); height: 172px; }
     #coords .coords-content { min-width: max-content; padding: 10px 8px; line-height: 26px; }
     #coord-line-numbers { padding: 10px 0; line-height: 26px; text-align: center; color: var(--muted); user-select: none; }
@@ -305,7 +304,7 @@
     tr[data-selected="true"] { background: var(--accent-wash); }
     tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--accent); color: var(--accent); }
     .location-button {
-      display: block; border: 0; border-radius: 6px; background: transparent; color: inherit;
+      display: block; border: 0; border-radius: 6px; background: transparent;
       position: relative; width: 100%; min-height: 44px; padding: 0; text-align: left; line-height: 1.6;
     }
     .address-main, .address-sub { display: block; overflow-wrap: anywhere; unicode-bidi: plaintext; }
@@ -330,7 +329,7 @@
     .results-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 18px; }
     #results-count { color: var(--muted); font-size: .875rem; }
     .result-pages, .page-numbers { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
-    .result-pages .action-btn { min-width: 44px; min-height: 44px; padding: 8px; border-color: transparent; border-radius: 10px; font-size: .875rem; }
+    .result-pages .action-btn { padding: 8px; border-color: transparent; border-radius: 10px; }
     .page-number[aria-current="page"] { background: var(--accent-wash); color: var(--accent); font-weight: 650; }
     .page-ellipsis { color: var(--muted); }
     .inspector { min-width: 0; padding: 20px; border-left: 1px solid var(--line-soft); background: var(--panel-bg); border-bottom-right-radius: 24px; }
@@ -359,7 +358,7 @@
     #detail-tag { margin-top: 7px; font-size: .875rem; overflow-wrap: anywhere; }
     #detail-coordinates { margin-top: 12px; font: .875rem/1.7 ui-monospace, monospace; overflow-wrap: anywhere; color: var(--muted); }
     .open-map { width: 100%; margin-top: 18px; }
-    .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding: 18px 28px 24px; margin: auto; color: var(--muted); font-size: .875rem; }
+    .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding-block: 18px 24px; margin: auto; color: var(--muted); font-size: .875rem; }
     .footer-copyright {
       display: inline-flex; flex: none; min-width: 1em; min-height: 44px;
       align-items: center; justify-content: center; font-size: 1rem; line-height: 1.5;
@@ -376,8 +375,7 @@
     }
     .usage-policy { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: .35em; }
     .usage-policy > a { white-space: nowrap; }
-    .usage-policy > span, .usage-policy > span > a { white-space: normal; }
-    .settings-popover, .map-popover, dialog {
+    .map-popover, dialog {
       max-width: calc(100vw - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
       max-height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom))); overflow: auto;
       padding: 22px; color: var(--fg); background: var(--surface-panel);
@@ -386,7 +384,7 @@
     .settings-popover, .map-popover { position: fixed; inset: auto; margin: 0; z-index: 40; }
     .settings-popover { width: 300px; }
     .map-popover { width: min(340px, calc(100vw - 24px)); }
-    .settings-popover h2 { font-size: 1.25rem; margin-bottom: 18px; }
+    .settings-popover h2 { margin-bottom: 18px; }
     .settings-popover label { display: block; margin: 16px 0 8px; }
     .settings-popover select { min-height: 44px; width: 100%; color: var(--fg); background: var(--panel-bg); border: 1px solid var(--line-control); border-radius: 12px; padding: 8px; }
     #settings-help { width: 100%; margin-top: 18px; }
@@ -398,15 +396,13 @@
     .supp-dialog-form h2 { font-size: 1.375rem; }
     .supp-dialog-form .manual-rng-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
     dialog::backdrop { background: #0006; }
-    #detail-sheet { width: min(440px, calc(100vw - 24px)); padding: 22px; }
-    .sheet-heading h2 { unicode-bidi: plaintext; }
+    #detail-sheet { width: min(440px, calc(100vw - 24px)); }
     .sheet-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .sheet-heading h2 { font-size: 1rem; }
+    .sheet-heading h2 { font-size: 1rem; unicode-bidi: plaintext; }
     #help-dialog { width: 480px; }
     #help-dialog p { margin: 12px 0; }
     #help-dialog ol { padding-left: 24px; line-height: 1.9; }
     .ui-notice { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px); width: max-content; padding: 8px 12px 8px 18px; border-radius: 16px; background: var(--fg); color: var(--surface-panel); font-size: .875rem; box-shadow: 0 8px 25px #0002; display: flex; align-items: center; gap: 12px; }
-    .ui-notice .icon-button { width: 44px; min-width: 44px; color: inherit; }
     .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
     .confirm-actions .action-btn { flex: 1; }
     #clear-dialog, #bulk-dialog { width: min(440px, calc(100vw - 32px)); }
@@ -414,13 +410,12 @@
     .mobile-bottom, .mobile-job-slot { display: none; }
     .mobile-job-slot:not(:empty) { display: block; }
     .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip-path: inset(50%); white-space: nowrap !important; border: 0 !important; }
-    .nowrap { white-space: nowrap; }
-    .manual-rng-meta .nowrap { white-space: normal; overflow-wrap: anywhere; }
+    #num64-help > span { white-space: normal; }
     @media (max-width: 1230px) {
       :root { --page-gutter: 20px; }
       .workflow-steps { display: none; }
       .workflow-compact { display: block; }
-      #app { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; padding-inline: 20px; }
+      #app { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; }
       .results-grid { grid-template-columns: 1fr; }
       .inspector { display: none; }
       .workspace-heading { padding-inline: 22px; }
@@ -429,7 +424,7 @@
     }
     @media (max-width: 800px) {
       :root { font-size: 106.25%; }
-      .header-inner { min-height: 68px; padding: max(10px, env(safe-area-inset-top)) 20px 10px; gap: 10px; }
+      .header-inner { min-height: 68px; padding-block: max(10px, env(safe-area-inset-top)) 10px; gap: 10px; }
       .site-header { border: 0; }
       .brand-mark { width: 32px; height: 32px; }
       .site-brand h1 { font-size: 1rem; }
@@ -441,10 +436,10 @@
       .help-button__label { display: none; }
       .help-button::before { content: "?"; font-size: 1rem; font-weight: 700; line-height: 1; }
       .header-tools { gap: 4px; }
-      #app { display: block; margin-top: 10px; padding-inline: 20px; }
+      #app { display: block; margin-top: 10px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
       body[data-mobiletab="input"] .results-column, body[data-mobiletab="results"] .input-card { display: none; }
-      .coords-section, .workflow-panel { border-color: transparent; box-shadow: none; border-radius: 20px; }
+      .coords-section, .workflow-panel { border-color: transparent; border-radius: 20px; }
       .coords-heading { padding-inline: 18px; }
       .coords-section[data-empty="false"] .coords-tools { display: flex; }
       .coords-section[data-expanded="false"] #coords { height: 100px; overflow: hidden; }
@@ -489,7 +484,7 @@
       .mobile-bottom {
         position: fixed; z-index: 25; bottom: 8px; left: 0; right: 0; display: flex;
         justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px;
-        padding: 6px 20px max(6px, env(safe-area-inset-bottom));
+        padding-block: 6px max(6px, env(safe-area-inset-bottom));
         /* Keep the outer dock clear so Safari can show scrolling content below it. */
         isolation: isolate;
       }
@@ -503,13 +498,12 @@
       .mobile-nav button .ui-icon { width: 23px; height: 23px; }
       .mobile-nav [aria-selected="true"] { color: var(--accent); background: var(--accent-wash); font-weight: 650; }
       .mobile-nav [aria-selected="true"] .ui-icon { stroke-width: 2.4; }
-      .mobile-nav [aria-selected="true"] .ui-icon :is(path, circle) { stroke-width: inherit; }
-      .mobile-nav button:active, .tool-capsule button:active { background: var(--press-bg); }
-      .page-footer { padding: 22px 20px calc(7rem + env(safe-area-inset-bottom)); }
+      .mobile-nav button:active { background: var(--press-bg); }
+      .page-footer { padding-block: 22px calc(7rem + env(safe-area-inset-bottom)); }
       .ui-notice { bottom: calc(7rem + env(safe-area-inset-bottom)); }
       .mobile-job-slot .workflow-panel { margin: 0 0 18px; }
       .mobile-job-slot .workflow-panel:has([data-state="idle"]):has(#start:disabled) { display: none; }
-      .settings-popover, .map-popover { inset: auto 0 0; left: 0; top: auto; right: 0; width: auto; max-width: none; max-height: calc(100dvh - max(16px, env(safe-area-inset-top))); margin: 0; padding: 22px max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; }
+      .map-popover { inset: auto 0 0; width: auto; max-width: none; max-height: calc(100dvh - max(16px, env(safe-area-inset-top))); margin: 0; padding: 22px max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; }
       #detail-sheet, #help-dialog, #supp-dialog, #clear-dialog, #bulk-dialog, #filter-dialog, #display-settings {
         position: fixed; inset: auto 0 0; width: 100%; max-width: 100%;
         max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
@@ -523,14 +517,11 @@
     }
     @media (max-width: 374px) {
       :root { --page-gutter: 12px; }
-      .header-inner { padding-inline: 12px; }
-      #app { padding-inline: 12px; }
       .site-brand { gap: 6px; }
       .site-brand h1 { font-size: .875rem; }
       .tool-capsule { padding: 1px; }
-      .tool-capsule button { width: 44px; min-width: 44px; min-height: 44px; }
       .brand-mark { width: 28px; height: 28px; }
-      .mobile-bottom { padding-inline: 12px; gap: 8px; }
+      .mobile-bottom { gap: 8px; }
       .mobile-nav button { gap: 4px; padding-inline: 6px; }
       .result-pages, .page-numbers { gap: 1px; }
     }
@@ -631,8 +622,8 @@
 123456789
 0x1122334455667788" title="입력 범위: 0 ~
                   18446744073709551615 (0x0 ~ 0xFFFFFFFFFFFFFFFF)"></textarea>
-<span class="manual-rng-meta" id="num64-help"><span class="nowrap">입력 범위: 0 ~
-                    18446744073709551615</span><br><span class="nowrap">(0x0 ~ 0xFFFFFFFFFFFFFFFF)</span></span>
+<span class="manual-rng-meta" id="num64-help"><span>입력 범위: 0 ~
+                    18446744073709551615</span><br><span>(0x0 ~ 0xFFFFFFFFFFFFFFFF)</span></span>
 </div>
 <div class="manual-rng-field">
 <label class="manual-rng-label" for="suppValues">보조 난수값 목록 (선택)</label>
@@ -1139,8 +1130,8 @@
       function getAdmin(fields, countryCode, p0, p1) {
         const adminCountry = fields.level2;
         const countryName = fields.country || adminCountry;
-        let lowerCountryName = "";
-        let lowerAdminCountry = "";
+        let lowerCountryName;
+        let lowerAdminCountry;
         const explicitKorean =
           countryCode === "kr" ||
           countryCode === "kp" ||
@@ -1191,7 +1182,7 @@
         const label = text(gc.label);
         const countryCode = text(gc.country_code).toLowerCase();
         const fields = readFields(gc);
-        let firstLabelPart = "";
+        let firstLabelPart;
         let p0 = "";
         let p1 = "";
         for (let start = 0; start <= label.length && !p1;) {
@@ -1328,6 +1319,10 @@
     const themeColors = document.querySelectorAll('meta[name="theme-color"]');
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const appearance = document.getElementById("appearance");
+    const useOutput = document.getElementById("useOutput");
+    const coordsExpand = document.getElementById("coords-expand");
+    const dropState = document.getElementById("drop-state");
+    const bulkDialog = document.getElementById("bulk-dialog");
     // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
@@ -1694,27 +1689,25 @@
     function updateUIState() {
       const active = document.activeElement;
       const controls = [domElements.parseBtn, domElements.startBtn, domElements.pauseBtn,
-        domElements.resumeBtn, domElements.stopBtn, domElements.file, document.getElementById("useOutput")];
+        domElements.resumeBtn, domElements.stopBtn, domElements.file, useOutput];
       const ownedFocus = controls.includes(active);
       const s = AppState.status;
       domElements.statusRow.dataset.state = s;
       if (s === "idle") stopElapsed();
       const isBusy = AppState.task !== null;
       domElements.tableWrap.toggleAttribute("data-running", s === "running");
-      domElements.prog.toggleAttribute("data-running", s === "running");
       domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
       domElements.parseBtn.disabled = isBusy;
       domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
       domElements.pauseBtn.disabled = s !== "running";
       domElements.resumeBtn.disabled = s !== "paused";
-      domElements.stopBtn.disabled = !(AppState.isRunning || s === "parsing") ||
-        s === "stopping";
+      domElements.stopBtn.disabled = !(AppState.isRunning || s === "parsing");
       domElements.file.disabled = isBusy;
       domElements.startBtn.hidden = isBusy;
       domElements.pauseBtn.hidden = s !== "running" && s !== "pausing";
       domElements.resumeBtn.hidden = s !== "paused";
       domElements.stopBtn.hidden = !isBusy;
-      document.getElementById("useOutput").disabled = isBusy || !manualOutputReady;
+      useOutput.disabled = isBusy || !manualOutputReady;
       updateWorkflowStep();
       if (ownedFocus && (active.disabled || active.hidden)) {
         const next = s === "running" ? domElements.pauseBtn
@@ -1792,8 +1785,8 @@
         domElements.coordsCount.textContent = totalText;
         domElements.coordsSection.dataset.empty = String(total === 0);
         domElements.coordsSection.dataset.expanded = "false";
-        document.getElementById("coords-expand").ariaExpanded = "false";
-        document.getElementById("coords-expand").textContent = "좌표 모두 보기";
+        coordsExpand.ariaExpanded = "false";
+        coordsExpand.textContent = "좌표 모두 보기";
       }
       if (processedChanged || failChanged) {
         const successText = fmt(success);
@@ -2819,7 +2812,7 @@
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
-        document.getElementById("drop-state").textContent = ` · ${fmt(records.length)}개 좌표 추출 완료`;
+        dropState.textContent = ` · ${fmt(records.length)}개 좌표 추출 완료`;
         domElements.emptyHint.textContent =
           "좌표 추출 완료. 조회 시작을 눌러주세요.";
         const MAX_DISP = 200;
@@ -2863,13 +2856,12 @@
       renderCurrentPage(true);
       domElements.pageNumbers.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
     });
-    document.getElementById("coords-expand").addEventListener("click", () => {
+    coordsExpand.addEventListener("click", () => {
       const area = domElements.coordsSection;
       const expanded = area.dataset.expanded !== "true";
       area.dataset.expanded = String(expanded);
-      const button = document.getElementById("coords-expand");
-      button.ariaExpanded = String(expanded);
-      button.textContent = expanded ? "좌표 접기" : "좌표 모두 보기";
+      coordsExpand.ariaExpanded = String(expanded);
+      coordsExpand.textContent = expanded ? "좌표 접기" : "좌표 모두 보기";
     });
     document.getElementById("coords-copy").addEventListener("click", async () => {
       try {
@@ -2918,7 +2910,6 @@
         }
         const count = AppState.records.length;
         if (count > CONFIG.BULK_CONFIRM_THRESHOLD && !AppState.bulkAcknowledged) {
-          const bulkDialog = document.getElementById("bulk-dialog");
           document.getElementById("bulk-description").textContent =
             `공용 Nominatim에서 ${fmt(count)}개 좌표를 조회합니다. 대량 역지오코딩은 권장되지 않습니다.`;
           AppState.bulkAcknowledged = await new Promise(resolve => {
@@ -2988,9 +2979,9 @@
       },
     };
     document.getElementById("bulk-cancel").addEventListener("click", () =>
-      document.getElementById("bulk-dialog").close("cancel"));
+      bulkDialog.close("cancel"));
     document.getElementById("bulk-confirm").addEventListener("click", () =>
-      document.getElementById("bulk-dialog").close("confirm"));
+      bulkDialog.close("confirm"));
     document.getElementById("app").addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
@@ -3027,7 +3018,7 @@
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
       document.getElementById("drop-filename").textContent = file.name;
-      document.getElementById("drop-state").textContent = "선택됨 · 좌표 추출을 눌러주세요";
+      dropState.textContent = "선택됨 · 좌표 추출을 눌러주세요";
       document.getElementById("file-changed").hidden = false;
       return true;
     }
@@ -3510,7 +3501,6 @@
         const copyBtn = document.getElementById("copyOutput");
         const output = document.getElementById("output");
         const outputContent = output.querySelector(".coords-content");
-        const manualBody = runBtn.closest(".manual-rng-body");
         const error = document.getElementById("error");
         const meta = document.getElementById("meta");
         const suppDialog = document.getElementById("supp-dialog");
@@ -3591,7 +3581,6 @@
           saveBtn.disabled = manualBusy || !hasOutput;
           copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
         };
-        const useOutput = document.getElementById("useOutput");
         let manualGenerationId = 0;
         setManualBusy(false);
         runBtn.addEventListener("click", async () => {
@@ -3610,8 +3599,8 @@
             let queuedSuppCount = 0;
             let renderedCount = -1;
             let supplementHead = 0;
-            let supplementCursor = 0;
-            let preloadedCount = 0;
+            let supplementCursor;
+            let preloadedCount;
             const nextSupplement = (reason) => {
               if (supplementCursor === supplementValues.length) {
                 const queued = suppTokens.next();
@@ -3704,7 +3693,6 @@
               throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
             }
             updateManualProgress(cancelled ? "중단" : "완료");
-            manualBody.scrollTop = 0;
             output.scrollTop = 0;
           } catch (err) {
             if (generationId === manualGenerationId) {
@@ -4031,7 +4019,6 @@
       clearTimeout(noticeTimer);
       const error = /실패|오류|불가|연결되지/.test(message);
       notice.setAttribute("aria-live", error ? "assertive" : "polite");
-      notice.dataset.severity = error ? "error" : "info";
       noticeText.textContent = message;
       notice.hidden = false;
       // Errors persist until dismissed; success notifications stay long
@@ -4168,8 +4155,7 @@
       const record = selectedRecord;
       if (!record) return;
       const lat = Number(record.latStr), lon = Number(record.lonStr);
-      const lat6 = fmtCoord6(record.latStr), lon6 = fmtCoord6(record.lonStr);
-      mapExternal.href = buildMapLink(1, record.latStr, record.lonStr, lat6, lon6);
+      mapExternal.href = buildMapLink(1, record.latStr, record.lonStr);
       if (Math.abs(lat) > 85) {
         loadMap.hidden = true;
         showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
@@ -4229,8 +4215,8 @@
     const helpDialog = document.getElementById("help-dialog");
     let helpReturnFocus = null;
     for (const id of ["show-help", "settings-help"]) {
-      document.getElementById(id).addEventListener("click", () => {
-        helpReturnFocus = id === "settings-help" ? document.querySelector(".settings-button") : document.getElementById(id);
+      document.getElementById(id).addEventListener("click", event => {
+        helpReturnFocus = id === "settings-help" ? settingsTrigger : event.currentTarget;
         if (settingsDialog.open) settingsDialog.close();
         helpDialog.showModal();
       });
