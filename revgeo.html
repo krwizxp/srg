@@ -27,7 +27,6 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
     integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg" rel="stylesheet">
   <style>
-    /* Content stays opaque; translucency is reserved for navigation. */
     :root {
       color-scheme: light dark;
       --page-bg: #f5f5f7;
@@ -57,7 +56,6 @@
       scrollbar-color: var(--line-control) transparent;
     }
 
-    /* Use explicit canvas colors for browser-edge background sampling. */
     @media (prefers-color-scheme: dark) {
       :root {
         --page-bg: #111113;
@@ -1980,7 +1978,6 @@
         flex-wrap: wrap;
         gap: 12px;
         padding-block: 6px max(6px, env(safe-area-inset-bottom));
-        /* Keep the outer dock clear so Safari can show scrolling content below it. */
         isolation: isolate;
       }
 
@@ -2665,7 +2662,6 @@
                   <path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z"></path>
                   <path d="M9 2v17m6-14v17"></path>
                 </svg>지도에서 열기</button>
-              <!-- Modal controls must stay inside the content moved into detail-sheet. -->
               <nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
                 <div class="map-links" id="map-popover-links">
                   <a href="about:blank" rel="noopener noreferrer" target="_blank">Google</a>
@@ -3216,7 +3212,6 @@
     const coordsExpand = byId("coords-expand");
     const dropState = byId("drop-state");
     const bulkDialog = byId("bulk-dialog");
-    // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
     const updateThemeToggle = () => {
@@ -3352,7 +3347,6 @@
         filterTimer = null;
       }
     }
-    // Render at most seven page controls, regardless of the result count.
     let pageNavigationKey = "";
     function updatePageNavigation(visibleCount) {
       const pageCount = Math.max(1, Math.ceil(visibleCount / resultPageSize));
@@ -4552,8 +4546,6 @@
       button.firstElementChild.textContent = title;
       button.lastElementChild.textContent = result.error || addr.eupmyeon || addr.tag || "상세 정보 보기";
       button.setAttribute("aria-label", `${index + 1}. ${title} - 위치 상세 보기`);
-      // Mobile CSS hides the number cell; keep a complete, ordered label
-      // on the tappable row for VoiceOver without changing the table DOM.
       button.setAttribute("aria-description", `좌표 ${record.latStr}, ${record.lonStr}; 구분 ${result.kind || record.set}; ${result.error ? "조회 실패" : "조회 완료"}`);
       cells[2].firstElementChild.textContent = fmtCoord6(record.latStr);
       cells[2].lastElementChild.textContent = fmtCoord6(record.lonStr);
@@ -4996,8 +4988,6 @@
       const F64_SIGN_BIT = 1n << 63n;
       function composeRoundedNormalF64(integer, exponent) {
         if (integer === 0n) return 0;
-        // This kernel's integers fit in a finite Number. Converting rounds
-        // once; a power-of-two scale preserves that rounding for normal f64.
         const value = Number(integer) * 2 ** exponent;
         if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022) {
           throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
@@ -5645,7 +5635,6 @@
         clearOutput();
       });
     }
-    // One set of controls and result nodes serves desktop and mobile layouts.
     const mobileMedia = matchMedia("(max-width: 800px)");
     const compactMedia = matchMedia("(max-width: 1230px)");
     const inputTabs = document.querySelector(".input-tabs");
@@ -5675,7 +5664,6 @@
     let selectedRecord = null;
     let noticeTimer = 0;
     let detailReturnFocus = null;
-    // A media-query change can hide a focused slot before its change event runs.
     let layoutFocus = null;
     document.addEventListener("focusin", ({ target }) => {
       layoutFocus = jobPanel.contains(target) ? target : null;
@@ -5732,7 +5720,6 @@
       if (!compactMedia.matches && detailSheet.open) detailSheet.close();
       if (restoreFocus && active.getClientRects().length && !active.disabled) active.focus({ preventScroll: true });
     }
-    // Keep wide-screen popovers attached to their initiating control.
     const settingsDialog = byId("display-settings");
     const settingsTrigger = document.querySelector(".settings-button");
     const popoverAnchors = [
@@ -5819,7 +5806,6 @@
     });
     mobileMedia.addEventListener("change", adaptLayout);
     compactMedia.addEventListener("change", adaptLayout);
-    // The filter dialog owns focus and backdrop dismissal on all screen sizes.
     function updateWorkflowStep() {
       const step = AppState.isRunning || AppState.isStopping ? "lookup" :
         AppState.processed ? "results" : "input";
@@ -5871,8 +5857,6 @@
       notice.setAttribute("aria-live", error ? "assertive" : "polite");
       noticeText.textContent = message;
       notice.hidden = false;
-      // Errors persist until dismissed; success notifications stay long
-      // enough for screen readers and can be dismissed manually.
       if (!error) noticeTimer = setTimeout(() => { notice.hidden = true; }, 8000);
     }
     const mapFeedback = byId("map-feedback");
