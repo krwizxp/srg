@@ -452,8 +452,9 @@
       .drop-zone { border-style: solid; }
       .drop-zone .drop-text > .ui-icon { margin-bottom: 10px; }
       .workflow-compact { display: none; }
-      .help-button { display: grid; place-items: center; min-width: 44px; width: 44px; padding: 0; font-size: 0; }
-      .help-button::before { content: "?"; font-size: 1rem; font-weight: 700; }
+      .help-button { display: grid; place-items: center; min-width: 44px; width: 44px; padding: 0; }
+      .help-button__label { display: none; }
+      .help-button::before { content: "?"; font-size: 1rem; font-weight: 700; line-height: 1; }
       .header-tools { gap: 4px; }
       #app { display: block; margin-top: 10px; padding-inline: 20px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
@@ -610,7 +611,7 @@
 </ol>
 <p class="workflow-compact" id="workflow-compact">1/3 · 데이터 입력</p>
 <div class="header-tools">
-<button class="action-btn help-button" id="show-help" type="button">도움말</button>
+<button aria-label="도움말" class="action-btn help-button" id="show-help" type="button"><span class="help-button__label">도움말</span></button>
 <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <circle cx="12" cy="12" fill="currentColor" r="4"></circle>
 <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"></path>
