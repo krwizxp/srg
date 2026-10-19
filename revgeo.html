@@ -34,21 +34,16 @@
       --page-bg: #f5f5f7;
       --surface-panel: light-dark(#ffffff, #1c1c1e);
       --panel-bg: light-dark(#f6f6f8, #252528);
-      --input-bg: var(--surface-panel);
       --fg: light-dark(#1d1d1f, #f5f5f7);
-      --heading: var(--fg);
       --muted: light-dark(#68686e, #aeaeb6);
-      --muted-strong: var(--muted);
       --line-soft: light-dark(#e5e5eb, #38383d);
       --line-control: light-dark(#8b8b92, #777780);
       --accent: light-dark(#0068df, #7ab6ff);
-      --accent-ink: var(--accent);
       --accent-wash: light-dark(#edf4ff, #25354b);
       --accent-border: light-dark(#a8c8f2, #46638a);
       --danger: light-dark(#c62836, #ff6961);
       --danger-bg: light-dark(#fff0f1, #402428);
       --success: light-dark(#19733f, #78d89c);
-      --success-bg: light-dark(#eaf5ee, #20372a);
       --glass: light-dark(#ffffffc7, #27272acc);
       --glass-edge: light-dark(#ffffffd9, #ffffff38);
       --glass-sheen: light-dark(#ffffffb3, #ffffff14);
@@ -69,22 +64,21 @@
     :root[data-theme="light"] { color-scheme: light; --page-bg: #f5f5f7; }
     :root[data-theme="dark"] { color-scheme: dark; --page-bg: #111113; }
     *, *::before, *::after { box-sizing: border-box; }
-    body, h1, h2, h3, p, pre, fieldset, dl, dd { margin: 0; }
-    fieldset { border: 0; padding: 0; min-width: 0; }
+    body, h1, h2, h3, p, pre, dl, dd { margin: 0; }
     button, input, select, textarea { font: inherit; }
-    button, select, summary { cursor: pointer; }
+    button, select { cursor: pointer; }
     button { color: inherit; }
-    button, summary, .map-links a {
+    button, .map-links a {
       -webkit-tap-highlight-color: transparent;
       transition: background-color .15s, box-shadow .15s, transform .25s cubic-bezier(.2, .8, .2, 1.2);
     }
-    :is(button, summary, .map-links a):active:not(:disabled) {
+    :is(button, .map-links a):active:not(:disabled) {
       background-color: var(--press-bg); transform: scale(.97);
     }
     a { color: var(--accent); text-underline-offset: 3px; }
     svg { flex-shrink: 0; vertical-align: middle; }
     [hidden] { display: none !important; }
-    :is(button, input, textarea, select, summary, a, [tabindex]):focus-visible {
+    :is(button, input, textarea, select, a, [tabindex]):focus-visible {
       outline: 2px solid var(--focus-ring);
       outline-offset: 3px;
     }
@@ -103,10 +97,7 @@
       width: 20px; height: 20px;
       stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8;
     }
-    .action-btn__icon {
-      fill: none; stroke: currentColor; stroke-width: 1.8;
-      stroke-linecap: round; stroke-linejoin: round;
-    }
+    .action-btn__icon { fill: none; stroke: currentColor; }
     .site-header { border-bottom: 1px solid var(--line-soft); }
     .header-inner {
       display: flex; align-items: center; justify-content: space-between;
@@ -266,8 +257,7 @@
     .manual-rng-meta:empty { display: none; }
     .manual-rng-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     @media (max-width: 374px) { .confirm-actions { flex-wrap: wrap; } .confirm-actions .action-btn { flex-basis: 100%; } }
-    #runBtn, #useOutput { grid-column: 1 / -1; }
-    #clearBtn { grid-column: 1 / -1; }
+    #runBtn, #useOutput, #clearBtn { grid-column: 1 / -1; }
     #error, #supp-dialog-error { color: var(--danger); }
     #output { margin-top: 8px; height: 150px; background: var(--surface-panel); border: 1px solid var(--line-control); border-radius: 14px; }
     .results-column { min-width: 0; }
@@ -291,12 +281,10 @@
     .search-field > input::-webkit-search-cancel-button { cursor: pointer; }
     .filter-trigger[aria-expanded="true"] { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
     #filter-dialog { width: min(380px, calc(100vw - 24px)); }
-    #filter-dialog .filter-grid { position: static; width: 100%; max-height: none; background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none; }
     #filter-dialog .sheet-heading { margin-bottom: 18px; }
     .filter-grid {
-      position: absolute; right: 0; top: calc(100% + 8px); z-index: 15; display: grid; gap: 12px;
-      width: min(340px, 100%); padding: 20px; max-height: 65dvh; overflow: auto;
-      background: var(--surface-panel); border: 1px solid var(--line-control); border-radius: 18px; box-shadow: 0 12px 40px #0002;
+      display: grid; gap: 12px; width: 100%; overflow: auto;
+      right: 0; top: calc(100% + 8px); z-index: 15;
     }
     .filter-grid label { display: grid; gap: 6px; font-size: .8125rem; }
     .results-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; border-top: 1px solid var(--line-soft); }
@@ -318,11 +306,10 @@
     tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--accent); color: var(--accent); }
     .location-button {
       display: block; border: 0; border-radius: 6px; background: transparent; color: inherit;
-      width: 100%; min-height: 44px; padding: 0; text-align: left; line-height: 1.6;
+      position: relative; width: 100%; min-height: 44px; padding: 0; text-align: left; line-height: 1.6;
     }
     .address-main, .address-sub { display: block; overflow-wrap: anywhere; unicode-bidi: plaintext; }
     .address-main[dir="auto"], .address-sub[dir="auto"], #detail-full[dir="auto"] { text-align: start; }
-    .location-button { position: relative; }
     .location-button::after { content: "›"; display: none; position: absolute; inset-inline-end: 0; top: 0; color: var(--muted); font-size: 1.4rem; line-height: 1; }
     .address-main { font-weight: 650; }
     .address-sub { color: var(--muted); font-size: .875rem; margin-top: 3px; }
@@ -355,7 +342,6 @@
     .map-load { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 166px; background: transparent; border: 0; color: var(--accent); padding: 16px; font-size: .8125rem; }
     .map-load .ui-icon { width: 32px; height: 32px; }
     .map-feedback { padding: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .875rem; color: var(--muted); }
-    .map-feedback[hidden], .map-recovery[hidden] { display: none; }
     .map-feedback[data-loading="true"]::before { content: ""; width: 16px; height: 16px; border: 2px solid var(--line-control); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
     .map-recovery { display: flex; gap: 8px; margin: 8px 0 18px; flex-wrap: wrap; }
     .map-recovery > * { flex: 1; font-size: .8125rem; }
@@ -420,7 +406,6 @@
     #help-dialog p { margin: 12px 0; }
     #help-dialog ol { padding-left: 24px; line-height: 1.9; }
     .ui-notice { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px); width: max-content; padding: 8px 12px 8px 18px; border-radius: 16px; background: var(--fg); color: var(--surface-panel); font-size: .875rem; box-shadow: 0 8px 25px #0002; display: flex; align-items: center; gap: 12px; }
-    .ui-notice[hidden] { display: none; }
     .ui-notice .icon-button { width: 44px; min-width: 44px; color: inherit; }
     .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
     .confirm-actions .action-btn { flex: 1; }
@@ -452,7 +437,7 @@
       .drop-zone { border-style: solid; }
       .drop-zone .drop-text > .ui-icon { margin-bottom: 10px; }
       .workflow-compact { display: none; }
-      .help-button { display: grid; place-items: center; min-width: 44px; width: 44px; padding: 0; }
+      .help-button { display: grid; place-items: center; width: 44px; padding: 0; }
       .help-button__label { display: none; }
       .help-button::before { content: "?"; font-size: 1rem; font-weight: 700; line-height: 1; }
       .header-tools { gap: 4px; }
@@ -466,18 +451,16 @@
       .coords-section[data-expanded="true"] #coords { height: min(320px, 50dvh); overflow: auto; }
       .workflow-panel { padding: 18px 20px; }
       .results-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
-      .workspace-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 0 18px; }
+      .workspace-heading { gap: 10px; padding: 0 0 18px; }
       .workspace-heading .card-label { font-size: 1.5rem; }
       #desktop-export-slot { margin-left: auto; }
       .result-filterbar { padding: 0 0 16px; gap: 8px; }
       .result-filterbar .segmented { min-width: 0; width: 100%; }
-      .remaining-note { font-size: .875rem; }
       search { padding: 0 0 18px; }
       .filters { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
       .search-field { grid-column: 1 / -1; }
       .filter-trigger { padding: 10px; }
       .filter-trigger span { display: none; }
-      #filter-dialog .filter-grid { width: 100%; }
       .results-grid { border: 0; display: block; }
       .table-wrap { overflow: visible; min-height: 280px; max-height: none; }
       table, tbody { display: block; }
@@ -496,7 +479,6 @@
       .location-button { padding-inline-end: 22px; }
       .location-button::after { display: block; }
       .coordinate-cell { direction: ltr; unicode-bidi: isolate; }
-      .address-sub { font-size: .875rem; }
       .coordinate-cell, .result-state, .kind-badge { font-size: .875rem; }
       .coordinate-cell span { display: inline; }
       .coordinate-cell span:first-child::after { content: ", "; }
@@ -545,14 +527,12 @@
       #app { padding-inline: 12px; }
       .site-brand { gap: 6px; }
       .site-brand h1 { font-size: .875rem; }
-      .help-button { width: 44px; min-width: 44px; }
       .tool-capsule { padding: 1px; }
       .tool-capsule button { width: 44px; min-width: 44px; min-height: 44px; }
       .brand-mark { width: 28px; height: 28px; }
       .mobile-bottom { padding-inline: 12px; gap: 8px; }
       .mobile-nav button { gap: 4px; padding-inline: 6px; }
       .result-pages, .page-numbers { gap: 1px; }
-      .result-pages .action-btn { min-width: 44px; }
     }
     .header-inner, #app, .page-footer, .mobile-bottom {
       padding-left: max(var(--page-gutter), env(safe-area-inset-left));
@@ -563,7 +543,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-      :is(button, summary, .map-links a):active:not(:disabled) { transform: none; }
+      :is(button, .map-links a):active:not(:disabled) { transform: none; }
     }
     @media (prefers-reduced-transparency: reduce) {
       .tool-capsule, .mobile-nav { background: var(--surface-panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -571,11 +551,9 @@
     @media (prefers-contrast: more) {
       :root { --line-soft: var(--line-control); --line-control: var(--fg); --muted: var(--fg); }
       .tool-capsule, .mobile-nav { background: var(--surface-panel); border-color: var(--fg); -webkit-backdrop-filter: none; backdrop-filter: none; }
-      .mobile-nav::before { border: 2px solid var(--accent); }
     }
     @media (forced-colors: active) {
       .tool-capsule, .mobile-nav { border-color: ButtonText; }
-      .mobile-nav::before { border: 2px solid Highlight; }
       .progress-fill { background: Highlight; }
       .segmented :is([aria-selected="true"], [aria-pressed="true"]), tr[data-selected="true"] { outline: 2px solid Highlight; }
     }
@@ -612,12 +590,12 @@
 <p class="workflow-compact" id="workflow-compact">1/3 · 데이터 입력</p>
 <div class="header-tools">
 <button aria-label="도움말" class="action-btn help-button" id="show-help" type="button"><span class="help-button__label">도움말</span></button>
-<div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle" title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <circle cx="12" cy="12" fill="currentColor" r="4"></circle>
 <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"></path>
-</svg><svg aria-hidden="true" class="theme-moon ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+</svg><svg aria-hidden="true" class="theme-moon ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"></path>
-</svg></button><button aria-label="화면 설정" class="settings-button" title="화면 설정" aria-haspopup="dialog" aria-controls="display-settings" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+</svg></button><button aria-label="화면 설정" class="settings-button" title="화면 설정" aria-haspopup="dialog" aria-controls="display-settings" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z">
 </path>
 <circle cx="11" cy="12" r="3"></circle>
@@ -633,13 +611,13 @@
 <button aria-controls="manual-pane" aria-selected="false" data-mode="manual" id="manual-tab" role="tab" tabindex="-1" type="button">난수 직접 입력</button>
 </div>
 <section aria-labelledby="file-tab" id="file-pane" role="tabpanel"><label class="drop-zone">
-<span class="drop-text"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<span class="drop-text"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M6 3h8l4 4v14H6z"></path>
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
 </svg><strong id="drop-filename">좌표 TXT 파일 선택</strong><span id="drop-state">TXT 파일을 선택하거나 이곳에 끌어 놓으세요.</span><span class="file-picker-cue">파일 선택</span><span class="file-changed" id="file-changed" hidden>선택한 파일을 바꾸려면 탭하세요.</span></span>
 <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file">
 </label><button class="action-btn action-btn--tinted" command="--parse" commandfor="app" id="parse" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M6 3h8l4 4v14H6z"></path>
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
 </svg>
@@ -665,7 +643,7 @@
 </div>
 <div class="manual-rng-actions">
 <button class="action-btn action-btn--primary" id="runBtn" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z">
 </path>
 <circle cx="11" cy="12" r="3"></circle>
@@ -689,7 +667,7 @@
 <span>결과 복사</span>
 </button>
 <button class="action-btn action-btn--danger" id="clearBtn" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"></path>
 </svg>
 <span>출력 지우기</span>
@@ -704,11 +682,11 @@
 </div>
 </section>
 <section aria-labelledby="coords-label" class="coords-section" data-empty="true" data-expanded="false">
-<div class="coords-heading"><span class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<div class="coords-heading"><span class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path>
 <circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle>
 </svg>추출된 좌표 (lat,lon)</span><span>총 <strong id="coords-count">0</strong>개</span></div>
-<div class="coords-empty"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z"></path><circle cx="12" cy="9" r="2.5"></circle></svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
+<div class="coords-empty"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z"></path><circle cx="12" cy="9" r="2.5"></circle></svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
 <pre class="coords-view" id="coords" tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="coords-content"></code></pre>
 <div class="coords-tools"><button aria-controls="coords" aria-expanded="false" class="action-btn action-btn--tinted" id="coords-expand" type="button">좌표 모두 보기</button><button class="action-btn" id="coords-copy" type="button">좌표 복사</button></div>
 </section>
@@ -716,7 +694,7 @@
 <section aria-label="조회 진행 상황" class="workflow-panel">
 <p aria-hidden="true" class="progress-pending">조회 준비</p>
 <div class="row-progress">
-<div class="sp">
+<div>
 <div class="progress-heading"><label class="caps" for="prog" id="prog-label">진행 상황</label><span aria-hidden="true" id="progress-percent">0%</span></div>
 <div class="progress-shell">
 <progress aria-labelledby="prog-label" id="prog" max="100" value="0"></progress>
@@ -725,27 +703,27 @@
 </div>
 <output id="counts">총 <strong id="cnt-total">0</strong>건 중
               <strong id="cnt-success">0</strong>건 완료, <strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
-</div><div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해 주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+</div><div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해 주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <circle cx="12" cy="12" r="9"></circle>
 <path d="M12 7v5l3 2"></path>
 </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
 <div class="input-actions"><button class="action-btn action-btn--primary" command="--start" commandfor="app" disabled id="start" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
 </svg>
 <span>주소 조회 시작</span>
 </button><button class="action-btn" command="--pause" commandfor="app" disabled hidden id="pause" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none"></path>
 </svg>
 <span>일시정지</span>
 </button><button class="action-btn" command="--resume" commandfor="app" disabled hidden id="resume" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
 </svg>
 <span>재개</span>
 </button><button class="action-btn action-btn--danger" command="--stop" commandfor="app" disabled hidden id="stop" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5"></rect>
 </svg>
 <span>중지</span>
@@ -776,7 +754,7 @@
 <p class="remaining-note">총 <strong id="summary-total">0</strong>개 좌표 · 미처리 <strong id="summary-remain">0</strong></p>
 </div>
 <search aria-label="주소 조회 결과 필터"><form class="filters" id="filters"><div class="search-field">
-<svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <circle cx="10.5" cy="10.5" r="6.5">
 </circle>
 <path d="m16 16 4.5 4.5">
@@ -797,8 +775,8 @@
 <option value="에러">
                 에러
               </option>
-</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog" aria-expanded="false" class="action-btn filter-trigger" id="advanced-filters" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M4 7h7m6 0h3M4 17h3m6 0h7"></path><circle cx="14" cy="7" r="3"></circle><circle cx="10" cy="17" r="3"></circle></svg><span>상세 필터</span></button><dialog aria-labelledby="filter-dialog-title" id="filter-dialog"><div class="sheet-heading"><h2 id="filter-dialog-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button" id="filter-dismiss" type="button">×</button></div><div class="filter-grid"><label>시·도<input aria-label="시·도" enterkeyhint="search" id="filter-sido" inputmode="search" placeholder="시·도" type="search"></label><label>시·군·구<input aria-label="시·군·구" enterkeyhint="search" id="filter-sigungu" inputmode="search" placeholder="시·군·구" type="search"></label><label>읍·면·동·리<input aria-label="읍·면·동·리" enterkeyhint="search" id="filter-emd" inputmode="search" placeholder="읍·면·동·리" type="search"></label><label>지물 태그<input aria-label="지물 태그" enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그" type="search"></label><label>전체주소<input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소" type="search"></label><button class="action-btn" command="--filter-clear" commandfor="app" id="filter-clear" type="button">
-<svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog" aria-expanded="false" class="action-btn filter-trigger" id="advanced-filters" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 7h7m6 0h3M4 17h3m6 0h7"></path><circle cx="14" cy="7" r="3"></circle><circle cx="10" cy="17" r="3"></circle></svg><span>상세 필터</span></button><dialog aria-labelledby="filter-dialog-title" id="filter-dialog"><div class="sheet-heading"><h2 id="filter-dialog-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button" id="filter-dismiss" type="button">×</button></div><div class="filter-grid"><label>시·도<input aria-label="시·도" enterkeyhint="search" id="filter-sido" inputmode="search" placeholder="시·도" type="search"></label><label>시·군·구<input aria-label="시·군·구" enterkeyhint="search" id="filter-sigungu" inputmode="search" placeholder="시·군·구" type="search"></label><label>읍·면·동·리<input aria-label="읍·면·동·리" enterkeyhint="search" id="filter-emd" inputmode="search" placeholder="읍·면·동·리" type="search"></label><label>지물 태그<input aria-label="지물 태그" enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그" type="search"></label><label>전체주소<input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소" type="search"></label><button class="action-btn" command="--filter-clear" commandfor="app" id="filter-clear" type="button">
+<svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M20 7v5h-5M4 17v-5h5">
 </path>
 <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18">
@@ -822,11 +800,11 @@
 </section>
 <div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
 <nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
-<button aria-label="이전 페이지" class="action-btn" command="--page-prev" commandfor="app" id="page-prev" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<button aria-label="이전 페이지" class="action-btn" command="--page-prev" commandfor="app" id="page-prev" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="m14 6-6 6 6 6"></path>
 </svg><span>이전</span></button>
 <output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers" id="page-numbers"></span>
-<button aria-label="다음 페이지" class="action-btn" command="--page-next" commandfor="app" id="page-next" type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<button aria-label="다음 페이지" class="action-btn" command="--page-next" commandfor="app" id="page-next" type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="m10 6 6 6-6 6"></path>
 </svg></button>
 </nav>
@@ -838,9 +816,9 @@
 <div hidden id="inspector-content">
 <p class="inspector-eyebrow">선택한 위치</p>
 <h2 dir="auto" id="detail-title">선택한 위치</h2><p dir="auto" id="detail-town"></p>
-<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg><span>OpenStreetMap 지도 불러오기</span></button><div aria-live="polite" class="map-feedback" hidden id="map-feedback"></div><iframe hidden id="detail-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="선택한 좌표의 OpenStreetMap 지도"></iframe></div><div class="map-recovery" hidden id="map-recovery"><button class="action-btn action-btn--tinted" id="retry-map" type="button">다시 시도</button><a class="action-btn" href="about:blank" id="map-external" rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
+<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg><span>OpenStreetMap 지도 불러오기</span></button><div aria-live="polite" class="map-feedback" hidden id="map-feedback"></div><iframe hidden id="detail-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="선택한 좌표의 OpenStreetMap 지도"></iframe></div><div class="map-recovery" hidden id="map-recovery"><button class="action-btn action-btn--tinted" id="retry-map" type="button">다시 시도</button><a class="action-btn" href="about:blank" id="map-external" rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
 <p class="detail-label">전체 주소</p>
-<div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사" class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><rect height="11" rx="2" width="11" x="9" y="9"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg></button></div>
+<div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사" class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><rect height="11" rx="2" width="11" x="9" y="9"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg></button></div>
 <dl class="detail-fields">
 <div><dt>시·도</dt><dd dir="auto" id="detail-province"></dd></div>
 <div><dt>시·군·구</dt><dd dir="auto" id="detail-district"></dd></div>
@@ -848,7 +826,7 @@
 </dl>
 <div class="detail-tags"><p class="detail-label">지물 태그</p><p dir="auto" id="detail-tag"></p></div>
 <p dir="ltr" id="detail-coordinates"></p>
-<button class="map-btn action-btn open-map" id="detail-map-links" popovertarget="map-popover" popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z"></path><path d="M9 2v17m6-14v17"></path></svg>지도에서 열기</button>
+<button class="map-btn action-btn open-map" id="detail-map-links" popovertarget="map-popover" popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z"></path><path d="M9 2v17m6-14v17"></path></svg>지도에서 열기</button>
 <!-- Modal controls must stay inside the content moved into detail-sheet. -->
 <nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
 <div class="map-links" id="map-popover-links">
@@ -873,8 +851,8 @@
 </footer>
 <div class="mobile-bottom">
 <div aria-label="작업 화면" class="mobile-nav" role="tablist">
-<button aria-controls="input-view" aria-selected="true" data-mobile="input" id="mobile-input-tab" role="tab" tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg>입력</button>
-<button aria-controls="results-view" aria-selected="false" data-mobile="results" id="mobile-results-tab" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path></svg>결과</button>
+<button aria-controls="input-view" aria-selected="true" data-mobile="input" id="mobile-input-tab" role="tab" tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 12h6m-6 4h6"></path></svg>입력</button>
+<button aria-controls="results-view" aria-selected="false" data-mobile="results" id="mobile-results-tab" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path></svg>결과</button>
 </div>
 </div>
 <dialog aria-labelledby="settings-title" class="settings-popover" id="display-settings">
@@ -914,10 +892,10 @@
 </form>
 </dialog>
 <dialog aria-labelledby="sheet-title" id="detail-sheet">
-<div class="sheet-heading"><h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></svg></button></div>
+<div class="sheet-heading"><h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></svg></button></div>
 </dialog>
 <dialog aria-labelledby="help-title" id="help-dialog">
-<div class="sheet-heading"><h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></svg></button></div>
+<div class="sheet-heading"><h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></svg></button></div>
 <p class="manual-rng-meta">주소 조회는 Nominatim, 지도 미리보기는 OpenStreetMap에 좌표를 전송합니다.</p>
 <ol><li>TXT 파일을 불러와 좌표를 추출하거나, 난수를 직접 변환합니다.</li><li>주소 조회를 시작합니다. 입력 화면에서 일시정지, 재개, 중지할 수 있습니다.</li><li>결과에서 주소를 선택하면 상세 정보와 지도 링크를 확인할 수 있습니다.</li><li>CSV에는 필터와 관계없이 조회된 전체 결과가 포함됩니다.</li></ol>
 <p class="manual-rng-meta">공용 Nominatim은 초당 1회 이하로 조회합니다. 클립보드는 HTTPS 또는 localhost에서 사용할 수 있습니다.</p>
@@ -1253,8 +1231,6 @@
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
     const REVERSE_CACHE_KEY_PREFIX =
       `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.REVERSE_CACHE_PARSER_VERSION}:`;
-    const NOMINATIM_POLICY_URL =
-      "https://operations.osmfoundation.org/policies/nominatim/";
     const CSV_ATTRIBUTION_COLUMNS =
       ",\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)," +
       "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)," +
@@ -1273,13 +1249,11 @@
           lon + "," + lat + "," + lon;
       }
     }
-    let LAST_MAP_INVOKER = null;
     mapPopover.addEventListener("beforetoggle", (e) => {
-      if (e.newState !== "open") return void (LAST_MAP_INVOKER = null);
+      if (e.newState !== "open") return;
       const btn = e.source;
       if (!btn?.matches("button.map-btn")) return;
       const r = AppState.records[Number(btn.dataset.idx)];
-      LAST_MAP_INVOKER = btn;
       const { latStr: lat, lonStr: lon } = r;
       const lat6 = fmtCoord6(lat), lon6 = fmtCoord6(lon);
       for (let i = 0; i < MAP_LINK_KEYS.length; i++) {
@@ -1315,7 +1289,6 @@
       cntFail: document.getElementById("cnt-fail"),
       cntRemain: document.getElementById("cnt-remain"),
       prog: document.getElementById("prog"),
-      progLabel: document.getElementById("prog-label"),
       progressPercent: document.getElementById("progress-percent"),
       summaryTotal: document.getElementById("summary-total"),
       summarySuccess: document.getElementById("summary-success"),
@@ -2933,10 +2906,6 @@
       domElements.filterQ.focus();
       domElements.filterQ.select();
     });
-    domElements.tbody.addEventListener("click", (e) => {
-      const btn = e.target?.closest?.("button.map-btn");
-      if (btn && mapPopover.matches(":popover-open") && btn !== LAST_MAP_INVOKER) mapPopover.hidePopover();
-    }, { capture: true });
     const COMMANDS = {
       "--parse": handleParse,
       "--start": async () => {
@@ -3927,7 +3896,7 @@
     const settingsTrigger = document.querySelector(".settings-button");
     const popoverAnchors = [
       [settingsDialog, settingsTrigger],
-      [document.getElementById("map-popover"), document.getElementById("detail-map-links")],
+      [mapPopover, detailMapLinks],
     ];
     function alignPopover(panel, trigger) {
       if (!(panel.open || panel.matches(":popover-open"))) return;
@@ -3953,7 +3922,7 @@
       if (mobileMedia.matches) settingsDialog.showModal();
       else settingsDialog.show();
       alignPopover(settingsDialog, settingsTrigger);
-      document.getElementById("appearance").focus({ preventScroll: true });
+      appearance.focus({ preventScroll: true });
     });
     document.getElementById("settings-close").addEventListener("click", () => settingsDialog.close());
     settingsDialog.addEventListener("close", () => settingsTrigger.focus({ preventScroll: true }));
