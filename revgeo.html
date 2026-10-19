@@ -187,6 +187,8 @@
     .action-btn:disabled { opacity: .45; cursor: not-allowed; }
     .action-btn--primary { background: #0068df; color: #fff; border-color: #0068df; }
     .action-btn--primary:hover:not(:disabled) { background: #0057bc; color: #fff; }
+    .action-btn--tinted { background: var(--accent-wash); border-color: transparent; color: var(--accent); font-weight: 650; }
+    .action-btn--tinted:hover:not(:disabled) { background: var(--accent-wash); border-color: var(--accent-border); }
     .action-btn--danger { color: var(--danger); border-color: var(--line-control); }
     #parse { width: 100%; margin-top: 12px; }
     .coords-section {
@@ -199,12 +201,27 @@
     }
     .caps, .field-heading, .manual-rng-label { font-size: .875rem; font-weight: 650; color: var(--fg); }
     .coords-heading .ui-icon { width: 16px; height: 16px; color: var(--accent); margin-right: 4px; }
+    .coords-section[data-empty="true"] .coords-heading { border-bottom: 0; }
+    .coords-section[data-empty="true"] .coords-heading > span:last-child,
+    .coords-section[data-empty="true"] #coords { display: none; }
+    .coords-section[data-empty="false"] .coords-empty { display: none; }
+    .coords-empty {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 100px; padding: 12px 18px 22px; color: var(--muted);
+      font-size: .875rem; text-align: center;
+    }
+    .coords-empty .ui-icon { width: 22px; height: 22px; color: var(--accent); }
     .coords-view { overflow: auto; scrollbar-width: thin; font-size: .875rem; }
     .coords-content { display: block; padding: 12px; white-space: pre; font: inherit; }
     #coords { display: grid; grid-template-columns: 34px minmax(0, 1fr); height: 172px; }
     #coords .coords-content { min-width: max-content; padding: 10px 8px; line-height: 26px; }
     #coord-line-numbers { padding: 10px 0; line-height: 26px; text-align: center; color: var(--muted); user-select: none; }
     .workflow-panel { margin-top: 20px; padding: 18px; border: 1px solid var(--line-soft); border-radius: 20px; background: var(--surface-panel); }
+    .progress-pending { display: none; font-size: .875rem; font-weight: 650; margin-bottom: 8px; }
+    .workflow-panel:has(.status-row[data-state="idle"]):has(#start:disabled) .progress-pending { display: block; }
+    .workflow-panel:has(.status-row[data-state="idle"]):has(#start:disabled) .row-progress,
+    .workflow-panel:has(.status-row[data-state="idle"]):has(#start:disabled) .elapsed-time,
+    .workflow-panel:has(.status-row[data-state="idle"]):has(#start:disabled) .input-actions { display: none; }
     .progress-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     #progress-percent { color: var(--accent); font-size: .875rem; font-weight: 650; }
     .progress-shell { --pct: 0; height: 6px; border-radius: 99px; background: var(--line-soft); overflow: hidden; position: relative; }
@@ -324,7 +341,11 @@
     .open-map { width: 100%; margin-top: 18px; }
     .page-footer { display: flex; gap: 8px; align-items: start; max-width: 1680px; padding: 18px 28px 24px; margin: auto; color: var(--muted); font-size: .875rem; }
     .footer-info { width: 16px; height: 16px; margin-top: 2px; }
-    .usage-policy { margin-top: 4px; }
+    .footer-credit a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); text-decoration-color: var(--line-control); }
+    .footer-credit a:hover, .footer-credit a:focus-visible { color: var(--accent); text-decoration-color: currentColor; }
+    .footer-credit { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .65rem; row-gap: .25rem; min-width: 0; }
+    .usage-policy { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: .35em; }
+    .usage-policy > a, .usage-policy > span { white-space: nowrap; }
     .settings-popover, .map-popover, dialog {
       max-width: calc(100vw - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
       max-height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom))); overflow: auto;
@@ -377,6 +398,9 @@
       #app { display: block; margin-top: 10px; padding-inline: 20px; }
       .card-label, .workspace-heading .card-label { font-size: 1.875rem; }
       body[data-mobiletab="input"] .results-column, body[data-mobiletab="results"] .input-card { display: none; }
+      .coords-section, .workflow-panel { border-color: transparent; box-shadow: none; border-radius: 20px; }
+      .coords-heading { padding-inline: 18px; }
+      .workflow-panel { padding: 18px 20px; }
       .results-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
       .workspace-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 0 18px; }
       .workspace-heading .card-label { font-size: 1.5rem; }
@@ -420,15 +444,15 @@
         /* Keep the outer dock clear so Safari can show scrolling content below it. */
         isolation: isolate;
       }
-      .mobile-nav { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: 300px; gap: 3px; padding: 3px; border-radius: 99px; }
-      .mobile-nav::before {
-        content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 9px) / 2);
-        border-radius: inherit; background: var(--surface-panel); box-shadow: 0 1px 5px #00000014, inset 0 1px 0 var(--glass-edge);
-        transition: transform .28s cubic-bezier(.2, .8, .2, 1.1);
+      .mobile-nav { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: 320px; gap: 2px; padding: 5px; border-radius: 24px; }
+      .mobile-nav button {
+        position: relative; flex: 1; min-width: 44px; min-height: 56px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px; padding: 6px 10px; font-size: .75rem; line-height: 1.2;
+        border: 0; border-radius: 18px; color: var(--muted); background: transparent;
       }
-      .mobile-nav:has([data-mobile="results"][aria-pressed="true"])::before { transform: translateX(calc(100% + 3px)); }
-      .mobile-nav button { position: relative; flex: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: .8125rem; border: 0; border-radius: 99px; color: var(--muted); background: transparent; }
-      .mobile-nav [aria-pressed="true"] { color: var(--accent); font-weight: 650; }
+      .mobile-nav button .ui-icon { width: 23px; height: 23px; }
+      .mobile-nav [aria-pressed="true"] { color: var(--accent); background: var(--accent-wash); font-weight: 650; }
       .mobile-nav button:active, .tool-capsule button:active { background: var(--press-bg); }
       .page-footer { padding: 22px 20px calc(7rem + env(safe-area-inset-bottom)); }
       .ui-notice { bottom: calc(7rem + env(safe-area-inset-bottom)); }
@@ -532,7 +556,7 @@
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
 </svg><strong id="drop-filename">random_data.txt</strong><span id="drop-state">파일을 선택하거나 끌어 놓으세요.</span></span>
 <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file">
-</label><button class="action-btn" command="--parse" commandfor="app" id="parse" type="button">
+</label><button class="action-btn action-btn--tinted" command="--parse" commandfor="app" id="parse" type="button">
 <svg aria-hidden="true" class="action-btn__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="M6 3h8l4 4v14H6z"></path>
 <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
@@ -597,15 +621,17 @@
 </section>
 </div>
 </section>
-<section aria-labelledby="coords-label" class="coords-section">
+<section aria-labelledby="coords-label" class="coords-section" data-empty="true">
 <div class="coords-heading"><span class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
 <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path>
 <circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle>
 </svg>추출된 좌표 (lat,lon)</span><span>총 <strong id="coords-count">0</strong>개</span></div>
+<div class="coords-empty"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z"></path><circle cx="12" cy="9" r="2.5"></circle></svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
 <pre class="coords-view" id="coords" tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="coords-content"></code></pre>
 </section>
 <div id="input-job-slot">
 <section aria-label="조회 진행 상황" class="workflow-panel">
+<p aria-hidden="true" class="progress-pending">조회 준비</p>
 <div class="row-progress">
 <div class="sp">
 <div class="progress-heading"><label class="caps" for="prog" id="prog-label">진행 상황</label><span aria-hidden="true" id="progress-percent">0%</span></div>
@@ -648,7 +674,7 @@
 <div class="results-card">
 <header class="workspace-heading">
 <div><h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2></div>
-<div id="desktop-export-slot"><button class="action-btn action-btn--primary" command="--export" commandfor="app" disabled id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
+<div id="desktop-export-slot"><button class="action-btn action-btn--tinted" command="--export" commandfor="app" disabled id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
 <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
 <path d="M12 4.5v10"></path>
 <path d="m8 10.75 4 4 4-4"></path>
@@ -762,9 +788,8 @@
 <path d="M12 11v6m0-10h.01"></path>
 </svg>
 <div class="footer-credit">
-<p>© <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a>
-            · <a href="https://nominatim.org/" rel="noopener noreferrer" target="_blank">Nominatim</a></p>
-<p class="usage-policy"><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a></p>
+<p>© <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer" target="_blank">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer" target="_blank">ODbL</a></p>
+<p class="usage-policy"><a href="https://nominatim.org/" rel="noopener noreferrer" target="_blank">Nominatim</a><span>· <a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a></span></p>
 </div>
 </footer>
 <div class="mobile-bottom">
@@ -1206,6 +1231,7 @@
       summaryFail: document.getElementById("summary-fail"),
       summaryRemain: document.getElementById("summary-remain"),
       coordsCount: document.getElementById("coords-count"),
+      coordsSection: document.querySelector(".coords-section"),
       coordLineNumbers: document.getElementById("coord-line-numbers"),
       resultsCount: document.getElementById("results-count"),
       pageNumbers: document.getElementById("page-numbers"),
@@ -1698,6 +1724,7 @@
         domElements.cntTotal.textContent = totalText;
         domElements.summaryTotal.textContent = totalText;
         domElements.coordsCount.textContent = totalText;
+        domElements.coordsSection.dataset.empty = String(total === 0);
       }
       if (processedChanged || failChanged) {
         const successText = fmt(success);
