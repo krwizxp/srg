@@ -910,6 +910,7 @@
 <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
 
   <script type="module">
+    const byId = id => document.getElementById(id);
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])/g;
     const csvEsc = (s) => {
@@ -1226,7 +1227,7 @@
       ",\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)," +
       "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)," +
       "Reverse geocoding by Nominatim (https://nominatim.org/)";
-    const mapPopover = document.getElementById("map-popover");
+    const mapPopover = byId("map-popover");
     const mapAnchors = document.querySelectorAll("#map-popover-links a");
     const MAP_LINK_KEYS = ["Google", "OSM", "Naver", "Kakao"];
     function buildMapLink(index, lat, lon, lat6, lon6) {
@@ -1270,59 +1271,57 @@
       if (end && s.charCodeAt(end - 1) === 46) end--;
       return normalizeCoordText(end === s.length ? s : s.slice(0, end));
     };
-    const domElements = {
-      file: document.getElementById("file"),
-      themeToggle: document.getElementById("theme-toggle"),
-      exportBtn: document.getElementById("export"),
-      status: document.getElementById("status"),
-      cntTotal: document.getElementById("cnt-total"),
-      cntSuccess: document.getElementById("cnt-success"),
-      cntFail: document.getElementById("cnt-fail"),
-      cntRemain: document.getElementById("cnt-remain"),
-      prog: document.getElementById("prog"),
-      progressPercent: document.getElementById("progress-percent"),
-      summaryTotal: document.getElementById("summary-total"),
-      summarySuccess: document.getElementById("summary-success"),
-      summaryFail: document.getElementById("summary-fail"),
-      summaryRemain: document.getElementById("summary-remain"),
-      coordsCount: document.getElementById("coords-count"),
-      coordsSection: document.querySelector(".coords-section"),
-      coordLineNumbers: document.getElementById("coord-line-numbers"),
-      resultsCount: document.getElementById("results-count"),
-      pageNumbers: document.getElementById("page-numbers"),
-      elapsed: document.getElementById("elapsed"),
-      statusRow: document.querySelector(".status-row"),
-      tableWrap: document.querySelector(".table-wrap"),
-      emptyHint: document.querySelector(".table-wrap .empty-hint"),
-      tbody: document.getElementById("tbl").tBodies[0],
-      coordsContent: document.querySelector("#coords .coords-content"),
-      parseBtn: document.getElementById("parse"),
-      startBtn: document.getElementById("start"),
-      pauseBtn: document.getElementById("pause"),
-      resumeBtn: document.getElementById("resume"),
-      stopBtn: document.getElementById("stop"),
-      filterQ: document.getElementById("filter-q"),
-      filters: document.getElementById("filters"),
-      filterKind: document.getElementById("filter-kind"),
-      filterSido: document.getElementById("filter-sido"),
-      filterSigungu: document.getElementById("filter-sigungu"),
-      filterEmd: document.getElementById("filter-emd"),
-      filterTag: document.getElementById("filter-tag"),
-      filterFullAddr: document.getElementById("filter-fulladdr"),
-      pageNav: document.getElementById("result-pages"),
-      pagePrev: document.getElementById("page-prev"),
-      pageNext: document.getElementById("page-next"),
-      pageStatus: document.getElementById("page-status"),
-    };
+    const fileInput = byId("file");
+    const themeToggle = byId("theme-toggle");
+    const exportButton = byId("export");
+    const statusMessage = byId("status");
+    const countTotal = byId("cnt-total");
+    const countSuccess = byId("cnt-success");
+    const countFail = byId("cnt-fail");
+    const countRemain = byId("cnt-remain");
+    const progressBar = byId("prog");
+    const progressPercent = byId("progress-percent");
+    const summaryTotal = byId("summary-total");
+    const summarySuccess = byId("summary-success");
+    const summaryFail = byId("summary-fail");
+    const summaryRemain = byId("summary-remain");
+    const coordsCount = byId("coords-count");
+    const coordsSection = document.querySelector(".coords-section");
+    const coordLineNumbers = byId("coord-line-numbers");
+    const resultsCount = byId("results-count");
+    const pageNumbers = byId("page-numbers");
+    const elapsedOutput = byId("elapsed");
+    const statusRow = document.querySelector(".status-row");
+    const tableWrap = document.querySelector(".table-wrap");
+    const emptyHint = document.querySelector(".table-wrap .empty-hint");
+    const resultBody = byId("tbl").tBodies[0];
+    const coordsContent = document.querySelector("#coords .coords-content");
+    const parseButton = byId("parse");
+    const startButton = byId("start");
+    const pauseButton = byId("pause");
+    const resumeButton = byId("resume");
+    const stopButton = byId("stop");
+    const filterQuery = byId("filter-q");
+    const filterForm = byId("filters");
+    const filterKind = byId("filter-kind");
+    const filterSido = byId("filter-sido");
+    const filterSigungu = byId("filter-sigungu");
+    const filterEmd = byId("filter-emd");
+    const filterTag = byId("filter-tag");
+    const filterFullAddr = byId("filter-fulladdr");
+    const pageNav = byId("result-pages");
+    const pagePrev = byId("page-prev");
+    const pageNext = byId("page-next");
+    const pageStatus = byId("page-status");
     const root = document.documentElement;
     const pageColorScheme = document.querySelector('meta[name="color-scheme"]');
     const themeColors = document.querySelectorAll('meta[name="theme-color"]');
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const appearance = document.getElementById("appearance");
-    const useOutput = document.getElementById("useOutput");
-    const coordsExpand = document.getElementById("coords-expand");
-    const dropState = document.getElementById("drop-state");
-    const bulkDialog = document.getElementById("bulk-dialog");
+    const appearance = byId("appearance");
+    const useOutput = byId("useOutput");
+    const coordsExpand = byId("coords-expand");
+    const dropState = byId("drop-state");
+    const bulkDialog = byId("bulk-dialog");
     // Follow the system until toggled; manual overrides last only for this page.
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
@@ -1331,10 +1330,10 @@
       const dark = currentTheme() === "dark";
       const background = getComputedStyle(root).backgroundColor;
       for (const meta of themeColors) meta.content = background;
-      domElements.themeToggle.ariaPressed = String(dark);
-      domElements.themeToggle.title = dark ? "라이트 모드로 전환" : "다크 모드로 전환";
-      domElements.themeToggle.setAttribute("aria-label", domElements.themeToggle.title);
-      domElements.themeToggle.setAttribute("aria-description", "시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요.");
+      themeToggle.ariaPressed = String(dark);
+      themeToggle.title = dark ? "라이트 모드로 전환" : "다크 모드로 전환";
+      themeToggle.setAttribute("aria-label", themeToggle.title);
+      themeToggle.setAttribute("aria-description", "시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요.");
       appearance.value = root.dataset.theme || "system";
     };
     function setTheme(theme) {
@@ -1345,11 +1344,11 @@
     updateThemeToggle();
     themeMedia.addEventListener("change", updateThemeToggle);
     appearance.addEventListener("change", () => setTheme(appearance.value));
-    domElements.themeToggle.addEventListener("click", () => {
+    themeToggle.addEventListener("click", () => {
       setTheme(currentTheme() === "dark" ? "light" : "dark");
     });
     let statusFilter = "all";
-    const ROW_TEMPLATE = document.getElementById("tmpl-row").content
+    const ROW_TEMPLATE = byId("tmpl-row").content
       .querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => {
@@ -1358,13 +1357,13 @@
       return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
     };
     function buildFilterSnapshot() {
-      const q = norm(domElements.filterQ.value);
-      const kind = domElements.filterKind.value;
-      const sido = norm(domElements.filterSido.value);
-      const sigungu = norm(domElements.filterSigungu.value);
-      const emd = norm(domElements.filterEmd.value);
-      const tag = norm(domElements.filterTag.value);
-      const fullAddr = norm(domElements.filterFullAddr.value);
+      const q = norm(filterQuery.value);
+      const kind = filterKind.value;
+      const sido = norm(filterSido.value);
+      const sigungu = norm(filterSigungu.value);
+      const emd = norm(filterEmd.value);
+      const tag = norm(filterTag.value);
+      const fullAddr = norm(filterFullAddr.value);
       let query = null;
       if (q) {
         const isOr = q.includes("|");
@@ -1464,13 +1463,13 @@
     function updatePageNavigation(visibleCount) {
       const pageCount = Math.max(1, Math.ceil(visibleCount / resultPageSize));
       if (AppState.page >= pageCount) AppState.page = pageCount - 1;
-      domElements.pageNav.hidden = visibleCount === 0;
-      domElements.pagePrev.disabled = AppState.page === 0;
-      domElements.pageNext.disabled = AppState.page + 1 >= pageCount;
-      domElements.pageStatus.textContent =
+      pageNav.hidden = visibleCount === 0;
+      pagePrev.disabled = AppState.page === 0;
+      pageNext.disabled = AppState.page + 1 >= pageCount;
+      pageStatus.textContent =
         `${fmt(AppState.page + 1)} / ${fmt(pageCount)} 페이지 · ${fmt(visibleCount)}건`;
       const shown = Math.min(resultPageSize, Math.max(0, visibleCount - AppState.page * resultPageSize));
-      domElements.resultsCount.textContent =
+      resultsCount.textContent =
         `${fmt(shown)}개의 항목을 표시 중 (총 ${fmt(visibleCount)}개)`;
       const key = `${AppState.page}:${pageCount}`;
       if (key === pageNavigationKey) return;
@@ -1499,7 +1498,7 @@
         }
         fragment.append(el);
       }
-      domElements.pageNumbers.replaceChildren(fragment);
+      pageNumbers.replaceChildren(fragment);
     }
     function rebuildVisibleIndices() {
       const f = FILTER_SNAP;
@@ -1525,14 +1524,14 @@
         const recordIndex = indices[position];
         fragment.append(createResultRow(AppState.records[recordIndex], recordIndex));
       }
-      domElements.tbody.replaceChildren(fragment);
+      resultBody.replaceChildren(fragment);
       syncInspectorWithPage();
-      domElements.tableWrap.classList.toggle("has-results", AppState.processed > 0);
-      if (resetScroll) domElements.tableWrap.scrollTop = 0;
+      tableWrap.classList.toggle("has-results", AppState.processed > 0);
+      if (resetScroll) tableWrap.scrollTop = 0;
     }
     function renderCommittedResult(index, visiblePosition) {
       if (pageRenderReq !== null || filterTimer !== null) return;
-      domElements.tableWrap.classList.toggle(
+      tableWrap.classList.toggle(
         "has-results",
         AppState.processed > 0,
       );
@@ -1543,11 +1542,11 @@
       const end = Math.min(visibleCount, start + resultPageSize);
       if (visiblePosition < start || visiblePosition >= end) return;
       const expectedRows = visiblePosition - start;
-      if (domElements.tbody.children.length !== expectedRows) {
+      if (resultBody.children.length !== expectedRows) {
         schedulePageRender();
         return;
       }
-      domElements.tbody.append(
+      resultBody.append(
         createResultRow(AppState.records[index], index),
       );
       if (selectedRecordIndex < 0) selectRecord(index, false);
@@ -1564,10 +1563,10 @@
       }, 80);
     }
     function clearFilters(keepQuery = false) {
-      const query = keepQuery ? domElements.filterQ.value : "";
-      domElements.filters.reset();
+      const query = keepQuery ? filterQuery.value : "";
+      filterForm.reset();
       setStatusFilter("all", false);
-      domElements.filterQ.value = query;
+      filterQuery.value = query;
       scheduleApplyFilterAll();
     }
     const CSV_HEADER =
@@ -1603,7 +1602,7 @@
     let elapsedTimer = 0;
     function updateElapsed() {
       const seconds = elapsedStart ? Math.floor((performance.now() - elapsedStart) / 1000) : 0;
-      domElements.elapsed.textContent = [
+      elapsedOutput.textContent = [
         Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60,
       ].map((value) => String(value).padStart(2, "0")).join(":");
     }
@@ -1688,33 +1687,33 @@
     };
     function updateUIState() {
       const active = document.activeElement;
-      const controls = [domElements.parseBtn, domElements.startBtn, domElements.pauseBtn,
-        domElements.resumeBtn, domElements.stopBtn, domElements.file, useOutput];
+      const controls = [parseButton, startButton, pauseButton,
+        resumeButton, stopButton, fileInput, useOutput];
       const ownedFocus = controls.includes(active);
       const s = AppState.status;
-      domElements.statusRow.dataset.state = s;
+      statusRow.dataset.state = s;
       if (s === "idle") stopElapsed();
       const isBusy = AppState.task !== null;
-      domElements.tableWrap.toggleAttribute("data-running", s === "running");
-      domElements.tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
-      domElements.parseBtn.disabled = isBusy;
-      domElements.startBtn.disabled = isBusy || AppState.records.length === 0;
-      domElements.pauseBtn.disabled = s !== "running";
-      domElements.resumeBtn.disabled = s !== "paused";
-      domElements.stopBtn.disabled = !(AppState.isRunning || s === "parsing");
-      domElements.file.disabled = isBusy;
-      domElements.startBtn.hidden = isBusy;
-      domElements.pauseBtn.hidden = s !== "running" && s !== "pausing";
-      domElements.resumeBtn.hidden = s !== "paused";
-      domElements.stopBtn.hidden = !isBusy;
+      tableWrap.toggleAttribute("data-running", s === "running");
+      tableWrap.setAttribute("aria-busy", String(AppState.isRunning));
+      parseButton.disabled = isBusy;
+      startButton.disabled = isBusy || AppState.records.length === 0;
+      pauseButton.disabled = s !== "running";
+      resumeButton.disabled = s !== "paused";
+      stopButton.disabled = !(AppState.isRunning || s === "parsing");
+      fileInput.disabled = isBusy;
+      startButton.hidden = isBusy;
+      pauseButton.hidden = s !== "running" && s !== "pausing";
+      resumeButton.hidden = s !== "paused";
+      stopButton.hidden = !isBusy;
       useOutput.disabled = isBusy || !manualOutputReady;
       updateWorkflowStep();
       if (ownedFocus && (active.disabled || active.hidden)) {
-        const next = s === "running" ? domElements.pauseBtn
-          : s === "paused" ? domElements.resumeBtn
-          : isBusy ? domElements.stopBtn
-          : AppState.records.length ? domElements.startBtn : domElements.parseBtn;
-        (next.disabled ? domElements.status : next).focus({ preventScroll: true });
+        const next = s === "running" ? pauseButton
+          : s === "paused" ? resumeButton
+          : isBusy ? stopButton
+          : AppState.records.length ? startButton : parseButton;
+        (next.disabled ? statusMessage : next).focus({ preventScroll: true });
       }
     }
     const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
@@ -1730,7 +1729,7 @@
       }
     }
     function setStatusVisual(msg, type) {
-      const el = domElements.status;
+      const el = statusMessage;
       if (el.textContent !== msg) el.textContent = msg;
       el.classList.toggle("err", type === "error");
       el.classList.toggle("warn", type === "warn");
@@ -1780,36 +1779,36 @@
       const remaining = total - processed;
       if (totalChanged) {
         const totalText = fmt(total);
-        domElements.cntTotal.textContent = totalText;
-        domElements.summaryTotal.textContent = totalText;
-        domElements.coordsCount.textContent = totalText;
-        domElements.coordsSection.dataset.empty = String(total === 0);
-        domElements.coordsSection.dataset.expanded = "false";
+        countTotal.textContent = totalText;
+        summaryTotal.textContent = totalText;
+        coordsCount.textContent = totalText;
+        coordsSection.dataset.empty = String(total === 0);
+        coordsSection.dataset.expanded = "false";
         coordsExpand.ariaExpanded = "false";
         coordsExpand.textContent = "좌표 모두 보기";
       }
       if (processedChanged || failChanged) {
         const successText = fmt(success);
-        domElements.cntSuccess.textContent = successText;
-        domElements.summarySuccess.textContent = successText;
+        countSuccess.textContent = successText;
+        summarySuccess.textContent = successText;
       }
       if (failChanged) {
         const failText = fmt(fail);
-        domElements.cntFail.textContent = failText;
-        domElements.summaryFail.textContent = failText;
+        countFail.textContent = failText;
+        summaryFail.textContent = failText;
       }
       if (totalChanged || processedChanged) {
         const remainingText = fmt(remaining);
-        domElements.cntRemain.textContent = remainingText;
-        domElements.summaryRemain.textContent = remainingText;
+        countRemain.textContent = remainingText;
+        summaryRemain.textContent = remainingText;
         const pct = total ? Math.round((processed / total) * 100) : 0;
-        domElements.prog.value = pct;
-        domElements.prog.parentElement.style.setProperty("--pct", pct);
-        domElements.progressPercent.textContent = `${pct}%`;
+        progressBar.value = pct;
+        progressBar.parentElement.style.setProperty("--pct", pct);
+        progressPercent.textContent = `${pct}%`;
       }
       if (processedChanged) {
-        document.getElementById("summary-processed").textContent = fmt(processed);
-        domElements.exportBtn.disabled = processed === 0 || EXPORT_TASK !== null;
+        byId("summary-processed").textContent = fmt(processed);
+        exportButton.disabled = processed === 0 || EXPORT_TASK !== null;
       }
     }
     function scheduleRender() {
@@ -1817,15 +1816,15 @@
     }
     function clearTable() {
       cancelActiveFilterTask();
-      const wrap = domElements.tableWrap;
+      const wrap = tableWrap;
       mapPopover.hidePopover();
-      domElements.tbody.replaceChildren();
+      resultBody.replaceChildren();
       resetInspector();
       wrap.scrollTop = 0;
       wrap.scrollLeft = 0;
       wrap.classList.remove("has-results");
-      domElements.pageNav.hidden = true;
-      domElements.resultsCount.textContent = "표시할 결과가 없습니다.";
+      pageNav.hidden = true;
+      resultsCount.textContent = "표시할 결과가 없습니다.";
     }
     function sleep(ms, signal) {
       if (ms <= 0 || signal.aborted) {
@@ -2709,7 +2708,7 @@
           throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
         }
       };
-      domElements.exportBtn.disabled = true;
+      exportButton.disabled = true;
       EXPORT_TASK = (async () => {
         try {
           setStatusMessage("CSV 생성 중…");
@@ -2786,7 +2785,7 @@
           setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
         } finally {
           EXPORT_TASK = null;
-          domElements.exportBtn.disabled = AppState.processed === 0;
+          exportButton.disabled = AppState.processed === 0;
         }
       })();
       return EXPORT_TASK;
@@ -2794,11 +2793,11 @@
     async function handleParse() {
       const file = AppState.droppedFile;
       if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
-      domElements.coordsContent.textContent = "";
-      domElements.coordLineNumbers.textContent = "";
+      coordsContent.textContent = "";
+      coordLineNumbers.textContent = "";
       clearTable();
       const task = AppState.setRecords([], "parsing");
-      domElements.emptyHint.textContent = "좌표를 추출 중입니다.";
+      emptyHint.textContent = "좌표를 추출 중입니다.";
       setStatusMessage("파일 분석 중…");
       try {
         const records = await parseFileToRecords(
@@ -2808,12 +2807,12 @@
         if (AppState.task !== task) return;
         if (!records.length) {
           AppState.setRecords([]);
-          domElements.emptyHint.textContent = "좌표를 찾지 못했습니다.";
+          emptyHint.textContent = "좌표를 찾지 못했습니다.";
           return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
         dropState.textContent = ` · ${fmt(records.length)}개 좌표 추출 완료`;
-        domElements.emptyHint.textContent =
+        emptyHint.textContent =
           "좌표 추출 완료. 조회 시작을 눌러주세요.";
         const MAX_DISP = 200;
         const disp = records
@@ -2822,8 +2821,8 @@
         if (records.length > MAX_DISP) {
           disp.push(`… 외 ${fmt(records.length - MAX_DISP)}건 생략됨`);
         }
-        domElements.coordsContent.textContent = disp.join("\n");
-        domElements.coordLineNumbers.textContent = disp.map((_, i) =>
+        coordsContent.textContent = disp.join("\n");
+        coordLineNumbers.textContent = disp.map((_, i) =>
           i < MAX_DISP ? String(i + 1) : "…").join("\n");
         setStatusMessage(
           records.length > CONFIG.BULK_CONFIRM_THRESHOLD
@@ -2832,7 +2831,7 @@
         );
       } catch (err) {
         if (AppState.task !== task) return;
-        domElements.emptyHint.textContent = FILE_READY_HINT;
+        emptyHint.textContent = FILE_READY_HINT;
         if (err && err.name === "AbortError") {
           setControlsIdle("중지되었습니다.", "stopped");
           return;
@@ -2846,7 +2845,7 @@
         setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
       }
     }
-    domElements.pageNumbers.addEventListener("click", (event) => {
+    pageNumbers.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-page]");
       if (!button) return;
       const page = Number(button.dataset.page);
@@ -2854,16 +2853,16 @@
       if (!Number.isInteger(page) || page < 0 || page >= count || page === AppState.page) return;
       AppState.page = page;
       renderCurrentPage(true);
-      domElements.pageNumbers.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
+      pageNumbers.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
     });
     coordsExpand.addEventListener("click", () => {
-      const area = domElements.coordsSection;
+      const area = coordsSection;
       const expanded = area.dataset.expanded !== "true";
       area.dataset.expanded = String(expanded);
       coordsExpand.ariaExpanded = String(expanded);
       coordsExpand.textContent = expanded ? "좌표 접기" : "좌표 모두 보기";
     });
-    document.getElementById("coords-copy").addEventListener("click", async () => {
+    byId("coords-copy").addEventListener("click", async () => {
       try {
         if (!navigator.clipboard || !isSecureContext) throw new Error("HTTPS 연결에서 사용할 수 있습니다.");
         await navigator.clipboard.writeText(
@@ -2874,15 +2873,15 @@
         showNotice(`좌표 복사 실패: ${getErrorMessage(error)}`);
       }
     });
-    document.getElementById("page-size").addEventListener("change", (event) => {
+    byId("page-size").addEventListener("change", (event) => {
       const size = Number(event.target.value);
       if (![10, 25, 50, 100].includes(size)) return;
       resultPageSize = size;
       AppState.page = 0;
       renderCurrentPage(true);
     });
-    domElements.filters.addEventListener("submit", (e) => e.preventDefault());
-    domElements.filters.addEventListener("input", scheduleApplyFilterAll);
+    filterForm.addEventListener("submit", (e) => e.preventDefault());
+    filterForm.addEventListener("input", scheduleApplyFilterAll);
     document.addEventListener("keydown", (e) => {
       if (
         AppState.processed === 0 ||
@@ -2895,8 +2894,8 @@
       e.preventDefault();
       clearFilters(true);
       setMobileView("results");
-      domElements.filterQ.focus();
-      domElements.filterQ.select();
+      filterQuery.focus();
+      filterQuery.select();
     });
     const COMMANDS = {
       "--parse": handleParse,
@@ -2910,7 +2909,7 @@
         }
         const count = AppState.records.length;
         if (count > CONFIG.BULK_CONFIRM_THRESHOLD && !AppState.bulkAcknowledged) {
-          document.getElementById("bulk-description").textContent =
+          byId("bulk-description").textContent =
             `공용 Nominatim에서 ${fmt(count)}개 좌표를 조회합니다. 대량 역지오코딩은 권장되지 않습니다.`;
           AppState.bulkAcknowledged = await new Promise(resolve => {
             bulkDialog.returnValue = "";
@@ -2927,7 +2926,7 @@
         startElapsed();
         clearTable();
         setStatusMessage("조회 시작…");
-        domElements.emptyHint.textContent = "주소를 조회하고 있습니다.";
+        emptyHint.textContent = "주소를 조회하고 있습니다.";
         setMobileView("results");
         void runProcessingLoop(task).catch((err) => {
           if (AppState.task !== task) return;
@@ -2978,11 +2977,11 @@
         renderCurrentPage(true);
       },
     };
-    document.getElementById("bulk-cancel").addEventListener("click", () =>
+    byId("bulk-cancel").addEventListener("click", () =>
       bulkDialog.close("cancel"));
-    document.getElementById("bulk-confirm").addEventListener("click", () =>
+    byId("bulk-confirm").addEventListener("click", () =>
       bulkDialog.close("confirm"));
-    document.getElementById("app").addEventListener("command", (e) => {
+    byId("app").addEventListener("command", (e) => {
       const cmd = COMMANDS[e.command];
       if (!cmd) return;
       Promise.try(cmd).catch((err) => {
@@ -3007,24 +3006,24 @@
         );
         return false;
       }
-      domElements.coordsContent.textContent = "";
-      domElements.coordLineNumbers.textContent = "";
+      coordsContent.textContent = "";
+      coordLineNumbers.textContent = "";
       clearTable();
       AppState.setRecords([]);
       AppState.droppedFile = file;
       void openReverseCacheDb();
-      domElements.emptyHint.textContent = FILE_READY_HINT;
+      emptyHint.textContent = FILE_READY_HINT;
       setStatusMessage(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
-      document.getElementById("drop-filename").textContent = file.name;
+      byId("drop-filename").textContent = file.name;
       dropState.textContent = "선택됨 · 좌표 추출을 눌러주세요";
-      document.getElementById("file-changed").hidden = false;
+      byId("file-changed").hidden = false;
       return true;
     }
-    domElements.file.addEventListener("change", () => {
-      const file = domElements.file.files[0];
-      domElements.file.value = "";
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      fileInput.value = "";
       acceptInputFile(file);
     });
     function loadManualRng() {
@@ -3101,50 +3100,16 @@
       const NUMERIC_SCRATCH_BYTES = new Uint8Array(NUMERIC_SCRATCH_BUFFER);
       const F64_FRACTION_MASK = (1n << 52n) - 1n;
       const F64_HIDDEN_BIT = 1n << 52n;
-      const F64_CARRY_BIT = 1n << 53n;
       const F64_SIGN_BIT = 1n << 63n;
       function composeRoundedNormalF64(integer, exponent) {
-        if (integer === 0n) {
-          return 0;
-        }
-        const negative = integer < 0n;
-        const magnitude = negative ? -integer : integer;
-        const magnitudeHex = magnitude.toString(16);
-        let shift =
-          (magnitudeHex.length - 1) * 4 +
-          32 -
-          Math.clz32(Number.parseInt(magnitudeHex.charAt(0), 16)) -
-          53;
-        let significand;
-        if (shift > 0) {
-          const shiftBits = BigInt(shift);
-          significand = magnitude >> shiftBits;
-          const remainder = magnitude - (significand << shiftBits);
-          const halfway = 1n << (shiftBits - 1n);
-          if (
-            remainder > halfway ||
-            (remainder === halfway && (significand & 1n) !== 0n)
-          ) {
-            significand += 1n;
-          }
-        } else {
-          significand = magnitude << BigInt(-shift);
-        }
-        if (significand === F64_CARRY_BIT) {
-          significand >>= 1n;
-          shift += 1;
-        }
-        const exponentBits = exponent + shift + 52 + 1023;
-        if (exponentBits <= 0 || exponentBits >= 0x7ff) {
+        if (integer === 0n) return 0;
+        // This kernel's integers fit in a finite Number. Converting rounds
+        // once; a power-of-two scale preserves that rounding for normal f64.
+        const value = Number(integer) * 2 ** exponent;
+        if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022) {
           throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
         }
-        let bits =
-          (BigInt(exponentBits) << 52n) | (significand - F64_HIDDEN_BIT);
-        if (negative) {
-          bits |= F64_SIGN_BIT;
-        }
-        NUMERIC_SCRATCH_VIEW.setBigUint64(0, bits, false);
-        return NUMERIC_SCRATCH_VIEW.getFloat64(0, false);
+        return value;
       }
       function affineF64(
         ratio,
@@ -3492,328 +3457,325 @@
           "text/plain": blob,
         })]);
       }
-      function initializeManualRng() {
-        const num64Input = document.getElementById("num64");
-        const suppInput = document.getElementById("suppValues");
-        const runBtn = document.getElementById("runBtn");
-        const clearBtn = document.getElementById("clearBtn");
-        const saveBtn = document.getElementById("saveOutput");
-        const copyBtn = document.getElementById("copyOutput");
-        const output = document.getElementById("output");
-        const outputContent = output.querySelector(".coords-content");
-        const error = document.getElementById("error");
-        const meta = document.getElementById("meta");
-        const suppDialog = document.getElementById("supp-dialog");
-        const suppDialogForm = document.getElementById("supp-dialog-form");
-        const suppDialogContext = document.getElementById("supp-dialog-context");
-        const suppDialogValues = document.getElementById("supp-dialog-values");
-        const suppDialogError = document.getElementById("supp-dialog-error");
-        let supplementRequest = null;
-        let supplementReturnFocus = null;
-        function finishSupplementRequest(values) {
-          if (!supplementRequest) return;
-          const resolve = supplementRequest;
+      const num64Input = byId("num64");
+      const suppInput = byId("suppValues");
+      const runBtn = byId("runBtn");
+      const clearBtn = byId("clearBtn");
+      const saveBtn = byId("saveOutput");
+      const copyBtn = byId("copyOutput");
+      const output = byId("output");
+      const outputContent = output.querySelector(".coords-content");
+      const error = byId("error");
+      const meta = byId("meta");
+      const suppDialog = byId("supp-dialog");
+      const suppDialogForm = byId("supp-dialog-form");
+      const suppDialogContext = byId("supp-dialog-context");
+      const suppDialogValues = byId("supp-dialog-values");
+      const suppDialogError = byId("supp-dialog-error");
+      let supplementRequest = null;
+      let supplementReturnFocus = null;
+      function finishSupplementRequest(values) {
+        if (!supplementRequest) return;
+        const resolve = supplementRequest;
+        supplementRequest = null;
+        if (values === null) supplementReturnFocus = clearBtn;
+        suppDialog.close();
+        resolve(values);
+      }
+      function requestSupplementBatch(index, reason, processedCount) {
+        if (!supplementReturnFocus) {
+          const active = document.activeElement;
+          supplementReturnFocus = active instanceof HTMLElement &&
+            active !== document.body
+            ? active
+            : runBtn;
+        }
+        const { promise, resolve } = Promise.withResolvers();
+        supplementRequest = resolve;
+        suppDialogContext.textContent =
+          `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processedCount)}개`;
+        suppDialogValues.value = "";
+        suppDialogValues.ariaInvalid = "false";
+        suppDialogError.textContent = "";
+        try {
+          suppDialog.showModal();
+        } catch (err) {
           supplementRequest = null;
-          if (values === null) supplementReturnFocus = clearBtn;
-          suppDialog.close();
-          resolve(values);
+          throw err;
         }
-        function requestSupplementBatch(index, reason, processedCount) {
-          if (!supplementReturnFocus) {
-            const active = document.activeElement;
-            supplementReturnFocus = active instanceof HTMLElement &&
-              active !== document.body
-              ? active
-              : runBtn;
+        return promise;
+      }
+      suppDialogForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!supplementRequest) return;
+        try {
+          const values = [];
+          for (const token of iterU64Tokens(suppDialogValues.value)) {
+            if (values.length >= MANUAL_GENERATION_HARD_LIMIT) {
+              throw new InputValidationError(
+                `보조 난수값은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 입력할 수 있습니다.`,
+              );
+            }
+            values.push(parseU64(token));
           }
-          const { promise, resolve } = Promise.withResolvers();
-          supplementRequest = resolve;
-          suppDialogContext.textContent =
-            `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processedCount)}개`;
-          suppDialogValues.value = "";
+          if (values.length === 0) {
+            throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
+          }
           suppDialogValues.ariaInvalid = "false";
-          suppDialogError.textContent = "";
-          try {
-            suppDialog.showModal();
-          } catch (err) {
-            supplementRequest = null;
-            throw err;
-          }
-          return promise;
+          finishSupplementRequest(values);
+        } catch (err) {
+          suppDialogValues.ariaInvalid = "true";
+          suppDialogError.textContent = getErrorMessage(err);
+          suppDialogValues.focus({ preventScroll: true });
         }
-        suppDialogForm.addEventListener("submit", (event) => {
-          event.preventDefault();
-          if (!supplementRequest) return;
-          try {
-            const values = [];
-            for (const token of iterU64Tokens(suppDialogValues.value)) {
-              if (values.length >= MANUAL_GENERATION_HARD_LIMIT) {
-                throw new InputValidationError(
-                  `보조 난수값은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 입력할 수 있습니다.`,
+      });
+      suppDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        finishSupplementRequest(null);
+      });
+      let lastGeneratedChunks = [];
+      let manualBusy = false;
+      let copyTask = null;
+      const setManualBusy = (busy) => {
+        manualBusy = busy;
+        const hasOutput = lastGeneratedChunks.length > 0;
+        runBtn.disabled = manualBusy;
+        manualOutputReady = !manualBusy && hasOutput;
+        useOutput.disabled = !manualOutputReady || AppState.task !== null;
+        saveBtn.disabled = manualBusy || !hasOutput;
+        copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
+      };
+      let manualGenerationId = 0;
+      setManualBusy(false);
+      runBtn.addEventListener("click", async () => {
+        const generationId = manualGenerationId + 1;
+        manualGenerationId = generationId;
+        error.textContent = "";
+        meta.textContent = "기본 난수 변환 준비 중…";
+        lastGeneratedChunks = [];
+        outputContent.textContent = "";
+        setManualBusy(true);
+        try {
+          const suppTokens = iterU64Tokens(suppInput.value);
+          const supplementValues = [];
+          let processedCount = 0;
+          let suppInputCount = 0;
+          let queuedSuppCount = 0;
+          let renderedCount = -1;
+          let supplementHead = 0;
+          let supplementCursor;
+          let preloadedCount;
+          const nextSupplement = (reason) => {
+            if (supplementCursor === supplementValues.length) {
+              const queued = suppTokens.next();
+              if (queued.done) throw new SupplementRequired(reason);
+              supplementValues.push(parseU64(queued.value));
+              preloadedCount += 1;
+            }
+            const value = supplementValues[supplementCursor];
+            supplementCursor += 1;
+            return { value, bitsRemaining: 64 };
+          };
+          const updateManualProgress = (state) => {
+            const count = Math.min(lastGeneratedChunks.length, MANUAL_PREVIEW_LIMIT);
+            if (
+              state !== "처리 중" ||
+              renderedCount !== count
+            ) {
+              let preview = lastGeneratedChunks.slice(0, count).join("");
+              const omitted = lastGeneratedChunks.length - count;
+              if (omitted > 0) preview += `\n\n… 외 ${fmt(omitted)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
+              outputContent.textContent = preview;
+              renderedCount = count;
+            }
+            meta.textContent =
+              `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 대화상자 ${fmt(suppInputCount - queuedSuppCount)}개)`;
+          };
+          let lastYieldAt = performance.now();
+          let lastMetaUpdateAt = lastYieldAt;
+          let cancelled = false;
+          for (const token of iterU64Tokens(num64Input.value)) {
+            if (generationId !== manualGenerationId) {
+              return;
+            }
+            if (processedCount >= MANUAL_GENERATION_HARD_LIMIT) {
+              throw new InputValidationError(
+                `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
+              );
+            }
+            const num = parseU64(token);
+            preloadedCount = 0;
+            let generated;
+            for (; ;) {
+              supplementCursor = supplementHead;
+              try {
+                generated = generateRandomDataFromNum(num, nextSupplement);
+                suppInputCount += supplementCursor - supplementHead;
+                queuedSuppCount += preloadedCount;
+                supplementHead = supplementCursor;
+                if (supplementHead === supplementValues.length) {
+                  supplementValues.length = 0;
+                  supplementHead = 0;
+                }
+                break;
+              } catch (err) {
+                if (!(err instanceof SupplementRequired)) throw err;
+                const values = await requestSupplementBatch(
+                  suppInputCount + supplementCursor - supplementHead + 1,
+                  err.message,
+                  processedCount,
                 );
+                if (generationId !== manualGenerationId) return;
+                if (values === null) {
+                  cancelled = true;
+                  break;
+                }
+                supplementValues.push(...values);
               }
-              values.push(parseU64(token));
             }
-            if (values.length === 0) {
-              throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
-            }
-            suppDialogValues.ariaInvalid = "false";
-            finishSupplementRequest(values);
-          } catch (err) {
-            suppDialogValues.ariaInvalid = "true";
-            suppDialogError.textContent = getErrorMessage(err);
-            suppDialogValues.focus({ preventScroll: true });
-          }
-        });
-        suppDialog.addEventListener("cancel", (event) => {
-          event.preventDefault();
-          finishSupplementRequest(null);
-        });
-        let lastGeneratedChunks = [];
-        let manualBusy = false;
-        let copyTask = null;
-        const setManualBusy = (busy) => {
-          manualBusy = busy;
-          const hasOutput = lastGeneratedChunks.length > 0;
-          runBtn.disabled = manualBusy;
-          manualOutputReady = !manualBusy && hasOutput;
-          useOutput.disabled = !manualOutputReady || AppState.task !== null;
-          saveBtn.disabled = manualBusy || !hasOutput;
-          copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
-        };
-        let manualGenerationId = 0;
-        setManualBusy(false);
-        runBtn.addEventListener("click", async () => {
-          const generationId = manualGenerationId + 1;
-          manualGenerationId = generationId;
-          error.textContent = "";
-          meta.textContent = "기본 난수 변환 준비 중…";
-          lastGeneratedChunks = [];
-          outputContent.textContent = "";
-          setManualBusy(true);
-          try {
-            const suppTokens = iterU64Tokens(suppInput.value);
-            const supplementValues = [];
-            let processedCount = 0;
-            let suppInputCount = 0;
-            let queuedSuppCount = 0;
-            let renderedCount = -1;
-            let supplementHead = 0;
-            let supplementCursor;
-            let preloadedCount;
-            const nextSupplement = (reason) => {
-              if (supplementCursor === supplementValues.length) {
-                const queued = suppTokens.next();
-                if (queued.done) throw new SupplementRequired(reason);
-                supplementValues.push(parseU64(queued.value));
-                preloadedCount += 1;
+            if (cancelled) break;
+            const outputBlock = formatOutput(generated);
+            const outputChunk = processedCount === 0
+              ? outputBlock
+              : `\n${outputBlock}`;
+            lastGeneratedChunks.push(outputChunk);
+            processedCount += 1;
+            const now = performance.now();
+            if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
+              if (now - lastMetaUpdateAt >= MANUAL_META_UPDATE_INTERVAL_MS) {
+                updateManualProgress("처리 중");
+                lastMetaUpdateAt = now;
               }
-              const value = supplementValues[supplementCursor];
-              supplementCursor += 1;
-              return { value, bitsRemaining: 64 };
-            };
-            const updateManualProgress = (state) => {
-              const count = Math.min(lastGeneratedChunks.length, MANUAL_PREVIEW_LIMIT);
-              if (
-                state !== "처리 중" ||
-                renderedCount !== count
-              ) {
-                let preview = lastGeneratedChunks.slice(0, count).join("");
-                const omitted = lastGeneratedChunks.length - count;
-                if (omitted > 0) preview += `\n\n… 외 ${fmt(omitted)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
-                outputContent.textContent = preview;
-                renderedCount = count;
-              }
-              meta.textContent =
-                `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 대화상자 ${fmt(suppInputCount - queuedSuppCount)}개)`;
-            };
-            let lastYieldAt = performance.now();
-            let lastMetaUpdateAt = lastYieldAt;
-            let cancelled = false;
-            for (const token of iterU64Tokens(num64Input.value)) {
+              await yieldToMain();
               if (generationId !== manualGenerationId) {
                 return;
               }
-              if (processedCount >= MANUAL_GENERATION_HARD_LIMIT) {
-                throw new InputValidationError(
-                  `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
-                );
-              }
-              const num = parseU64(token);
-              preloadedCount = 0;
-              let generated;
-              for (; ;) {
-                supplementCursor = supplementHead;
-                try {
-                  generated = generateRandomDataFromNum(num, nextSupplement);
-                  suppInputCount += supplementCursor - supplementHead;
-                  queuedSuppCount += preloadedCount;
-                  supplementHead = supplementCursor;
-                  if (supplementHead === supplementValues.length) {
-                    supplementValues.length = 0;
-                    supplementHead = 0;
-                  }
-                  break;
-                } catch (err) {
-                  if (!(err instanceof SupplementRequired)) throw err;
-                  const values = await requestSupplementBatch(
-                    suppInputCount + supplementCursor - supplementHead + 1,
-                    err.message,
-                    processedCount,
-                  );
-                  if (generationId !== manualGenerationId) return;
-                  if (values === null) {
-                    cancelled = true;
-                    break;
-                  }
-                  supplementValues.push(...values);
-                }
-              }
-              if (cancelled) break;
-              const outputBlock = formatOutput(generated);
-              const outputChunk = processedCount === 0
-                ? outputBlock
-                : `\n${outputBlock}`;
-              lastGeneratedChunks.push(outputChunk);
-              processedCount += 1;
-              const now = performance.now();
-              if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
-                if (now - lastMetaUpdateAt >= MANUAL_META_UPDATE_INTERVAL_MS) {
-                  updateManualProgress("처리 중");
-                  lastMetaUpdateAt = now;
-                }
-                await yieldToMain();
-                if (generationId !== manualGenerationId) {
-                  return;
-                }
-                lastYieldAt = performance.now();
-              }
-            }
-            if (!cancelled && processedCount === 0) {
-              throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
-            }
-            updateManualProgress(cancelled ? "중단" : "완료");
-            output.scrollTop = 0;
-          } catch (err) {
-            if (generationId === manualGenerationId) {
-              lastGeneratedChunks = [];
-              meta.textContent = "";
-              outputContent.textContent = "";
-              error.textContent = getErrorMessage(err);
-            }
-          } finally {
-            if (generationId === manualGenerationId) {
-              setManualBusy(false);
-              const focusTarget = supplementReturnFocus;
-              supplementReturnFocus = null;
-              if (
-                focusTarget?.isConnected &&
-                !focusTarget.matches(":disabled")
-              ) focusTarget.focus({ preventScroll: true });
+              lastYieldAt = performance.now();
             }
           }
-        });
-        useOutput.addEventListener("click", async () => {
-          if (!manualOutputReady || AppState.task !== null) return;
-          const file = new File([randomDataBlob(lastGeneratedChunks, false)], "random_data.txt", {type: "text/plain"});
-          if (!acceptInputFile(file)) return;
-          await handleParse();
-          if (AppState.records.length) {
-            setInputMode("file");
-            domElements.startBtn.focus();
+          if (!cancelled && processedCount === 0) {
+            throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
           }
-        });
-        saveBtn.addEventListener("click", () => {
-          error.textContent = "";
-          try {
-            downloadBlob(
-              randomDataBlob(lastGeneratedChunks, true),
-              "random_data.txt",
-            );
-            meta.textContent =
-              (meta.textContent ? `${meta.textContent}\n` : "") +
-              "random_data.txt 저장 요청을 완료했습니다.";
-          } catch (err) {
-            error.textContent = `저장 실패: ${getErrorMessage(err)}`;
+          updateManualProgress(cancelled ? "중단" : "완료");
+          output.scrollTop = 0;
+        } catch (err) {
+          if (generationId === manualGenerationId) {
+            lastGeneratedChunks = [];
+            meta.textContent = "";
+            outputContent.textContent = "";
+            error.textContent = getErrorMessage(err);
           }
-        });
-        copyBtn.addEventListener("click", async () => {
-          if (copyTask) return;
-          const generationId = manualGenerationId;
-          const chunks = lastGeneratedChunks;
-          error.textContent = "";
-          copyTask = copyRandomDataChunksToClipboard(chunks);
+        } finally {
+          if (generationId === manualGenerationId) {
+            setManualBusy(false);
+            const focusTarget = supplementReturnFocus;
+            supplementReturnFocus = null;
+            if (
+              focusTarget?.isConnected &&
+              !focusTarget.matches(":disabled")
+            ) focusTarget.focus({ preventScroll: true });
+          }
+        }
+      });
+      useOutput.addEventListener("click", async () => {
+        if (!manualOutputReady || AppState.task !== null) return;
+        const file = new File([randomDataBlob(lastGeneratedChunks, false)], "random_data.txt", {type: "text/plain"});
+        if (!acceptInputFile(file)) return;
+        await handleParse();
+        if (AppState.records.length) {
+          setInputMode("file");
+          startButton.focus();
+        }
+      });
+      saveBtn.addEventListener("click", () => {
+        error.textContent = "";
+        try {
+          downloadBlob(
+            randomDataBlob(lastGeneratedChunks, true),
+            "random_data.txt",
+          );
+          meta.textContent =
+            (meta.textContent ? `${meta.textContent}\n` : "") +
+            "random_data.txt 저장 요청을 완료했습니다.";
+        } catch (err) {
+          error.textContent = `저장 실패: ${getErrorMessage(err)}`;
+        }
+      });
+      copyBtn.addEventListener("click", async () => {
+        if (copyTask) return;
+        const generationId = manualGenerationId;
+        const chunks = lastGeneratedChunks;
+        error.textContent = "";
+        copyTask = copyRandomDataChunksToClipboard(chunks);
+        setManualBusy(manualBusy);
+        try {
+          await copyTask;
+          if (
+            generationId !== manualGenerationId ||
+            chunks !== lastGeneratedChunks
+          ) return;
+          meta.textContent =
+            (meta.textContent ? `${meta.textContent}\n` : "") +
+            "변환 결과를 클립보드에 복사했습니다.";
+        } catch (err) {
+          if (
+            generationId === manualGenerationId &&
+            chunks === lastGeneratedChunks
+          ) {
+            error.textContent = err instanceof Error
+              ? err.message
+              : "클립보드 복사에 실패했습니다.";
+          }
+        } finally {
+          copyTask = null;
           setManualBusy(manualBusy);
-          try {
-            await copyTask;
-            if (
-              generationId !== manualGenerationId ||
-              chunks !== lastGeneratedChunks
-            ) return;
-            meta.textContent =
-              (meta.textContent ? `${meta.textContent}\n` : "") +
-              "변환 결과를 클립보드에 복사했습니다.";
-          } catch (err) {
-            if (
-              generationId === manualGenerationId &&
-              chunks === lastGeneratedChunks
-            ) {
-              error.textContent = err instanceof Error
-                ? err.message
-                : "클립보드 복사에 실패했습니다.";
-            }
-          } finally {
-            copyTask = null;
-            setManualBusy(manualBusy);
-          }
-        });
-        const clearDialog = document.getElementById("clear-dialog");
-        const clearOutput = () => {
-          finishSupplementRequest(null);
-          supplementReturnFocus = null;
-          manualGenerationId += 1;
-          lastGeneratedChunks = [];
-          error.textContent = "";
-          meta.textContent = "";
-          outputContent.textContent = "";
-          setManualBusy(false);
-        };
-        clearBtn.addEventListener("click", () => {
-          if (lastGeneratedChunks.length || outputContent.textContent) clearDialog.showModal();
-          else clearOutput();
-        });
-        document.getElementById("clear-cancel").addEventListener("click", () => clearDialog.close());
-        document.getElementById("clear-confirm").addEventListener("click", () => {
-          clearDialog.close();
-          clearOutput();
-        });
-      }
-      initializeManualRng();
+        }
+      });
+      const clearDialog = byId("clear-dialog");
+      const clearOutput = () => {
+        finishSupplementRequest(null);
+        supplementReturnFocus = null;
+        manualGenerationId += 1;
+        lastGeneratedChunks = [];
+        error.textContent = "";
+        meta.textContent = "";
+        outputContent.textContent = "";
+        setManualBusy(false);
+      };
+      clearBtn.addEventListener("click", () => {
+        if (lastGeneratedChunks.length || outputContent.textContent) clearDialog.showModal();
+        else clearOutput();
+      });
+      byId("clear-cancel").addEventListener("click", () => clearDialog.close());
+      byId("clear-confirm").addEventListener("click", () => {
+        clearDialog.close();
+        clearOutput();
+      });
     }
     // One set of controls and result nodes serves desktop and mobile layouts.
     const mobileMedia = matchMedia("(max-width: 800px)");
     const compactMedia = matchMedia("(max-width: 1230px)");
     const inputTabs = document.querySelector(".input-tabs");
-    const inputView = document.getElementById("input-view");
-    const filePane = document.getElementById("file-pane");
-    const manualPanel = document.getElementById("manual-pane");
+    const inputView = byId("input-view");
+    const filePane = byId("file-pane");
+    const manualPanel = byId("manual-pane");
     const mobileButtons = document.querySelectorAll("[data-mobile]");
     const statusButtons = document.querySelectorAll("[data-status]");
     const workflowSteps = document.querySelectorAll("[data-step]");
     const jobPanel = document.querySelector(".workflow-panel");
-    const inputJobSlot = document.getElementById("input-job-slot");
-    const mobileJobSlot = document.getElementById("mobile-job-slot");
-    const advancedFilters = document.getElementById("filter-dialog");
-    const filterTrigger = document.getElementById("advanced-filters");
-    const inspector = document.getElementById("inspector");
-    const inspectorEmpty = document.getElementById("inspector-empty");
-    const inspectorContent = document.getElementById("inspector-content");
-    const detailSheet = document.getElementById("detail-sheet");
-    const detailMap = document.getElementById("detail-map");
-    const loadMap = document.getElementById("load-map");
-    const detailMapLinks = document.getElementById("detail-map-links");
-    const copyAddress = document.getElementById("copy-address");
-    const notice = document.getElementById("ui-notice");
+    const inputJobSlot = byId("input-job-slot");
+    const mobileJobSlot = byId("mobile-job-slot");
+    const advancedFilters = byId("filter-dialog");
+    const filterTrigger = byId("advanced-filters");
+    const inspector = byId("inspector");
+    const inspectorEmpty = byId("inspector-empty");
+    const inspectorContent = byId("inspector-content");
+    const detailSheet = byId("detail-sheet");
+    const detailMap = byId("detail-map");
+    const loadMap = byId("load-map");
+    const detailMapLinks = byId("detail-map-links");
+    const copyAddress = byId("copy-address");
+    const notice = byId("ui-notice");
     let manualLoaded = false;
     let manualOutputReady = false;
     let selectedRecordIndex = -1;
@@ -3855,13 +3817,13 @@
       const mode = event.key === "Home" ? "file" : event.key === "End" ? "manual" :
         tab.dataset.mode === "file" ? "manual" : "file";
       setInputMode(mode);
-      document.getElementById(`${mode}-tab`).focus();
+      byId(`${mode}-tab`).focus();
     });
 
     function adaptLayout() {
       for (const [panel, tab, heading] of [
         [inputView, "mobile-input-tab", "input-title"],
-        [document.getElementById("results-view"), "mobile-results-tab", "results-title"],
+        [byId("results-view"), "mobile-results-tab", "results-title"],
       ]) {
         if (mobileMedia.matches) {
           panel.setAttribute("role", "tabpanel");
@@ -3880,7 +3842,7 @@
       if (restoreFocus && active.getClientRects().length && !active.disabled) active.focus({ preventScroll: true });
     }
     // Keep wide-screen popovers attached to their initiating control.
-    const settingsDialog = document.getElementById("display-settings");
+    const settingsDialog = byId("display-settings");
     const settingsTrigger = document.querySelector(".settings-button");
     const popoverAnchors = [
       [settingsDialog, settingsTrigger],
@@ -3912,7 +3874,7 @@
       alignPopover(settingsDialog, settingsTrigger);
       appearance.focus({ preventScroll: true });
     });
-    document.getElementById("settings-close").addEventListener("click", () => settingsDialog.close());
+    byId("settings-close").addEventListener("click", () => settingsDialog.close());
     settingsDialog.addEventListener("close", () => settingsTrigger.focus({ preventScroll: true }));
     document.addEventListener("pointerdown", event => {
       if (!mobileMedia.matches && settingsDialog.open &&
@@ -3948,7 +3910,7 @@
         });
         if (focusInView) {
           const next = active.getClientRects().length && !active.disabled ? active
-            : document.getElementById(view === "results" ? "results-title" : "input-title");
+            : byId(view === "results" ? "results-title" : "input-title");
           next.focus({ preventScroll: true });
         }
       }
@@ -3963,7 +3925,7 @@
       const view = event.key === "Home" ? "input" : event.key === "End" ? "results" :
         event.key === "ArrowRight" ? "results" : "input";
       setMobileView(view);
-      document.getElementById(`mobile-${view}-tab`).focus({ preventScroll: true });
+      byId(`mobile-${view}-tab`).focus({ preventScroll: true });
     });
     mobileMedia.addEventListener("change", adaptLayout);
     compactMedia.addEventListener("change", adaptLayout);
@@ -3976,7 +3938,7 @@
         if (item.dataset.step === step) item.setAttribute("aria-current", "step");
         else item.removeAttribute("aria-current");
       }
-      document.getElementById("workflow-compact").textContent =
+      byId("workflow-compact").textContent =
         step === "lookup" ? "2/3 · 주소 조회" :
           step === "results" ? "3/3 · 결과 확인" : "1/3 · 데이터 입력";
     }
@@ -3994,11 +3956,11 @@
       if (advancedFilters.open) return advancedFilters.close();
       advancedFilters.showModal();
       filterTrigger.ariaExpanded = "true";
-      domElements.filterSido.focus({ preventScroll: true });
+      filterSido.focus({ preventScroll: true });
     });
     function closeFilters() { if (advancedFilters.open) advancedFilters.close(); }
-    document.getElementById("filter-close").addEventListener("click", closeFilters);
-    document.getElementById("filter-dismiss").addEventListener("click", closeFilters);
+    byId("filter-close").addEventListener("click", closeFilters);
+    byId("filter-dismiss").addEventListener("click", closeFilters);
     advancedFilters.addEventListener("close", () => {
       filterTrigger.ariaExpanded = "false";
       filterTrigger.focus({ preventScroll: true });
@@ -4010,8 +3972,8 @@
           event.clientY < r.top || event.clientY > r.bottom) closeFilters();
     });
 
-    const noticeText = document.getElementById("ui-notice-text");
-    document.getElementById("ui-notice-close").addEventListener("click", () => {
+    const noticeText = byId("ui-notice-text");
+    byId("ui-notice-close").addEventListener("click", () => {
       clearTimeout(noticeTimer);
       notice.hidden = true;
     });
@@ -4025,9 +3987,9 @@
       // enough for screen readers and can be dismissed manually.
       if (!error) noticeTimer = setTimeout(() => { notice.hidden = true; }, 8000);
     }
-    const mapFeedback = document.getElementById("map-feedback");
-    const mapRecovery = document.getElementById("map-recovery");
-    const mapExternal = document.getElementById("map-external");
+    const mapFeedback = byId("map-feedback");
+    const mapRecovery = byId("map-recovery");
+    const mapExternal = byId("map-external");
     let mapLoadTimer = 0;
     function showMapFailure(message) {
       clearTimeout(mapLoadTimer);
@@ -4076,46 +4038,46 @@
           "detail-tag": addr?.tag || "—",
           "detail-coordinates": record.latStr + ", " + record.lonStr,
         };
-        for (const [id, value] of Object.entries(fields)) document.getElementById(id).textContent = value;
+        for (const [id, value] of Object.entries(fields)) byId(id).textContent = value;
         detailMapLinks.dataset.idx = String(index);
         detailMapLinks.disabled = false;
         copyAddress.disabled = !addr?.fullAddr;
         inspectorEmpty.hidden = true;
         inspectorContent.hidden = false;
       }
-      for (const row of domElements.tbody.rows) {
+      for (const row of resultBody.rows) {
         const selected = Number(row.dataset.record) === index;
         row.dataset.selected = String(selected);
         row.querySelector(".location-button").ariaPressed = String(selected);
       }
       if (reveal && compactMedia.matches && !detailSheet.open) {
-        detailReturnFocus = domElements.tbody.querySelector(`.location-button[data-record="${index}"]`);
+        detailReturnFocus = resultBody.querySelector(`.location-button[data-record="${index}"]`);
         detailSheet.append(inspectorContent);
         detailSheet.showModal();
       }
     }
     function syncInspectorWithPage() {
-      const first = domElements.tbody.firstElementChild;
+      const first = resultBody.firstElementChild;
       if (!first) return resetInspector();
-      const selectedIsOnPage = [...domElements.tbody.rows].some(row => Number(row.dataset.record) === selectedRecordIndex);
+      const selectedIsOnPage = [...resultBody.rows].some(row => Number(row.dataset.record) === selectedRecordIndex);
       selectRecord(selectedIsOnPage ? selectedRecordIndex : Number(first.dataset.record), false);
     }
-    domElements.tbody.addEventListener("click", (event) => {
+    resultBody.addEventListener("click", (event) => {
       const row = event.target.closest("tr[data-record]");
       if (row) selectRecord(Number(row.dataset.record));
     });
-    domElements.tbody.addEventListener("keydown", (event) => {
+    resultBody.addEventListener("keydown", (event) => {
       const button = event.target.closest(".location-button");
       if (!button || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
-      const buttons = [...domElements.tbody.querySelectorAll(".location-button")];
+      const buttons = [...resultBody.querySelectorAll(".location-button")];
       const position = buttons.indexOf(button);
       const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 :
         Math.max(0, Math.min(buttons.length - 1, position + (event.key === "ArrowDown" ? 1 : -1)));
       buttons[next].focus();
       selectRecord(Number(buttons[next].dataset.record), false);
     });
-    document.getElementById("close-detail").addEventListener("click", () => detailSheet.close());
+    byId("close-detail").addEventListener("click", () => detailSheet.close());
     let detailSwipe = null;
     detailSheet.addEventListener("touchstart", event => {
       if (!mobileMedia.matches || !event.target.closest(".sheet-heading") || event.touches.length !== 1) return;
@@ -4184,7 +4146,7 @@
       ), 12000);
     }
     loadMap.addEventListener("click", startMapLoad);
-    document.getElementById("retry-map").addEventListener("click", () => {
+    byId("retry-map").addEventListener("click", () => {
       unloadDetailMap();
       startMapLoad();
     });
@@ -4212,16 +4174,16 @@
       dropZone.classList.remove("is-dragging");
       acceptInputFile(event.dataTransfer?.files[0]);
     });
-    const helpDialog = document.getElementById("help-dialog");
+    const helpDialog = byId("help-dialog");
     let helpReturnFocus = null;
     for (const id of ["show-help", "settings-help"]) {
-      document.getElementById(id).addEventListener("click", event => {
+      byId(id).addEventListener("click", event => {
         helpReturnFocus = id === "settings-help" ? settingsTrigger : event.currentTarget;
         if (settingsDialog.open) settingsDialog.close();
         helpDialog.showModal();
       });
     }
-    document.getElementById("close-help").addEventListener("click", () => helpDialog.close());
+    byId("close-help").addEventListener("click", () => helpDialog.close());
     helpDialog.addEventListener("close", () => {
       if (helpReturnFocus?.getClientRects().length) helpReturnFocus.focus({ preventScroll: true });
       helpReturnFocus = null;
