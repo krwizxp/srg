@@ -129,7 +129,8 @@
       display: none !important;
     }
 
-    :is(button, input, textarea, select, a, [tabindex]):focus-visible {
+    :is(button, input, textarea, select, a, [tabindex]):focus-visible,
+    .drop-zone:focus-within {
       outline: 2px solid var(--focus-ring);
       outline-offset: 3px;
     }
@@ -204,7 +205,10 @@
       flex: none;
     }
 
-    .site-brand>div {
+    .site-brand>div,
+    .input-card,
+    .results-column,
+    .table-zone {
       min-width: 0;
     }
 
@@ -321,10 +325,6 @@
       margin: 26px auto 0;
     }
 
-    .input-card {
-      min-width: 0;
-    }
-
     .card-label {
       font-size: 1.5rem;
       font-weight: 720;
@@ -382,11 +382,6 @@
     .drop-zone:hover {
       border-color: var(--accent);
       background: var(--accent-wash);
-    }
-
-    .drop-zone:focus-within {
-      outline: 2px solid var(--focus-ring);
-      outline-offset: 3px;
     }
 
     .drop-zone:has(input:disabled) {
@@ -546,10 +541,6 @@
       color: var(--fg);
     }
 
-    .coords-heading h2 {
-      margin: 0;
-    }
-
     .coords-heading .ui-icon {
       width: 16px;
       height: 16px;
@@ -600,7 +591,8 @@
       padding: 8px 16px 14px;
     }
 
-    .coords-tools .action-btn {
+    .coords-tools .action-btn,
+    .map-recovery>* {
       flex: 1;
       font-size: .8125rem;
     }
@@ -716,7 +708,10 @@
     }
 
     .status.err,
-    .status.warn {
+    .status.warn,
+    #error,
+    #supp-dialog-error,
+    .result-state[data-error="true"] {
       color: var(--danger);
     }
 
@@ -815,21 +810,12 @@
       grid-column: 1 / -1;
     }
 
-    #error,
-    #supp-dialog-error {
-      color: var(--danger);
-    }
-
     #output {
       margin-top: 8px;
       height: 150px;
       background: var(--surface-panel);
       border: 1px solid var(--line-control);
       border-radius: 14px;
-    }
-
-    .results-column {
-      min-width: 0;
     }
 
     .results-card {
@@ -939,7 +925,8 @@
       width: min(380px, calc(100vw - 24px));
     }
 
-    #filter-dialog .sheet-heading {
+    #filter-dialog .sheet-heading,
+    .settings-popover h2 {
       margin-bottom: 18px;
     }
 
@@ -963,10 +950,6 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) 280px;
       border-top: 1px solid var(--line-soft);
-    }
-
-    .table-zone {
-      min-width: 0;
     }
 
     .table-wrap {
@@ -1128,10 +1111,6 @@
       white-space: nowrap;
     }
 
-    .result-state[data-error="true"] {
-      color: var(--danger);
-    }
-
     .table-hint {
       display: none;
       position: absolute;
@@ -1149,15 +1128,19 @@
       display: flex;
     }
 
-    .table-wrap[data-running]:not(.has-results) .empty-hint::before {
+    .table-wrap[data-running]:not(.has-results) .empty-hint::before,
+    .map-feedback[data-loading="true"]::before {
       content: "";
       width: 16px;
       height: 16px;
       border: 2px solid var(--line-control);
       border-top-color: var(--accent);
       border-radius: 50%;
-      margin-right: 12px;
       animation: spin 1s linear infinite;
+    }
+
+    .table-wrap[data-running]:not(.has-results) .empty-hint::before {
+      margin-right: 12px;
     }
 
     @keyframes spin {
@@ -1279,26 +1262,11 @@
       color: var(--muted);
     }
 
-    .map-feedback[data-loading="true"]::before {
-      content: "";
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--line-control);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
     .map-recovery {
       display: flex;
       gap: 8px;
       margin: 8px 0 18px;
       flex-wrap: wrap;
-    }
-
-    .map-recovery>* {
-      flex: 1;
-      font-size: .8125rem;
     }
 
     #detail-map {
@@ -1385,7 +1353,8 @@
       color: var(--muted);
     }
 
-    .open-map {
+    .open-map,
+    #settings-help {
       width: 100%;
       margin-top: 18px;
     }
@@ -1482,10 +1451,6 @@
       width: min(340px, calc(100vw - 24px));
     }
 
-    .settings-popover h2 {
-      margin-bottom: 18px;
-    }
-
     .settings-popover label {
       display: block;
       margin: 16px 0 8px;
@@ -1499,11 +1464,6 @@
       border: 1px solid var(--line-control);
       border-radius: 12px;
       padding: 8px;
-    }
-
-    #settings-help {
-      width: 100%;
-      margin-top: 18px;
     }
 
     .map-links {
@@ -1668,10 +1628,7 @@
         display: none;
       }
 
-      .workspace-heading {
-        padding-inline: 22px;
-      }
-
+      .workspace-heading,
       .result-filterbar,
       search {
         padding-inline: 22px;
