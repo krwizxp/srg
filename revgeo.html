@@ -163,9 +163,6 @@
       stroke-linecap: round;
       stroke-linejoin: round;
       stroke-width: 1.8;
-    }
-
-    .action-btn__icon {
       fill: none;
       stroke: currentColor;
     }
@@ -2245,20 +2242,17 @@
         <button aria-label="도움말" class="action-btn help-button" id="show-help" type="button"><span
             class="help-button__label">도움말</span></button>
         <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle"
-            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" fill="none"
-              stroke="currentColor" viewbox="0 0 24 24">
-              <circle cx="12" cy="12" fill="currentColor" r="4"></circle>
-              <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"></path>
-            </svg><svg aria-hidden="true" class="theme-moon ui-icon" fill="none" stroke="currentColor"
+            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" viewbox="0 0 24 24">
+              <circle cx="12" cy="12" fill="currentColor" r="4" />
+              <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
+            </svg><svg aria-hidden="true" class="theme-moon ui-icon"
               viewbox="0 0 24 24">
-              <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"></path>
+              <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" />
             </svg></button><button aria-label="화면 설정" class="settings-button" title="화면 설정" aria-haspopup="dialog"
-            aria-controls="display-settings" type="button"><svg aria-hidden="true" class="ui-icon" fill="none"
-              stroke="currentColor" viewbox="0 0 24 24">
+            aria-controls="display-settings" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
               <path
-                d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z">
-              </path>
-              <circle cx="11" cy="12" r="3"></circle>
+                d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
+              <circle cx="11" cy="12" r="3" />
             </svg></button></div>
       </div>
     </div>
@@ -2273,10 +2267,10 @@
           tabindex="-1" type="button">난수 직접 입력</button>
       </div>
       <div aria-labelledby="file-tab" id="file-pane" role="tabpanel"><label class="drop-zone">
-          <span class="drop-text"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+          <span class="drop-text"><svg aria-hidden="true" class="ui-icon"
               viewbox="0 0 24 24">
-              <path d="M6 3h8l4 4v14H6z"></path>
-              <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
+              <path d="M6 3h8l4 4v14H6z" />
+              <path d="M14 3v5h4M9 12h6m-6 4h6" />
             </svg><strong id="drop-filename">좌표 TXT 파일 선택</strong><span id="drop-state">TXT 파일을 선택하거나 이곳에 끌어
               놓으세요.</span><span class="file-picker-cue">파일 선택</span><span class="file-changed" id="file-changed"
               hidden>선택한 파일을 바꾸려면 탭하세요.</span></span>
@@ -2284,8 +2278,8 @@
         </label><button class="action-btn action-btn--tinted" command="--parse" commandfor="app" id="parse"
           type="button">
           <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-            <path d="M6 3h8l4 4v14H6z"></path>
-            <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
+            <path d="M6 3h8l4 4v14H6z" />
+            <path d="M14 3v5h4M9 12h6m-6 4h6" />
           </svg>
           <span>좌표 추출</span>
         </button></div>
@@ -2313,31 +2307,29 @@
             <button class="action-btn action-btn--primary" id="runBtn" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
                 <path
-                  d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z">
-                </path>
-                <circle cx="11" cy="12" r="3"></circle>
+                  d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
+                <circle cx="11" cy="12" r="3" />
               </svg>
               <span>좌표로 변환</span>
             </button>
             <button class="action-btn" disabled id="saveOutput" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="M12 4.5v10"></path>
-                <path d="m8 10.75 4 4 4-4"></path>
-                <path d="M5.5 18.5h13"></path>
+                <path d="M12 4.5v10" />
+                <path d="m8 10.75 4 4 4-4" />
+                <path d="M5.5 18.5h13" />
               </svg>
               <span>TXT 저장</span>
             </button>
             <button aria-label="클립보드 복사" class="action-btn" disabled id="copyOutput" title="클립보드 복사" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <rect height="10" rx="2" width="10" x="9" y="9"></rect>
-                <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1">
-                </path>
+                <rect height="10" rx="2" width="10" x="9" y="9" />
+                <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
               </svg>
               <span>결과 복사</span>
             </button>
             <button class="action-btn action-btn--danger" id="clearBtn" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"></path>
+                <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" />
               </svg>
               <span>출력 지우기</span>
             </button>
@@ -2353,16 +2345,16 @@
       </div>
       <section aria-labelledby="coords-label" class="coords-section" data-empty="true" data-expanded="false">
         <div class="coords-heading">
-          <h2 class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+          <h2 class="caps" id="coords-label"><svg aria-hidden="true" class="ui-icon"
               viewbox="0 0 24 24">
-              <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none"></path>
-              <circle cx="12" cy="9" fill="white" r="2.8" stroke="none"></circle>
+              <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="9" fill="white" r="2.8" stroke="none" />
             </svg>추출된 좌표 (lat,lon)</h2><span>총 <strong id="coords-count">0</strong>개</span>
         </div>
-        <div class="coords-empty"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+        <div class="coords-empty"><svg aria-hidden="true" class="ui-icon"
             viewbox="0 0 24 24">
-            <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z"></path>
-            <circle cx="12" cy="9" r="2.5"></circle>
+            <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" />
+            <circle cx="12" cy="9" r="2.5" />
           </svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
         <pre class="coords-view" id="coords"
           tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="coords-content"></code></pre>
@@ -2387,33 +2379,32 @@
                 id="cnt-remain">0</strong>건 미처리</output>
           </div>
           <div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해
-              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" fill="none"
-                stroke="currentColor" viewbox="0 0 24 24">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 7v5l3 2"></path>
+              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
               </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
           <div class="input-actions"><button class="action-btn action-btn--primary" command="--start" commandfor="app"
               disabled id="start" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
+                <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
               </svg>
               <span>주소 조회 시작</span>
             </button><button class="action-btn" command="--pause" commandfor="app" disabled hidden id="pause"
               type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none"></path>
+                <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none" />
               </svg>
               <span>일시정지</span>
             </button><button class="action-btn" command="--resume" commandfor="app" disabled hidden id="resume"
               type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"></path>
+                <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
               </svg>
               <span>재개</span>
             </button><button class="action-btn action-btn--danger" command="--stop" commandfor="app" disabled hidden
               id="stop" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5"></rect>
+                <rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5" />
               </svg>
               <span>중지</span>
             </button></div>
@@ -2429,9 +2420,9 @@
           <div id="desktop-export-slot"><button class="action-btn action-btn--tinted" command="--export"
               commandfor="app" disabled id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
               <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                <path d="M12 4.5v10"></path>
-                <path d="m8 10.75 4 4 4-4"></path>
-                <path d="M5.5 18.5h13"></path>
+                <path d="M12 4.5v10" />
+                <path d="m8 10.75 4 4 4-4" />
+                <path d="M5.5 18.5h13" />
               </svg>
               <span>CSV 내보내기</span>
             </button></div>
@@ -2452,11 +2443,9 @@
         <search aria-label="주소 조회 결과 필터">
           <form class="filters" id="filters">
             <div class="search-field">
-              <svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
-                <circle cx="10.5" cy="10.5" r="6.5">
-                </circle>
-                <path d="m16 16 4.5 4.5">
-                </path>
+              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="m16 16 4.5 4.5" />
               </svg>
               <input aria-keyshortcuts="/" aria-label="주소, 좌표, 지물 검색" enterkeyhint="search" id="filter-q"
                 inputmode="search" placeholder="주소, 좌표, 지물 검색" type="search">
@@ -2476,10 +2465,10 @@
               </option>
             </select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
               aria-expanded="false" class="action-btn filter-trigger" id="advanced-filters" type="button"><svg
-                aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
-                <path d="M4 7h7m6 0h3M4 17h3m6 0h7"></path>
-                <circle cx="14" cy="7" r="3"></circle>
-                <circle cx="10" cy="17" r="3"></circle>
+                aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                <path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
+                <circle cx="14" cy="7" r="3" />
+                <circle cx="10" cy="17" r="3" />
               </svg><span>상세 필터</span></button>
             <dialog aria-labelledby="filter-dialog-title" id="filter-dialog">
               <div class="sheet-heading">
@@ -2496,10 +2485,8 @@
                     inputmode="search" placeholder="전체주소" type="search"></label><button class="action-btn"
                   command="--filter-clear" commandfor="app" id="filter-clear" type="button">
                   <svg aria-hidden="true" class="action-btn__icon" viewbox="0 0 24 24">
-                    <path d="M20 7v5h-5M4 17v-5h5">
-                    </path>
-                    <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18">
-                    </path>
+                    <path d="M20 7v5h-5M4 17v-5h5" />
+                    <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
                   </svg>
                   <span>
                     필터 초기화
@@ -2539,16 +2526,16 @@
             <div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
               <nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
                 <button aria-label="이전 페이지" class="action-btn" command="--page-prev" commandfor="app" id="page-prev"
-                  type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+                  type="button"><svg aria-hidden="true" class="ui-icon"
                     viewbox="0 0 24 24">
-                    <path d="m14 6-6 6 6 6"></path>
+                    <path d="m14 6-6 6 6 6" />
                   </svg><span>이전</span></button>
                 <output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers"
                   id="page-numbers"></span>
                 <button aria-label="다음 페이지" class="action-btn" command="--page-next" commandfor="app" id="page-next"
-                  type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+                  type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon"
                     viewbox="0 0 24 24">
-                    <path d="m10 6 6 6-6 6"></path>
+                    <path d="m10 6 6 6-6 6" />
                   </svg></button>
               </nav>
             </div>
@@ -2560,9 +2547,9 @@
               <h2 dir="auto" id="detail-title">선택한 위치</h2>
               <p dir="auto" id="detail-town"></p>
               <div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true"
-                    class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
-                    <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path>
-                    <circle cx="12" cy="10" r="2.5"></circle>
+                    class="ui-icon" viewbox="0 0 24 24">
+                    <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" />
+                    <circle cx="12" cy="10" r="2.5" />
                   </svg><span>OpenStreetMap 지도 불러오기</span></button>
                 <div aria-live="polite" class="map-feedback" hidden id="map-feedback"></div><iframe hidden
                   id="detail-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
@@ -2573,10 +2560,9 @@
                   rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
               <p class="detail-label">전체 주소</p>
               <div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
-                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon"
-                    fill="none" stroke="currentColor" viewbox="0 0 24 24">
-                    <rect height="11" rx="2" width="11" x="9" y="9"></rect>
-                    <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                    <rect height="11" rx="2" width="11" x="9" y="9" />
+                    <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
                   </svg></button></div>
               <dl class="detail-fields">
                 <div>
@@ -2598,10 +2584,9 @@
               </div>
               <p dir="ltr" id="detail-coordinates"></p>
               <button class="map-btn action-btn open-map" id="detail-map-links" popovertarget="map-popover"
-                popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" fill="none"
-                  stroke="currentColor" viewbox="0 0 24 24">
-                  <path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z"></path>
-                  <path d="M9 2v17m6-14v17"></path>
+                popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                  <path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z" />
+                  <path d="M9 2v17m6-14v17" />
                 </svg>지도에서 열기</button>
               <nav aria-label="지도 링크" class="map-popover" id="map-popover" popover="auto">
                 <div class="map-links" id="map-popover-links">
@@ -2630,15 +2615,15 @@
   <div class="mobile-bottom">
     <div aria-label="작업 화면" class="mobile-nav" role="tablist">
       <button aria-controls="input-view" aria-selected="true" data-mobile="input" id="mobile-input-tab" role="tab"
-        tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+        tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon"
           viewbox="0 0 24 24">
-          <path d="M6 3h8l4 4v14H6z"></path>
-          <path d="M14 3v5h4M9 12h6m-6 4h6"></path>
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v5h4M9 12h6m-6 4h6" />
         </svg>입력</button>
       <button aria-controls="results-view" aria-selected="false" data-mobile="results" id="mobile-results-tab"
-        role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor"
+        role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon"
           viewbox="0 0 24 24">
-          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path>
+          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
         </svg>결과</button>
     </div>
   </div>
@@ -2687,16 +2672,16 @@
   <dialog aria-labelledby="sheet-title" id="detail-sheet">
     <div class="sheet-heading">
       <h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg
-          aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
-          <path d="m6 6 12 12M6 18 18 6"></path>
+          aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
   </dialog>
   <dialog aria-labelledby="help-title" id="help-dialog">
     <div class="sheet-heading">
       <h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg
-          aria-hidden="true" class="ui-icon" fill="none" stroke="currentColor" viewbox="0 0 24 24">
-          <path d="m6 6 12 12M6 18 18 6"></path>
+          aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
     <p class="manual-rng-meta">주소 조회는 Nominatim, 지도 미리보기는 OpenStreetMap에 좌표를 전송합니다.</p>
@@ -2769,291 +2754,285 @@
       BULK_HARD_LIMIT: 5_000,
       INPUT_FILE_HARD_LIMIT: 64 * 1024 * 1024,
       INPUT_LINE_HARD_LIMIT: 1_000_000,
-      REVERSE_CACHE_DB_NAME: "srg-revgeo-cache",
-      REVERSE_CACHE_DB_VERSION: 4,
-      REVERSE_CACHE_STORE: "nominatim-reverse",
-      REVERSE_CACHE_PARSER_VERSION: 2,
-      REVERSE_CACHE_MAX: 10_000,
-      REVERSE_CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
+      CACHE_DB_NAME: "srg-revgeo-cache",
+      CACHE_DB_VERSION: 4,
+      CACHE_STORE: "nominatim-reverse",
+      CACHE_PARSER_VERSION: 2,
+      CACHE_MAX: 10_000,
+      CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
       REVERSE_RESPONSE_MAX_BYTES: 1024 * 1024,
       REVERSE_TEXT_HARD_LIMIT: 4_096,
     };
     class InputValidationError extends Error { }
-    const GeocodeParser = (() => {
-      const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
-        CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
-      const isBoundedText = (value) =>
-        typeof value === "string" &&
-        value.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
-      function text(value) {
-        if (typeof value !== "string") return "";
-        if (value.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
-          throw new InputValidationError(TEXT_LIMIT_MESSAGE);
-        }
-        return value;
+    const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
+      CONFIG.REVERSE_TEXT_HARD_LIMIT + "자를 초과했습니다.";
+    const isBoundedText = (value) =>
+      typeof value === "string" &&
+      value.length <= CONFIG.REVERSE_TEXT_HARD_LIMIT;
+    function text(value) {
+      if (typeof value !== "string") return "";
+      if (value.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
+        throw new InputValidationError(TEXT_LIMIT_MESSAGE);
       }
-      function pickAdminName(
-        candidates, suffixes, excludedA = "", excludedB = "",
-        excludedC = "",
-      ) {
+      return value;
+    }
+    function pickAdminName(
+      candidates, suffixes, excludedA = "", excludedB = "",
+      excludedC = "",
+    ) {
+      for (const name of candidates) {
+        if (!name || name === excludedA || name === excludedB ||
+          name === excludedC) continue;
+        if (suffixes && !suffixes.includes(name.at(-1))) continue;
+        return name;
+      }
+      return "";
+    }
+    function parseKoreanAdmin(fields, p0, p1) {
+      const primaryName = fields.name || p0;
+      const cityDistrict = fields.cityDistrict || fields.district ||
+        fields.suburb;
+      const level6 = fields.level6 || fields.level7;
+      const { city, county } = fields;
+      let sido = fields.level4 || fields.state;
+      let sigungu = "";
+      const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
+      if (!sido && cityIsSpecial) sido = city;
+      if (!!sido && (sido === city
+        ? cityIsSpecial
+        : CONFIG.SPECIAL_CITIES.test(sido))) {
+        const candidates = [cityDistrict, level6, county, primaryName, p0, p1];
+        let fallback = "";
         for (const name of candidates) {
-          if (!name || name === excludedA || name === excludedB ||
-            name === excludedC) continue;
-          if (suffixes && !suffixes.includes(name.at(-1))) continue;
-          return name;
-        }
-        return "";
-      }
-      function readFields(gc) {
-        const admin = gc.admin && typeof gc.admin === "object"
-          ? gc.admin
-          : null;
-        return {
-          level2: text(admin?.level2),
-          level4: text(admin?.level4),
-          level6: text(admin?.level6),
-          level7: text(admin?.level7),
-          level8: text(admin?.level8),
-          level9: text(admin?.level9),
-          level10: text(admin?.level10),
-          country: text(gc.country),
-          name: text(gc.name),
-          street: text(gc.street),
-          type: text(gc.type),
-          cityDistrict: text(gc.city_district),
-          district: text(gc.district),
-          suburb: text(gc.suburb),
-          city: text(gc.city),
-          county: text(gc.county),
-          state: text(gc.state),
-          region: text(gc.region),
-          province: text(gc.province),
-          town: text(gc.town),
-          locality: text(gc.locality),
-          village: text(gc.village),
-          neighbourhood: text(gc.neighbourhood),
-          municipality: text(gc.municipality),
-          quarter: text(gc.quarter),
-          hamlet: text(gc.hamlet),
-          township: text(gc.township),
-          residential: text(gc.residential),
-        };
-      }
-      function parseKoreanAdmin(fields, p0, p1) {
-        const primaryName = fields.name || p0;
-        const cityDistrict = fields.cityDistrict || fields.district ||
-          fields.suburb;
-        const level6 = fields.level6 || fields.level7;
-        const { city, county } = fields;
-        let sido = fields.level4 || fields.state;
-        let sigungu = "";
-        const cityIsSpecial = !!city && CONFIG.SPECIAL_CITIES.test(city);
-        if (!sido && cityIsSpecial) sido = city;
-        if (!!sido && (sido === city
-          ? cityIsSpecial
-          : CONFIG.SPECIAL_CITIES.test(sido))) {
-          const candidates = [cityDistrict, level6, county, primaryName, p0, p1];
-          let fallback = "";
-          for (const name of candidates) {
-            if (!name || name === sido) continue;
-            const suffix = name.at(-1);
-            if ("구군".includes(suffix)) {
-              sigungu = name;
-              break;
-            }
-            if (!fallback && suffix === "시" &&
-              !CONFIG.SPECIAL_CITIES.test(name)) fallback = name;
+          if (!name || name === sido) continue;
+          const suffix = name.at(-1);
+          if ("구군".includes(suffix)) {
+            sigungu = name;
+            break;
           }
-          sigungu ||= fallback;
-        } else {
-          const cityLike = pickAdminName(
-            [city, county, level6, primaryName, p1, p0], "시군", sido,
-          );
-          const districtLike = pickAdminName(
-            [
-              cityDistrict, fields.level8, fields.level9,
-              fields.town, fields.locality, fields.village,
-            ],
-            "구", sido, cityLike,
-          );
-          sigungu = cityLike && districtLike
-            ? cityLike + " " + districtLike
-            : cityLike || districtLike;
-          sigungu ||= pickAdminName(
-            [county, level6, cityDistrict, primaryName, p0, p1],
-            "시구군", sido,
-          );
+          if (!fallback && suffix === "시" &&
+            !CONFIG.SPECIAL_CITIES.test(name)) fallback = name;
         }
-        const eupmyeon = [];
-        for (const name of [
-          fields.level8, fields.level9, fields.level10, fields.town,
-          fields.village, fields.locality, fields.suburb, primaryName, p0, p1,
-        ]) {
-          if (!name || name === sido || name === sigungu) continue;
-          if (eupmyeon.includes(name)) continue;
-          const last = name.length - 1;
-          if (
-            "읍면동리".includes(name.at(-1)) ||
-            (
-              name.charCodeAt(last) === 0xac00 &&
-              name.charCodeAt(last - 1) >= 48 &&
-              name.charCodeAt(last - 1) <= 57
-            )
-          ) eupmyeon.push(name);
-        }
-        return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
-      }
-      function removeDistrict(sigungu, district) {
-        if (!sigungu || sigungu === district) return "";
-        const cut = sigungu.length - district.length;
-        if (cut > 0 && sigungu.endsWith(district) &&
-          sigungu.charCodeAt(cut - 1) === 32) {
-          return sigungu.slice(0, cut - 1).trim();
-        }
-        const normalized = sigungu.replace(/\s+/gu, " ").trim();
-        const normalizedDistrict = district.replace(/\s+/gu, " ").trim();
-        return (` ${normalized} `)
-          .replaceAll(` ${normalizedDistrict} `, " ")
-          .trim();
-      }
-      function parseGlobalAdmin(fields, p0, p1) {
-        const primaryName = fields.name || p0;
-        const cityDistrict = fields.cityDistrict || fields.district ||
-          fields.suburb;
-        const { city, county } = fields;
-        const sido = fields.level4 || fields.state || fields.region ||
-          fields.province || county || city;
+        sigungu ||= fallback;
+      } else {
         const cityLike = pickAdminName(
-          [city, county, fields.level6, fields.level7, primaryName, p1, p0],
-          0, sido,
+          [city, county, level6, primaryName, p1, p0], "시군", sido,
         );
         const districtLike = pickAdminName(
           [
-            cityDistrict, fields.level8, fields.level9, fields.town,
-            fields.locality, fields.village, fields.suburb,
-            fields.neighbourhood,
+            cityDistrict, fields.level8, fields.level9,
+            fields.town, fields.locality, fields.village,
           ],
-          0, sido, cityLike,
+          "구", sido, cityLike,
         );
-        let sigungu = cityLike && districtLike
+        sigungu = cityLike && districtLike
           ? cityLike + " " + districtLike
-          : cityLike || districtLike || fields.level6 || fields.level8 ||
-          city || fields.town || county || fields.district ||
-          fields.municipality;
-        if ((!sigungu || sigungu === sido) &&
-          (fields.type === "city" || fields.type === "county")) {
-          sigungu = primaryName || city || county;
-        }
-        let eupmyeon = pickAdminName(
-          [
-            fields.locality, fields.level10, fields.town, fields.village,
-            fields.suburb, fields.neighbourhood, fields.quarter, fields.hamlet,
-            fields.township, fields.residential, fields.name, p0, p1,
-          ],
-          0, sido, cityLike, districtLike,
+          : cityLike || districtLike;
+        sigungu ||= pickAdminName(
+          [county, level6, cityDistrict, primaryName, p0, p1],
+          "시구군", sido,
         );
-        if (eupmyeon === sigungu) eupmyeon = "";
-        if (!eupmyeon && districtLike) {
-          eupmyeon = districtLike;
-          sigungu = removeDistrict(sigungu, districtLike);
-        }
-        return { sido, sigungu, eupmyeon };
       }
-      function getAdmin(fields, countryCode, p0, p1) {
-        const adminCountry = fields.level2;
-        const countryName = fields.country || adminCountry;
-        let lowerCountryName;
-        let lowerAdminCountry;
-        const explicitKorean =
-          countryCode === "kr" ||
-          countryCode === "kp" ||
-          countryName === "대한민국" ||
-          countryName === "조선민주주의인민공화국";
-        if (!explicitKorean) {
-          lowerCountryName = countryName.toLowerCase();
-          lowerAdminCountry = adminCountry.toLowerCase();
-        }
-        const korean = explicitKorean ||
-          lowerCountryName.includes("korea") ||
-          lowerAdminCountry.includes("korea");
-        const result = korean
-          ? parseKoreanAdmin(fields, p0, p1)
-          : parseGlobalAdmin(fields, p0, p1);
-        if (!korean) {
-          for (const key of ["sido", "sigungu", "eupmyeon"]) {
-            const value = result[key].toLowerCase();
-            if (value && (
-              value === lowerCountryName || value === lowerAdminCountry
-            )) result[key] = "";
-          }
-        }
-        if (result.sido && result.sido === result.sigungu) result.sigungu = "";
-        return result;
+      const eupmyeon = [];
+      for (const name of [
+        fields.level8, fields.level9, fields.level10, fields.town,
+        fields.village, fields.locality, fields.suburb, primaryName, p0, p1,
+      ]) {
+        if (!name || name === sido || name === sigungu) continue;
+        if (eupmyeon.includes(name)) continue;
+        const last = name.length - 1;
+        if (
+          "읍면동리".includes(name.at(-1)) ||
+          (
+            name.charCodeAt(last) === 0xac00 &&
+            name.charCodeAt(last - 1) >= 48 &&
+            name.charCodeAt(last - 1) <= 57
+          )
+        ) eupmyeon.push(name);
       }
-      function isValid(parsed) {
-        const addr = parsed?.addr;
-        return !!addr && typeof parsed === "object" &&
-          typeof addr === "object" &&
-          isBoundedText(addr.sido) &&
-          isBoundedText(addr.sigungu) &&
-          isBoundedText(addr.eupmyeon) &&
-          isBoundedText(addr.tag) &&
-          isBoundedText(addr.fullAddr) &&
-          (parsed.kind === undefined || isBoundedText(parsed.kind));
+      return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
+    }
+    function removeDistrict(sigungu, district) {
+      if (!sigungu || sigungu === district) return "";
+      const cut = sigungu.length - district.length;
+      if (cut > 0 && sigungu.endsWith(district) &&
+        sigungu.charCodeAt(cut - 1) === 32) {
+        return sigungu.slice(0, cut - 1).trim();
       }
-      function parse(data) {
-        const gc = data && typeof data === "object" &&
-          Array.isArray(data.features)
-          ? data.features[0]?.properties?.geocoding
-          : null;
-        if (!gc) {
-          return {
-            addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
-          };
+      const normalized = sigungu.replace(/\s+/gu, " ").trim();
+      const normalizedDistrict = district.replace(/\s+/gu, " ").trim();
+      return (` ${normalized} `)
+        .replaceAll(` ${normalizedDistrict} `, " ")
+        .trim();
+    }
+    function parseGlobalAdmin(fields, p0, p1) {
+      const primaryName = fields.name || p0;
+      const cityDistrict = fields.cityDistrict || fields.district ||
+        fields.suburb;
+      const { city, county } = fields;
+      const sido = fields.level4 || fields.state || fields.region ||
+        fields.province || county || city;
+      const cityLike = pickAdminName(
+        [city, county, fields.level6, fields.level7, primaryName, p1, p0],
+        0, sido,
+      );
+      const districtLike = pickAdminName(
+        [
+          cityDistrict, fields.level8, fields.level9, fields.town,
+          fields.locality, fields.village, fields.suburb,
+          fields.neighbourhood,
+        ],
+        0, sido, cityLike,
+      );
+      let sigungu = cityLike && districtLike
+        ? cityLike + " " + districtLike
+        : cityLike || districtLike || fields.level6 || fields.level8 ||
+        city || fields.town || county || fields.district ||
+        fields.municipality;
+      if ((!sigungu || sigungu === sido) &&
+        (fields.type === "city" || fields.type === "county")) {
+        sigungu = primaryName || city || county;
+      }
+      let eupmyeon = pickAdminName(
+        [
+          fields.locality, fields.level10, fields.town, fields.village,
+          fields.suburb, fields.neighbourhood, fields.quarter, fields.hamlet,
+          fields.township, fields.residential, fields.name, p0, p1,
+        ],
+        0, sido, cityLike, districtLike,
+      );
+      if (eupmyeon === sigungu) eupmyeon = "";
+      if (!eupmyeon && districtLike) {
+        eupmyeon = districtLike;
+        sigungu = removeDistrict(sigungu, districtLike);
+      }
+      return { sido, sigungu, eupmyeon };
+    }
+    function getAdmin(fields, countryCode, p0, p1) {
+      const adminCountry = fields.level2;
+      const countryName = fields.country || adminCountry;
+      let lowerCountryName;
+      let lowerAdminCountry;
+      const explicitKorean =
+        countryCode === "kr" ||
+        countryCode === "kp" ||
+        countryName === "대한민국" ||
+        countryName === "조선민주주의인민공화국";
+      if (!explicitKorean) {
+        lowerCountryName = countryName.toLowerCase();
+        lowerAdminCountry = adminCountry.toLowerCase();
+      }
+      const korean = explicitKorean ||
+        lowerCountryName.includes("korea") ||
+        lowerAdminCountry.includes("korea");
+      const result = korean
+        ? parseKoreanAdmin(fields, p0, p1)
+        : parseGlobalAdmin(fields, p0, p1);
+      if (!korean) {
+        for (const key of ["sido", "sigungu", "eupmyeon"]) {
+          const value = result[key].toLowerCase();
+          if (value && (
+            value === lowerCountryName || value === lowerAdminCountry
+          )) result[key] = "";
         }
-        const label = text(gc.label);
-        const countryCode = text(gc.country_code).toLowerCase();
-        const fields = readFields(gc);
-        let firstLabelPart;
-        let p0 = "";
-        let p1 = "";
-        for (let start = 0; start <= label.length && !p1;) {
-          const comma = label.indexOf(",", start);
-          const end = comma < 0 ? label.length : comma;
-          const part = label.slice(start, end).trim();
-          if (start === 0) firstLabelPart = part;
-          if (part) {
-            if (p0) p1 = part;
-            else p0 = part;
-          }
-          if (comma < 0) break;
-          start = comma + 1;
-        }
-        const { sido, sigungu, eupmyeon } = getAdmin(
-          fields, countryCode, p0, p1,
-        );
-        let tag = fields.name || firstLabelPart || fields.street || fields.city;
-        const tagType = fields.type;
-        if (tagType) tag = tag ? tag + ", " + tagType : tagType;
-        const kind = countryCode === "kr" ? "KR" :
-          countryCode === "kp" ? "KP" :
-            countryCode ? "WORLD" : undefined;
-        if (sigungu.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
-          eupmyeon.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
-          tag.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
-          throw new InputValidationError(TEXT_LIMIT_MESSAGE);
-        }
+      }
+      if (result.sido && result.sido === result.sigungu) result.sigungu = "";
+      return result;
+    }
+    function isValidGeocode(parsed) {
+      const addr = parsed?.addr;
+      return !!addr && typeof parsed === "object" &&
+        typeof addr === "object" &&
+        isBoundedText(addr.sido) &&
+        isBoundedText(addr.sigungu) &&
+        isBoundedText(addr.eupmyeon) &&
+        isBoundedText(addr.tag) &&
+        isBoundedText(addr.fullAddr) &&
+        (parsed.kind === undefined || isBoundedText(parsed.kind));
+    }
+    function parseGeocode(data) {
+      const gc = data && typeof data === "object" &&
+        Array.isArray(data.features)
+        ? data.features[0]?.properties?.geocoding
+        : null;
+      if (!gc) {
         return {
-          addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
-          kind,
+          addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
         };
       }
-      return Object.freeze({ isValid, parse });
-    })();
+      const label = text(gc.label);
+      const countryCode = text(gc.country_code).toLowerCase();
+      const admin = gc.admin && typeof gc.admin === "object"
+        ? gc.admin
+        : null;
+      const fields = {
+        level2: text(admin?.level2),
+        level4: text(admin?.level4),
+        level6: text(admin?.level6),
+        level7: text(admin?.level7),
+        level8: text(admin?.level8),
+        level9: text(admin?.level9),
+        level10: text(admin?.level10),
+        country: text(gc.country),
+        name: text(gc.name),
+        street: text(gc.street),
+        type: text(gc.type),
+        cityDistrict: text(gc.city_district),
+        district: text(gc.district),
+        suburb: text(gc.suburb),
+        city: text(gc.city),
+        county: text(gc.county),
+        state: text(gc.state),
+        region: text(gc.region),
+        province: text(gc.province),
+        town: text(gc.town),
+        locality: text(gc.locality),
+        village: text(gc.village),
+        neighbourhood: text(gc.neighbourhood),
+        municipality: text(gc.municipality),
+        quarter: text(gc.quarter),
+        hamlet: text(gc.hamlet),
+        township: text(gc.township),
+        residential: text(gc.residential),
+      };
+      let firstLabelPart;
+      let p0 = "";
+      let p1 = "";
+      for (let start = 0; start <= label.length && !p1;) {
+        const comma = label.indexOf(",", start);
+        const end = comma < 0 ? label.length : comma;
+        const part = label.slice(start, end).trim();
+        if (start === 0) firstLabelPart = part;
+        if (part) {
+          if (p0) p1 = part;
+          else p0 = part;
+        }
+        if (comma < 0) break;
+        start = comma + 1;
+      }
+      const { sido, sigungu, eupmyeon } = getAdmin(
+        fields, countryCode, p0, p1,
+      );
+      let tag = fields.name || firstLabelPart || fields.street || fields.city;
+      const tagType = fields.type;
+      if (tagType) tag = tag ? tag + ", " + tagType : tagType;
+      const kind = countryCode === "kr" ? "KR" :
+        countryCode === "kp" ? "KP" :
+          countryCode ? "WORLD" : undefined;
+      if (sigungu.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
+        eupmyeon.length > CONFIG.REVERSE_TEXT_HARD_LIMIT ||
+        tag.length > CONFIG.REVERSE_TEXT_HARD_LIMIT) {
+        throw new InputValidationError(TEXT_LIMIT_MESSAGE);
+      }
+      return {
+        addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
+        kind,
+      };
+    }
     const BASE_URL_HREF =
       `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
-    const REVERSE_CACHE_KEY_PREFIX =
-      `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.REVERSE_CACHE_PARSER_VERSION}:`;
+    const CACHE_KEY_PREFIX =
+      `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
     const CSV_ATTRIBUTION_COLUMNS =
       ",\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)," +
       "Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)," +
@@ -3087,10 +3066,9 @@
       new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
     const COORD_DECIMALS = 6;
     const COORD_POW = 10 ** COORD_DECIMALS;
-    const normalizeCoordText = (s) => s === "-0" ? "0" : s;
     const fmtCoord6 = (v) => {
       const dot = v.indexOf(".");
-      if (dot === -1) return normalizeCoordText(v);
+      if (dot === -1) return v === "-0" ? "0" : v;
       let s = v;
       if (v.length - dot - 1 > COORD_DECIMALS) {
         s = (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(
@@ -3100,7 +3078,8 @@
       let end = s.length;
       while (end && s.charCodeAt(end - 1) === 48) end--;
       if (end && s.charCodeAt(end - 1) === 46) end--;
-      return normalizeCoordText(end === s.length ? s : s.slice(0, end));
+      s = end === s.length ? s : s.slice(0, end);
+      return s === "-0" ? "0" : s;
     };
     const fileInput = byId("file");
     const themeToggle = byId("theme-toggle");
@@ -3178,7 +3157,7 @@
       setTheme(currentTheme() === "dark" ? "light" : "dark");
     });
     let statusFilter = "all";
-    const ROW_TEMPLATE = byId("tmpl-row").content
+    const rowTemplate = byId("tmpl-row").content
       .querySelector("tr");
     const RX_COMMA_WS = /\s*,\s*/g;
     const norm = (s) => {
@@ -3222,7 +3201,7 @@
         query,
       };
     }
-    let FILTER_SNAP = buildFilterSnapshot();
+    let filterSnapshot = buildFilterSnapshot();
     const Q_SEARCH_SEP = "\u0000";
     function matchesFilter(r, f) {
       if (!r.result) return false;
@@ -3282,7 +3261,7 @@
     let resultPageSize = 10;
     let filterTimer = null;
     let pageRenderReq = null;
-    function cancelActiveFilterTask() {
+    function cancelFilterTimer() {
       if (filterTimer !== null) {
         clearTimeout(filterTimer);
         filterTimer = null;
@@ -3330,7 +3309,7 @@
       pageNumbers.replaceChildren(fragment);
     }
     function rebuildVisibleIndices() {
-      const f = FILTER_SNAP;
+      const f = filterSnapshot;
       const indices = AppState.visibleIndices;
       indices.length = 0;
       const records = AppState.records;
@@ -3338,9 +3317,9 @@
         if (matchesFilter(records[i], f)) indices.push(i);
       }
       AppState.page = 0;
-      renderCurrentPage(true);
+      renderPage(true);
     }
-    function renderCurrentPage(resetScroll = false) {
+    function renderPage(resetScroll = false) {
       pageRenderReq = null;
       mapPopover.hidePopover();
       const indices = AppState.visibleIndices;
@@ -3358,19 +3337,19 @@
       tableWrap.classList.toggle("has-results", AppState.processed > 0);
       if (resetScroll) tableWrap.scrollTop = 0;
     }
-    function renderCommittedResult(index, visiblePosition) {
+    function renderCommittedResult(index, visibleIndex) {
       if (pageRenderReq !== null || filterTimer !== null) return;
       tableWrap.classList.toggle(
         "has-results",
         AppState.processed > 0,
       );
-      if (visiblePosition < 0) return;
+      if (visibleIndex < 0) return;
       const visibleCount = AppState.visibleIndices.length;
       updatePageNavigation(visibleCount);
       const start = AppState.page * resultPageSize;
       const end = Math.min(visibleCount, start + resultPageSize);
-      if (visiblePosition < start || visiblePosition >= end) return;
-      const expectedRows = visiblePosition - start;
+      if (visibleIndex < start || visibleIndex >= end) return;
+      const expectedRows = visibleIndex - start;
       if (resultBody.children.length !== expectedRows) {
         schedulePageRender();
         return;
@@ -3378,14 +3357,14 @@
       resultBody.append(
         createResultRow(AppState.records[index], index),
       );
-      if (selectedRecordIndex < 0) selectRecord(index, false);
+      if (selectedIndex < 0) selectRecord(index, false);
     }
     function schedulePageRender() {
-      pageRenderReq ??= requestAnimationFrame(() => renderCurrentPage());
+      pageRenderReq ??= requestAnimationFrame(() => renderPage());
     }
-    function scheduleApplyFilterAll() {
-      FILTER_SNAP = buildFilterSnapshot();
-      cancelActiveFilterTask();
+    function scheduleFilter() {
+      filterSnapshot = buildFilterSnapshot();
+      cancelFilterTimer();
       filterTimer = setTimeout(() => {
         filterTimer = null;
         rebuildVisibleIndices();
@@ -3396,23 +3375,23 @@
       filterForm.reset();
       setStatusFilter("all", false);
       filterQuery.value = query;
-      scheduleApplyFilterAll();
+      scheduleFilter();
     }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
       MAP_LINK_KEYS.map((key) => "," + csvEsc(`지도링크(${key})`)).join("");
-    let ACTIVE_DOWNLOAD_URL = null;
-    let EXPORT_TASK = null;
+    let downloadUrl = null;
+    let exportTask = null;
     function revokeActiveDownloadUrl() {
-      if (!ACTIVE_DOWNLOAD_URL) return;
-      URL.revokeObjectURL(ACTIVE_DOWNLOAD_URL);
-      ACTIVE_DOWNLOAD_URL = null;
+      if (!downloadUrl) return;
+      URL.revokeObjectURL(downloadUrl);
+      downloadUrl = null;
     }
     window.addEventListener("pagehide", revokeActiveDownloadUrl);
     function downloadBlob(blob, filename) {
       revokeActiveDownloadUrl();
       const url = URL.createObjectURL(blob);
-      ACTIVE_DOWNLOAD_URL = url;
+      downloadUrl = url;
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
@@ -3424,7 +3403,7 @@
       }
       setTimeout(() => {
         URL.revokeObjectURL(url);
-        if (ACTIVE_DOWNLOAD_URL === url) ACTIVE_DOWNLOAD_URL = null;
+        if (downloadUrl === url) downloadUrl = null;
       }, 60_000);
     }
     let elapsedStart = 0;
@@ -3472,7 +3451,7 @@
         return this.status === "stopping";
       },
       reset(status) {
-        this.generation += 1;
+        this.generation++;
         this.task?.resume?.();
         this.task?.controller.abort();
         this.processed = 0;
@@ -3545,11 +3524,11 @@
         (next.disabled ? statusMessage : next).focus({ preventScroll: true });
       }
     }
-    const SR_STATUS_CACHE = { msg: null, progressBucket: -1 };
+    const srStatus = { msg: null, progressBucket: -1 };
     let statusNotifyTimer = 0;
     function announceStatusText(text) {
-      if (SR_STATUS_CACHE.msg === text) return;
-      SR_STATUS_CACHE.msg = text;
+      if (srStatus.msg === text) return;
+      srStatus.msg = text;
       clearTimeout(statusNotifyTimer);
       if (text) {
         statusNotifyTimer = setTimeout(() => {
@@ -3564,11 +3543,11 @@
       el.classList.toggle("warn", type === "warn");
       el.classList.toggle("stopped", type === "stopped");
     }
-    function setStatusMessage(msg, type = "info") {
+    function showStatus(msg, type = "info") {
       const nextMsg = String(msg ?? "");
       setStatusVisual(nextMsg, type);
       const text = nextMsg.trim();
-      SR_STATUS_CACHE.progressBucket = -1;
+      srStatus.progressBucket = -1;
       announceStatusText(text || null);
     }
     function setProgressStatus(processed, total, totalDisp) {
@@ -3578,15 +3557,15 @@
         ? pct
         : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
       if (
-        bucket === SR_STATUS_CACHE.progressBucket && processed !== total
+        bucket === srStatus.progressBucket && processed !== total
       ) return;
-      SR_STATUS_CACHE.progressBucket = bucket;
+      srStatus.progressBucket = bucket;
       announceStatusText(
         `진행 상황 ${pct}%. ${processed} / ${total}건 처리됨.`,
       );
     }
     const FILE_READY_HINT = "파일 업로드 완료! 좌표 추출을 눌러주세요.";
-    const RENDER_CACHE = {
+    const renderCache = {
       total: -1,
       processed: -1,
       fail: -1,
@@ -3596,14 +3575,14 @@
       const total = AppState.records.length;
       const processed = AppState.processed;
       const fail = AppState.cntFail;
-      const totalChanged = RENDER_CACHE.total !== total;
-      const processedChanged = RENDER_CACHE.processed !== processed;
-      const failChanged = RENDER_CACHE.fail !== fail;
+      const totalChanged = renderCache.total !== total;
+      const processedChanged = renderCache.processed !== processed;
+      const failChanged = renderCache.fail !== fail;
       if (!(totalChanged || processedChanged || failChanged)) return;
       updateWorkflowStep();
-      RENDER_CACHE.total = total;
-      RENDER_CACHE.processed = processed;
-      RENDER_CACHE.fail = fail;
+      renderCache.total = total;
+      renderCache.processed = processed;
+      renderCache.fail = fail;
       const success = processed - fail;
       const remaining = total - processed;
       if (totalChanged) {
@@ -3637,21 +3616,20 @@
       }
       if (processedChanged) {
         byId("summary-processed").textContent = fmt(processed);
-        exportButton.disabled = processed === 0 || EXPORT_TASK !== null;
+        exportButton.disabled = processed === 0 || exportTask !== null;
       }
     }
     function scheduleRender() {
       AppState.renderReq ??= requestAnimationFrame(renderFrame);
     }
     function clearTable() {
-      cancelActiveFilterTask();
-      const wrap = tableWrap;
+      cancelFilterTimer();
       mapPopover.hidePopover();
       resultBody.replaceChildren();
       resetInspector();
-      wrap.scrollTop = 0;
-      wrap.scrollLeft = 0;
-      wrap.classList.remove("has-results");
+      tableWrap.scrollTop = 0;
+      tableWrap.scrollLeft = 0;
+      tableWrap.classList.remove("has-results");
       pageNav.hidden = true;
       resultsCount.textContent = "표시할 결과가 없습니다.";
     }
@@ -3697,7 +3675,7 @@
           return promise;
         };
       })();
-    const cancelReadableBestEffort = (readable) => readable?.cancel().catch(() => { });
+    const tryCancelReadable = (readable) => readable?.cancel().catch(() => { });
     function ensureInputLineLength(length) {
       if (length > CONFIG.INPUT_LINE_HARD_LIMIT) {
         throw new InputValidationError(
@@ -3770,7 +3748,7 @@
         }
         if (pendingCr || pendingLength !== 0) yield takePending();
       } finally {
-        await cancelReadableBestEffort(reader);
+        await tryCancelReadable(reader);
         reader.releaseLock();
       }
     }
@@ -3817,67 +3795,67 @@
       }
       return out;
     }
-    const REVERSE_PARSED_CACHE = new Map();
-    const REVERSE_PARSED_CACHE_MAX = 5_000;
-    const REVERSE_CACHE_KEYED_READ_LIMIT = 2_000;
-    const REVERSE_CACHE_ADAPTIVE_READ_MIN = 1_000;
-    const REVERSE_CACHE_SCAN_RATIO = 2;
-    const REVERSE_CACHE_WRITE_LIMIT = 8;
-    const REVERSE_CACHE_PRUNE_INTERVAL = 32;
-    let REVERSE_CACHE_EXTERNAL_WRITES = new Set();
-    const REVERSE_CACHE_TAB_ID =
+    const parsedCache = new Map();
+    const PARSED_CACHE_MAX = 5_000;
+    const CACHE_KEYED_READ_LIMIT = 2_000;
+    const CACHE_ADAPTIVE_READ_MIN = 1_000;
+    const CACHE_SCAN_RATIO = 2;
+    const CACHE_WRITE_LIMIT = 8;
+    const CACHE_PRUNE_INTERVAL = 32;
+    let externalCacheWrites = new Set();
+    const cacheTabId =
       `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`;
-    const REVERSE_CACHE_SYNC_CHANNEL = new BroadcastChannel(
-      `${CONFIG.REVERSE_CACHE_DB_NAME}:v${CONFIG.REVERSE_CACHE_DB_VERSION}`,
+    const cacheSyncChannel = new BroadcastChannel(
+      `${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`,
     );
-    let REVERSE_CACHE_WRITE_SEQUENCE = 0;
-    let REVERSE_CACHE_ROWS_UPPER_BOUND = null;
-    let REVERSE_CACHE_WRITES_SINCE_PRUNE = 0;
-    let LAST_REVERSE_FETCH_AT = 0;
-    let REVERSE_CACHE_DB_PROMISE = null;
-    let REVERSE_CACHE_RETRY_AT = 0;
-    const REVERSE_CACHE_OPEN_RETRY_MS = 5_000;
-    const NO_REVERSE_CACHE_DB = Promise.resolve(null);
-    REVERSE_CACHE_SYNC_CHANNEL.onmessage = ({ data }) => {
+    let cacheWriteSequence = 0;
+    let cacheRowsUpperBound = null;
+    let cacheWritesSincePrune = 0;
+    let lastReverseFetchAt = 0;
+    let cacheDbPromise = null;
+    let cacheRetryAt = 0;
+    const CACHE_OPEN_RETRY_MS = 5_000;
+    const NO_CACHE_DB = Promise.resolve(null);
+    cacheSyncChannel.onmessage = ({ data }) => {
       if (!Array.isArray(data) || data.length !== 2) return;
       const [phase, token] = data;
       if (typeof token !== "string") return;
       if (phase === 0) {
-        if (REVERSE_CACHE_EXTERNAL_WRITES) {
+        if (externalCacheWrites) {
           if (
             token.length > 128 ||
-            (REVERSE_CACHE_EXTERNAL_WRITES.size >= 64 &&
-              !REVERSE_CACHE_EXTERNAL_WRITES.has(token))
+            (externalCacheWrites.size >= 64 &&
+              !externalCacheWrites.has(token))
           ) {
-            REVERSE_CACHE_EXTERNAL_WRITES = null;
+            externalCacheWrites = null;
           } else {
-            REVERSE_CACHE_EXTERNAL_WRITES.add(token);
+            externalCacheWrites.add(token);
           }
         }
-        REVERSE_CACHE_ROWS_UPPER_BOUND = null;
+        cacheRowsUpperBound = null;
       } else if (phase === 1) {
-        REVERSE_CACHE_EXTERNAL_WRITES?.delete(token);
-        REVERSE_CACHE_ROWS_UPPER_BOUND = null;
+        externalCacheWrites?.delete(token);
+        cacheRowsUpperBound = null;
       }
     };
-    function getReverseMemoryCache(cacheKey) {
-      const row = REVERSE_PARSED_CACHE.get(cacheKey);
+    function getMemoryCache(cacheKey) {
+      const row = parsedCache.get(cacheKey);
       if (!row) return;
       const age = Date.now() - row.savedAt;
-      if (age >= 0 && age <= CONFIG.REVERSE_CACHE_TTL_MS) return row.parsed;
-      REVERSE_PARSED_CACHE.delete(cacheKey);
+      if (age >= 0 && age <= CONFIG.CACHE_TTL_MS) return row.parsed;
+      parsedCache.delete(cacheKey);
     }
-    function putReverseMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
-      REVERSE_PARSED_CACHE.delete(cacheKey);
-      REVERSE_PARSED_CACHE.set(cacheKey, { parsed, savedAt });
-      if (REVERSE_PARSED_CACHE.size > REVERSE_PARSED_CACHE_MAX) {
-        REVERSE_PARSED_CACHE.delete(REVERSE_PARSED_CACHE.keys().next().value);
+    function putMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
+      parsedCache.delete(cacheKey);
+      parsedCache.set(cacheKey, { parsed, savedAt });
+      if (parsedCache.size > PARSED_CACHE_MAX) {
+        parsedCache.delete(parsedCache.keys().next().value);
       }
     }
-    function openReverseCacheDb() {
-      if (REVERSE_CACHE_DB_PROMISE) return REVERSE_CACHE_DB_PROMISE;
-      if (Date.now() < REVERSE_CACHE_RETRY_AT) {
-        return NO_REVERSE_CACHE_DB;
+    function openCacheDb() {
+      if (cacheDbPromise) return cacheDbPromise;
+      if (Date.now() < cacheRetryAt) {
+        return NO_CACHE_DB;
       }
       const attempt = new Promise((resolve) => {
         let settled = false;
@@ -3889,15 +3867,15 @@
         };
         const fail = (message, detail) => {
           if (!finish(null)) return;
-          REVERSE_CACHE_RETRY_AT =
-            Date.now() + REVERSE_CACHE_OPEN_RETRY_MS;
+          cacheRetryAt =
+            Date.now() + CACHE_OPEN_RETRY_MS;
           console.warn(message, detail);
         };
         let req;
         try {
           req = indexedDB.open(
-            CONFIG.REVERSE_CACHE_DB_NAME,
-            CONFIG.REVERSE_CACHE_DB_VERSION,
+            CONFIG.CACHE_DB_NAME,
+            CONFIG.CACHE_DB_VERSION,
           );
         } catch (err) {
           fail("Reverse geocoding cache is unavailable.", err);
@@ -3906,12 +3884,12 @@
         req.onupgradeneeded = (event) => {
           const db = req.result;
           let store;
-          if (!db.objectStoreNames.contains(CONFIG.REVERSE_CACHE_STORE)) {
-            store = db.createObjectStore(CONFIG.REVERSE_CACHE_STORE, {
+          if (!db.objectStoreNames.contains(CONFIG.CACHE_STORE)) {
+            store = db.createObjectStore(CONFIG.CACHE_STORE, {
               keyPath: "key",
             });
           } else {
-            store = req.transaction.objectStore(CONFIG.REVERSE_CACHE_STORE);
+            store = req.transaction.objectStore(CONFIG.CACHE_STORE);
           }
           if (event.oldVersion < 3) {
             store.clear();
@@ -3922,15 +3900,15 @@
         };
         req.onsuccess = () => {
           const db = req.result;
-          REVERSE_CACHE_RETRY_AT = 0;
+          cacheRetryAt = 0;
           db.onversionchange = () => {
             db.close();
-            REVERSE_CACHE_DB_PROMISE = null;
+            cacheDbPromise = null;
           };
           if (!finish(db)) {
-            REVERSE_CACHE_DB_PROMISE = Promise.resolve(db);
+            cacheDbPromise = Promise.resolve(db);
           }
-          setTimeout(() => startReverseCacheMaintenance(db), 0);
+          setTimeout(() => startCacheMaintenance(db), 0);
         };
         req.onerror = () =>
           fail("Reverse geocoding cache is unavailable.", req.error);
@@ -3938,15 +3916,15 @@
           fail("Reverse geocoding cache upgrade is blocked.");
       });
       const shared = attempt.then((db) => {
-        if (!db && REVERSE_CACHE_DB_PROMISE === shared) {
-          REVERSE_CACHE_DB_PROMISE = null;
+        if (!db && cacheDbPromise === shared) {
+          cacheDbPromise = null;
         }
         return db;
       });
-      REVERSE_CACHE_DB_PROMISE = shared;
+      cacheDbPromise = shared;
       return shared;
     }
-    function runReverseCacheTransaction(db, mode, signal, operation) {
+    function runCacheTransaction(db, mode, signal, operation) {
       signal.throwIfAborted();
       return new Promise((resolve, reject) => {
         let settled = false;
@@ -3969,7 +3947,7 @@
           finish(reject, signal.reason);
         };
         try {
-          tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, mode);
+          tx = db.transaction(CONFIG.CACHE_STORE, mode);
           tx.oncomplete = () => finish(resolve);
           tx.onerror = () => finish(
             reject,
@@ -3987,55 +3965,55 @@
             onAbort();
             return;
           }
-          operation(tx.objectStore(CONFIG.REVERSE_CACHE_STORE));
+          operation(tx.objectStore(CONFIG.CACHE_STORE));
         } catch (err) {
           abortTransaction();
           finish(reject, err);
         }
       });
     }
-    async function readPersistentReverseCache(results, signal) {
+    async function readPersistentCache(results, signal) {
       if (results.size === 0) return;
-      const db = await openReverseCacheDb();
+      const db = await openCacheDb();
       signal.throwIfAborted();
       if (!db) return;
       const now = Date.now();
       try {
-        await runReverseCacheTransaction(db, "readonly", signal, (store) => {
+        await runCacheTransaction(db, "readonly", signal, (store) => {
           const acceptRow = (row) => {
             const persistentKey = row?.key;
             if (
               typeof persistentKey !== "string" ||
-              !persistentKey.startsWith(REVERSE_CACHE_KEY_PREFIX)
+              !persistentKey.startsWith(CACHE_KEY_PREFIX)
             ) return;
             const cacheKey = persistentKey.slice(
-              REVERSE_CACHE_KEY_PREFIX.length,
+              CACHE_KEY_PREFIX.length,
             );
             const age = now - row.savedAt;
             if (
               results.has(cacheKey) &&
               Number.isFinite(row.savedAt) &&
               age >= 0 &&
-              age <= CONFIG.REVERSE_CACHE_TTL_MS &&
-              GeocodeParser.isValid(row.parsed)
+              age <= CONFIG.CACHE_TTL_MS &&
+              isValidGeocode(row.parsed)
             ) results.set(cacheKey, row);
           };
           const scanCache =
-            results.size > REVERSE_CACHE_KEYED_READ_LIMIT ||
-            (results.size >= REVERSE_CACHE_ADAPTIVE_READ_MIN &&
-              REVERSE_CACHE_ROWS_UPPER_BOUND !== null &&
-              REVERSE_CACHE_ROWS_UPPER_BOUND <=
-              results.size * REVERSE_CACHE_SCAN_RATIO);
+            results.size > CACHE_KEYED_READ_LIMIT ||
+            (results.size >= CACHE_ADAPTIVE_READ_MIN &&
+              cacheRowsUpperBound !== null &&
+              cacheRowsUpperBound <=
+              results.size * CACHE_SCAN_RATIO);
           if (!scanCache) {
             for (const cacheKey of results.keys()) {
-              const req = store.get(REVERSE_CACHE_KEY_PREFIX + cacheKey);
+              const req = store.get(CACHE_KEY_PREFIX + cacheKey);
               req.onsuccess = () => acceptRow(req.result);
             }
             return;
           }
           const req = store.getAll(
             undefined,
-            CONFIG.REVERSE_CACHE_MAX + REVERSE_CACHE_PRUNE_INTERVAL,
+            CONFIG.CACHE_MAX + CACHE_PRUNE_INTERVAL,
           );
           req.onsuccess = () => {
             for (const row of req.result) acceptRow(row);
@@ -4046,18 +4024,18 @@
         console.warn("Reverse geocoding cache read failed.", err);
       }
     }
-    async function writePersistentReverseCacheBatch(entries, signal) {
+    async function writePersistentCacheBatch(entries, signal) {
       let syncToken = null;
       try {
-        const db = await openReverseCacheDb();
+        const db = await openCacheDb();
         if (!db || signal.aborted) return;
-        syncToken = `${REVERSE_CACHE_TAB_ID}:${++REVERSE_CACHE_WRITE_SEQUENCE}`;
-        REVERSE_CACHE_SYNC_CHANNEL.postMessage([0, syncToken]);
+        syncToken = `${cacheTabId}:${++cacheWriteSequence}`;
+        cacheSyncChannel.postMessage([0, syncToken]);
         const pendingWrites =
-          REVERSE_CACHE_WRITES_SINCE_PRUNE + entries.length;
-        const maintain = pendingWrites >= REVERSE_CACHE_PRUNE_INTERVAL;
+          cacheWritesSincePrune + entries.length;
+        const maintain = pendingWrites >= CACHE_PRUNE_INTERVAL;
         let maintainedRows = null;
-        await runReverseCacheTransaction(
+        await runCacheTransaction(
           db,
           "readwrite",
           signal,
@@ -4065,27 +4043,27 @@
             const savedAt = Date.now();
             for (const { cacheKey, parsed } of entries) {
               store.put({
-                key: REVERSE_CACHE_KEY_PREFIX + cacheKey,
+                key: CACHE_KEY_PREFIX + cacheKey,
                 savedAt,
                 parsed,
               });
             }
             if (maintain) {
-              maintainReverseCacheRows(store, (rows) => {
+              maintainCacheRows(store, (rows) => {
                 maintainedRows = rows;
               });
             }
           },
         );
-        if (REVERSE_CACHE_EXTERNAL_WRITES?.size === 0) {
+        if (externalCacheWrites?.size === 0) {
           if (maintainedRows !== null) {
-            REVERSE_CACHE_ROWS_UPPER_BOUND = maintainedRows;
-          } else if (REVERSE_CACHE_ROWS_UPPER_BOUND !== null) {
-            REVERSE_CACHE_ROWS_UPPER_BOUND += entries.length;
+            cacheRowsUpperBound = maintainedRows;
+          } else if (cacheRowsUpperBound !== null) {
+            cacheRowsUpperBound += entries.length;
           }
         }
-        REVERSE_CACHE_WRITES_SINCE_PRUNE = maintain
-          ? pendingWrites % REVERSE_CACHE_PRUNE_INTERVAL
+        cacheWritesSincePrune = maintain
+          ? pendingWrites % CACHE_PRUNE_INTERVAL
           : pendingWrites;
       } catch (err) {
         if (!signal.aborted) {
@@ -4093,20 +4071,20 @@
         }
       } finally {
         if (syncToken !== null) {
-          REVERSE_CACHE_SYNC_CHANNEL.postMessage([1, syncToken]);
+          cacheSyncChannel.postMessage([1, syncToken]);
         }
       }
     }
-    function startReverseCacheMaintenance(db) {
+    function startCacheMaintenance(db) {
       try {
-        const tx = db.transaction(CONFIG.REVERSE_CACHE_STORE, "readwrite");
+        const tx = db.transaction(CONFIG.CACHE_STORE, "readwrite");
         let maintainedRows = null;
         tx.oncomplete = () => {
           if (
             maintainedRows !== null &&
-            REVERSE_CACHE_EXTERNAL_WRITES?.size === 0
+            externalCacheWrites?.size === 0
           ) {
-            REVERSE_CACHE_ROWS_UPPER_BOUND = maintainedRows;
+            cacheRowsUpperBound = maintainedRows;
           }
         };
         tx.onabort = () => {
@@ -4115,8 +4093,8 @@
             tx.error ?? new Error("Reverse geocoding cache maintenance failed."),
           );
         };
-        maintainReverseCacheRows(
-          tx.objectStore(CONFIG.REVERSE_CACHE_STORE),
+        maintainCacheRows(
+          tx.objectStore(CONFIG.CACHE_STORE),
           (rows) => {
             maintainedRows = rows;
           },
@@ -4125,10 +4103,10 @@
         console.warn("Reverse geocoding cache maintenance failed.", err);
       }
     }
-    function maintainReverseCacheRows(store, onRows) {
+    function maintainCacheRows(store, onRows) {
       const expiredReq = store.index("savedAt").openKeyCursor(
         IDBKeyRange.upperBound(
-          Date.now() - CONFIG.REVERSE_CACHE_TTL_MS,
+          Date.now() - CONFIG.CACHE_TTL_MS,
           true,
         ),
       );
@@ -4142,7 +4120,7 @@
         const countReq = store.count();
         countReq.onsuccess = () => {
           let remaining = countReq.result;
-          let excess = remaining - CONFIG.REVERSE_CACHE_MAX;
+          let excess = remaining - CONFIG.CACHE_MAX;
           if (excess <= 0) {
             onRows(remaining);
             return;
@@ -4176,7 +4154,7 @@
       const limit = CONFIG.REVERSE_RESPONSE_MAX_BYTES;
       const contentLength = Number(response.headers.get("content-length"));
       if (Number.isFinite(contentLength) && contentLength > limit) {
-        await cancelReadableBestEffort(response.body);
+        await tryCancelReadable(response.body);
         throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
       }
       if (!response.body) return "";
@@ -4200,7 +4178,7 @@
         parts.push(decodeReverseBytes(decoder, undefined, false));
         return parts.join("");
       } finally {
-        await cancelReadableBestEffort(reader);
+        await tryCancelReadable(reader);
         reader.releaseLock();
       }
     }
@@ -4211,14 +4189,14 @@
       while (++attempt <= maxRetry) {
         userSignal.throwIfAborted();
         let now = performance.now();
-        if (LAST_REVERSE_FETCH_AT) {
-          const remaining = baseDelayMs - (now - LAST_REVERSE_FETCH_AT);
+        if (lastReverseFetchAt) {
+          const remaining = baseDelayMs - (now - lastReverseFetchAt);
           if (remaining > 0) {
             await sleep(remaining, userSignal);
             now = performance.now();
           }
         }
-        LAST_REVERSE_FETCH_AT = now;
+        lastReverseFetchAt = now;
         const requestSignal = AbortSignal.any([
           userSignal,
           AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS),
@@ -4267,7 +4245,7 @@
             `HTTP ${res.status}: ${(await readReverseResponseText(res, requestSignal)).slice(0, 200)}`,
           );
         } else {
-          await cancelReadableBestEffort(res.body);
+          await tryCancelReadable(res.body);
           if (attempt >= maxRetry) {
             throw new Error(
               `HTTP ${res.status}: 요청 제한 또는 서버 오류`,
@@ -4281,7 +4259,7 @@
       task, message = '일시정지됨. "재개"를 눌러 이어서 진행',
     ) {
       AppState.setStatus("paused");
-      setStatusMessage(message, "warn");
+      showStatus(message, "warn");
       const { promise, resolve } = Promise.withResolvers();
       task.resume = resolve;
       scheduleRender();
@@ -4293,12 +4271,12 @@
       const total = records.length;
       const totalDisp = fmt(total);
       const signal = task.controller.signal;
-      let lastStatusUpdate = 0;
+      let lastStatusAt = 0;
       let lastYield = performance.now();
       const cacheWriteBatch = [];
       const flushCacheWrites = async () => {
         if (cacheWriteBatch.length === 0) return;
-        await writePersistentReverseCacheBatch(cacheWriteBatch, signal);
+        await writePersistentCacheBatch(cacheWriteBatch, signal);
         cacheWriteBatch.length = 0;
       };
       const persistentCache = new Map();
@@ -4310,15 +4288,15 @@
         const record = records[i];
         record.result = null;
         record._search = null;
-        const parsed = getReverseMemoryCache(record.cacheKey);
+        const parsed = getMemoryCache(record.cacheKey);
         if (parsed === undefined) {
           persistentCache.getOrInsert(record.cacheKey, null);
           continue;
         }
         commitResult(i, parsed, false);
         const now = performance.now();
-        if (now - lastStatusUpdate >= 200) {
-          lastStatusUpdate = now;
+        if (now - lastStatusAt >= 200) {
+          lastStatusAt = now;
           setProgressStatus(AppState.processed, total, totalDisp);
         }
         if (now - lastYield >= 8) {
@@ -4328,7 +4306,7 @@
       }
       if (persistentCache.size && !signal.aborted) {
         try {
-          await readPersistentReverseCache(persistentCache, signal);
+          await readPersistentCache(persistentCache, signal);
         } catch (err) {
           if (!signal.aborted) throw err;
         }
@@ -4342,11 +4320,11 @@
           const cacheKey = r.cacheKey;
           const row = persistentCache.get(cacheKey);
           if (!row) continue;
-          putReverseMemoryCache(cacheKey, row.parsed, row.savedAt);
+          putMemoryCache(cacheKey, row.parsed, row.savedAt);
           commitResult(i, row.parsed, false);
           const now = performance.now();
-          if (now - lastStatusUpdate >= 200) {
-            lastStatusUpdate = now;
+          if (now - lastStatusAt >= 200) {
+            lastStatusAt = now;
             setProgressStatus(AppState.processed, total, totalDisp);
           }
           if (now - lastYield >= 8) {
@@ -4373,22 +4351,22 @@
               i--;
               continue;
             }
-            if (!AppState.isStopping) setStatusMessage("재개합니다…");
+            if (!AppState.isStopping) showStatus("재개합니다…");
           }
           if (AppState.task !== task || !AppState.isRunning) break;
           const r = records[i];
           const cacheKey = r.cacheKey;
-          let parsed = getReverseMemoryCache(cacheKey);
+          let parsed = getMemoryCache(cacheKey);
           const cacheHit = parsed !== undefined;
           try {
             if (!cacheHit) {
               const url = `${BASE_URL_HREF}&lat=${r.latStr}&lon=${r.lonStr}`;
-              parsed = GeocodeParser.parse(
+              parsed = parseGeocode(
                 await fetchReverseWithRetry(url, signal),
               );
-              putReverseMemoryCache(cacheKey, parsed);
+              putMemoryCache(cacheKey, parsed);
               cacheWriteBatch.push({ cacheKey, parsed });
-              if (cacheWriteBatch.length >= REVERSE_CACHE_WRITE_LIMIT) {
+              if (cacheWriteBatch.length >= CACHE_WRITE_LIMIT) {
                 await flushCacheWrites();
               }
             }
@@ -4413,14 +4391,14 @@
           commitResult(i, parsed, true);
           const now = performance.now();
           if (
-            now - lastStatusUpdate >= 200 ||
+            now - lastStatusAt >= 200 ||
             AppState.processed === total
           ) {
-            lastStatusUpdate = now;
+            lastStatusAt = now;
             setProgressStatus(AppState.processed, total, totalDisp);
           }
           if (parsed.error && !AppState.isStopping) {
-            setStatusMessage(
+            showStatus(
               `에러 발생: (${fmt(i1)}/${totalDisp}) ${parsed.error}`,
               "error",
             );
@@ -4433,7 +4411,7 @@
           if (signal.aborted && err?.name === "AbortError") break;
           console.error(err);
           task.resume = null;
-          setControlsIdle(
+          finishTask(
             `오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${getErrorMessage(err)
             }`,
             "error",
@@ -4445,36 +4423,36 @@
       if (AppState.task !== task) return;
       if (pageRenderReq !== null) {
         cancelAnimationFrame(pageRenderReq);
-        renderCurrentPage();
+        renderPage();
       }
       if (AppState.isStopping) {
-        setControlsIdle("중지되었습니다.", "stopped");
+        finishTask("중지되었습니다.", "stopped");
       } else if (AppState.processed >= AppState.records.length) {
         const failed = AppState.cntFail;
         if (failed === 0) {
-          setControlsIdle("모든 처리가 완료되었습니다.");
+          finishTask("모든 처리가 완료되었습니다.");
         } else {
           const succeeded = AppState.processed - failed;
-          setControlsIdle(
+          finishTask(
             `처리 완료: ${fmt(succeeded)}건 성공, ${fmt(failed)}건 실패했습니다.`,
             succeeded === 0 ? "error" : "warn",
           );
         }
       }
     }
-    function setControlsIdle(message, type = "info") {
+    function finishTask(message, type = "info") {
       AppState.setStatus("idle");
-      setStatusMessage(message, type);
+      showStatus(message, type);
     }
     function getErrorMessage(err) {
       return String(err?.message || err);
     }
     function createResultRow(record, index) {
-      const tr = ROW_TEMPLATE.cloneNode(true);
+      const tr = rowTemplate.cloneNode(true);
       const cells = tr.cells;
       const result = record.result;
       const addr = result.addr;
-      const selected = index === selectedRecordIndex;
+      const selected = index === selectedIndex;
       tr.dataset.record = String(index);
       tr.dataset.selected = String(selected);
       cells[0].textContent = String(index + 1);
@@ -4508,16 +4486,16 @@
       r.result = parsed;
       AppState.processed++;
       if (parsed.error) AppState.cntFail++;
-      let visiblePosition = -1;
-      if (matchesFilter(r, FILTER_SNAP)) {
-        visiblePosition = AppState.visibleIndices.length;
+      let visibleIndex = -1;
+      if (matchesFilter(r, filterSnapshot)) {
+        visibleIndex = AppState.visibleIndices.length;
         AppState.visibleIndices.push(index);
       }
       scheduleRender();
-      if (render) renderCommittedResult(index, visiblePosition);
+      if (render) renderCommittedResult(index, visibleIndex);
     }
     async function handleExport() {
-      if (EXPORT_TASK) return EXPORT_TASK;
+      if (exportTask) return exportTask;
       const records = AppState.records;
       const rows = [];
       for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
@@ -4525,7 +4503,7 @@
       }
       const totalRows = rows.length;
       if (totalRows <= 0) {
-        return setStatusMessage("내보낼 데이터가 없습니다.", "warn");
+        return showStatus("내보낼 데이터가 없습니다.", "warn");
       }
       const sourceFile = AppState.droppedFile;
       const appGeneration = AppState.generation;
@@ -4535,9 +4513,9 @@
         }
       };
       exportButton.disabled = true;
-      EXPORT_TASK = (async () => {
+      exportTask = (async () => {
         try {
-          setStatusMessage("CSV 생성 중…");
+          showStatus("CSV 생성 중…");
           await yieldToMain();
           ensureCurrent();
           const parts = [CSV_HEADER];
@@ -4592,7 +4570,7 @@
             exportedRows++;
             if (chunkChars >= 1_000_000) {
               flushChunk();
-              setStatusMessage(`CSV 생성 중… (${fmt(exportedRows)}/${totalDisp})`);
+              showStatus(`CSV 생성 중… (${fmt(exportedRows)}/${totalDisp})`);
               await yieldToMain();
               ensureCurrent();
             }
@@ -4604,27 +4582,27 @@
             `${sourceFile.name.replace(/\.[^.]+$/, "")
             }_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`,
           );
-          setStatusMessage("CSV 파일을 다운로드했습니다.");
+          showStatus("CSV 파일을 다운로드했습니다.");
         } catch (err) {
           if (err?.name === "AbortError") return;
           console.error(err);
-          setStatusMessage(`저장 실패: ${getErrorMessage(err)}`, "error");
+          showStatus(`저장 실패: ${getErrorMessage(err)}`, "error");
         } finally {
-          EXPORT_TASK = null;
+          exportTask = null;
           exportButton.disabled = AppState.processed === 0;
         }
       })();
-      return EXPORT_TASK;
+      return exportTask;
     }
     async function handleParse() {
       const file = AppState.droppedFile;
-      if (!file) return setStatusMessage("파일을 선택해 주세요.", "warn");
+      if (!file) return showStatus("파일을 선택해 주세요.", "warn");
       coordsContent.textContent = "";
       coordLineNumbers.textContent = "";
       clearTable();
       const task = AppState.setRecords([], "parsing");
       emptyHint.textContent = "좌표를 추출 중입니다.";
-      setStatusMessage("파일 분석 중…");
+      showStatus("파일 분석 중…");
       try {
         const records = await parseFileToRecords(
           file,
@@ -4634,7 +4612,7 @@
         if (!records.length) {
           AppState.setRecords([]);
           emptyHint.textContent = "좌표를 찾지 못했습니다.";
-          return setStatusMessage("좌표를 찾지 못했습니다.", "warn");
+          return showStatus("좌표를 찾지 못했습니다.", "warn");
         }
         AppState.setRecords(records);
         dropState.textContent = ` · ${fmt(records.length)}개 좌표 추출 완료`;
@@ -4650,7 +4628,7 @@
         coordsContent.textContent = disp.join("\n");
         coordLineNumbers.textContent = disp.map((_, i) =>
           i < MAX_DISP ? String(i + 1) : "…").join("\n");
-        setStatusMessage(
+        showStatus(
           records.length > CONFIG.BULK_CONFIRM_THRESHOLD
             ? `분석 완료: ${fmt(records.length)}개 좌표. 대량 조회 확인 후 시작할 수 있습니다.`
             : `분석 완료: ${fmt(records.length)}개 좌표. 조회 시작을 눌러주세요`,
@@ -4659,16 +4637,16 @@
         if (AppState.task !== task) return;
         emptyHint.textContent = FILE_READY_HINT;
         if (err && err.name === "AbortError") {
-          setControlsIdle("중지되었습니다.", "stopped");
+          finishTask("중지되었습니다.", "stopped");
           return;
         }
         if (err instanceof InputValidationError) {
           AppState.setRecords([]);
-          setControlsIdle(err.message, "warn");
+          finishTask(err.message, "warn");
           return;
         }
         console.error(err);
-        setControlsIdle(`오류 발생: ${getErrorMessage(err)}`, "error");
+        finishTask(`오류 발생: ${getErrorMessage(err)}`, "error");
       }
     }
     pageNumbers.addEventListener("click", (event) => {
@@ -4678,13 +4656,12 @@
       const count = Math.ceil(AppState.visibleIndices.length / resultPageSize);
       if (!Number.isInteger(page) || page < 0 || page >= count || page === AppState.page) return;
       AppState.page = page;
-      renderCurrentPage(true);
+      renderPage(true);
       pageNumbers.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
     });
     coordsExpand.addEventListener("click", () => {
-      const area = coordsSection;
-      const expanded = area.dataset.expanded !== "true";
-      area.dataset.expanded = String(expanded);
+      const expanded = coordsSection.dataset.expanded !== "true";
+      coordsSection.dataset.expanded = String(expanded);
       coordsExpand.ariaExpanded = String(expanded);
       coordsExpand.textContent = expanded ? "좌표 접기" : "좌표 모두 보기";
     });
@@ -4704,10 +4681,10 @@
       if (![10, 25, 50, 100].includes(size)) return;
       resultPageSize = size;
       AppState.page = 0;
-      renderCurrentPage(true);
+      renderPage(true);
     });
     filterForm.addEventListener("submit", (e) => e.preventDefault());
-    filterForm.addEventListener("input", scheduleApplyFilterAll);
+    filterForm.addEventListener("input", scheduleFilter);
     document.addEventListener("keydown", (e) => {
       if (
         AppState.processed === 0 ||
@@ -4727,7 +4704,7 @@
       "--parse": handleParse,
       "--start": async () => {
         if (location.protocol !== "https:" && location.protocol !== "http:") {
-          setStatusMessage(
+          showStatus(
             "Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.",
             "warn",
           );
@@ -4744,20 +4721,20 @@
             bulkDialog.showModal();
           });
           if (!AppState.bulkAcknowledged) {
-            setStatusMessage("대량 조회 확인이 취소되었습니다.", "warn");
+            showStatus("대량 조회 확인이 취소되었습니다.", "warn");
             return;
           }
         }
         const task = AppState.reset("running");
         startElapsed();
         clearTable();
-        setStatusMessage("조회 시작…");
+        showStatus("조회 시작…");
         emptyHint.textContent = "주소를 조회하고 있습니다.";
         setMobileView("results");
         void runProcessingLoop(task).catch((err) => {
           if (AppState.task !== task) return;
           console.error(err);
-          setControlsIdle(
+          finishTask(
             `오류로 중단됨: ${getErrorMessage(err)}`,
             "error",
           );
@@ -4766,7 +4743,7 @@
       "--pause": () => {
         if (!AppState.isRunning) return;
         AppState.setStatus("pausing");
-        setStatusMessage(
+        showStatus(
           "일시정지 요청됨. 현재 작업을 마치고 멈춥니다…",
           "warn",
         );
@@ -4785,14 +4762,14 @@
         task.resume?.();
         task.resume = null;
         task.controller.abort();
-        setStatusMessage("중지 요청됨. 취소 중…", "warn");
+        showStatus("중지 요청됨. 취소 중…", "warn");
       },
       "--export": handleExport,
       "--filter-clear": () => clearFilters(),
       "--page-prev": () => {
         if (AppState.page === 0) return;
         AppState.page--;
-        renderCurrentPage(true);
+        renderPage(true);
       },
       "--page-next": () => {
         const pages = Math.ceil(
@@ -4800,7 +4777,7 @@
         );
         if (AppState.page + 1 >= pages) return;
         AppState.page++;
-        renderCurrentPage(true);
+        renderPage(true);
       },
     };
     byId("bulk-cancel").addEventListener("click", () =>
@@ -4813,7 +4790,7 @@
       Promise.try(cmd).catch((err) => {
         if (err?.name === "AbortError") return;
         console.error(err);
-        setStatusMessage(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
+        showStatus(`명령 실행 중 오류: ${getErrorMessage(err)}`, "error");
       });
     });
     function acceptInputFile(file) {
@@ -4822,11 +4799,11 @@
         !file.name.toLowerCase().endsWith(".txt") &&
         file.type !== "text/plain"
       ) {
-        setStatusMessage("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
+        showStatus("텍스트 파일(.txt)만 업로드 가능합니다.", "warn");
         return false;
       }
       if (AppState.task !== null) {
-        setStatusMessage(
+        showStatus(
           "조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.",
           "warn",
         );
@@ -4837,9 +4814,9 @@
       clearTable();
       AppState.setRecords([]);
       AppState.droppedFile = file;
-      void openReverseCacheDb();
+      void openCacheDb();
       emptyHint.textContent = FILE_READY_HINT;
-      setStatusMessage(
+      showStatus(
         `파일 선택됨: ${file.name}  →  좌표 추출을 눌러주세요`,
       );
       byId("drop-filename").textContent = file.name;
@@ -4879,7 +4856,6 @@
           euroMain: createUniqueNumbers(5),
           euroLucky: createUniqueNumbers(2),
           numeric_password: 0,
-          glyph_string: "",
           password: [],
           numeric_password_digits: 0,
         };
@@ -4921,9 +4897,8 @@
         }
         return value;
       }
-      const NUMERIC_SCRATCH_BUFFER = new ArrayBuffer(8);
-      const NUMERIC_SCRATCH_VIEW = new DataView(NUMERIC_SCRATCH_BUFFER);
-      const NUMERIC_SCRATCH_BYTES = new Uint8Array(NUMERIC_SCRATCH_BUFFER);
+      const numericView = new DataView(new ArrayBuffer(8));
+      const numericBytes = new Uint8Array(numericView.buffer);
       const F64_FRACTION_MASK = (1n << 52n) - 1n;
       const F64_HIDDEN_BIT = 1n << 52n;
       const F64_SIGN_BIT = 1n << 63n;
@@ -4943,8 +4918,8 @@
         addendExponent,
         addend,
       ) {
-        NUMERIC_SCRATCH_VIEW.setFloat64(0, ratio, false);
-        const ratioBits = NUMERIC_SCRATCH_VIEW.getBigUint64(0, false);
+        numericView.setFloat64(0, ratio, false);
+        const ratioBits = numericView.getBigUint64(0, false);
         const exponentBits = Number((ratioBits >> 52n) & 0x7ffn);
         const fraction = ratioBits & F64_FRACTION_MASK;
         if (exponentBits === 0x7ff) {
@@ -4999,15 +4974,15 @@
           digits.slice(decimalIndex);
       }
       function reverseBitsU64(v) {
-        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
+        numericView.setBigUint64(0, v, false);
         for (let offset = 0; offset < 8; offset += 4) {
-          let x = NUMERIC_SCRATCH_VIEW.getUint32(offset, false);
+          let x = numericView.getUint32(offset, false);
           x = ((x >>> 1) & 0x5555_5555) | ((x & 0x5555_5555) << 1);
           x = ((x >>> 2) & 0x3333_3333) | ((x & 0x3333_3333) << 2);
           x = ((x >>> 4) & 0x0f0f_0f0f) | ((x & 0x0f0f_0f0f) << 4);
-          NUMERIC_SCRATCH_VIEW.setUint32(offset, x, false);
+          numericView.setUint32(offset, x, false);
         }
-        return NUMERIC_SCRATCH_VIEW.getBigUint64(0, true);
+        return numericView.getBigUint64(0, true);
       }
       function pushUniqueNumber(byte, modulus, numbers) {
         if (numbers.values.length >= numbers.limit) return true;
@@ -5020,15 +4995,15 @@
         }
         return complete;
       }
-      function fillDataFieldsFromU64(v, data) {
-        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
-        for (const byte of NUMERIC_SCRATCH_BYTES) {
+      function fillNumberFields(v, data) {
+        numericView.setBigUint64(0, v, false);
+        for (const byte of numericBytes) {
           if (byte > 249) {
             continue;
           }
           if (data.numeric_password_digits < 6) {
             data.numeric_password = data.numeric_password * 10 + (byte % 10);
-            data.numeric_password_digits += 1;
+            data.numeric_password_digits++;
           }
           pushUniqueNumber(byte, 50, data.euroMain);
           if (byte <= 224) {
@@ -5050,7 +5025,7 @@
         shifts,
         maxValue,
         reason,
-        supplementalRef,
+        supplement,
         nextSupp,
       ) {
         const mask = (1n << BigInt(bits)) - 1n;
@@ -5063,12 +5038,12 @@
         }
         for (let attempt = 0; attempt < SUPPLEMENTAL_RETRY_LIMIT; attempt++) {
           if (
-            supplementalRef.current === null ||
-            supplementalRef.current.bitsRemaining < bits
+            supplement.current === null ||
+            supplement.current.bitsRemaining < bits
           ) {
-            supplementalRef.current = nextSupp(reason);
+            supplement.current = nextSupp(reason);
           }
-          const supp = supplementalRef.current;
+          const supp = supplement.current;
           const shift = supp.bitsRemaining - bits;
           const extracted = (supp.value >> BigInt(shift)) & mask;
           supp.bitsRemaining = shift;
@@ -5078,35 +5053,32 @@
         }
         throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
       }
-      function galaxyCoord(value, offset, mask) {
-        return (value + offset) & mask;
-      }
-      function generateRandomDataFromNum(num, nextSupp) {
+      function convertNumber(num, nextSupp) {
         const data = createDataSet(num);
-        let complete = fillDataFieldsFromU64(num, data);
-        const supplementalRef = { current: null };
+        let complete = fillNumberFields(num, data);
+        const supplement = { current: null };
         for (
           let attempt = 0;
           !complete && attempt < SUPPLEMENTAL_RETRY_LIMIT;
           attempt++
         ) {
           const newSupp = nextSupp("기본 필드 보완");
-          complete = fillDataFieldsFromU64(newSupp.value, data);
-          supplementalRef.current = newSupp;
+          complete = fillNumberFields(newSupp.value, data);
+          supplement.current = newSupp;
         }
         if (!complete) {
           throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
         }
         let luckyStarSource = reverseBitsU64(
-          supplementalRef.current?.value ?? num,
+          supplement.current?.value ?? num,
         );
         luckyStarLoop: for (
           let attempt = 0;
           attempt < SUPPLEMENTAL_RETRY_LIMIT;
           attempt++
         ) {
-          NUMERIC_SCRATCH_VIEW.setBigUint64(0, luckyStarSource, false);
-          for (const byte of NUMERIC_SCRATCH_BYTES) {
+          numericView.setBigUint64(0, luckyStarSource, false);
+          for (const byte of numericBytes) {
             if (byte > 251) {
               continue;
             }
@@ -5119,32 +5091,32 @@
           }
           const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
           luckyStarSource = reverseBitsU64(newSupp.value);
-          supplementalRef.current = newSupp;
+          supplement.current = newSupp;
         }
         if (data.euroLucky.values.length !== data.euroLucky.limit) {
           throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
         }
         const hangul = new Array(4);
-        for (let i = 0; i < hangul.length; i += 1) {
-          NUMERIC_SCRATCH_VIEW.setBigUint64(0, num, false);
-          let index = NUMERIC_SCRATCH_VIEW.getUint16(i * 2, false);
+        for (let i = 0; i < hangul.length; i++) {
+          numericView.setBigUint64(0, num, false);
+          let index = numericView.getUint16(i * 2, false);
           for (
             let attempt = 0;
             index > HANGUL_SYLLABLE_MAX &&
             attempt < SUPPLEMENTAL_RETRY_LIMIT;
             attempt++
           ) {
-            if (supplementalRef.current === null) {
-              supplementalRef.current = nextSupp("한글 음절 보완");
+            if (supplement.current === null) {
+              supplement.current = nextSupp("한글 음절 보완");
             }
-            const supp = supplementalRef.current;
-            NUMERIC_SCRATCH_VIEW.setBigUint64(0, supp.value, false);
+            const supp = supplement.current;
+            numericView.setBigUint64(0, supp.value, false);
             for (
               let offset = 0;
-              offset < NUMERIC_SCRATCH_BYTES.length;
+              offset < numericBytes.length;
               offset += 2
             ) {
-              const candidate = NUMERIC_SCRATCH_VIEW.getUint16(offset, false);
+              const candidate = numericView.getUint16(offset, false);
               if (candidate <= HANGUL_SYLLABLE_MAX) {
                 index = candidate;
                 break;
@@ -5154,7 +5126,7 @@
               index > HANGUL_SYLLABLE_MAX &&
               attempt + 1 < SUPPLEMENTAL_RETRY_LIMIT
             ) {
-              supplementalRef.current = nextSupp("한글 음절 보완 재시도");
+              supplement.current = nextSupp("한글 음절 보완 재시도");
             }
           }
           if (index > HANGUL_SYLLABLE_MAX) {
@@ -5165,11 +5137,11 @@
           );
         }
         data.hangul_syllables = hangul;
-        NUMERIC_SCRATCH_VIEW.setBigUint64(0, num, false);
-        const upper32 = NUMERIC_SCRATCH_VIEW.getUint32(0, false);
-        const portalBits = NUMERIC_SCRATCH_VIEW.getUint32(3, false);
+        numericView.setBigUint64(0, num, false);
+        const upper32 = numericView.getUint32(0, false);
+        const portalBits = numericView.getUint32(3, false);
         const upperRatio = upper32 * U32_MAX_INV;
-        const lowerRatio = NUMERIC_SCRATCH_VIEW.getUint32(4, false) * U32_MAX_INV;
+        const lowerRatio = numericView.getUint32(4, false) * U32_MAX_INV;
         data.kor_coords = [
           affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
           affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
@@ -5184,7 +5156,7 @@
           NMS_PLANET_SHIFTS,
           11,
           "NMS 행성 번호 보완",
-          supplementalRef,
+          supplement,
           nextSupp,
         ) %
           6) +
@@ -5195,7 +5167,7 @@
           NMS_SOLAR_SYSTEM_SHIFTS,
           3834,
           "NMS 태양계 번호 보완",
-          supplementalRef,
+          supplement,
           nextSupp,
         ) %
           767) +
@@ -5203,9 +5175,9 @@
         data.nms_portal_yy = upper32 & 0xff;
         data.nms_portal_zzz = (portalBits >>> 12) & 0xfff;
         data.nms_portal_xxx = portalBits & 0xfff;
-        data.galaxy_x = galaxyCoord(data.nms_portal_xxx, 0x7ff, 0xfff);
-        data.galaxy_y = galaxyCoord(data.nms_portal_yy, 0x7f, 0xff);
-        data.galaxy_z = galaxyCoord(data.nms_portal_zzz, 0x7ff, 0xfff);
+        data.galaxy_x = (data.nms_portal_xxx + 0x7ff) & 0xfff;
+        data.galaxy_y = (data.nms_portal_yy + 0x7f) & 0xff;
+        data.galaxy_z = (data.nms_portal_zzz + 0x7ff) & 0xfff;
         data.glyph_string =
           GLYPHS[data.planet_number & 0xf] +
           GLYPHS[(data.solar_system_index >> 8) & 0xf] +
@@ -5221,47 +5193,44 @@
       }
       function formatOutput(data) {
         const v = data.num_64;
-        NUMERIC_SCRATCH_VIEW.setBigUint64(0, v, false);
-        const bytes = NUMERIC_SCRATCH_BYTES;
-        const binary = v.toString(2).padStart(64, "0");
+        numericView.setBigUint64(0, v, false);
+        const bytes = numericBytes;
         const hex = bytes.toHex().toUpperCase();
-        return [
-          `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
-          })`,
-          `2진수: ${binary.match(/.{8}/g).join(" ")}`,
-          `8진수: ${v.toString(8)}`,
-          `16진수: ${hex.match(/../g).join(" ")}`,
-          `Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}`,
-          `바이트 배열: ${bytes.join(" ")}`,
-          `6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}`,
-          `8자리 비밀번호: ${data.password.join("")}`,
-          `로또 번호: ${data.lotto.values.join(" ")}`,
-          `일본 로또 7 번호: ${data.lotto7.values.join(" ")}`,
-          `유로밀리언 번호: ${data.euroMain.values.join(" ")} + ${data.euroLucky.values.join(" ")
-          }`,
-          `한글 음절 4글자: ${data.hangul_syllables.join("")}`,
-          `대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}`,
-          `세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}`,
-          `NMS 은하 번호: ${bytes[0] + 1}`,
-          `NMS 포탈 주소: ${data.planet_number} ${paddedHex(data.solar_system_index, 3)
+        return `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
+          })
+2진수: ${v.toString(2).padStart(64, "0").match(/.{8}/g).join(" ")}
+8진수: ${v.toString(8)}
+16진수: ${hex.match(/../g).join(" ")}
+Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
+바이트 배열: ${bytes.join(" ")}
+6자리 숫자 비밀번호: ${String(data.numeric_password).padStart(6, "0")}
+8자리 비밀번호: ${data.password.join("")}
+로또 번호: ${data.lotto.values.join(" ")}
+일본 로또 7 번호: ${data.lotto7.values.join(" ")}
+유로밀리언 번호: ${data.euroMain.values.join(" ")} + ${data.euroLucky.values.join(" ")
+          }
+한글 음절 4글자: ${data.hangul_syllables.join("")}
+대한민국 위경도: ${formatRustF64(data.kor_coords[0])}, ${formatRustF64(data.kor_coords[1])}
+세계 위경도: ${formatRustF64(data.world_coords[0])}, ${formatRustF64(data.world_coords[1])}
+NMS 은하 번호: ${bytes[0] + 1}
+NMS 포탈 주소: ${data.planet_number} ${paddedHex(data.solar_system_index, 3)
           } ${paddedHex(data.nms_portal_yy, 2)} ${paddedHex(data.nms_portal_zzz, 3)
           } ${paddedHex(data.nms_portal_xxx, 3)} (${data.glyph_string
-          })`,
-          `NMS 은하 좌표: ${paddedHex(data.galaxy_x, 4)}:${paddedHex(data.galaxy_y, 4)
+          })
+NMS 은하 좌표: ${paddedHex(data.galaxy_x, 4)}:${paddedHex(data.galaxy_y, 4)
           }:${paddedHex(data.galaxy_z, 4)}:${paddedHex(data.solar_system_index, 4)
-          }`,
-        ].join("\n");
+          }`;
       }
-      const MANUAL_GENERATION_HARD_LIMIT = 10_000;
-      const MANUAL_PREVIEW_LIMIT = 100;
-      const MANUAL_YIELD_INTERVAL_MS = 12;
-      const MANUAL_META_UPDATE_INTERVAL_MS = 150;
+      const GENERATION_HARD_LIMIT = 10_000;
+      const PREVIEW_LIMIT = 100;
+      const YIELD_INTERVAL_MS = 12;
+      const META_UPDATE_INTERVAL_MS = 150;
       const RX_U64_TOKEN_SCAN = /[^\s,]+/gu;
       function iterU64Tokens(raw) {
         return raw.matchAll(RX_U64_TOKEN_SCAN).map((match) => match[0]);
       }
       class SupplementRequired extends Error { }
-      function randomDataBlob(chunks, includeBom) {
+      function outputBlob(chunks, includeBom) {
         const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
         if (chunks.length > 0 && !chunks[chunks.length - 1].endsWith("\n")) {
           parts.push("\n");
@@ -5270,13 +5239,13 @@
           type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
         });
       }
-      async function copyRandomDataChunksToClipboard(chunks) {
+      async function copyOutputChunks(chunks) {
         if (!window.isSecureContext) {
           throw new Error(
             "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
           );
         }
-        const blob = randomDataBlob(chunks, false);
+        const blob = outputBlob(chunks, false);
         await navigator.clipboard.write([new ClipboardItem({
           "text/plain": blob,
         })]);
@@ -5297,19 +5266,19 @@
       const suppDialogValues = byId("supp-dialog-values");
       const suppDialogError = byId("supp-dialog-error");
       let supplementRequest = null;
-      let supplementReturnFocus = null;
-      function finishSupplementRequest(values) {
+      let returnFocus = null;
+      function finishSupplement(values) {
         if (!supplementRequest) return;
         const resolve = supplementRequest;
         supplementRequest = null;
-        if (values === null) supplementReturnFocus = clearBtn;
+        if (values === null) returnFocus = clearBtn;
         suppDialog.close();
         resolve(values);
       }
-      function requestSupplementBatch(index, reason, processedCount) {
-        if (!supplementReturnFocus) {
+      function requestSupplements(index, reason, processed) {
+        if (!returnFocus) {
           const active = document.activeElement;
-          supplementReturnFocus = active instanceof HTMLElement &&
+          returnFocus = active instanceof HTMLElement &&
             active !== document.body
             ? active
             : runBtn;
@@ -5317,7 +5286,7 @@
         const { promise, resolve } = Promise.withResolvers();
         supplementRequest = resolve;
         suppDialogContext.textContent =
-          `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processedCount)}개`;
+          `다음 보조 난수 #${fmt(index)} · ${reason}\n완료된 기본 난수: ${fmt(processed)}개`;
         suppDialogValues.value = "";
         suppDialogValues.ariaInvalid = "false";
         suppDialogError.textContent = "";
@@ -5335,9 +5304,9 @@
         try {
           const values = [];
           for (const token of iterU64Tokens(suppDialogValues.value)) {
-            if (values.length >= MANUAL_GENERATION_HARD_LIMIT) {
+            if (values.length >= GENERATION_HARD_LIMIT) {
               throw new InputValidationError(
-                `보조 난수값은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 입력할 수 있습니다.`,
+                `보조 난수값은 한 번에 ${fmt(GENERATION_HARD_LIMIT)}개까지 입력할 수 있습니다.`,
               );
             }
             values.push(parseU64(token));
@@ -5346,7 +5315,7 @@
             throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
           }
           suppDialogValues.ariaInvalid = "false";
-          finishSupplementRequest(values);
+          finishSupplement(values);
         } catch (err) {
           suppDialogValues.ariaInvalid = "true";
           suppDialogError.textContent = getErrorMessage(err);
@@ -5355,145 +5324,144 @@
       });
       suppDialog.addEventListener("cancel", (event) => {
         event.preventDefault();
-        finishSupplementRequest(null);
+        finishSupplement(null);
       });
-      let lastGeneratedChunks = [];
+      let outputChunks = [];
       let manualBusy = false;
       let copyTask = null;
-      const setManualBusy = (busy) => {
+      const setBusy = (busy) => {
         manualBusy = busy;
-        const hasOutput = lastGeneratedChunks.length > 0;
+        const hasOutput = outputChunks.length > 0;
         runBtn.disabled = manualBusy;
         manualOutputReady = !manualBusy && hasOutput;
         useOutput.disabled = !manualOutputReady || AppState.task !== null;
         saveBtn.disabled = manualBusy || !hasOutput;
         copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
       };
-      let manualGenerationId = 0;
-      setManualBusy(false);
+      let outputVersion = 0;
+      setBusy(false);
       runBtn.addEventListener("click", async () => {
-        const generationId = manualGenerationId + 1;
-        manualGenerationId = generationId;
+        const generationId = ++outputVersion;
         error.textContent = "";
         meta.textContent = "기본 난수 변환 준비 중…";
-        lastGeneratedChunks = [];
+        outputChunks = [];
         outputContent.textContent = "";
-        setManualBusy(true);
+        setBusy(true);
         try {
           const suppTokens = iterU64Tokens(suppInput.value);
-          const supplementValues = [];
-          let processedCount = 0;
+          const supplements = [];
+          let processed = 0;
           let suppInputCount = 0;
-          let queuedSuppCount = 0;
+          let queuedCount = 0;
           let renderedCount = -1;
-          let supplementHead = 0;
-          let supplementCursor;
+          let head = 0;
+          let cursor;
           let preloadedCount;
           const nextSupplement = (reason) => {
-            if (supplementCursor === supplementValues.length) {
+            if (cursor === supplements.length) {
               const queued = suppTokens.next();
               if (queued.done) throw new SupplementRequired(reason);
-              supplementValues.push(parseU64(queued.value));
-              preloadedCount += 1;
+              supplements.push(parseU64(queued.value));
+              preloadedCount++;
             }
-            const value = supplementValues[supplementCursor];
-            supplementCursor += 1;
+            const value = supplements[cursor];
+            cursor++;
             return { value, bitsRemaining: 64 };
           };
-          const updateManualProgress = (state) => {
-            const count = Math.min(lastGeneratedChunks.length, MANUAL_PREVIEW_LIMIT);
+          const updateProgress = (state) => {
+            const count = Math.min(outputChunks.length, PREVIEW_LIMIT);
             if (
               state !== "처리 중" ||
               renderedCount !== count
             ) {
-              let preview = lastGeneratedChunks.slice(0, count).join("");
-              const omitted = lastGeneratedChunks.length - count;
+              let preview = outputChunks.slice(0, count).join("");
+              const omitted = outputChunks.length - count;
               if (omitted > 0) preview += `\n\n… 외 ${fmt(omitted)}개 결과는 화면 미리보기에서 생략됨.\n전체 결과는 저장/복사 버튼으로 사용할 수 있습니다.`;
               outputContent.textContent = preview;
               renderedCount = count;
             }
             meta.textContent =
-              `기본 난수 변환 ${state}: ${fmt(processedCount)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedSuppCount)}개, 대화상자 ${fmt(suppInputCount - queuedSuppCount)}개)`;
+              `기본 난수 변환 ${state}: ${fmt(processed)}개. 보조 난수 사용: 총 ${fmt(suppInputCount)}개 (사전 ${fmt(queuedCount)}개, 대화상자 ${fmt(suppInputCount - queuedCount)}개)`;
           };
           let lastYieldAt = performance.now();
           let lastMetaUpdateAt = lastYieldAt;
           let cancelled = false;
           for (const token of iterU64Tokens(num64Input.value)) {
-            if (generationId !== manualGenerationId) {
+            if (generationId !== outputVersion) {
               return;
             }
-            if (processedCount >= MANUAL_GENERATION_HARD_LIMIT) {
+            if (processed >= GENERATION_HARD_LIMIT) {
               throw new InputValidationError(
-                `기본 난수 변환은 한 번에 ${fmt(MANUAL_GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
+                `기본 난수 변환은 한 번에 ${fmt(GENERATION_HARD_LIMIT)}개까지 가능합니다.`,
               );
             }
             const num = parseU64(token);
             preloadedCount = 0;
             let generated;
             for (; ;) {
-              supplementCursor = supplementHead;
+              cursor = head;
               try {
-                generated = generateRandomDataFromNum(num, nextSupplement);
-                suppInputCount += supplementCursor - supplementHead;
-                queuedSuppCount += preloadedCount;
-                supplementHead = supplementCursor;
-                if (supplementHead === supplementValues.length) {
-                  supplementValues.length = 0;
-                  supplementHead = 0;
+                generated = convertNumber(num, nextSupplement);
+                suppInputCount += cursor - head;
+                queuedCount += preloadedCount;
+                head = cursor;
+                if (head === supplements.length) {
+                  supplements.length = 0;
+                  head = 0;
                 }
                 break;
               } catch (err) {
                 if (!(err instanceof SupplementRequired)) throw err;
-                const values = await requestSupplementBatch(
-                  suppInputCount + supplementCursor - supplementHead + 1,
+                const values = await requestSupplements(
+                  suppInputCount + cursor - head + 1,
                   err.message,
-                  processedCount,
+                  processed,
                 );
-                if (generationId !== manualGenerationId) return;
+                if (generationId !== outputVersion) return;
                 if (values === null) {
                   cancelled = true;
                   break;
                 }
-                supplementValues.push(...values);
+                supplements.push(...values);
               }
             }
             if (cancelled) break;
             const outputBlock = formatOutput(generated);
-            const outputChunk = processedCount === 0
+            const outputChunk = processed === 0
               ? outputBlock
               : `\n${outputBlock}`;
-            lastGeneratedChunks.push(outputChunk);
-            processedCount += 1;
+            outputChunks.push(outputChunk);
+            processed++;
             const now = performance.now();
-            if (now - lastYieldAt >= MANUAL_YIELD_INTERVAL_MS) {
-              if (now - lastMetaUpdateAt >= MANUAL_META_UPDATE_INTERVAL_MS) {
-                updateManualProgress("처리 중");
+            if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
+              if (now - lastMetaUpdateAt >= META_UPDATE_INTERVAL_MS) {
+                updateProgress("처리 중");
                 lastMetaUpdateAt = now;
               }
               await yieldToMain();
-              if (generationId !== manualGenerationId) {
+              if (generationId !== outputVersion) {
                 return;
               }
               lastYieldAt = performance.now();
             }
           }
-          if (!cancelled && processedCount === 0) {
+          if (!cancelled && processed === 0) {
             throw new Error("기본 난수값을 하나 이상 입력해 주세요.");
           }
-          updateManualProgress(cancelled ? "중단" : "완료");
+          updateProgress(cancelled ? "중단" : "완료");
           output.scrollTop = 0;
         } catch (err) {
-          if (generationId === manualGenerationId) {
-            lastGeneratedChunks = [];
+          if (generationId === outputVersion) {
+            outputChunks = [];
             meta.textContent = "";
             outputContent.textContent = "";
             error.textContent = getErrorMessage(err);
           }
         } finally {
-          if (generationId === manualGenerationId) {
-            setManualBusy(false);
-            const focusTarget = supplementReturnFocus;
-            supplementReturnFocus = null;
+          if (generationId === outputVersion) {
+            setBusy(false);
+            const focusTarget = returnFocus;
+            returnFocus = null;
             if (
               focusTarget?.isConnected &&
               !focusTarget.matches(":disabled")
@@ -5503,7 +5471,7 @@
       });
       useOutput.addEventListener("click", async () => {
         if (!manualOutputReady || AppState.task !== null) return;
-        const file = new File([randomDataBlob(lastGeneratedChunks, false)], "random_data.txt", { type: "text/plain" });
+        const file = new File([outputBlob(outputChunks, false)], "random_data.txt", { type: "text/plain" });
         if (!acceptInputFile(file)) return;
         await handleParse();
         if (AppState.records.length) {
@@ -5515,7 +5483,7 @@
         error.textContent = "";
         try {
           downloadBlob(
-            randomDataBlob(lastGeneratedChunks, true),
+            outputBlob(outputChunks, true),
             "random_data.txt",
           );
           meta.textContent =
@@ -5527,24 +5495,24 @@
       });
       copyBtn.addEventListener("click", async () => {
         if (copyTask) return;
-        const generationId = manualGenerationId;
-        const chunks = lastGeneratedChunks;
+        const generationId = outputVersion;
+        const chunks = outputChunks;
         error.textContent = "";
-        copyTask = copyRandomDataChunksToClipboard(chunks);
-        setManualBusy(manualBusy);
+        copyTask = copyOutputChunks(chunks);
+        setBusy(manualBusy);
         try {
           await copyTask;
           if (
-            generationId !== manualGenerationId ||
-            chunks !== lastGeneratedChunks
+            generationId !== outputVersion ||
+            chunks !== outputChunks
           ) return;
           meta.textContent =
             (meta.textContent ? `${meta.textContent}\n` : "") +
             "변환 결과를 클립보드에 복사했습니다.";
         } catch (err) {
           if (
-            generationId === manualGenerationId &&
-            chunks === lastGeneratedChunks
+            generationId === outputVersion &&
+            chunks === outputChunks
           ) {
             error.textContent = err instanceof Error
               ? err.message
@@ -5552,22 +5520,22 @@
           }
         } finally {
           copyTask = null;
-          setManualBusy(manualBusy);
+          setBusy(manualBusy);
         }
       });
       const clearDialog = byId("clear-dialog");
       const clearOutput = () => {
-        finishSupplementRequest(null);
-        supplementReturnFocus = null;
-        manualGenerationId += 1;
-        lastGeneratedChunks = [];
+        finishSupplement(null);
+        returnFocus = null;
+        outputVersion++;
+        outputChunks = [];
         error.textContent = "";
         meta.textContent = "";
         outputContent.textContent = "";
-        setManualBusy(false);
+        setBusy(false);
       };
       clearBtn.addEventListener("click", () => {
-        if (lastGeneratedChunks.length || outputContent.textContent) clearDialog.showModal();
+        if (outputChunks.length || outputContent.textContent) clearDialog.showModal();
         else clearOutput();
       });
       byId("clear-cancel").addEventListener("click", () => clearDialog.close());
@@ -5601,7 +5569,7 @@
     const notice = byId("ui-notice");
     let manualLoaded = false;
     let manualOutputReady = false;
-    let selectedRecordIndex = -1;
+    let selectedIndex = -1;
     let selectedRecord = null;
     let noticeTimer = 0;
     let detailReturnFocus = null;
@@ -5763,7 +5731,7 @@
       for (const button of statusButtons) {
         button.ariaPressed = String(button.dataset.status === status);
       }
-      if (apply) scheduleApplyFilterAll();
+      if (apply) scheduleFilter();
     }
     for (const button of statusButtons) {
       button.addEventListener("click", () => setStatusFilter(button.dataset.status));
@@ -5821,7 +5789,7 @@
       mapExternal.href = "about:blank";
     }
     function resetInspector() {
-      selectedRecordIndex = -1;
+      selectedIndex = -1;
       selectedRecord = null;
       if (detailSheet.open) detailSheet.close();
       unloadDetailMap();
@@ -5834,7 +5802,7 @@
       const record = AppState.records[index];
       if (!record?.result) return;
       if (record !== selectedRecord) {
-        selectedRecordIndex = index;
+        selectedIndex = index;
         selectedRecord = record;
         const { addr, error } = record.result;
         unloadDetailMap();
@@ -5872,8 +5840,8 @@
     function syncInspectorWithPage() {
       const first = resultBody.firstElementChild;
       if (!first) return resetInspector();
-      const selectedIsOnPage = [...resultBody.rows].some(row => Number(row.dataset.record) === selectedRecordIndex);
-      selectRecord(selectedIsOnPage ? selectedRecordIndex : Number(first.dataset.record), false);
+      const selectedIsOnPage = [...resultBody.rows].some(row => Number(row.dataset.record) === selectedIndex);
+      selectRecord(selectedIsOnPage ? selectedIndex : Number(first.dataset.record), false);
     }
     resultBody.addEventListener("click", (event) => {
       const row = event.target.closest("tr[data-record]");
