@@ -2922,17 +2922,36 @@
       const label = text(gc.label);
       const country = text(gc.country_code).toLowerCase();
       const admin = typeof gc.admin === "object" ? gc.admin : null;
-      const fields = {};
-      for (const level of [2, 4, 6, 7, 8, 9, 10]) {
-        const key = `level${level}`;
-        fields[key] = text(admin?.[key]);
-      }
-      for (const source of [
-        "country", "name", "street", "type", "city_district",
-        "district", "suburb", "city", "county", "state", "region",
-        "province", "town", "locality", "village", "neighbourhood",
-        "municipality", "quarter", "hamlet", "township", "residential",
-      ]) fields[source === "city_district" ? "cityDistrict" : source] = text(gc[source]);
+      const fields = {
+        level2: text(admin?.level2),
+        level4: text(admin?.level4),
+        level6: text(admin?.level6),
+        level7: text(admin?.level7),
+        level8: text(admin?.level8),
+        level9: text(admin?.level9),
+        level10: text(admin?.level10),
+        country: text(gc.country),
+        name: text(gc.name),
+        street: text(gc.street),
+        type: text(gc.type),
+        cityDistrict: text(gc.city_district),
+        district: text(gc.district),
+        suburb: text(gc.suburb),
+        city: text(gc.city),
+        county: text(gc.county),
+        state: text(gc.state),
+        region: text(gc.region),
+        province: text(gc.province),
+        town: text(gc.town),
+        locality: text(gc.locality),
+        village: text(gc.village),
+        neighbourhood: text(gc.neighbourhood),
+        municipality: text(gc.municipality),
+        quarter: text(gc.quarter),
+        hamlet: text(gc.hamlet),
+        township: text(gc.township),
+        residential: text(gc.residential),
+      };
       const labelParts = label.split(",").map(part => part.trim());
       const firstPart = labelParts[0];
       const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
