@@ -2255,15 +2255,15 @@
         <button aria-label="도움말" class="button help-button" id="show-help" type="button"><span
             class="help-label">도움말</span></button>
         <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle"
-            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun" viewbox="0 0 24 24">
-              <circle cx="12" cy="12" fill="currentColor" r="4" />
+            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4" fill="currentColor" />
               <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
-            </svg><svg aria-hidden="true" class="theme-moon" viewbox="0 0 24 24">
+            </svg><svg aria-hidden="true" class="theme-moon" viewBox="0 0 24 24">
               <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" />
             </svg></button><button aria-label="화면 설정" class="settings-button" title="화면 설정" aria-haspopup="dialog"
-            aria-controls="display-settings" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
+            aria-controls="display-settings" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
               <path
-                d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
+                d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8L2.4 15l2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
               <circle cx="11" cy="12" r="3" />
             </svg></button></div>
       </div>
@@ -2279,17 +2279,17 @@
           tabindex="-1" type="button">난수 직접 입력</button>
       </div>
       <div aria-labelledby="file-tab" id="file-pane" role="tabpanel"><label class="drop-zone">
-          <span class="drop-text"><svg aria-hidden="true" viewbox="0 0 24 24">
+          <span class="drop-text"><svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M6 3h8l4 4v14H6z" />
-              <path d="M14 3v5h4M9 12h6m-6 4h6" />
+              <path d="M14 3v5h4m-9 4h6m-6 4h6" />
             </svg><strong id="drop-filename">좌표 TXT 파일 선택</strong><span id="drop-state">TXT 파일을 선택하거나 이곳에 끌어
               놓으세요.</span><span class="file-cue">파일 선택</span><span class="file-changed" id="file-changed" hidden>선택한 파일을
               바꾸려면 탭하세요.</span></span>
           <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file">
         </label><button class="button tinted" command="--parse" commandfor="app" id="parse" type="button">
-          <svg aria-hidden="true" viewbox="0 0 24 24">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M6 3h8l4 4v14H6z" />
-            <path d="M14 3v5h4M9 12h6m-6 4h6" />
+            <path d="M14 3v5h4m-9 4h6m-6 4h6" />
           </svg>
           <span>좌표 추출</span>
         </button></div>
@@ -2315,9 +2315,9 @@
           </div>
           <div class="rng-actions">
             <button class="button primary" id="runBtn" type="button">
-              <svg aria-hidden="true" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path
-                  d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
+                  d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8L2.4 15l2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
                 <circle cx="11" cy="12" r="3" />
               </svg>
               <span>좌표로 변환</span>
@@ -2331,15 +2331,15 @@
               <span>TXT 저장</span>
             </button>
             <button aria-label="클립보드 복사" class="button" disabled id="copyOutput" title="클립보드 복사" type="button">
-              <svg aria-hidden="true" viewbox="0 0 24 24">
-                <rect height="10" rx="2" width="10" x="9" y="9" />
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <rect width="10" height="10" x="9" y="9" rx="2" />
                 <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
               </svg>
               <span>결과 복사</span>
             </button>
             <button class="button danger" id="clearBtn" type="button">
-              <svg aria-hidden="true" viewbox="0 0 24 24">
-                <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" />
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15m-8 4v7m4-7v7" />
               </svg>
               <span>출력 지우기</span>
             </button>
@@ -2360,7 +2360,7 @@
               <circle cx="12" cy="9" fill="white" r="2.8" stroke="none" />
             </svg>추출된 좌표 (lat,lon)</h2><span>총 <strong id="coords-count">0</strong>개</span>
         </div>
-        <div class="coords-empty"><svg aria-hidden="true" viewbox="0 0 24 24">
+        <div class="coords-empty"><svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" />
             <circle cx="12" cy="9" r="2.5" />
           </svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
@@ -2387,7 +2387,7 @@
                 id="cnt-remain">0</strong>건 미처리</output>
           </div>
           <div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해
-              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" viewbox="0 0 24 24">
+              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
@@ -2450,7 +2450,7 @@
         <search aria-label="주소 조회 결과 필터">
           <form class="filters" id="filters">
             <div class="search-field">
-              <svg aria-hidden="true" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
                 <circle cx="10.5" cy="10.5" r="6.5" />
                 <path d="m16 16 4.5 4.5" />
               </svg>
@@ -2472,7 +2472,7 @@
               </option>
             </select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
               aria-expanded="false" class="button filter-trigger" id="advanced-filters" type="button"><svg
-                aria-hidden="true" viewbox="0 0 24 24">
+                aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
                 <circle cx="14" cy="7" r="3" />
                 <circle cx="10" cy="17" r="3" />
@@ -2491,7 +2491,7 @@
                     type="search"></label><label>전체주소<input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr"
                     inputmode="search" placeholder="전체주소" type="search"></label><button class="button"
                   command="--filter-clear" commandfor="app" id="filter-clear" type="button">
-                  <svg aria-hidden="true" viewbox="0 0 24 24">
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
                     <path d="M20 7v5h-5M4 17v-5h5" />
                     <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
                   </svg>
@@ -2533,13 +2533,13 @@
             <div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
               <nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
                 <button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app" id="page-prev"
-                  type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
+                  type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
                     <path d="m14 6-6 6 6 6" />
                   </svg><span>이전</span></button>
                 <output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers"
                   id="page-numbers"></span>
                 <button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app" id="page-next"
-                  type="button"><span>다음</span><svg aria-hidden="true" viewbox="0 0 24 24">
+                  type="button"><span>다음</span><svg aria-hidden="true" viewBox="0 0 24 24">
                     <path d="m10 6 6 6-6 6" />
                   </svg></button>
               </nav>
@@ -2552,8 +2552,8 @@
               <h2 dir="auto" id="detail-title">선택한 위치</h2>
               <p dir="auto" id="detail-town"></p>
               <div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true"
-                    viewbox="0 0 24 24">
-                    <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" />
+                    viewBox="0 0 24 24">
+                    <path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
                     <circle cx="12" cy="10" r="2.5" />
                   </svg><span>OpenStreetMap 지도 불러오기</span></button>
                 <div aria-live="polite" class="map-feedback" hidden id="map-feedback"></div><iframe hidden
@@ -2565,8 +2565,8 @@
                   rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
               <p class="detail-label">전체 주소</p>
               <div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
-                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
-                    <rect height="11" rx="2" width="11" x="9" y="9" />
+                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+                    <rect width="11" height="11" x="9" y="9" rx="2" />
                     <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
                   </svg></button></div>
               <dl class="detail-fields">
@@ -2678,7 +2678,7 @@
   <dialog aria-labelledby="sheet-title" id="detail-sheet">
     <div class="sheet-heading">
       <h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg
-          aria-hidden="true" viewbox="0 0 24 24">
+          aria-hidden="true" viewBox="0 0 24 24">
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
@@ -2686,7 +2686,7 @@
   <dialog aria-labelledby="help-title" id="help-dialog">
     <div class="sheet-heading">
       <h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg
-          aria-hidden="true" viewbox="0 0 24 24">
+          aria-hidden="true" viewBox="0 0 24 24">
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
@@ -2777,16 +2777,9 @@
         throw new InputError(TEXT_LIMIT_MESSAGE);
       return value;
     }
-    function pickAdmin(
-      candidates, suffixes, excludedA = "", excludedB = "",
-      excludedC = "",
-    ) {
-      for (const name of candidates) {
-        if (name && name !== excludedA && name !== excludedB &&
-          name !== excludedC &&
-          (!suffixes || suffixes.includes(name.at(-1)))) return name;
-      }
-      return "";
+    function pickAdmin(candidates, suffixes, ...excluded) {
+      return candidates.find(name => name && !excluded.includes(name) &&
+        (!suffixes || suffixes.includes(name.at(-1)))) || "";
     }
     function parseKoreanAdmin(fields, p0, p1) {
       const primary = fields.name || p0;
@@ -2847,11 +2840,8 @@
       if (cut > 0 && sigungu.endsWith(district) &&
         sigungu.charCodeAt(cut - 1) === 32)
         return sigungu.slice(0, cut - 1).trim();
-      const normalized = sigungu.replace(/\s+/gu, " ").trim();
-      const districtText = district.replace(/\s+/gu, " ").trim();
-      return (` ${normalized} `)
-        .replaceAll(` ${districtText} `, " ")
-        .trim();
+      return (` ${sigungu.replace(/\s+/gu, " ").trim()} `)
+        .replaceAll(` ${district.replace(/\s+/gu, " ").trim()} `, " ").trim();
     }
     function parseGlobalAdmin(fields, p0, p1) {
       const primary = fields.name || p0;
@@ -2918,11 +2908,9 @@
     }
     function isValidGeocode(parsed) {
       const addr = parsed?.addr;
-      if (!addr || typeof parsed !== "object" || typeof addr !== "object") return false;
-      for (const key of ["sido", "sigungu", "eupmyeon", "tag", "fullAddr"]) {
-        if (!boundedText(addr[key])) return false;
-      }
-      return parsed.kind === undefined || boundedText(parsed.kind);
+      return !!addr && typeof parsed === "object" && typeof addr === "object" &&
+        ["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(key => boundedText(addr[key])) &&
+        (parsed.kind === undefined || boundedText(parsed.kind));
     }
     function parseGeocode(data) {
       const gc = Array.isArray(data?.features)
@@ -2944,10 +2932,7 @@
         "district", "suburb", "city", "county", "state", "region",
         "province", "town", "locality", "village", "neighbourhood",
         "municipality", "quarter", "hamlet", "township", "residential",
-      ]) {
-        const key = source === "city_district" ? "cityDistrict" : source;
-        fields[key] = text(gc[source]);
-      }
+      ]) fields[source === "city_district" ? "cityDistrict" : source] = text(gc[source]);
       const labelParts = label.split(",").map(part => part.trim());
       const firstPart = labelParts[0];
       const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
@@ -3074,23 +3059,19 @@
         else if (tokens.length > 1)
           query = isOr ? new Set(tokens) : tokens.sort((a, b) => b.length - a.length);
       }
-      const fields = {
-        kind: filterKind.value,
-        sido: norm(filterSido.value),
-        sigungu: norm(filterSigungu.value),
-        emd: norm(filterEmd.value),
-        tag: norm(filterTag.value),
-        fullAddr: norm(filterFullAddr.value),
-      };
-      return filterStatus === "all" && !query && !Object.values(fields).some(Boolean)
-        ? null : { status: filterStatus, ...fields, query };
+      const values = [
+        filterKind.value, norm(filterSido.value), norm(filterSigungu.value),
+        norm(filterEmd.value), norm(filterTag.value), norm(filterFullAddr.value),
+      ];
+      const tests = [...values.entries()].filter(([, needle]) => needle);
+      return filterStatus === "all" && !query && !tests.length
+        ? null : { status: filterStatus, tests, query };
     }
     let filterState = readFilters();
     function matchesFilter(r, f) {
       if (!r.result) return false;
       if (!f) return true;
-      if (f.status === "done" && r.result.error) return false;
-      if (f.status === "failed" && !r.result.error) return false;
+      if (f.status !== "all" && !!r.result.error !== (f.status === "failed")) return false;
       const fields = r._search ??= [
         (r.result.kind || r.set).toLowerCase(),
         norm(r.result.addr?.sido),
@@ -3100,20 +3081,11 @@
         norm(r.result.error || r.result.addr?.fullAddr),
         undefined,
       ];
-      if (!((!f.kind || fields[0] === f.kind) &&
-        (!f.sido || fields[1].includes(f.sido)) &&
-        (!f.sigungu || fields[2].includes(f.sigungu)) &&
-        (!f.emd || fields[3].includes(f.emd)) &&
-        (!f.tag || fields[4].includes(f.tag)) &&
-        (!f.fullAddr || fields[5].includes(f.fullAddr))))
-        return false;
+      for (const [index, needle] of f.tests)
+        if (index === 0 ? fields[0] !== needle : !fields[index].includes(needle)) return false;
       const query = f.query;
       if (!query) return true;
-      let hay = fields[6];
-      if (hay === undefined) {
-        hay = `${fields[5]}\u0000${fields[0]}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
-        fields[6] = hay;
-      }
+      const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
       if (typeof query === "string") return hay.includes(query);
       const isOr = query instanceof Set;
       for (const token of query)
@@ -3124,10 +3096,8 @@
     let filterTimer = null;
     let pageFrame = null;
     function cancelFilterTimer() {
-      if (filterTimer !== null) {
-        clearTimeout(filterTimer);
-        filterTimer = null;
-      }
+      if (filterTimer !== null) clearTimeout(filterTimer);
+      filterTimer = null;
     }
     let pageKey = "";
     function updatePages(visibleCount) {
@@ -3159,7 +3129,7 @@
         if (page) {
           el.type = "button";
           el.dataset.page = page - 1;
-          el.ariaLabel = `${fmt(page)} 페이지`;
+          el.ariaLabel = el.textContent + " 페이지";
           if (page === current) el.ariaCurrent = "page";
         } else {
           el.ariaHidden = "true";
@@ -3269,9 +3239,8 @@
     let elapsedTimer = 0;
     function updateElapsed() {
       const seconds = elapsedStart ? Math.floor((performance.now() - elapsedStart) / 1000) : 0;
-      elapsed.textContent = [
-        Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60,
-      ].map((value) => String(value).padStart(2, "0")).join(":");
+      elapsed.textContent = [seconds / 3600, seconds / 60 % 60, seconds % 60]
+        .map(n => String(Math.floor(n)).padStart(2, "0")).join(":");
     }
     function stopElapsed() {
       if (!elapsedTimer) return;
@@ -3356,21 +3325,18 @@
       const controls = [parseBtn, startBtn, pauseBtn,
         resumeBtn, stopBtn, fileInput, useOutput];
       const ownedFocus = controls.includes(active);
-      const s = state.status;
-      statusRow.dataset.state = s;
+      const s = statusRow.dataset.state = state.status;
       if (s === "idle") stopElapsed();
       const isBusy = state.task !== null;
       tableWrap.toggleAttribute("data-running", s === "running");
       tableWrap.ariaBusy = String(state.isRunning);
-      parseBtn.disabled = isBusy;
-      startBtn.disabled = isBusy || state.records.length === 0;
+      parseBtn.disabled = fileInput.disabled = isBusy;
+      startBtn.disabled = isBusy || !state.records.length;
       pauseBtn.disabled = s !== "running";
-      resumeBtn.disabled = s !== "paused";
+      resumeBtn.disabled = resumeBtn.hidden = s !== "paused";
       stopBtn.disabled = !(state.isRunning || s === "parsing");
-      fileInput.disabled = isBusy;
       startBtn.hidden = isBusy;
       pauseBtn.hidden = s !== "running" && s !== "pausing";
-      resumeBtn.hidden = s !== "paused";
       stopBtn.hidden = !isBusy;
       useOutput.disabled = isBusy || !outputReady;
       updateWorkflowStep();
@@ -3447,13 +3413,10 @@
         coordsExpand.ariaExpanded = "false";
         coordsExpand.textContent = "좌표 모두 보기";
       }
-      if (doneChanged || failChanged) {
-        countSuccess.textContent = summarySuccess.textContent =
-          fmt(processed - fail);
-      }
-      if (failChanged) {
+      if (doneChanged || failChanged)
+        countSuccess.textContent = summarySuccess.textContent = fmt(processed - fail);
+      if (failChanged)
         countFail.textContent = summaryFail.textContent = fmt(fail);
-      }
       if (totalChanged || doneChanged) {
         countRemain.textContent = summaryRemain.textContent = fmt(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
@@ -3493,18 +3456,13 @@
     }
     function retryDelay(response, attempt) {
       const fallback = CONFIG.RATE_LIMIT_DELAY_MS * attempt;
-      if (response.status === 429) {
-        const value = response.headers.get("retry-after");
-        if (value) {
-          const seconds = Number(value);
-          const delay = Number.isFinite(seconds)
-            ? seconds * 1_000
-            : Date.parse(value) - Date.now();
-          return Math.min(
-            CONFIG.MAX_RETRY_DELAY_MS,
-            Math.max(fallback, Number.isFinite(delay) ? delay : 0),
-          );
-        }
+      const value = response.status === 429 ? response.headers.get("retry-after") : null;
+      if (value) {
+        const seconds = Number(value);
+        const delay = Number.isFinite(seconds)
+          ? seconds * 1_000 : Date.parse(value) - Date.now();
+        return Math.min(CONFIG.MAX_RETRY_DELAY_MS,
+          Math.max(fallback, Number.isFinite(delay) ? delay : 0));
       }
       return fallback * (0.8 + Math.random() * 0.4);
     }
@@ -3704,9 +3662,7 @@
           const db = req.result;
           let store;
           if (!db.objectStoreNames.contains(CONFIG.CACHE_STORE))
-            store = db.createObjectStore(CONFIG.CACHE_STORE, {
-              keyPath: "key",
-            });
+            store = db.createObjectStore(CONFIG.CACHE_STORE, { keyPath: "key" });
           else
             store = req.transaction.objectStore(CONFIG.CACHE_STORE);
           if (event.oldVersion < 3)
@@ -3775,11 +3731,8 @@
               new Error("Reverse geocoding cache transaction aborted."),
           );
           on(signal, "abort", onAbort, { once: true });
-          if (signal.aborted) {
-            onAbort();
-            return;
-          }
-          operation(tx.objectStore(CONFIG.CACHE_STORE));
+          if (signal.aborted) onAbort();
+          else operation(tx.objectStore(CONFIG.CACHE_STORE));
         } catch (err) {
           abortTransaction();
           finish(reject, err);
@@ -3787,7 +3740,7 @@
       });
     }
     async function readDiskCache(results, signal) {
-      if (results.size === 0) return;
+      if (!results.size) return;
       const db = await openCacheDb();
       signal.throwIfAborted();
       if (!db) return;
@@ -3876,6 +3829,7 @@
       }
     }
     function startCachePrune(db) {
+      const errorText = "Reverse geocoding cache maintenance failed.";
       try {
         const tx = db.transaction(CONFIG.CACHE_STORE, "readwrite");
         let prunedRows = null;
@@ -3887,14 +3841,11 @@
             cacheRowCeiling = prunedRows;
         };
         tx.onabort = () => {
-          console.warn(
-            "Reverse geocoding cache maintenance failed.",
-            tx.error ?? new Error("Reverse geocoding cache maintenance failed."),
-          );
+          console.warn(errorText, tx.error ?? new Error(errorText));
         };
         pruneCache(tx.objectStore(CONFIG.CACHE_STORE), rows => prunedRows = rows);
       } catch (err) {
-        console.warn("Reverse geocoding cache maintenance failed.", err);
+        console.warn(errorText, err);
       }
     }
     function pruneCache(store, onRows) {
@@ -4071,9 +4022,15 @@
         }
         return now;
       };
+      const yieldIfNeeded = async () => {
+        if (reportProgress() - lastYield >= 8) {
+          await yieldToMain();
+          lastYield = performance.now();
+        }
+      };
       const cacheBatch = [];
       const flushCache = async () => {
-        if (cacheBatch.length === 0) return;
+        if (!cacheBatch.length) return;
         await writeDiskCache(cacheBatch, signal);
         cacheBatch.length = 0;
       };
@@ -4094,10 +4051,7 @@
           continue;
         }
         commitResult(i, parsed, false);
-        if (reportProgress() - lastYield >= 8) {
-          await yieldToMain();
-          lastYield = performance.now();
-        }
+        await yieldIfNeeded();
       }
       if (persistentCache.size && !signal.aborted) {
         try {
@@ -4116,10 +4070,7 @@
           if (!row) continue;
           putMemoryCache(cacheKey, row.parsed, row.savedAt);
           commitResult(i, row.parsed, false);
-          if (reportProgress() - lastYield >= 8) {
-            await yieldToMain();
-            lastYield = performance.now();
-          }
+          await yieldIfNeeded();
         }
       }
       queuePage();
@@ -4274,7 +4225,7 @@
         if (records[rowIndex].result) rows.push(rowIndex);
       }
       const totalRows = rows.length;
-      if (totalRows <= 0)
+      if (!totalRows)
         return showStatus("내보낼 데이터가 없습니다.", "warn");
       const sourceFile = state.droppedFile;
       const appEpoch = state.generation;
@@ -4293,7 +4244,7 @@
           let chunkLines = [];
           let chunkChars = 0;
           const flushChunk = () => {
-            if (chunkLines.length === 0) return;
+            if (!chunkLines.length) return;
             parts.push("\n", chunkLines.join("\n"));
             chunkChars = 0;
             chunkLines.length = 0;
@@ -4304,8 +4255,7 @@
             const result = r.result;
             const lat = r.latStr;
             const lon = r.lonStr;
-            const firstLat = lat.charCodeAt(0);
-            let line = `${csvEsc(result.kind || r.set)},${rowIndex + 1},"${firstLat === 43 || firstLat === 45 ? "'" : ""}${lat}, ${lon}",`;
+            let line = `${csvEsc(result.kind || r.set)},${rowIndex + 1},"${/^[+-]/.test(lat) ? "'" : ""}${lat}, ${lon}",`;
             const addr = result.addr;
             line += (addr
               ? [addr.sido, addr.sigungu, addr.eupmyeon, addr.tag].map(csvEsc).join(",")
@@ -4402,8 +4352,7 @@
       const button = event.target.closest("button[data-page]");
       if (!button) return;
       const page = Number(button.dataset.page);
-      const count = Math.ceil(state.visibleIndices.length / pageSize);
-      if (!Number.isInteger(page) || page < 0 || page >= count || page === state.page) return;
+      if (!Number.isInteger(page) || page < 0 || page >= Math.ceil(state.visibleIndices.length / pageSize) || page === state.page) return;
       state.page = page;
       renderPage(true);
       query('[aria-current="page"]', pageNumbers)?.focus(NO_SCROLL);
@@ -4449,6 +4398,12 @@
       filterQuery.focus();
       filterQuery.select();
     });
+    function shiftPage(step) {
+      const next = state.page + step;
+      if (next < 0 || next >= Math.ceil(state.visibleIndices.length / pageSize)) return;
+      state.page = next;
+      renderPage(true);
+    }
     const COMMANDS = {
       "--parse": handleParse,
       "--start": async () => {
@@ -4515,19 +4470,8 @@
       },
       "--export": handleExport,
       "--filter-clear": () => clearFilters(),
-      "--page-prev": () => {
-        if (state.page === 0) return;
-        state.page--;
-        renderPage(true);
-      },
-      "--page-next": () => {
-        const pages = Math.ceil(
-          state.visibleIndices.length / pageSize,
-        );
-        if (state.page + 1 >= pages) return;
-        state.page++;
-        renderPage(true);
-      },
+      "--page-prev": () => shiftPage(-1),
+      "--page-next": () => shiftPage(1),
     };
     on(byId("bulk-cancel"), "click", () =>
       bulkDialog.close("cancel"));
@@ -4586,10 +4530,8 @@
     const HANGUL_MODULUS = 11172;
     const SUPPLEMENT_LIMIT = 1024;
     const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
-    const MAX_U64_DEC = U64_MAX.toString(10);
-    const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
-    const U64_FORMAT_ERROR =
-      `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`;
+    const U64_BOUND_TEXT = `최소값 예: 0 또는 0x0, 최대값 예: ${U64_MAX} 또는 0x${U64_MAX.toString(16).toUpperCase()}`;
+    const U64_FORMAT_ERROR = `유효한 u64 형식이 아닙니다 (${U64_BOUND_TEXT}).`;
     const U64_TEXT_LIMIT = 64;
     const createLottery = (length) => ({
       limit: length,
@@ -4618,7 +4560,7 @@
     }
     function parseU64(raw) {
       const input = raw.trim();
-      if (input.length === 0)
+      if (!input.length)
         throw new Error("빈 값은 허용되지 않습니다.");
       if (input.length > U64_TEXT_LIMIT)
         throw new Error(
@@ -4633,54 +4575,26 @@
       }
       if (value > U64_MAX)
         throw new Error(
-          `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+          `u64 범위를 벗어났습니다 (${U64_BOUND_TEXT}).`,
         );
       return value;
     }
     const bitsView = new DataView(new ArrayBuffer(8));
     const bytesView = new Uint8Array(bitsView.buffer);
-    const F64_FRACTION_MASK = (1n << 52n) - 1n;
-    const F64_HIDDEN_BIT = 1n << 52n;
-    const F64_SIGN_BIT = 1n << 63n;
-    function normalF64(integer, exponent) {
-      if (integer === 0n) return 0;
-      const value = Number(integer) * 2 ** exponent;
-      if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022)
-        throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
-      return value;
-    }
-    function affineF64(
-      ratio,
-      scaleSignificand,
-      scaleExponent,
-      addendSignificand,
-      addendExponent,
-      addend,
-    ) {
-      bitsView.setFloat64(0, ratio, false);
-      const ratioBits = bitsView.getBigUint64(0, false);
-      const exponentBits = Number((ratioBits >> 52n) & 0x7ffn);
-      const fraction = ratioBits & F64_FRACTION_MASK;
-      if (exponentBits === 0x7ff)
-        throw new RangeError("유한한 f64 좌표값이 필요합니다.");
-      const unsignedSignificand = exponentBits === 0
-        ? fraction
-        : F64_HIDDEN_BIT | fraction;
-      const ratioSignificand = (ratioBits & F64_SIGN_BIT) === 0n
-        ? unsignedSignificand
-        : -unsignedSignificand;
-      const ratioExponent = exponentBits === 0
-        ? -1074
-        : exponentBits - 1023 - 52;
-      const productSignificand = scaleSignificand * ratioSignificand;
-      if (productSignificand === 0n)
-        return addend;
-      const productExponent = scaleExponent + ratioExponent;
-      const commonExponent = Math.min(productExponent, addendExponent);
-      const exact =
-        (productSignificand << BigInt(productExponent - commonExponent)) +
-        (addendSignificand << BigInt(addendExponent - commonExponent));
-      return normalF64(exact, commonExponent);
+    function affineF64(ratio, scale, scalePower, offset, offsetPower, addend) {
+      bitsView.setFloat64(0, ratio);
+      const bits = bitsView.getBigUint64(0);
+      const exponent = Number((bits >> 52n) & 2047n);
+      let significand = bits & ((1n << 52n) - 1n);
+      if (exponent) significand |= 1n << 52n;
+      if (bits & (1n << 63n)) significand = -significand;
+      const product = scale * significand;
+      if (!product) return addend;
+      const productPower = scalePower + (exponent ? exponent - 1075 : -1074);
+      const power = Math.min(productPower, offsetPower);
+      const exact = (product << BigInt(productPower - power)) +
+        (offset << BigInt(offsetPower - power));
+      return Number(exact) * 2 ** power;
     }
     const decimalFormatter = new Intl.NumberFormat("en-US", {
       useGrouping: false,
@@ -4706,10 +4620,9 @@
       const number = (byte % modulus) + 1;
       if (numbers.values.includes(number)) return false;
       numbers.values.push(number);
-      const complete = numbers.values.length === numbers.limit;
-      if (complete)
-        numbers.values.sort((a, b) => a - b);
-      return complete;
+      if (numbers.values.length !== numbers.limit) return false;
+      numbers.values.sort((a, b) => a - b);
+      return true;
     }
     function fillNumbers(v, data) {
       bitsView.setBigUint64(0, v, false);
@@ -4733,6 +4646,7 @@
       }
       return false;
     }
+    const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
     function extractNmsBits(bits, num, shifts, maxValue, reason, supplement, nextSupp) {
       const mask = (1n << BigInt(bits)) - 1n;
       const maxBig = BigInt(maxValue);
@@ -4748,7 +4662,7 @@
         const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
         if (value <= maxBig) return Number(value);
       }
-      throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
+      throw supplementLimitError("NMS");
     }
     function convertNumber(num, nextSupp) {
       const data = createDataSet(num);
@@ -4764,7 +4678,7 @@
         supplement.current = newSupp;
       }
       if (!complete)
-        throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
+        throw supplementLimitError("기본 필드");
       let luckyStarSource = reverseBitsU64(
         supplement.current?.value ?? num,
       );
@@ -4787,7 +4701,7 @@
         supplement.current = newSupp;
       }
       if (data.euroLucky.values.length !== data.euroLucky.limit)
-        throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
+        throw supplementLimitError("유로밀리언 럭키 스타");
       const hangul = new Array(4);
       for (let i = 0; i < hangul.length; i++) {
         bitsView.setBigUint64(0, num, false);
@@ -4820,7 +4734,7 @@
             supplement.current = nextSupp("한글 음절 보완 재시도");
         }
         if (index > HANGUL_MAX)
-          throw new Error("한글 음절 보완 난수 시도 횟수를 초과했습니다.");
+          throw supplementLimitError("한글 음절");
         hangul[i] = String.fromCodePoint(
           HANGUL_BASE + (index % HANGUL_MODULUS),
         );
@@ -4924,14 +4838,13 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       })]);
     }
     function loadManualRng() {
-      const num64Input = byId("num64"),
-        suppInput = byId("suppValues");
-      const [runBtn, clearBtn, saveBtn, copyBtn] = ["runBtn", "clearBtn", "saveOutput", "copyOutput"].map(byId);
-      const output = byId("output");
+      const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn,
+        output, error, meta, suppDialog, suppForm, suppContext, suppValues, suppError] = [
+          "num64", "suppValues", "runBtn", "clearBtn", "saveOutput", "copyOutput",
+          "output", "error", "meta", "supp-dialog", "supp-form", "supp-context",
+          "supp-values", "supp-error",
+        ].map(byId);
       const outputContent = query(".code-content", output);
-      const error = byId("error"),
-        meta = byId("meta");
-      const [suppDialog, suppForm, suppContext, suppValues, suppError] = ["supp-dialog", "supp-form", "supp-context", "supp-values", "supp-error"].map(byId);
       let suppRequest = null;
       let returnFocus = null;
       function finishSupplement(values) {
@@ -4977,7 +4890,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
               );
             values.push(parseU64(token));
           }
-          if (values.length === 0)
+          if (!values.length)
             throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
           suppValues.ariaInvalid = "false";
           finishSupplement(values);
@@ -5001,11 +4914,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       const setBusy = (busy) => {
         manualBusy = busy;
         const hasOutput = chunks.length > 0;
-        runBtn.disabled = manualBusy;
-        outputReady = !manualBusy && hasOutput;
+        runBtn.disabled = busy;
+        outputReady = !busy && hasOutput;
         useOutput.disabled = !outputReady || state.task !== null;
-        saveBtn.disabled = manualBusy || !hasOutput;
-        copyBtn.disabled = manualBusy || copyTask !== null || !hasOutput;
+        saveBtn.disabled = busy || !hasOutput;
+        copyBtn.disabled = saveBtn.disabled || copyTask !== null;
       };
       let outputEpoch = 0;
       setBusy(false);
@@ -5229,7 +5142,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       filePane.hidden = manual;
       manualPanel.hidden = !manual;
       for (const tab of queryAll("[role=tab]", inputTabs)) {
-        const selected = tab.dataset.mode === inputView.dataset.mode;
+        const selected = tab.dataset.mode === mode;
         tab.ariaSelected = selected;
         tab.tabIndex = selected ? 0 : -1;
       }
@@ -5247,8 +5160,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       const tab = event.target.closest("[role=tab]");
       if (!tab) return;
       event.preventDefault();
-      const mode = event.key === "Home" ? "file" : event.key === "End" ? "manual" :
-        tab.dataset.mode === "file" ? "manual" : "file";
+      const mode = event.key === "Home" ? "file" : event.key === "End" || tab.dataset.mode === "file" ? "manual" : "file";
       setInputMode(mode);
       byId(`${mode}-tab`).focus();
     });
@@ -5277,8 +5189,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     function alignPopover(panel, trigger) {
       if (!(panel.open || panel.matches(":popover-open"))) return;
       if (mobileMedia.matches) {
-        panel.style.removeProperty("left");
-        panel.style.removeProperty("top");
+        for (const key of ["left", "top"]) panel.style.removeProperty(key);
         return;
       }
       const rect = trigger.getBoundingClientRect();
@@ -5323,7 +5234,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       const focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .job-panel");
       document.body.dataset.mobiletab = nextView;
       for (const button of mobileButtons) {
-        const selected = button.dataset.mobile === document.body.dataset.mobiletab;
+        const selected = button.dataset.mobile === nextView;
         button.ariaSelected = selected;
         button.tabIndex = selected ? 0 : -1;
       }
