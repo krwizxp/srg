@@ -3059,19 +3059,25 @@
         else if (tokens.length > 1)
           query = isOr ? new Set(tokens) : tokens.sort((a, b) => b.length - a.length);
       }
-      const values = [
-        filterKind.value, norm(filterSido.value), norm(filterSigungu.value),
-        norm(filterEmd.value), norm(filterTag.value), norm(filterFullAddr.value),
-      ];
-      const tests = [...values.entries()].filter(([, needle]) => needle);
-      return filterStatus === "all" && !query && !tests.length
-        ? null : { status: filterStatus, tests, query };
+      const fields = {
+        kind: filterKind.value,
+        sido: norm(filterSido.value),
+        sigungu: norm(filterSigungu.value),
+        emd: norm(filterEmd.value),
+        tag: norm(filterTag.value),
+        fullAddr: norm(filterFullAddr.value),
+      };
+      const hasFields = Object.values(fields).some(Boolean);
+      return filterStatus === "all" && !query && !hasFields
+        ? null : { status: filterStatus, ...fields, query, hasFields };
     }
     let filterState = readFilters();
     function matchesFilter(r, f) {
       if (!r.result) return false;
       if (!f) return true;
       if (f.status !== "all" && !!r.result.error !== (f.status === "failed")) return false;
+      const hasFields = f.hasFields ?? !!(f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
+      if (!hasFields && !f.query) return true;
       const fields = r._search ??= [
         (r.result.kind || r.set).toLowerCase(),
         norm(r.result.addr?.sido),
@@ -3081,8 +3087,13 @@
         norm(r.result.error || r.result.addr?.fullAddr),
         undefined,
       ];
-      for (const [index, needle] of f.tests)
-        if (index === 0 ? fields[0] !== needle : !fields[index].includes(needle)) return false;
+      if (hasFields && !((!f.kind || fields[0] === f.kind) &&
+        (!f.sido || fields[1].includes(f.sido)) &&
+        (!f.sigungu || fields[2].includes(f.sigungu)) &&
+        (!f.emd || fields[3].includes(f.emd)) &&
+        (!f.tag || fields[4].includes(f.tag)) &&
+        (!f.fullAddr || fields[5].includes(f.fullAddr))))
+        return false;
       const query = f.query;
       if (!query) return true;
       const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
@@ -4022,12 +4033,6 @@
         }
         return now;
       };
-      const yieldIfNeeded = async () => {
-        if (reportProgress() - lastYield >= 8) {
-          await yieldToMain();
-          lastYield = performance.now();
-        }
-      };
       const cacheBatch = [];
       const flushCache = async () => {
         if (!cacheBatch.length) return;
@@ -4051,7 +4056,10 @@
           continue;
         }
         commitResult(i, parsed, false);
-        await yieldIfNeeded();
+        if (reportProgress() - lastYield >= 8) {
+          await yieldToMain();
+          lastYield = performance.now();
+        }
       }
       if (persistentCache.size && !signal.aborted) {
         try {
@@ -4070,7 +4078,10 @@
           if (!row) continue;
           putMemoryCache(cacheKey, row.parsed, row.savedAt);
           commitResult(i, row.parsed, false);
-          await yieldIfNeeded();
+          if (reportProgress() - lastYield >= 8) {
+            await yieldToMain();
+            lastYield = performance.now();
+          }
         }
       }
       queuePage();
@@ -4585,16 +4596,21 @@
       bitsView.setFloat64(0, ratio);
       const bits = bitsView.getBigUint64(0);
       const exponent = Number((bits >> 52n) & 2047n);
-      let significand = bits & ((1n << 52n) - 1n);
-      if (exponent) significand |= 1n << 52n;
-      if (bits & (1n << 63n)) significand = -significand;
+      if (exponent === 2047)
+        throw new RangeError("유한한 f64 좌표값이 필요합니다.");
+      let significand = bits & 0xfffffffffffffn;
+      if (exponent) significand |= 0x10000000000000n;
+      if (bits & 0x8000000000000000n) significand = -significand;
       const product = scale * significand;
       if (!product) return addend;
       const productPower = scalePower + (exponent ? exponent - 1075 : -1074);
-      const power = Math.min(productPower, offsetPower);
-      const exact = (product << BigInt(productPower - power)) +
-        (offset << BigInt(offsetPower - power));
-      return Number(exact) * 2 ** power;
+      const offsetShift = offsetPower - productPower;
+      const value = offsetShift >= 0
+        ? Number(product + (offset << BigInt(offsetShift))) * 2 ** productPower
+        : Number((product << BigInt(-offsetShift)) + offset) * 2 ** offsetPower;
+      if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022)
+        throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
+      return value;
     }
     const decimalFormatter = new Intl.NumberFormat("en-US", {
       useGrouping: false,
