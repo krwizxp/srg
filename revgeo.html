@@ -122,7 +122,14 @@
 
     svg {
       flex-shrink: 0;
-      vertical-align: middle
+      vertical-align: middle;
+      width: 20px;
+      height: 20px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+      fill: none;
+      stroke: currentColor
     }
 
     [hidden] {
@@ -130,6 +137,7 @@
     }
 
     .drop-zone:focus-within,
+    .map-preview:has(:focus-visible),
     :is(button, input, textarea, select, a, [tabindex]):focus-visible {
       outline: 2px solid var(--focus);
       outline-offset: 3px
@@ -157,16 +165,6 @@
       font-variant-numeric: tabular-nums;
       word-break: keep-all;
       min-height: 100dvh
-    }
-
-    svg {
-      width: 20px;
-      height: 20px;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 1.8;
-      fill: none;
-      stroke: currentColor
     }
 
     .coords-empty,
@@ -202,7 +200,6 @@
     }
 
     .input-actions,
-    .map-links,
     .map-recovery,
     .status-row {
       display: flex;
@@ -230,11 +227,6 @@
 
     :is(input, textarea)[aria-invalid=true] {
       border-color: var(--danger)
-    }
-
-    .map-preview:has(:focus-visible) {
-      outline: 2px solid var(--focus);
-      outline-offset: 3px
     }
 
     #coords:focus-visible {
@@ -550,7 +542,6 @@
 
     #detail-tag,
     #progress-percent,
-    .button,
     .code-view,
     .detail-fields>div,
     .file-cue,
@@ -865,20 +856,12 @@
       display: none
     }
 
+    .confirm-actions,
+    .map-links,
     .rng-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px
-    }
-
-    @media (max-width:374px) {
-      .confirm-actions {
-        flex-wrap: wrap
-      }
-
-      .confirm-actions .button {
-        flex-basis: 100%
-      }
     }
 
     #clearBtn,
@@ -928,7 +911,6 @@
     }
 
     .filters {
-      position: relative;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
       gap: 12px;
@@ -975,20 +957,7 @@
     }
 
     .filter-trigger:is([aria-expanded=true], [data-active=true]) {
-      background: var(--tint);
-      border-color: var(--accent);
-      color: var(--accent)
-    }
-
-    .filter-trigger:hover:not(:disabled) {
-      color: #fff;
-      background: var(--button-hover);
-      border-color: transparent
-    }
-
-    .filter-trigger:active:not(:disabled) {
-      color: #fff;
-      background: var(--button-active)
+      background: var(--tint)
     }
 
     #filter-count {
@@ -1009,7 +978,7 @@
     }
 
     #filter-dialog .sheet-heading,
-    .settings h2 {
+    .settings .sheet-heading {
       margin-bottom: 18px
     }
 
@@ -1017,10 +986,7 @@
       display: grid;
       gap: 12px;
       width: 100%;
-      overflow: auto;
-      right: 0;
-      top: calc(100% + 8px);
-      z-index: 15
+      overflow: auto
     }
 
     .filter-grid label {
@@ -1103,8 +1069,7 @@
       background: var(--panel)
     }
 
-    tr[data-record][data-selected=true],
-    tr[data-record][data-selected=true]:hover {
+    tr[data-record][data-selected=true] {
       background: var(--tint)
     }
 
@@ -1474,8 +1439,12 @@
 
     .map-links a {
       justify-content: center;
-      flex: 1 1 6rem;
+      min-width: 0;
       overflow-wrap: anywhere
+    }
+
+    .map-links {
+      grid-auto-rows: 1fr
     }
 
     #supp-dialog {
@@ -1488,7 +1457,7 @@
     }
 
     .supp-form h2,
-    .settings h2 {
+    .sheet-heading h2 {
       font-size: 1.25rem;
       font-weight: 600
     }
@@ -1512,17 +1481,11 @@
     }
 
     .sheet-heading h2 {
-      font-size: 1.25rem;
-      font-weight: 600;
       unicode-bidi: plaintext
     }
 
     #help-dialog {
       width: 480px
-    }
-
-    #help-dialog p {
-      margin: 12px 0
     }
 
     #help-dialog ol {
@@ -1571,19 +1534,28 @@
     }
 
     .confirm-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
       margin-top: 24px
     }
 
     .confirm-actions .button {
-      flex: 1
+      padding-inline: 12px;
+      overflow-wrap: anywhere
     }
 
-    #bulk-dialog,
-    #clear-dialog {
-      width: min(440px, calc(100vw - 32px))
+    [role=alertdialog] {
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: min(380px, calc(100vw - 32px))
+    }
+
+    [role=alertdialog] .sheet-heading {
+      justify-content: center
+    }
+
+    [role=alertdialog]>p,
+    [role=alertdialog] .sheet-heading {
+      text-align: center
     }
 
     #bulk-dialog p {
@@ -1708,8 +1680,7 @@
 
       .coords-panel,
       .job-panel {
-        border-color: transparent;
-        border-radius: var(--radius-card)
+        border-color: transparent
       }
 
       .coords-head {
@@ -1737,7 +1708,6 @@
       .results-card {
         border: 0;
         border-radius: 0;
-        box-shadow: none;
         background: 0 0
       }
 
@@ -1950,10 +1920,7 @@
         content: "";
         position: absolute;
         border-radius: inherit;
-        pointer-events: none
-      }
-
-      .mobile-nav::before {
+        pointer-events: none;
         inset: 4px auto 4px 4px;
         width: calc(50% - 5px);
         background: var(--tint);
@@ -2014,7 +1981,7 @@
         display: none
       }
 
-      :is(dialog, #detail-sheet),
+      :is(dialog, #detail-sheet):not([role=alertdialog]),
       .map-popover {
         inset: auto 0 0;
         max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
@@ -2028,7 +1995,7 @@
         max-width: none
       }
 
-      :is(dialog, #detail-sheet) {
+      :is(dialog, #detail-sheet):not([role=alertdialog]) {
         position: fixed;
         width: 100%;
         max-width: 100%;
@@ -2068,7 +2035,6 @@
       }
 
       .mobile-nav button {
-        gap: 4px;
         padding-inline: 6px
       }
 
@@ -2184,8 +2150,7 @@
       }
 
       .results-card {
-        border: 0;
-        box-shadow: none
+        border: 0
       }
 
       .table-wrap {
@@ -2256,7 +2221,8 @@
             <circle cx="12" cy="12" r="9" />
             <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3h.01" />
           </svg></button>
-        <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle"
+        <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false"
+            aria-description="시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요." class="theme-toggle" id="theme-toggle"
             title="다크 모드" type="button"><svg aria-hidden="true" class="theme-sun" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="4" fill="currentColor" />
               <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
@@ -2272,7 +2238,7 @@
     </div>
   </header>
   <main id="app">
-    <section aria-labelledby="mobile-input-tab" class="input-card" data-mode="file" id="input-view" role="tabpanel">
+    <section aria-labelledby="mobile-input-tab" class="input-card" id="input-view" role="tabpanel">
       <h2 class="card-label" id="input-title" tabindex="-1">좌표 입력</h2>
       <div aria-label="데이터 입력 방법" class="segmented input-tabs" role="tablist">
         <button aria-controls="file-pane" aria-selected="true" data-mode="file" id="file-tab" role="tab"
@@ -2698,24 +2664,22 @@
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
-    <p class="note">주소 조회는 Nominatim, 지도 미리보기는 OpenStreetMap에 좌표를 전송합니다.</p>
     <ol>
       <li>TXT 파일을 불러와 좌표를 추출하거나, 난수를 직접 변환합니다.</li>
       <li>주소 조회를 시작합니다. 입력 화면에서 일시정지, 재개, 중지할 수 있습니다.</li>
       <li>결과에서 주소를 선택하면 상세 정보와 지도 링크를 확인할 수 있습니다.</li>
       <li>CSV에는 필터와 관계없이 조회된 전체 결과가 포함됩니다.</li>
     </ol>
-    <p class="note">공용 Nominatim은 초당 1회 이하로 조회합니다. 클립보드는 HTTPS 또는 localhost에서 사용할 수 있습니다.</p>
   </dialog>
-  <dialog aria-describedby="clear-description" aria-labelledby="clear-title" id="clear-dialog">
+  <dialog aria-describedby="clear-description" aria-labelledby="clear-title" id="clear-dialog" role="alertdialog">
     <div class="sheet-heading">
       <h2 id="clear-title">변환 결과 지우기</h2>
     </div>
     <p id="clear-description">현재 변환 결과를 지우면 복구할 수 없습니다.</p>
-    <div class="confirm-actions"><button class="button" id="clear-cancel" type="button">취소</button><button
+    <div class="confirm-actions"><button autofocus class="button" id="clear-cancel" type="button">취소</button><button
         class="button danger" id="clear-confirm" type="button">결과 지우기</button></div>
   </dialog>
-  <dialog aria-describedby="bulk-description" aria-labelledby="bulk-title" id="bulk-dialog">
+  <dialog aria-describedby="bulk-description" aria-labelledby="bulk-title" id="bulk-dialog" role="alertdialog">
     <div class="sheet-heading">
       <h2 id="bulk-title">대량 주소 조회 확인</h2>
     </div>
@@ -2723,7 +2687,7 @@
     <p class="note">초당 1회 이하의 일회성 조회이며, 결과는 이 브라우저에 캐시됩니다. 반복·정기 실행 또는 격자형 수집에는 사용하지 마세요.</p>
     <p><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer"
         target="_blank">Nominatim 사용 정책</a></p>
-    <div class="confirm-actions"><button class="button" id="bulk-cancel" type="button">취소</button><button
+    <div class="confirm-actions"><button autofocus class="button" id="bulk-cancel" type="button">취소</button><button
         class="button primary" id="bulk-confirm" type="button">일회성 조회 확인</button></div>
   </dialog>
   <div class="ui-notice" hidden id="ui-notice" role="status" aria-atomic="true"><span id="ui-notice-text"></span><button
@@ -3057,9 +3021,6 @@
       const background = getComputedStyle(root).backgroundColor;
       for (const meta of themeColors) meta.content = background;
       themeToggle.ariaPressed = dark;
-      themeToggle.title = "다크 모드";
-      themeToggle.ariaLabel = "다크 모드";
-      themeToggle.setAttribute("aria-description", "시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요.");
       appearance.value = root.dataset.theme || "system";
     };
     function setTheme(theme) {
@@ -5229,7 +5190,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     on(window, "blur", () => { layoutFocus = null; });
     function setInputMode(mode) {
       const manual = mode === "manual";
-      inputView.dataset.mode = mode;
       filePane.hidden = manual;
       manualPanel.hidden = !manual;
       for (const tab of queryAll("[role=tab]", inputTabs)) {
