@@ -985,8 +985,7 @@
     .filter-grid {
       display: grid;
       gap: 12px;
-      width: 100%;
-      overflow: auto
+      width: 100%
     }
 
     .filter-grid label {
@@ -2520,7 +2519,7 @@
             <p class="inspector-empty" id="inspector-empty">결과에서 주소를 선택하세요.</p>
             <div hidden id="inspector-content">
               <p class="inspector-eyebrow">선택한 위치</p>
-              <h2 dir="auto" id="detail-title">선택한 위치</h2>
+              <h2 dir="auto" id="detail-title">주소 정보 없음</h2>
               <p dir="auto" id="detail-town"></p>
               <div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true"
                     viewBox="0 0 24 24">
@@ -5453,7 +5452,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         unloadMap();
         mapPopover.hidePopover();
         const title = error ? "조회 실패" :
-          [addr.sido, addr.sigungu].filter(Boolean).join(" ") || "선택한 위치";
+          [addr.sido, addr.sigungu].filter(Boolean).join(" ") || addr.fullAddr || "주소 정보 없음";
         const fields = {
           "detail-title": title,
           "detail-town": addr?.eupmyeon || "",
