@@ -27,9 +27,15 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
     integrity="sha384-SN6A48CJQjx946+DRb8wsoifC4a8ur9ZS6R+HCTgnBHOKCa6GLXAR3Qn8d1jztxg" rel="stylesheet">
   <style>
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
     :root {
       color-scheme: light dark;
-      --page: #f5f5f7;
+      --page: light-dark(#f5f5f7, #111113);
       --surface: light-dark(#fff, #1c1c1e);
       --panel: light-dark(#f6f6f8, #252528);
       --fg: light-dark(#1d1d1f, #f5f5f7);
@@ -48,102 +54,96 @@
       --glass-shadow: 0 4px 20px #00000012, inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 #0000000a;
       --press-bg: light-dark(#dce7f7, #35455b);
       --page-gutter: 28px;
-      --shadow: 0 1px 3px #151e3105, 0 8px 28px #151e3108;
-      --focus-ring: var(--accent);
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", "Noto Sans CJK KR", sans-serif;
       font-size: 100%;
       scrollbar-width: thin;
-      scrollbar-color: var(--control) transparent;
+      scrollbar-color: var(--control) transparent
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --page: #111113;
-      }
+    :root[data-theme=light] {
+      color-scheme: light
     }
 
-    :root[data-theme="light"] {
-      color-scheme: light;
-      --page: #f5f5f7;
-    }
-
-    :root[data-theme="dark"] {
-      color-scheme: dark;
-      --page: #111113;
+    :root[data-theme=dark] {
+      color-scheme: dark
     }
 
     *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
+    ::after,
+    ::before {
+      box-sizing: border-box
     }
 
     body,
+    dd,
+    dl,
     h1,
     h2,
     p,
-    pre,
-    dl,
-    dd {
-      margin: 0;
+    pre {
+      margin: 0
     }
 
     button,
     input,
     select,
     textarea {
-      font: inherit;
+      font: inherit
     }
 
     button,
     select {
-      cursor: pointer;
+      cursor: pointer
     }
 
     button {
-      color: inherit;
+      color: inherit
     }
 
-    button,
-    .map-links a {
+    .map-links a,
+    button {
       -webkit-tap-highlight-color: transparent;
-      transition: background-color .15s, box-shadow .15s, transform .25s cubic-bezier(.2, .8, .2, 1.2);
+      transition: background-color .15s, box-shadow .15s, transform .25s cubic-bezier(.2, .8, .2, 1.2)
     }
 
     :is(button, .map-links a):active:not(:disabled) {
       background-color: var(--press-bg);
-      transform: scale(.97);
+      transform: scale(.97)
     }
 
     a {
       color: var(--accent);
-      text-underline-offset: 3px;
+      text-underline-offset: 3px
     }
 
     svg {
       flex-shrink: 0;
-      vertical-align: middle;
+      vertical-align: middle
     }
 
     [hidden] {
-      display: none !important;
+      display: none !important
     }
 
-    :is(button, input, textarea, select, a, [tabindex]):focus-visible,
-    .drop-zone:focus-within {
-      outline: 2px solid var(--focus-ring);
-      outline-offset: 3px;
+    .drop-zone:focus-within,
+    :is(button, input, textarea, select, a, [tabindex]):focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px
     }
 
     ::selection {
       background: var(--tint);
-      color: var(--fg);
+      color: var(--fg)
+    }
+
+    body,
+    html {
+      background: var(--page)
     }
 
     html {
       min-width: 320px;
-      background: var(--page);
-      -webkit-text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%
     }
 
     body {
@@ -152,123 +152,122 @@
       line-height: 1.55;
       font-variant-numeric: tabular-nums;
       word-break: keep-all;
-      background: var(--page);
-      min-height: 100dvh;
+      min-height: 100dvh
     }
 
-    .ui-icon {
+    svg {
       width: 20px;
       height: 20px;
       stroke-linecap: round;
       stroke-linejoin: round;
       stroke-width: 1.8;
       fill: none;
-      stroke: currentColor;
+      stroke: currentColor
     }
 
-    .header-inner,
-    .site-brand,
-    .header-tools,
-    .steps li,
-    .drop-zone,
-    .coords-head,
     .coords-empty,
-    .progress-heading,
+    .coords-head,
+    .drop-zone,
     .elapsed-time,
-    .results-heading,
     .filterbar,
-    .results-footer,
-    .result-pages,
-    .page-numbers,
-    .map-load,
+    .header-inner,
+    .header-tools,
     .map-feedback,
     .map-links a,
+    .map-load,
+    .page-numbers,
+    .progress-heading,
+    .result-pages,
+    .results-footer,
+    .results-heading,
     .sheet-heading,
+    .site-brand,
+    .steps li,
     .ui-notice {
       display: flex;
-      align-items: center;
+      align-items: center
     }
 
-    .header-inner,
     .coords-head,
+    .header-inner,
     .progress-heading,
-    .results-heading,
     .results-footer,
+    .results-heading,
     .sheet-heading {
-      justify-content: space-between;
+      justify-content: space-between
     }
 
-    .status-row,
     .input-actions,
+    .map-links,
     .map-recovery,
-    .map-links {
+    .status-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 8px
     }
 
-    .button,
-    textarea,
     #output,
+    .button,
     .filters :is(input, select),
-    .map-preview,
     .map-popover,
-    dialog {
+    .map-preview,
+    dialog,
+    textarea {
       background: var(--surface);
-      border: 1px solid var(--control);
+      border: 1px solid var(--control)
     }
 
     .coords-panel,
     .job-panel,
     .results-card {
       background: var(--surface);
-      border: 1px solid var(--line);
+      border: 1px solid var(--line)
     }
 
-    .coords-head,
-    .coords-empty,
     #counts,
-    .note,
-    .remaining-note,
-    .address-sub,
-    .table-hint,
-    #results-count,
-    .inspector-eyebrow,
     #detail-town,
-    .inspector-empty,
-    .map-feedback,
+    #results-count,
+    .address-sub,
+    .coords-empty,
+    .coords-head,
     .detail-label,
-    .page-footer {
+    .inspector-empty,
+    .inspector-eyebrow,
+    .map-feedback,
+    .note,
+    .page-footer,
+    .remaining-note,
+    .table-hint {
       font-size: .875rem;
-      color: var(--muted);
+      color: var(--muted)
     }
 
+    #drop-state,
+    .coords-cell,
+    .file-changed,
+    .segmented button,
     .step-label,
     .steps li,
-    .segmented button,
-    .file-changed,
-    #drop-state,
-    th,
-    .coords-cell {
+    th {
       font-size: .8125rem;
-      color: var(--muted);
+      color: var(--muted)
     }
 
-    .site-brand h1,
-    #drop-filename,
-    .status,
-    .note,
-    td,
-    .address-main,
-    .address-sub,
+    #detail-coordinates,
+    #detail-tag,
     #detail-title,
     #detail-town,
+    #drop-filename,
+    .address-main,
+    .address-sub,
+    .credits a,
     .full-address,
+    .note,
+    .site-brand h1,
+    .status,
     dd,
-    #detail-tag,
-    #detail-coordinates,
-    .credits a {
-      overflow-wrap: anywhere;
+    td {
+      overflow-wrap: anywhere
     }
 
     .drop-zone input,
@@ -277,33 +276,33 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      opacity: 0;
+      opacity: 0
     }
 
     .button,
-    .kind-badge,
     .copyright,
-    .credits a {
+    .credits a,
+    .kind-badge {
       display: inline-flex;
-      align-items: center;
+      align-items: center
     }
 
     .button,
+    .copyright,
     .kind-badge,
-    .table-hint,
-    .copyright {
-      justify-content: center;
+    .table-hint {
+      justify-content: center
     }
 
-    .drop-zone,
     .coords-empty,
+    .drop-zone,
     .map-load {
       justify-content: center;
-      gap: 10px;
+      gap: 10px
     }
 
     .site-header {
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--line)
     }
 
     .header-inner {
@@ -311,38 +310,38 @@
       min-height: 88px;
       max-width: 1680px;
       margin: auto;
-      padding-block: max(16px, env(safe-area-inset-top)) 16px;
+      padding-block: max(16px, env(safe-area-inset-top)) 16px
     }
 
-    .site-brand,
-    .header-tools {
-      gap: 10px;
+    .header-tools,
+    .site-brand {
+      gap: 10px
     }
 
     .site-brand {
       text-decoration: none;
       color: var(--fg);
       min-width: 44px;
-      min-height: 44px;
+      min-height: 44px
     }
 
     .brand-mark {
       width: 42px;
       height: 42px;
-      flex: none;
+      flex: none
     }
 
-    .site-brand>div,
     .input-card,
     .results,
+    .site-brand>div,
     .table-zone {
-      min-width: 0;
+      min-width: 0
     }
 
     .site-brand h1 {
       display: inline;
       font-size: 1.2rem;
-      letter-spacing: -.035em;
+      letter-spacing: -.035em
     }
 
     .steps {
@@ -350,15 +349,17 @@
       gap: 24px;
       padding: 0;
       margin: 0;
-      list-style: none;
+      list-style: none
     }
 
-    .step-label {
-      display: none;
+    .step-label,
+    .theme-toggle .theme-moon,
+    .theme-toggle[aria-pressed=true] .theme-sun {
+      display: none
     }
 
     .steps li {
-      gap: 8px;
+      gap: 8px
     }
 
     .steps span {
@@ -368,65 +369,60 @@
       height: 24px;
       border: 1px solid var(--control);
       border-radius: 50%;
-      font-size: .75rem;
+      font-size: .75rem
     }
 
-    .steps [aria-current="step"] span {
+    .steps [aria-current=step] span {
       background: var(--accent);
       color: var(--surface);
-      border-color: var(--accent);
+      border-color: var(--accent)
     }
 
     .tool-capsule {
       display: flex;
       padding: 3px;
-      border-radius: 99px;
+      border-radius: 99px
     }
 
-    .tool-capsule,
-    .mobile-nav {
+    .mobile-nav,
+    .tool-capsule {
       isolation: isolate;
       border: 1px solid var(--glass-edge);
       background: linear-gradient(145deg, var(--glass-sheen), transparent 55%), var(--glass);
       box-shadow: var(--glass-shadow);
       -webkit-backdrop-filter: blur(20px) saturate(1.6);
-      backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6)
     }
 
-    .theme-toggle,
+    .icon-button,
     .settings-button,
-    .icon-button {
+    .theme-toggle {
       border: 0;
       border-radius: 50%;
-      background: transparent;
+      background: 0 0;
       display: grid;
       place-items: center;
       width: 44px;
       min-width: 44px;
       min-height: 44px;
-      padding: 0;
+      padding: 0
     }
 
-    .theme-toggle .theme-moon,
-    .theme-toggle[aria-pressed="true"] .theme-sun {
-      display: none;
-    }
-
-    .theme-toggle[aria-pressed="true"] .theme-moon {
-      display: block;
+    .theme-toggle[aria-pressed=true] .theme-moon {
+      display: block
     }
 
     :is(.theme-toggle, .settings-button, .icon-button):hover {
-      background: var(--panel);
+      background: var(--panel)
     }
 
     :is(.theme-toggle, .settings-button, .icon-button, .segmented button):active:not(:disabled) {
       background: var(--press-bg);
-      box-shadow: inset 0 1px 3px #00000018;
+      box-shadow: inset 0 1px 3px #00000018
     }
 
     .help-button {
-      font-size: .8125rem;
+      font-size: .8125rem
     }
 
     #app {
@@ -435,13 +431,13 @@
       align-items: start;
       gap: 24px;
       max-width: 1680px;
-      margin: 26px auto 0;
+      margin: 26px auto 0
     }
 
     .card-label {
       font-size: 1.5rem;
       font-weight: 720;
-      letter-spacing: -.04em;
+      letter-spacing: -.04em
     }
 
     .segmented {
@@ -450,7 +446,7 @@
       gap: 3px;
       padding: 4px;
       border-radius: 15px;
-      background: light-dark(#e9e9ee, #2c2c30);
+      background: light-dark(#e9e9ee, #2c2c30)
     }
 
     .segmented button {
@@ -460,18 +456,18 @@
       border: 0;
       border-radius: 11px;
       padding: 8px;
-      background: transparent;
+      background: 0 0
     }
 
-    .segmented :is([aria-selected="true"], [aria-pressed="true"]) {
+    .segmented :is([aria-selected=true], [aria-pressed=true]) {
       background: var(--surface);
       color: var(--fg);
       font-weight: 650;
-      box-shadow: 0 1px 5px #00000010;
+      box-shadow: 0 1px 5px #00000010
     }
 
     .input-tabs {
-      margin: 18px 0;
+      margin: 18px 0
     }
 
     .drop-zone {
@@ -482,65 +478,66 @@
       min-height: 168px;
       background: var(--surface);
       border: 1px dashed var(--control);
-      border-radius: 20px;
+      border-radius: 20px
     }
 
     .drop-zone.is-dragging,
     .drop-zone:hover {
       border-color: var(--accent);
-      background: var(--tint);
+      background: var(--tint)
     }
 
     .drop-zone:has(input:disabled) {
-      opacity: .55;
+      opacity: .55
     }
 
     .drop-zone input {
-      cursor: pointer;
+      cursor: pointer
     }
 
     .drop-zone input:disabled {
-      cursor: not-allowed;
+      cursor: not-allowed
     }
 
     .file-cue {
-      display: none;
+      display: none
     }
 
+    .coords-cell span,
     .file-changed {
-      display: block;
+      display: block
     }
 
-    .drop-text>.ui-icon {
+    .drop-text>svg {
       display: block;
       width: 30px;
       height: 30px;
       margin: 0 auto 14px;
-      color: var(--accent);
+      color: var(--accent)
     }
 
     #drop-filename {
-      font-size: 1rem;
+      font-size: 1rem
     }
 
     #drop-state {
       display: block;
-      margin-top: 6px;
+      margin-top: 6px
     }
 
-    .file-cue,
-    .button,
-    .label,
-    .code-view,
-    .progress-pending,
-    #progress-percent,
-    .status-row,
-    td,
-    .full-address,
-    .detail-fields>div,
     #detail-tag,
-    .ui-notice {
-      font-size: .875rem;
+    #progress-percent,
+    .button,
+    .code-view,
+    .detail-fields>div,
+    .file-cue,
+    .full-address,
+    .label,
+    .progress-pending,
+    .status-row,
+    .ui-notice,
+    td {
+      font-size: .875rem
     }
 
     .button {
@@ -553,159 +550,159 @@
       font-weight: 550;
       line-height: 1.4;
       text-decoration: none;
-      transition: background .15s, border-color .15s;
+      transition: background .15s, border-color .15s
     }
 
     .button:hover:not(:disabled) {
       background: var(--panel);
-      border-color: var(--accent);
+      border-color: var(--accent)
     }
 
     .button:active:not(:disabled) {
-      transform: translateY(1px);
+      transform: translateY(1px)
     }
 
     .primary:active:not(:disabled) {
       background: #004ca6;
-      color: #fff;
+      color: #fff
     }
 
     .button:disabled {
       opacity: .45;
-      cursor: not-allowed;
+      cursor: not-allowed
     }
 
     .primary {
       background: #0068df;
       color: #fff;
-      border-color: #0068df;
+      border-color: #0068df
     }
 
     .primary:hover:not(:disabled) {
       background: #0057bc;
-      color: #fff;
+      color: #fff
     }
 
-    .steps [aria-current="step"],
-    .file-cue,
-    .tinted,
     #progress-percent,
-    .page-number[aria-current="page"] {
+    .file-cue,
+    .page-number[aria-current=page],
+    .steps [aria-current=step],
+    .tinted {
       color: var(--accent);
-      font-weight: 650;
+      font-weight: 650
     }
 
     .tinted {
       background: var(--tint);
-      border-color: transparent;
+      border-color: transparent
     }
 
     .tinted:hover:not(:disabled) {
       background: var(--tint);
-      border-color: var(--accent-border);
+      border-color: var(--accent-border)
     }
 
     .danger {
       color: var(--danger);
       background: var(--danger-bg);
       border-color: transparent;
-      font-weight: 650;
+      font-weight: 650
     }
 
     .danger:hover:not(:disabled) {
       background: var(--danger-bg);
-      border-color: var(--danger);
+      border-color: var(--danger)
     }
 
     #parse {
       width: 100%;
-      margin-top: 12px;
+      margin-top: 12px
     }
 
     .coords-panel {
       min-width: 0;
       margin-top: 20px;
       overflow: hidden;
-      border-radius: 18px;
+      border-radius: 18px
     }
 
     .coords-head {
       flex-wrap: wrap;
       padding: 13px 16px;
       border-bottom: 1px solid var(--line);
-      gap: 8px;
+      gap: 8px
     }
 
     .label {
       font-weight: 650;
-      color: var(--fg);
+      color: var(--fg)
     }
 
-    .coords-head .ui-icon {
+    .coords-head svg {
       width: 16px;
       height: 16px;
       color: var(--accent);
-      margin-right: 4px;
+      margin-right: 4px
     }
 
-    .coords-panel[data-empty="true"] .coords-head {
-      border-bottom: 0;
+    .coords-panel[data-empty=true] .coords-head {
+      border-bottom: 0
     }
 
-    .coords-panel[data-empty="true"] .coords-head>span:last-child,
-    .coords-panel[data-empty="true"] #coords {
-      display: none;
+    .coords-panel[data-empty=true] #coords,
+    .coords-panel[data-empty=true] .coords-head>span:last-child {
+      display: none
     }
 
-    .coords-panel[data-empty="false"] .coords-empty {
-      display: none;
+    .coords-panel[data-empty=false] .coords-empty {
+      display: none
     }
 
     .coords-empty {
       min-height: 100px;
       padding: 12px 18px 22px;
-      text-align: center;
+      text-align: center
     }
 
-    .coords-empty .ui-icon {
+    .coords-empty svg {
       width: 22px;
       height: 22px;
-      color: var(--accent);
+      color: var(--accent)
     }
 
     .code-view {
       overflow: auto;
-      scrollbar-width: thin;
+      scrollbar-width: thin
     }
 
     .coords-tools {
       display: none;
       gap: 8px;
-      padding: 8px 16px 14px;
+      padding: 8px 16px 14px
     }
 
     .coords-tools .button,
     .map-recovery>* {
       flex: 1;
-      font-size: .8125rem;
+      font-size: .8125rem
     }
 
     .code-content {
       display: block;
       padding: 12px;
-      font: inherit;
+      font: inherit
     }
 
     #coords {
       display: grid;
       grid-template-columns: 34px minmax(0, 1fr);
-      height: 172px;
+      height: 172px
     }
 
     #coords .code-content {
       min-width: max-content;
       padding: 10px 8px;
-      line-height: 26px;
+      line-height: 26px
     }
 
     #coord-line-numbers {
@@ -713,31 +710,31 @@
       line-height: 26px;
       text-align: center;
       color: var(--muted);
-      user-select: none;
+      user-select: none
     }
 
     .job-panel {
       margin-top: 20px;
       padding: 18px;
-      border-radius: 20px;
+      border-radius: 20px
     }
 
     .progress-pending {
       display: none;
       font-weight: 650;
-      margin-bottom: 8px;
+      margin-bottom: 8px
     }
 
-    .job-panel:has(.status-row[data-state="idle"]):has(#start:disabled) .progress-pending {
-      display: block;
+    .job-panel:has(.status-row[data-state=idle]):has(#start:disabled) .progress-pending {
+      display: block
     }
 
-    .job-panel:has(.status-row[data-state="idle"]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions) {
-      display: none;
+    .job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions) {
+      display: none
     }
 
     .progress-heading {
-      margin-bottom: 12px;
+      margin-bottom: 12px
     }
 
     .track {
@@ -746,72 +743,72 @@
       border-radius: 99px;
       background: var(--line);
       overflow: hidden;
-      position: relative;
+      position: relative
     }
 
     .fill {
       display: block;
-      width: calc(var(--pct) * 1%);
+      width: calc(var(--pct)*1%);
       height: 100%;
       background: var(--accent);
-      border-radius: inherit;
+      border-radius: inherit
     }
 
     #counts {
       display: block;
-      margin-top: 10px;
+      margin-top: 10px
     }
 
     .status-row {
-      margin-top: 12px;
+      margin-top: 12px
     }
 
     .status {
       flex-basis: 100%;
-      color: var(--success);
+      color: var(--success)
     }
 
-    .status:is(.err, .warn),
     #error,
     #supp-error,
-    .result-state[data-error="true"] {
-      color: var(--danger);
+    .result-state[data-error=true],
+    .status:is(.err, .warn) {
+      color: var(--danger)
     }
 
     .status.stopped,
-    [data-state="idle"] .status:not(.err):not(.warn) {
-      color: var(--muted);
+    [data-state=idle] .status:not(.err):not(.warn) {
+      color: var(--muted)
     }
 
     .elapsed-time {
       color: var(--muted);
-      gap: 5px;
+      gap: 5px
     }
 
-    .elapsed-time .ui-icon {
+    .elapsed-time svg {
       width: 14px;
-      height: 14px;
+      height: 14px
     }
 
     .input-actions {
-      margin-top: 16px;
+      margin-top: 16px
     }
 
     .input-actions .button {
-      flex: 1;
+      flex: 1
     }
 
     .rng-fields {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 16px;
+      gap: 16px
     }
 
     .field {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      min-width: 0;
+      min-width: 0
     }
 
     textarea {
@@ -824,93 +821,93 @@
       color: var(--fg);
       border-radius: 15px;
       font-size: 1rem;
-      line-height: 1.75;
+      line-height: 1.75
     }
 
-    textarea::placeholder,
-    input::placeholder {
+    input::placeholder,
+    textarea::placeholder {
       color: var(--muted);
-      opacity: 1;
+      opacity: 1
     }
 
     .note {
-      white-space: pre-wrap;
+      white-space: pre-wrap
     }
 
     .note:empty {
-      display: none;
+      display: none
     }
 
     .rng-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
+      gap: 8px
     }
 
-    @media (max-width: 374px) {
+    @media (max-width:374px) {
       .confirm-actions {
-        flex-wrap: wrap;
+        flex-wrap: wrap
       }
 
       .confirm-actions .button {
-        flex-basis: 100%;
+        flex-basis: 100%
       }
     }
 
+    #clearBtn,
     #runBtn,
-    #useOutput,
-    #clearBtn {
-      grid-column: 1 / -1;
+    #useOutput {
+      grid-column: 1/-1
     }
 
     #output {
       margin-top: 8px;
       height: 150px;
-      border-radius: 14px;
+      border-radius: 14px
     }
 
     .results-card {
       border-radius: 24px;
-      box-shadow: var(--shadow);
+      box-shadow: 0 1px 3px #151e3105, 0 8px 28px #151e3108
     }
 
+    .filterbar,
     .results-heading {
       flex-wrap: wrap;
       gap: 16px;
-      padding: 26px 28px 18px;
+      padding: 26px 28px 18px
     }
 
     .results-heading .card-label {
-      font-size: 1.875rem;
+      font-size: 1.875rem
     }
 
     #export {
-      border-radius: 99px;
+      border-radius: 99px
     }
 
     .filterbar {
-      flex-wrap: wrap;
       gap: 12px;
-      padding: 0 28px 18px;
+      padding: 0 28px 18px
     }
 
     .filterbar .segmented {
       min-width: 300px;
-      background: var(--panel);
+      background: var(--panel)
     }
 
     .segmented strong {
       font-weight: 500;
-      margin-left: 3px;
+      margin-left: 3px
     }
 
     .remaining-note {
-      margin-left: auto;
+      margin-left: auto
     }
 
     search {
       display: block;
-      padding: 0 28px 20px;
+      padding: 0 28px 20px
     }
 
     .filters {
@@ -918,7 +915,7 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
       gap: 10px;
-      align-items: start;
+      align-items: start
     }
 
     .filters :is(input, select) {
@@ -930,44 +927,44 @@
       border-radius: 12px;
       color: var(--fg);
       padding: 8px 12px;
-      font-size: 1rem;
+      font-size: 1rem
     }
 
     .search-field {
       position: relative;
-      min-width: 0;
+      min-width: 0
     }
 
-    .search-field>.ui-icon {
+    .search-field>svg {
       position: absolute;
       top: 12px;
       left: 12px;
-      color: var(--muted);
+      color: var(--muted)
     }
 
     .search-field>input {
       padding-left: 40px;
       background: var(--panel);
-      border-color: transparent;
+      border-color: transparent
     }
 
     .search-field>input::-webkit-search-cancel-button {
-      cursor: pointer;
+      cursor: pointer
     }
 
-    .filter-trigger[aria-expanded="true"] {
+    .filter-trigger[aria-expanded=true] {
       background: var(--tint);
       border-color: var(--accent);
-      color: var(--accent);
+      color: var(--accent)
     }
 
     #filter-dialog {
-      width: min(380px, calc(100vw - 24px));
+      width: min(380px, calc(100vw - 24px))
     }
 
     #filter-dialog .sheet-heading,
     .settings h2 {
-      margin-bottom: 18px;
+      margin-bottom: 18px
     }
 
     .filter-grid {
@@ -977,19 +974,19 @@
       overflow: auto;
       right: 0;
       top: calc(100% + 8px);
-      z-index: 15;
+      z-index: 15
     }
 
     .filter-grid label {
       display: grid;
       gap: 6px;
-      font-size: .8125rem;
+      font-size: .8125rem
     }
 
     .results-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 280px;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--line)
     }
 
     .table-wrap {
@@ -997,14 +994,20 @@
       overflow: auto;
       min-height: 520px;
       max-height: 720px;
-      scrollbar-width: thin;
+      scrollbar-width: thin
     }
 
     table {
       border-spacing: 0;
       width: 100%;
       table-layout: fixed;
-      text-align: left;
+      text-align: left
+    }
+
+    td,
+    th {
+      border-bottom: 1px solid var(--line);
+      padding: 10px
     }
 
     th {
@@ -1013,85 +1016,79 @@
       z-index: 1;
       height: 44px;
       font-weight: 550;
-      background: var(--panel);
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid var(--line);
-      padding: 10px;
+      background: var(--panel)
     }
 
     td {
-      height: 76px;
+      height: 76px
     }
 
-    th:first-child,
-    td:first-child {
+    td:first-child,
+    th:first-child {
       text-align: center;
-      color: var(--muted);
+      color: var(--muted)
     }
 
     col:nth-child(1) {
-      width: 44px;
+      width: 44px
     }
 
     col:nth-child(2) {
-      width: auto;
+      width: auto
     }
 
     col:nth-child(3) {
-      width: 26%;
+      width: 26%
     }
 
     col:nth-child(4) {
-      width: 102px;
+      width: 102px
     }
 
     col:nth-child(5) {
-      width: 78px;
+      width: 78px
     }
 
     td:nth-child(4) {
-      white-space: nowrap;
+      white-space: nowrap
     }
 
     tr[data-record]:hover {
-      background: var(--panel);
+      background: var(--panel)
     }
 
-    tr[data-selected="true"] {
-      background: var(--tint);
+    tr[data-selected=true] {
+      background: var(--tint)
     }
 
-    tr[data-selected="true"] td:first-child {
+    tr[data-selected=true] td:first-child {
       box-shadow: inset 3px 0 var(--accent);
-      color: var(--accent);
+      color: var(--accent)
     }
 
     .location-button {
       display: block;
       border: 0;
       border-radius: 6px;
-      background: transparent;
+      background: 0 0;
       position: relative;
       width: 100%;
       min-height: 44px;
       padding: 0;
       text-align: left;
-      line-height: 1.6;
+      line-height: 1.6
     }
 
     .address-main,
     .address-sub {
       display: block;
-      unicode-bidi: plaintext;
+      unicode-bidi: plaintext
     }
 
-    .address-main[dir="auto"],
-    .address-sub[dir="auto"],
-    #detail-full[dir="auto"] {
-      text-align: start;
+    #detail-full[dir=auto],
+    .address-main[dir=auto],
+    .address-sub[dir=auto] {
+      text-align: start
     }
 
     .location-button::after {
@@ -1102,23 +1099,25 @@
       top: 0;
       color: var(--muted);
       font-size: 1.4rem;
-      line-height: 1;
+      line-height: 1
     }
 
     .address-main {
-      font-weight: 650;
+      font-weight: 650
     }
 
     .address-sub {
-      margin-top: 3px;
+      margin-top: 3px
     }
 
     .coords-cell {
-      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace
     }
 
-    .coords-cell span {
-      display: block;
+    .kind-badge,
+    .result-state {
+      font-size: .8125rem;
+      white-space: nowrap
     }
 
     .kind-badge {
@@ -1126,17 +1125,13 @@
       border-radius: 6px;
       border: 1px solid var(--control);
       background: var(--panel);
-      font-size: .8125rem;
       font-weight: 600;
-      white-space: nowrap;
       word-break: normal;
-      overflow-wrap: normal;
+      overflow-wrap: normal
     }
 
     .result-state {
-      color: var(--success);
-      font-size: .8125rem;
-      white-space: nowrap;
+      color: var(--success)
     }
 
     .table-hint {
@@ -1145,60 +1140,56 @@
       inset: 44px 0 0;
       padding: 32px;
       align-items: center;
-      text-align: center;
+      text-align: center
     }
 
-    .table-wrap:not(.has-results) .empty-hint,
-    .table-wrap.has-results:not(:has(tbody > tr)) .filter-empty-hint {
-      display: flex;
+    .table-wrap.has-results:not(:has(tbody>tr)) .filter-empty-hint,
+    .table-wrap:not(.has-results) .empty-hint {
+      display: flex
     }
 
-    .table-wrap[data-running]:not(.has-results) .empty-hint::before,
-    .map-feedback[data-loading="true"]::before {
+    .map-feedback[data-loading=true]::before,
+    .table-wrap[data-running]:not(.has-results) .empty-hint::before {
       content: "";
       width: 16px;
       height: 16px;
       border: 2px solid var(--control);
       border-top-color: var(--accent);
       border-radius: 50%;
-      animation: spin 1s linear infinite;
+      animation: spin 1s linear infinite
     }
 
     .table-wrap[data-running]:not(.has-results) .empty-hint::before {
-      margin-right: 12px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      margin-right: 12px
     }
 
     .results-footer {
       flex-wrap: wrap;
       gap: 10px;
-      padding: 14px 18px;
+      padding: 14px 18px
     }
 
-    .result-pages,
-    .page-numbers {
+    .page-numbers,
+    .result-pages {
       justify-content: center;
       flex-wrap: wrap;
-      gap: 4px;
+      gap: 4px
     }
 
     .result-pages .button {
       padding: 8px;
       border-color: transparent;
-      border-radius: 10px;
+      border-radius: 10px
     }
 
-    .page-number[aria-current="page"] {
-      background: var(--tint);
+    .page-number[aria-current=page] {
+      background: var(--tint)
     }
 
-    .page-ellipsis {
-      color: var(--muted);
+    .credits a,
+    .page-ellipsis,
+    dt {
+      color: var(--muted)
     }
 
     .inspector {
@@ -1206,137 +1197,133 @@
       padding: 20px;
       border-left: 1px solid var(--line);
       background: var(--panel);
-      border-bottom-right-radius: 24px;
+      border-bottom-right-radius: 24px
     }
 
     .inspector-eyebrow {
-      margin-bottom: 12px;
+      margin-bottom: 12px
     }
 
     #detail-title {
       font-size: 1.25rem;
       font-weight: 670;
-      letter-spacing: -.04em;
+      letter-spacing: -.04em
     }
 
     #detail-town {
-      margin-top: 3px;
+      margin-top: 3px
     }
 
     .inspector-empty {
       padding-top: 120px;
-      text-align: center;
+      text-align: center
     }
 
     .map-preview {
       margin: 18px 0;
       min-height: 166px;
       border-radius: 16px;
-      overflow: hidden;
+      overflow: hidden
     }
 
     .map-load {
       flex-direction: column;
       width: 100%;
       min-height: 166px;
-      background: transparent;
+      background: 0 0;
       border: 0;
       color: var(--accent);
       padding: 16px;
-      font-size: .8125rem;
+      font-size: .8125rem
     }
 
-    .map-load .ui-icon {
+    .map-load svg {
       width: 32px;
-      height: 32px;
+      height: 32px
     }
 
     .map-feedback {
       padding: 16px;
       justify-content: center;
-      gap: 8px;
+      gap: 8px
     }
 
     .map-recovery {
-      margin: 8px 0 18px;
+      margin: 8px 0 18px
     }
 
     #detail-map {
       border: 0;
       width: 100%;
       height: 190px;
-      display: block;
+      display: block
     }
 
     .full-address {
       margin-top: 6px;
       display: flex;
       align-items: start;
-      gap: 8px;
+      gap: 8px
     }
 
     #detail-full {
       flex: 1;
-      min-width: 0;
+      min-width: 0
     }
 
     #copy-address {
       flex: none;
       margin-top: -9px;
-      margin-right: -8px;
+      margin-right: -8px
     }
 
     .detail-fields {
-      margin-top: 18px;
       padding: 12px 0;
       border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--line)
     }
 
     .detail-fields>div {
       display: grid;
       grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
       gap: 8px;
-      margin: 10px 0;
+      margin: 10px 0
     }
 
-    @media (max-width: 420px) {
+    @media (max-width:420px) {
       .detail-fields>div {
         grid-template-columns: 1fr;
-        gap: 2px;
+        gap: 2px
       }
 
       .detail-fields dd {
-        text-align: start;
+        text-align: start
       }
     }
 
-    dt {
-      color: var(--muted);
-    }
-
     dd {
-      text-align: right;
+      text-align: right
     }
 
+    .detail-fields,
     .detail-tags {
-      margin-top: 18px;
+      margin-top: 18px
     }
 
     #detail-tag {
-      margin-top: 7px;
+      margin-top: 7px
     }
 
     #detail-coordinates {
       margin-top: 12px;
       font: .875rem/1.7 ui-monospace, monospace;
-      color: var(--muted);
+      color: var(--muted)
     }
 
-    .open-map,
-    #settings-help {
+    #settings-help,
+    .open-map {
       width: 100%;
-      margin-top: 18px;
+      margin-top: 18px
     }
 
     .page-footer {
@@ -1345,7 +1332,7 @@
       align-items: start;
       max-width: 1680px;
       padding-block: 18px 24px;
-      margin: auto;
+      margin: auto
     }
 
     .copyright {
@@ -1353,77 +1340,78 @@
       min-width: 1em;
       min-height: 44px;
       font-size: 1rem;
-      line-height: 1.5;
+      line-height: 1.5
     }
 
     .credits a {
       min-height: 44px;
       max-width: 100%;
-      color: var(--muted);
-      text-decoration-color: var(--control);
+      text-decoration-color: var(--control)
     }
 
-    .credits a:hover,
-    .credits a:focus-visible {
+    .credits a:focus-visible,
+    .credits a:hover {
       color: var(--accent);
-      text-decoration-color: currentColor;
+      text-decoration-color: currentColor
     }
 
     .credits a[href*="opendatacommons.org/licenses/odbl"] {
       min-width: 44px;
-      justify-content: center;
+      justify-content: center
+    }
+
+    .credits,
+    .usage-policy {
+      flex-wrap: wrap;
+      align-items: baseline
     }
 
     .credits {
       display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
       column-gap: .65rem;
       row-gap: 0;
-      min-width: 0;
+      min-width: 0
     }
 
     .usage-policy {
       display: inline-flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      column-gap: .35em;
+      column-gap: .35em
     }
 
     .usage-policy>a {
-      white-space: nowrap;
+      white-space: nowrap
     }
 
     .map-popover,
     dialog {
-      max-width: calc(100vw - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
-      max-height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)));
+      max-width: calc(100vw - 2*max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
+      max-height: calc(100dvh - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)));
       overflow: auto;
       padding: 22px;
       color: var(--fg);
       border-radius: 22px;
-      box-shadow: 0 20px 60px #0003;
+      box-shadow: 0 20px 60px #0003
     }
 
-    .settings,
-    .map-popover {
+    .map-popover,
+    .settings {
       position: fixed;
       inset: auto;
       margin: 0;
-      z-index: 40;
+      z-index: 40
     }
 
     .settings {
-      width: 300px;
+      width: 300px
     }
 
     .map-popover {
-      width: min(340px, calc(100vw - 24px));
+      width: min(340px, calc(100vw - 24px))
     }
 
     .settings label {
       display: block;
-      margin: 16px 0 8px;
+      margin: 16px 0 8px
     }
 
     .settings select {
@@ -1433,7 +1421,7 @@
       background: var(--panel);
       border: 1px solid var(--control);
       border-radius: 12px;
-      padding: 8px;
+      padding: 8px
     }
 
     .map-links a {
@@ -1441,60 +1429,60 @@
       min-width: 64px;
       padding: 10px;
       text-decoration: none;
-      border-radius: 10px;
+      border-radius: 10px
     }
 
     .map-links a:hover {
-      background: var(--tint);
+      background: var(--tint)
     }
 
     #supp-dialog {
-      width: 560px;
+      width: 560px
     }
 
     .supp-form {
       display: grid;
-      gap: 16px;
+      gap: 16px
     }
 
     .supp-form h2 {
-      font-size: 1.375rem;
+      font-size: 1.375rem
     }
 
     .supp-form .rng-actions {
       display: flex;
       flex-wrap: wrap;
-      justify-content: flex-end;
+      justify-content: flex-end
     }
 
     dialog::backdrop {
-      background: #0006;
+      background: #0006
     }
 
     #detail-sheet {
-      width: min(440px, calc(100vw - 24px));
+      width: min(440px, calc(100vw - 24px))
     }
 
     .sheet-heading {
-      margin-bottom: 8px;
+      margin-bottom: 8px
     }
 
     .sheet-heading h2 {
       font-size: 1rem;
-      unicode-bidi: plaintext;
+      unicode-bidi: plaintext
     }
 
     #help-dialog {
-      width: 480px;
+      width: 480px
     }
 
     #help-dialog p {
-      margin: 12px 0;
+      margin: 12px 0
     }
 
     #help-dialog ol {
       padding-left: 24px;
-      line-height: 1.9;
+      line-height: 1.9
     }
 
     .ui-notice {
@@ -1510,36 +1498,36 @@
       background: var(--fg);
       color: var(--surface);
       box-shadow: 0 8px 25px #0002;
-      gap: 12px;
+      gap: 12px
     }
 
     .confirm-actions {
       display: flex;
       justify-content: flex-end;
       gap: 8px;
-      margin-top: 24px;
+      margin-top: 24px
     }
 
     .confirm-actions .button {
-      flex: 1;
+      flex: 1
     }
 
-    #clear-dialog,
-    #bulk-dialog {
-      width: min(440px, calc(100vw - 32px));
+    #bulk-dialog,
+    #clear-dialog {
+      width: min(440px, calc(100vw - 32px))
     }
 
     #bulk-dialog p {
-      margin-top: 12px;
+      margin-top: 12px
     }
 
     .mobile-bottom,
     .mobile-job-slot {
-      display: none;
+      display: none
     }
 
     .mobile-job-slot:not(:empty) {
-      display: block;
+      display: block
     }
 
     .sr-only {
@@ -1551,232 +1539,219 @@
       overflow: hidden !important;
       clip-path: inset(50%);
       white-space: nowrap !important;
-      border: 0 !important;
+      border: 0 !important
     }
 
     #num64-help>span {
-      white-space: normal;
+      white-space: normal
     }
 
-    @media (max-width: 1230px) {
+    @media (max-width:1230px) {
       :root {
-        --page-gutter: 20px;
+        --page-gutter: 20px
       }
 
       .steps {
-        display: none;
+        display: none
       }
 
       .step-label {
-        display: block;
+        display: block
       }
 
       #app {
         grid-template-columns: 280px minmax(0, 1fr);
-        gap: 18px;
+        gap: 18px
       }
 
       .results-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr
       }
 
       .inspector {
-        display: none;
+        display: none
       }
 
-      .results-heading,
       .filterbar,
+      .results-heading,
       search {
-        padding-inline: 22px;
+        padding-inline: 22px
       }
 
       .remaining-note {
-        margin-left: 0;
+        margin-left: 0
       }
     }
 
-    @media (max-width: 800px) {
+    @media (max-width:800px) {
       :root {
-        font-size: 106.25%;
+        font-size: 106.25%
       }
 
       .header-inner {
         min-height: 68px;
         padding-block: max(10px, env(safe-area-inset-top)) 10px;
-        gap: 10px;
+        gap: 10px
       }
 
       .site-header {
-        border: 0;
+        border: 0
       }
 
       .brand-mark {
         width: 32px;
-        height: 32px;
+        height: 32px
       }
 
       .site-brand h1 {
-        font-size: 1rem;
+        font-size: 1rem
       }
 
-      .file-cue {
-        display: block;
+      #app,
+      .file-cue,
+      table,
+      tbody {
+        display: block
       }
 
       .drop-zone {
-        border-style: solid;
+        border-style: solid
       }
 
-      .drop-zone .drop-text>.ui-icon {
-        margin-bottom: 10px;
+      .drop-zone .drop-text>svg {
+        margin-bottom: 10px
       }
 
       .step-label {
-        display: none;
+        display: none
       }
 
       .help-button {
         display: grid;
         place-items: center;
         width: 44px;
-        padding: 0;
+        padding: 0
       }
 
-      .help-label {
-        display: none;
+      .filter-trigger span,
+      .help-label,
+      body[data-mobiletab=input] .results,
+      body[data-mobiletab=results] .input-card,
+      colgroup {
+        display: none
       }
 
       .help-button::before {
         content: "?";
         font-size: 1rem;
         font-weight: 700;
-        line-height: 1;
+        line-height: 1
       }
 
       .header-tools {
-        gap: 4px;
+        gap: 4px
       }
 
       #app {
-        display: block;
-        margin-top: 10px;
+        margin-top: 10px
       }
 
-      .card-label,
-      .results-heading .card-label {
-        font-size: 1.875rem;
-      }
-
-      body[data-mobiletab="input"] .results,
-      body[data-mobiletab="results"] .input-card {
-        display: none;
+      .card-label {
+        font-size: 1.875rem
       }
 
       .coords-panel,
       .job-panel {
         border-color: transparent;
-        border-radius: 20px;
+        border-radius: 20px
       }
 
       .coords-head {
-        padding-inline: 18px;
+        padding-inline: 18px
       }
 
-      .coords-panel[data-empty="false"] .coords-tools {
-        display: flex;
+      .coords-panel[data-empty=false] .coords-tools {
+        display: flex
       }
 
-      .coords-panel[data-expanded="false"] #coords {
+      .coords-panel[data-expanded=false] #coords {
         height: 100px;
-        overflow: hidden;
+        overflow: hidden
       }
 
-      .coords-panel[data-expanded="true"] #coords {
+      .coords-panel[data-expanded=true] #coords {
         height: min(320px, 50dvh);
-        overflow: auto;
+        overflow: auto
       }
 
       .job-panel {
-        padding: 18px 20px;
+        padding: 18px 20px
       }
 
       .results-card {
         border: 0;
         border-radius: 0;
         box-shadow: none;
-        background: transparent;
+        background: 0 0
       }
 
       .results-heading {
         gap: 10px;
-        padding: 0 0 18px;
+        padding: 0 0 18px
       }
 
       .results-heading .card-label {
-        font-size: 1.5rem;
+        font-size: 1.5rem
       }
 
       #desktop-export-slot {
-        margin-left: auto;
+        margin-left: auto
       }
 
       .filterbar {
         padding: 0 0 16px;
-        gap: 8px;
+        gap: 8px
       }
 
       .filterbar .segmented {
         min-width: 0;
-        width: 100%;
+        width: 100%
       }
 
       search {
-        padding: 0 0 18px;
+        padding: 0 0 18px
       }
 
       .filters {
         grid-template-columns: minmax(0, 1fr) 44px;
-        gap: 8px;
+        gap: 8px
       }
 
       .search-field {
-        grid-column: 1 / -1;
+        grid-column: 1/-1
       }
 
       .filter-trigger {
-        padding: 10px;
-      }
-
-      .filter-trigger span {
-        display: none;
+        padding: 10px
       }
 
       .results-grid {
         border: 0;
-        display: block;
+        display: block
       }
 
       .table-wrap {
         overflow: visible;
         min-height: 280px;
-        max-height: none;
+        max-height: none
       }
 
-      .table-wrap:not(:has(tbody > tr)) {
-        min-height: 96px;
+      .table-wrap:not(:has(tbody>tr)) {
+        min-height: 96px
       }
 
-      .table-wrap:not(:has(tbody > tr))+.results-footer {
-        display: none;
-      }
-
-      table,
-      tbody {
-        display: block;
-      }
-
-      colgroup {
-        display: none;
+      .table-wrap:not(:has(tbody>tr))+.results-footer {
+        display: none
       }
 
       thead {
@@ -1784,12 +1759,12 @@
         width: 1px;
         height: 1px;
         overflow: hidden;
-        clip-path: inset(50%);
+        clip-path: inset(50%)
       }
 
       tbody {
         display: grid;
-        gap: 12px;
+        gap: 12px
       }
 
       tr[data-record] {
@@ -1799,95 +1774,94 @@
         padding: 16px;
         background: var(--surface);
         border: 1px solid var(--line);
-        border-radius: 18px;
+        border-radius: 18px
       }
 
-      tr[data-record][data-selected="true"] {
-        border-color: var(--accent-border);
+      tr[data-record][data-selected=true] {
+        border-color: var(--accent-border)
       }
 
       td {
         display: block;
         padding: 0;
         height: auto;
-        border: 0;
+        border: 0
       }
 
       td:nth-child(1) {
-        display: none;
+        display: none
       }
 
       td:nth-child(2) {
         grid-column: 1;
         grid-row: 1;
-        min-width: 0;
+        min-width: 0
       }
 
       td:nth-child(3) {
         grid-column: 1;
-        grid-row: 2;
+        grid-row: 2
       }
 
-      td:nth-child(4) {
+      td:nth-child(4),
+      td:nth-child(5) {
         grid-column: 2;
         grid-row: 1;
-        text-align: right;
+        text-align: right
       }
 
       td:nth-child(5) {
-        grid-column: 2;
         grid-row: 2;
-        text-align: right;
-        align-self: end;
+        align-self: end
       }
 
       .address-main {
-        font-size: .9375rem;
+        font-size: .9375rem
       }
 
       .location-button {
-        padding-inline-end: 22px;
+        padding-inline-end: 22px
       }
 
       .location-button::after {
-        display: block;
+        display: block
       }
 
       .coords-cell {
         direction: ltr;
-        unicode-bidi: isolate;
+        unicode-bidi: isolate
       }
 
       .coords-cell,
-      .result-state,
-      .kind-badge {
-        font-size: .875rem;
+      .kind-badge,
+      .result-state {
+        font-size: .875rem
       }
 
       .coords-cell span {
-        display: inline;
+        display: inline
       }
 
       .coords-cell span:first-child::after {
-        content: ", ";
+        content: ", "
       }
 
       .table-hint {
-        inset: 0;
+        inset: 0
       }
 
       .results-footer {
         padding: 16px 0;
-        justify-content: center;
+        justify-content: center
       }
 
       #results-count {
         text-align: center;
-        width: 100%;
+        width: 100%
       }
 
       :is(#page-prev, #page-next)>span {
-        display: none;
+        display: none
       }
 
       .mobile-bottom {
@@ -1902,7 +1876,14 @@
         flex-wrap: wrap;
         gap: 12px;
         padding-block: 6px max(6px, env(safe-area-inset-bottom));
-        isolation: isolate;
+        isolation: isolate
+      }
+
+      .mobile-nav,
+      .mobile-nav button {
+        position: relative;
+        display: flex;
+        border-radius: 999px
       }
 
       .mobile-nav {
@@ -1910,41 +1891,39 @@
         --glass-sheen: light-dark(#ffffff0d, #ffffff08);
         --glass-edge: light-dark(#ffffff40, #ffffff26);
         --glass-shadow: 0 8px 24px #0000001a, inset 0 1px 2px #ffffff66, inset 0 -1px 2px #00000014;
-        position: relative;
-        display: flex;
         flex: 0 1 220px;
         min-width: 0;
         max-width: 220px;
         gap: 2px;
         padding: 4px;
-        border-radius: 999px;
         -webkit-backdrop-filter: blur(10px) saturate(1.6);
-        backdrop-filter: blur(10px) saturate(1.6);
+        backdrop-filter: blur(10px) saturate(1.6)
       }
 
+      .mobile-nav::after,
       .mobile-nav::before {
         content: "";
         position: absolute;
-        inset: 4px auto 4px 4px;
-        width: calc(50% - 5px);
         border-radius: inherit;
-        background: linear-gradient(145deg, #ffffff26, transparent 60%), light-dark(#0000000d, #ffffff1a);
-        box-shadow: inset 0 1px 1px #ffffff80, inset 0 -1px 1px #ffffff26, 0 2px 6px #00000012;
-        transform: translateX(var(--selection-x, 0px));
-        transition: transform .36s cubic-bezier(.22, 1, .36, 1);
-        pointer-events: none;
+        pointer-events: none
       }
 
-      body[data-mobiletab="results"] .mobile-nav::before {
-        --selection-x: calc(100% + 2px);
+      .mobile-nav::before {
+        inset: 4px auto 4px 4px;
+        width: calc(50% - 5px);
+        background: linear-gradient(145deg, #ffffff26, transparent 60%), light-dark(#0000000d, #ffffff1a);
+        box-shadow: inset 0 1px 1px #ffffff80, inset 0-1px 1px #ffffff26, 0 2px 6px #00000012;
+        transform: translateX(var(--selection-x, 0px));
+        transition: transform .36s cubic-bezier(.22, 1, .36, 1)
+      }
+
+      body[data-mobiletab=results] .mobile-nav::before {
+        --selection-x: calc(100% + 2px)
       }
 
       .mobile-nav::after {
-        content: "";
-        position: absolute;
         inset: 0;
         padding: 1px;
-        border-radius: inherit;
         background: linear-gradient(135deg, #fffffff0, #ffffff26 28%, transparent 45% 55%, #ffffff99);
         -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
         mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
@@ -1953,20 +1932,17 @@
         -webkit-mask-clip: content-box, border-box;
         mask-clip: content-box, border-box;
         -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
+        mask-composite: exclude
       }
 
       .mobile-nav:active::before {
-        transform: translateX(var(--selection-x, 0px)) scale(.96);
+        transform: translateX(var(--selection-x, 0px)) scale(.96)
       }
 
       .mobile-nav button {
-        position: relative;
         flex: 1;
         min-width: 44px;
         min-height: 56px;
-        display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -1976,78 +1952,65 @@
         font-weight: 600;
         line-height: 1.2;
         border: 0;
-        border-radius: 999px;
         color: var(--fg);
-        background: transparent;
+        background: 0 0
       }
 
-      .mobile-nav button .ui-icon {
+      .mobile-nav button svg {
         width: 26px;
         height: 26px;
         fill: currentColor;
-        stroke: none;
+        stroke: none
       }
 
-      .mobile-nav [aria-selected="true"] {
-        color: var(--accent);
+      .mobile-nav [aria-selected=true] {
+        color: var(--accent)
       }
 
       .mobile-nav button:active:not(:disabled) {
-        background: light-dark(#ffffff1a, #ffffff0d);
+        background: light-dark(#ffffff1a, #ffffff0d)
       }
 
       .page-footer {
-        padding-block: 22px calc(7rem + env(safe-area-inset-bottom));
+        padding-block: 22px calc(7rem + env(safe-area-inset-bottom))
       }
 
       .ui-notice {
-        bottom: calc(7rem + env(safe-area-inset-bottom));
+        bottom: calc(7rem + env(safe-area-inset-bottom))
       }
 
       .mobile-job-slot .job-panel {
-        margin: 0 0 18px;
+        margin: 0 0 18px
       }
 
-      .mobile-job-slot .job-panel:has([data-state="idle"]):has(#start:disabled) {
-        display: none;
+      .mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
+        display: none
       }
 
-      .map-popover,
-      #detail-sheet,
-      #help-dialog,
-      #supp-dialog,
-      #clear-dialog,
-      #bulk-dialog,
-      #filter-dialog,
-      #display-settings {
+      :is(dialog, #detail-sheet),
+      .map-popover {
         inset: auto 0 0;
         max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
         margin: 0;
         padding: 22px max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
-        border-radius: 24px 24px 0 0;
+        border-radius: 24px 24px 0 0
       }
 
       .map-popover {
         width: auto;
-        max-width: none;
+        max-width: none
       }
 
-      #detail-sheet,
-      #help-dialog,
-      #supp-dialog,
-      #clear-dialog,
-      #bulk-dialog,
-      #filter-dialog,
-      #display-settings {
+      :is(dialog, #detail-sheet) {
         position: fixed;
         width: 100%;
         max-width: 100%;
         overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
+        -webkit-overflow-scrolling: touch
       }
 
       #detail-sheet {
-        max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)));
+        max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
       }
 
       dialog:modal::before {
@@ -2057,133 +2020,133 @@
         height: 5px;
         border-radius: 5px;
         background: var(--control);
-        margin: -10px auto 16px;
+        margin: -10px auto 16px
       }
     }
 
-    @media (max-width: 374px) {
+    @media (max-width:374px) {
       :root {
-        --page-gutter: 12px;
+        --page-gutter: 12px
       }
 
       .site-brand {
-        gap: 6px;
+        gap: 6px
       }
 
       .site-brand h1 {
-        font-size: .875rem;
+        font-size: .875rem
       }
 
       .tool-capsule {
-        padding: 1px;
+        padding: 1px
       }
 
       .brand-mark {
         width: 28px;
-        height: 28px;
+        height: 28px
       }
 
       .mobile-bottom {
-        gap: 8px;
+        gap: 8px
       }
 
       .mobile-nav button {
         gap: 4px;
-        padding-inline: 6px;
+        padding-inline: 6px
       }
 
-      .result-pages,
-      .page-numbers {
-        gap: 1px;
+      .page-numbers,
+      .result-pages {
+        gap: 1px
       }
     }
 
-    .header-inner,
     #app,
-    .page-footer,
-    .mobile-bottom {
+    .header-inner,
+    .mobile-bottom,
+    .page-footer {
       padding-left: max(var(--page-gutter), env(safe-area-inset-left));
-      padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+      padding-right: max(var(--page-gutter), env(safe-area-inset-right))
     }
 
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
 
-      .tool-capsule,
-      .mobile-nav {
-        background: var(--surface);
+      .mobile-nav,
+      .tool-capsule {
+        background: var(--surface)
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
+    @media (prefers-reduced-motion:reduce) {
 
       *,
-      *::before,
-      *::after {
+      ::after,
+      ::before {
         animation: none !important;
         transition: none !important;
-        scroll-behavior: auto !important;
+        scroll-behavior: auto !important
       }
 
       :is(button, .map-links a):active:not(:disabled) {
-        transform: none;
+        transform: none
       }
 
       .mobile-nav:active::before {
-        transform: translateX(var(--selection-x, 0px));
+        transform: translateX(var(--selection-x, 0px))
       }
     }
 
-    @media (prefers-reduced-transparency: reduce) {
+    @media (prefers-reduced-transparency:reduce) {
       .mobile-nav::after {
-        display: none;
+        display: none
       }
 
-      .tool-capsule,
-      .mobile-nav {
+      .mobile-nav,
+      .tool-capsule {
         background: var(--surface);
         -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        backdrop-filter: none
       }
     }
 
-    @media (prefers-contrast: more) {
+    @media (prefers-contrast:more) {
       .mobile-nav::after {
-        display: none;
+        display: none
       }
 
       :root {
         --line: var(--control);
         --control: var(--fg);
-        --muted: var(--fg);
+        --muted: var(--fg)
       }
 
-      .tool-capsule,
-      .mobile-nav {
+      .mobile-nav,
+      .tool-capsule {
         background: var(--surface);
         border-color: var(--fg);
         -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        backdrop-filter: none
       }
     }
 
-    @media (forced-colors: active) {
+    @media (forced-colors:active) {
       .mobile-nav::after {
-        display: none;
+        display: none
       }
 
-      .tool-capsule,
-      .mobile-nav {
-        border-color: ButtonText;
+      .mobile-nav,
+      .tool-capsule {
+        border-color: ButtonText
       }
 
       .fill {
-        background: Highlight;
+        background: Highlight
       }
 
-      .segmented :is([aria-selected="true"], [aria-pressed="true"]),
-      .mobile-nav [aria-selected="true"],
-      tr[data-selected="true"] {
-        outline: 2px solid Highlight;
+      .mobile-nav [aria-selected=true],
+      .segmented :is([aria-selected=true], [aria-pressed=true]),
+      tr[data-selected=true] {
+        outline: 2px solid Highlight
       }
     }
 
@@ -2192,51 +2155,51 @@
       :root,
       :root[data-theme] {
         color-scheme: light;
-        --page: #fff;
+        --page: #fff
       }
 
       body {
-        background: white;
+        background: #fff
       }
 
-      .site-header,
-      .input-card,
-      search,
-      .filterbar,
-      .mobile-bottom,
-      .inspector,
-      .results-footer,
-      .ui-notice,
       #export,
-      .mobile-job-slot {
-        display: none !important;
+      .filterbar,
+      .input-card,
+      .inspector,
+      .mobile-bottom,
+      .mobile-job-slot,
+      .results-footer,
+      .site-header,
+      .ui-notice,
+      search {
+        display: none !important
       }
 
       #app,
       .results,
-      body[data-mobiletab="input"] .results,
-      .results-grid {
+      .results-grid,
+      body[data-mobiletab=input] .results {
         display: block;
         margin: 0;
-        padding: 0;
+        padding: 0
       }
 
       .results-card {
         border: 0;
-        box-shadow: none;
+        box-shadow: none
       }
 
       .table-wrap {
         overflow: visible;
-        max-height: none;
+        max-height: none
       }
 
       table {
-        display: table;
+        display: table
       }
 
       colgroup {
-        display: table-column-group;
+        display: table-column-group
       }
 
       thead {
@@ -2245,29 +2208,29 @@
         width: auto;
         height: auto;
         overflow: visible;
-        clip-path: none;
+        clip-path: none
       }
 
       tbody {
-        display: table-row-group;
+        display: table-row-group
       }
 
       tbody tr[data-record] {
-        display: table-row;
+        display: table-row
       }
 
       tbody td {
         display: table-cell;
         border-bottom: 1px solid #ccc;
-        padding: 8px;
+        padding: 8px
       }
 
       tbody td:first-child {
-        display: table-cell;
+        display: table-cell
       }
 
       .page-footer {
-        padding: 20px;
+        padding: 20px
       }
     }
   </style>
@@ -2292,13 +2255,13 @@
         <button aria-label="도움말" class="button help-button" id="show-help" type="button"><span
             class="help-label">도움말</span></button>
         <div class="tool-capsule"><button aria-label="다크 모드" aria-pressed="false" class="theme-toggle" id="theme-toggle"
-            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun ui-icon" viewbox="0 0 24 24">
+            title="다크 모드 켜기" type="button"><svg aria-hidden="true" class="theme-sun" viewbox="0 0 24 24">
               <circle cx="12" cy="12" fill="currentColor" r="4" />
               <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
-            </svg><svg aria-hidden="true" class="theme-moon ui-icon" viewbox="0 0 24 24">
+            </svg><svg aria-hidden="true" class="theme-moon" viewbox="0 0 24 24">
               <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" />
             </svg></button><button aria-label="화면 설정" class="settings-button" title="화면 설정" aria-haspopup="dialog"
-            aria-controls="display-settings" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+            aria-controls="display-settings" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
               <path
                 d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
               <circle cx="11" cy="12" r="3" />
@@ -2316,7 +2279,7 @@
           tabindex="-1" type="button">난수 직접 입력</button>
       </div>
       <div aria-labelledby="file-tab" id="file-pane" role="tabpanel"><label class="drop-zone">
-          <span class="drop-text"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          <span class="drop-text"><svg aria-hidden="true" viewbox="0 0 24 24">
               <path d="M6 3h8l4 4v14H6z" />
               <path d="M14 3v5h4M9 12h6m-6 4h6" />
             </svg><strong id="drop-filename">좌표 TXT 파일 선택</strong><span id="drop-state">TXT 파일을 선택하거나 이곳에 끌어
@@ -2324,7 +2287,7 @@
               바꾸려면 탭하세요.</span></span>
           <input accept=".txt,text/plain" aria-label="좌표 TXT 파일 선택" id="file" type="file">
         </label><button class="button tinted" command="--parse" commandfor="app" id="parse" type="button">
-          <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          <svg aria-hidden="true" viewbox="0 0 24 24">
             <path d="M6 3h8l4 4v14H6z" />
             <path d="M14 3v5h4M9 12h6m-6 4h6" />
           </svg>
@@ -2352,7 +2315,7 @@
           </div>
           <div class="rng-actions">
             <button class="button primary" id="runBtn" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path
                   d="m9 3-.6 2.2-2 .9-2-.6-2 3.5L4 10.6v2.8l-1.6 1.6 2 3.5 2-.6 2 .9L9 21h4l.6-2.2 2-.9 2 .6 2-3.5-1.6-1.6v-2.8L19.6 9l-2-3.5-2 .6-2-.9L13 3Z" />
                 <circle cx="11" cy="12" r="3" />
@@ -2360,7 +2323,7 @@
               <span>좌표로 변환</span>
             </button>
             <button class="button" disabled id="saveOutput" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="M12 4.5v10" />
                 <path d="m8 10.75 4 4 4-4" />
                 <path d="M5.5 18.5h13" />
@@ -2368,14 +2331,14 @@
               <span>TXT 저장</span>
             </button>
             <button aria-label="클립보드 복사" class="button" disabled id="copyOutput" title="클립보드 복사" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <rect height="10" rx="2" width="10" x="9" y="9" />
                 <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
               </svg>
               <span>결과 복사</span>
             </button>
             <button class="button danger" id="clearBtn" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" />
               </svg>
               <span>출력 지우기</span>
@@ -2392,12 +2355,12 @@
       </div>
       <section aria-labelledby="coords-label" class="coords-panel" data-empty="true" data-expanded="false">
         <div class="coords-head">
-          <h2 class="label" id="coords-label"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          <h2 class="label" id="coords-label"><svg aria-hidden="true" viewbox="0 0 24 24">
               <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" fill="currentColor" stroke="none" />
               <circle cx="12" cy="9" fill="white" r="2.8" stroke="none" />
             </svg>추출된 좌표 (lat,lon)</h2><span>총 <strong id="coords-count">0</strong>개</span>
         </div>
-        <div class="coords-empty"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+        <div class="coords-empty"><svg aria-hidden="true" viewbox="0 0 24 24">
             <path d="M12 22S4 14.9 4 9a8 8 0 1 1 16 0c0 5.9-8 13-8 13Z" />
             <circle cx="12" cy="9" r="2.5" />
           </svg><span>좌표를 추출하면 이곳에 표시됩니다.</span></div>
@@ -2424,30 +2387,30 @@
                 id="cnt-remain">0</strong>건 미처리</output>
           </div>
           <div class="status-row" data-state="idle"><output class="status" id="status" tabindex="-1">파일을 업로드해
-              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              주세요.</output><span class="elapsed-time"><svg aria-hidden="true" viewbox="0 0 24 24">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
           <div class="input-actions"><button class="button primary" command="--start" commandfor="app" disabled
               id="start" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
               </svg>
               <span>주소 조회 시작</span>
             </button><button class="button" command="--pause" commandfor="app" disabled hidden id="pause" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none" />
               </svg>
               <span>일시정지</span>
             </button><button class="button" command="--resume" commandfor="app" disabled hidden id="resume"
               type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
               </svg>
               <span>재개</span>
             </button><button class="button danger" command="--stop" commandfor="app" disabled hidden id="stop"
               type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5" />
               </svg>
               <span>중지</span>
@@ -2463,7 +2426,7 @@
           </div>
           <div id="desktop-export-slot"><button class="button tinted" command="--export" commandfor="app" disabled
               id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <path d="M12 4.5v10" />
                 <path d="m8 10.75 4 4 4-4" />
                 <path d="M5.5 18.5h13" />
@@ -2487,7 +2450,7 @@
         <search aria-label="주소 조회 결과 필터">
           <form class="filters" id="filters">
             <div class="search-field">
-              <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+              <svg aria-hidden="true" viewbox="0 0 24 24">
                 <circle cx="10.5" cy="10.5" r="6.5" />
                 <path d="m16 16 4.5 4.5" />
               </svg>
@@ -2509,7 +2472,7 @@
               </option>
             </select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
               aria-expanded="false" class="button filter-trigger" id="advanced-filters" type="button"><svg
-                aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                aria-hidden="true" viewbox="0 0 24 24">
                 <path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
                 <circle cx="14" cy="7" r="3" />
                 <circle cx="10" cy="17" r="3" />
@@ -2528,7 +2491,7 @@
                     type="search"></label><label>전체주소<input aria-label="전체주소" enterkeyhint="search" id="filter-fulladdr"
                     inputmode="search" placeholder="전체주소" type="search"></label><button class="button"
                   command="--filter-clear" commandfor="app" id="filter-clear" type="button">
-                  <svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                  <svg aria-hidden="true" viewbox="0 0 24 24">
                     <path d="M20 7v5h-5M4 17v-5h5" />
                     <path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
                   </svg>
@@ -2570,13 +2533,13 @@
             <div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
               <nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
                 <button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app" id="page-prev"
-                  type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                  type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
                     <path d="m14 6-6 6 6 6" />
                   </svg><span>이전</span></button>
                 <output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers"
                   id="page-numbers"></span>
                 <button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app" id="page-next"
-                  type="button"><span>다음</span><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                  type="button"><span>다음</span><svg aria-hidden="true" viewbox="0 0 24 24">
                     <path d="m10 6 6 6-6 6" />
                   </svg></button>
               </nav>
@@ -2589,7 +2552,7 @@
               <h2 dir="auto" id="detail-title">선택한 위치</h2>
               <p dir="auto" id="detail-town"></p>
               <div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true"
-                    class="ui-icon" viewbox="0 0 24 24">
+                    viewbox="0 0 24 24">
                     <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" />
                     <circle cx="12" cy="10" r="2.5" />
                   </svg><span>OpenStreetMap 지도 불러오기</span></button>
@@ -2602,8 +2565,7 @@
                   rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
               <p class="detail-label">전체 주소</p>
               <div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
-                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" class="ui-icon"
-                    viewbox="0 0 24 24">
+                  class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
                     <rect height="11" rx="2" width="11" x="9" y="9" />
                     <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
                   </svg></button></div>
@@ -2627,7 +2589,7 @@
               </div>
               <p dir="ltr" id="detail-coordinates"></p>
               <button class="map-btn button open-map" id="detail-map-links" popovertarget="map-popover"
-                popovertargetaction="show" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+                popovertargetaction="show" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
                   <path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z" />
                   <path d="M9 2v17m6-14v17" />
                 </svg>지도에서 열기</button>
@@ -2658,13 +2620,13 @@
   <div class="mobile-bottom">
     <div aria-label="작업 화면" class="mobile-nav" role="tablist">
       <button aria-controls="input-view" aria-selected="true" data-mobile="input" id="mobile-input-tab" role="tab"
-        tabindex="0" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+        tabindex="0" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
           <path
             d="M6.5 2A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V9h-5a2 2 0 0 1-2-2V2ZM15 2.6V7h4.4ZM8 12a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H9a1 1 0 0 1-1-1Zm0 5a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H9a1 1 0 0 1-1-1Z"
             fill-rule="evenodd" />
         </svg>입력</button>
       <button aria-controls="results-view" aria-selected="false" data-mobile="results" id="mobile-results-tab"
-        role="tab" tabindex="-1" type="button"><svg aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+        role="tab" tabindex="-1" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
           <path
             d="M5 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3Zm2 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm4 .5a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2ZM7 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm4 .5a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2ZM7 15a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm4 .5a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2Z"
             fill-rule="evenodd" />
@@ -2716,7 +2678,7 @@
   <dialog aria-labelledby="sheet-title" id="detail-sheet">
     <div class="sheet-heading">
       <h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg
-          aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          aria-hidden="true" viewbox="0 0 24 24">
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
@@ -2724,7 +2686,7 @@
   <dialog aria-labelledby="help-title" id="help-dialog">
     <div class="sheet-heading">
       <h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg
-          aria-hidden="true" class="ui-icon" viewbox="0 0 24 24">
+          aria-hidden="true" viewbox="0 0 24 24">
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
@@ -2764,8 +2726,8 @@
       <td><button class="location-button" type="button"><span class="address-main" dir="auto">위치 상세 보기</span><span
             class="address-sub" dir="auto"></span></button></td>
       <td class="coords-cell"><span></span><span></span></td>
-      <td></td>
-      <td></td>
+      <td><span class="kind-badge"></span></td>
+      <td><span class="result-state"></span></td>
     </tr>
   </template>
   <noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
@@ -2778,18 +2740,11 @@
     const COORD_REGEX =
       /(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])/g;
     const csvEsc = (s) => {
-      if (s) {
-        const c0 = s.charCodeAt(0);
-        if (
-          c0 === 9 || c0 === 10 || c0 === 13 || c0 === 61 || c0 === 43 ||
-          c0 === 45 || c0 === 64
-        )
-          s = "'" + s;
-      }
+      if (s && /^[\t\n\r=+\-@]/.test(s)) s = "'" + s;
       return /[",\r\n]/.test(s)
-        ? `"${s.replaceAll('"', '""')}"`
+        ? "\"" + s.replaceAll("\"", "\"\"") + "\""
         : s;
-    };
+    }
     const CONFIG = {
       MAX_RETRY: 3,
       REQUEST_TIMEOUT_MS: 10_000,
@@ -2827,10 +2782,9 @@
       excludedC = "",
     ) {
       for (const name of candidates) {
-        if (!name || name === excludedA || name === excludedB ||
-          name === excludedC) continue;
-        if (suffixes && !suffixes.includes(name.at(-1))) continue;
-        return name;
+        if (name && name !== excludedA && name !== excludedB &&
+          name !== excludedC &&
+          (!suffixes || suffixes.includes(name.at(-1)))) return name;
       }
       return "";
     }
@@ -2842,11 +2796,8 @@
       const { city, county } = fields;
       let sido = fields.level4 || fields.state;
       let sigungu = "";
-      const specialCity = !!city && CONFIG.SPECIAL_CITIES.test(city);
-      if (!sido && specialCity) sido = city;
-      if (!!sido && (sido === city
-        ? specialCity
-        : CONFIG.SPECIAL_CITIES.test(sido))) {
+      if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) sido = city;
+      if (sido && CONFIG.SPECIAL_CITIES.test(sido)) {
         const candidates = [cityDistrict, level6, county, primary, p0, p1];
         let fallback = "";
         for (const name of candidates) {
@@ -2871,9 +2822,7 @@
           ],
           "구", sido, cityLike,
         );
-        sigungu = cityLike && districtName
-          ? cityLike + " " + districtName
-          : cityLike || districtName;
+        sigungu = [cityLike, districtName].filter(Boolean).join(" ");
         sigungu ||= pickAdmin(
           [county, level6, cityDistrict, primary, p0, p1],
           "시구군", sido,
@@ -2886,15 +2835,9 @@
       ]) {
         if (!name || name === sido || name === sigungu) continue;
         if (eupmyeon.includes(name)) continue;
-        const last = name.length - 1;
-        if (
-          "읍면동리".includes(name.at(-1)) ||
-          (
-            name.charCodeAt(last) === 0xac00 &&
-            name.charCodeAt(last - 1) >= 48 &&
-            name.charCodeAt(last - 1) <= 57
-          )
-        ) eupmyeon.push(name);
+        if ("읍면동리".includes(name.at(-1)) ||
+          (name.endsWith("가") && "0123456789".includes(name.at(-2))))
+          eupmyeon.push(name);
       }
       return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
     }
@@ -2929,11 +2872,9 @@
         ],
         0, sido, cityLike,
       );
-      let sigungu = cityLike && districtName
-        ? cityLike + " " + districtName
-        : cityLike || districtName || fields.level6 || fields.level8 ||
-        city || fields.town || county || fields.district ||
-        fields.municipality;
+      let sigungu = [cityLike, districtName].filter(Boolean).join(" ") ||
+        fields.level6 || fields.level8 || city || fields.town ||
+        county || fields.district || fields.municipality;
       if ((!sigungu || sigungu === sido) &&
         (fields.type === "city" || fields.type === "county"))
         sigungu = primary || city || county;
@@ -2955,20 +2896,12 @@
     function getAdmin(fields, country, p0, p1) {
       const adminCountry = fields.level2;
       const countryLabel = fields.country || adminCountry;
-      let lowerCountry;
-      let lowerAdmin;
-      const explicitKorean =
-        country === "kr" ||
-        country === "kp" ||
+      const lowerCountry = countryLabel.toLowerCase();
+      const lowerAdmin = adminCountry.toLowerCase();
+      const korean = country === "kr" || country === "kp" ||
         countryLabel === "대한민국" ||
-        countryLabel === "조선민주주의인민공화국";
-      if (!explicitKorean) {
-        lowerCountry = countryLabel.toLowerCase();
-        lowerAdmin = adminCountry.toLowerCase();
-      }
-      const korean = explicitKorean ||
-        lowerCountry.includes("korea") ||
-        lowerAdmin.includes("korea");
+        countryLabel === "조선민주주의인민공화국" ||
+        lowerCountry.includes("korea") || lowerAdmin.includes("korea");
       const result = korean
         ? parseKoreanAdmin(fields, p0, p1)
         : parseGlobalAdmin(fields, p0, p1);
@@ -2985,74 +2918,39 @@
     }
     function isValidGeocode(parsed) {
       const addr = parsed?.addr;
-      return !!addr && typeof parsed === "object" &&
-        typeof addr === "object" &&
-        boundedText(addr.sido) &&
-        boundedText(addr.sigungu) &&
-        boundedText(addr.eupmyeon) &&
-        boundedText(addr.tag) &&
-        boundedText(addr.fullAddr) &&
-        (parsed.kind === undefined || boundedText(parsed.kind));
+      if (!addr || typeof parsed !== "object" || typeof addr !== "object") return false;
+      for (const key of ["sido", "sigungu", "eupmyeon", "tag", "fullAddr"]) {
+        if (!boundedText(addr[key])) return false;
+      }
+      return parsed.kind === undefined || boundedText(parsed.kind);
     }
     function parseGeocode(data) {
-      const gc = data && typeof data === "object" &&
-        Array.isArray(data.features)
-        ? data.features[0]?.properties?.geocoding
-        : null;
+      const gc = Array.isArray(data?.features)
+        ? data.features[0]?.properties?.geocoding : null;
       if (!gc)
         return {
           addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
         };
       const label = text(gc.label);
       const country = text(gc.country_code).toLowerCase();
-      const admin = gc.admin && typeof gc.admin === "object"
-        ? gc.admin
-        : null;
-      const fields = {
-        level2: text(admin?.level2),
-        level4: text(admin?.level4),
-        level6: text(admin?.level6),
-        level7: text(admin?.level7),
-        level8: text(admin?.level8),
-        level9: text(admin?.level9),
-        level10: text(admin?.level10),
-        country: text(gc.country),
-        name: text(gc.name),
-        street: text(gc.street),
-        type: text(gc.type),
-        cityDistrict: text(gc.city_district),
-        district: text(gc.district),
-        suburb: text(gc.suburb),
-        city: text(gc.city),
-        county: text(gc.county),
-        state: text(gc.state),
-        region: text(gc.region),
-        province: text(gc.province),
-        town: text(gc.town),
-        locality: text(gc.locality),
-        village: text(gc.village),
-        neighbourhood: text(gc.neighbourhood),
-        municipality: text(gc.municipality),
-        quarter: text(gc.quarter),
-        hamlet: text(gc.hamlet),
-        township: text(gc.township),
-        residential: text(gc.residential),
-      };
-      let firstPart;
-      let p0 = "";
-      let p1 = "";
-      for (let start = 0; start <= label.length && !p1;) {
-        const comma = label.indexOf(",", start);
-        const end = comma < 0 ? label.length : comma;
-        const part = label.slice(start, end).trim();
-        if (start === 0) firstPart = part;
-        if (part) {
-          if (p0) p1 = part;
-          else p0 = part;
-        }
-        if (comma < 0) break;
-        start = comma + 1;
+      const admin = typeof gc.admin === "object" ? gc.admin : null;
+      const fields = {};
+      for (const level of [2, 4, 6, 7, 8, 9, 10]) {
+        const key = `level${level}`;
+        fields[key] = text(admin?.[key]);
       }
+      for (const source of [
+        "country", "name", "street", "type", "city_district",
+        "district", "suburb", "city", "county", "state", "region",
+        "province", "town", "locality", "village", "neighbourhood",
+        "municipality", "quarter", "hamlet", "township", "residential",
+      ]) {
+        const key = source === "city_district" ? "cityDistrict" : source;
+        fields[key] = text(gc[source]);
+      }
+      const labelParts = label.split(",").map(part => part.trim());
+      const firstPart = labelParts[0];
+      const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
       const { sido, sigungu, eupmyeon } = getAdmin(
         fields, country, p0, p1,
       );
@@ -3109,70 +3007,33 @@
     const COORD_POW = 10 ** COORD_DECIMALS;
     const fmtCoord6 = (v) => {
       const dot = v.indexOf(".");
-      if (dot === -1) return v === "-0" ? "0" : v;
-      let s = v;
-      if (v.length - dot - 1 > COORD_DECIMALS) {
-        s = (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(
-          COORD_DECIMALS,
-        );
-      }
-      let end = s.length;
-      while (end && s.charCodeAt(end - 1) === 48) end--;
-      if (end && s.charCodeAt(end - 1) === 46) end--;
-      s = end === s.length ? s : s.slice(0, end);
-      return s === "-0" ? "0" : s;
-    };
-    const fileInput = byId("file"),
-      themeToggle = byId("theme-toggle"),
-      exportBtn = byId("export"),
-      statusText = byId("status");
-    const countTotal = byId("cnt-total"),
-      countSuccess = byId("cnt-success"),
-      countFail = byId("cnt-fail"),
-      countRemain = byId("cnt-remain");
-    const progressBar = byId("prog"),
-      percentText = byId("progress-percent");
-    const summaryTotal = byId("summary-total"),
-      summarySuccess = byId("summary-success"),
-      summaryFail = byId("summary-fail"),
-      summaryRemain = byId("summary-remain");
+      if (dot < 0) return v === "-0" ? "0" : v;
+      const rounded = v.length - dot - 1 > COORD_DECIMALS
+        ? (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(COORD_DECIMALS)
+        : v;
+      const normalized = rounded.replace(/\.?0+$/, "");
+      return normalized === "-0" ? "0" : normalized;
+    }
+    const [fileInput, themeToggle, exportBtn, statusText] = ["file", "theme-toggle", "export", "status"].map(byId);
+    const [countTotal, countSuccess, countFail, countRemain] = ["cnt-total", "cnt-success", "cnt-fail", "cnt-remain"].map(byId);
+    const [progressBar, percentText] = ["prog", "progress-percent"].map(byId);
+    const [summaryTotal, summarySuccess, summaryFail, summaryRemain] = ["summary-total", "summary-success", "summary-fail", "summary-remain"].map(byId);
     const coordsCount = byId("coords-count");
     const coordsPanel = query(".coords-panel");
-    const lineNumbers = byId("coord-line-numbers"),
-      resultsCount = byId("results-count"),
-      pageNumbers = byId("page-numbers"),
-      elapsed = byId("elapsed");
+    const [lineNumbers, resultsCount, pageNumbers, elapsed] = ["coord-line-numbers", "results-count", "page-numbers", "elapsed"].map(byId);
     const statusRow = query(".status-row");
     const tableWrap = query(".table-wrap");
     const emptyHint = query(".table-wrap .empty-hint");
     const resultBody = byId("tbl").tBodies[0];
     const coordsContent = query("#coords .code-content");
-    const parseBtn = byId("parse"),
-      startBtn = byId("start"),
-      pauseBtn = byId("pause"),
-      resumeBtn = byId("resume"),
-      stopBtn = byId("stop");
-    const filterQuery = byId("filter-q"),
-      filterForm = byId("filters"),
-      filterKind = byId("filter-kind"),
-      filterSido = byId("filter-sido"),
-      filterSigungu = byId("filter-sigungu"),
-      filterEmd = byId("filter-emd"),
-      filterTag = byId("filter-tag"),
-      filterFullAddr = byId("filter-fulladdr");
-    const pageNav = byId("result-pages"),
-      pagePrev = byId("page-prev"),
-      pageNext = byId("page-next"),
-      pageStatus = byId("page-status");
+    const [parseBtn, startBtn, pauseBtn, resumeBtn, stopBtn] = ["parse", "start", "pause", "resume", "stop"].map(byId);
+    const [filterQuery, filterForm, filterKind, filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr] = ["filter-q", "filters", "filter-kind", "filter-sido", "filter-sigungu", "filter-emd", "filter-tag", "filter-fulladdr"].map(byId);
+    const [pageNav, pagePrev, pageNext, pageStatus] = ["result-pages", "page-prev", "page-next", "page-status"].map(byId);
     const root = document.documentElement;
     const pageScheme = query('meta[name="color-scheme"]');
     const themeColors = queryAll('meta[name="theme-color"]');
     const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
-    const appearance = byId("appearance"),
-      useOutput = byId("useOutput"),
-      coordsExpand = byId("coords-expand"),
-      dropState = byId("drop-state"),
-      bulkDialog = byId("bulk-dialog");
+    const [appearance, useOutput, coordsExpand, dropState, bulkDialog] = ["appearance", "useOutput", "coords-expand", "drop-state", "bulk-dialog"].map(byId);
     const currentTheme = () =>
       root.dataset.theme || (themeMedia.matches ? "dark" : "light");
     const updateTheme = () => {
@@ -3182,7 +3043,7 @@
       for (const meta of themeColors) meta.content = background;
       themeToggle.ariaPressed = dark;
       themeToggle.title = dark ? "라이트 모드로 전환" : "다크 모드로 전환";
-      themeToggle.setAttribute("aria-label", themeToggle.title);
+      themeToggle.ariaLabel = themeToggle.title;
       themeToggle.setAttribute("aria-description", "시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요.");
       appearance.value = root.dataset.theme || "system";
     };
@@ -3200,44 +3061,29 @@
     let filterStatus = "all";
     const rowTemplate = query("tr", byId("tmpl-row").content);
     const RX_COMMA_WS = /\s*,\s*/g;
-    const norm = (s) => {
-      if (s == null) return "";
-      s = s.trim().toLowerCase();
-      return s.includes(",") ? s.replace(RX_COMMA_WS, ",") : s;
-    };
+    const norm = s => s == null ? "" : s.trim().toLowerCase().replace(RX_COMMA_WS, ",");
     function readFilters() {
       const q = norm(filterQuery.value);
-      const kind = filterKind.value;
-      const sido = norm(filterSido.value);
-      const sigungu = norm(filterSigungu.value);
-      const emd = norm(filterEmd.value);
-      const tag = norm(filterTag.value);
-      const fullAddr = norm(filterFullAddr.value);
       let query = null;
       if (q) {
         const isOr = q.includes("|");
-        const tokens = new Set();
-        for (const rawToken of isOr ? q.split("|") : q.split(/\s+/u)) {
-          const token = rawToken.trim();
-          if (token) tokens.add(token);
-        }
-        if (tokens.size === 1)
-          query = tokens.values().next().value;
-        else if (tokens.size > 1)
-          query = isOr ? tokens : [...tokens].sort((a, b) => b.length - a.length);
+        const tokens = [...new Set(
+          q.split(isOr ? "|" : /\s+/u).map(token => token.trim()).filter(Boolean),
+        )];
+        if (tokens.length === 1) query = tokens[0];
+        else if (tokens.length > 1)
+          query = isOr ? new Set(tokens) : tokens.sort((a, b) => b.length - a.length);
       }
-      if (!(filterStatus !== "all" || kind || sido || sigungu || emd || tag || fullAddr || query))
-        return null;
-      return {
-        status: filterStatus,
-        kind,
-        sido,
-        sigungu,
-        emd,
-        tag,
-        fullAddr,
-        query,
+      const fields = {
+        kind: filterKind.value,
+        sido: norm(filterSido.value),
+        sigungu: norm(filterSigungu.value),
+        emd: norm(filterEmd.value),
+        tag: norm(filterTag.value),
+        fullAddr: norm(filterFullAddr.value),
       };
+      return filterStatus === "all" && !query && !Object.values(fields).some(Boolean)
+        ? null : { status: filterStatus, ...fields, query };
     }
     let filterState = readFilters();
     function matchesFilter(r, f) {
@@ -3269,16 +3115,10 @@
         fields[6] = hay;
       }
       if (typeof query === "string") return hay.includes(query);
-      if (query instanceof Set) {
-        for (const token of query) {
-          if (hay.includes(token)) return true;
-        }
-        return false;
-      }
-      for (const token of query) {
-        if (!hay.includes(token)) return false;
-      }
-      return true;
+      const isOr = query instanceof Set;
+      for (const token of query)
+        if (hay.includes(token) === isOr) return isOr;
+      return !isOr;
     }
     let pageSize = 10;
     let filterTimer = null;
@@ -3314,16 +3154,14 @@
       const fragment = document.createDocumentFragment();
       for (const page of numbers) {
         const el = document.createElement(page ? "button" : "span");
+        el.className = page ? "page-number button" : "page-ellipsis";
+        el.textContent = page ? fmt(page) : "…";
         if (page) {
           el.type = "button";
-          el.className = "page-number button";
           el.dataset.page = page - 1;
-          el.textContent = fmt(page);
           el.ariaLabel = `${fmt(page)} 페이지`;
           if (page === current) el.ariaCurrent = "page";
         } else {
-          el.className = "page-ellipsis";
-          el.textContent = "…";
           el.ariaHidden = "true";
         }
         fragment.append(el);
@@ -3400,7 +3238,7 @@
     }
     const CSV_HEADER =
       "\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
-      MAP_NAMES.map((key) => "," + csvEsc(`지도링크(${key})`)).join("");
+      MAP_NAMES.map((key) => "," + `지도링크(${key})`).join("");
     let downloadUrl = null;
     let exportTask = null;
     function revokeDownloadUrl() {
@@ -3572,9 +3410,7 @@
     function showProgress(processed, total, totalDisp) {
       paintStatus(`처리 중… (${fmt(processed)}/${totalDisp})`, "info");
       const pct = Math.round((processed / total) * 100);
-      const bucket = total <= 10
-        ? pct
-        : (pct === 100 ? 100 : Math.floor(pct / 10) * 10);
+      const bucket = total <= 10 || pct === 100 ? pct : Math.floor(pct / 10) * 10;
       if (
         bucket === srStatus.progressBucket && processed !== total
       ) return;
@@ -3604,29 +3440,22 @@
       renderCache.fail = fail;
       const remaining = total - processed;
       if (totalChanged) {
-        const totalText = fmt(total);
-        countTotal.textContent = totalText;
-        summaryTotal.textContent = totalText;
-        coordsCount.textContent = totalText;
+        countTotal.textContent = summaryTotal.textContent =
+          coordsCount.textContent = fmt(total);
         coordsPanel.dataset.empty = total === 0;
         coordsPanel.dataset.expanded = "false";
         coordsExpand.ariaExpanded = "false";
         coordsExpand.textContent = "좌표 모두 보기";
       }
       if (doneChanged || failChanged) {
-        const successText = fmt((processed - fail));
-        countSuccess.textContent = successText;
-        summarySuccess.textContent = successText;
+        countSuccess.textContent = summarySuccess.textContent =
+          fmt(processed - fail);
       }
       if (failChanged) {
-        const failText = fmt(fail);
-        countFail.textContent = failText;
-        summaryFail.textContent = failText;
+        countFail.textContent = summaryFail.textContent = fmt(fail);
       }
       if (totalChanged || doneChanged) {
-        const remainingText = fmt(remaining);
-        countRemain.textContent = remainingText;
-        summaryRemain.textContent = remainingText;
+        countRemain.textContent = summaryRemain.textContent = fmt(remaining);
         const pct = total ? Math.round((processed / total) * 100) : 0;
         progressBar.value = pct;
         progressBar.parentElement.style.setProperty("--pct", pct);
@@ -3693,77 +3522,60 @@
         };
       })();
     const cancelReader = (readable) => readable?.cancel().catch(() => { });
-    function checkLineLength(length) {
-      if (length > CONFIG.INPUT_LINE_HARD_LIMIT)
-        throw new InputError(
-          `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
-        );
-    }
     async function* lineIterator(stream, signal) {
-      const reader = (stream.pipeThrough(
+      const decoded = stream.pipeThrough(
         new TextDecoderStream("utf-8", { fatal: true }),
         { signal },
-      )).getReader();
-      const pendingParts = [];
-      let pendingLength = 0;
-      let pendingCr = false;
-      const appendPending = (part) => {
+      );
+      const parts = [];
+      let length = 0, trailingCr = false;
+      const append = part => {
         if (!part) return;
-        pendingParts.push(part);
-        pendingLength += part.length;
-        checkLineLength(pendingLength);
+        length += part.length;
+        if (length > CONFIG.INPUT_LINE_HARD_LIMIT)
+          throw new InputError(
+            `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
+          );
+        parts.push(part);
       };
-      const takePending = () => {
-        const line = pendingParts.length === 1
-          ? pendingParts[0]
-          : pendingParts.join("");
-        pendingParts.length = 0;
-        pendingLength = 0;
+      const emit = () => {
+        const line = parts.length === 1 ? parts[0] : parts.join("");
+        parts.length = 0;
+        length = 0;
         return line;
       };
       try {
-        for (; ;) {
-          let read;
-          try {
-            read = await reader.read();
-          } catch (err) {
-            signal.throwIfAborted();
-            if (err instanceof TypeError)
-              throw new InputError(
-                "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
-                { cause: err },
-              );
-            throw err;
-          }
-          if (read.done) break;
+        for await (const chunk of decoded) {
           signal.throwIfAborted();
-          const chunk = read.value;
-          if (chunk.length === 0) continue;
+          if (!chunk) continue;
           let start = 0;
-          if (pendingCr) {
-            yield takePending();
-            pendingCr = false;
+          if (trailingCr) {
+            yield emit();
+            trailingCr = false;
             if (chunk.charCodeAt(0) === 10) start = 1;
           }
-          for (let pos = start; pos < chunk.length; pos++) {
-            const code = chunk.charCodeAt(pos);
-            if (code !== 10 && code !== 13) continue;
-            appendPending(chunk.slice(start, pos));
-            if (code === 13 && pos + 1 === chunk.length) {
-              pendingCr = true;
-              start = chunk.length;
+          const newlines = /\r\n|[\r\n]/g;
+          newlines.lastIndex = start;
+          for (const match of chunk.matchAll(newlines)) {
+            append(chunk.slice(start, match.index));
+            start = match.index + match[0].length;
+            if (match[0] === "\r" && start === chunk.length) {
+              trailingCr = true;
               break;
             }
-            yield takePending();
-            if (code === 13 && chunk.charCodeAt(pos + 1) === 10) pos++;
-            start = pos + 1;
+            yield emit();
           }
-          appendPending(chunk.slice(start));
+          append(chunk.slice(start));
         }
-        if (pendingCr || pendingLength !== 0) yield takePending();
-      } finally {
-        await cancelReader(reader);
-        reader.releaseLock();
+        if (trailingCr || length) yield emit();
+      } catch (err) {
+        signal.throwIfAborted();
+        if (err instanceof TypeError)
+          throw new InputError(
+            "입력 파일은 올바른 UTF-8 텍스트여야 합니다.",
+            { cause: err },
+          );
+        throw err;
       }
     }
     async function parseFile(file, signal) {
@@ -3784,14 +3596,12 @@
           linesSinceYield = 0;
         }
         if (!line.includes("위경도")) continue;
-        COORD_REGEX.lastIndex = 0;
-        for (let m; (m = COORD_REGEX.exec(line));) {
+        for (const m of line.matchAll(COORD_REGEX)) {
           const lat = m[2];
           const lon = m[3];
-          const fLat = +lat;
-          const fLon = +lon;
-          if (!Number.isFinite(fLat) || !Number.isFinite(fLon)) continue;
-          if (fLat < -90 || fLat > 90 || fLon < -180 || fLon > 180) continue;
+          const fLat = +lat, fLon = +lon;
+          if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
+            Math.abs(fLat) > 90 || Math.abs(fLon) > 180) continue;
           if (out.length >= CONFIG.BULK_HARD_LIMIT)
             throw new InputError(
               `공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
@@ -4046,15 +3856,8 @@
           (store) => {
             const savedAt = Date.now();
             for (const { cacheKey, parsed } of entries)
-              store.put({
-                key: CACHE_KEY_PREFIX + cacheKey,
-                savedAt,
-                parsed,
-              });
-            if (maintain)
-              pruneCache(store, (rows) => {
-                prunedRows = rows;
-              });
+              store.put({ key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed });
+            if (maintain) pruneCache(store, rows => prunedRows = rows);
           },
         );
         if (cacheWriters?.size === 0) {
@@ -4063,9 +3866,7 @@
           else if (cacheRowCeiling !== null)
             cacheRowCeiling += entries.length;
         }
-        writesSincePrune = maintain
-          ? pendingWrites % CACHE_PRUNE_EVERY
-          : pendingWrites;
+        writesSincePrune = maintain ? pendingWrites % CACHE_PRUNE_EVERY : pendingWrites;
       } catch (err) {
         if (!signal.aborted)
           console.warn("Reverse geocoding cache write failed.", err);
@@ -4091,12 +3892,7 @@
             tx.error ?? new Error("Reverse geocoding cache maintenance failed."),
           );
         };
-        pruneCache(
-          tx.objectStore(CONFIG.CACHE_STORE),
-          (rows) => {
-            prunedRows = rows;
-          },
-        );
+        pruneCache(tx.objectStore(CONFIG.CACHE_STORE), rows => prunedRows = rows);
       } catch (err) {
         console.warn("Reverse geocoding cache maintenance failed.", err);
       }
@@ -4267,6 +4063,14 @@
       const signal = task.controller.signal;
       let lastStatusAt = 0;
       let lastYield = performance.now();
+      const reportProgress = (force = false) => {
+        const now = performance.now();
+        if (force || now - lastStatusAt >= 200) {
+          lastStatusAt = now;
+          showProgress(state.processed, total, totalDisp);
+        }
+        return now;
+      };
       const cacheBatch = [];
       const flushCache = async () => {
         if (cacheBatch.length === 0) return;
@@ -4274,6 +4078,7 @@
         cacheBatch.length = 0;
       };
       const persistentCache = new Map();
+      const unresolved = [];
       for (let i = 0; i < total && !signal.aborted; i++) {
         if (state.status === "pausing") {
           await pauseTask(task);
@@ -4285,15 +4090,11 @@
         const parsed = getMemoryCache(record.cacheKey);
         if (parsed === undefined) {
           persistentCache.getOrInsert(record.cacheKey, null);
+          unresolved.push(i);
           continue;
         }
         commitResult(i, parsed, false);
-        const now = performance.now();
-        if (now - lastStatusAt >= 200) {
-          lastStatusAt = now;
-          showProgress(state.processed, total, totalDisp);
-        }
-        if (now - lastYield >= 8) {
+        if (reportProgress() - lastYield >= 8) {
           await yieldToMain();
           lastYield = performance.now();
         }
@@ -4304,24 +4105,18 @@
         } catch (err) {
           if (!signal.aborted) throw err;
         }
-        for (let i = 0; i < total && !signal.aborted; i++) {
+        for (const i of unresolved) {
+          if (signal.aborted) break;
           if (state.status === "pausing") {
             await pauseTask(task);
             if (signal.aborted) break;
           }
-          const r = records[i];
-          if (r.result) continue;
-          const cacheKey = r.cacheKey;
+          const cacheKey = records[i].cacheKey;
           const row = persistentCache.get(cacheKey);
           if (!row) continue;
           putMemoryCache(cacheKey, row.parsed, row.savedAt);
           commitResult(i, row.parsed, false);
-          const now = performance.now();
-          if (now - lastStatusAt >= 200) {
-            lastStatusAt = now;
-            showProgress(state.processed, total, totalDisp);
-          }
-          if (now - lastYield >= 8) {
+          if (reportProgress() - lastYield >= 8) {
             await yieldToMain();
             lastYield = performance.now();
           }
@@ -4382,14 +4177,7 @@
           }
           if (signal.aborted) break;
           commitResult(i, parsed, true);
-          const now = performance.now();
-          if (
-            now - lastStatusAt >= 200 ||
-            state.processed === total
-          ) {
-            lastStatusAt = now;
-            showProgress(state.processed, total, totalDisp);
-          }
+          const now = reportProgress(state.processed === total);
           if (parsed.error && !state.isStopping)
             showStatus(
               `에러 발생: (${fmt(i1)}/${totalDisp}) ${parsed.error}`,
@@ -4419,17 +4207,14 @@
       }
       if (state.isStopping)
         finishTask("중지되었습니다.", "stopped");
-      else if (state.processed >= state.records.length) {
+      else if (state.processed >= total) {
         const failed = state.cntFail;
-        if (failed === 0)
-          finishTask("모든 처리가 완료되었습니다.");
-        else {
-          const succeeded = state.processed - failed;
-          finishTask(
-            `처리 완료: ${fmt(succeeded)}건 성공, ${fmt(failed)}건 실패했습니다.`,
-            succeeded === 0 ? "error" : "warn",
-          );
-        }
+        const succeeded = total - failed;
+        finishTask(
+          failed ? `처리 완료: ${fmt(succeeded)}건 성공, ${fmt(failed)}건 실패했습니다.`
+            : "모든 처리가 완료되었습니다.",
+          !failed ? "info" : !succeeded ? "error" : "warn",
+        );
       }
     }
     function finishTask(message, type = "info") {
@@ -4462,15 +4247,10 @@
       cells[2].lastElementChild.textContent = fmtCoord6(record.lonStr);
       cells[2].dir = "ltr";
       cells[2].title = record.latStr + ", " + record.lonStr;
-      const badge = document.createElement("span");
-      badge.className = "kind-badge";
-      badge.textContent = result.kind || record.set;
-      cells[3].append(badge);
-      const statusBadge = document.createElement("span");
-      statusBadge.className = "result-state";
+      cells[3].firstElementChild.textContent = result.kind || record.set;
+      const statusBadge = cells[4].firstElementChild;
       statusBadge.dataset.error = !!result.error;
       statusBadge.textContent = result.error ? "! 실패" : "✓ 완료";
-      cells[4].append(statusBadge);
       return tr;
     }
     function commitResult(index, parsed, render) {
@@ -4527,12 +4307,9 @@
             const firstLat = lat.charCodeAt(0);
             let line = `${csvEsc(result.kind || r.set)},${rowIndex + 1},"${firstLat === 43 || firstLat === 45 ? "'" : ""}${lat}, ${lon}",`;
             const addr = result.addr;
-            if (addr)
-              line += `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)},`;
-            else
-              line += ",,,,";
-            line += csvEsc(result.error || addr.fullAddr);
-            line += CSV_CREDITS;
+            line += (addr
+              ? [addr.sido, addr.sigungu, addr.eupmyeon, addr.tag].map(csvEsc).join(",")
+              : ",,,") + "," + csvEsc(result.error || addr.fullAddr) + CSV_CREDITS;
             const lat6 = fmtCoord6(lat);
             const lon6 = fmtCoord6(lon);
             for (let k = 0; k < MAP_NAMES.length; k++) {
@@ -4571,8 +4348,7 @@
     async function handleParse() {
       const file = state.droppedFile;
       if (!file) return showStatus("파일을 선택해 주세요.", "warn");
-      coordsContent.textContent = "";
-      lineNumbers.textContent = "";
+      coordsContent.textContent = lineNumbers.textContent = "";
       clearTable();
       const task = state.setRecords([], "parsing");
       emptyHint.textContent = "좌표를 추출 중입니다.";
@@ -4782,8 +4558,7 @@
         );
         return false;
       }
-      coordsContent.textContent = "";
-      lineNumbers.textContent = "";
+      coordsContent.textContent = lineNumbers.textContent = "";
       clearTable();
       state.setRecords([]);
       state.droppedFile = file;
@@ -4802,349 +4577,302 @@
       fileInput.value = "";
       acceptInputFile(file);
     });
-    function loadManualRng() {
-      const U64_MAX = (1n << 64n) - 1n;
-      const U32_MAX_INV = 1 / 4294967295;
-      const HANGUL_BASE = 0xac00;
-      const NMS_PLANET_SHIFTS = [52n, 4n, 0n];
-      const NMS_SYSTEM_SHIFTS = [40n];
-      const HANGUL_MAX = 55859;
-      const HANGUL_MODULUS = 11172;
-      const SUPPLEMENT_LIMIT = 1024;
-      const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
-      const MAX_U64_DEC = U64_MAX.toString(10);
-      const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
-      const U64_FORMAT_ERROR =
-        `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`;
-      const U64_TEXT_LIMIT = 64;
-      const createLottery = (length) => ({
-        limit: length,
-        values: [],
-      });
-      function createDataSet(num64) {
-        return {
-          number: num64,
-          lotto: createLottery(6),
-          lotto7: createLottery(7),
-          euroMain: createLottery(5),
-          euroLucky: createLottery(2),
-          pin: 0,
-          password: [],
-          pinDigits: 0,
-        };
-      }
-      function isComplete(data) {
-        return (
-          data.pinDigits >= 6 &&
-          data.lotto.values.length === data.lotto.limit &&
-          data.lotto7.values.length === data.lotto7.limit &&
-          data.password.length >= 8 &&
-          data.euroMain.values.length === data.euroMain.limit
+    const U64_MAX = (1n << 64n) - 1n;
+    const U32_MAX_INV = 1 / 4294967295;
+    const HANGUL_BASE = 0xac00;
+    const NMS_PLANET_SHIFTS = [52n, 4n, 0n];
+    const NMS_SYSTEM_SHIFTS = [40n];
+    const HANGUL_MAX = 55859;
+    const HANGUL_MODULUS = 11172;
+    const SUPPLEMENT_LIMIT = 1024;
+    const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
+    const MAX_U64_DEC = U64_MAX.toString(10);
+    const MAX_U64_HEX = "0x" + U64_MAX.toString(16).toUpperCase();
+    const U64_FORMAT_ERROR =
+      `유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`;
+    const U64_TEXT_LIMIT = 64;
+    const createLottery = (length) => ({
+      limit: length,
+      values: [],
+    });
+    function createDataSet(num64) {
+      return {
+        number: num64,
+        lotto: createLottery(6),
+        lotto7: createLottery(7),
+        euroMain: createLottery(5),
+        euroLucky: createLottery(2),
+        pin: 0,
+        password: [],
+        pinDigits: 0,
+      };
+    }
+    function isComplete(data) {
+      return (
+        data.pinDigits >= 6 &&
+        data.lotto.values.length === data.lotto.limit &&
+        data.lotto7.values.length === data.lotto7.limit &&
+        data.password.length >= 8 &&
+        data.euroMain.values.length === data.euroMain.limit
+      );
+    }
+    function parseU64(raw) {
+      const input = raw.trim();
+      if (input.length === 0)
+        throw new Error("빈 값은 허용되지 않습니다.");
+      if (input.length > U64_TEXT_LIMIT)
+        throw new Error(
+          `u64 입력값이 허용 길이 ${U64_TEXT_LIMIT}자를 초과했습니다.`,
         );
+      if (/^(?:-|0[bo])/i.test(input)) throw new Error(U64_FORMAT_ERROR);
+      let value;
+      try {
+        value = BigInt(input);
+      } catch {
+        throw new Error(U64_FORMAT_ERROR);
       }
-      function parseU64(raw) {
-        const input = raw.trim();
-        if (input.length === 0)
-          throw new Error("빈 값은 허용되지 않습니다.");
-        if (input.length > U64_TEXT_LIMIT)
-          throw new Error(
-            `u64 입력값이 허용 길이 ${U64_TEXT_LIMIT}자를 초과했습니다.`,
-          );
-        const first = input.charCodeAt(0);
-        const second = input.charCodeAt(1) | 32;
-        if (first === 45 || (first === 48 && (second === 98 || second === 111)))
-          throw new Error(U64_FORMAT_ERROR);
-        let value;
-        try {
-          value = BigInt(input);
-        } catch {
-          throw new Error(U64_FORMAT_ERROR);
+      if (value > U64_MAX)
+        throw new Error(
+          `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
+        );
+      return value;
+    }
+    const bitsView = new DataView(new ArrayBuffer(8));
+    const bytesView = new Uint8Array(bitsView.buffer);
+    const F64_FRACTION_MASK = (1n << 52n) - 1n;
+    const F64_HIDDEN_BIT = 1n << 52n;
+    const F64_SIGN_BIT = 1n << 63n;
+    function normalF64(integer, exponent) {
+      if (integer === 0n) return 0;
+      const value = Number(integer) * 2 ** exponent;
+      if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022)
+        throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
+      return value;
+    }
+    function affineF64(
+      ratio,
+      scaleSignificand,
+      scaleExponent,
+      addendSignificand,
+      addendExponent,
+      addend,
+    ) {
+      bitsView.setFloat64(0, ratio, false);
+      const ratioBits = bitsView.getBigUint64(0, false);
+      const exponentBits = Number((ratioBits >> 52n) & 0x7ffn);
+      const fraction = ratioBits & F64_FRACTION_MASK;
+      if (exponentBits === 0x7ff)
+        throw new RangeError("유한한 f64 좌표값이 필요합니다.");
+      const unsignedSignificand = exponentBits === 0
+        ? fraction
+        : F64_HIDDEN_BIT | fraction;
+      const ratioSignificand = (ratioBits & F64_SIGN_BIT) === 0n
+        ? unsignedSignificand
+        : -unsignedSignificand;
+      const ratioExponent = exponentBits === 0
+        ? -1074
+        : exponentBits - 1023 - 52;
+      const productSignificand = scaleSignificand * ratioSignificand;
+      if (productSignificand === 0n)
+        return addend;
+      const productExponent = scaleExponent + ratioExponent;
+      const commonExponent = Math.min(productExponent, addendExponent);
+      const exact =
+        (productSignificand << BigInt(productExponent - commonExponent)) +
+        (addendSignificand << BigInt(addendExponent - commonExponent));
+      return normalF64(exact, commonExponent);
+    }
+    const decimalFormatter = new Intl.NumberFormat("en-US", {
+      useGrouping: false,
+      maximumSignificantDigits: 21,
+    }).format;
+    function formatRustF64(value) {
+      const str = Object.is(value, -0) ? "-0" : String(value);
+      return str.includes("e") ? decimalFormatter(value) : str;
+    }
+    function reverseBitsU64(v) {
+      bitsView.setBigUint64(0, v, false);
+      for (let offset = 0; offset < 8; offset += 4) {
+        let x = bitsView.getUint32(offset, false);
+        x = ((x >>> 1) & 0x5555_5555) | ((x & 0x5555_5555) << 1);
+        x = ((x >>> 2) & 0x3333_3333) | ((x & 0x3333_3333) << 2);
+        x = ((x >>> 4) & 0x0f0f_0f0f) | ((x & 0x0f0f_0f0f) << 4);
+        bitsView.setUint32(offset, x, false);
+      }
+      return bitsView.getBigUint64(0, true);
+    }
+    function addLotteryNumber(byte, modulus, numbers) {
+      if (numbers.values.length >= numbers.limit) return true;
+      const number = (byte % modulus) + 1;
+      if (numbers.values.includes(number)) return false;
+      numbers.values.push(number);
+      const complete = numbers.values.length === numbers.limit;
+      if (complete)
+        numbers.values.sort((a, b) => a - b);
+      return complete;
+    }
+    function fillNumbers(v, data) {
+      bitsView.setBigUint64(0, v, false);
+      for (const byte of bytesView) {
+        if (byte > 249)
+          continue;
+        if (data.pinDigits < 6) {
+          data.pin = data.pin * 10 + (byte % 10);
+          data.pinDigits++;
         }
-        if (value > U64_MAX)
-          throw new Error(
-            `u64 범위를 벗어났습니다 (최소값 예: 0 또는 0x0, 최대값 예: ${MAX_U64_DEC} 또는 ${MAX_U64_HEX}).`,
-          );
-        return value;
+        addLotteryNumber(byte, 50, data.euroMain);
+        if (byte <= 224) {
+          addLotteryNumber(byte, 45, data.lotto);
+          if (byte <= 221) addLotteryNumber(byte, 37, data.lotto7);
+          if (byte <= 187 && data.password.length < 8)
+            data.password.push(String.fromCodePoint(
+              (byte % 94) + 33,
+            ));
+        }
+        if (isComplete(data)) return true;
       }
-      const bitsView = new DataView(new ArrayBuffer(8));
-      const bytesView = new Uint8Array(bitsView.buffer);
-      const F64_FRACTION_MASK = (1n << 52n) - 1n;
-      const F64_HIDDEN_BIT = 1n << 52n;
-      const F64_SIGN_BIT = 1n << 63n;
-      function normalF64(integer, exponent) {
-        if (integer === 0n) return 0;
-        const value = Number(integer) * 2 ** exponent;
-        if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022)
-          throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
-        return value;
+      return false;
+    }
+    function extractNmsBits(bits, num, shifts, maxValue, reason, supplement, nextSupp) {
+      const mask = (1n << BigInt(bits)) - 1n;
+      const maxBig = BigInt(maxValue);
+      for (const shift of shifts) {
+        const candidate = (num >> shift) & mask;
+        if (candidate <= maxBig) return Number(candidate);
       }
-      function affineF64(
-        ratio,
-        scaleSignificand,
-        scaleExponent,
-        addendSignificand,
-        addendExponent,
-        addend,
+      for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
+        if (!supplement.current || supplement.current.bitsRemaining < bits)
+          supplement.current = nextSupp(reason);
+        const current = supplement.current;
+        current.bitsRemaining -= bits;
+        const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
+        if (value <= maxBig) return Number(value);
+      }
+      throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
+    }
+    function convertNumber(num, nextSupp) {
+      const data = createDataSet(num);
+      let complete = fillNumbers(num, data);
+      const supplement = { current: null };
+      for (
+        let attempt = 0;
+        !complete && attempt < SUPPLEMENT_LIMIT;
+        attempt++
       ) {
-        bitsView.setFloat64(0, ratio, false);
-        const ratioBits = bitsView.getBigUint64(0, false);
-        const exponentBits = Number((ratioBits >> 52n) & 0x7ffn);
-        const fraction = ratioBits & F64_FRACTION_MASK;
-        if (exponentBits === 0x7ff)
-          throw new RangeError("유한한 f64 좌표값이 필요합니다.");
-        const unsignedSignificand = exponentBits === 0
-          ? fraction
-          : F64_HIDDEN_BIT | fraction;
-        const ratioSignificand = (ratioBits & F64_SIGN_BIT) === 0n
-          ? unsignedSignificand
-          : -unsignedSignificand;
-        const ratioExponent = exponentBits === 0
-          ? -1074
-          : exponentBits - 1023 - 52;
-        const productSignificand = scaleSignificand * ratioSignificand;
-        if (productSignificand === 0n)
-          return addend;
-        const productExponent = scaleExponent + ratioExponent;
-        const commonExponent = Math.min(productExponent, addendExponent);
-        const exact =
-          (productSignificand << BigInt(productExponent - commonExponent)) +
-          (addendSignificand << BigInt(addendExponent - commonExponent));
-        return normalF64(exact, commonExponent);
+        const newSupp = nextSupp("기본 필드 보완");
+        complete = fillNumbers(newSupp.value, data);
+        supplement.current = newSupp;
       }
-      function formatRustF64(value) {
-        if (Object.is(value, -0))
-          return "-0";
-        const text = String(value);
-        const exponentAt = text.indexOf("e");
-        if (exponentAt < 0)
-          return text;
-        const exponent = Number(text.slice(exponentAt + 1));
-        const mantissa = text.slice(0, exponentAt);
-        const negative = mantissa.startsWith("-");
-        const unsigned = negative ? mantissa.slice(1) : mantissa;
-        const point = unsigned.indexOf(".");
-        const digits = point < 0
-          ? unsigned
-          : unsigned.slice(0, point) + unsigned.slice(point + 1);
-        const decimalAt = (point < 0 ? unsigned.length : point) + exponent;
-        const sign = negative ? "-" : "";
-        if (decimalAt <= 0)
-          return sign + "0." + "0".repeat(-decimalAt) + digits;
-        if (decimalAt >= digits.length)
-          return sign + digits + "0".repeat(decimalAt - digits.length);
-        return sign + digits.slice(0, decimalAt) + "." +
-          digits.slice(decimalAt);
-      }
-      function reverseBitsU64(v) {
-        bitsView.setBigUint64(0, v, false);
-        for (let offset = 0; offset < 8; offset += 4) {
-          let x = bitsView.getUint32(offset, false);
-          x = ((x >>> 1) & 0x5555_5555) | ((x & 0x5555_5555) << 1);
-          x = ((x >>> 2) & 0x3333_3333) | ((x & 0x3333_3333) << 2);
-          x = ((x >>> 4) & 0x0f0f_0f0f) | ((x & 0x0f0f_0f0f) << 4);
-          bitsView.setUint32(offset, x, false);
-        }
-        return bitsView.getBigUint64(0, true);
-      }
-      function addLotteryNumber(byte, modulus, numbers) {
-        if (numbers.values.length >= numbers.limit) return true;
-        const number = (byte % modulus) + 1;
-        if (numbers.values.includes(number)) return false;
-        numbers.values.push(number);
-        const complete = numbers.values.length === numbers.limit;
-        if (complete)
-          numbers.values.sort((a, b) => a - b);
-        return complete;
-      }
-      function fillNumbers(v, data) {
-        bitsView.setBigUint64(0, v, false);
+      if (!complete)
+        throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
+      let luckyStarSource = reverseBitsU64(
+        supplement.current?.value ?? num,
+      );
+      luckyStarLoop: for (
+        let attempt = 0;
+        attempt < SUPPLEMENT_LIMIT;
+        attempt++
+      ) {
+        bitsView.setBigUint64(0, luckyStarSource, false);
         for (const byte of bytesView) {
-          if (byte > 249)
+          if (byte > 251)
             continue;
-          if (data.pinDigits < 6) {
-            data.pin = data.pin * 10 + (byte % 10);
-            data.pinDigits++;
-          }
-          addLotteryNumber(byte, 50, data.euroMain);
-          if (byte <= 224) {
-            addLotteryNumber(byte, 45, data.lotto);
-            if (byte <= 221) addLotteryNumber(byte, 37, data.lotto7);
-            if (byte <= 187 && data.password.length < 8)
-              data.password.push(String.fromCodePoint(
-                (byte % 94) + 33,
-              ));
-          }
-          if (isComplete(data)) return true;
+          if (addLotteryNumber(byte, 12, data.euroLucky))
+            break luckyStarLoop;
         }
-        return false;
+        if (attempt + 1 >= SUPPLEMENT_LIMIT)
+          break;
+        const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
+        luckyStarSource = reverseBitsU64(newSupp.value);
+        supplement.current = newSupp;
       }
-      function extractNmsBits(
-        bits,
-        num,
-        shifts,
-        maxValue,
-        reason,
-        supplement,
-        nextSupp,
-      ) {
-        const mask = (1n << BigInt(bits)) - 1n;
-        const maxBig = BigInt(maxValue);
-        for (const shift of shifts) {
-          const v = (num >> shift) & mask;
-          if (v <= maxBig)
-            return Number(v);
-        }
-        for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
-          if (
-            supplement.current === null ||
-            supplement.current.bitsRemaining < bits
-          )
-            supplement.current = nextSupp(reason);
-          const supp = supplement.current;
-          const shift = supp.bitsRemaining - bits;
-          const extracted = (supp.value >> BigInt(shift)) & mask;
-          supp.bitsRemaining = shift;
-          if (extracted <= maxBig)
-            return Number(extracted);
-        }
-        throw new Error("NMS 보완 난수 시도 횟수를 초과했습니다.");
-      }
-      function convertNumber(num, nextSupp) {
-        const data = createDataSet(num);
-        let complete = fillNumbers(num, data);
-        const supplement = { current: null };
+      if (data.euroLucky.values.length !== data.euroLucky.limit)
+        throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
+      const hangul = new Array(4);
+      for (let i = 0; i < hangul.length; i++) {
+        bitsView.setBigUint64(0, num, false);
+        let index = bitsView.getUint16(i * 2, false);
         for (
           let attempt = 0;
-          !complete && attempt < SUPPLEMENT_LIMIT;
-          attempt++
-        ) {
-          const newSupp = nextSupp("기본 필드 보완");
-          complete = fillNumbers(newSupp.value, data);
-          supplement.current = newSupp;
-        }
-        if (!complete)
-          throw new Error("기본 필드 보완 난수 시도 횟수를 초과했습니다.");
-        let luckyStarSource = reverseBitsU64(
-          supplement.current?.value ?? num,
-        );
-        luckyStarLoop: for (
-          let attempt = 0;
+          index > HANGUL_MAX &&
           attempt < SUPPLEMENT_LIMIT;
           attempt++
         ) {
-          bitsView.setBigUint64(0, luckyStarSource, false);
-          for (const byte of bytesView) {
-            if (byte > 251)
-              continue;
-            if (addLotteryNumber(byte, 12, data.euroLucky))
-              break luckyStarLoop;
-          }
-          if (attempt + 1 >= SUPPLEMENT_LIMIT)
-            break;
-          const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
-          luckyStarSource = reverseBitsU64(newSupp.value);
-          supplement.current = newSupp;
-        }
-        if (data.euroLucky.values.length !== data.euroLucky.limit)
-          throw new Error("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.");
-        const hangul = new Array(4);
-        for (let i = 0; i < hangul.length; i++) {
-          bitsView.setBigUint64(0, num, false);
-          let index = bitsView.getUint16(i * 2, false);
+          if (supplement.current === null)
+            supplement.current = nextSupp("한글 음절 보완");
+          const supp = supplement.current;
+          bitsView.setBigUint64(0, supp.value, false);
           for (
-            let attempt = 0;
-            index > HANGUL_MAX &&
-            attempt < SUPPLEMENT_LIMIT;
-            attempt++
+            let offset = 0;
+            offset < bytesView.length;
+            offset += 2
           ) {
-            if (supplement.current === null)
-              supplement.current = nextSupp("한글 음절 보완");
-            const supp = supplement.current;
-            bitsView.setBigUint64(0, supp.value, false);
-            for (
-              let offset = 0;
-              offset < bytesView.length;
-              offset += 2
-            ) {
-              const candidate = bitsView.getUint16(offset, false);
-              if (candidate <= HANGUL_MAX) {
-                index = candidate;
-                break;
-              }
+            const candidate = bitsView.getUint16(offset, false);
+            if (candidate <= HANGUL_MAX) {
+              index = candidate;
+              break;
             }
-            if (
-              index > HANGUL_MAX &&
-              attempt + 1 < SUPPLEMENT_LIMIT
-            )
-              supplement.current = nextSupp("한글 음절 보완 재시도");
           }
-          if (index > HANGUL_MAX)
-            throw new Error("한글 음절 보완 난수 시도 횟수를 초과했습니다.");
-          hangul[i] = String.fromCodePoint(
-            HANGUL_BASE + (index % HANGUL_MODULUS),
-          );
+          if (
+            index > HANGUL_MAX &&
+            attempt + 1 < SUPPLEMENT_LIMIT
+          )
+            supplement.current = nextSupp("한글 음절 보완 재시도");
         }
-        data.hangul = hangul;
-        bitsView.setBigUint64(0, num, false);
-        const upper32 = bitsView.getUint32(0, false);
-        const portalBits = bitsView.getUint32(3, false);
-        const upperRatio = upper32 * U32_MAX_INV;
-        const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
-        data.korea = [
-          affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
-          affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
-        ];
-        data.world = [
-          affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
-          affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
-        ];
-        data.planet = (extractNmsBits(
-          4,
-          num,
-          NMS_PLANET_SHIFTS,
-          11,
-          "NMS 행성 번호 보완",
-          supplement,
-          nextSupp,
-        ) %
-          6) +
-          1;
-        data.system = (extractNmsBits(
-          12,
-          num,
-          NMS_SYSTEM_SHIFTS,
-          3834,
-          "NMS 태양계 번호 보완",
-          supplement,
-          nextSupp,
-        ) %
-          767) +
-          1;
-        data.portalY = upper32 & 0xff;
-        data.portalZ = (portalBits >>> 12) & 0xfff;
-        data.portalX = portalBits & 0xfff;
-        data.galaxyX = (data.portalX + 0x7ff) & 0xfff;
-        data.galaxyY = (data.portalY + 0x7f) & 0xff;
-        data.galaxyZ = (data.portalZ + 0x7ff) & 0xfff;
-        data.glyphs =
-          GLYPHS[data.planet & 0xf] +
-          GLYPHS[(data.system >> 8) & 0xf] +
-          GLYPHS[(data.system >> 4) & 0xf] +
-          GLYPHS[data.system & 0xf];
-        for (let shift = 28; shift >= 0; shift -= 4)
-          data.glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
-        return data;
+        if (index > HANGUL_MAX)
+          throw new Error("한글 음절 보완 난수 시도 횟수를 초과했습니다.");
+        hangul[i] = String.fromCodePoint(
+          HANGUL_BASE + (index % HANGUL_MODULUS),
+        );
       }
-      function paddedHex(value, width) {
-        return value.toString(16).toUpperCase().padStart(width, "0");
-      }
-      function formatOutput(data) {
-        const v = data.number;
-        bitsView.setBigUint64(0, v, false);
-        const bytes = bytesView;
-        const hex = bytes.toHex().toUpperCase();
-        return `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
-          })
+      data.hangul = hangul;
+      bitsView.setBigUint64(0, num, false);
+      const upper32 = bitsView.getUint32(0, false);
+      const portalBits = bitsView.getUint32(3, false);
+      const upperRatio = upper32 * U32_MAX_INV;
+      const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
+      data.korea = [
+        affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
+        affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
+      ];
+      data.world = [
+        affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
+        affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
+      ];
+      const planetIndex = extractNmsBits(
+        4, num, NMS_PLANET_SHIFTS, 11,
+        "NMS 행성 번호 보완", supplement, nextSupp,
+      );
+      data.planet = planetIndex % 6 + 1;
+      const systemIndex = extractNmsBits(
+        12, num, NMS_SYSTEM_SHIFTS, 3834,
+        "NMS 태양계 번호 보완", supplement, nextSupp,
+      );
+      data.system = systemIndex % 767 + 1;
+      data.portalY = upper32 & 0xff;
+      data.portalZ = (portalBits >>> 12) & 0xfff;
+      data.portalX = portalBits & 0xfff;
+      data.galaxyX = (data.portalX + 0x7ff) & 0xfff;
+      data.galaxyY = (data.portalY + 0x7f) & 0xff;
+      data.galaxyZ = (data.portalZ + 0x7ff) & 0xfff;
+      let glyphs = GLYPHS[data.planet & 0xf];
+      for (let shift = 8; shift >= 0; shift -= 4)
+        glyphs += GLYPHS[(data.system >> shift) & 0xf];
+      for (let shift = 28; shift >= 0; shift -= 4)
+        glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
+      data.glyphs = glyphs;
+      return data;
+    }
+    function paddedHex(value, width) {
+      return value.toString(16).toUpperCase().padStart(width, "0");
+    }
+    function formatOutput(data) {
+      const v = data.number;
+      bitsView.setBigUint64(0, v, false);
+      const bytes = bytesView;
+      const hex = bytes.toHex().toUpperCase();
+      return `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
+        })
 2진수: ${v.toString(2).padStart(64, "0").match(/.{8}/g).join(" ")}
 8진수: ${v.toString(8)}
 16진수: ${hex.match(/../g).join(" ")}
@@ -5155,61 +4883,55 @@ Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
 로또 번호: ${data.lotto.values.join(" ")}
 일본 로또 7 번호: ${data.lotto7.values.join(" ")}
 유로밀리언 번호: ${data.euroMain.values.join(" ")} + ${data.euroLucky.values.join(" ")
-          }
+        }
 한글 음절 4글자: ${data.hangul.join("")}
 대한민국 위경도: ${formatRustF64(data.korea[0])}, ${formatRustF64(data.korea[1])}
 세계 위경도: ${formatRustF64(data.world[0])}, ${formatRustF64(data.world[1])}
 NMS 은하 번호: ${bytes[0] + 1}
 NMS 포탈 주소: ${data.planet} ${paddedHex(data.system, 3)
-          } ${paddedHex(data.portalY, 2)} ${paddedHex(data.portalZ, 3)
-          } ${paddedHex(data.portalX, 3)} (${data.glyphs
-          })
+        } ${paddedHex(data.portalY, 2)} ${paddedHex(data.portalZ, 3)
+        } ${paddedHex(data.portalX, 3)} (${data.glyphs
+        })
 NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
-          }:${paddedHex(data.galaxyZ, 4)}:${paddedHex(data.system, 4)
-          }`;
-      }
-      const GENERATION_LIMIT = 10_000;
-      const PREVIEW_LIMIT = 100;
-      const YIELD_INTERVAL_MS = 12;
-      const META_INTERVAL_MS = 150;
-      const RX_U64_TOKEN = /[^\s,]+/gu;
-      function u64Tokens(raw) {
-        return raw.matchAll(RX_U64_TOKEN).map((match) => match[0]);
-      }
-      class SupplementRequired extends Error { }
-      function outputBlob(chunks, includeBom) {
-        const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
-        if (chunks.length > 0 && !chunks[chunks.length - 1].endsWith("\n"))
-          parts.push("\n");
-        return new Blob(parts, {
-          type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
-        });
-      }
-      async function copyChunks(chunks) {
-        if (!window.isSecureContext)
-          throw new Error(
-            "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
-          );
-        const blob = outputBlob(chunks, false);
-        await navigator.clipboard.write([new ClipboardItem({
-          "text/plain": blob,
-        })]);
-      }
+        }:${paddedHex(data.galaxyZ, 4)}:${paddedHex(data.system, 4)
+        }`;
+    }
+    const GENERATION_LIMIT = 10_000;
+    const PREVIEW_LIMIT = 100;
+    const YIELD_INTERVAL_MS = 12;
+    const META_INTERVAL_MS = 150;
+    const RX_U64_TOKEN = /[^\s,]+/gu;
+    function u64Tokens(raw) {
+      return raw.matchAll(RX_U64_TOKEN).map((match) => match[0]);
+    }
+    class SupplementRequired extends Error { }
+    function outputBlob(chunks, includeBom) {
+      const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
+      if (chunks.length && !chunks.at(-1).endsWith("\n"))
+        parts.push("\n");
+      return new Blob(parts, {
+        type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
+      });
+    }
+    async function copyChunks(chunks) {
+      if (!window.isSecureContext)
+        throw new Error(
+          "클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
+        );
+      const blob = outputBlob(chunks, false);
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/plain": blob,
+      })]);
+    }
+    function loadManualRng() {
       const num64Input = byId("num64"),
         suppInput = byId("suppValues");
-      const runBtn = byId("runBtn"),
-        clearBtn = byId("clearBtn"),
-        saveBtn = byId("saveOutput"),
-        copyBtn = byId("copyOutput");
+      const [runBtn, clearBtn, saveBtn, copyBtn] = ["runBtn", "clearBtn", "saveOutput", "copyOutput"].map(byId);
       const output = byId("output");
       const outputContent = query(".code-content", output);
       const error = byId("error"),
         meta = byId("meta");
-      const suppDialog = byId("supp-dialog"),
-        suppForm = byId("supp-form"),
-        suppContext = byId("supp-context"),
-        suppValues = byId("supp-values"),
-        suppError = byId("supp-error");
+      const [suppDialog, suppForm, suppContext, suppValues, suppError] = ["supp-dialog", "supp-form", "supp-context", "supp-values", "supp-error"].map(byId);
       let suppRequest = null;
       let returnFocus = null;
       function finishSupplement(values) {
@@ -5270,6 +4992,10 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         finishSupplement(null);
       });
       let chunks = [];
+      const clearPreview = () => {
+        chunks = [];
+        meta.textContent = outputContent.textContent = "";
+      };
       let manualBusy = false;
       let copyTask = null;
       const setBusy = (busy) => {
@@ -5286,9 +5012,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       on(runBtn, "click", async () => {
         const epoch = ++outputEpoch;
         error.textContent = "";
+        clearPreview();
         meta.textContent = "기본 난수 변환 준비 중…";
-        chunks = [];
-        outputContent.textContent = "";
         setBusy(true);
         try {
           const suppTokens = u64Tokens(suppInput.value);
@@ -5390,9 +5115,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
           output.scrollTop = 0;
         } catch (err) {
           if (epoch === outputEpoch) {
-            chunks = [];
-            meta.textContent = "";
-            outputContent.textContent = "";
+            clearPreview();
             error.textContent = errorMessage(err);
           }
         } finally {
@@ -5435,23 +5158,18 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         if (copyTask) return;
         const epoch = outputEpoch;
         const snapshot = chunks;
+        const isCurrent = () => epoch === outputEpoch && snapshot === chunks;
         error.textContent = "";
         copyTask = copyChunks(snapshot);
         setBusy(manualBusy);
         try {
           await copyTask;
-          if (
-            epoch !== outputEpoch ||
-            snapshot !== chunks
-          ) return;
+          if (!isCurrent()) return;
           meta.textContent =
             (meta.textContent ? `${meta.textContent}\n` : "") +
             "변환 결과를 클립보드에 복사했습니다.";
         } catch (err) {
-          if (
-            epoch === outputEpoch &&
-            snapshot === chunks
-          )
+          if (isCurrent())
             error.textContent = err instanceof Error
               ? err.message
               : "클립보드 복사에 실패했습니다.";
@@ -5465,10 +5183,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         finishSupplement(null);
         returnFocus = null;
         outputEpoch++;
-        chunks = [];
+        clearPreview();
         error.textContent = "";
-        meta.textContent = "";
-        outputContent.textContent = "";
         setBusy(false);
       };
       on(clearBtn, "click", () => {
@@ -5481,28 +5197,19 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         clearOutput();
       });
     }
+    const TAB_KEYS = ["ArrowLeft", "ArrowRight", "Home", "End"];
     const mobileMedia = matchMedia("(max-width: 800px)");
     const compactMedia = matchMedia("(max-width: 1230px)");
     const inputTabs = query(".input-tabs");
-    const inputView = byId("input-view"),
-      filePane = byId("file-pane"),
-      manualPanel = byId("manual-pane");
+    const [inputView, filePane, manualPanel] = ["input-view", "file-pane", "manual-pane"].map(byId);
     const mobileButtons = queryAll("[data-mobile]");
     const statusButtons = queryAll("[data-status]");
     const steps = queryAll("[data-step]");
     const jobPanel = query(".job-panel");
-    const inputSlot = byId("input-job-slot"),
-      mobileSlot = byId("mobile-job-slot");
-    const filterDialog = byId("filter-dialog"),
-      filterTrigger = byId("advanced-filters");
-    const inspector = byId("inspector"),
-      detailEmpty = byId("inspector-empty"),
-      detailContent = byId("inspector-content"),
-      detailSheet = byId("detail-sheet");
-    const detailMap = byId("detail-map"),
-      loadMap = byId("load-map"),
-      mapLinks = byId("detail-map-links"),
-      copyAddress = byId("copy-address");
+    const [inputSlot, mobileSlot] = ["input-job-slot", "mobile-job-slot"].map(byId);
+    const [filterDialog, filterTrigger] = ["filter-dialog", "advanced-filters"].map(byId);
+    const [inspector, detailEmpty, detailContent, detailSheet] = ["inspector", "inspector-empty", "inspector-content", "detail-sheet"].map(byId);
+    const [detailMap, loadMap, mapLinks, copyAddress] = ["detail-map", "load-map", "detail-map-links", "copy-address"].map(byId);
     const notice = byId("ui-notice");
     let manualLoaded = false;
     let outputReady = false;
@@ -5518,7 +5225,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     on(window, "blur", () => { layoutFocus = null; });
     function setInputMode(mode) {
       const manual = mode === "manual";
-      inputView.dataset.mode = manual ? "manual" : "file";
+      inputView.dataset.mode = mode;
       filePane.hidden = manual;
       manualPanel.hidden = !manual;
       for (const tab of queryAll("[role=tab]", inputTabs)) {
@@ -5536,7 +5243,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       if (tab) setInputMode(tab.dataset.mode);
     });
     on(inputTabs, "keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (!TAB_KEYS.includes(event.key)) return;
       const tab = event.target.closest("[role=tab]");
       if (!tab) return;
       event.preventDefault();
@@ -5550,13 +5257,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
         [inputView, "mobile-input-tab", "input-title"],
         [byId("results-view"), "mobile-results-tab", "results-title"],
       ]) {
-        if (mobileMedia.matches) {
-          panel.role = "tabpanel";
-          panel.setAttribute("aria-labelledby", tab);
-        } else {
-          panel.removeAttribute("role");
-          panel.setAttribute("aria-labelledby", heading);
-        }
+        panel.role = mobileMedia.matches ? "tabpanel" : null;
+        panel.setAttribute("aria-labelledby", mobileMedia.matches ? tab : heading);
       }
       const active = document.activeElement === document.body ? layoutFocus : document.activeElement;
       const restoreFocus = active && jobPanel.contains(active);
@@ -5611,8 +5313,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     function alignPopovers() {
       for (const [panel, trigger] of popoverAnchors) alignPopover(panel, trigger);
     }
-    on(window, "resize", alignPopovers, { passive: true });
-    on(window, "scroll", alignPopovers, { passive: true });
+    for (const event of ["resize", "scroll"])
+      on(window, event, alignPopovers, { passive: true });
     const mobileScroll = { input: 0, results: 0 };
     function setMobileView(view) {
       const nextView = view === "results" ? "results" : "input";
@@ -5640,7 +5342,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     for (const button of mobileButtons)
       on(button, "click", () => setMobileView(button.dataset.mobile));
     on(query(".mobile-nav"), "keydown", event => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (!TAB_KEYS.includes(event.key)) return;
       if (!event.target.closest('[role="tab"]')) return;
       event.preventDefault();
       const view = event.key === "Home" ? "input" : event.key === "End" ? "results" :
@@ -5648,15 +5350,12 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       setMobileView(view);
       byId(`mobile-${view}-tab`).focus(NO_SCROLL);
     });
-    on(mobileMedia, "change", adaptLayout);
-    on(compactMedia, "change", adaptLayout);
+    for (const media of [mobileMedia, compactMedia]) on(media, "change", adaptLayout);
     function updateWorkflowStep() {
       const step = state.isRunning || state.isStopping ? "lookup" :
         state.processed ? "results" : "input";
-      for (const item of steps) {
-        if (item.dataset.step === step) item.ariaCurrent = "step";
-        else item.removeAttribute("aria-current");
-      }
+      for (const item of steps)
+        item.ariaCurrent = item.dataset.step === step ? "step" : null;
       byId("step-label").textContent =
         step === "lookup" ? "2/3 · 주소 조회" :
           step === "results" ? "3/3 · 결과 확인" : "1/3 · 데이터 입력";
@@ -5699,26 +5398,22 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       notice.ariaLive = error ? "assertive" : "polite";
       noticeText.textContent = message;
       notice.hidden = false;
-      if (!error) noticeTimer = setTimeout(() => { notice.hidden = true; }, 8000);
+      if (!error) noticeTimer = setTimeout(() => notice.hidden = true, 8000);
     }
-    const mapFeedback = byId("map-feedback"),
-      mapRecovery = byId("map-recovery"),
-      mapExternal = byId("map-external");
+    const [mapFeedback, mapRecovery, mapExternal] = ["map-feedback", "map-recovery", "map-external"].map(byId);
     let mapLoadTimer = 0;
     function showMapFailure(message) {
       clearTimeout(mapLoadTimer);
       mapFeedback.textContent = message;
       mapFeedback.dataset.loading = "false";
-      mapFeedback.hidden = false;
-      mapRecovery.hidden = false;
+      mapFeedback.hidden = mapRecovery.hidden = false;
     }
     function unloadMap() {
       clearTimeout(mapLoadTimer);
       detailMap.removeAttribute("src");
       detailMap.hidden = true;
       loadMap.hidden = false;
-      mapFeedback.hidden = true;
-      mapRecovery.hidden = true;
+      mapFeedback.hidden = mapRecovery.hidden = true;
       mapExternal.href = "about:blank";
     }
     function resetInspector() {
@@ -5773,7 +5468,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     function syncSelection() {
       const first = resultBody.firstElementChild;
       if (!first) return resetInspector();
-      const selectionOnPage = [...resultBody.rows].some(row => Number(row.dataset.record) === selectedIndex);
+      const selectionOnPage = !!query(`tr[data-record="${selectedIndex}"]`, resultBody);
       selectRecord(selectionOnPage ? selectedIndex : Number(first.dataset.record), false);
     }
     on(resultBody, "click", (event) => {
@@ -5832,13 +5527,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       mapExternal.href = buildMapLink(1, record.latStr, record.lonStr);
       if (Math.abs(lat) > 85) {
         loadMap.hidden = true;
-        showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
-        return;
+        return showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
       }
       if (!navigator.onLine) {
         loadMap.hidden = true;
-        showMapFailure("네트워크 연결이 없습니다. 연결 후 다시 시도해 주세요.");
-        return;
+        return showMapFailure("네트워크 연결이 없습니다. 연결 후 다시 시도해 주세요.");
       }
       mapFeedback.textContent = "OpenStreetMap 지도를 불러오는 중…";
       mapFeedback.dataset.loading = "true";
@@ -5846,9 +5539,9 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
       mapRecovery.hidden = true;
       const box = [Math.max(-180, lon - .01), Math.max(-85, lat - .006), Math.min(180, lon + .01), Math.min(85, lat + .006)];
       const url = new URL("https://www.openstreetmap.org/export/embed.html");
-      url.searchParams.set("bbox", box.join(","));
-      url.searchParams.set("layer", "mapnik");
-      url.searchParams.set("marker", lat + "," + lon);
+      url.search = new URLSearchParams({
+        bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon,
+      });
       detailMap.src = url.href;
       detailMap.hidden = false;
       loadMap.hidden = true;
@@ -5865,8 +5558,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
     on(detailMap, "load", () => {
       if (detailMap.hidden || !detailMap.getAttribute("src")) return;
       clearTimeout(mapLoadTimer);
-      mapFeedback.hidden = true;
-      mapRecovery.hidden = true;
+      mapFeedback.hidden = mapRecovery.hidden = true;
     });
     on(window, "offline", () => {
       if (!detailMap.hidden) showMapFailure("네트워크 연결이 끊어졌습니다. 외부 지도로 확인하세요.");
