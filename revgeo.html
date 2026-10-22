@@ -513,7 +513,7 @@
     }
 
     .file-cue {
-      display: none
+      display: block
     }
 
     .coords-cell span {
@@ -848,12 +848,6 @@
     .note {
       line-height: 1.6;
       white-space: pre-wrap
-    }
-
-    .file-help,
-    .privacy-note {
-      margin-top: 12px;
-      white-space: normal
     }
 
     .note:empty {
@@ -1611,13 +1605,25 @@
       width: 480px
     }
 
-    #help-dialog ul {
+    #help-dialog ol {
       padding-left: 24px;
       line-height: 1.6
     }
 
     #help-dialog li+li {
       margin-top: 12px
+    }
+
+    #help-dialog details {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      line-height: 1.6
+    }
+
+    #help-dialog summary {
+      cursor: pointer;
+      font-weight: 600
     }
 
     .ui-notice {
@@ -1779,7 +1785,6 @@
       }
 
       #app,
-      .file-cue,
       table,
       tbody {
         display: block
@@ -2501,10 +2506,9 @@
           <span class="drop-text"><svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M6 3h8l4 4v14H6z" />
               <path d="M14 3v5h4m-9 4h6m-6 4h6" />
-            </svg><strong id="drop-filename">SRG TXT</strong><span class="file-cue">파일 선택</span></span>
-          <input accept=".txt,text/plain" aria-describedby="file-help" aria-label="SRG TXT 파일 선택" id="file" type="file">
+            </svg><strong id="drop-filename">SRG TXT 파일</strong><span class="file-cue">선택하거나 끌어다 놓기</span></span>
+          <input accept=".txt,text/plain" aria-label="SRG TXT 파일 선택" id="file" type="file">
         </label>
-        <p class="note file-help" id="file-help">최대 64 MiB</p>
         <p class="note" id="file-analysis"></p>
         <button class="button primary" command="--parse" commandfor="app" id="parse" type="button">
           <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -2625,7 +2629,6 @@
               </svg>
               <span>중지</span>
             </button></div>
-          <p class="note privacy-note">주소 조회 시 좌표가 Nominatim에 전송됩니다.</p>
         </section>
       </div>
     </section>
@@ -2876,10 +2879,18 @@
           <path d="m6 6 12 12M6 18 18 6" />
         </svg></button>
     </div>
-    <ul>
-      <li>SRG TXT는 <code>대한민국 위경도</code> 또는 <code>세계 위경도</code> 형식을 사용합니다.</li>
-      <li>CSV에는 필터와 관계없이 전체 조회 결과가 포함됩니다.</li>
-    </ul>
+    <ol>
+      <li><strong>파일 불러오기:</strong> SRG에서 생성한 <code>random_data.txt</code>를 선택하거나 끌어다 놓은 후 <strong>좌표 추출</strong>을 누르세요.</li>
+      <li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하고 <strong>좌표로 변환</strong> → <strong>이 좌표로 조회 준비</strong>를 누르세요.</li>
+      <li><strong>주소 조회:</strong> 추출된 좌표를 확인한 후 <strong>주소 조회 시작</strong>을 누르세요. 진행 중에는 일시정지·재개·중지할 수 있습니다.</li>
+      <li><strong>결과 확인:</strong> 검색·필터로 결과를 찾고 항목을 눌러 상세 위치와 지도를 확인하세요. <strong>전체 결과 CSV</strong>에는 필터와 관계없이 모든 조회 결과가 포함됩니다.</li>
+    </ol>
+    <details>
+      <summary>파일 형식·데이터 처리</summary>
+      <p>UTF-8 TXT 파일(최대 64 MiB)에서 <code>대한민국 위경도: 37.5,127.0</code> 또는 <code>세계 위경도: 37.5,127.0</code> 형식의 좌표를 읽습니다.</p>
+      <p>파일은 브라우저에서 분석하고, 주소 조회 시에는 좌표를 Nominatim에 전송합니다. 조회 결과는 브라우저에 최대 30일간 저장되며 설정에 따라 더 일찍 삭제될 수 있습니다.</p>
+      <p>좌표 미리보기는 최대 200개이며, <strong>전체 좌표 복사</strong>로 모든 좌표를 가져올 수 있습니다.</p>
+    </details>
   </dialog>
   <dialog aria-describedby="clear-description" aria-labelledby="clear-title" id="clear-dialog" role="alertdialog">
     <div class="sheet-heading">
