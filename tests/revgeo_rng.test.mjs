@@ -5,8 +5,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../revgeo.html', import.meta.url), 'utf8');
-const generator = html.slice(html.indexOf('async function generateRandomValues('), html.indexOf('function loadManualRng()'));
-const signal = () => new AbortController().signal;
+const generator = html.slice(html.indexOf('function generateRandomValues('), html.indexOf('function loadManualRng()'));
 function setup(overrides = {}) {
   const context = vm.createContext({
     crypto: webcrypto,
@@ -20,7 +19,7 @@ function setup(overrides = {}) {
   return context.generateRandomValues;
 }
 
-test('splits the 10,000-value Web Crypto request at its 65,536-byte quota', async () => {
+test('splits the 10,000-value Web Crypto request at its 65,536-byte quota', () => {
   const calls = [];
   const generate = setup({ crypto: { getRandomValues(words) {
     calls.push(words.byteLength);
@@ -28,30 +27,30 @@ test('splits the 10,000-value Web Crypto request at its 65,536-byte quota', asyn
     words.fill(0xffffffff);
     return words;
   } } });
-  const values = await generate(10000, signal());
+  const values = generate(10000);
   assert.deepEqual(calls, [65536, 14464]);
   assert.equal(values.length, 10000);
   assert.equal(values[0], (1n << 64n) - 1n);
   assert.equal(values.at(-1), (1n << 64n) - 1n);
 });
 
-test('preserves zero, values above MAX_SAFE_INTEGER and u64 max from client entropy', async () => {
+test('preserves zero, values above MAX_SAFE_INTEGER and u64 max from client entropy', () => {
   const generate = setup({ crypto: { getRandomValues(words) {
     words.set([0, 0, 0x200000, 1, 0xffffffff, 0xffffffff]);
     return words;
   } } });
-  const values = await generate(3, signal());
+  const values = generate(3);
   assert.deepEqual(Array.from(values), [0n, 9007199254740993n, 18446744073709551615n]);
 });
 
-test('uses actual Web Crypto and keeps all u64 values in range', async () => {
-  const values = await setup()(64, signal());
+test('uses actual Web Crypto and keeps all u64 values in range', () => {
+  const values = setup()(64);
   assert.equal(values.length, 64);
   assert.ok(values.every(value => value >= 0n && value <= (1n << 64n) - 1n));
   assert.ok(new Set(values).size > 1);
 });
 
-test('uses client entropy regardless of page host or obsolete backend metadata', async () => {
+test('uses client entropy regardless of page host or obsolete backend metadata', () => {
   for (const href of ['https://example.com/revgeo.html', 'http://127.0.0.1:8787/revgeo.html']) {
     let calls = 0;
     const generate = setup({
@@ -59,31 +58,35 @@ test('uses client entropy regardless of page host or obsolete backend metadata',
       query: () => ({ content: '/api/random' }),
       crypto: { getRandomValues(words) { calls++; words.fill(7); return words; } },
     });
-    const values = await generate(2, signal());
+    const values = generate(2);
     assert.equal(calls, 1);
     assert.deepEqual(Array.from(values), [30064771079n, 30064771079n]);
   }
 });
 
-test('rejects invalid counts before requesting any entropy', async () => {
+test('rejects invalid counts before requesting any entropy', () => {
   const generate = setup({ crypto: { getRandomValues() { assert.fail('must not request entropy'); } } });
   for (const count of [0, -1, 1.5, 10001, NaN, Infinity])
-    await assert.rejects(generate(count, signal()));
+    assert.throws(() => generate(count));
 });
 
-test('fails without a fallback when client cryptography is unavailable', async () => {
+test('fails without a fallback when client cryptography is unavailable', () => {
   for (const crypto of [undefined, null, {}])
-    await assert.rejects(setup({ crypto })(1, signal()), /이 기기의 브라우저에서 암호화 난수/);
+    assert.throws(() => setup({ crypto })(1), /이 기기의 브라우저에서 암호화 난수/);
 });
 
-test('propagates client entropy errors without a server or insecure fallback', async () => {
+test('propagates client entropy errors without a server or insecure fallback', () => {
   const generate = setup({ crypto: { getRandomValues() { throw new Error('client entropy failure'); } } });
-  await assert.rejects(generate(1, signal()), /client entropy failure/);
+  assert.throws(() => generate(1), /client entropy failure/);
 });
 
-test('does not request entropy after cancellation', async () => {
-  const controller = new AbortController();
-  controller.abort();
-  const generate = setup({ crypto: { getRandomValues() { assert.fail('must not request entropy'); } } });
-  await assert.rejects(generate(1, controller.signal), { name: 'AbortError' });
+test('propagates failure in a later entropy chunk without returning partial results', () => {
+  let calls = 0;
+  const generate = setup({ crypto: { getRandomValues(words) {
+    if (++calls === 2) throw new Error('second entropy chunk failed');
+    words.fill(1);
+    return words;
+  } } });
+  assert.throws(() => generate(10000), /second entropy chunk failed/);
+  assert.equal(calls, 2);
 });

@@ -2459,7 +2459,8 @@
 						<p class="note" id="rng-help">이 페이지를 연 기기의 브라우저에서 암호화 난수를 생성합니다. 난수 생성에 서버를 사용하지 않습니다.</p>
 						<div class="field">
 							<label class="label" for="rng-count">생성 개수</label>
-							<input id="rng-count" type="number" min="1" max="10000" step="1" value="1" inputmode="numeric" aria-describedby="rng-count-help">
+							<input id="rng-count" type="number" min="1" max="10000" step="1" value="1"
+								inputmode="numeric" aria-describedby="rng-count-help">
 							<span class="note" id="rng-count-help">1~10,000개 · 기존 입력값 뒤에 추가</span>
 						</div>
 						<div class="rng-actions">
@@ -2877,7 +2878,8 @@
 			<li><strong>파일 불러오기:</strong> SRG에서 생성한 <code>random_data.txt</code>를 선택하거나 끌어다 놓은 후 <strong>좌표 추출</strong>을
 				누르세요.
 			</li>
-			<li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하거나 <strong>기본 난수 생성</strong>을 누른 뒤 <strong>좌표로 변환</strong> →
+			<li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하거나 <strong>기본 난수 생성</strong>을 누른 뒤
+				<strong>좌표로 변환</strong> →
 				<strong>이 좌표로
 					조회 준비</strong>를 누르세요.
 			</li>
@@ -5150,10 +5152,9 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			else input.removeAttribute("aria-invalid");
 			input.setAttribute("aria-describedby", message ? `${help} ${error}` : help);
 		}
-		async function generateRandomValues(count, signal) {
+		function generateRandomValues(count) {
 			if (!Number.isInteger(count) || count < 1 || count > GENERATION_LIMIT)
 				throw new Error(`생성 개수는 1~${fmt(GENERATION_LIMIT)} 사이의 정수여야 합니다.`);
-			signal.throwIfAborted();
 			if (typeof globalThis.crypto?.getRandomValues !== "function")
 				throw new Error("이 기기의 브라우저에서 암호화 난수를 사용할 수 없습니다. 최신 브라우저에서 다시 시도해 주세요.");
 			const values = [];
@@ -5176,59 +5177,42 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const outputContent = query(".code-content", output);
 			const [rngCount, generateNum, generateSupp, autoSupp, rngStatus, rngError, generateDialog] =
 				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-status", "rng-error", "generate-supp-dialog"].map(byId);
-			let randomTask = null;
-			async function generateValues(count) {
-				if (randomTask) throw new Error("난수 생성이 진행 중입니다.");
-				const task = new AbortController();
-				randomTask = task;
+			function generateValues(count) {
 				rngError.textContent = "";
-				rngStatus.textContent = "난수 생성 중…";
-				setBusy(manualBusy);
 				try {
-					const values = await generateRandomValues(count, task.signal);
-					task.signal.throwIfAborted();
+					const values = generateRandomValues(count);
 					rngStatus.textContent = `이 기기의 Web Crypto · ${fmt(values.length)}개 생성`;
 					return values;
 				} catch (err) {
-					if (!task.signal.aborted) rngStatus.textContent = "난수 생성 실패";
+					rngStatus.textContent = "난수 생성 실패";
 					throw err;
-				} finally {
-					if (randomTask === task) {
-						randomTask = null;
-						setBusy(manualBusy);
-					}
 				}
 			}
 			const inputCount = input => {
 				let count = 0;
-				for (const token of u64Tokens(input.value)) {
-					if (++count > GENERATION_LIMIT) break;
-				}
+				const tokens = u64Tokens(input.value);
+				while (count <= GENERATION_LIMIT && !tokens.next().done) count++;
 				return count;
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
-				on(button, "click", async () => {
-					const epoch = outputEpoch;
+				on(button, "click", () => {
 					try {
 						const count = rngCount.valueAsNumber;
 						if (inputCount(input) + count > GENERATION_LIMIT) throw new Error(`입력값은 ${fmt(GENERATION_LIMIT)}개까지 추가할 수 있습니다.`);
-						const values = await generateValues(count);
-						if (epoch !== outputEpoch) return;
-						if (inputCount(input) + values.length > GENERATION_LIMIT) throw new Error(`입력값은 ${fmt(GENERATION_LIMIT)}개까지 추가할 수 있습니다.`);
+						const values = generateValues(count);
 						input.value = [input.value.trim(), values.join("\n")].filter(Boolean).join("\n");
 						setInputError(input, "");
 						if (input === num64Input) autoSupp.checked = true;
 					} catch (err) {
-						if (epoch === outputEpoch) rngError.textContent = errorMessage(err);
+						rngError.textContent = errorMessage(err);
 					}
 				});
-			on(generateDialog, "click", async () => {
-				const request = suppRequest;
+			on(generateDialog, "click", () => {
+				if (!suppRequest) return;
 				try {
-					const values = await generateValues(32);
-					if (request && request === suppRequest) finishSupplement(values);
+					finishSupplement(generateValues(32));
 				} catch (err) {
-					if (request && request === suppRequest) setSupplementError(errorMessage(err));
+					setSupplementError(errorMessage(err));
 				}
 			});
 			const clearInputErrors = () => {
@@ -5250,13 +5234,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				if (!suppRequest) return;
 				const resolve = suppRequest;
 				suppRequest = null;
-				if (values === null) {
-					returnFocus = clearBtn;
-					if (randomTask) {
-						randomTask.abort();
-						rngStatus.textContent = "난수 생성 중단";
-					}
-				}
+				if (values === null) returnFocus = clearBtn;
 				suppDialog.close();
 				resolve(values);
 			}
@@ -5310,22 +5288,15 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			});
 			on(byId("supp-dismiss"), "click", () => finishSupplement(null));
 			let chunks = [];
-			const clearPreview = () => {
-				chunks = [];
-				meta.textContent = outputContent.textContent = "";
-			};
 			let manualBusy = false;
 			let copyTask = null;
 			const setBusy = (busy) => {
 				manualBusy = busy;
 				const hasOutput = chunks.length > 0;
-				const working = busy || randomTask !== null;
-				for (const control of [rngCount, generateNum, generateSupp, autoSupp]) control.disabled = working;
-				generateDialog.disabled = randomTask !== null;
-				runBtn.disabled = working;
-				outputReady = !working && hasOutput;
+				for (const control of [rngCount, generateNum, generateSupp, autoSupp, runBtn]) control.disabled = busy;
+				outputReady = !busy && hasOutput;
 				useOutput.disabled = !outputReady || state.task !== null;
-				saveBtn.disabled = working || !hasOutput;
+				saveBtn.disabled = busy || !hasOutput;
 				copyBtn.disabled = saveBtn.disabled || copyTask !== null;
 			};
 			let outputEpoch = 0;
@@ -5376,7 +5347,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							invalidInput = null;
 							if (supplied.done) {
 								const values = autoSupp.checked
-									? await generateValues(32)
+									? generateValues(32)
 									: await requestSupplements(suppCount + used + 1, step.value);
 								if (epoch !== outputEpoch) return;
 								if (values === null) {
@@ -5488,13 +5459,12 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			});
 			const clearDialog = byId("clear-dialog");
 			const clearOutput = () => {
-				randomTask?.abort();
-				randomTask = null;
 				rngStatus.textContent = rngError.textContent = "";
 				finishSupplement(null);
 				returnFocus = null;
 				outputEpoch++;
-				clearPreview();
+				chunks = [];
+				meta.textContent = outputContent.textContent = "";
 				clearInputErrors();
 				setBusy(false);
 			};
