@@ -107,7 +107,8 @@
 		}
 
 		button,
-		select {
+		select,
+		.drop-zone input {
 			cursor: pointer
 		}
 
@@ -386,8 +387,6 @@
 		}
 
 		.steps [aria-current=step] span {
-			background: var(--button-fill);
-			color: #fff;
 			border-color: var(--button-fill)
 		}
 
@@ -417,11 +416,6 @@
 			min-width: 44px;
 			min-height: 44px;
 			padding: 0
-		}
-
-		.theme-toggle[data-next-theme=dark] .theme-moon,
-		.theme-toggle[data-next-theme=light] .theme-sun {
-			display: block
 		}
 
 		:is(.icon-button, .segmented button):active:not(:disabled) {
@@ -504,17 +498,8 @@
 			opacity: .55
 		}
 
-		.drop-zone input {
-			cursor: pointer
-		}
-
 		.drop-zone input:disabled {
 			cursor: not-allowed
-		}
-
-		.file-cue,
-		.coords-cell span {
-			display: block
 		}
 
 		.drop-text>svg {
@@ -566,9 +551,15 @@
 			color: #fff
 		}
 
-		.primary {
+		.steps [aria-current=step] span,
+		.primary,
+		#filter-count,
+		.page-number[aria-current=page] {
 			background: var(--button-fill);
-			color: #fff;
+			color: #fff
+		}
+
+		.primary {
 			border-color: transparent
 		}
 
@@ -631,12 +622,6 @@
 			border-bottom: 0
 		}
 
-		.coords-panel[data-empty=true] #coords,
-		.coords-panel[data-empty=true] .coords-head>span:last-child,
-		.coords-panel[data-empty=false] .coords-empty {
-			display: none
-		}
-
 		.coords-empty {
 			min-height: 72px;
 			padding: 12px 18px 18px;
@@ -663,10 +648,6 @@
 
 		.coords-panel[data-empty=false] .coords-tools {
 			display: flex
-		}
-
-		#coords-expand {
-			display: none
 		}
 
 		.coords-tools .button {
@@ -715,14 +696,6 @@
 			display: block
 		}
 
-		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions) {
-			display: none
-		}
-
-		.progress-heading {
-			margin-bottom: 12px
-		}
-
 		.track {
 			--pct: 0;
 			height: 6px;
@@ -735,10 +708,6 @@
 		.track>progress:not([value]) {
 			opacity: 1;
 			accent-color: var(--accent)
-		}
-
-		.track:has(progress:not([value]))>.fill {
-			display: none
 		}
 
 		.fill {
@@ -754,19 +723,11 @@
 			margin-top: 10px
 		}
 
-		.status-row {
-			margin-top: 12px
-		}
-
 		.status {
 			flex-basis: 100%;
 			font-size: var(--text-address);
 			line-height: 1.6;
 			color: var(--muted)
-		}
-
-		.status.success {
-			color: var(--success)
 		}
 
 		.status.info {
@@ -775,15 +736,6 @@
 
 		.status.warn {
 			color: var(--warning)
-		}
-
-		#error,
-		#supp-error,
-		#num64-error,
-		#suppValues-error,
-		.result-state[data-error=true],
-		.status.err {
-			color: var(--danger)
 		}
 
 		.elapsed-time {
@@ -824,10 +776,7 @@
 			min-height: 120px;
 			max-height: 420px;
 			padding: 14px;
-			color: var(--fg);
-			border-radius: var(--radius-control);
 			font-family: var(--mono);
-			font-size: 1rem;
 			line-height: 1.75
 		}
 
@@ -840,10 +789,6 @@
 		.note {
 			line-height: 1.6;
 			white-space: pre-wrap
-		}
-
-		.note:empty {
-			display: none
 		}
 
 		.confirm-actions,
@@ -936,10 +881,7 @@
 			height: max(44px, calc(1.5em + 18px));
 			line-height: 1.5;
 			min-width: 0;
-			border-radius: var(--radius-control);
-			color: var(--fg);
-			padding: 8px 12px;
-			font-size: 1rem
+			padding: 8px 12px
 		}
 
 		.search-field {
@@ -979,8 +921,6 @@
 			height: 20px;
 			padding-inline: 4px;
 			border-radius: var(--radius-pill);
-			background: var(--button-fill);
-			color: #fff;
 			font-size: .75rem;
 			font-weight: 600
 		}
@@ -1084,14 +1024,6 @@
 			width: 98px
 		}
 
-		td:nth-child(4) {
-			white-space: nowrap
-		}
-
-		tr[data-record][data-selected=true] {
-			background: var(--tint)
-		}
-
 		tr[data-selected=true] td:first-child {
 			box-shadow: inset 3px 0 var(--accent);
 			color: var(--accent)
@@ -1114,12 +1046,6 @@
 		.address-sub {
 			display: block;
 			unicode-bidi: plaintext
-		}
-
-		#detail-full[dir=auto],
-		.address-main[dir=auto],
-		.address-sub[dir=auto] {
-			text-align: start
 		}
 
 		.location-button::after {
@@ -1163,12 +1089,14 @@
 			}
 		}
 
+		#error,
+		#supp-error,
+		#num64-error,
+		#suppValues-error,
+		.result-state[data-error=true],
+		.status.err,
 		.row-error {
 			color: var(--danger)
-		}
-
-		.address-sub {
-			margin-top: 3px
 		}
 
 		.coords-cell {
@@ -1193,12 +1121,9 @@
 			overflow-wrap: normal
 		}
 
+		.status.success,
 		.result-state {
 			color: var(--success)
-		}
-
-		.result-state[data-status=missing] {
-			color: var(--muted)
 		}
 
 		.table-hint {
@@ -1226,6 +1151,8 @@
 			min-height: 240px
 		}
 
+		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions),
+		.track:has(progress:not([value]))>.fill,
 		.table-wrap.has-results:has(tbody:empty) table {
 			display: none
 		}
@@ -1269,11 +1196,10 @@
 		}
 
 		.page-number[aria-current=page] {
-			color: #fff;
-			background: var(--button-fill);
 			font-weight: 600
 		}
 
+		.result-state[data-status=missing],
 		.credits a,
 		.page-ellipsis,
 		dt {
@@ -1288,6 +1214,7 @@
 			border-bottom-right-radius: var(--radius-large)
 		}
 
+		.progress-heading,
 		.inspector-eyebrow {
 			margin-bottom: 12px
 		}
@@ -1298,6 +1225,7 @@
 			letter-spacing: 0
 		}
 
+		.address-sub,
 		#detail-town {
 			margin-top: 3px
 		}
@@ -1327,6 +1255,7 @@
 			font-size: .875rem
 		}
 
+		tr[data-record][data-selected=true],
 		.map-load:active:not(:disabled) {
 			background: var(--tint)
 		}
@@ -1474,6 +1403,7 @@
 			column-gap: .35em
 		}
 
+		td:nth-child(4),
 		.usage-policy>a {
 			white-space: nowrap
 		}
@@ -1515,14 +1445,20 @@
 			margin: 16px 0 8px
 		}
 
+		textarea,
+		.filters :is(input, select),
+		.settings select,
+		.map-links a {
+			border-radius: var(--radius-control);
+			color: var(--fg);
+			font-size: 1rem
+		}
+
 		.map-links a {
 			justify-content: flex-start;
 			min-width: 0;
 			padding: 12px 14px;
 			border-color: transparent;
-			border-radius: var(--radius-control);
-			color: var(--fg);
-			font-size: 1rem;
 			text-align: start;
 			overflow-wrap: anywhere
 		}
@@ -1601,10 +1537,6 @@
 			line-height: 1.6
 		}
 
-		#help-dialog li+li {
-			margin-top: 12px
-		}
-
 		#help-dialog details {
 			margin-top: 16px;
 			padding-top: 12px;
@@ -1676,6 +1608,9 @@
 			justify-content: flex-start
 		}
 
+		#detail-full[dir=auto],
+		.address-main[dir=auto],
+		.address-sub[dir=auto],
 		[role=alertdialog]>p,
 		[role=alertdialog] .sheet-heading {
 			text-align: start
@@ -1685,15 +1620,26 @@
 			line-height: 1.6
 		}
 
+		.status-row,
+		#help-dialog li+li,
 		#bulk-dialog p {
 			margin-top: 12px
 		}
 
+		.coords-panel[data-empty=true] #coords,
+		.coords-panel[data-empty=true] .coords-head>span:last-child,
+		.coords-panel[data-empty=false] .coords-empty,
+		#coords-expand,
+		.note:empty,
 		.mobile-bottom,
 		.mobile-job-slot {
 			display: none
 		}
 
+		.theme-toggle[data-next-theme=dark] .theme-moon,
+		.theme-toggle[data-next-theme=light] .theme-sun,
+		.file-cue,
+		.coords-cell span,
 		.mobile-job-slot:not(:empty) {
 			display: block
 		}
@@ -1768,13 +1714,10 @@
 				height: 32px
 			}
 
-			.site-brand h1 {
-				font-size: 1rem
-			}
-
 			#app,
 			table,
-			tbody {
+			tbody,
+			.location-button::after {
 				display: block
 			}
 
@@ -1790,7 +1733,8 @@
 			.filter-trigger>span:not(#filter-count),
 			body[data-mobiletab=input] .results,
 			body[data-mobiletab=results] .input-card,
-			colgroup {
+			colgroup,
+			td:nth-child(1) {
 				display: none
 			}
 
@@ -1938,10 +1882,6 @@
 				border: 0
 			}
 
-			td:nth-child(1) {
-				display: none
-			}
-
 			td:nth-child(2) {
 				grid-column: 1;
 				grid-row: 1;
@@ -1965,16 +1905,13 @@
 				align-self: end
 			}
 
+			.site-brand h1,
 			.address-main {
 				font-size: 1rem
 			}
 
 			.location-button {
 				padding-inline-end: 22px
-			}
-
-			.location-button::after {
-				display: block
 			}
 
 			.coords-cell {
@@ -2160,7 +2097,8 @@
 				--page-gutter: 12px
 			}
 
-			.site-brand {
+			.site-brand,
+			.mobile-bottom {
 				gap: 8px
 			}
 
@@ -2175,10 +2113,6 @@
 			.brand-mark {
 				width: 28px;
 				height: 28px
-			}
-
-			.mobile-bottom {
-				gap: 8px
 			}
 
 			.mobile-nav button {
@@ -2304,7 +2238,8 @@
 			}
 		}
 
-		@media (prefers-reduced-transparency:reduce) {
+		@media (prefers-reduced-transparency:reduce),
+		(prefers-contrast:more) {
 
 			.mobile-nav,
 			.tool-capsule {
@@ -2323,10 +2258,7 @@
 
 			.mobile-nav,
 			.tool-capsule {
-				background: var(--surface);
-				border-color: var(--fg);
-				-webkit-backdrop-filter: none;
-				backdrop-filter: none
+				border-color: var(--fg)
 			}
 
 			.coords-panel,
@@ -2500,9 +2432,7 @@
 					<svg aria-hidden="true" viewBox="0 0 24 24">
 						<path d="M6 3h8l4 4v14H6z" />
 						<path d="M14 3v5h4m-9 4h6m-6 4h6" />
-					</svg>
-					<span>좌표 추출</span>
-				</button>
+					</svg> 좌표 추출 </button>
 			</div>
 			<div aria-labelledby="manual-tab" class="manual-rng" hidden id="manual-pane" role="tabpanel">
 				<div class="rng-fields">
@@ -2528,31 +2458,23 @@
 						<button class="button primary" id="runBtn" type="button">
 							<svg aria-hidden="true" viewBox="0 0 24 24">
 								<path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" />
-							</svg>
-							<span>좌표로 변환</span>
-						</button>
+							</svg> 좌표로 변환 </button>
 						<button class="button" disabled id="saveOutput" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="M12 4.5v10" />
 								<path d="m8 10.75 4 4 4-4" />
 								<path d="M5.5 18.5h13" />
-							</svg>
-							<span>TXT 저장</span>
-						</button>
+							</svg> TXT 저장 </button>
 						<button class="button" disabled id="copyOutput" title="결과 복사" type="button">
 							<svg aria-hidden="true" viewBox="0 0 24 24">
 								<rect width="11" height="11" x="9" y="9" rx="2" />
 								<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-							</svg>
-							<span>결과 복사</span>
-						</button>
+							</svg> 결과 복사 </button>
 						<button class="button primary" disabled id="useOutput" type="button">이 좌표로 조회 준비</button>
 						<button class="button danger" id="clearBtn" type="button">
 							<svg aria-hidden="true" viewBox="0 0 24 24">
 								<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15m-8 4v7m4-7v7" />
-							</svg>
-							<span>출력 지우기</span>
-						</button>
+							</svg> 출력 지우기 </button>
 					</div>
 					<div aria-atomic="true" class="note" id="meta" role="status"></div>
 					<div aria-atomic="true" class="note" id="error" role="alert"></div>
@@ -2609,20 +2531,15 @@
 						</button><button class="button" command="--pause" commandfor="app" disabled hidden id="pause" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none" />
-							</svg>
-							<span>일시정지</span>
-						</button><button class="button primary" command="--resume" commandfor="app" disabled hidden id="resume"
-							type="button">
+							</svg> 일시정지 </button><button class="button primary" command="--resume" commandfor="app" disabled hidden
+							id="resume" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
-							</svg>
-							<span>재개</span>
-						</button><button class="button" command="--stop" commandfor="app" disabled hidden id="stop" type="button">
+							</svg> 재개 </button><button class="button" command="--stop" commandfor="app" disabled hidden id="stop"
+							type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5" />
-							</svg>
-							<span>중지</span>
-						</button></div>
+							</svg> 중지 </button></div>
 				</section>
 			</div>
 		</section>
@@ -2699,9 +2616,8 @@
 									<svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="M20 7v5h-5M4 17v-5h5" />
 										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
-									</svg>
-									<span> 검색·필터 모두 초기화 </span>
-								</button><button class="button primary" id="filter-close" type="button">완료</button>
+									</svg> 검색·필터 모두 초기화 </button><button class="button primary" id="filter-close"
+									type="button">완료</button>
 							</div>
 						</dialog>
 					</div>
@@ -2761,7 +2677,7 @@
 										viewBox="0 0 24 24">
 										<path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
 										<circle cx="12" cy="10" r="2.5" />
-									</svg><span>OpenStreetMap 지도 불러오기</span></button>
+									</svg>OpenStreetMap 지도 불러오기</button>
 								<div aria-live="polite" class="map-feedback" hidden id="map-feedback" tabindex="-1"></div><iframe hidden
 									id="detail-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
 									title="선택한 좌표의 OpenStreetMap 지도"></iframe>
@@ -5193,31 +5109,30 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				"text/plain": blob,
 			})]);
 		}
+		function setInputError(input, message, help = `${input.id}-help`, error = `${input.id}-error`) {
+			byId(error).textContent = message;
+			if (message) input.ariaInvalid = "true";
+			else input.removeAttribute("aria-invalid");
+			input.setAttribute("aria-describedby", message ? `${help} ${error}` : help);
+		}
 		function loadManualRng() {
 			const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn,
-				output, error, meta, suppDialog, suppForm, suppContext, suppValues, suppError] = [
+				output, error, meta, suppDialog, suppForm, suppContext, suppValues] = [
 					"num64", "suppValues", "runBtn", "clearBtn", "saveOutput", "copyOutput",
 					"output", "error", "meta", "supp-dialog", "supp-form", "supp-context",
-					"supp-values", "supp-error",
+					"supp-values",
 				].map(byId);
 			const outputContent = query(".code-content", output);
 			const clearInputErrors = () => {
 				error.textContent = "";
-				for (const input of [num64Input, suppInput]) {
-					byId(`${input.id}-error`).textContent = "";
-					input.removeAttribute("aria-invalid");
-					input.setAttribute("aria-describedby", `${input.id}-help`);
-				}
+				for (const input of [num64Input, suppInput]) setInputError(input, "");
 			};
 			for (const input of [num64Input, suppInput])
 				on(input, "input", () => {
 					if (input.ariaInvalid === "true") clearInputErrors();
 				});
-			const clearSupplementError = () => {
-				suppValues.removeAttribute("aria-invalid");
-				suppValues.setAttribute("aria-describedby", "supp-help");
-				suppError.textContent = "";
-			};
+			const setSupplementError = message => setInputError(suppValues, message, "supp-help", "supp-error");
+			const clearSupplementError = () => setSupplementError("");
 			on(suppValues, "input", () => {
 				if (suppValues.ariaInvalid === "true") clearSupplementError();
 			});
@@ -5270,9 +5185,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 					clearSupplementError();
 					finishSupplement(values);
 				} catch (err) {
-					suppValues.ariaInvalid = "true";
-					suppValues.setAttribute("aria-describedby", "supp-help supp-error");
-					suppError.textContent = errorMessage(err);
+					setSupplementError(errorMessage(err));
 					suppValues.focus(NO_SCROLL);
 					suppValues.closest(".field").scrollIntoView({ block: "center" });
 				}
@@ -5410,9 +5323,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 						meta.textContent = previousMeta;
 						const message = errorMessage(err);
 						if (invalidInput) {
-							byId(`${invalidInput.id}-error`).textContent = message;
-							invalidInput.ariaInvalid = "true";
-							invalidInput.setAttribute("aria-describedby", `${invalidInput.id}-help ${invalidInput.id}-error`);
+							setInputError(invalidInput, message);
 							returnFocus = invalidInput;
 						} else error.textContent = message;
 					}
@@ -5805,11 +5716,14 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		}
 		const [mapFeedback, mapRecovery, mapExternal] = ["map-feedback", "map-recovery", "map-external"].map(byId);
 		let mapLoadTimer = 0;
+		function clearMapTimer() {
+			clearTimeout(mapLoadTimer);
+			mapLoadTimer = 0;
+		}
 		function showMapFailure(message) {
 			const active = document.activeElement;
 			const ownedFocus = [loadMap, retryMap, mapFeedback, detailMap].includes(active);
-			clearTimeout(mapLoadTimer);
-			mapLoadTimer = 0;
+			clearMapTimer();
 			detailMap.hidden = true;
 			loadMap.hidden = true;
 			mapFeedback.textContent = message;
@@ -5818,8 +5732,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			if (ownedFocus) (retryMap.disabled ? mapExternal : retryMap).focus(NO_SCROLL);
 		}
 		function unloadMap() {
-			clearTimeout(mapLoadTimer);
-			mapLoadTimer = 0;
+			clearMapTimer();
 			detailMap.removeAttribute("src");
 			detailMap.hidden = true;
 			loadMap.hidden = false;
@@ -5940,8 +5853,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		function startMapLoad() {
 			const record = selection;
 			if (!record) return;
-			clearTimeout(mapLoadTimer);
-			mapLoadTimer = 0;
+			clearMapTimer();
 			const lat = Number(record.latStr), lon = Number(record.lonStr);
 			mapExternal.href = buildMapLink(1, record.latStr, record.lonStr);
 			retryMap.disabled = Math.abs(lat) > 85;
@@ -5974,8 +5886,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		on(detailMap, "load", () => {
 			if (detailMap.hidden || !detailMap.getAttribute("src")) return;
 			const ownedFocus = document.activeElement === mapFeedback;
-			clearTimeout(mapLoadTimer);
-			mapLoadTimer = 0;
+			clearMapTimer();
 			mapFeedback.dataset.loading = "false";
 			mapFeedback.hidden = mapRecovery.hidden = true;
 			if (ownedFocus) detailMap.focus(NO_SCROLL);
