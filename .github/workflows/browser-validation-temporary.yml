@@ -1,0 +1,63 @@
+name: Temporary browser and HTML regression checks
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+concurrency:
+  group: temporary-html-browser-${{ github.head_ref }}
+  cancel-in-progress: true
+jobs:
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - name: Install maintained browser engines
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Test real Chromium Firefox and WebKit browser workflows
+        run: node .validation/browser-regressions.cjs
+  html:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - name: Install formatter and validators
+        run: npm install --no-save html-validate vscode-html-languageservice vscode-languageserver-textdocument
+      - name: Remove empty source lines and apply built-in VS Code HTML formatting
+        run: |
+          sed -i '/^[[:space:]]*$/d' revgeo.html
+          node - <<'JS'
+          const fs = require('fs');
+          const {getLanguageService} = require('vscode-html-languageservice');
+          const {TextDocument} = require('vscode-languageserver-textdocument');
+          const text = fs.readFileSync('revgeo.html','utf8');
+          const doc = TextDocument.create('file:///revgeo.html','html',1,text);
+          const edits = getLanguageService().format(doc,{start:{line:0,character:0},end:doc.positionAt(text.length)},{tabSize:4,insertSpaces:false});
+          let formatted = text;
+          for(const edit of edits.sort((a,b)=>doc.offsetAt(b.range.start)-doc.offsetAt(a.range.start))) {
+            formatted = formatted.slice(0,doc.offsetAt(edit.range.start)) + edit.newText + formatted.slice(doc.offsetAt(edit.range.end));
+          }
+          fs.writeFileSync('revgeo.html',formatted);
+          JS
+          git diff --numstat -- revgeo.html
+          git diff --exit-code -- revgeo.html
+      - name: Validate saved HTML with HTMLValidate
+        run: npx html-validate revgeo.html
+      - name: Validate saved HTML with Nu Html Checker
+        run: |
+          curl -fsSL https://github.com/validator/validator/releases/latest/download/vnu.jar -o /tmp/vnu.jar
+          java -jar /tmp/vnu.jar --errors-only revgeo.html
