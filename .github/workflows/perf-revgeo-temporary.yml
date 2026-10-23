@@ -1,0 +1,42 @@
+name: Temporary srg exact-baseline browser performance
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  measured-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - name: Install browser engines and product-independent test harness
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Materialize exact pre-change checkpoint and current main checkpoint
+        run: |
+          git show d5aba432cd9c6408931ef0dc95b97e562038fcb0:revgeo.html > .validation/revgeo-baseline.html
+          git show e7e96594440bdbd36f6d15457ea62b11ff0a51bf:revgeo.html > .validation/revgeo-candidate.html
+          test -s .validation/revgeo-baseline.html
+          test -s .validation/revgeo-candidate.html
+      - name: Compare six paired cold, warm, persistent cache, and cross-tab trials in three browser engines
+        env:
+          SRG_BASELINE_SHA: d5aba432cd9c6408931ef0dc95b97e562038fcb0
+          SRG_CANDIDATE_SHA: e7e96594440bdbd36f6d15457ea62b11ff0a51bf
+        run: node .validation/revgeo-perf.cjs
+      - name: Retain raw browser metrics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: exact-baseline-revgeo-performance
+          path: .validation/perf-results.json
+          if-no-files-found: warn
+          retention-days: 7
