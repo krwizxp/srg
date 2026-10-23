@@ -46,7 +46,6 @@ srg ladder <players-csv> <results-csv>
 srg random-integer <min> <max>
 srg random-float <min> <max>
 srg time-observe <host> <seconds>
-srg serve-revgeo [port]
 ```
 
 - `generate`: 지정한 개수의 데이터를 생성
@@ -54,7 +53,6 @@ srg serve-revgeo [port]
 - `random-integer`: 지정 범위의 정수 생성
 - `random-float`: 지정 범위의 실수 생성
 - `time-observe`: 지정한 서버 시간을 일정 시간 관찰
-- `serve-revgeo`: 브라우저용 난수 생성 백엔드와 내장 revgeo 페이지 실행 (기본 포트 8787)
 
 생성 결과는 기본적으로 `random_data.txt`에 저장됩니다.
 
@@ -85,23 +83,11 @@ srg serve-revgeo [port]
 
 `난수 직접 입력` 탭에서 생성 개수(1~10,000)를 정하고 `기본 난수 생성` 또는 `보조 난수 생성`을 누르면 기존 입력 뒤에 값이 추가됩니다. 기본 난수를 생성하면 `변환 중 부족한 보조 난수 자동 생성`이 켜집니다. 직접 입력만 하는 경우에는 기존처럼 보조 난수를 수동으로 입력할 수 있고, 보조 입력 대화상자에서도 난수를 생성할 수 있습니다.
 
-일반 웹페이지와 GitHub Pages에서는 브라우저의 `crypto.getRandomValues()`를 사용합니다. ARM 기기에서도 사용할 수 있습니다. 브라우저는 RDSEED/RDRAND 명령을 직접 실행하거나 어떤 CPU 명령을 사용했는지 보장하는 API를 제공하지 않습니다.
+난수는 HTML을 제공하는 서버가 아니라 **페이지를 연 기기의 브라우저**에서 `crypto.getRandomValues()`로 생성합니다. GitHub Pages 등 어떤 서버에서 페이지를 열든 같은 방식이며, 난수 생성을 위한 서버 요청은 보내지 않습니다. 기본 난수, 사전 입력용 보조 난수, 변환 중 자동 보완과 보조 입력 대화상자의 생성 버튼 모두 이 기기의 난수원을 사용합니다.
 
-Rust SRG의 난수원을 사용하려면 다음 명령을 실행하고 표시된 주소를 브라우저에서 엽니다. HTML과 아이콘은 실행 파일에 포함되어 별도로 복사하지 않아도 됩니다.
+Web Crypto는 브라우저가 제공하는 암호학적으로 안전한 난수 API입니다. x86_64와 ARM에서 모두 사용할 수 있지만, 브라우저 API로 RDSEED/RDRAND 사용을 강제하거나 사용된 CPU 명령을 확인할 수는 없습니다. RDSEED/RDRAND를 반드시 직접 사용하려면 사용자의 기기에서 SRG 같은 네이티브 프로그램을 실행해야 합니다. Rust/WASM으로 컴파일하더라도 일반 브라우저에서 해당 CPU 명령을 직접 실행할 수는 없습니다.
 
-```bash
-cargo run --release --frozen -- serve-revgeo
-# 또는 빌드한 실행 파일로 실행
-./target/release/srg serve-revgeo
-# 포트 변경: srg serve-revgeo 9000
-```
-
-- x86_64 백엔드: 기존 SRG의 RDSEED 우선, 5분 재시도 한도 후 RDRAND 전환 정책을 사용합니다. 둘 다 미지원이거나 생성에 실패하면 오류를 표시합니다. 다른 난수원으로 자동 대체하지 않습니다.
-- ARM 등 다른 아키텍처의 백엔드: Linux/macOS는 운영체제의 `getentropy`, Windows는 `BCryptGenRandom`을 사용합니다. 이 지원은 `serve-revgeo` 모드에 적용되며 기존 CLI·메뉴의 아키텍처 제한은 그대로입니다.
-- 로컬 페이지는 Rust SRG를 기본 난수원으로 선택하고, 실제 사용한 난수원을 생성 상태에 표시합니다. 브라우저 난수원도 직접 선택할 수 있습니다.
-- 서버는 `127.0.0.1`에만 바인딩하고 같은 출처의 요청만 허용합니다. GitHub Pages에서 로컬 서버로 연결하는 방식이 아니라 서버가 제공하는 페이지를 사용합니다. 종료는 `Ctrl+C`입니다.
-
-64비트 값은 JSON에서 10진수 문자열로 전송하고 브라우저에서 `BigInt`로 읽어 정밀도를 유지합니다. 한 번에 최대 10,000개를 요청할 수 있습니다. 난수 생성 결과는 캐시하지 않습니다.
+암호화 난수 API가 없거나 생성에 실패하면 오류를 표시합니다. 서버 난수원이나 `Math.random()`으로 대체하지 않습니다. 한 번에 최대 10,000개를 생성하고 각 64비트 값을 `BigInt`와 10진수 문자열로 유지해 정밀도를 보존합니다.
 
 ### 이용 순서
 

@@ -215,7 +215,7 @@
 		}
 
 		.filters :is(input, select),
-		.rng-generator :is(input[type=number], select),
+		.rng-generator input[type=number],
 		.settings select,
 		textarea {
 			background: var(--surface);
@@ -887,7 +887,7 @@
 		}
 
 		.filters :is(input, select),
-		.rng-generator :is(input[type=number], select),
+		.rng-generator input[type=number],
 		.settings select {
 			width: 100%;
 			min-height: 44px;
@@ -1461,7 +1461,7 @@
 
 		textarea,
 		.filters :is(input, select),
-		.rng-generator :is(input[type=number], select),
+		.rng-generator input[type=number],
 		.settings select,
 		.map-links a {
 			border-radius: var(--radius-control);
@@ -2456,14 +2456,7 @@
 			<div aria-labelledby="manual-tab" class="manual-rng" hidden id="manual-pane" role="tabpanel">
 				<div class="rng-fields">
 					<section aria-label="난수 생성" class="rng-generator">
-						<div class="field">
-							<label class="label" for="rng-source">난수원</label>
-							<select aria-describedby="rng-help" id="rng-source">
-								<option value="browser">시스템 암호화 난수 (Web Crypto)</option>
-								<option value="srg">Rust SRG (로컬 서버)</option>
-							</select>
-							<p class="note" id="rng-help">Rust SRG는 srg serve-revgeo 실행 후 표시된 주소에서 사용합니다. x86_64: RDSEED/RDRAND · ARM: 운영체제 암호화 난수. 일반 웹페이지에서는 Web Crypto를 사용합니다.</p>
-						</div>
+						<p class="note" id="rng-help">이 페이지를 연 기기의 브라우저에서 암호화 난수를 생성합니다. 난수 생성에 서버를 사용하지 않습니다.</p>
 						<div class="field">
 							<label class="label" for="rng-count">생성 개수</label>
 							<input id="rng-count" type="number" min="1" max="10000" step="1" value="1" inputmode="numeric" aria-describedby="rng-count-help">
@@ -5157,43 +5150,21 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			else input.removeAttribute("aria-invalid");
 			input.setAttribute("aria-describedby", message ? `${help} ${error}` : help);
 		}
-		const RANDOM_SOURCE_LABELS = Object.freeze({
-			"web-crypto": "Web Crypto · 시스템 암호화 난수",
-			rdseed: "Rust SRG · RDSEED",
-			rdrand: "Rust SRG · RDRAND",
-			"rdseed+rdrand": "Rust SRG · RDSEED → RDRAND",
-			"os-csprng": "Rust SRG · 운영체제 암호화 난수",
-		});
-		const hasSrgBackend = () => query('meta[name="srg-rng-backend"]')?.content === "/api/random";
-		async function generateRandomValues(count, source, signal) {
+		async function generateRandomValues(count, signal) {
 			if (!Number.isInteger(count) || count < 1 || count > GENERATION_LIMIT)
 				throw new Error(`생성 개수는 1~${fmt(GENERATION_LIMIT)} 사이의 정수여야 합니다.`);
 			signal.throwIfAborted();
-			if (source === "srg") {
-				if (!hasSrgBackend()) throw new Error("srg serve-revgeo 실행 후 표시된 주소에서 열어 주세요.");
-				const response = await fetch(new URL("/api/random", location.href), {
-					method: "POST", body: String(count), cache: "no-store", credentials: "omit",
-					redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(330_000)]),
-				});
-				if (!response.ok) throw new Error(`Rust SRG 난수 생성 실패 (${response.status}). ${(await response.text()).slice(0, 300)}`);
-				const data = await response.json();
-				if (!data || !Object.hasOwn(RANDOM_SOURCE_LABELS, data.source) || data.source === "web-crypto" ||
-					!Array.isArray(data.values) || data.values.length !== count ||
-					data.values.some(value => typeof value !== "string" || !/^[0-9]{1,20}$/.test(value)))
-					throw new Error("Rust SRG 응답 형식이 올바르지 않습니다.");
-				return { values: data.values.map(parseU64), source: data.source };
-			}
-			if (source !== "browser" || typeof globalThis.crypto?.getRandomValues !== "function")
-				throw new Error("이 브라우저에서 암호화 난수를 사용할 수 없습니다. 최신 브라우저 또는 로컬 Rust SRG를 사용해 주세요.");
+			if (typeof globalThis.crypto?.getRandomValues !== "function")
+				throw new Error("이 기기의 브라우저에서 암호화 난수를 사용할 수 없습니다. 최신 브라우저에서 다시 시도해 주세요.");
 			const values = [];
-			// Web Crypto permits at most 65,536 bytes per call (8,192 u64s).
+			// Generate on the client only. Web Crypto permits 65,536 bytes per call.
 			while (values.length < count) {
 				const words = new Uint32Array(Math.min(count - values.length, 8192) * 2);
 				crypto.getRandomValues(words);
 				for (let index = 0; index < words.length; index += 2)
 					values.push((BigInt(words[index]) << 32n) | BigInt(words[index + 1]));
 			}
-			return { values, source: "web-crypto" };
+			return values;
 		}
 		function loadManualRng() {
 			const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn,
@@ -5203,10 +5174,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 					"supp-values",
 				].map(byId);
 			const outputContent = query(".code-content", output);
-			const [rngSource, rngCount, generateNum, generateSupp, autoSupp, rngStatus, rngError, generateDialog] =
-				["rng-source", "rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-status", "rng-error", "generate-supp-dialog"].map(byId);
-			if (hasSrgBackend()) rngSource.value = "srg";
-			else query('option[value="srg"]', rngSource).disabled = true;
+			const [rngCount, generateNum, generateSupp, autoSupp, rngStatus, rngError, generateDialog] =
+				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-status", "rng-error", "generate-supp-dialog"].map(byId);
 			let randomTask = null;
 			async function generateValues(count) {
 				if (randomTask) throw new Error("난수 생성이 진행 중입니다.");
@@ -5216,10 +5185,10 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				rngStatus.textContent = "난수 생성 중…";
 				setBusy(manualBusy);
 				try {
-					const result = await generateRandomValues(count, rngSource.value, task.signal);
+					const values = await generateRandomValues(count, task.signal);
 					task.signal.throwIfAborted();
-					rngStatus.textContent = `${RANDOM_SOURCE_LABELS[result.source]} · ${fmt(result.values.length)}개 생성`;
-					return result.values;
+					rngStatus.textContent = `이 기기의 Web Crypto · ${fmt(values.length)}개 생성`;
+					return values;
 				} catch (err) {
 					if (!task.signal.aborted) rngStatus.textContent = "난수 생성 실패";
 					throw err;
@@ -5351,7 +5320,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				manualBusy = busy;
 				const hasOutput = chunks.length > 0;
 				const working = busy || randomTask !== null;
-				for (const control of [rngSource, rngCount, generateNum, generateSupp, autoSupp]) control.disabled = working;
+				for (const control of [rngCount, generateNum, generateSupp, autoSupp]) control.disabled = working;
 				generateDialog.disabled = randomTask !== null;
 				runBtn.disabled = working;
 				outputReady = !working && hasOutput;
