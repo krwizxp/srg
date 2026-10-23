@@ -8,19 +8,19 @@ permissions:
 jobs:
   measured-browser:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --ipc=host
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "24"
-      - name: Install browser engines and product-independent test harness
+      - name: Use pinned Playwright browsers from supported prebuilt image
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium firefox webkit
+          node --version
+          npm install --no-save playwright@1.64.0
       - name: Materialize exact pre-change checkpoint and current main checkpoint
         run: |
           git show d5aba432cd9c6408931ef0dc95b97e562038fcb0:revgeo.html > .validation/revgeo-baseline.html
