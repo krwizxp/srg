@@ -30,6 +30,7 @@ jobs:
           test -s .validation/revgeo-candidate.html
       - name: Compare six paired cold, warm, persistent cache, and cross-tab trials in three browser engines
         env:
+          HOME: /root
           SRG_BASELINE_SHA: d5aba432cd9c6408931ef0dc95b97e562038fcb0
           SRG_CANDIDATE_SHA: e7e96594440bdbd36f6d15457ea62b11ff0a51bf
         run: node .validation/revgeo-perf.cjs
