@@ -23,6 +23,7 @@ jobs:
           npm install --no-save playwright@1.64.0
       - name: Materialize exact pre-change checkpoint and current main checkpoint
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git show d5aba432cd9c6408931ef0dc95b97e562038fcb0:revgeo.html > .validation/revgeo-baseline.html
           git show e7e96594440bdbd36f6d15457ea62b11ff0a51bf:revgeo.html > .validation/revgeo-candidate.html
           test -s .validation/revgeo-baseline.html
