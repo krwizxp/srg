@@ -4,9 +4,9 @@ use self::timer_resolution::{
 };
 use self::util::{blend_rtt, parse_u32_digits};
 use crate::{IS_TERMINAL, buffmt::ByteCursor, stop_input::StopInput};
+use alloc::borrow::Cow;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
-use alloc::{borrow::Cow, sync::Arc};
 use core::{
     error::Error,
     fmt::{self, Write as FmtWrite},
@@ -567,15 +567,15 @@ impl ObservationStop<'_> {
 struct SampleWorker {
     command_sender: mpsc::SyncSender<u64>,
     generation: u64,
-    host: Arc<ParsedServer>,
     response_receiver: mpsc::Receiver<SampleWorkerResponse>,
+    scheme: UrlScheme,
     worker: Option<thread::JoinHandle<()>>,
 }
 impl ServerTimeSession {
     pub(super) fn run_loop(self, out: &mut dyn io::Write, err: &mut dyn io::Write) -> Result<()> {
         let now = Instant::now();
-        let shared_host = Arc::new(self.host);
-        let host = Arc::clone(&shared_host);
+        let host = self.host;
+        let scheme = host.scheme;
         let (command_sender, command_receiver) = mpsc::sync_channel(1);
         let (response_sender, response_receiver) = mpsc::sync_channel(1);
         let worker = thread::Builder::new()
@@ -596,8 +596,8 @@ impl ServerTimeSession {
         let mut sample_worker = SampleWorker {
             command_sender,
             generation: 0,
-            host: shared_host,
             response_receiver,
+            scheme,
             worker: Some(worker),
         };
         let scheduled_trigger =
@@ -606,7 +606,7 @@ impl ServerTimeSession {
                     action,
                     target: ScheduledTarget::Pending(target_time),
                 });
-        if scheduled_trigger.is_some() && matches!(sample_worker.host.scheme, UrlScheme::Http) {
+        if scheduled_trigger.is_some() && matches!(sample_worker.scheme, UrlScheme::Http) {
             err.write_all(
                 concat!(
                     "[경고] HTTP 서버 시간은 네트워크에서 위조될 수 있습니다.\n",
@@ -763,7 +763,7 @@ impl AppState<'_> {
                                         return transition_to_retry(msg_buf, true);
                                     }
                                 };
-                            match self.sample_worker.host.scheme {
+                            match self.sample_worker.scheme {
                                 UrlScheme::Https => Ok(TriggerTimingPolicy::AuthenticatedHttps),
                                 UrlScheme::Http => strict_server_deadline(
                                     server_time,
