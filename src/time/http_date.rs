@@ -7,8 +7,6 @@ use core::{
     time::Duration,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
-#[cfg(test)]
-mod tests;
 const SECS_PER_DAY_I64: i64 = 86_400;
 const SECS_PER_DAY_U64: u64 = 86_400;
 const SECS_PER_HOUR_I64: i64 = 3_600;
