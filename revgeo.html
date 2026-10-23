@@ -5154,10 +5154,9 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const values = [];
 			// Generate on the client only. Web Crypto permits 65,536 bytes per call.
 			while (values.length < count) {
-				const words = new Uint32Array(Math.min(count - values.length, 8192) * 2);
+				const words = new BigUint64Array(Math.min(count - values.length, 8192));
 				crypto.getRandomValues(words);
-				for (let index = 0; index < words.length; index += 2)
-					values.push((BigInt(words[index]) << 32n) | BigInt(words[index + 1]));
+				for (const word of words) values.push(word);
 			}
 			return values;
 		}
