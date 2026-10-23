@@ -2377,7 +2377,8 @@
 	<header class="site-header">
 		<div class="header-inner">
 			<a aria-label="SRG 역지오코딩 상단으로 이동" class="site-brand" href="#app">
-				<img alt="" aria-hidden="true" class="brand-mark" decoding="async" height="38" src="./icon.svg?v=7" width="38">
+				<img alt="" aria-hidden="true" class="brand-mark" decoding="async" height="38" src="./icon.svg?v=7"
+					width="38">
 				<div>
 					<h1>SRG 역지오코딩</h1>
 				</div>
@@ -2389,16 +2390,18 @@
 			</ol>
 			<p class="step-label" id="step-label">1/3 · 데이터 입력</p>
 			<div class="header-tools">
-				<button aria-label="도움말" class="icon-button" id="show-help" title="도움말" type="button"><svg aria-hidden="true"
-						viewBox="0 0 24 24">
+				<button aria-label="도움말" class="icon-button" id="show-help" title="도움말" type="button"><svg
+						aria-hidden="true" viewBox="0 0 24 24">
 						<circle cx="12" cy="12" r="9" />
 						<path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3h.01" />
 					</svg></button>
 				<div class="tool-capsule"><button aria-label="다크 모드로 전환" data-next-theme="dark"
-						aria-description="시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요." class="icon-button theme-toggle" id="theme-toggle"
-						title="다크 모드" type="button"><svg aria-hidden="true" class="theme-sun" viewBox="0 0 24 24">
+						aria-description="시스템 설정으로 되돌리려면 화면 설정에서 시스템 설정을 선택하세요." class="icon-button theme-toggle"
+						id="theme-toggle" title="다크 모드" type="button"><svg aria-hidden="true" class="theme-sun"
+							viewBox="0 0 24 24">
 							<circle cx="12" cy="12" r="4" fill="currentColor" />
-							<path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
+							<path
+								d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
 						</svg><svg aria-hidden="true" class="theme-moon" viewBox="0 0 24 24">
 							<path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" />
 						</svg></button><button aria-label="화면 설정" class="icon-button settings-button" title="화면 설정"
@@ -2424,7 +2427,8 @@
 					<span class="drop-text"><svg aria-hidden="true" viewBox="0 0 24 24">
 							<path d="M6 3h8l4 4v14H6z" />
 							<path d="M14 3v5h4m-9 4h6m-6 4h6" />
-						</svg><strong id="drop-filename">SRG TXT 파일</strong><span class="file-cue">선택하거나 끌어다 놓기</span></span>
+						</svg><strong id="drop-filename">SRG TXT 파일</strong><span class="file-cue">선택하거나 끌어다
+							놓기</span></span>
 					<input accept=".txt,text/plain" aria-label="SRG TXT 파일 선택" id="file" type="file">
 				</label>
 				<p class="note" id="file-analysis"></p>
@@ -2438,8 +2442,8 @@
 				<div class="rng-fields">
 					<div class="field">
 						<label class="label" for="num64">기본 난수값 목록</label>
-						<textarea aria-describedby="num64-help" id="num64" spellcheck="false" autocorrect="off" autocapitalize="off"
-							autocomplete="off" inputmode="text" placeholder="예)
+						<textarea aria-describedby="num64-help" id="num64" spellcheck="false" autocorrect="off"
+							autocapitalize="off" autocomplete="off" inputmode="text" placeholder="예)
 123456789
 0x1122334455667788"></textarea>
 						<span class="note" id="num64-help">64비트 정수 · 10진수 또는 0x 16진수</span>
@@ -2447,8 +2451,8 @@
 					</div>
 					<div class="field">
 						<label class="label" for="suppValues">보조 난수값 목록 (선택)</label>
-						<textarea aria-describedby="suppValues-help" id="suppValues" spellcheck="false" autocorrect="off"
-							autocapitalize="off" autocomplete="off" inputmode="text" placeholder="예)
+						<textarea aria-describedby="suppValues-help" id="suppValues" spellcheck="false"
+							autocorrect="off" autocapitalize="off" autocomplete="off" inputmode="text" placeholder="예)
 123456789
 0x1122334455667788" title="사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다."></textarea>
 						<span class="note" id="suppValues-help">부족하면 나중에 추가 가능</span>
@@ -2497,46 +2501,50 @@
 					</svg><span>좌표 없음</span></div>
 				<pre class="code-view" id="coords"
 					tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="code-content"></code></pre>
-				<div class="coords-tools"><button aria-controls="coords" aria-expanded="false" class="button" id="coords-expand"
-						type="button">미리보기 펼치기</button><button class="button" id="coords-copy" type="button">전체 좌표 복사</button></div>
+				<div class="coords-tools"><button aria-controls="coords" aria-expanded="false" class="button"
+						id="coords-expand" type="button">미리보기 펼치기</button><button class="button" id="coords-copy"
+						type="button">전체 좌표 복사</button></div>
 			</section>
 			<div id="input-job-slot">
 				<section aria-label="조회 진행 상황" class="job-panel">
 					<p aria-hidden="true" class="progress-pending">조회 준비</p>
 					<div class="row-progress">
 						<div hidden id="progress-indicator">
-							<div class="progress-heading"><label class="label" for="prog" id="prog-label">진행 상황</label><span
-									aria-hidden="true" id="progress-percent">0%</span></div>
+							<div class="progress-heading"><label class="label" for="prog" id="prog-label">진행
+									상황</label><span aria-hidden="true" id="progress-percent">0%</span></div>
 							<div class="track">
 								<progress aria-labelledby="prog-label" id="prog" max="100" value="0"></progress>
 								<span aria-hidden="true" class="fill"></span>
 							</div>
 						</div>
 						<output aria-live="off" id="counts">총 <strong id="cnt-total">0</strong>건 중 <strong
-								id="cnt-success">0</strong>건 주소 확인, <strong id="cnt-no-address">0</strong>건 주소 없음, <strong
-								id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
+								id="cnt-success">0</strong>건 주소 확인, <strong id="cnt-no-address">0</strong>건 주소 없음,
+							<strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
 					</div>
-					<div class="status-row" data-state="idle"><output aria-live="off" class="status" id="status" tabindex="-1">SRG
-							TXT 파일을 불러오거나 난수를 입력해 주세요.</output><span aria-atomic="true" class="sr-only" id="status-announcement"
-							role="status"></span><span class="elapsed-time"><svg aria-hidden="true" viewBox="0 0 24 24">
+					<div class="status-row" data-state="idle"><output aria-live="off" class="status" id="status"
+							tabindex="-1">SRG
+							TXT 파일을 불러오거나 난수를 입력해 주세요.</output><span aria-atomic="true" class="sr-only"
+							id="status-announcement" role="status"></span><span class="elapsed-time"><svg
+								aria-hidden="true" viewBox="0 0 24 24">
 								<circle cx="12" cy="12" r="9" />
 								<path d="M12 7v5l3 2" />
 							</svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
-					<div class="input-actions"><button class="button primary" command="--start" commandfor="app" disabled
-							id="start" type="button">
+					<div class="input-actions"><button class="button primary" command="--start" commandfor="app"
+							disabled id="start" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
 							</svg>
 							<span>주소 조회 시작</span>
-						</button><button class="button" command="--pause" commandfor="app" disabled hidden id="pause" type="button">
+						</button><button class="button" command="--pause" commandfor="app" disabled hidden id="pause"
+							type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none" />
-							</svg> 일시정지 </button><button class="button primary" command="--resume" commandfor="app" disabled hidden
-							id="resume" type="button">
+							</svg> 일시정지 </button><button class="button primary" command="--resume" commandfor="app"
+							disabled hidden id="resume" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
-							</svg> 재개 </button><button class="button" command="--stop" commandfor="app" disabled hidden id="stop"
-							type="button">
+							</svg> 재개 </button><button class="button" command="--stop" commandfor="app" disabled hidden
+							id="stop" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5" />
 							</svg> 중지 </button></div>
@@ -2549,8 +2557,8 @@
 					<div>
 						<h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2>
 					</div>
-					<div id="desktop-export-slot"><button class="button" command="--export" commandfor="app" disabled id="export"
-							title="조회된 전체 결과를 CSV로 저장" type="button">
+					<div id="desktop-export-slot"><button class="button" command="--export" commandfor="app" disabled
+							id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="M12 4.5v10" />
 								<path d="m8 10.75 4 4 4-4" />
@@ -2598,21 +2606,23 @@
 							</svg><span>상세 필터</span> <span hidden id="filter-count"></span></button>
 						<dialog aria-labelledby="filter-title" id="filter-dialog">
 							<div class="sheet-heading">
-								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button" id="filter-dismiss"
-									type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
+									id="filter-dismiss" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="m6 6 12 12M6 18 18 6" />
 									</svg></button>
 							</div>
-							<div class="filter-grid"><label>광역 지역<input aria-label="광역 지역" enterkeyhint="search" id="filter-sido"
-										inputmode="search" placeholder="시·도, 주 등" type="search"></label><label>도시·행정구역<input
-										aria-label="도시·행정구역" enterkeyhint="search" id="filter-sigungu" inputmode="search"
-										placeholder="시·군·구 등" type="search"></label><label>세부 지역<input aria-label="세부 지역"
-										enterkeyhint="search" id="filter-emd" inputmode="search" placeholder="읍·면·동·리 등"
-										type="search"></label><label>지물 태그<input aria-label="지물 태그" enterkeyhint="search" id="filter-tag"
-										inputmode="search" placeholder="지물 태그" type="search"></label><label>전체주소<input aria-label="전체주소"
+							<div class="filter-grid"><label>광역 지역<input aria-label="광역 지역" enterkeyhint="search"
+										id="filter-sido" inputmode="search" placeholder="시·도, 주 등"
+										type="search"></label><label>도시·행정구역<input aria-label="도시·행정구역"
+										enterkeyhint="search" id="filter-sigungu" inputmode="search"
+										placeholder="시·군·구 등" type="search"></label><label>세부 지역<input
+										aria-label="세부 지역" enterkeyhint="search" id="filter-emd" inputmode="search"
+										placeholder="읍·면·동·리 등" type="search"></label><label>지물 태그<input
+										aria-label="지물 태그" enterkeyhint="search" id="filter-tag" inputmode="search"
+										placeholder="지물 태그" type="search"></label><label>전체주소<input aria-label="전체주소"
 										enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소"
-										type="search"></label><button class="button" command="--filter-clear" commandfor="app"
-									id="filter-clear" type="button">
+										type="search"></label><button class="button" command="--filter-clear"
+									commandfor="app" id="filter-clear" type="button">
 									<svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="M20 7v5h-5M4 17v-5h5" />
 										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
@@ -2628,8 +2638,8 @@
 							<p aria-atomic="true" aria-live="polite" class="table-hint empty-hint">조회 결과 없음</p>
 							<div class="table-hint filter-empty-hint">
 								<p>검색 결과가 없습니다.</p>
-								<p class="note" id="active-filter-summary"></p><button class="button" command="--filter-clear"
-									commandfor="app" type="button">검색·필터 모두 초기화</button>
+								<p class="note" id="active-filter-summary"></p><button class="button"
+									command="--filter-clear" commandfor="app" type="button">검색·필터 모두 초기화</button>
 							</div>
 							<table id="tbl">
 								<caption class="sr-only">역지오코딩 결과</caption>
@@ -2654,14 +2664,15 @@
 						</section>
 						<div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
 							<nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
-								<button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app" id="page-prev"
-									type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+								<button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app"
+									id="page-prev" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="m14 6-6 6 6 6" />
 									</svg><span>이전</span></button>
-								<output aria-live="polite" class="sr-only" id="page-status"></output><span class="page-numbers"
-									id="page-numbers"></span>
-								<button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app" id="page-next"
-									type="button"><span>다음</span><svg aria-hidden="true" viewBox="0 0 24 24">
+								<output aria-live="polite" class="sr-only" id="page-status"></output><span
+									class="page-numbers" id="page-numbers"></span>
+								<button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app"
+									id="page-next" type="button"><span>다음</span><svg aria-hidden="true"
+										viewBox="0 0 24 24">
 										<path d="m10 6 6 6-6 6" />
 									</svg></button>
 							</nav>
@@ -2673,21 +2684,24 @@
 							<p class="inspector-eyebrow">선택한 위치</p>
 							<h2 dir="auto" id="detail-title">주소 정보 없음</h2>
 							<p dir="auto" id="detail-town"></p>
-							<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg aria-hidden="true"
-										viewBox="0 0 24 24">
+							<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg
+										aria-hidden="true" viewBox="0 0 24 24">
 										<path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
 										<circle cx="12" cy="10" r="2.5" />
 									</svg>OpenStreetMap 지도 불러오기</button>
-								<div aria-live="polite" class="map-feedback" hidden id="map-feedback" tabindex="-1"></div><iframe hidden
-									id="detail-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+								<div aria-live="polite" class="map-feedback" hidden id="map-feedback" tabindex="-1">
+								</div><iframe hidden id="detail-map" loading="lazy"
+									referrerpolicy="strict-origin-when-cross-origin"
 									title="선택한 좌표의 OpenStreetMap 지도"></iframe>
 							</div>
-							<div class="map-recovery" hidden id="map-recovery"><button class="button" id="retry-map" type="button">다시
-									시도</button><a class="button" href="about:blank" id="map-external" rel="noopener noreferrer"
-									target="_blank">OpenStreetMap에서 열기</a></div>
+							<div class="map-recovery" hidden id="map-recovery"><button class="button" id="retry-map"
+									type="button">다시
+									시도</button><a class="button" href="about:blank" id="map-external"
+									rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
 							<p class="detail-label">전체 주소</p>
-							<div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
-									class="icon-button" id="copy-address" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+							<div class="full-address"><span dir="auto" id="detail-full"></span><button
+									aria-label="주소 복사" class="icon-button" id="copy-address" type="button"><svg
+										aria-hidden="true" viewBox="0 0 24 24">
 										<rect width="11" height="11" x="9" y="9" rx="2" />
 										<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
 									</svg></button></div>
@@ -2715,11 +2729,13 @@
 									<path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z" />
 									<path d="M9 2v17m6-14v17" />
 								</svg>지도에서 열기</button>
-							<nav aria-labelledby="map-popover-title" class="map-popover" id="map-popover" popover="auto">
+							<nav aria-labelledby="map-popover-title" class="map-popover" id="map-popover"
+								popover="auto">
 								<div class="sheet-heading">
-									<h2 id="map-popover-title">지도에서 열기</h2><button aria-label="지도 선택 닫기" class="icon-button"
-										id="map-popover-close" popovertarget="map-popover" popovertargetaction="hide" type="button"><svg
-											aria-hidden="true" viewBox="0 0 24 24">
+									<h2 id="map-popover-title">지도에서 열기</h2><button aria-label="지도 선택 닫기"
+										class="icon-button" id="map-popover-close" popovertarget="map-popover"
+										popovertargetaction="hide" type="button"><svg aria-hidden="true"
+											viewBox="0 0 24 24">
 											<path d="m6 6 12 12M6 18 18 6" />
 										</svg></button>
 								</div>
@@ -2742,8 +2758,9 @@
 					contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" rel="noopener noreferrer"
 					target="_blank">ODbL</a></p>
 			<p class="usage-policy"><a href="https://nominatim.org/" rel="noopener noreferrer"
-					target="_blank">Nominatim</a><span>· <a href="https://operations.osmfoundation.org/policies/nominatim/"
-						rel="noopener noreferrer" target="_blank">Nominatim 사용 정책</a></span></p>
+					target="_blank">Nominatim</a><span>· <a
+						href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer"
+						target="_blank">Nominatim 사용 정책</a></span></p>
 		</div>
 	</footer>
 	<nav aria-label="작업 화면 이동" class="mobile-bottom">
@@ -2764,8 +2781,8 @@
 	</nav>
 	<dialog aria-labelledby="settings-title" class="settings" id="display-settings">
 		<div class="sheet-heading">
-			<h2 id="settings-title">화면 설정</h2><button aria-label="화면 설정 닫기" autofocus class="icon-button" id="settings-close"
-				type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+			<h2 id="settings-title">화면 설정</h2><button aria-label="화면 설정 닫기" autofocus class="icon-button"
+				id="settings-close" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2812,31 +2829,36 @@
 	</dialog>
 	<dialog aria-labelledby="sheet-title" id="detail-sheet">
 		<div class="sheet-heading">
-			<h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail" type="button"><svg
-					aria-hidden="true" viewBox="0 0 24 24">
+			<h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail"
+				type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
 	</dialog>
 	<dialog aria-labelledby="help-title" id="help-dialog">
 		<div class="sheet-heading">
-			<h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help" type="button"><svg
-					aria-hidden="true" viewBox="0 0 24 24">
+			<h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help"
+				type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
 		<ol>
-			<li><strong>파일 불러오기:</strong> SRG에서 생성한 <code>random_data.txt</code>를 선택하거나 끌어다 놓은 후 <strong>좌표 추출</strong>을 누르세요.
+			<li><strong>파일 불러오기:</strong> SRG에서 생성한 <code>random_data.txt</code>를 선택하거나 끌어다 놓은 후 <strong>좌표 추출</strong>을
+				누르세요.
 			</li>
-			<li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하고 <strong>좌표로 변환</strong> → <strong>이 좌표로
-					조회 준비</strong>를 누르세요.</li>
+			<li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하고 <strong>좌표로 변환</strong> →
+				<strong>이 좌표로
+					조회 준비</strong>를 누르세요.
+			</li>
 			<li><strong>주소 조회:</strong> 추출된 좌표를 확인한 후 <strong>주소 조회 시작</strong>을 누르세요. 진행 중에는 일시정지·재개·중지할 수 있습니다.</li>
-			<li><strong>결과 확인:</strong> 검색·필터로 결과를 찾고 항목을 눌러 상세 위치와 지도를 확인하세요. <strong>전체 결과 CSV</strong>에는 필터와 관계없이 모든 조회 결과가
+			<li><strong>결과 확인:</strong> 검색·필터로 결과를 찾고 항목을 눌러 상세 위치와 지도를 확인하세요. <strong>전체 결과 CSV</strong>에는 필터와 관계없이 모든
+				조회 결과가
 				포함됩니다.</li>
 		</ol>
 		<details>
 			<summary>파일 형식·데이터 처리</summary>
-			<p>UTF-8 TXT 파일(최대 64 MiB)에서 <code>대한민국 위경도: 37.5,127.0</code> 또는 <code>세계 위경도: 37.5,127.0</code> 형식의 좌표를 읽습니다.
+			<p>UTF-8 TXT 파일(최대 64 MiB)에서 <code>대한민국 위경도: 37.5,127.0</code> 또는 <code>세계 위경도: 37.5,127.0</code> 형식의 좌표를
+				읽습니다.
 			</p>
 			<p>파일은 브라우저에서 분석하고, 주소 조회 시에는 좌표를 Nominatim에 전송합니다. 조회 결과는 브라우저에 최대 30일간 저장되며 설정에 따라 더 일찍 삭제될 수 있습니다.</p>
 			<p>좌표 미리보기는 최대 200개이며, <strong>전체 좌표 복사</strong>로 모든 좌표를 가져올 수 있습니다.</p>
@@ -2861,16 +2883,16 @@
 		<div class="confirm-actions"><button autofocus class="button" id="bulk-cancel" type="button">취소</button><button
 				class="button primary" id="bulk-confirm" type="button">일회성 조회 확인</button></div>
 	</dialog>
-	<div class="ui-notice" hidden id="ui-notice" role="status" aria-atomic="true"><span id="ui-notice-text"></span><button
-			aria-label="알림 닫기" class="icon-button" id="ui-notice-close" type="button"><svg aria-hidden="true"
-				viewBox="0 0 24 24">
+	<div class="ui-notice" hidden id="ui-notice" role="status" aria-atomic="true"><span
+			id="ui-notice-text"></span><button aria-label="알림 닫기" class="icon-button" id="ui-notice-close"
+			type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 				<path d="m6 6 12 12M6 18 18 6" />
 			</svg></button></div>
 	<template id="tmpl-row">
 		<tr>
 			<td></td>
-			<td><button class="location-button" type="button"><span class="address-main" dir="auto">위치 상세 보기</span> <span
-						class="address-sub" dir="auto"></span></button></td>
+			<td><button class="location-button" type="button"><span class="address-main" dir="auto">위치 상세 보기</span>
+					<span class="address-sub" dir="auto"></span></button></td>
 			<td class="coords-cell"><span></span><span></span></td>
 			<td><span class="kind-badge"></span></td>
 			<td><span class="result-state" data-status="done"></span></td>
@@ -4091,39 +4113,22 @@
 			}
 		}
 		function pruneCache(store, onRows) {
-			const expiredReq = store.index("savedAt").openKeyCursor(
-				IDBKeyRange.upperBound(
-					Date.now() - CONFIG.CACHE_TTL_MS,
-					true,
-				),
-			);
-			expiredReq.onsuccess = () => {
-				const expired = expiredReq.result;
-				if (expired) {
-					store.delete(expired.primaryKey);
-					expired.continue();
-					return;
-				}
-				const countReq = store.count();
-				countReq.onsuccess = () => {
-					let remaining = countReq.result;
-					let excess = remaining - CONFIG.CACHE_MAX;
-					if (excess <= 0) {
+			const index = store.index("savedAt");
+			const expiresBefore = Date.now() - CONFIG.CACHE_TTL_MS;
+			const countReq = store.count();
+			countReq.onsuccess = () => {
+				let remaining = countReq.result;
+				const cursorReq = index.openKeyCursor();
+				cursorReq.onsuccess = () => {
+					const cursor = cursorReq.result;
+					if (!cursor || (remaining <= CONFIG.CACHE_MAX &&
+						indexedDB.cmp(cursor.key, expiresBefore) >= 0)) {
 						onRows(remaining);
 						return;
 					}
-					const oldestReq = store.index("savedAt").openKeyCursor();
-					oldestReq.onsuccess = () => {
-						const oldest = oldestReq.result;
-						if (!oldest || excess <= 0) {
-							onRows(remaining);
-							return;
-						}
-						store.delete(oldest.primaryKey);
-						remaining--;
-						excess--;
-						oldest.continue();
-					};
+					store.delete(cursor.primaryKey);
+					remaining--;
+					cursor.continue();
 				};
 			};
 		}
@@ -4919,7 +4924,7 @@
 			return false;
 		}
 		const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
-		function extractNmsBits(bits, num, shifts, maxValue, reason, supplement, nextSupp) {
+		function* extractNmsBits(bits, num, shifts, maxValue, reason, supplement) {
 			const mask = (1n << BigInt(bits)) - 1n;
 			const maxBig = BigInt(maxValue);
 			for (const shift of shifts) {
@@ -4928,7 +4933,7 @@
 			}
 			for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
 				if (!supplement.current || supplement.current.bitsRemaining < bits)
-					supplement.current = nextSupp(reason);
+					supplement.current = yield reason;
 				const current = supplement.current;
 				current.bitsRemaining -= bits;
 				const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
@@ -4936,7 +4941,7 @@
 			}
 			throw supplementLimitError("NMS");
 		}
-		function convertNumber(num, nextSupp) {
+		function* convertNumber(num) {
 			const data = createDataSet(num);
 			let complete = fillNumbers(num, data);
 			const supplement = { current: null };
@@ -4945,7 +4950,7 @@
 				!complete && attempt < SUPPLEMENT_LIMIT;
 				attempt++
 			) {
-				const newSupp = nextSupp("기본 필드 보완");
+				const newSupp = yield "기본 필드 보완";
 				complete = fillNumbers(newSupp.value, data);
 				supplement.current = newSupp;
 			}
@@ -4968,7 +4973,7 @@
 				}
 				if (attempt + 1 >= SUPPLEMENT_LIMIT)
 					break;
-				const newSupp = nextSupp("유로밀리언 럭키 스타 보완");
+				const newSupp = yield "유로밀리언 럭키 스타 보완";
 				luckyStarSource = reverseBitsU64(newSupp.value);
 				supplement.current = newSupp;
 			}
@@ -4985,7 +4990,7 @@
 					attempt++
 				) {
 					if (supplement.current === null)
-						supplement.current = nextSupp("한글 음절 보완");
+						supplement.current = yield "한글 음절 보완";
 					const supp = supplement.current;
 					bitsView.setBigUint64(0, supp.value, false);
 					for (
@@ -5003,7 +5008,7 @@
 						index > HANGUL_MAX &&
 						attempt + 1 < SUPPLEMENT_LIMIT
 					)
-						supplement.current = nextSupp("한글 음절 보완 재시도");
+						supplement.current = yield "한글 음절 보완 재시도";
 				}
 				if (index > HANGUL_MAX)
 					throw supplementLimitError("한글 음절");
@@ -5025,14 +5030,14 @@
 				affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
 				affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
 			];
-			const planetIndex = extractNmsBits(
+			const planetIndex = yield* extractNmsBits(
 				4, num, NMS_PLANET_SHIFTS, 11,
-				"NMS 행성 번호 보완", supplement, nextSupp,
+				"NMS 행성 번호 보완", supplement,
 			);
 			data.planet = planetIndex % 6 + 1;
-			const systemIndex = extractNmsBits(
+			const systemIndex = yield* extractNmsBits(
 				12, num, NMS_SYSTEM_SHIFTS, 3834,
-				"NMS 태양계 번호 보완", supplement, nextSupp,
+				"NMS 태양계 번호 보완", supplement,
 			);
 			data.system = systemIndex % 767 + 1;
 			data.portalY = upper32 & 0xff;
@@ -5090,7 +5095,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		function u64Tokens(raw) {
 			return raw.matchAll(RX_U64_TOKEN).map((match) => match[0]);
 		}
-		class SupplementRequired extends Error { }
 		function outputBlob(chunks, includeBom) {
 			const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
 			if (chunks.length && !chunks.at(-1).endsWith("\n"))
@@ -5222,24 +5226,9 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				meta.textContent = "변환 중…";
 				setBusy(true);
 				try {
-					const suppTokens = u64Tokens(suppInput.value);
-					const supplements = [];
+					let supplements = u64Tokens(suppInput.value).map(parseU64);
 					let processed = 0;
 					let suppCount = 0;
-					let head = 0;
-					let cursor;
-					const nextExtra = (reason) => {
-						if (cursor === supplements.length) {
-							const queued = suppTokens.next();
-							if (queued.done) throw new SupplementRequired(reason);
-							invalidInput = suppInput;
-							supplements.push(parseU64(queued.value));
-							invalidInput = null;
-						}
-						const value = supplements[cursor];
-						cursor++;
-						return { value, bitsRemaining: 64 };
-					};
 					const updateProgress = (state) => {
 						const count = Math.min(nextChunks.length, PREVIEW_LIMIT);
 						if (
@@ -5265,34 +5254,29 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							);
 						const num = parseU64(token);
 						invalidInput = null;
-						let generated;
-						for (; ;) {
-							cursor = head;
-							try {
-								generated = convertNumber(num, nextExtra);
-								suppCount += cursor - head;
-								head = cursor;
-								if (head === supplements.length) {
-									supplements.length = 0;
-									head = 0;
-								}
-								break;
-							} catch (err) {
-								if (!(err instanceof SupplementRequired)) throw err;
-								const values = await requestSupplements(
-									suppCount + cursor - head + 1,
-									err.message,
-								);
+						const conversion = convertNumber(num);
+						let step = conversion.next();
+						let used = 0;
+						while (!step.done) {
+							invalidInput = suppInput;
+							let supplied = supplements.next();
+							invalidInput = null;
+							if (supplied.done) {
+								const values = await requestSupplements(suppCount + used + 1, step.value);
 								if (epoch !== outputEpoch) return;
 								if (values === null) {
 									cancelled = true;
 									break;
 								}
-								supplements.push(...values);
+								supplements = values.values();
+								supplied = supplements.next();
 							}
+							used++;
+							step = conversion.next({ value: supplied.value, bitsRemaining: 64 });
 						}
 						if (cancelled) break;
-						const outputBlock = formatOutput(generated);
+						suppCount += used;
+						const outputBlock = formatOutput(step.value);
 						nextChunks.push((processed === 0
 							? outputBlock
 							: `\n${outputBlock}`));
