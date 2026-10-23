@@ -4208,7 +4208,6 @@
 				if (lastFetchAt) {
 					const remaining = baseDelayMs - (now - lastFetchAt);
 					if (remaining > 0) {
-						report("대기 중…");
 						await sleep(remaining, userSignal);
 						now = performance.now();
 					}
