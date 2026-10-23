@@ -50,12 +50,11 @@ test('uses actual Web Crypto and keeps all u64 values in range', () => {
   assert.ok(new Set(values).size > 1);
 });
 
-test('uses client entropy regardless of page host or obsolete backend metadata', () => {
-  for (const href of ['https://example.com/revgeo.html', 'http://127.0.0.1:8787/revgeo.html']) {
+test('uses client entropy regardless of page host', () => {
+  for (const href of ['https://example.com/revgeo.html', 'http://localhost/revgeo.html']) {
     let calls = 0;
     const generate = setup({
       location: { href },
-      query: () => ({ content: '/api/random' }),
       crypto: { getRandomValues(words) { calls++; words.fill(7); return words; } },
     });
     const values = generate(2);
@@ -72,7 +71,7 @@ test('rejects invalid counts before requesting any entropy', () => {
 
 test('fails without a fallback when client cryptography is unavailable', () => {
   for (const crypto of [undefined, null, {}])
-    assert.throws(() => setup({ crypto })(1), /이 기기의 브라우저에서 암호화 난수/);
+    assert.throws(() => setup({ crypto })(1), /암호화 난수 생성을 지원하지 않는 브라우저/);
 });
 
 test('propagates client entropy errors without a server or insecure fallback', () => {

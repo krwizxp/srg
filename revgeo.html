@@ -2456,37 +2456,32 @@
 			<div aria-labelledby="manual-tab" class="manual-rng" hidden id="manual-pane" role="tabpanel">
 				<div class="rng-fields">
 					<section aria-label="난수 생성" class="rng-generator">
-						<p class="note" id="rng-help">이 페이지를 연 기기의 브라우저에서 암호화 난수를 생성합니다. 난수 생성에 서버를 사용하지 않습니다.</p>
 						<div class="field">
 							<label class="label" for="rng-count">생성 개수</label>
 							<input id="rng-count" type="number" min="1" max="10000" step="1" value="1"
-								inputmode="numeric" aria-describedby="rng-count-help">
-							<span class="note" id="rng-count-help">1~10,000개 · 기존 입력값 뒤에 추가</span>
+								inputmode="numeric">
 						</div>
 						<div class="rng-actions">
 							<button class="button" id="generate-num64" type="button">기본 난수 생성</button>
 							<button class="button" id="generate-supp" type="button">보조 난수 생성</button>
 						</div>
-						<label class="check-label"><input id="auto-supp" type="checkbox">변환 중 부족한 보조 난수 자동 생성</label>
-						<p class="note" id="rng-status" role="status" aria-atomic="true"></p>
+						<label class="check-label"><input id="auto-supp" type="checkbox">보조 난수 자동 생성</label>
 						<p class="note" id="rng-error" role="alert" aria-atomic="true"></p>
 					</section>
 					<div class="field">
 						<label class="label" for="num64">기본 난수값 목록</label>
-						<textarea aria-describedby="num64-help" id="num64" spellcheck="false" autocorrect="off"
-							autocapitalize="off" autocomplete="off" inputmode="text" placeholder="예)
+						<textarea id="num64" spellcheck="false" autocorrect="off" autocapitalize="off"
+							autocomplete="off" inputmode="text" placeholder="예)
 123456789
 0x1122334455667788"></textarea>
-						<span class="note" id="num64-help">64비트 정수 · 10진수 또는 0x 16진수</span>
 						<p aria-atomic="true" class="note" id="num64-error" role="alert"></p>
 					</div>
 					<div class="field">
 						<label class="label" for="suppValues">보조 난수값 목록 (선택)</label>
-						<textarea aria-describedby="suppValues-help" id="suppValues" spellcheck="false"
-							autocorrect="off" autocapitalize="off" autocomplete="off" inputmode="text" placeholder="예)
+						<textarea id="suppValues" spellcheck="false" autocorrect="off" autocapitalize="off"
+							autocomplete="off" inputmode="text" placeholder="예)
 123456789
-0x1122334455667788" title="사전 입력값이 부족하면 실행 중 대화상자에서 보조 난수값을 추가 입력합니다."></textarea>
-						<span class="note" id="suppValues-help">부족하면 나중에 추가 가능</span>
+0x1122334455667788"></textarea>
 						<p aria-atomic="true" class="note" id="suppValues-error" role="alert"></p>
 					</div>
 					<div class="rng-actions">
@@ -2831,7 +2826,7 @@
 			<option value="100">100개</option>
 		</select>
 	</dialog>
-	<dialog aria-describedby="supp-context supp-help" aria-labelledby="supp-title" id="supp-dialog">
+	<dialog aria-labelledby="supp-title" id="supp-dialog">
 		<form class="supp-form" id="supp-form" novalidate>
 			<div class="sheet-heading">
 				<h2 id="supp-title">보조 난수값 추가</h2><button aria-label="보조 난수 입력 중단" class="icon-button" id="supp-dismiss"
@@ -2839,13 +2834,10 @@
 						<path d="m6 6 12 12M6 18 18 6" />
 					</svg></button>
 			</div>
-			<p class="note" id="supp-context"></p>
 			<div class="field">
 				<label class="label" for="supp-values">보조 난수값</label>
-				<textarea aria-describedby="supp-help" autocomplete="off" autocorrect="off" autocapitalize="off"
-					spellcheck="false" autofocus id="supp-values" inputmode="text" placeholder="공백이나 줄바꿈으로 여러 값을 구분하세요."
-					required></textarea>
-				<p class="note" id="supp-help">중단 시 기존 결과 유지</p>
+				<textarea autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" autofocus
+					id="supp-values" inputmode="text" placeholder="공백이나 줄바꿈으로 여러 값을 구분하세요." required></textarea>
 				<output aria-atomic="true" class="note" id="supp-error" role="alert"></output>
 			</div>
 			<div class="rng-actions">
@@ -4910,7 +4902,7 @@
 			useGrouping: false,
 			maximumSignificantDigits: 21,
 		}).format;
-		function formatRustF64(value) {
+		function formatCoordinate(value) {
 			const str = Object.is(value, -0) ? "-0" : String(value);
 			return str.includes("e") ? decimalFormatter(value) : str;
 		}
@@ -4957,7 +4949,7 @@
 			return false;
 		}
 		const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
-		function* extractNmsBits(bits, num, shifts, maxValue, reason, supplement) {
+		function* extractNmsBits(bits, num, shifts, maxValue, supplement) {
 			const mask = (1n << BigInt(bits)) - 1n;
 			const maxBig = BigInt(maxValue);
 			for (const shift of shifts) {
@@ -4966,7 +4958,7 @@
 			}
 			for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
 				if (!supplement.current || supplement.current.bitsRemaining < bits)
-					supplement.current = yield reason;
+					supplement.current = yield;
 				const current = supplement.current;
 				current.bitsRemaining -= bits;
 				const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
@@ -4983,7 +4975,7 @@
 				!complete && attempt < SUPPLEMENT_LIMIT;
 				attempt++
 			) {
-				const newSupp = yield "기본 필드 보완";
+				const newSupp = yield;
 				complete = fillNumbers(newSupp.value, data);
 				supplement.current = newSupp;
 			}
@@ -5006,7 +4998,7 @@
 				}
 				if (attempt + 1 >= SUPPLEMENT_LIMIT)
 					break;
-				const newSupp = yield "유로밀리언 럭키 스타 보완";
+				const newSupp = yield;
 				luckyStarSource = reverseBitsU64(newSupp.value);
 				supplement.current = newSupp;
 			}
@@ -5023,7 +5015,7 @@
 					attempt++
 				) {
 					if (supplement.current === null)
-						supplement.current = yield "한글 음절 보완";
+						supplement.current = yield;
 					const supp = supplement.current;
 					bitsView.setBigUint64(0, supp.value, false);
 					for (
@@ -5041,7 +5033,7 @@
 						index > HANGUL_MAX &&
 						attempt + 1 < SUPPLEMENT_LIMIT
 					)
-						supplement.current = yield "한글 음절 보완 재시도";
+						supplement.current = yield;
 				}
 				if (index > HANGUL_MAX)
 					throw supplementLimitError("한글 음절");
@@ -5065,12 +5057,12 @@
 			];
 			const planetIndex = yield* extractNmsBits(
 				4, num, NMS_PLANET_SHIFTS, 11,
-				"NMS 행성 번호 보완", supplement,
+				supplement,
 			);
 			data.planet = planetIndex % 6 + 1;
 			const systemIndex = yield* extractNmsBits(
 				12, num, NMS_SYSTEM_SHIFTS, 3834,
-				"NMS 태양계 번호 보완", supplement,
+				supplement,
 			);
 			data.system = systemIndex % 767 + 1;
 			data.portalY = upper32 & 0xff;
@@ -5109,8 +5101,8 @@ Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
 유로밀리언 번호: ${data.euroMain.values.join(" ")} + ${data.euroLucky.values.join(" ")
 				}
 한글 음절 4글자: ${data.hangul.join("")}
-대한민국 위경도: ${formatRustF64(data.korea[0])}, ${formatRustF64(data.korea[1])}
-세계 위경도: ${formatRustF64(data.world[0])}, ${formatRustF64(data.world[1])}
+대한민국 위경도: ${formatCoordinate(data.korea[0])}, ${formatCoordinate(data.korea[1])}
+세계 위경도: ${formatCoordinate(data.world[0])}, ${formatCoordinate(data.world[1])}
 NMS 은하 번호: ${bytes[0] + 1}
 NMS 포탈 주소: ${data.planet} ${paddedHex(data.system, 3)
 				} ${paddedHex(data.portalY, 2)} ${paddedHex(data.portalZ, 3)
@@ -5146,17 +5138,21 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				"text/plain": blob,
 			})]);
 		}
-		function setInputError(input, message, help = `${input.id}-help`, error = `${input.id}-error`) {
+		function setInputError(input, message, error = `${input.id}-error`) {
 			byId(error).textContent = message;
-			if (message) input.ariaInvalid = "true";
-			else input.removeAttribute("aria-invalid");
-			input.setAttribute("aria-describedby", message ? `${help} ${error}` : help);
+			if (message) {
+				input.ariaInvalid = "true";
+				input.setAttribute("aria-describedby", error);
+			} else {
+				input.removeAttribute("aria-invalid");
+				input.removeAttribute("aria-describedby");
+			}
 		}
 		function generateRandomValues(count) {
 			if (!Number.isInteger(count) || count < 1 || count > GENERATION_LIMIT)
 				throw new Error(`생성 개수는 1~${fmt(GENERATION_LIMIT)} 사이의 정수여야 합니다.`);
 			if (typeof globalThis.crypto?.getRandomValues !== "function")
-				throw new Error("이 기기의 브라우저에서 암호화 난수를 사용할 수 없습니다. 최신 브라우저에서 다시 시도해 주세요.");
+				throw new Error("암호화 난수 생성을 지원하지 않는 브라우저입니다.");
 			const values = [];
 			// Generate on the client only. Web Crypto permits 65,536 bytes per call.
 			while (values.length < count) {
@@ -5169,25 +5165,14 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		}
 		function loadManualRng() {
 			const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn,
-				output, error, meta, suppDialog, suppForm, suppContext, suppValues] = [
+				output, error, meta, suppDialog, suppForm, suppValues] = [
 					"num64", "suppValues", "runBtn", "clearBtn", "saveOutput", "copyOutput",
-					"output", "error", "meta", "supp-dialog", "supp-form", "supp-context",
+					"output", "error", "meta", "supp-dialog", "supp-form",
 					"supp-values",
 				].map(byId);
 			const outputContent = query(".code-content", output);
-			const [rngCount, generateNum, generateSupp, autoSupp, rngStatus, rngError, generateDialog] =
-				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-status", "rng-error", "generate-supp-dialog"].map(byId);
-			function generateValues(count) {
-				rngError.textContent = "";
-				try {
-					const values = generateRandomValues(count);
-					rngStatus.textContent = `이 기기의 Web Crypto · ${fmt(values.length)}개 생성`;
-					return values;
-				} catch (err) {
-					rngStatus.textContent = "난수 생성 실패";
-					throw err;
-				}
-			}
+			const [rngCount, generateNum, generateSupp, autoSupp, rngError, generateDialog] =
+				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-error", "generate-supp-dialog"].map(byId);
 			const inputCount = input => {
 				let count = 0;
 				const tokens = u64Tokens(input.value);
@@ -5196,10 +5181,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
 				on(button, "click", () => {
+					rngError.textContent = "";
 					try {
 						const count = rngCount.valueAsNumber;
 						if (inputCount(input) + count > GENERATION_LIMIT) throw new Error(`입력값은 ${fmt(GENERATION_LIMIT)}개까지 추가할 수 있습니다.`);
-						const values = generateValues(count);
+						const values = generateRandomValues(count);
 						input.value = [input.value.trim(), values.join("\n")].filter(Boolean).join("\n");
 						setInputError(input, "");
 						if (input === num64Input) autoSupp.checked = true;
@@ -5209,21 +5195,22 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				});
 			on(generateDialog, "click", () => {
 				if (!suppRequest) return;
+				clearSupplementError();
 				try {
-					finishSupplement(generateValues(32));
+					finishSupplement(generateRandomValues(32));
 				} catch (err) {
 					setSupplementError(errorMessage(err));
 				}
 			});
 			const clearInputErrors = () => {
-				error.textContent = "";
+				error.textContent = rngError.textContent = "";
 				for (const input of [num64Input, suppInput]) setInputError(input, "");
 			};
 			for (const input of [num64Input, suppInput])
 				on(input, "input", () => {
 					if (input.ariaInvalid === "true") clearInputErrors();
 				});
-			const setSupplementError = message => setInputError(suppValues, message, "supp-help", "supp-error");
+			const setSupplementError = message => setInputError(suppValues, message, "supp-error");
 			const clearSupplementError = () => setSupplementError("");
 			on(suppValues, "input", () => {
 				if (suppValues.ariaInvalid === "true") clearSupplementError();
@@ -5238,7 +5225,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				suppDialog.close();
 				resolve(values);
 			}
-			function requestSupplements(index, reason) {
+			function requestSupplements() {
 				if (!returnFocus) {
 					const active = document.activeElement;
 					returnFocus = active instanceof HTMLElement &&
@@ -5248,8 +5235,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				}
 				const { promise, resolve } = Promise.withResolvers();
 				suppRequest = resolve;
-				suppContext.textContent =
-					`보조 난수 #${fmt(index)} · ${reason}`;
 				suppValues.value = "";
 				clearSupplementError();
 				try {
@@ -5347,8 +5332,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							invalidInput = null;
 							if (supplied.done) {
 								const values = autoSupp.checked
-									? generateValues(32)
-									: await requestSupplements(suppCount + used + 1, step.value);
+									? generateRandomValues(32)
+									: await requestSupplements();
 								if (epoch !== outputEpoch) return;
 								if (values === null) {
 									cancelled = true;
@@ -5459,7 +5444,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			});
 			const clearDialog = byId("clear-dialog");
 			const clearOutput = () => {
-				rngStatus.textContent = rngError.textContent = "";
 				finishSupplement(null);
 				returnFocus = null;
 				outputEpoch++;
