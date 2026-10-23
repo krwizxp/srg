@@ -3900,11 +3900,10 @@
 					else
 						cacheWriters.add(token);
 				}
-				cacheRowCeiling = null;
 			} else if (phase === 1) {
 				cacheWriters?.delete(token);
-				cacheRowCeiling = null;
-			}
+			} else return;
+			cacheRowCeiling = null;
 		};
 		function getMemoryCache(cacheKey) {
 			const row = parsedCache.get(cacheKey);
