@@ -24,6 +24,9 @@ use std::{
     io,
 };
 pub(super) enum CliCommand {
+    ServeRevgeo {
+        port: u16,
+    },
     #[cfg(target_arch = "x86_64")]
     Generate {
         count: usize,
@@ -53,6 +56,7 @@ impl CliCommand {
         let mut out = io::stdout().lock();
         let mut err = io::stderr();
         match self {
+            Self::ServeRevgeo { port } => crate::revgeo_server::serve(port, &mut out, &mut err),
             #[cfg(target_arch = "x86_64")]
             Self::Generate { count } => Self::run_with_rng(&mut err, |rng| {
                 let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
@@ -133,6 +137,14 @@ where
             Ok((first, second))
         };
         match raw_command.to_str().ok_or(INVALID_COMMAND_NAME)? {
+            "serve-revgeo" => {
+                let port = match (args.next(), args.next()) {
+                    (None, None) => 8787,
+                    (Some(value), None) => Self::parse_arg::<u16>(&value, "port", 5)?,
+                    _ => return Err("사용법: srg serve-revgeo [port]".into()),
+                };
+                Ok(Self::ServeRevgeo { port })
+            }
             #[cfg(target_arch = "x86_64")]
             "generate" => {
                 let (Some(count_arg), None) = (args.next(), args.next()) else {

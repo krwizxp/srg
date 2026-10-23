@@ -34,6 +34,9 @@ mod output;
 mod random_data;
 #[cfg(target_arch = "x86_64")]
 mod random_number;
+mod revgeo_server;
+#[cfg(any(not(target_arch = "x86_64"), test))]
+mod system_rng;
 mod stop_input;
 mod time;
 const BUFFER_SIZE: usize = 1016;
@@ -63,6 +66,8 @@ const HELP_TEXT: &str = concat!(
     " random-integer <min> <max>\n  ",
     env!("CARGO_PKG_NAME"),
     " random-float <min> <max>\n  ",
+    env!("CARGO_PKG_NAME"),
+    " serve-revgeo [port]\n  ",
     env!("CARGO_PKG_NAME"),
     " time-observe <host> <seconds>\n\n",
     "옵션:\n",
