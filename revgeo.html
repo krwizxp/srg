@@ -5628,7 +5628,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const active = document.activeElement;
 			const editing = active instanceof HTMLInputElement && active.type === "search" &&
 				!active.disabled && !active.readOnly && active.closest("dialog") === filterDialog;
-			// Keep an owned session sized during keyboard dismissal, until the visible band restores.
 			const retaining = filterViewportState && (filterDialog.contains(active) || active === document.body);
 			if (!filterViewport || filterViewportPaused || !filterDialog.open ||
 				!filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
