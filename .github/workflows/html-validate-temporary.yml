@@ -36,3 +36,5 @@ jobs:
         run: |
           curl -fsSL https://github.com/validator/validator/releases/latest/download/vnu.jar -o /tmp/vnu.jar
           java -jar /tmp/vnu.jar --errors-only revgeo.html
+      - name: Report formatter changes
+        run: git diff --numstat -- revgeo.html
