@@ -56,6 +56,10 @@ const HTTP_HEAD_MAX_HEADER_BYTES_DWORD: u32 = 64 * 1024;
 const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
 const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
 const WINHTTP_TIMEOUT_MILLIS: i32 = 5_000;
+const USER_AGENT_CAPACITY: usize = "Rust-Time-Sync"
+    .len()
+    .strict_add(concat!("srg/", env!("CARGO_PKG_VERSION")).len())
+    .strict_add(1);
 enum WinHttpHandle {}
 type HInternet = *mut WinHttpHandle;
 #[derive(Default)]
@@ -90,13 +94,10 @@ impl Client {
                 UrlScheme::Http => "Rust-Time-Sync",
                 UrlScheme::Https => concat!("srg/", env!("CARGO_PKG_VERSION")),
             };
-            let capacity = user_agent_text.len().strict_add(1);
-            let mut user_agent = Vec::new();
-            user_agent.try_reserve_exact(capacity).map_err(|source| {
-                error_with_source(context, "wide 문자열 메모리 확보 실패", source)
-            })?;
-            user_agent.extend(user_agent_text.encode_utf16());
-            user_agent.push(0);
+            let mut user_agent = [0_u16; USER_AGENT_CAPACITY];
+            for (slot, unit) in user_agent.iter_mut().zip(user_agent_text.encode_utf16()) {
+                *slot = unit;
+            }
             // SAFETY: user_agent is NUL-terminated and optional proxy pointers are intentionally null.
             let raw_session = unsafe {
                 sys::WinHttpOpen(
