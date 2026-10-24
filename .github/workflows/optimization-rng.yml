@@ -1,0 +1,51 @@
+name: Validate direct hardware RNG simplification
+on:
+  push:
+    branches:
+      - validation/direct-rng-20261025
+env:
+  PYTHONUTF8: "1"
+permissions:
+  contents: read
+jobs:
+  native:
+    name: Native ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-26.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+          - os: macos-26
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: srg
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 1d421dd1ac5b3868912d03952f6bfb1b3023863b
+          path: baseline
+          persist-credentials: false
+      - name: Install pinned optimization toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt,clippy --no-self-update
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Compare native builds, packaging and runtime
+        run: python srg/.rng-validation/native_rng.py "${{ matrix.target }}"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-${{ matrix.target }}
+          path: native-evidence
+          if-no-files-found: error
+          retention-days: 14

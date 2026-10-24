@@ -63,18 +63,17 @@ impl CliCommand {
                 write_ladder_results(
                     players.split(',').map(str::trim),
                     results.split(',').map(str::trim),
-                    rng.next_u64()?,
                     rng,
                     &mut out,
                 )
             }),
             #[cfg(target_arch = "x86_64")]
             Self::RandomFloat { max, min } => Self::run_with_rng(&mut err, |rng| {
-                generate_random_float(min, max, rng.next_u64()?, &mut out, rng)
+                generate_random_float(min, max, &mut out, rng)
             }),
             #[cfg(target_arch = "x86_64")]
             Self::RandomInteger { max, min } => Self::run_with_rng(&mut err, |rng| {
-                generate_random_integer(min, max, rng.next_u64()?, &mut out, rng)
+                generate_random_integer(min, max, &mut out, rng)
             }),
             Self::TimeObserve { host, seconds } => ServerTimeSession {
                 host,

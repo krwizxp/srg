@@ -1,0 +1,59 @@
+mod diagnostic {
+    pub type Result<T> = std::result::Result<T,Box<dyn std::error::Error>>;
+    pub fn terminal_safe(s:&str)->&str {s}
+}
+#[path="RNG_SOURCE"] mod hardware_rng;
+#[path="NUMBER_SOURCE"] mod random_number;
+#[path="LADDER_SOURCE"] mod ladder;
+use hardware_rng::HardwareRng;
+use diagnostic::Result;
+use std::{io::{self,Write},alloc::{GlobalAlloc,Layout,System},sync::atomic::{AtomicBool,AtomicUsize,Ordering}};
+struct Allocator;
+static ENABLED:AtomicBool=AtomicBool::new(false);
+static ALLOCS:AtomicUsize=AtomicUsize::new(0);
+static BYTES:AtomicUsize=AtomicUsize::new(0);
+#[global_allocator] static ALLOCATOR:Allocator=Allocator;
+unsafe impl GlobalAlloc for Allocator {
+    unsafe fn alloc(&self,l:Layout)->*mut u8 {if ENABLED.load(Ordering::Relaxed){ALLOCS.fetch_add(1,Ordering::Relaxed);BYTES.fetch_add(l.size(),Ordering::Relaxed);}unsafe{System.alloc(l)}}
+    unsafe fn dealloc(&self,p:*mut u8,l:Layout){unsafe{System.dealloc(p,l)}}
+    unsafe fn realloc(&self,p:*mut u8,l:Layout,n:usize)->*mut u8{if ENABLED.load(Ordering::Relaxed){ALLOCS.fetch_add(1,Ordering::Relaxed);BYTES.fetch_add(n,Ordering::Relaxed);}unsafe{System.realloc(p,l,n)}}
+}
+enum Task {Integer(i64,i64),Float(f64,f64),Ladder(Vec<String>,Vec<String>),Bounded(u64)}
+impl Task {
+    fn new(args:&[String])->Self {
+        match args[2].as_str() {
+            "integer"=>Self::Integer(args[4].parse().unwrap(),args[5].parse().unwrap()),
+            "float"=>Self::Float(args[4].parse().unwrap(),args[5].parse().unwrap()),
+            "bounded"=>Self::Bounded(args[5].parse().unwrap()),
+            "ladder"=>{let n:usize=args[5].parse().unwrap();Self::Ladder((0..n).map(|i|format!("p{i}")).collect(),(0..n).map(|i|format!("r{i}")).collect())},
+            _=>unreachable!(),
+        }
+    }
+}
+INVOKE
+struct LimitedOutput {bytes:Vec<u8>,limit:usize}
+impl Write for LimitedOutput {
+    fn write(&mut self,bytes:&[u8])->io::Result<usize>{if self.bytes.len()==self.limit{return Err(io::Error::other("injected output failure"));}let n=bytes.len().min(self.limit-self.bytes.len());self.bytes.extend_from_slice(&bytes[..n]);Ok(n)}
+    fn flush(&mut self)->io::Result<()>{Ok(())}
+}
+struct BenchmarkOutput;
+impl Write for BenchmarkOutput {
+    fn write(&mut self,bytes:&[u8])->io::Result<usize>{std::hint::black_box(bytes);Ok(bytes.len())}
+    fn flush(&mut self)->io::Result<()>{Ok(())}
+}
+fn main()->Result<()> {
+    let args:Vec<String>=std::env::args().collect();let task=Task::new(&args);BIND_MODE
+    let rng=HardwareRng::new();PREFLIGHT
+    if args[1]=="trace" {
+        let limit:usize=args[7].parse().unwrap();let mut out=LimitedOutput{bytes:Vec::new(),limit};let result=INVOKE_TRACE;
+        println!("status\t{}",result.as_ref().map_or_else(|e|format!("error:{e}"),|_|"ok".to_owned()));
+        println!("calls\t{}",OBSERVED_CALLS);
+        print!("output\t");for byte in out.bytes {print!("{byte:02x}");}println!();
+    } else {
+        let count:usize=args[7].parse().unwrap();let mut out=BenchmarkOutput;ENABLED.store(std::env::var_os("COUNT_ALLOCATIONS").is_some(),Ordering::Relaxed);
+        let start=std::time::Instant::now();for _ in 0..count {INVOKE_BENCH?;}let elapsed=start.elapsed().as_nanos();ENABLED.store(false,Ordering::Relaxed);
+        println!("elapsed\t{elapsed}");println!("allocations\t{}\t{}",ALLOCS.load(Ordering::Relaxed),BYTES.load(Ordering::Relaxed));println!("calls\t{}",OBSERVED_CALLS);
+    }
+    AFTER
+    Ok(())
+}
