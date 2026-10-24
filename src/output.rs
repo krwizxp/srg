@@ -14,6 +14,8 @@ pub(super) mod progress;
 #[cfg(target_arch = "x86_64")]
 pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
+const COLORED_HEX_BUF_LEN: usize = 64;
+const HEX_CODE_LABEL: &[u8] = "Hex 코드: ".as_bytes();
 const HEX_U16_FULL_WIDTH: usize = 4;
 static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const OCTAL_DIGIT_MASK: u64 = 7;
@@ -21,6 +23,7 @@ const OCTAL_SHIFT_BITS: u32 = 3;
 const OCTAL_TMP_LEN: usize = 22;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
+const PLAIN_HEX_CODE_LEN: usize = 15;
 const TWO_DIGIT_WIDTH: usize = 2;
 const U8_THREE_DIGIT_THRESHOLD: u8 = 100;
 const U8_TWO_DIGIT_THRESHOLD: u8 = 10;
@@ -30,14 +33,13 @@ static BINARY_NIBBLES: [[u8; 4]; 16] = [
 ];
 #[derive(Clone, Copy)]
 pub(super) enum OutputTarget {
-    Console,
+    Console(usize),
     File,
 }
 struct OutputFormatter<'cursor, 'buffer, 'data> {
     bytes: [u8; 8],
     cursor: &'cursor mut ByteCursor<'buffer>,
     data: &'data RandomDataSet,
-    use_colors: bool,
 }
 impl OutputFormatter<'_, '_, '_> {
     fn write_labeled_line<F>(&mut self, label: &[u8], write_value: F)
@@ -90,7 +92,6 @@ impl OutputFormatter<'_, '_, '_> {
         let number64 = self.data.num_64;
         let signed_number = number64.cast_signed();
         let bytes = self.bytes;
-        let use_colors = self.use_colors;
         self.cursor.write_bytes(FILE_RECORD_START);
         let mut number_buffer = NumBuffer::new();
         let number_text = number64.format_into(&mut number_buffer).as_bytes();
@@ -127,26 +128,8 @@ impl OutputFormatter<'_, '_, '_> {
             buffer_cur.write_bytes(tmp.split_at(index).1);
         });
         self.write_prefixed_byte_groups("16진수: ", hex_byte);
-        self.write_labeled_line("Hex 코드: ".as_bytes(), |buffer_cur| {
+        self.write_labeled_line(HEX_CODE_LABEL, |buffer_cur| {
             let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
-            if use_colors {
-                buffer_cur.write_bytes(b"\x1B[38;2;");
-                buf_write_u8_dec(buffer_cur, b0);
-                buffer_cur.write_byte(b';');
-                buf_write_u8_dec(buffer_cur, b1);
-                buffer_cur.write_byte(b';');
-                buf_write_u8_dec(buffer_cur, b2);
-                buf_write_prefixed_hex24(buffer_cur, b"m#", b0, b1, b2);
-                buffer_cur.write_bytes(b"\x1B[0m \x1B[38;2;");
-                buf_write_u8_dec(buffer_cur, b3);
-                buffer_cur.write_byte(b';');
-                buf_write_u8_dec(buffer_cur, b4);
-                buffer_cur.write_byte(b';');
-                buf_write_u8_dec(buffer_cur, b5);
-                buf_write_prefixed_hex24(buffer_cur, b"m#", b3, b4, b5);
-                buffer_cur.write_bytes(b"\x1B[0m");
-                return;
-            }
             buf_write_prefixed_hex24(buffer_cur, b"#", b0, b1, b2);
             buffer_cur.write_byte(b' ');
             buf_write_prefixed_hex24(buffer_cur, b"#", b3, b4, b5);
@@ -221,12 +204,45 @@ pub(super) fn format_data_into_buffer(
     buffer: &mut [u8; BUFFER_SIZE],
     target: OutputTarget,
 ) -> usize {
+    let bytes = data.num_64.to_be_bytes();
+    if let OutputTarget::Console(file_len) = target {
+        let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
+        let mut colored = [0_u8; COLORED_HEX_BUF_LEN];
+        let mut color_cur = ByteCursor::new(colored.as_mut_slice());
+        color_cur.write_bytes(b"\x1B[38;2;");
+        buf_write_u8_dec(&mut color_cur, b0);
+        color_cur.write_byte(b';');
+        buf_write_u8_dec(&mut color_cur, b1);
+        color_cur.write_byte(b';');
+        buf_write_u8_dec(&mut color_cur, b2);
+        buf_write_prefixed_hex24(&mut color_cur, b"m#", b0, b1, b2);
+        color_cur.write_bytes(b"\x1B[0m \x1B[38;2;");
+        buf_write_u8_dec(&mut color_cur, b3);
+        color_cur.write_byte(b';');
+        buf_write_u8_dec(&mut color_cur, b4);
+        color_cur.write_byte(b';');
+        buf_write_u8_dec(&mut color_cur, b5);
+        buf_write_prefixed_hex24(&mut color_cur, b"m#", b3, b4, b5);
+        color_cur.write_bytes(b"\x1B[0m");
+        let colored_len = color_cur.written_len();
+        let value_start = buffer
+            .get(..file_len)
+            .and_then(|slice| slice.iter().position(|&byte| byte == b'#'))
+            .unwrap_or_else(|| process::abort());
+        let value_end = value_start.strict_add(PLAIN_HEX_CODE_LEN);
+        let extra = colored_len.strict_sub(PLAIN_HEX_CODE_LEN);
+        buffer.copy_within(value_end..file_len, value_end.strict_add(extra));
+        buffer
+            .get_mut(value_start..value_start.strict_add(colored_len))
+            .unwrap_or_else(|| process::abort())
+            .copy_from_slice(colored.split_at(colored_len).0);
+        return file_len.strict_add(extra);
+    }
     let mut cur = ByteCursor::new(buffer.as_mut_slice());
     let mut formatter = OutputFormatter {
-        bytes: data.num_64.to_be_bytes(),
+        bytes,
         cursor: &mut cur,
         data,
-        use_colors: matches!(target, OutputTarget::Console),
     };
     formatter.write_number_lines();
     formatter.write_random_lines();

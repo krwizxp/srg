@@ -235,7 +235,7 @@ impl OutputFile {
         let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File);
         self.file.write_all(buffer.split_at(file_len).0)?;
         let output_len = if *IS_TERMINAL {
-            format_data_into_buffer(data, &mut buffer, OutputTarget::Console)
+            format_data_into_buffer(data, &mut buffer, OutputTarget::Console(file_len))
         } else {
             file_len
         };

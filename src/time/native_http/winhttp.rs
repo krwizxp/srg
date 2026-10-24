@@ -9,7 +9,10 @@ use core::{
     result::Result as CoreResult,
     str,
 };
-use std::time::{Instant, SystemTime};
+use std::{
+    process,
+    time::{Instant, SystemTime},
+};
 mod sys;
 const DWORD_BYTE_SIZE: u32 = 4;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
@@ -292,29 +295,26 @@ impl Client {
         let mut index = 0_u32;
         loop {
             let current_index = index;
-            let mut bytes = 0_u32;
-            // SAFETY: request is valid; this call probes one indexed response header value.
-            let probed = unsafe {
+            let mut short_buffer = [0_u16; 64];
+            let mut bytes = 128_u32;
+            // SAFETY: request is valid and short_buffer provides bytes writable bytes for this indexed header.
+            let fetched = unsafe {
                 sys::WinHttpQueryHeaders(
                     request.0.as_ptr(),
                     query,
                     null(),
-                    null_mut(),
+                    short_buffer.as_mut_ptr().cast::<c_void>(),
                     &raw mut bytes,
                     &raw mut index,
                 )
             };
-            if probed != 0_i32 {
-                return Err(error(
-                    context,
-                    format!("{name} 헤더 크기 조회가 예기치 않게 성공했습니다."),
-                ));
-            }
-            let code = Self::last_error_code();
-            if code == ERROR_WINHTTP_HEADER_NOT_FOUND {
+            let fetch_error = (fetched == 0_i32).then(Self::last_error_code);
+            if fetch_error == Some(ERROR_WINHTTP_HEADER_NOT_FOUND) {
                 return Ok(());
             }
-            if code != ERROR_INSUFFICIENT_BUFFER {
+            if let Some(code) = fetch_error
+                && code != ERROR_INSUFFICIENT_BUFFER
+            {
                 return Err(Self::windows_error(
                     "WinHttpQueryHeaders header size",
                     code,
@@ -337,39 +337,48 @@ impl Client {
                 ));
             }
             let units = header_bytes.div_euclid(2);
-            wide_buffer.clear();
-            wide_buffer.try_reserve_exact(units).map_err(|source| {
-                error_with_source(context, "응답 헤더 메모리 확보 실패", source)
-            })?;
-            wide_buffer.resize(units, 0_u16);
-            index = current_index;
-            // SAFETY: wide_buffer has the probed size and request is valid.
-            let fetched = unsafe {
-                sys::WinHttpQueryHeaders(
-                    request.0.as_ptr(),
-                    query,
-                    null(),
-                    wide_buffer.as_mut_ptr().cast::<c_void>(),
-                    &raw mut bytes,
-                    &raw mut index,
-                )
+            let mut header = if fetch_error.is_none() {
+                short_buffer
+                    .get(..units)
+                    .unwrap_or_else(|| process::abort())
+            } else {
+                wide_buffer.clear();
+                wide_buffer.try_reserve_exact(units).map_err(|source| {
+                    error_with_source(context, "응답 헤더 메모리 확보 실패", source)
+                })?;
+                wide_buffer.resize(units, 0_u16);
+                index = current_index;
+                // SAFETY: wide_buffer has the probed size and request is valid.
+                let long_fetched = unsafe {
+                    sys::WinHttpQueryHeaders(
+                        request.0.as_ptr(),
+                        query,
+                        null(),
+                        wide_buffer.as_mut_ptr().cast::<c_void>(),
+                        &raw mut bytes,
+                        &raw mut index,
+                    )
+                };
+                (long_fetched != 0_i32)
+                    .ok_or_else(|| Self::last_error("WinHttpQueryHeaders header", context))?;
+                wide_buffer.as_slice()
             };
-            (fetched != 0_i32)
-                .ok_or_else(|| Self::last_error("WinHttpQueryHeaders header", context))?;
             if index <= current_index {
                 return Err(error(
                     context,
                     format!("{name} 헤더 index가 진행되지 않았습니다."),
                 ));
             }
-            while wide_buffer.pop_if(|unit| *unit == 0).is_some() {}
+            while let Some((&0, rest)) = header.split_last() {
+                header = rest;
+            }
             ascii_buffer.clear();
             ascii_buffer
-                .try_reserve_exact(wide_buffer.len())
+                .try_reserve_exact(header.len())
                 .map_err(|source| {
                     error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
                 })?;
-            for &unit in wide_buffer.iter() {
+            for &unit in header {
                 ascii_buffer.push(u8::try_from(unit).map_err(|source| {
                     error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
                 })?);

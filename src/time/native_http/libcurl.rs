@@ -70,6 +70,12 @@ pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
 }
 struct EasyHandle(NonNull<Curl>);
+struct TransferOptions<'handle>(&'handle EasyHandle);
+impl Drop for TransferOptions<'_> {
+    fn drop(&mut self) {
+        self.0.reset();
+    }
+}
 #[derive(Default)]
 struct CurlBodySink {
     bytes_seen: usize,
@@ -181,50 +187,52 @@ impl Client {
                 empty.insert(EasyHandle(raw_handle))
             }
         };
-        handle.reset();
-        handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
-        handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
-        handle.setopt_str(CURLOPT_URL, server.request_target.as_ptr(), context)?;
-        handle.setopt_str(
-            CURLOPT_USERAGENT,
-            match server.scheme {
-                UrlScheme::Http => HTTP_USER_AGENT,
-                UrlScheme::Https => HTTPS_USER_AGENT,
-            }
-            .as_ptr(),
-            context,
-        )?;
-        handle.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
-        handle.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
-        handle.setopt_long(CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
-        handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
-        handle.setopt_long(CURLOPT_NOBODY, 1, context)?;
-        handle.setopt_long(CURLOPT_FOLLOWLOCATION, 0, context)?;
-        let protocol = match server.scheme {
-            UrlScheme::Http => {
-                handle.setopt_str(CURLOPT_NOPROXY, NO_PROXY.as_ptr(), context)?;
-                HTTP_PROTOCOL
-            }
-            UrlScheme::Https => {
-                handle.setopt_long(
-                    CURLOPT_SSLVERSION,
-                    CURL_SSLVERSION_TLSV1_2 | CURL_SSLVERSION_MAX_DEFAULT,
-                    context,
-                )?;
-                HTTPS_PROTOCOL
-            }
-        };
-        handle.setopt_str(CURLOPT_PROTOCOLS_STR, protocol.as_ptr(), context)?;
-        let (perform_code, request_start) = {
+        let (perform_code, request_start, scheme_result) = {
             let mut body_target = CurlWriteTarget::Body(&mut body_sink);
             let mut header_target = CurlWriteTarget::Header(&mut header_capture);
+            let _options = TransferOptions(handle);
+            handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
+            handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
+            handle.setopt_str(CURLOPT_URL, server.request_target.as_ptr(), context)?;
+            handle.setopt_str(
+                CURLOPT_USERAGENT,
+                match server.scheme {
+                    UrlScheme::Http => HTTP_USER_AGENT,
+                    UrlScheme::Https => HTTPS_USER_AGENT,
+                }
+                .as_ptr(),
+                context,
+            )?;
+            handle.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
+            handle.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
+            handle.setopt_long(CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
+            handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
+            handle.setopt_long(CURLOPT_NOBODY, 1, context)?;
+            handle.setopt_long(CURLOPT_FOLLOWLOCATION, 0, context)?;
+            let protocol = match server.scheme {
+                UrlScheme::Http => {
+                    handle.setopt_str(CURLOPT_NOPROXY, NO_PROXY.as_ptr(), context)?;
+                    HTTP_PROTOCOL
+                }
+                UrlScheme::Https => {
+                    handle.setopt_long(
+                        CURLOPT_SSLVERSION,
+                        CURL_SSLVERSION_TLSV1_2 | CURL_SSLVERSION_MAX_DEFAULT,
+                        context,
+                    )?;
+                    HTTPS_PROTOCOL
+                }
+            };
+            handle.setopt_str(CURLOPT_PROTOCOLS_STR, protocol.as_ptr(), context)?;
+
             let body_data = (&raw mut body_target).cast::<c_void>();
             let header_data = (&raw mut header_target).cast::<c_void>();
             handle.setopt_ptr(CURLOPT_WRITEDATA, body_data, context)?;
             handle.setopt_ptr(CURLOPT_HEADERDATA, header_data, context)?;
             let request_start = Instant::now();
             let code = handle.perform();
-            (code, request_start)
+            let scheme_result = (code == CURLE_OK).then(|| handle.ensure_scheme(protocol, context));
+            (code, request_start, scheme_result)
         };
         if let Some(callback_error) = body_sink.error.or(header_capture.error) {
             self.easy_handle = None;
@@ -247,7 +255,7 @@ impl Client {
             self.easy_handle = None;
             return Err(error(context, perform_error));
         }
-        if let Err(scheme_error) = handle.ensure_scheme(protocol, context) {
+        if let Err(scheme_error) = scheme_result.unwrap_or_else(|| process::abort()) {
             self.easy_handle = None;
             return Err(scheme_error);
         }
