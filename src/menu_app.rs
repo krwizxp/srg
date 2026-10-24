@@ -44,8 +44,6 @@ pub(super) struct MenuApp {
     pub input_buffer: String,
     #[cfg(target_arch = "x86_64")]
     pub ladder_results_storage: String,
-    #[cfg(target_arch = "x86_64")]
-    pub num_64: u64,
     pub output_file: OutputFile,
     #[cfg(target_arch = "x86_64")]
     pub rng: HardwareRng,
@@ -114,16 +112,13 @@ impl MenuApp {
                                 }
                             }
                         };
-                        let completion = regenerate_with_count(
+                        regenerate_with_count(
                             &mut self.output_file,
                             &self.rng,
                             requested_count,
                             command == b'4',
                             out,
                         )?;
-                        if let Some(next_num_64) = completion {
-                            self.num_64 = next_num_64;
-                        }
                     }
                     _ => return Ok(false),
                 }
@@ -162,7 +157,6 @@ impl MenuApp {
         write_ladder_results(
             players_storage.trim().split(',').map(str::trim),
             results_storage.trim().split(',').map(str::trim),
-            self.num_64,
             &self.rng,
             out,
         )
@@ -183,10 +177,6 @@ impl MenuApp {
             out,
             err,
         )?;
-        #[cfg(target_arch = "x86_64")]
-        {
-            self.num_64 = manual_num_64;
-        }
         let mut supp_input_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
             supp_input_count = supp_input_count.strict_add(1);
@@ -219,7 +209,6 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let num_64 = self.num_64;
         let input_buffer = &mut self.input_buffer;
         writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
         let selection = read_line_reuse_limited(
@@ -265,7 +254,7 @@ impl MenuApp {
                     }
                     writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
                 };
-                generate_random_integer(min_value, max_value, num_64, out, &self.rng)?;
+                generate_random_integer(min_value, max_value, out, &self.rng)?;
             }
             b"2" => {
                 writeln!(out, "\n무작위 실수 생성기")?;
@@ -294,7 +283,7 @@ impl MenuApp {
                 (max_value - min_value)
                     .is_finite()
                     .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
-                generate_random_float(min_value, max_value, num_64, out, &self.rng)?;
+                generate_random_float(min_value, max_value, out, &self.rng)?;
             }
             _ => {
                 writeln!(out, "무작위 숫자 생성을 취소합니다.")?;

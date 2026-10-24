@@ -9,7 +9,6 @@ pub(super) const MAX_LADDER_INPUT_BYTES: usize = 64 * 1024;
 pub(super) fn write_ladder_results<'player, 'result>(
     players: impl Iterator<Item = &'player str>,
     results: impl Iterator<Item = &'result str>,
-    mut seed: u64,
     rng: &HardwareRng,
     out: &mut dyn Write,
 ) -> Result<()> {
@@ -20,10 +19,9 @@ pub(super) fn write_ladder_results<'player, 'result>(
         entry_count = entry_count.strict_add(1);
     }
     for index in (1..entry_count).rev() {
-        seed ^= rng.next_u64()?;
         let upper_bound = index as u64;
         let swap_index =
-            usize::from_le_bytes(random_bounded_inclusive(upper_bound, seed, rng)?.to_le_bytes());
+            usize::from_le_bytes(random_bounded_inclusive(upper_bound, rng)?.to_le_bytes());
         result_entries.swap(index, swap_index);
     }
     writeln!(out, "사다리타기 결과:")?;

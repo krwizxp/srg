@@ -27,20 +27,15 @@ struct WorkerFailure {
     count: usize,
     first_error: AppError,
 }
-#[derive(Clone, Copy, Default)]
-struct RecordedData {
-    len: usize,
-    num_64: u64,
-}
 #[derive(Default)]
 struct WorkerChunk {
     bytes: Vec<u8>,
-    last: RecordedData,
+    last_len: usize,
     record_count: usize,
     written_len: usize,
 }
 struct WorkerOutput<'writer> {
-    last: Option<RecordedData>,
+    last_len: Option<usize>,
     writer: &'writer mut File,
 }
 fn record_failure(outcome: &mut Option<WorkerFailure>, count: usize, first_error: AppError) {
@@ -69,7 +64,7 @@ fn write_worker_chunk(
         .writer
         .write_all(chunk.bytes.split_at(chunk.written_len).0)
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
-    output.last = Some(chunk.last);
+    output.last_len = Some(chunk.last_len);
     drop(output);
     processed.fetch_add(chunk.record_count, Ordering::Relaxed);
     chunk.record_count = 0;
@@ -94,11 +89,10 @@ pub(super) fn regenerate_with_count(
     requested_count: usize,
     cancel_on_enter: bool,
     out: &mut dyn Write,
-) -> Result<Option<u64>> {
+) -> Result<()> {
     if requested_count == 1 {
         let final_data = generate_random_data_with_rng(rng)?;
-        output_file.persist_and_print(&final_data)?;
-        return Ok(Some(final_data.num_64));
+        return output_file.persist_and_print(&final_data);
     }
     let start_time = Instant::now();
     let mut stop_input = if cancel_on_enter && stdin().is_terminal() {
@@ -113,7 +107,7 @@ pub(super) fn regenerate_with_count(
     let base_count = requested_count.div_euclid(thread_count);
     let remainder = requested_count.rem_euclid(thread_count);
     let writer_lock = Mutex::new(WorkerOutput {
-        last: None,
+        last_len: None,
         writer: output_file.writer(),
     });
     let coordinator = thread::current();
@@ -165,10 +159,7 @@ pub(super) fn regenerate_with_count(
                             let len = format_data_into_buffer(&data, buffer, OutputTarget::File);
                             chunk.written_len = chunk.written_len.strict_add(len);
                             chunk.record_count = chunk.record_count.strict_add(1);
-                            chunk.last = RecordedData {
-                                len,
-                                num_64: data.num_64,
-                            };
+                            chunk.last_len = len;
                         }
                         write_worker_chunk(writer, stop, done, &mut chunk)?;
                         Ok(outcome)
@@ -249,10 +240,10 @@ pub(super) fn regenerate_with_count(
             }
             Ok((combined, user_cancelled))
         })?;
-    let last_recorded_data = writer_lock
+    let last_recorded_len = writer_lock
         .into_inner()
         .unwrap_or_else(|_| process::abort())
-        .last;
+        .last_len;
     if let Some(failure) = worker_outcome {
         return Err(AppError::context(
             format!(
@@ -277,11 +268,11 @@ pub(super) fn regenerate_with_count(
         )?;
     }
     out.flush()?;
-    let Some(last_record) = last_recorded_data else {
-        return Ok(None);
+    let Some(last_len) = last_recorded_len else {
+        return Ok(());
     };
     let mut buffer = [0_u8; BUFFER_SIZE];
-    let last_output = output_file.read_tail_into(last_record.len, &mut buffer)?;
+    let last_output = output_file.read_tail_into(last_len, &mut buffer)?;
     write_slice_to_console(last_output)?;
-    Ok(Some(last_record.num_64))
+    Ok(())
 }

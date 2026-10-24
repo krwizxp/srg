@@ -102,15 +102,13 @@ fn main() -> Result<()> {
         target_arch = "x86_64" => {{
             let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
             let rng = HardwareRng::new();
-            let num_64 = match rng.source() {
+            match rng.source() {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
                     let mut err = stderr().lock();
                     rng.write_initial_source_notice(&mut err)?;
                     let data = generate_random_data_with_rng(&rng)?;
                     rng.write_rdseed_fallback_notice(&mut err)?;
-                    let num_64 = data.num_64;
                     output_file.persist_and_print(&data)?;
-                    num_64
                 }
                 HardwareRandomSource::None => {
                     let mut err = stderr().lock();
@@ -118,14 +116,12 @@ fn main() -> Result<()> {
                         "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
                             .as_bytes(),
                     )?;
-                    0
                 }
-            };
+            }
             let ladder_results_storage = String::new();
             MenuApp {
                 input_buffer,
                 ladder_results_storage,
-                num_64,
                 output_file,
                 rng,
             }
