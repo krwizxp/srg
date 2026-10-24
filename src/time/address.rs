@@ -4,6 +4,8 @@ use super::{
 };
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use core::fmt::NumBuffer;
 use core::{num::IntErrorKind, str::FromStr};
 use std::net;
 const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
@@ -80,12 +82,19 @@ impl FromStr for ParsedServer {
                 UrlScheme::Http => HTTP_SCHEME_PREFIX,
                 UrlScheme::Https => HTTPS_SCHEME_PREFIX,
             };
-            let request_target_text = match (host_is_ipv6, explicit_port.is_some()) {
-                (true, true) => format!("{prefix}[{host_part}]:{port}"),
-                (true, false) => format!("{prefix}[{host_part}]"),
-                (false, true) => format!("{prefix}{host_part}:{port}"),
-                (false, false) => format!("{prefix}{host_part}"),
+            let (opening, closing) = if host_is_ipv6 { ("[", "]") } else { ("", "") };
+            let mut port_buffer = NumBuffer::new();
+            let (separator, port_text) = if explicit_port.is_some() {
+                (":", port.format_into(&mut port_buffer))
+            } else {
+                ("", "")
             };
+            let parts = [prefix, opening, host_part, closing, separator, port_text];
+            let capacity = parts
+                .iter()
+                .fold(1_usize, |len, part| len.strict_add(part.len()));
+            let mut request_target_text = String::with_capacity(capacity);
+            request_target_text.extend(parts);
             CString::new(request_target_text).map_err(|source| {
                 TimeError::parse_with_source("서버 HTTP 요청 대상 변환 실패", source)
             })?
