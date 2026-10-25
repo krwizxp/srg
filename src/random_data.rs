@@ -30,12 +30,7 @@ const LOTTO7_COUNT: usize = 7;
 const LOTTO7_MODULUS: u8 = 37;
 const LOTTO_COUNT: usize = 6;
 const LOTTO_COUNT_U8: u8 = 6;
-const NIBBLE_MASK_U64: u64 = 0xF;
 const NMS_COORD_MASK: u64 = 0x0FFF;
-const NMS_GLYPH_COUNT: usize = 12;
-const NMS_GLYPHS: [char; 16] = [
-    '🌅', '🐦', '👫', '🦕', '🌘', '🎈', '⛵', '🕷', '🦋', '🌀', '🧊', '🐟', '⛺', '🚀', '🌳', '🔯',
-];
 const NMS_PLANET_MAX_VALUE: u64 = 11;
 const NMS_PLANET_FIELD: (u8, u64) = (4, 0x0f);
 const NMS_PLANET_MODULUS: u64 = 6;
@@ -57,7 +52,6 @@ pub(super) struct RandomDataSet {
     pub galaxy_x: u16,
     pub galaxy_y: u16,
     pub galaxy_z: u16,
-    pub glyph_string: [char; NMS_GLYPH_COUNT],
     pub hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
     pub kor_coords: Coordinates,
     pub lotto7_numbers: [u8; LOTTO7_COUNT],
@@ -265,14 +259,6 @@ where
             .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS)
             .strict_add(1),
         );
-        let mut glyph_bits = (u64::from(self.data.planet_number) << 44_u32)
-            | (u64::from(self.data.solar_system_index) << 32_u32)
-            | ((num >> 8_u32) & u64::from(u32::MAX));
-        for slot in self.data.glyph_string.iter_mut().rev() {
-            let index = usize::from(low_u8_from_u64(glyph_bits & NIBBLE_MASK_U64));
-            *slot = *NMS_GLYPHS.get(index).unwrap_or_else(|| process::abort());
-            glyph_bits >>= 4_u32;
-        }
         Ok(())
     }
     fn fill_required_fields(&mut self) -> Result<()> {

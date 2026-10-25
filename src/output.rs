@@ -18,9 +18,14 @@ const COLORED_HEX_BUF_LEN: usize = 64;
 const HEX_CODE_LABEL: &[u8] = "Hex 코드: ".as_bytes();
 const HEX_U16_FULL_WIDTH: usize = 4;
 static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+const NIBBLE_MASK_U64: u64 = 0xF;
+const NMS_GLYPH_COUNT: usize = 12;
+const NMS_GLYPH_TOP_SHIFT: u32 = 44;
+static NMS_GLYPHS: [&str; 16] = [
+    "🌅", "🐦", "👫", "🦕", "🌘", "🎈", "⛵", "🕷", "🦋", "🌀", "🧊", "🐟", "⛺", "🚀", "🌳", "🔯",
+];
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
-const OCTAL_TMP_LEN: usize = 22;
 const PASSWORD_HIGH_DIVISOR: u32 = 10_000;
 const PASSWORD_WIDTH: usize = 6;
 const PLAIN_HEX_CODE_LEN: usize = 15;
@@ -73,8 +78,19 @@ impl OutputFormatter<'_, '_, '_> {
             buf_write_hex_u16_3(buffer_cur, data.nms_portal_xxx);
             buffer_cur.write_byte(b' ');
             buffer_cur.write_byte(b'(');
-            for &ch in &data.glyph_string {
-                ch.encode_utf8(buffer_cur.take(ch.len_utf8()));
+            let mut glyph_bits = (u64::from(data.planet_number) << 44_u32)
+                | (u64::from(data.solar_system_index) << 32_u32)
+                | ((data.num_64 >> 8_u32) & u64::from(u32::MAX));
+            for _ in 0..NMS_GLYPH_COUNT {
+                let index = usize::from(low_u8_from_u64(
+                    (glyph_bits >> NMS_GLYPH_TOP_SHIFT) & NIBBLE_MASK_U64,
+                ));
+                let glyph = NMS_GLYPHS
+                    .get(index)
+                    .copied()
+                    .unwrap_or_else(|| process::abort());
+                buffer_cur.write_bytes(glyph.as_bytes());
+                glyph_bits <<= 4_u32;
             }
             buffer_cur.write_bytes(b")");
         });
@@ -114,18 +130,17 @@ impl OutputFormatter<'_, '_, '_> {
             [h0, h1, h2, h3, l0, l1, l2, l3]
         });
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
-            let mut tmp = [0_u8; OCTAL_TMP_LEN];
-            let mut index = tmp.len();
+            let octal_len = usize::from(low_u8_from_u32(
+                u64::BITS
+                    .strict_sub(number64.leading_zeros())
+                    .div_ceil(OCTAL_SHIFT_BITS)
+                    .max(1),
+            ));
             let mut octal_number = number64;
-            for slot in tmp.iter_mut().rev() {
+            for slot in buffer_cur.take(octal_len).iter_mut().rev() {
                 *slot = digit_byte(low_u8_from_u64(octal_number & OCTAL_DIGIT_MASK));
                 octal_number >>= OCTAL_SHIFT_BITS;
-                index = index.strict_sub(1);
-                if octal_number == 0 {
-                    break;
-                }
             }
-            buffer_cur.write_bytes(tmp.split_at(index).1);
         });
         self.write_prefixed_byte_groups("16진수: ", hex_byte);
         self.write_labeled_line(HEX_CODE_LABEL, |buffer_cur| {

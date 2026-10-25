@@ -3761,6 +3761,7 @@
 			on(signal, "abort", abort, { once: true });
 			const parts = [];
 			let length = 0, trailingCr = false;
+			let skippedLines = 0;
 			const append = part => {
 				if (!part) return;
 				length += part.length;
@@ -3790,25 +3791,63 @@
 					if (!chunk && !done) continue;
 					let start = 0;
 					if (trailingCr) {
-						yield emit();
+						const line = emit();
 						trailingCr = false;
 						if (chunk.charCodeAt(0) === 10) start = 1;
+						if (line.includes("위경도")) yield line;
+						else if (++skippedLines >= 1000) {
+							skippedLines = 0;
+							yield null;
+						}
 					}
+					let keywordIndex = chunk.indexOf("위경도", start);
 					const newlines = /\r\n|[\r\n]/g;
 					newlines.lastIndex = start;
 					for (const match of chunk.matchAll(newlines)) {
-						append(chunk.slice(start, match.index));
-						start = match.index + match[0].length;
-						if (match[0] === "\r" && start === chunk.length) {
+						const end = match.index;
+						const nextStart = end + match[0].length;
+						if (match[0] === "\r" && nextStart === chunk.length) {
+							append(chunk.slice(start, end));
+							start = nextStart;
 							trailingCr = true;
 							break;
 						}
-						yield emit();
+						if (parts.length === 0) {
+							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
+								throw new InputError(
+									`입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
+								);
+							if (keywordIndex !== -1 && keywordIndex < end) {
+								yield chunk.slice(start, end);
+								keywordIndex = chunk.indexOf("위경도", nextStart);
+							} else if (++skippedLines >= 1000) {
+								skippedLines = 0;
+								yield null;
+							}
+						} else {
+							append(chunk.slice(start, end));
+							const line = emit();
+							if (line.includes("위경도")) yield line;
+							else if (++skippedLines >= 1000) {
+								skippedLines = 0;
+								yield null;
+							}
+							if (keywordIndex !== -1 && keywordIndex < nextStart)
+								keywordIndex = chunk.indexOf("위경도", nextStart);
+						}
+						start = nextStart;
 					}
 					append(chunk.slice(start));
 					if (done) break;
 				}
-				if (trailingCr || length) yield emit();
+				if (trailingCr || length) {
+					const line = emit();
+					if (line.includes("위경도")) yield line;
+					else if (++skippedLines >= 1000) {
+						skippedLines = 0;
+						yield null;
+					}
+				}
 			} finally {
 				signal.removeEventListener("abort", abort);
 				await cancelReader(reader);
@@ -3826,14 +3865,20 @@
 			let linesSinceYield = 0;
 			for await (const line of lineIterator(file.stream(), signal)) {
 				signal.throwIfAborted();
-				if (++linesSinceYield >= 1000) {
+				if (line === null) {
+					if (performance.now() - lastYield >= 8) {
+						await yieldToMain();
+						lastYield = performance.now();
+					}
+					continue;
+				}
+				if (++linesSinceYield >= 128) {
 					if (performance.now() - lastYield >= 8) {
 						await yieldToMain();
 						lastYield = performance.now();
 					}
 					linesSinceYield = 0;
 				}
-				if (!line.includes("위경도")) continue;
 				let invalid = 0;
 				for (const m of line.matchAll(COORD_REGEX)) {
 					if (!m[1]) {
