@@ -300,10 +300,10 @@ where
                     }
                 }
             }
-            if self.numeric_password_digits >= LOTTO_COUNT_U8
-                && self.lotto.is_full()
+            if usize::from(self.password_len) >= PASSWORD_BYTE_LEN
+                && self.numeric_password_digits >= LOTTO_COUNT_U8
                 && self.lotto7.is_full()
-                && usize::from(self.password_len) >= PASSWORD_BYTE_LEN
+                && self.lotto.is_full()
                 && self.euro_main.is_full()
             {
                 return true;
