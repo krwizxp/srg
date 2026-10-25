@@ -36,6 +36,7 @@ struct WorkerChunk {
 }
 struct WorkerOutput<'writer> {
     last_len: Option<usize>,
+    last_record: &'writer mut [u8; BUFFER_SIZE],
     writer: &'writer mut File,
 }
 fn record_failure(outcome: &mut Option<WorkerFailure>, count: usize, first_error: AppError) {
@@ -60,11 +61,21 @@ fn write_worker_chunk(
     if cancelled.load(Ordering::Relaxed) {
         return Ok(());
     }
+    let written = chunk.bytes.split_at(chunk.written_len).0;
     output
         .writer
-        .write_all(chunk.bytes.split_at(chunk.written_len).0)
+        .write_all(written)
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
-    output.last_len = Some(chunk.last_len);
+    let last_len = chunk.last_len;
+    let last_slice = written
+        .get(chunk.written_len.strict_sub(last_len)..)
+        .unwrap_or_else(|| process::abort());
+    output
+        .last_record
+        .get_mut(..last_len)
+        .unwrap_or_else(|| process::abort())
+        .copy_from_slice(last_slice);
+    output.last_len = Some(last_len);
     drop(output);
     processed.fetch_add(chunk.record_count, Ordering::Relaxed);
     chunk.record_count = 0;
@@ -106,8 +117,10 @@ pub(super) fn regenerate_with_count(
     let (cancelled, processed) = (AtomicBool::new(false), AtomicUsize::new(0));
     let base_count = requested_count.div_euclid(thread_count);
     let remainder = requested_count.rem_euclid(thread_count);
+    let mut last_record_buffer = [0_u8; BUFFER_SIZE];
     let writer_lock = Mutex::new(WorkerOutput {
         last_len: None,
+        last_record: &mut last_record_buffer,
         writer: output_file.writer(),
     });
     let coordinator = thread::current();
@@ -271,8 +284,6 @@ pub(super) fn regenerate_with_count(
     let Some(last_len) = last_recorded_len else {
         return Ok(());
     };
-    let mut buffer = [0_u8; BUFFER_SIZE];
-    let last_output = output_file.read_tail_into(last_len, &mut buffer)?;
-    write_slice_to_console(last_output)?;
+    write_slice_to_console(last_record_buffer.split_at(last_len).0)?;
     Ok(())
 }

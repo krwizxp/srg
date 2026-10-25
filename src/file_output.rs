@@ -241,18 +241,7 @@ impl OutputFile {
         };
         write_slice_to_console(buffer.split_at(output_len).0).map_err(Into::into)
     }
-    #[cfg(target_arch = "x86_64")]
-    pub(super) fn read_tail_into<'buffer>(
-        &mut self,
-        len: usize,
-        buffer: &'buffer mut [u8],
-    ) -> Result<&'buffer [u8]> {
-        let tail = buffer.get_mut(..len).unwrap_or_else(|| process::abort());
-        let offset = i64::try_from(len).unwrap_or_else(|_| process::abort());
-        self.file.seek(SeekFrom::End(offset.strict_neg()))?;
-        self.file.read_exact(tail)?;
-        Ok(tail)
-    }
+
     #[cfg(target_arch = "x86_64")]
     pub(super) const fn writer(&mut self) -> &mut File {
         &mut self.file
