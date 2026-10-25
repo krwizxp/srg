@@ -1,0 +1,133 @@
+name: SRG Completion Check Validation
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+concurrency:
+  group: completion-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: ${{ matrix.target }} native validation
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-26.04
+            target: x86_64-unknown-linux-gnu
+            binary_name: srg-linux-x64
+          - os: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary_name: srg-linux-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: srg-windows-x64
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            binary_name: srg-windows-arm64
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+            binary_name: srg-macos-x64
+          - os: macos-26
+            target: aarch64-apple-darwin
+            binary_name: srg-macos-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal --component clippy --component rustfmt --no-self-update
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Verify toolchain
+        run: rustc +1.99.1 -Vv
+      - name: Formatting
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Strict Clippy
+        run: cargo +1.99.1 clippy --all-targets --frozen --target ${{ matrix.target }} -- -D warnings
+      - name: Rust tests
+        run: cargo +1.99.1 test --frozen --target ${{ matrix.target }}
+      - name: Release build
+        run: cargo +1.99.1 build --release --frozen --bin srg --target ${{ matrix.target }}
+      - name: Native packaging
+        env:
+          CARGO_TARGET_DIR: target/${{ matrix.target }}
+        run: cargo +1.99.1 run --frozen --example package_artifact -- ${{ matrix.binary_name }}
+  compare:
+    name: Baseline and candidate release comparison
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal --component clippy --component rustfmt --no-self-update
+      - name: Install Linux native dependencies
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Check source-only delta
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --check "$BASE_SHA" HEAD
+          git diff --stat "$BASE_SHA" HEAD
+          git diff --unified=0 "$BASE_SHA" HEAD -- src/random_data.rs
+      - name: Create isolated baseline
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/srg-baseline" "$BASE_SHA"
+      - name: Build baseline release
+        working-directory: ${{ runner.temp }}/srg-baseline
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/srg-before-target
+        run: cargo +1.99.1 build --release --frozen --bin srg
+      - name: Build candidate release
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/srg-after-target
+        run: cargo +1.99.1 build --release --frozen --bin srg
+      - name: Check binary size and production runtime
+        shell: bash
+        env:
+          BEFORE: ${{ runner.temp }}/srg-before-target/release/srg
+          AFTER: ${{ runner.temp }}/srg-after-target/release/srg
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+          import tempfile
+          import time
+          import statistics
+          a = pathlib.Path(os.environ['BEFORE'])
+          b = pathlib.Path(os.environ['AFTER'])
+          print('baseline bytes:', a.stat().st_size)
+          print('candidate bytes:', b.stat().st_size)
+          samples = {'baseline': [], 'candidate': []}
+          for i in range(6):
+              order = [('baseline', a), ('candidate', b)] if i % 2 == 0 else [('candidate', b), ('baseline', a)]
+              for name, binary in order:
+                  with tempfile.TemporaryDirectory(prefix='srg-check-') as cwd:
+                      start = time.perf_counter()
+                      result = subprocess.run([str(binary), 'generate', '250'], cwd=cwd, capture_output=True, timeout=120)
+                      elapsed = time.perf_counter() - start
+                      if result.returncode != 0:
+                          raise RuntimeError(f'{name} failed: {result.stderr[-2500:]!r}')
+                      output = pathlib.Path(cwd) / 'random_data.txt'
+                      if not output.is_file() or output.stat().st_size == 0:
+                          raise RuntimeError(f'{name} missing output')
+                      samples[name].append(elapsed)
+          for name, times in samples.items():
+              print(name, 'times seconds', [round(x, 5) for x in times], 'median', statistics.median(times))
+          ratio = statistics.median(samples['candidate']) / statistics.median(samples['baseline'])
+          print('candidate/baseline median ratio:', ratio)
+          if ratio > 1.08 and statistics.median(samples['candidate']) - statistics.median(samples['baseline']) > 0.04:
+              raise RuntimeError('candidate median runtime exceeds 8 percent and 40 ms thresholds')
+          PY
