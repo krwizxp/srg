@@ -301,7 +301,6 @@ where
                 }
             }
             if usize::from(self.password_len) >= PASSWORD_BYTE_LEN
-                && self.numeric_password_digits >= LOTTO_COUNT_U8
                 && self.lotto7.is_full()
                 && self.lotto.is_full()
                 && self.euro_main.is_full()
