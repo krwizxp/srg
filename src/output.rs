@@ -16,6 +16,7 @@ pub(super) const PROGRESS_LINE_BUF_LEN: usize = 128;
 const BYTE_GROUP_COUNT: usize = 8;
 const COLORED_HEX_BUF_LEN: usize = 64;
 const HEX_CODE_LABEL: &[u8] = "Hex 코드: ".as_bytes();
+const HEX_CODE_MIN_OFFSET: usize = 175;
 const HEX_U16_FULL_WIDTH: usize = 4;
 static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const NIBBLE_MASK_U64: u64 = 0xF;
@@ -241,9 +242,12 @@ pub(super) fn format_data_into_buffer(
         color_cur.write_bytes(b"\x1B[0m");
         let colored_len = color_cur.written_len();
         let value_start = buffer
-            .get(..file_len)
+            .get(HEX_CODE_MIN_OFFSET..file_len)
             .and_then(|slice| slice.iter().position(|&byte| byte == b'#'))
-            .unwrap_or_else(|| process::abort());
+            .map_or_else(
+                || process::abort(),
+                |offset| HEX_CODE_MIN_OFFSET.strict_add(offset),
+            );
         let value_end = value_start.strict_add(PLAIN_HEX_CODE_LEN);
         let extra = colored_len.strict_sub(PLAIN_HEX_CODE_LEN);
         buffer.copy_within(value_end..file_len, value_end.strict_add(extra));

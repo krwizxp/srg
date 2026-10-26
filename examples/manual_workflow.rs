@@ -1,9 +1,9 @@
 use std::env;
 use std::ffi::OsString;
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 macro_rules! required_pair_args {
     ($command:literal, $first_env:literal, $second_env:literal) => {
         vec![
@@ -47,39 +47,36 @@ fn main() -> io::Result<()> {
         Some(_) | None => return Err(invalid_input("unsupported SRG workflow action")),
     };
     let artifacts = Path::new("artifacts");
-    let console_log = artifacts.join("srg-result-console.log");
     let random_data = artifacts.join("random_data.txt");
-    let published_random_data = artifacts.join("srg-result-random_data.txt");
     fs::create_dir_all(artifacts)?;
-    for path in [&random_data, &published_random_data] {
-        match fs::remove_file(path) {
-            Ok(()) => {}
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-            Err(source) => return Err(source),
-        }
+    match fs::remove_file(&random_data) {
+        Ok(()) => {}
+        Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+        Err(source) => return Err(source),
     }
-    let log = File::create(&console_log)?;
     let mut binary = env::var_os("CARGO_TARGET_DIR")
         .map_or_else(|| PathBuf::from("target"), PathBuf::from)
         .join("release")
         .join(env!("CARGO_PKG_NAME"));
     binary.add_extension(env::consts::EXE_EXTENSION);
-    let status = Command::new(fs::canonicalize(binary)?)
+    let output = Command::new(fs::canonicalize(binary)?)
         .args(args)
         .current_dir(artifacts)
-        .stdout(Stdio::from(log.try_clone()?))
-        .stderr(Stdio::from(log))
-        .status()?;
-    let log_bytes = fs::read(&console_log)?;
+        .output()?;
     let mut stdout = io::stdout().lock();
-    stdout.write_all(&log_bytes)?;
+    stdout.write_all(&output.stdout)?;
     stdout.flush()?;
-    status
+    let mut stderr = io::stderr().lock();
+    stderr.write_all(&output.stderr)?;
+    stderr.flush()?;
+    output
+        .status
         .success()
         .ok_or_else(|| io::Error::other("selected SRG action failed"))?;
     output_check
         .is_none_or(|expected| {
-            log_bytes
+            output
+                .stdout
                 .windows(expected.len())
                 .any(|window| window == expected.as_bytes())
         })
@@ -87,7 +84,6 @@ fn main() -> io::Result<()> {
     if output_check.is_none() {
         (fs::metadata(&random_data)?.len() > 3)
             .ok_or_else(|| io::Error::other("SRG generated no random data"))?;
-        fs::rename(random_data, published_random_data)?;
     }
     Ok(())
 }

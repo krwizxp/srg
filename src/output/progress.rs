@@ -7,7 +7,6 @@ use crate::{
 use core::{fmt::NumBuffer, time::Duration};
 use std::io::Write as IoWrite;
 const BAR_WIDTH: usize = 10;
-const DECI_PER_MINUTE: u128 = 600;
 const DECI_PER_SECOND: u128 = 10;
 const ELAPSED_MILLIS_PER_DECI: u128 = 100;
 const INVALID_TIME: &[u8; 7] = b"--:--.-";
@@ -96,11 +95,13 @@ fn format_time_into(deci_seconds: Option<u128>, buf: &mut [u8; TIME_BUF_LEN]) {
         *buf = *INVALID_TIME;
         return;
     };
-    let minutes = low_u8_from_u128((deci.div_euclid(DECI_PER_MINUTE)).min(MAX_TIME_MINUTES));
-    let sec_whole = low_u8_from_u128(
-        deci.div_euclid(DECI_PER_SECOND)
-            .rem_euclid(SECONDS_PER_MINUTE_U128),
+    let total_seconds = deci.div_euclid(DECI_PER_SECOND);
+    let minutes = low_u8_from_u128(
+        total_seconds
+            .div_euclid(SECONDS_PER_MINUTE_U128)
+            .min(MAX_TIME_MINUTES),
     );
+    let sec_whole = low_u8_from_u128(total_seconds.rem_euclid(SECONDS_PER_MINUTE_U128));
     let tenths = low_u8_from_u128(deci.rem_euclid(DECI_PER_SECOND));
     let [m0, m1] = two_digits(minutes);
     let [s0, s1] = two_digits(sec_whole);

@@ -84,17 +84,10 @@ jobs:
           SRG_TIME_HOST: ${{ inputs.time_host }}
           SRG_OBSERVE_SECONDS: ${{ inputs.observe_seconds }}
         run: target/release/examples/manual_workflow
-      - name: Upload console log artifact
-        if: always() && hashFiles('artifacts/srg-result-console.log') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: artifacts/srg-result-console.log
-          archive: false
-          retention-days: 14
       - name: Upload generated data artifact
-        if: always() && hashFiles('artifacts/srg-result-random_data.txt') != ''
+        if: always() && hashFiles('artifacts/random_data.txt') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          path: artifacts/srg-result-random_data.txt
+          path: artifacts/random_data.txt
           archive: false
           retention-days: 14

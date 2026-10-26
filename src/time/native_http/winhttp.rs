@@ -372,18 +372,29 @@ impl Client {
             while let Some((&0, rest)) = header.split_last() {
                 header = rest;
             }
-            ascii_buffer.clear();
-            ascii_buffer
-                .try_reserve_exact(header.len())
-                .map_err(|source| {
-                    error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
-                })?;
-            for &unit in header {
-                ascii_buffer.push(u8::try_from(unit).map_err(|source| {
-                    error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
-                })?);
-            }
-            let value = str::from_utf8(ascii_buffer)
+            let mut short_ascii = [0_u8; 64];
+            let ascii_slice = if let Some(dest) = short_ascii.get_mut(..header.len()) {
+                for (slot, &unit) in dest.iter_mut().zip(header) {
+                    *slot = u8::try_from(unit).map_err(|source| {
+                        error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
+                    })?;
+                }
+                &*dest
+            } else {
+                ascii_buffer.clear();
+                ascii_buffer
+                    .try_reserve_exact(header.len())
+                    .map_err(|source| {
+                        error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
+                    })?;
+                for &unit in header {
+                    ascii_buffer.push(u8::try_from(unit).map_err(|source| {
+                        error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
+                    })?);
+                }
+                ascii_buffer.as_slice()
+            };
+            let value = str::from_utf8(ascii_slice)
                 .map(str::trim_ascii)
                 .map_err(|source| {
                     error_with_source(context, format!("{name} 헤더 UTF-8 변환 실패"), source)

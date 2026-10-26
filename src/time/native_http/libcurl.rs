@@ -163,7 +163,7 @@ impl Client {
         server: &ParsedServer,
         context: &str,
     ) -> Result<TimeSample> {
-        let mut error_buffer = [c_char::default(); CURL_ERROR_SIZE];
+        let mut error_buffer = [0_u8; CURL_ERROR_SIZE];
         let mut body_sink = CurlBodySink::default();
         let mut header_capture = CurlHeaderCapture {
             bytes_seen: 0,
@@ -203,7 +203,11 @@ impl Client {
                 .as_ptr(),
                 context,
             )?;
-            handle.setopt_ptr(CURLOPT_ERRORBUFFER, error_buffer.as_mut_ptr(), context)?;
+            handle.setopt_ptr(
+                CURLOPT_ERRORBUFFER,
+                error_buffer.as_mut_ptr().cast::<c_char>(),
+                context,
+            )?;
             handle.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
             handle.setopt_long(CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
             handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
@@ -239,9 +243,8 @@ impl Client {
             return Err(error(context, callback_error));
         }
         if perform_code != CURLE_OK {
-            let error_bytes = error_buffer.map(|ch| ch.to_le_bytes()[0]);
             let perform_error: Cow<'static, str> = if let Ok(message_cstr) =
-                CStr::from_bytes_until_nul(&error_bytes)
+                CStr::from_bytes_until_nul(&error_buffer)
                 && !message_cstr.is_empty()
             {
                 Cow::Owned(format!(
