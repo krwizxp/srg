@@ -50,12 +50,16 @@ pub(super) fn random_bounded_inclusive(inclusive_max: u64, rng: &HardwareRng) ->
         return Ok(0);
     }
     let range_value = inclusive_max.strict_add(1);
-    let mut threshold = 0;
-    for _ in 0..RANDOM_BOUNDED_RETRY_LIMIT {
+    let (first_low, first_high) = rng.next_u64()?.carrying_mul(range_value, 0_u64);
+    if first_low >= range_value {
+        return Ok(first_high);
+    }
+    let threshold = range_value.wrapping_neg().rem_euclid(range_value);
+    if first_low >= threshold {
+        return Ok(first_high);
+    }
+    for _ in 1..RANDOM_BOUNDED_RETRY_LIMIT {
         let (low_bits, high_bits) = rng.next_u64()?.carrying_mul(range_value, 0_u64);
-        if low_bits < range_value && threshold == 0 {
-            threshold = range_value.wrapping_neg().rem_euclid(range_value);
-        }
         if low_bits >= threshold {
             return Ok(high_bits);
         }
