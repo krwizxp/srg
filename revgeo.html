@@ -924,7 +924,7 @@
 			position: relative
 		}
 
-		.filter-trigger:is([aria-expanded=true], [data-active=true]) {
+		.filter-trigger:is([data-active=true], :has(+ #filter-dialog[open])) {
 			background: var(--tint)
 		}
 
@@ -2476,8 +2476,8 @@
 			</ol>
 			<p class="step-label" id="step-label">1/3 · 데이터 입력</p>
 			<div class="header-tools">
-				<button aria-label="도움말" class="icon-button" id="show-help" title="도움말" type="button"><svg
-						aria-hidden="true" viewBox="0 0 24 24">
+				<button aria-label="도움말" class="icon-button" command="show-modal" commandfor="help-dialog"
+					id="show-help" title="도움말" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 						<circle cx="12" cy="12" r="9" />
 						<path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3h.01" />
 					</svg></button>
@@ -2695,13 +2695,13 @@
 							<option value="world"> 세계 </option>
 							<option value="에러"> 조회 실패 </option>
 						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
-							aria-expanded="false" class="button filter-trigger" id="advanced-filters" type="button"><svg
-								aria-hidden="true" viewBox="0 0 24 24">
+							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
+							id="advanced-filters" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 								<path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
 								<circle cx="14" cy="7" r="3" />
 								<circle cx="10" cy="17" r="3" />
 							</svg><span>상세 필터</span> <span hidden id="filter-count"></span></button>
-						<dialog aria-labelledby="filter-title" id="filter-dialog">
+						<dialog aria-labelledby="filter-title" closedby="any" id="filter-dialog">
 							<div class="sheet-heading">
 								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
 									command="close" commandfor="filter-dialog" id="filter-dismiss" type="button"><svg
@@ -2710,7 +2710,7 @@
 									</svg></button>
 							</div>
 							<div class="filter-grid"><label>광역 지역<input aria-label="광역 지역" enterkeyhint="search"
-										id="filter-sido" inputmode="search" placeholder="시·도, 주 등"
+										autofocus id="filter-sido" inputmode="search" placeholder="시·도, 주 등"
 										type="search"></label><label>도시·행정구역<input aria-label="도시·행정구역"
 										enterkeyhint="search" id="filter-sigungu" inputmode="search"
 										placeholder="시·군·구 등" type="search"></label><label>세부 지역<input
@@ -2880,7 +2880,8 @@
 	<dialog aria-labelledby="settings-title" class="settings" id="display-settings">
 		<div class="sheet-heading">
 			<h2 id="settings-title">화면 설정</h2><button aria-label="화면 설정 닫기" autofocus class="icon-button"
-				id="settings-close" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+				command="request-close" commandfor="display-settings" id="settings-close" type="button"><svg
+					aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2967,8 +2968,9 @@
 			<h2 id="clear-title">변환 결과 지우기</h2>
 		</div>
 		<p id="clear-description">현재 변환 결과를 지우면 복구할 수 없습니다.</p>
-		<div class="confirm-actions"><button autofocus class="button" id="clear-cancel" type="button">취소</button><button
-				class="button danger" id="clear-confirm" type="button">결과 지우기</button></div>
+		<div class="confirm-actions"><button autofocus class="button" command="close" commandfor="clear-dialog"
+				id="clear-cancel" type="button">취소</button><button class="button danger" id="clear-confirm"
+				type="button">결과 지우기</button></div>
 	</dialog>
 	<dialog aria-describedby="bulk-description" aria-labelledby="bulk-title" id="bulk-dialog" role="alertdialog">
 		<div class="sheet-heading">
@@ -2978,8 +2980,9 @@
 		<p class="note">초당 1회 이하 · 반복·격자형 수집 금지</p>
 		<p><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer"
 				target="_blank">Nominatim 사용 정책</a></p>
-		<div class="confirm-actions"><button autofocus class="button" id="bulk-cancel" type="button">취소</button><button
-				class="button primary" id="bulk-confirm" type="button">일회성 조회 확인</button></div>
+		<div class="confirm-actions"><button autofocus class="button" command="close" commandfor="bulk-dialog"
+				id="bulk-cancel" type="button" value="cancel">취소</button><button class="button primary" command="close"
+				commandfor="bulk-dialog" id="bulk-confirm" type="button" value="confirm">일회성 조회 확인</button></div>
 	</dialog>
 	<div class="ui-notice" hidden id="ui-notice" role="status" aria-atomic="true"><span
 			id="ui-notice-text"></span><button aria-label="알림 닫기" class="icon-button" id="ui-notice-close"
@@ -4892,10 +4895,6 @@
 			"--page-prev": () => shiftPage(-1),
 			"--page-next": () => shiftPage(1),
 		};
-		on(byId("bulk-cancel"), "click", () =>
-			bulkDialog.close("cancel"));
-		on(byId("bulk-confirm"), "click", () =>
-			bulkDialog.close("confirm"));
 		on(byId("app"), "command", (e) => {
 			const cmd = COMMANDS[e.command];
 			if (!cmd) return;
@@ -5570,7 +5569,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				if (chunks.length || outputContent.textContent) clearDialog.showModal();
 				else clearOutput();
 			});
-			on(byId("clear-cancel"), "click", () => clearDialog.close());
 			on(byId("clear-confirm"), "click", () => {
 				clearDialog.close();
 				clearOutput();
@@ -5664,7 +5662,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			else settings.show();
 			settingsBtn.ariaExpanded = "true";
 		});
-		on(byId("settings-close"), "click", () => closeSettings());
 		on(settings, "close", () => {settingsBtn.ariaExpanded = "false";});
 		on(settings, "cancel", event => {
 			event.preventDefault();
@@ -5801,23 +5798,15 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				scheduleFilterViewport();
 			});
 		}
-		on(filterTrigger, "click", () => {
-			if (filterDialog.open) return filterDialog.close();
-			filterDialog.showModal();
-			filterTrigger.ariaExpanded = "true";
-			filterSido.focus(NO_SCROLL);
-		});
 		function closeFilters() {if (filterDialog.open) filterDialog.close();}
-		on(filterDialog, "close", () => {
-			clearFilterViewport();
-			filterTrigger.ariaExpanded = "false";
-		});
-		on(filterDialog, "click", event => {
-			if (event.target !== filterDialog) return;
-			const r = filterDialog.getBoundingClientRect();
-			if (event.clientX < r.left || event.clientX > r.right ||
-				event.clientY < r.top || event.clientY > r.bottom) closeFilters();
-		});
+		on(filterDialog, "close", clearFilterViewport);
+		if (!("closedBy" in HTMLDialogElement.prototype))
+			on(filterDialog, "click", event => {
+				if (event.target !== filterDialog) return;
+				const r = filterDialog.getBoundingClientRect();
+				if (event.clientX < r.left || event.clientX > r.right ||
+					event.clientY < r.top || event.clientY > r.bottom) closeFilters();
+			});
 		const noticeText = byId("ui-notice-text");
 		const noticeClose = byId("ui-notice-close");
 		function dismissNotice(restoreFocus = true) {
@@ -6050,16 +6039,10 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			dropZone.classList.remove("is-dragging");
 			acceptInputFile(event.dataTransfer?.files[0]);
 		});
-		const helpDialog = byId("help-dialog");
-		let helpFocus = null;
-		on(byId("show-help"), "click", event => {
-			helpFocus = event.currentTarget;
-			closeSettings(false);
-			helpDialog.showModal();
-		});
-		on(helpDialog, "close", () => {
-			if (helpFocus?.getClientRects().length) helpFocus.focus(NO_SCROLL);
-			helpFocus = null;
+		const helpTrigger = byId("show-help");
+		on(helpTrigger, "click", () => closeSettings(false));
+		on(byId("help-dialog"), "close", () => {
+			if (helpTrigger.getClientRects().length) helpTrigger.focus(NO_SCROLL);
 		});
 		on(window, "pagehide", () => {
 			filterViewportPaused = true;
