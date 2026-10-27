@@ -46,10 +46,9 @@ const HTTP_HEAD_MAX_HEADER_BYTES: usize = 1024 * 1024;
 const HTTP_HEAD_MAX_PLAIN_HEADER_BYTES: usize = 64 * 1024;
 const HTTPS_PROTOCOL: &CStr = c"https";
 const HTTPS_USER_AGENT_C_BYTES: &[u8] = concat!("srg/", env!("CARGO_PKG_VERSION"), "\0").as_bytes();
-const HTTPS_USER_AGENT: &CStr = {
-    // SAFETY: concat! emits exactly one trailing NUL here, and Cargo package versions cannot
-    // contain interior NUL bytes.
-    unsafe { CStr::from_bytes_with_nul_unchecked(HTTPS_USER_AGENT_C_BYTES) }
+const HTTPS_USER_AGENT: &CStr = match CStr::from_bytes_with_nul(HTTPS_USER_AGENT_C_BYTES) {
+    Ok(user_agent) => user_agent,
+    Err(_) => c"srg",
 };
 const NO_PROXY: &CStr = c"*";
 const TCP_TIMEOUT_MILLIS: c_long = 5_000;

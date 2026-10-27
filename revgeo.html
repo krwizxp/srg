@@ -2525,8 +2525,8 @@
 						<path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
 						<circle cx="12" cy="10" r="2.5" />
 					</svg><span>좌표 없음</span></div>
-				<pre class="code-view" id="coords"
-					tabindex="0"><span aria-hidden="true" id="coord-line-numbers"></span><code class="code-content"></code></pre>
+				<pre class="code-view" id="coords" tabindex="0"><span aria-hidden="true"
+						id="coord-line-numbers"></span><code class="code-content"></code></pre>
 				<div class="coords-tools"><button aria-controls="coords" aria-expanded="false" class="button"
 						id="coords-expand" type="button">미리보기 펼치기</button><button class="button" id="coords-copy"
 						type="button">전체 좌표 복사</button></div>
@@ -2633,7 +2633,8 @@
 						<dialog aria-labelledby="filter-title" id="filter-dialog">
 							<div class="sheet-heading">
 								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
-									id="filter-dismiss" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+									command="close" commandfor="filter-dialog" id="filter-dismiss" type="button"><svg
+										aria-hidden="true" viewBox="0 0 24 24">
 										<path d="m6 6 12 12M6 18 18 6" />
 									</svg></button>
 							</div>
@@ -2652,8 +2653,8 @@
 									<svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="M20 7v5h-5M4 17v-5h5" />
 										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
-									</svg> 검색·필터 모두 초기화 </button><button class="button primary" id="filter-close"
-									type="button">완료</button>
+									</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close"
+									commandfor="filter-dialog" id="filter-close" type="button">완료</button>
 							</div>
 						</dialog>
 					</div>
@@ -2829,8 +2830,9 @@
 	<dialog aria-labelledby="supp-title" id="supp-dialog">
 		<form class="supp-form" id="supp-form" novalidate>
 			<div class="sheet-heading">
-				<h2 id="supp-title">보조 난수값 추가</h2><button aria-label="보조 난수 입력 중단" class="icon-button" id="supp-dismiss"
-					type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+				<h2 id="supp-title">보조 난수값 추가</h2><button aria-label="보조 난수 입력 중단" class="icon-button"
+					command="request-close" commandfor="supp-dialog" id="supp-dismiss" type="button"><svg
+						aria-hidden="true" viewBox="0 0 24 24">
 						<path d="m6 6 12 12M6 18 18 6" />
 					</svg></button>
 			</div>
@@ -2853,16 +2855,16 @@
 	</dialog>
 	<dialog aria-labelledby="sheet-title" id="detail-sheet">
 		<div class="sheet-heading">
-			<h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" id="close-detail"
-				type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+			<h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" command="close"
+				commandfor="detail-sheet" id="close-detail" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
 	</dialog>
 	<dialog aria-labelledby="help-title" id="help-dialog">
 		<div class="sheet-heading">
-			<h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" id="close-help"
-				type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+			<h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" command="close"
+				commandfor="help-dialog" id="close-help" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2929,7 +2931,7 @@
 		const on = (target, event, listener, options) => target.addEventListener(event, listener, options);
 		const query = (selector, within = document) => within.querySelector(selector);
 		const queryAll = (selector, within = document) => within.querySelectorAll(selector);
-		const NO_SCROLL = { preventScroll: true };
+		const NO_SCROLL = {preventScroll: true};
 		const COORD_REGEX =
 			/(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])|(?:대한민국|세계)\s*위경도/g;
 		const csvEsc = (s) => {
@@ -2979,7 +2981,7 @@
 			const cityDistrict = fields.cityDistrict || fields.district ||
 				fields.suburb;
 			const level6 = fields.level6 || fields.level7;
-			const { city, county } = fields;
+			const {city, county} = fields;
 			let sido = fields.level4 || fields.state;
 			let sigungu = "";
 			if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) sido = city;
@@ -3025,7 +3027,7 @@
 					(name.endsWith("가") && "0123456789".includes(name.at(-2))))
 					eupmyeon.push(name);
 			}
-			return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
+			return {sido, sigungu, eupmyeon: eupmyeon.join(" ")};
 		}
 		function removeDistrict(sigungu, district) {
 			if (!sigungu || sigungu === district) return "";
@@ -3040,7 +3042,7 @@
 			const primary = fields.name || p0;
 			const cityDistrict = fields.cityDistrict || fields.district ||
 				fields.suburb;
-			const { city, county } = fields;
+			const {city, county} = fields;
 			const sido = fields.level4 || fields.state || fields.region ||
 				fields.province || county || city;
 			const cityLike = pickAdmin(
@@ -3074,7 +3076,7 @@
 				eupmyeon = districtName;
 				sigungu = removeDistrict(sigungu, districtName);
 			}
-			return { sido, sigungu, eupmyeon };
+			return {sido, sigungu, eupmyeon};
 		}
 		function getAdmin(fields, country, p0, p1) {
 			const adminCountry = fields.level2;
@@ -3110,7 +3112,7 @@
 				? data.features[0]?.properties?.geocoding : null;
 			if (!gc)
 				return {
-					addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" },
+					addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""},
 				};
 			const label = text(gc.label);
 			const country = text(gc.country_code).toLowerCase();
@@ -3148,7 +3150,7 @@
 			const labelParts = label.split(",").map(part => part.trim());
 			const firstPart = labelParts[0];
 			const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
-			const { sido, sigungu, eupmyeon } = getAdmin(
+			const {sido, sigungu, eupmyeon} = getAdmin(
 				fields, country, p0, p1,
 			);
 			let tag = fields.name || firstPart || fields.street || fields.city;
@@ -3162,7 +3164,7 @@
 				tag.length > CONFIG.TEXT_HARD_LIMIT)
 				throw new InputError(TEXT_LIMIT_MESSAGE);
 			return {
-				addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
+				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
 				kind,
 			};
 		}
@@ -3193,13 +3195,13 @@
 			const btn = e.source;
 			if (!btn?.matches("button.map-btn")) return;
 			const r = state.records[Number(btn.dataset.idx)];
-			const { latStr: lat, lonStr: lon } = r;
+			const {latStr: lat, lonStr: lon} = r;
 			const lat6 = fmtCoord6(lat), lon6 = fmtCoord6(lon);
 			for (let i = 0; i < MAP_NAMES.length; i++)
 				mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
 		});
 		const fmt =
-			new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format;
+			new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format;
 		const COORD_DECIMALS = 6;
 		const COORD_POW = 10 ** COORD_DECIMALS;
 		const fmtCoord6 = (v) => {
@@ -3299,7 +3301,7 @@
 			};
 			const hasFields = Object.values(fields).some(Boolean);
 			return filterStatus === "all" && !query && !hasFields
-				? null : { status: filterStatus, ...fields, query, hasFields };
+				? null : {status: filterStatus, ...fields, query, hasFields};
 		}
 		let filterState = readFilters();
 		function matchesFilter(r, f) {
@@ -3366,7 +3368,7 @@
 			pageKey = key;
 			const current = state.page + 1;
 			const numbers = pageCount <= 7
-				? Array.from({ length: pageCount }, (_, i) => i + 1)
+				? Array.from({length: pageCount}, (_, i) => i + 1)
 				: current <= 4 ? [1, 2, 3, 4, 5, 0, pageCount]
 					: current >= pageCount - 3
 						? [1, 0, pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
@@ -3411,7 +3413,7 @@
 			announcePage();
 			if (mobileMedia.matches && document.body.dataset.mobiletab === "results") {
 				query(".location-button", resultBody)?.focus(NO_SCROLL);
-				tableWrap.scrollIntoView({ block: "start" });
+				tableWrap.scrollIntoView({block: "start"});
 				mobileScroll.results = window.scrollY;
 			}
 		}
@@ -3621,7 +3623,7 @@
 				(next.disabled ? statusText : next).focus(NO_SCROLL);
 			}
 		}
-		const srStatus = { msg: null, progressBucket: -1 };
+		const srStatus = {msg: null, progressBucket: -1};
 		const statusAnnouncement = byId("status-announcement");
 		function announceStatus(text) {
 			if (srStatus.msg === text) return;
@@ -3723,7 +3725,7 @@
 				return Promise.resolve();
 			}
 			return new Promise((resolve) => {
-				on((AbortSignal.any([signal, AbortSignal.timeout(ms)])), "abort", resolve, { once: true });
+				on((AbortSignal.any([signal, AbortSignal.timeout(ms)])), "abort", resolve, {once: true});
 			}).then(() => {
 				signal.throwIfAborted();
 			});
@@ -3747,7 +3749,7 @@
 				const queue = [];
 				channel.port1.onmessage = () => queue.shift()();
 				return () => {
-					const { promise, resolve } = Promise.withResolvers();
+					const {promise, resolve} = Promise.withResolvers();
 					queue.push(resolve);
 					channel.port2.postMessage(0);
 					return promise;
@@ -3756,9 +3758,9 @@
 		const cancelReader = (readable) => readable?.cancel().catch(() => { });
 		async function* lineIterator(stream, signal) {
 			const reader = stream.getReader();
-			const decoder = new TextDecoder("utf-8", { fatal: true });
-			const abort = () => { void cancelReader(reader); };
-			on(signal, "abort", abort, { once: true });
+			const decoder = new TextDecoder("utf-8", {fatal: true});
+			const abort = () => {void cancelReader(reader);};
+			on(signal, "abort", abort, {once: true});
 			const parts = [];
 			let length = 0, trailingCr = false;
 			let skippedLines = 0;
@@ -3780,13 +3782,13 @@
 			try {
 				for (; ;) {
 					signal.throwIfAborted();
-					const { value, done } = await reader.read();
+					const {value, done} = await reader.read();
 					signal.throwIfAborted();
 					let chunk;
 					try {
-						chunk = decoder.decode(value, { stream: !done });
+						chunk = decoder.decode(value, {stream: !done});
 					} catch (err) {
-						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", { cause: err });
+						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", {cause: err});
 					}
 					if (!chunk && !done) continue;
 					let start = 0;
@@ -3907,7 +3909,7 @@
 				}
 				invalidCount += invalid;
 			}
-			return { records: out, invalidCount };
+			return {records: out, invalidCount};
 		}
 		const parsedCache = new Map();
 		const PARSED_CACHE_MAX = 5_000;
@@ -3930,7 +3932,7 @@
 		let cacheRetryAt = 0;
 		const CACHE_OPEN_RETRY_MS = 5_000;
 		const NO_CACHE_DB = Promise.resolve(null);
-		cacheChannel.onmessage = ({ data }) => {
+		cacheChannel.onmessage = ({data}) => {
 			if (!Array.isArray(data) || data.length !== 2) return;
 			const [phase, token] = data;
 			if (typeof token !== "string") return;
@@ -3959,7 +3961,7 @@
 		}
 		function putMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
 			parsedCache.delete(cacheKey);
-			parsedCache.set(cacheKey, { parsed, savedAt });
+			parsedCache.set(cacheKey, {parsed, savedAt});
 			if (parsedCache.size > PARSED_CACHE_MAX)
 				parsedCache.delete(parsedCache.keys().next().value);
 		}
@@ -3995,7 +3997,7 @@
 					const db = req.result;
 					let store;
 					if (!db.objectStoreNames.contains(CONFIG.CACHE_STORE))
-						store = db.createObjectStore(CONFIG.CACHE_STORE, { keyPath: "key" });
+						store = db.createObjectStore(CONFIG.CACHE_STORE, {keyPath: "key"});
 					else
 						store = req.transaction.objectStore(CONFIG.CACHE_STORE);
 					if (event.oldVersion < 3)
@@ -4063,7 +4065,7 @@
 							: tx.error ??
 							new Error("Reverse geocoding cache transaction aborted."),
 					);
-					on(signal, "abort", onAbort, { once: true });
+					on(signal, "abort", onAbort, {once: true});
 					if (signal.aborted) onAbort();
 					else operation(tx.objectStore(CONFIG.CACHE_STORE));
 				} catch (err) {
@@ -4141,8 +4143,8 @@
 					signal,
 					(store) => {
 						const savedAt = Date.now();
-						for (const { cacheKey, parsed } of entries)
-							store.put({ key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed });
+						for (const {cacheKey, parsed} of entries)
+							store.put({key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed});
 						if (maintain) pruneCache(store, rows => prunedRows = rows);
 					},
 				);
@@ -4203,11 +4205,11 @@
 		}
 		function decodeResponse(decoder, value, stream) {
 			try {
-				return decoder.decode(value, { stream });
+				return decoder.decode(value, {stream});
 			} catch (err) {
 				throw new SyntaxError(
 					"역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.",
-					{ cause: err },
+					{cause: err},
 				);
 			}
 		}
@@ -4219,7 +4221,7 @@
 				throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
 			}
 			if (!response.body) return "";
-			const decoder = new TextDecoder("utf-8", { fatal: true });
+			const decoder = new TextDecoder("utf-8", {fatal: true});
 			const reader = response.body.getReader();
 			const parts = [];
 			let bytesRead = 0;
@@ -4265,7 +4267,7 @@
 				try {
 					report(attempt === 1 ? "조회 중…" : `재시도 ${attempt}/${maxRetry}`);
 					res = await fetch(url, {
-						headers: { Accept: "application/json" },
+						headers: {Accept: "application/json"},
 						referrerPolicy: "strict-origin-when-cross-origin",
 						signal: requestSignal,
 					});
@@ -4276,7 +4278,7 @@
 							requestSignal.reason?.name === "TimeoutError"
 								? "주소 조회 응답 시간이 초과되었습니다. 잠시 후 다시 조회해 주세요."
 								: "주소 조회 서버에 연결하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 조회해 주세요.",
-							{ cause: e },
+							{cause: e},
 						);
 					report("재연결 대기…", true);
 					await sleep(baseDelayMs * attempt, userSignal);
@@ -4290,7 +4292,7 @@
 						} catch (err) {
 							throw new SyntaxError(
 								"역지오코딩 응답이 올바른 JSON 형식이 아닙니다.",
-								{ cause: err },
+								{cause: err},
 							);
 						}
 					} catch (e) {
@@ -4328,7 +4330,7 @@
 		) {
 			state.setStatus("paused");
 			showStatus(message, type);
-			const { promise, resolve } = Promise.withResolvers();
+			const {promise, resolve} = Promise.withResolvers();
 			task.resume = resolve;
 			scheduleRender();
 			await promise;
@@ -4439,7 +4441,7 @@
 							);
 							signal.throwIfAborted();
 							putMemoryCache(cacheKey, parsed);
-							cacheBatch.push({ cacheKey, parsed });
+							cacheBatch.push({cacheKey, parsed});
 							if (cacheBatch.length >= CACHE_WRITE_LIMIT)
 								await flushCache();
 						}
@@ -4514,10 +4516,10 @@
 			return !!(addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag));
 		}
 		const resultStatus = result => result.error ? "failed" : hasAddress(result) ? "done" : "missing";
-		const KIND_LABELS = { KR: "대한민국", KP: "북한", WORLD: "세계", 에러: "조회 실패" };
+		const KIND_LABELS = {KR: "대한민국", KP: "북한", WORLD: "세계", 에러: "조회 실패"};
 		const kindLabel = kind => KIND_LABELS[kind] || kind;
-		const STATUS_LABELS = { done: "주소 확인", missing: "주소 없음", failed: "조회 실패" };
-		function resultTitle({ addr, error }) {
+		const STATUS_LABELS = {done: "주소 확인", missing: "주소 없음", failed: "조회 실패"};
+		function resultTitle({addr, error}) {
 			return error ? "조회 실패" :
 				[addr.sido, addr.sigungu].filter(Boolean).join(" ") || addr.fullAddr || "주소 정보 없음";
 		}
@@ -4630,7 +4632,7 @@
 					flushChunk();
 					ensureCurrent();
 					downloadBlob(
-						new Blob(parts, { type: "text/csv;charset=utf-8" }),
+						new Blob(parts, {type: "text/csv;charset=utf-8"}),
 						`${sourceFile.name.replace(/\.[^.]+$/, "")
 						}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`,
 					);
@@ -4649,12 +4651,12 @@
 		async function handleParse() {
 			const file = state.pendingFile || state.droppedFile;
 			if (!file) return showStatus("파일을 선택해 주세요.", "warn");
-			const task = { status: "parsing", controller: new AbortController(), resume: null };
+			const task = {status: "parsing", controller: new AbortController(), resume: null};
 			state.task = task;
 			updateUIState();
 			showStatus("좌표 추출 중…");
 			try {
-				const { records, invalidCount } = await parseFile(
+				const {records, invalidCount} = await parseFile(
 					file,
 					task.controller.signal,
 				);
@@ -4716,7 +4718,7 @@
 			try {
 				if (!navigator.clipboard || !isSecureContext) throw new Error("HTTPS 연결에서 사용할 수 있습니다.");
 				await navigator.clipboard.writeText(
-					state.records.map(({ latStr, lonStr }) => `${latStr}, ${lonStr}`).join("\n"),
+					state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"),
 				);
 				if (generation === state.generation) showNotice("좌표 복사됨");
 			} catch (error) {
@@ -4770,7 +4772,7 @@
 					state.bulkConfirmed = await new Promise(resolve => {
 						bulkDialog.returnValue = "";
 						const onClose = () => resolve(bulkDialog.returnValue === "confirm");
-						on(bulkDialog, "close", onClose, { once: true });
+						on(bulkDialog, "close", onClose, {once: true});
 						bulkDialog.showModal();
 					});
 					if (!state.bulkConfirmed) {
@@ -5012,7 +5014,7 @@
 		function* convertNumber(num) {
 			const data = createDataSet(num);
 			let complete = fillNumbers(num, data);
-			const supplement = { current: null };
+			const supplement = {current: null};
 			for (
 				let attempt = 0;
 				!complete && attempt < SUPPLEMENT_LIMIT;
@@ -5275,7 +5277,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 						? active
 						: runBtn;
 				}
-				const { promise, resolve } = Promise.withResolvers();
+				const {promise, resolve} = Promise.withResolvers();
 				suppRequest = resolve;
 				suppValues.value = "";
 				clearSupplementError();
@@ -5306,14 +5308,13 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				} catch (err) {
 					setSupplementError(errorMessage(err));
 					suppValues.focus(NO_SCROLL);
-					suppValues.closest(".field").scrollIntoView({ block: "center" });
+					suppValues.closest(".field").scrollIntoView({block: "center"});
 				}
 			});
 			on(suppDialog, "cancel", (event) => {
 				event.preventDefault();
 				finishSupplement(null);
 			});
-			on(byId("supp-dismiss"), "click", () => finishSupplement(null));
 			let chunks = [];
 			let manualBusy = false;
 			let copyTask = null;
@@ -5385,7 +5386,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 								supplied = supplements.next();
 							}
 							used++;
-							step = conversion.next({ value: supplied.value, bitsRemaining: 64 });
+							step = conversion.next({value: supplied.value, bitsRemaining: 64});
 						}
 						if (cancelled) break;
 						suppCount += used;
@@ -5434,14 +5435,14 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							!focusTarget.matches(":disabled")
 						) {
 							focusTarget.focus(NO_SCROLL);
-							if (focusTarget.ariaInvalid === "true") focusTarget.closest(".field").scrollIntoView({ block: "center" });
+							if (focusTarget.ariaInvalid === "true") focusTarget.closest(".field").scrollIntoView({block: "center"});
 						}
 					}
 				}
 			});
 			on(useOutput, "click", async () => {
 				if (!outputReady || state.task !== null) return;
-				const file = new File([outputBlob(chunks, false)], "random_data.txt", { type: "text/plain" });
+				const file = new File([outputBlob(chunks, false)], "random_data.txt", {type: "text/plain"});
 				if (!acceptInputFile(file)) return;
 				if (await handleParse()) {
 					setInputMode("file");
@@ -5527,11 +5528,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		let noticeFocus = null;
 		let detailFocus = null;
 		let layoutFocus = null;
-		on(document, "focusin", ({ target }) => {
+		on(document, "focusin", ({target}) => {
 			layoutFocus = jobPanel.contains(target) ? target : null;
 		});
-		on(document, "pointerdown", () => { layoutFocus = null; }, { passive: true });
-		on(window, "blur", () => { layoutFocus = null; });
+		on(document, "pointerdown", () => {layoutFocus = null;}, {passive: true});
+		on(window, "blur", () => {layoutFocus = null;});
 		function setInputMode(mode) {
 			const manual = mode === "manual";
 			filePane.hidden = manual;
@@ -5616,7 +5617,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			alignPopover(settings, settingsBtn);
 		});
 		on(byId("settings-close"), "click", () => closeSettings());
-		on(settings, "close", () => { settingsBtn.ariaExpanded = "false"; });
+		on(settings, "close", () => {settingsBtn.ariaExpanded = "false";});
 		on(settings, "cancel", event => {
 			event.preventDefault();
 			closeSettings();
@@ -5636,8 +5637,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			for (const [panel, trigger] of popoverAnchors) alignPopover(panel, trigger);
 		}
 		for (const event of ["resize", "scroll"])
-			on(window, event, alignPopovers, { passive: true });
-		const mobileScroll = { input: 0, results: 0 };
+			on(window, event, alignPopovers, {passive: true});
+		const mobileScroll = {input: 0, results: 0};
 		function setMobileView(view) {
 			const nextView = view === "results" ? "results" : "input";
 			if (mobileMedia.matches) mobileScroll[document.body.dataset.mobiletab] = window.scrollY;
@@ -5729,7 +5730,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const retaining = filterViewportState && (filterDialog.contains(active) || active === document.body);
 			if (!filterViewport || filterViewportPaused || !filterDialog.open ||
 				!filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
-			const { width, height, offsetLeft, offsetTop, scale } = filterViewport;
+			const {width, height, offsetLeft, offsetTop, scale} = filterViewport;
 			const layoutWidth = innerWidth, layoutHeight = innerHeight;
 			if (![width, height, offsetLeft, offsetTop, scale, layoutWidth, layoutHeight].every(Number.isFinite) ||
 				width <= 0 || height <= 0 || scale <= 0 || layoutWidth <= 0 || layoutHeight <= 0 ||
@@ -5750,8 +5751,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		if (filterViewport) {
 			for (const event of ["focusin", "focusout"]) on(filterDialog, event, scheduleFilterViewport);
 			for (const event of ["resize", "scroll"])
-				on(filterViewport, event, scheduleFilterViewport, { passive: true });
-			on(window, "resize", scheduleFilterViewport, { passive: true });
+				on(filterViewport, event, scheduleFilterViewport, {passive: true});
+			on(window, "resize", scheduleFilterViewport, {passive: true});
 			on(window, "pageshow", () => {
 				filterViewportPaused = false;
 				scheduleFilterViewport();
@@ -5763,9 +5764,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			filterTrigger.ariaExpanded = "true";
 			filterSido.focus(NO_SCROLL);
 		});
-		function closeFilters() { if (filterDialog.open) filterDialog.close(); }
-		on(byId("filter-close"), "click", closeFilters);
-		on(byId("filter-dismiss"), "click", closeFilters);
+		function closeFilters() {if (filterDialog.open) filterDialog.close();}
 		on(filterDialog, "close", () => {
 			clearFilterViewport();
 			filterTrigger.ariaExpanded = "false";
@@ -5854,7 +5853,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			if (record !== selection) {
 				selectedIndex = index;
 				selection = record;
-				const { addr, error } = record.result;
+				const {addr, error} = record.result;
 				unloadMap();
 				mapPopover.hidePopover();
 				const title = resultTitle(record.result);
@@ -5909,13 +5908,12 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			buttons[next].focus();
 			selectRecord(Number(buttons[next].dataset.record), false);
 		});
-		on(byId("close-detail"), "click", () => detailSheet.close());
 		let detailSwipe = null;
 		on(detailSheet, "touchstart", event => {
 			detailSwipe = null;
 			if (!mobileMedia.matches || !event.target.closest(".sheet-heading") || event.touches.length !== 1) return;
-			detailSwipe = { x: event.touches[0].clientX, y: event.touches[0].clientY };
-		}, { passive: true });
+			detailSwipe = {x: event.touches[0].clientX, y: event.touches[0].clientY};
+		}, {passive: true});
 		on(detailSheet, "touchend", event => {
 			const start = detailSwipe;
 			detailSwipe = null;
@@ -5923,8 +5921,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const dx = event.changedTouches[0].clientX - start.x;
 			const dy = event.changedTouches[0].clientY - start.y;
 			if (dy > 80 && dy > Math.abs(dx) * 1.4) detailSheet.close();
-		}, { passive: true });
-		on(detailSheet, "touchcancel", () => { detailSwipe = null; }, { passive: true });
+		}, {passive: true});
+		on(detailSheet, "touchcancel", () => {detailSwipe = null;}, {passive: true});
 		on(detailSheet, "close", () => {
 			detailSwipe = null;
 			mapPopover.hidePopover();
@@ -6016,7 +6014,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			closeSettings(false);
 			helpDialog.showModal();
 		});
-		on(byId("close-help"), "click", () => helpDialog.close());
 		on(helpDialog, "close", () => {
 			if (helpFocus?.getClientRects().length) helpFocus.focus(NO_SCROLL);
 			helpFocus = null;

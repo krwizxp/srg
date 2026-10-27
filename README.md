@@ -64,7 +64,7 @@ srg time-observe <host> <seconds>
 
 ## revgeo.html
 
-`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 단일 HTML 도구입니다.
+`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 단일 HTML 도구입니다. 최신 정식 Chrome, Edge, Firefox, Safari를 지원 기준으로 사용합니다.
 
 브라우저와 홈 화면 아이콘은 `icon.svg` 한 파일을 사용합니다. iOS/iPadOS에서는 SVG 아이콘을 지원하는 Safari 26 이상을 기준으로 합니다.
 
