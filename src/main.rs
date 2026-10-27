@@ -80,14 +80,14 @@ fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) 
 fn main() -> Result<()> {
     let mut args = env::args_os().skip(1);
     if let Some(first) = args.next() {
-        if first == OsStr::new("-h") || first == OsStr::new("--help") {
+        if first == "-h" || first == "--help" {
             if let Some(extra) = args.next() {
                 return Err(unknown_option("알 수 없는 도움말 옵션", &extra));
             }
             output::write_slice_to_console(HELP_TEXT.as_bytes())?;
             return Ok(());
         }
-        if first == OsStr::new("--version") {
+        if first == "--version" {
             if let Some(extra) = args.next() {
                 return Err(unknown_option("알 수 없는 --version 옵션", &extra));
             }
