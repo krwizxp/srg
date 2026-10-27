@@ -1439,15 +1439,7 @@
 			box-shadow: 0 20px 60px #0003
 		}
 
-		.settings-button {
-			anchor-name: --settings-trigger
-		}
-
-		#detail-map-links {
-			anchor-name: --map-trigger
-		}
-
-		.map-popover,
+.map-popover,
 		.settings {
 			position: fixed;
 			inset: auto;
@@ -1457,29 +1449,20 @@
 
 		.settings {
 			--popover-width: 300px;
-			position-anchor: --settings-trigger;
-			width: var(--popover-width)
+			width: min(var(--popover-width), calc(100vw - 24px))
 		}
 
 		.map-popover {
 			--popover-width: 340px;
-			position-anchor: --map-trigger;
 			width: min(var(--popover-width), calc(100vw - 24px))
 		}
-
-		@position-try --popover-viewport {
-			top: 12px;
-			bottom: auto
-		}
-
 		@media (min-width:801px) {
 
 			.map-popover,
 			.settings {
-				top: max(12px, calc(anchor(bottom, 0px) + 8px));
-				right: clamp(12px, anchor(right, 12px), calc(100vw - var(--popover-width) - 12px));
-				margin-bottom: 12px;
-				position-try-fallbacks: flip-block, --popover-viewport
+				inset: 12px 12px auto auto;
+				max-height: calc(100dvh - 24px);
+				overscroll-behavior: contain
 			}
 		}
 
@@ -5608,28 +5591,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 		}
 		const settings = byId("display-settings");
 		const settingsBtn = query(".settings-button");
-		function fitPopover(panel, trigger) {
-			if (!(panel.open || panel.matches(":popover-open"))) return;
-			for (const key of ["position-anchor", "position-try-fallbacks", "left", "right", "top", "bottom"]) panel.style.removeProperty(key);
-			if (mobileMedia.matches) return;
-			const rect = panel.getBoundingClientRect();
-			const anchor = trigger.getBoundingClientRect();
-			if (anchor.top >= 0 && anchor.bottom <= innerHeight && rect.left >= 12 && rect.top >= 12 && rect.right <= innerWidth - 12 && rect.bottom <= innerHeight - 12) return;
-			panel.style.positionAnchor = "auto";
-			panel.style.positionTryFallbacks = "none";
-			panel.style.bottom = "auto";
-			panel.style.right = "auto";
-			panel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - rect.width - 12))}px`;
-			panel.style.top = `${Math.max(12, Math.min(rect.top, innerHeight - rect.height - 12))}px`;
-		}
-		on(mapPopover, "toggle", event => {
-			if (event.newState === "open") fitPopover(mapPopover, mapLinks);
-		});
-		for (const event of ["resize", "scroll"])
-			on(window, event, () => {
-				fitPopover(settings, settingsBtn);
-				fitPopover(mapPopover, mapLinks);
-			}, {passive: true});
 		function closeSettings(restoreFocus = true) {
 			if (!settings.open) return;
 			const ownedFocus = settings.contains(document.activeElement) ||
@@ -5643,7 +5604,6 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			if (mobileMedia.matches) settings.showModal();
 			else settings.show();
 			settingsBtn.ariaExpanded = "true";
-			fitPopover(settings, settingsBtn);
 		});
 		on(byId("settings-close"), "click", () => closeSettings());
 		on(settings, "close", () => {settingsBtn.ariaExpanded = "false";});
