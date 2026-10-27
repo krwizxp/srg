@@ -1439,7 +1439,7 @@
 			box-shadow: 0 20px 60px #0003
 		}
 
-.map-popover,
+		.map-popover,
 		.settings {
 			position: fixed;
 			inset: auto;
@@ -1456,6 +1456,7 @@
 			--popover-width: 340px;
 			width: min(var(--popover-width), calc(100vw - 24px))
 		}
+
 		@media (min-width:801px) {
 
 			.map-popover,
@@ -1463,6 +1464,22 @@
 				inset: 12px 12px auto auto;
 				max-height: calc(100dvh - 24px);
 				overscroll-behavior: contain
+			}
+		}
+
+		@media (min-width:801px) {
+
+			body:has(#display-settings[open]) .settings-button,
+			body:has(#map-popover:popover-open) #detail-map-links {
+				background: var(--tint);
+				border-color: var(--accent);
+				color: var(--accent);
+				box-shadow: 0 0 0 2px var(--tint)
+			}
+
+			#display-settings[open],
+			#map-popover:popover-open {
+				border: 2px solid var(--accent)
 			}
 		}
 
