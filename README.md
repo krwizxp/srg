@@ -64,7 +64,7 @@ srg time-observe <host> <seconds>
 
 ## revgeo.html
 
-`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 단일 HTML 도구입니다. 최신 정식 Chrome, Edge, Firefox, Safari를 지원 기준으로 사용합니다.
+`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 HTML 도구입니다. 기존 파일의 좌표 추출·주소 조회는 경계 데이터 없이도 동작합니다. 난수의 국내 좌표 변환에는 `korea_boundary.js`와 `data/korea-boundary-v1/`를 같은 경로 구조로 함께 배포해야 합니다. 최신 정식 Chrome, Edge, Firefox, Safari를 지원 기준으로 사용합니다.
 
 브라우저와 홈 화면 아이콘은 `icon.svg` 한 파일을 사용합니다. iOS/iPadOS에서는 SVG 아이콘을 지원하는 Safari 26 이상을 기준으로 합니다.
 
@@ -96,6 +96,27 @@ srg time-observe <host> <seconds>
 5. 필요한 결과를 필터링하거나 CSV로 저장합니다.
 
 주소 조회는 Nominatim 이용 정책에 맞춰 순차적으로 진행됩니다. 클립보드 기능은 HTTPS 또는 localhost와 같은 브라우저 보안 컨텍스트에서 사용할 수 있습니다.
+
+
+## 대한민국 좌표 경계
+
+국내 좌표는 SGIS 2025년 6월 30일 행정경계에 한국환경연구원 공개 군사분계선·DMZ 경계를 반영한 영역에서 추출합니다. 남측 내륙 누락 약 38.06km²를 복원하고 북측 참고 영역 약 42.27km²를 제외한 보정본을 사용합니다. 동해안의 기존 해안선 밖 약 0.371km²는 판정 미확정 영역으로 추가하지 않았습니다. 현행 작전 경계나 민간인 출입 가능 구역을 인증하는 데이터는 아닙니다. 원본 SGIS의 내륙 하천·호수 포함 정책도 유지합니다.
+
+13,701개 폴리곤 성분과 내부 구멍을 보존하고, 정점 단순화 없이 5,165,448개 삼각형으로 분할했습니다. 독도·마라도·서북도서를 포함하며, 폴리곤 성분 수를 섬 개수로 해석하면 안 됩니다. 자료 출처는 [SGIS](https://www.data.go.kr/data/15129688/fileData.do), [한국환경연구원 군사분계선](https://data.neins.go.kr/detail/dts-eh03eVuTQu), [DMZ](https://data.neins.go.kr/detail/dts-FeJLArLgg1)입니다. KEI 메타데이터의 작성연도는 2024이며 측량 기준일은 확인되지 않았습니다. 데이터의 원제공기관과 이용조건은 프로그램의 MIT 라이선스와 구분합니다.
+
+삼각형 선택은 GRS80 측지 면적을 정수 가중치로 변환한 64비트 누적 구간을 사용합니다. 각 구간의 잔여 정수를 Hammersley 점 배열에 대응한 뒤 삼각형 안으로 반사합니다. 부동소수점 반올림으로 경계 밖에 걸치는 것을 줄이기 위해 각 무게에 2⁻²⁰의 최소 여유를 둡니다. 하나의 기본 `num_64`만 사용하므로 국내 좌표 때문에 보완 난수를 추가 소비하거나 경계 밖 후보를 반복 추출하지 않습니다. 유한한 결정적 점 배열이며, 독립적인 연속 난수 두 개를 새로 사용하는 방식이나 타원체 표면의 엄밀한 연속 균등 분포를 보장하는 방식은 아닙니다. 다른 필드 및 보완 난수 소비 순서는 유지됩니다.
+
+이전 버전과 같은 `num_64`를 변환해도 국내 좌표는 달라집니다. 기존 `random_data.txt`에 저장된 좌표 자체를 불러오는 기능은 그대로 사용합니다.
+
+경계 데이터는 총 약 104MB입니다. 삼각형 조회·압축 해제 비용이 추가되므로 기존 직사각형 계산보다 처리 시간은 늘어납니다. Rust 실행 파일에는 전체 데이터를 내장해 별도 파일·네트워크 연결 없이 사용합니다. 웹은 512KiB 이하의 압축 조각을 필요할 때 읽고 최대 8개 조각과 128개 해제 블록만 유지합니다. 큰 삼각형을 앞쪽에 배치해 일반적인 변환에서 읽는 조각 수를 줄였습니다. 경계 파일이 없거나 손상되면 오류를 표시하며 직사각형 좌표로 대체하지 않습니다. 경계 스냅샷을 갱신할 때는 경로의 버전도 올려 기존 브라우저 캐시와 섞이지 않게 해야 합니다.
+
+보정과 삼각형 데이터 생성은 다음과 같이 재현할 수 있습니다. 원본 시도 SHP 세트와 KEI MDL·DMZ ZIP이 필요합니다. 각 입력의 기준·해시와 산출물 해시는 보정 보고서 및 `data/korea-boundary-v1/manifest.json`에 기록합니다.
+
+```bash
+python -m pip install -r tools/requirements-korea.txt
+python tools/correct_korea_boundary.py --sgis-dir SGIS --kei-mdl mdl.zip --kei-dmz dmz.zip --out-dir corrected
+python tools/build_korea_boundary.py corrected/land_mask_5179.shp
+```
 
 ## GitHub Actions
 
