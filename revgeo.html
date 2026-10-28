@@ -2164,6 +2164,12 @@
 				max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
 			}
 
+			#detail-sheet>.sheet-heading {
+				touch-action: none;
+				user-select: none;
+				cursor: grab
+			}
+
 			#detail-sheet>.sheet-heading::before {
 				content: "";
 				position: absolute;
@@ -3246,10 +3252,6 @@
 			`https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
 		const CACHE_KEY_PREFIX =
 			`geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
-		const CSV_CREDITS =
-			",\u00A9 OpenStreetMap contributors (https://www.openstreetmap.org/copyright)," +
-			"Open Database License (ODbL) (https://opendatacommons.org/licenses/odbl/)," +
-			"Reverse geocoding by Nominatim (https://nominatim.org/)";
 		const mapPopover = byId("map-popover");
 		const mapAnchors = queryAll("#map-popover-links a");
 		const MAP_NAMES = ["Google", "OSM", "Naver", "Kakao"];
@@ -3548,7 +3550,7 @@
 			scheduleFilter();
 		}
 		const CSV_HEADER =
-			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,데이터 출처,라이선스,역지오코딩" +
+			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소" +
 			MAP_NAMES.map((key) => "," + `지도링크(${key})`).join("");
 		let downloadUrl = null;
 		let exportTask = null;
@@ -4686,7 +4688,7 @@
 						const addr = result.addr;
 						line += (addr
 							? [addr.sido, addr.sigungu, addr.eupmyeon, addr.tag].map(csvEsc).join(",")
-							: ",,,") + "," + csvEsc(result.error || addr.fullAddr) + CSV_CREDITS;
+							: ",,,") + "," + csvEsc(result.error || addr.fullAddr);
 						const lat6 = fmtCoord6(lat);
 						const lon6 = fmtCoord6(lon);
 						for (let k = 0; k < MAP_NAMES.length; k++) {
@@ -5940,23 +5942,59 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			buttons[next].focus();
 			selectRecord(Number(buttons[next].dataset.record), false);
 		});
-		let detailSwipe = null;
-		on(detailSheet, "touchstart", event => {
-			detailSwipe = null;
-			if (!mobileMedia.matches || !event.target.closest(".sheet-heading") || event.touches.length !== 1) return;
-			detailSwipe = {x: event.touches[0].clientX, y: event.touches[0].clientY};
-		}, {passive: true});
-		on(detailSheet, "touchend", event => {
-			const start = detailSwipe;
-			detailSwipe = null;
-			if (!start || !mobileMedia.matches || !detailSheet.open || event.changedTouches.length !== 1) return;
-			const dx = event.changedTouches[0].clientX - start.x;
-			const dy = event.changedTouches[0].clientY - start.y;
-			if (dy > 80 && dy > Math.abs(dx) * 1.4) detailSheet.close();
-		}, {passive: true});
-		on(detailSheet, "touchcancel", () => {detailSwipe = null;}, {passive: true});
+		const detailHeading = query(".sheet-heading", detailSheet);
+		let detailDrag = null;
+		let detailMotion = null;
+		function resetDetailDrag() {
+			const pointerId = detailDrag?.id;
+			detailDrag = null;
+			detailMotion?.cancel();
+			detailMotion = null;
+			detailSheet.style.removeProperty("translate");
+			if (pointerId !== undefined && detailHeading.hasPointerCapture(pointerId))
+				detailHeading.releasePointerCapture(pointerId);
+		}
+		function finishDetailDrag(event, dismiss = false) {
+			if (!detailDrag || event.pointerId !== detailDrag.id) return;
+			const offset = detailDrag.offset;
+			resetDetailDrag();
+			if (!detailSheet.open || !mobileMedia.matches) return;
+			const motion = detailSheet.animate([
+				{translate: `0 ${offset}px`},
+				{translate: `0 ${dismiss ? detailSheet.offsetHeight : 0}px`},
+			], {duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180, easing: "ease-out"});
+			detailMotion = motion;
+			motion.finished.then(() => {
+				if (detailMotion !== motion) return;
+				detailMotion = null;
+				if (dismiss && detailSheet.open) detailSheet.close();
+			}, () => { });
+		}
+		on(detailHeading, "pointerdown", event => {
+			if (!mobileMedia.matches || !detailSheet.open || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
+			event.preventDefault();
+			const offset = parseFloat(getComputedStyle(detailSheet).translate.split(" ")[1]) || 0;
+			resetDetailDrag();
+			detailDrag = {id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset};
+			detailSheet.style.translate = `0 ${offset}px`;
+			detailHeading.setPointerCapture(event.pointerId);
+		});
+		on(window, "pointermove", event => {
+			if (!detailDrag || event.pointerId !== detailDrag.id) return;
+			if (!(event.buttons & 1)) return finishDetailDrag(event);
+			detailDrag.offset = Math.max(0, detailDrag.startOffset + event.clientY - detailDrag.y);
+			detailSheet.style.translate = `0 ${detailDrag.offset}px`;
+		});
+		on(window, "pointerup", event => {
+			if (!detailDrag || event.pointerId !== detailDrag.id) return;
+			const dx = event.clientX - detailDrag.x, dy = event.clientY - detailDrag.y;
+			finishDetailDrag(event, dy > 80 && dy > Math.abs(dx) * 1.4);
+		});
+		on(window, "pointercancel", finishDetailDrag);
+		on(window, "blur", resetDetailDrag);
+		on(window, "resize", resetDetailDrag);
 		on(detailSheet, "close", () => {
-			detailSwipe = null;
+			resetDetailDrag();
 			mapPopover.hidePopover();
 			unloadMap();
 			inspector.append(detailContent);
