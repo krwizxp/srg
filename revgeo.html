@@ -5409,6 +5409,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 				try {
 					let supplements = u64Tokens(suppInput.value).map(parseU64);
 					let processed = 0;
+					let sampleKorea;
 					let suppCount = 0;
 					const updateProgress = (state) => {
 						const count = Math.min(nextChunks.length, PREVIEW_LIMIT);
@@ -5435,7 +5436,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							);
 						const num = parseU64(token);
 						invalidInput = null;
-						const {sampleKorea} = await import("./korea_boundary.js");
+						sampleKorea ??= (await import("./korea_boundary.js")).sampleKorea;
 						const korea = await sampleKorea(num);
 						if (epoch !== outputEpoch) return;
 						const conversion = convertNumber(num, korea);
