@@ -157,9 +157,11 @@ where
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
         let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
         let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
+        // Bounds rounded to six decimal degrees: north 38°36′38″ (Goseong-gun
+        // History, vol. 2, p. 11); west 124°36′36″ (2025 MOLIT Yearbook, p. 67).
         self.data.kor_coords = Coordinates {
-            latitude: 5.504_167_f64.mul_add(upper_ratio, 33.112_500),
-            longitude: 7.263_056_f64.mul_add(lower_ratio, 124.609_722),
+            latitude: 5.498_056_f64.mul_add(upper_ratio, 33.112_500),
+            longitude: 7.262_778_f64.mul_add(lower_ratio, 124.610_000),
         };
         self.data.world_coords = Coordinates {
             latitude: 180.0_f64.mul_add(upper_ratio, -90.0),

@@ -5164,9 +5164,11 @@
 			const portalBits = bitsView.getUint32(3, false);
 			const upperRatio = upper32 * U32_MAX_INV;
 			const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
+			// Match random_data.rs: north 38°36′38″ and west 124°36′36″,
+			// rounded to six decimal degrees; retain the south and east bounds.
 			data.korea = [
-				affineF64(upperRatio, 6197141112546245n, -50, 4660170083165798n, -47, 33.1125),
-				affineF64(lowerRatio, 8177474073792761n, -50, 8768629649467830n, -46, 124.609722),
+				affineF64(upperRatio, 3095130369107765n, -49, 4660170083165798n, -47, 33.1125),
+				affineF64(lowerRatio, 8177161073618659n, -50, 8768649211978711n, -46, 124.61),
 			];
 			data.world = [
 				affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
