@@ -3499,7 +3499,8 @@
     "Native end-to-end ru_maxrss was contaminated by Python fork high-water memory and is excluded; use separate /proc VmHWM measurement.",
     "Cold network emulation adds 40ms plus body bytes at 20Mbps per module/index/part request; HTML navigation and browser startup excluded.",
     "Warm corpus is 10000 unique coordinates and the same independent entropy seeds, second pass after warm-up, nine interleaved trials.",
-    "Final UI cold measurements use the v2 module URL; stale unversioned module UI test passed on all three engines."
+    "Final UI cold measurements use the v2 module URL; stale unversioned module UI test passed on all three engines.",
+    "Fresh-stream comparison warms on the first 10000 corpus entries and times the next disjoint 10000 entries, nine interleaved trials."
   ],
   "native-memory": [
     {
@@ -3626,5 +3627,304 @@
       "returncode": 1,
       "preserved_directory": true
     }
-  }
+  },
+  "warm-fresh-raw": [
+    {
+      "trial": 0,
+      "variant": "flat128",
+      "ms": 625.3000000007451,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 0,
+      "variant": "hier256",
+      "ms": 529.9000000003725,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 0,
+      "variant": "hier512",
+      "ms": 521.7999999998137,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "hier256",
+      "ms": 578.0999999996275,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "hier512",
+      "ms": 499.6000000005588,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "flat128",
+      "ms": 653.5999999996275,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "hier512",
+      "ms": 483.8999999994412,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "flat128",
+      "ms": 684.1000000005588,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "hier256",
+      "ms": 615.4000000003725,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 3,
+      "variant": "flat128",
+      "ms": 727.5,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 3,
+      "variant": "hier256",
+      "ms": 630.3000000007451,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 3,
+      "variant": "hier512",
+      "ms": 519.8999999994412,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 4,
+      "variant": "hier256",
+      "ms": 538.6999999992549,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 4,
+      "variant": "hier512",
+      "ms": 529.7999999998137,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 4,
+      "variant": "flat128",
+      "ms": 630.6999999992549,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 5,
+      "variant": "hier512",
+      "ms": 512.5,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 5,
+      "variant": "flat128",
+      "ms": 720.2000000001863,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 5,
+      "variant": "hier256",
+      "ms": 554.3999999994412,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 6,
+      "variant": "flat128",
+      "ms": 650.9000000003725,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 6,
+      "variant": "hier256",
+      "ms": 719.2999999998137,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 6,
+      "variant": "hier512",
+      "ms": 566.1000000005588,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 7,
+      "variant": "hier256",
+      "ms": 552,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    },
+    {
+      "trial": 7,
+      "variant": "hier512",
+      "ms": 499.79999999981374,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 7,
+      "variant": "flat128",
+      "ms": 668.2999999998137,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 8,
+      "variant": "hier512",
+      "ms": 534,
+      "decodes": 73,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 318
+      }
+    },
+    {
+      "trial": 8,
+      "variant": "flat128",
+      "ms": 654,
+      "decodes": 355,
+      "coldDecodes": 408,
+      "cache": {
+        "parts": 8,
+        "pages": 128
+      }
+    },
+    {
+      "trial": 8,
+      "variant": "hier256",
+      "ms": 581.5999999996275,
+      "decodes": 81,
+      "coldDecodes": 245,
+      "cache": {
+        "parts": 8,
+        "pages": 256
+      }
+    }
+  ]
 }
