@@ -24,6 +24,7 @@ mod buffmt;
 mod command;
 mod diagnostic;
 mod file_output;
+mod geo_uniform;
 #[cfg(target_arch = "x86_64")]
 mod hardware_rng;
 mod input;

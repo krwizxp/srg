@@ -117,8 +117,13 @@ impl RandomDataSet {
         state.fill_required_fields()?;
         state.fill_lucky_stars()?;
         state.fill_hangul_syllables()?;
-        state.fill_coords()?;
+        state.fill_coords();
         state.fill_nms_fields()?;
+        state.data.kor_coords = korea_boundary::sample(
+            state.data.num_64,
+            state.boundary_cache.as_deref_mut(),
+            state.next_supp,
+        )?;
         state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
         state.data.euro_millions_main_numbers = state.euro_main.into_values();
         state.data.lotto_numbers = state.lotto.into_values();
@@ -158,14 +163,12 @@ impl<F> RandomDataBuildState<'_, F>
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    fn fill_coords(&mut self) -> Result<()> {
+    fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
         let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
         let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
-        self.data.kor_coords =
-            korea_boundary::sample(self.data.num_64, self.boundary_cache.as_deref_mut())?;
         self.data.world_coords = Coordinates {
             latitude: 180.0_f64.mul_add(upper_ratio, -90.0),
             longitude: 360.0_f64.mul_add(lower_ratio, -180.0),
@@ -176,7 +179,6 @@ where
         self.data.galaxy_x = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_xxx);
         self.data.galaxy_y = galaxy_coord::<0x7F, 0xFF>(u16::from(self.data.nms_portal_yy));
         self.data.galaxy_z = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_zzz);
-        Ok(())
     }
     fn fill_hangul_syllables(&mut self) -> Result<()> {
         let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];

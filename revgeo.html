@@ -5083,7 +5083,14 @@
 			}
 			throw supplementLimitError("NMS");
 		}
-		function* convertNumber(num, korea) {
+		let koreaModulePromise;
+		function loadKoreaModule() {
+			return koreaModulePromise ??= import("./korea_boundary.js?v=2").catch(error => {koreaModulePromise = null; throw error;});
+		}
+		function prepareKorea(value) {
+			void loadKoreaModule().then(module => module.prepareKorea(value)).catch(() => { });
+		}
+		async function* convertNumber(num, sampleKorea) {
 			const data = createDataSet(num);
 			let complete = fillNumbers(num, data);
 			const supplement = {current: null};
@@ -5164,7 +5171,6 @@
 			const portalBits = bitsView.getUint32(3, false);
 			const upperRatio = upper32 * U32_MAX_INV;
 			const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
-			data.korea = korea;
 			data.world = [
 				affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
 				affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
@@ -5191,6 +5197,7 @@
 			for (let shift = 28; shift >= 0; shift -= 4)
 				glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
 			data.glyphs = glyphs;
+			data.korea = yield* sampleKorea(num);
 			return data;
 		}
 		function paddedHex(value, width) {
@@ -5286,6 +5293,14 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			const outputContent = query(".code-content", output);
 			const [rngCount, generateNum, generateSupp, autoSupp, rngError, generateDialog] =
 				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-error", "generate-supp-dialog"].map(byId);
+			let prepareTimer;
+			on(window, "pagehide", () => clearTimeout(prepareTimer));
+			on(num64Input, "input", () => {
+				clearTimeout(prepareTimer);
+				prepareTimer = setTimeout(() => {
+					try {const token = u64Tokens(num64Input.value).next(); if (!token.done) prepareKorea(parseU64(token.value));} catch { }
+				}, 200);
+			});
 			const inputCount = input => {
 				let count = 0;
 				const tokens = u64Tokens(input.value);
@@ -5301,7 +5316,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 						const values = generateRandomValues(count);
 						input.value = [input.value.trim(), values.join("\n")].filter(Boolean).join("\n");
 						setInputError(input, "");
-						if (input === num64Input) autoSupp.checked = true;
+						if (input === num64Input) {autoSupp.checked = true; prepareKorea(parseU64(u64Tokens(input.value).next().value));}
 					} catch (err) {
 						rngError.textContent = errorMessage(err);
 					}
@@ -5436,11 +5451,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							);
 						const num = parseU64(token);
 						invalidInput = null;
-						sampleKorea ??= (await import("./korea_boundary.js")).sampleKorea;
-						const korea = await sampleKorea(num);
+						sampleKorea ??= (await loadKoreaModule()).sampleKorea;
 						if (epoch !== outputEpoch) return;
-						const conversion = convertNumber(num, korea);
-						let step = conversion.next();
+						const conversion = convertNumber(num, sampleKorea);
+						let step = await conversion.next();
+						if (epoch !== outputEpoch) return;
 						let used = 0;
 						while (!step.done) {
 							invalidInput = suppInput;
@@ -5459,7 +5474,8 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 								supplied = supplements.next();
 							}
 							used++;
-							step = conversion.next({value: supplied.value, bitsRemaining: 64});
+							step = await conversion.next({value: supplied.value, bitsRemaining: 64});
+							if (epoch !== outputEpoch) return;
 						}
 						if (cancelled) break;
 						suppCount += used;
@@ -5560,6 +5576,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			});
 			const clearDialog = byId("clear-dialog");
 			const clearOutput = () => {
+				clearTimeout(prepareTimer);
 				finishSupplement(null);
 				returnFocus = null;
 				outputEpoch++;
@@ -5617,6 +5634,7 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 			if (manual && !manualLoaded) {
 				loadManualRng();
 				manualLoaded = true;
+				prepareKorea();
 			}
 		}
 		on(inputTabs, "click", (event) => {
