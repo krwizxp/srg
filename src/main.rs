@@ -108,7 +108,7 @@ fn main() -> Result<()> {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
                     let mut err = stderr().lock();
                     rng.write_initial_source_notice(&mut err)?;
-                    let data = generate_random_data_with_rng(&rng)?;
+                    let data = generate_random_data_with_rng(&rng, None)?;
                     rng.write_rdseed_fallback_notice(&mut err)?;
                     output_file.persist_and_print(&data)?;
                 }

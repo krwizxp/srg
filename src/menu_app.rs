@@ -200,7 +200,7 @@ impl MenuApp {
             num_64: manual_num_64,
             ..Default::default()
         }
-        .populate(&mut next_supp)?;
+        .populate(&mut next_supp, None)?;
         self.output_file.persist_and_print(&data)
     }
     #[cfg(target_arch = "x86_64")]

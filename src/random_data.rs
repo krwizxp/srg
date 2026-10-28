@@ -80,6 +80,7 @@ where
     F: FnMut(&'static str) -> Result<u64>,
 {
     data: RandomDataSet,
+    boundary_cache: Option<&'provider_ref mut korea_boundary::BoundaryCache>,
     euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
     euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
     lotto: UniqueNumbers<LOTTO_COUNT>,
@@ -90,12 +91,17 @@ where
     supplemental: RandomBitBuffer,
 }
 impl RandomDataSet {
-    pub(super) fn populate<F>(self, next_supp: &mut F) -> Result<Self>
+    pub(super) fn populate<F>(
+        self,
+        next_supp: &mut F,
+        boundary_cache: Option<&mut korea_boundary::BoundaryCache>,
+    ) -> Result<Self>
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
         let mut state = RandomDataBuildState {
             data: self,
+            boundary_cache,
             euro_lucky: UniqueNumbers::new(),
             euro_main: UniqueNumbers::new(),
             lotto: UniqueNumbers::new(),
@@ -158,7 +164,8 @@ where
         let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
         let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
         let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
-        self.data.kor_coords = korea_boundary::sample(self.data.num_64)?;
+        self.data.kor_coords =
+            korea_boundary::sample(self.data.num_64, self.boundary_cache.as_deref_mut())?;
         self.data.world_coords = Coordinates {
             latitude: 180.0_f64.mul_add(upper_ratio, -90.0),
             longitude: 360.0_f64.mul_add(lower_ratio, -180.0),
@@ -322,7 +329,10 @@ const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
     value.strict_add(OFFSET) & MASK
 }
 #[cfg(target_arch = "x86_64")]
-pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomDataSet> {
+pub(super) fn generate_random_data_with_rng(
+    rng: &HardwareRng,
+    boundary_cache: Option<&mut korea_boundary::BoundaryCache>,
+) -> Result<RandomDataSet> {
     let mut next_supp = |reason: &'static str| -> Result<u64> {
         rng.next_u64()
             .map_err(|source| AppError::context(reason, source))
@@ -331,7 +341,7 @@ pub(super) fn generate_random_data_with_rng(rng: &HardwareRng) -> Result<RandomD
         num_64: rng.next_u64()?,
         ..Default::default()
     }
-    .populate(&mut next_supp)
+    .populate(&mut next_supp, boundary_cache)
 }
 fn extract_valid_bits_for_nms(
     num: u64,

@@ -1,8 +1,13 @@
 use self::data::{INDEX as DATA, PARTS};
 use crate::{boundary_inflate::inflate, diagnostic::Result, random_data::Coordinates};
+use alloc::collections::VecDeque;
 mod data;
 #[cfg(test)]
 mod tests;
+#[derive(Default)]
+pub(super) struct BoundaryCache {
+    pages: VecDeque<(usize, Box<[u8; MAX_PAGE_SIZE]>)>,
+}
 const INDEX_SIZE: usize = 24;
 const MAX_PAGE_SIZE: usize = 15_876;
 const RECORD_SIZE: usize = 14;
@@ -91,7 +96,7 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
         .ok_or("대한민국 경계 데이터 구조 오류")?;
     Ok(u64::from_le_bytes(*value))
 }
-pub(super) fn sample(value: u64) -> Result<Coordinates> {
+pub(super) fn sample(value: u64, cache: Option<&mut BoundaryCache>) -> Result<Coordinates> {
     DATA.starts_with(b"SRGKR001")
         .ok_or("대한민국 경계 데이터 버전 오류")?;
     let count = usize::try_from(read_u32(DATA, 8)?)
@@ -129,15 +134,42 @@ pub(super) fn sample(value: u64) -> Result<Coordinates> {
     } else {
         None
     };
-    let page = decode_page(compressed, previous)?;
-    let vertices = usize::from(read_u16(&page, 0)?);
-    let triangles = usize::from(read_u16(&page, 2)?);
+    if let Some(cache) = cache {
+        let cache = &mut cache.pages;
+        let entry = if let Some(position) = cache.iter().position(|(key, _)| *key == block_index) {
+            cache.remove(position).ok_or("경계 캐시 위치 오류")?
+        } else {
+            let decoded = decode_page(compressed, previous)?;
+            if cache.len() == 32 {
+                let (_, mut page) = cache.pop_front().ok_or("경계 캐시 오류")?;
+                *page = decoded;
+                (block_index, page)
+            } else {
+                (block_index, Box::new(decoded))
+            }
+        };
+        cache.push_back(entry);
+        let page = &cache.back().ok_or("경계 캐시 오류")?.1;
+        sample_page(value, page, index, block_index)
+    } else {
+        let page = decode_page(compressed, previous)?;
+        sample_page(value, &page, index, block_index)
+    }
+}
+fn sample_page(
+    value: u64,
+    page: &[u8; MAX_PAGE_SIZE],
+    index: usize,
+    block_index: usize,
+) -> Result<Coordinates> {
+    let vertices = usize::from(read_u16(page, 0)?);
+    let triangles = usize::from(read_u16(page, 2)?);
     let records = 4_usize.strict_add(vertices.strict_mul(16));
-    low = 0;
-    high = triangles;
+    let mut low = 0;
+    let mut high = triangles;
     while low < high {
         let middle = low.midpoint(high);
-        if read_u64(&page, records.strict_add(middle.strict_mul(RECORD_SIZE)))? < value {
+        if read_u64(page, records.strict_add(middle.strict_mul(RECORD_SIZE)))? < value {
             low = middle.strict_add(1);
         } else {
             high = middle;
@@ -145,9 +177,9 @@ pub(super) fn sample(value: u64) -> Result<Coordinates> {
     }
     (low < triangles).ok_or("대한민국 경계 데이터 삼각형 오류")?;
     let record = records.strict_add(low.strict_mul(RECORD_SIZE));
-    let end = read_u64(&page, record)?;
+    let end = read_u64(page, record)?;
     let begin = if low > 0 {
-        read_u64(&page, record.strict_sub(RECORD_SIZE))?.strict_add(1)
+        read_u64(page, record.strict_sub(RECORD_SIZE))?.strict_add(1)
     } else if block_index > 0 {
         read_u64(DATA, index.strict_sub(INDEX_SIZE))?.strict_add(1)
     } else {
@@ -179,13 +211,13 @@ pub(super) fn sample(value: u64) -> Result<Coordinates> {
     let mut longitude = [0.0_f64; 3];
     for (corner, (lat, lon)) in latitude.iter_mut().zip(&mut longitude).enumerate() {
         let vertex = usize::from(read_u16(
-            &page,
+            page,
             record.strict_add(8).strict_add(corner.strict_mul(2)),
         )?);
         (vertex < vertices).ok_or("대한민국 경계 데이터 정점 오류")?;
         let position = 4_usize.strict_add(vertex.strict_mul(16));
-        *lat = f64::from_bits(read_u64(&page, position)?);
-        *lon = f64::from_bits(read_u64(&page, position.strict_add(8))?);
+        *lat = f64::from_bits(read_u64(page, position)?);
+        *lon = f64::from_bits(read_u64(page, position.strict_add(8))?);
     }
     Ok(Coordinates {
         latitude: latitude

@@ -3,6 +3,7 @@ use crate::{
     diagnostic::{AppError, Result},
     file_output::OutputFile,
     hardware_rng::HardwareRng,
+    korea_boundary::BoundaryCache,
     output::{self, OutputTarget, format_data_into_buffer, write_slice_to_console},
     random_data::generate_random_data_with_rng,
     stop_input::StopInput,
@@ -21,6 +22,7 @@ use std::{
     time::Instant,
 };
 pub(super) const MAX_BATCH_GENERATE_COUNT: usize = 10_000_000;
+const BOUNDARY_CACHE_MIN_RECORDS: usize = 32;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 const WORKER_CHUNK_CAPACITY: usize = 0x0008_0000_usize.strict_add(BUFFER_SIZE);
 struct WorkerFailure {
@@ -102,7 +104,7 @@ pub(super) fn regenerate_with_count(
     out: &mut dyn Write,
 ) -> Result<()> {
     if requested_count == 1 {
-        let final_data = generate_random_data_with_rng(rng)?;
+        let final_data = generate_random_data_with_rng(rng, None)?;
         return output_file.persist_and_print(&final_data);
     }
     let start_time = Instant::now();
@@ -148,6 +150,8 @@ pub(super) fn regenerate_with_count(
                             })?;
                         chunk.bytes.resize(chunk_capacity, 0);
                         let mut outcome = None;
+                        let mut boundary_cache =
+                            (loop_count >= BOUNDARY_CACHE_MIN_RECORDS).then(BoundaryCache::default);
                         for _ in 0..loop_count {
                             if chunk.written_len > chunk.bytes.len().strict_sub(BUFFER_SIZE) {
                                 write_worker_chunk(writer, stop, done, &mut chunk)?;
@@ -155,15 +159,16 @@ pub(super) fn regenerate_with_count(
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            let data = match generate_random_data_with_rng(rng) {
-                                Ok(data) => data,
-                                Err(source) => {
-                                    let error = AppError::context("난수 생성 실패", source);
-                                    record_failure(&mut outcome, 1, error);
-                                    done.fetch_add(1, Ordering::Relaxed);
-                                    continue;
-                                }
-                            };
+                            let data =
+                                match generate_random_data_with_rng(rng, boundary_cache.as_mut()) {
+                                    Ok(data) => data,
+                                    Err(source) => {
+                                        let error = AppError::context("난수 생성 실패", source);
+                                        record_failure(&mut outcome, 1, error);
+                                        done.fetch_add(1, Ordering::Relaxed);
+                                        continue;
+                                    }
+                                };
                             let buffer = chunk
                                 .bytes
                                 .get_mut(chunk.written_len..)

@@ -130,13 +130,16 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
     }
     let codes = Huffman::new(&code_lengths)?;
     let total = literal_count.strict_add(distance_count);
-    let mut lengths = Vec::with_capacity(total);
-    while lengths.len() < total {
+    let mut lengths = [0_u8; 318];
+    let mut filled = 0_usize;
+    while filled < total {
         let symbol = codes.symbol(bits)?;
         let (value, count) = match symbol {
             0..=15 => (symbol.to_le_bytes()[0], 1_usize),
             16 => (
-                *lengths.last().ok_or("경계 압축 코드 반복 오류")?,
+                *lengths
+                    .get(filled.checked_sub(1).ok_or("경계 압축 코드 반복 오류")?)
+                    .ok_or("경계 압축 코드 반복 오류")?,
                 usize::try_from(bits.read(2)?.strict_add(3))
                     .map_err(|source| format!("경계 압축 반복 오류: {source}"))?,
             ),
@@ -152,15 +155,22 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
             ),
             _ => return Err("경계 압축 코드 길이 오류".into()),
         };
-        let next = lengths.len().strict_add(count);
+        let next = filled.strict_add(count);
         (next <= total).ok_or("경계 압축 코드 반복 한도 오류")?;
-        lengths.resize(next, value);
+        lengths
+            .get_mut(filled..next)
+            .ok_or("경계 압축 코드 반복 오류")?
+            .fill(value);
+        filled = next;
     }
     lengths
         .get(256)
         .is_some_and(|length| *length != 0)
         .ok_or("경계 압축 종료 코드 오류")?;
-    let (literal, distance) = lengths.split_at(literal_count);
+    let (literal, distance) = lengths
+        .get(..total)
+        .ok_or("경계 압축 코드 개수 오류")?
+        .split_at(literal_count);
     Ok((Huffman::new(literal)?, Huffman::new(distance)?))
 }
 pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
@@ -260,9 +270,17 @@ pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
     (bits.position.div_ceil(8) == bits.bytes.len()).ok_or("경계 압축 잔여 데이터 오류")?;
     let mut first = 1_u32;
     let mut second = 0_u32;
-    for byte in output.get(..written).ok_or("경계 압축 출력 오류")? {
-        first = first.strict_add(u32::from(*byte)).rem_euclid(0xFFF1);
-        second = second.strict_add(first).rem_euclid(0xFFF1);
+    for chunk in output
+        .get(..written)
+        .ok_or("경계 압축 출력 오류")?
+        .chunks(1024)
+    {
+        for byte in chunk {
+            first = first.strict_add(u32::from(*byte));
+            second = second.strict_add(first);
+        }
+        first = first.rem_euclid(0xFFF1);
+        second = second.rem_euclid(0xFFF1);
     }
     let expected = input
         .get(tail..)
