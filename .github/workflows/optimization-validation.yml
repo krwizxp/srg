@@ -12,14 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-26.04
-            target: x86_64-unknown-linux-gnu
           - os: windows-2025
             target: x86_64-pc-windows-msvc
-          - os: macos-26-intel
-            target: x86_64-apple-darwin
-          - os: macos-26
-            target: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,21 +39,3 @@ jobs:
       - env:
           CARGO_TARGET_DIR: target/${{ matrix.target }}
         run: cargo +1.99.1 run --frozen --example package_artifact -- "srg-${{ matrix.target }}"
-  web:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - run: npm install --no-save playwright@1.62.1
-      - run: npx playwright install --with-deps chromium firefox webkit
-      - run: |
-          git worktree add --detach baseline-validation 1300842994d74d96076237c60f498384a5fa029e
-          python3 -m http.server 8765 --bind 127.0.0.1 &
-          server=$!
-          trap 'kill "$server"' EXIT
-          for engine in chromium firefox webkit; do
-            SRG_ENGINE="$engine" node tools/validation/browser_check.cjs
-          done

@@ -28,8 +28,8 @@ fn main()->diagnostic::Result<()> {
 '''
 outputs=[]
 for label,source in [('baseline',baseline),('candidate',candidate)]:
- module=work/(label+'_boundary.rs');s=(source/'src/korea_boundary.rs').read_text().replace('mod data;', '#[path="'+(source/'src/korea_boundary/data.rs').as_posix()+'"]\nmod data;');module.write_text(s)
- probe=work/(label+'.rs');probe.write_text(probe_template.replace('INFLATE',(source/'src/boundary_inflate.rs').as_posix()).replace('BOUNDARY',module.as_posix()))
+ module=work/(label+'_boundary.rs');s=(source/'src/korea_boundary.rs').read_text(encoding="utf-8").replace('mod data;', '#[path="'+(source/'src/korea_boundary/data.rs').as_posix()+'"]\nmod data;');module.write_text(s,encoding="utf-8")
+ probe=work/(label+'.rs');probe.write_text(probe_template.replace('INFLATE',(source/'src/boundary_inflate.rs').as_posix()).replace('BOUNDARY',module.as_posix()),encoding='utf-8')
  exe=work/(label+('.exe' if os.name=='nt' else ''))
  subprocess.run(['rustc','+1.99.1','--edition=2024','-O','-C','panic=abort',str(probe),'-o',str(exe)],check=True)
  for mode in ['single','threads']:
