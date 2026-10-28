@@ -19,6 +19,7 @@ use std::{
 };
 #[cfg(target_arch = "x86_64")]
 mod batch;
+mod boundary_inflate;
 mod buffmt;
 mod command;
 mod diagnostic;
@@ -26,6 +27,7 @@ mod file_output;
 #[cfg(target_arch = "x86_64")]
 mod hardware_rng;
 mod input;
+mod korea_boundary;
 #[cfg(target_arch = "x86_64")]
 mod ladder;
 mod menu_app;
