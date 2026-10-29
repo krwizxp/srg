@@ -149,8 +149,9 @@ try{
     await page.locator("#export").click();
     const d=await downloadWait;
     const csv=await fs.readFile(await d.path(),"utf8");
-    for(const name of ["미국","일본","북한"])if(!csv.includes(name))throw new Error("CSV missing "+name);
-    return {country_options:options,geocode_requests:requests.length,csv_bytes:Buffer.byteLength(csv)};
+    for(const name of ["미국","일본"])if(!csv.includes(name))throw new Error("CSV missing WORLD country "+name);
+    if(!/(^|\r?\n)KR,/.test(csv)||!/(^|\r?\n)KP,/.test(csv))throw new Error("Existing KR/KP CSV codes changed");
+    return {country_options:options,geocode_requests:requests.length,csv_bytes:Buffer.byteLength(csv),csv_kind_policy:"KR/KP codes unchanged; WORLD countries named"};
    });
    await check("file_replacement_removes_dynamic_kp_and_country",async ()=>{
     await page.locator("#filter-kind").selectOption("kp");
