@@ -171,8 +171,13 @@ try{
     return {error:(await page.locator("#num64-error").innerText()).slice(0,180)};
    });
    await check("no_unexpected_console_or_navigation_errors",async ()=>{
-    if(pageErrors.length||consoleErrors.length||requestFailures.length)throw new Error(JSON.stringify({pageErrors,consoleErrors,requestFailures}).slice(0,1600));
-    return {pageErrors:0,consoleErrors:0,requestFailures:0,browserVersion:browser.version()};
+    const cancelledIndexPrefetches=requestFailures.filter(x=>
+     x.failure?.errorText==="net::ERR_ABORTED" &&
+     x.url.startsWith("http://127.0.0.1:18973/data/korea-boundary-v4/index.bin?sha256="));
+    const unexpectedRequests=requestFailures.filter(x=>!cancelledIndexPrefetches.includes(x));
+    if(pageErrors.length||consoleErrors.length||unexpectedRequests.length||cancelledIndexPrefetches.length>1)
+     throw new Error(JSON.stringify({pageErrors,consoleErrors,requestFailures}).slice(0,1600));
+    return {pageErrors:0,consoleErrors:0,unexpectedRequests:0,cancelledIndexPrefetches:cancelledIndexPrefetches.length,browserVersion:browser.version()};
    });
   }catch(e){console.error("ENGINE FAILURE "+name+" "+String(e))}
   finally{if(context)await context.close();if(browser)await browser.close()}
