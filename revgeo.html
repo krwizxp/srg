@@ -5099,7 +5099,12 @@
 			return false;
 		}
 		const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
-		function* extractNmsBits(bits, num, shifts, maxValue, supplement) {
+		function* receiveSupplement(reused) {
+			const word = yield;
+			reused.push(word.value);
+			return word;
+		}
+		function* extractNmsBits(bits, num, shifts, maxValue, supplement, reused) {
 			const mask = (1n << BigInt(bits)) - 1n;
 			const maxBig = BigInt(maxValue);
 			for (const shift of shifts) {
@@ -5108,7 +5113,7 @@
 			}
 			for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
 				if (!supplement.current || supplement.current.bitsRemaining < bits)
-					supplement.current = yield;
+					supplement.current = yield* receiveSupplement(reused);
 				const current = supplement.current;
 				current.bitsRemaining -= bits;
 				const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
@@ -5127,12 +5132,13 @@
 			const data = createDataSet(num);
 			let complete = fillNumbers(num, data);
 			const supplement = { current: null };
+			const reused = [];
 			for (
 				let attempt = 0;
 				!complete && attempt < SUPPLEMENT_LIMIT;
 				attempt++
 			) {
-				const newSupp = yield;
+				const newSupp = yield* receiveSupplement(reused);
 				complete = fillNumbers(newSupp.value, data);
 				supplement.current = newSupp;
 			}
@@ -5155,7 +5161,7 @@
 				}
 				if (attempt + 1 >= SUPPLEMENT_LIMIT)
 					break;
-				const newSupp = yield;
+				const newSupp = yield* receiveSupplement(reused);
 				luckyStarSource = reverseBitsU64(newSupp.value);
 				supplement.current = newSupp;
 			}
@@ -5172,7 +5178,7 @@
 					attempt++
 				) {
 					if (supplement.current === null)
-						supplement.current = yield;
+						supplement.current = yield* receiveSupplement(reused);
 					const supp = supplement.current;
 					bitsView.setBigUint64(0, supp.value, false);
 					for (
@@ -5190,7 +5196,7 @@
 						index > HANGUL_MAX &&
 						attempt + 1 < SUPPLEMENT_LIMIT
 					)
-						supplement.current = yield;
+						supplement.current = yield* receiveSupplement(reused);
 				}
 				if (index > HANGUL_MAX)
 					throw supplementLimitError("한글 음절");
@@ -5210,12 +5216,12 @@
 			];
 			const planetIndex = yield* extractNmsBits(
 				4, num, NMS_PLANET_SHIFTS, 11,
-				supplement,
+					supplement, reused,
 			);
 			data.planet = planetIndex % 6 + 1;
 			const systemIndex = yield* extractNmsBits(
 				12, num, NMS_SYSTEM_SHIFTS, 3834,
-				supplement,
+					supplement, reused,
 			);
 			data.system = systemIndex % 767 + 1;
 			data.portalY = upper32 & 0xff;
@@ -5230,7 +5236,20 @@
 			for (let shift = 28; shift >= 0; shift -= 4)
 				glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
 			data.glyphs = glyphs;
-			data.korea = yield* sampleKorea(num);
+			const sampler = sampleKorea(num);
+			let result = await sampler.next();
+			let index = 0;
+			try {
+				while (!result.done) {
+					let next;
+					if (index < reused.length) next = { value: reused[index++], bitsRemaining: 64 };
+					else next = yield;
+					result = await sampler.next(next);
+				}
+				data.korea = result.value;
+			} finally {
+				if (!result.done) await sampler.return();
+			}
 			return data;
 		}
 		function paddedHex(value, width) {
