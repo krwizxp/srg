@@ -1,0 +1,98 @@
+{
+  "final_browser_product": "Byte-identical restored v4 checkpoint",
+  "accepted_browser_optimizations": [],
+  "minimum_runtime_improvement_percent": 5,
+  "decisions": [
+    {
+      "candidate": "Preallocated bounded response buffer",
+      "status": "rejected",
+      "reason": "One-run original-data Chromium runtime increased1.18%.",
+      "evidence": "runtime_smoke.json"
+    },
+    {
+      "candidate": "Remove redundant async wrappers",
+      "status": "rejected",
+      "reason": "One-run improvement1.75% was below the5% criterion and within measurement noise.",
+      "evidence": "runtime_smoke.json"
+    },
+    {
+      "candidate": "64KiB tile-aligned parts with64compressed entries and unchanged4MiB payload budget",
+      "status": "rejected",
+      "reason": "Local performance improved, but actualHTTP request count grew98to733. The actual-request-only nominal20ms header-delay workload increased runtime92.78%; WebKit first-result latency also regressed in the five-completed-pair diagnostic.",
+      "evidence": [
+        "chromium_three_way.json",
+        "webkit_final_pairs.json",
+        "chromium_delay20.json"
+      ]
+    },
+    {
+      "candidate": "Original512KiB parts and8compressed entries plus quick9 lookup",
+      "status": "rejected",
+      "reason": "Final five-run Chromium median improved4.6470246453%, below the predefined5% adoption criterion. No further repetitions were added to seek a pass.",
+      "baseline_median_ms": 8261.199999999255,
+      "candidate_median_ms": 7877.300000000745,
+      "runtime_reduction_percent": 4.647024645312358,
+      "evidence": "chromium_selected_pairs.json"
+    }
+  ],
+  "delay_comparison": {
+    "scope": "The local HTTP handler waits20ms for each actual request before response headers. Browser HTTP cache hits do not enter the server and receive no added delay. No bandwidth, DNS or TLS simulation. Each completed variant has a separate raw successful-response request log.",
+    "runs_per_variant": 1,
+    "variants": [
+      {
+        "variant": "before",
+        "total_ms": 10717.900000000373,
+        "network_requests": 98,
+        "network_body_bytes": 50310422,
+        "server_request_log": "chromium_delay20-before-requests.json",
+        "observed_minimum_server_delay_ms": 19.224271999999473,
+        "observed_maximum_server_delay_ms": 23.6115420000001,
+        "mismatches": 0,
+        "reads": 29278
+      },
+      {
+        "variant": "original_quick9",
+        "total_ms": 10011.10000000149,
+        "network_requests": 98,
+        "network_body_bytes": 50310545,
+        "server_request_log": "chromium_delay20-original_quick9-requests.json",
+        "observed_minimum_server_delay_ms": 19.238444000000527,
+        "observed_maximum_server_delay_ms": 21.466150000000198,
+        "mismatches": 0,
+        "reads": 29278
+      },
+      {
+        "variant": "final",
+        "total_ms": 20662,
+        "network_requests": 733,
+        "network_body_bytes": 40897048,
+        "server_request_log": "chromium_delay20-final-requests.json",
+        "observed_minimum_server_delay_ms": 19.163510999998834,
+        "observed_maximum_server_delay_ms": 23.295225999998365,
+        "mismatches": 0,
+        "reads": 29278
+      }
+    ]
+  },
+  "restored_identity_evidence": "restored-web-evidence-link.json",
+  "restored_ui_observation_evidence": "restored-ui-validation.json",
+  "restored_ui_scenarios_per_engine": 6,
+  "restored_ui_engines": 3,
+  "restored_ui_page_errors": 0,
+  "restored_runtime_files": {
+    "korea_boundary.js": {
+      "bytes": 33492,
+      "sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "byte_identical": true
+    },
+    "revgeo.html": {
+      "bytes": 188661,
+      "sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+      "byte_identical": true
+    }
+  },
+  "restored_binary_files": 97,
+  "restored_binary_bytes": 50276630,
+  "all_trials_and_interrupted_attempts_preserved": true,
+  "interrupted_webkit_attempt": "An unexpected target closure interrupted baseline run5 before its90-second watchdog. Four completed pairs are preserved separately; one additional completed pair used a newbrowser/server. The interrupted run was not counted asPASS. These measurements concern the discarded64KiB candidate, not the final restored product."
+}

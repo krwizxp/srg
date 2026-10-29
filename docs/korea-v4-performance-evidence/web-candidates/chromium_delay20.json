@@ -1,0 +1,169 @@
+{
+  "records": 10000,
+  "repetitions": 1,
+  "variants": [
+    "before",
+    "original_quick9",
+    "final"
+  ],
+  "profile": false,
+  "sources": {
+    "before": {
+      "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "product_bytes": 33492,
+      "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "data_index_bytes": 499628,
+      "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+      "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+      "harness_bytes": 33792
+    },
+    "original_quick9": {
+      "product_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+      "product_bytes": 33615,
+      "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "data_index_bytes": 499628,
+      "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+      "harness_sha256": "137ef33e56c413470c97abc418bf4f5139cc77e1a4b743eb6274da18edaf0dab",
+      "harness_bytes": 33915
+    },
+    "final": {
+      "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+      "product_bytes": 33616,
+      "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "data_index_bytes": 538940,
+      "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+      "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+      "harness_bytes": 33916
+    }
+  },
+  "variant_roots": {
+    "before": "/workspace/scratch/20ca01e7d960/evidence/perf2/before",
+    "original_quick9": "/workspace/scratch/20ca01e7d960/evidence/perf2/before",
+    "data_only": "/workspace/scratch/20ca01e7d960/srg",
+    "final": "/workspace/scratch/20ca01e7d960/srg"
+  },
+  "server_response_delay_ms": 20,
+  "delay_scope": "The local HTTP handler waits20ms for each actual request before response headers. Browser HTTP cache hits do not enter the server and receive no added delay. No bandwidth, DNS or TLS simulation. Each completed variant has a separate raw successful-response request log.",
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "Content-Length": "specified",
+    "ETag": null,
+    "Last-Modified": null
+  },
+  "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+  "raw": [
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 1,
+      "cold_first_ms": 53.90000000037253,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 10717.900000000373,
+      "p95_record_ms": 5.099999999627471,
+      "maximum_record_ms": 83.79999999888241,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 4375.899999938905,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 813.4999999981374
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1104.8000000286847
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "server_request_log": "chromium_delay20-before-requests.json",
+      "server_response_delay_ms": 20,
+      "observed_minimum_server_delay_ms": 19.224271999999473,
+      "observed_maximum_server_delay_ms": 23.6115420000001,
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "original_quick9",
+      "repetition": 1,
+      "cold_first_ms": 55.40000000037253,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 10011.10000000149,
+      "p95_record_ms": 4.599999999627471,
+      "maximum_record_ms": 81.80000000074506,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 4225.000000018626,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 780.5999999344349
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 693.1000000108033
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "server_request_log": "chromium_delay20-original_quick9-requests.json",
+      "server_response_delay_ms": 20,
+      "observed_minimum_server_delay_ms": 19.238444000000527,
+      "observed_maximum_server_delay_ms": 21.466150000000198,
+      "network_requests": 98,
+      "network_body_bytes": 50310545,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 1,
+      "cold_first_ms": 52,
+      "warm_first_ms": 0,
+      "total_ms": 20662,
+      "p95_record_ms": 23.299999998882413,
+      "maximum_record_ms": 121.60000000149012,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 17532.90000001155,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 132.40000001341105
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 679.6999999415129
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "server_request_log": "chromium_delay20-final-requests.json",
+      "server_response_delay_ms": 20,
+      "observed_minimum_server_delay_ms": 19.163510999998834,
+      "observed_maximum_server_delay_ms": 23.295225999998365,
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    }
+  ]
+}

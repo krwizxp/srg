@@ -1,0 +1,400 @@
+{
+  "status": "SHA-only formal qualification passed; no further measurements scheduled",
+  "candidate_source_sha256": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef",
+  "baseline_source_sha256": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6",
+  "changed_product_files_relative_to_adopted_baseline": [
+    "src/korea_boundary/hash.rs"
+  ],
+  "provisional_inflater_excluded": true,
+  "acceptance": {
+    "primary": true,
+    "actual_cli_noninferiority": true,
+    "fixed_cold_noninferiority": true,
+    "all_functional_checks": true,
+    "all_passed": true
+  },
+  "primary_fixed10000": {
+    "before_seconds": [
+      0.725338065,
+      0.762616511,
+      0.764128978,
+      0.722079501,
+      0.750092666
+    ],
+    "after_seconds": [
+      0.639646896,
+      0.611887254,
+      0.595917637,
+      0.606613145,
+      0.63238267
+    ],
+    "faster_pairs": 5,
+    "before_median_seconds": 0.750092666,
+    "after_median_seconds": 0.611887254,
+    "median_reduction_percent": 18.4251117581251,
+    "geometric_mean_ratio": 0.8286960872242433,
+    "paired_log_time_95_percent_t_interval": [
+      0.7810915509407825,
+      0.8792019375368135
+    ]
+  },
+  "actual_shipping_cli10000": {
+    "before_median_seconds": 0.158006519,
+    "after_median_seconds": 0.130281199,
+    "pairs": 25,
+    "faster_pairs": 23,
+    "geometric_mean_ratio": 0.8286791875199203,
+    "log_time_ratio_two_sided_95_percent_t_interval": [
+      0.7656668637900576,
+      0.8968772560294158
+    ],
+    "median_reduction_percent": 17.546946907931073,
+    "hardware_rng_values_paired": false,
+    "use": "Actual CLI throughput noninferiority",
+    "bulk_noninferiority_upper_ratio_1_03": true,
+    "limitation": "Live hardware RNG values differ; temporal execution pairs are not equal-input pairs. Exact value equivalence is covered by the fixed corpus and manual fixtures."
+  },
+  "fixed_cold1": {
+    "pairs": 25,
+    "faster_pairs": 25,
+    "before_median_seconds": 0.0038968,
+    "after_median_seconds": 0.002602841,
+    "geometric_mean_ratio": 0.6139832159986407,
+    "log_time_ratio_two_sided_95_percent_t_interval": [
+      0.546817857500132,
+      0.6893984612196805
+    ],
+    "paired_mean_delta_seconds": -0.00178768956,
+    "paired_delta_two_sided_95_percent_t_interval_seconds": [
+      -0.0023485842952592115,
+      -0.0012267948247407885
+    ],
+    "cold_allowance_seconds": 0.001,
+    "cold_noninferiority_upper_delta_within_allowance": true
+  },
+  "independent_sha_correctness": {
+    "mode": "validate",
+    "asset_files": 97,
+    "vectors": 1034,
+    "arbitrary_state_blocks": 4096,
+    "digest_mismatches": 0,
+    "compression_mismatches": 0,
+    "runtime_sha": true,
+    "runtime_sse2": true
+  },
+  "fixed100000": {
+    "output_lines": 100000,
+    "output_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+    "expected_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+    "all_coordinate_bits_and_supp_exact": true,
+    "binary_sha256": "59593be7930e233779992f771eb5621c21375cbd17dca94b9e8e4926d2f01af8"
+  },
+  "geography": {
+    "oracle_path": "evidence/source-mask.wkb",
+    "oracle_sha256": "4e7802454d55937eac2ac0a25fb9ed4434196963b5d848441ce8c08c3f857baf",
+    "source_shp_sha256": "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428",
+    "shapely": "2.2.0",
+    "geos": "3.14.1",
+    "predicate": "GEOS covers on full original float64 polygon set, including holes and boundary",
+    "variants": {
+      "before": {
+        "records_checked": 265330,
+        "outside": 0
+      },
+      "after": {
+        "records_checked": 266660,
+        "outside": 0
+      }
+    },
+    "candidate_automatic_supplemental": {
+      "initial_candidates_outside": 186847,
+      "outside_initial_candidates_replaced": 186847,
+      "initial_candidates_inside": 63153,
+      "inside_initial_candidates_preserved": 63153,
+      "coordinate_tolerance_degrees": 1e-12,
+      "oracle": "closed-form GRS80 authalic integral with 52-step bisection; GEOS source covers",
+      "supplemental_count_observable": false
+    }
+  },
+  "release_tests_passed": 17,
+  "contracts": {
+    "cases": 14,
+    "manual_golden_passed": true,
+    "cancelled_counts_match": true,
+    "standalone_binaries_passed": true
+  },
+  "binary": {
+    "before": {
+      "source": "build/perf2-final-512k/x86_64-unknown-linux-gnu/release/srg",
+      "path": "evidence/perf4-sha/final-native/binaries/before",
+      "bytes": 50950272,
+      "sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e"
+    },
+    "after": {
+      "source": "build/perf4-sha-final/x86_64-unknown-linux-gnu/release/srg",
+      "path": "evidence/perf4-sha/final-native/binaries/after",
+      "bytes": 50950592,
+      "sha256": "e649557d1676e499b387e216b1314a7123baed8ea72aa86cf3389cc1ba3b5fca"
+    }
+  },
+  "packages": {
+    "before": {
+      "tar_bytes": 50952192,
+      "tar_sha256": "9314561488682e30144952faf062ea8a061a995587799f703641c6872fda4c33",
+      "zip_bytes": 49846081,
+      "zip_sha256": "f740a4196d32dc10400d87f8268cfcb46745320fd121608cc498079c8528f643",
+      "tar_contract": {
+        "members": 1,
+        "name": "srg-linux-x64",
+        "size": 50950272,
+        "mode_octal": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "mtime": 0,
+        "embedded_sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e",
+        "matches_binary": true
+      },
+      "zip_matches_binary": true
+    },
+    "after": {
+      "tar_bytes": 50952192,
+      "tar_sha256": "e6f9fa07e4ec6b6464fc3c40a6d478ce3bb76c1b03d2d7a35e6b4207fda16fa0",
+      "zip_bytes": 49846271,
+      "zip_sha256": "bb7e380887647ad5463d926013e69700548934b9370b46461f530d327a657f6d",
+      "tar_contract": {
+        "members": 1,
+        "name": "srg-linux-x64",
+        "size": 50950592,
+        "mode_octal": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "mtime": 0,
+        "embedded_sha256": "e649557d1676e499b387e216b1314a7123baed8ea72aa86cf3389cc1ba3b5fca",
+        "matches_binary": true
+      },
+      "zip_matches_binary": true
+    }
+  },
+  "resources": {
+    "source_bytes_before": 4258,
+    "source_bytes_after": 6578,
+    "source_nonblank_lines_before": 160,
+    "source_nonblank_lines_after": 220,
+    "runtime_heap_allocations_added_by_helper": 0,
+    "application_cache_limits_changed": false,
+    "new_application_retained_state": false,
+    "temporary_storage": "Existing64u32 message schedule retained; register/stack placement of added SIMD temporaries is compiler dependent",
+    "actual_cli_rss_kib": {
+      "before": {
+        "values": [
+          69764,
+          69508,
+          69888,
+          69788,
+          69628,
+          69496,
+          70128,
+          69512,
+          69564,
+          69260,
+          69380,
+          69756,
+          69604,
+          69368,
+          69768,
+          69768,
+          68876,
+          69560,
+          69092,
+          69408,
+          69924,
+          69708,
+          69748,
+          69204,
+          69260
+        ],
+        "median": 69564,
+        "minimum": 68876,
+        "maximum": 70128
+      },
+      "after": {
+        "values": [
+          69636,
+          69500,
+          69920,
+          69772,
+          69112,
+          69512,
+          69348,
+          69252,
+          69628,
+          69756,
+          69764,
+          69384,
+          69640,
+          69368,
+          69484,
+          69692,
+          69264,
+          69764,
+          69508,
+          69764,
+          69016,
+          69792,
+          69260,
+          69540,
+          69776
+        ],
+        "median": 69540,
+        "minimum": 69016,
+        "maximum": 69920
+      }
+    },
+    "rss_interpretation": "Observed medians69564->69540KiB; no memory reduction claim"
+  },
+  "lint": [
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--all-targets",
+        "--target",
+        "x86_64-unknown-linux-gnu",
+        "--frozen",
+        "--manifest-path",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+        "--target-dir",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+        "--message-format=json"
+      ],
+      "cwd": "evidence/perf4-sha/product",
+      "exit_code": 0,
+      "diagnostics": 323,
+      "bin_warnings": 109,
+      "test_warnings": 214,
+      "record": "evidence/perf4-sha/clippy-final-host.json",
+      "record_sha256": "e72272a12de51aceb7a0bb24181976584b21ed52a8fb66662689aa470dc97bd6",
+      "stdout_sha256": "b8fb8facf280a4b43ee6d654900fbf412173ec66dd42b79817a84e5b2bb59dce",
+      "stderr_sha256": "c717be05befcd2a04ebd42d50af846a3e6c39ec75313fb14f3fb313f5fb76187"
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--all-targets",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--frozen",
+        "--manifest-path",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+        "--target-dir",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+        "--message-format=json"
+      ],
+      "cwd": "evidence/perf4-sha/product",
+      "exit_code": 0,
+      "diagnostics": 323,
+      "bin_warnings": 109,
+      "test_warnings": 214,
+      "record": "evidence/perf4-sha/clippy-final-windows.json",
+      "record_sha256": "e5cd53085a5b1a1783b10c97afb83bb872d4d6e435147e47a76afacf88577572",
+      "stdout_sha256": "ace32c868ad407e37d7f8e45b0dff041305402934f6dc24ddf476d518036d326",
+      "stderr_sha256": "4c37192ffa5578ef37bed9ab1db63f88c5e0c0f2b0a45a6a5683f67b5a010730"
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--all-targets",
+        "--target",
+        "x86_64-apple-darwin",
+        "--frozen",
+        "--manifest-path",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+        "--target-dir",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+        "--message-format=json"
+      ],
+      "cwd": "evidence/perf4-sha/product",
+      "exit_code": 0,
+      "diagnostics": 323,
+      "bin_warnings": 109,
+      "test_warnings": 214,
+      "record": "evidence/perf4-sha/clippy-final-intel-mac.json",
+      "record_sha256": "3d3583d48b5807c256b4d7e15b6d5c754aeb9aa8492acfcd74dcad10a60dc805",
+      "stdout_sha256": "608ac94d350c32b29827f42e12535e81952cdfecf280d939999518f01efcbe06",
+      "stderr_sha256": "9bfb2ad8ac47f330219604fa483a3e2a600a71f2b6eeaeed11df86adbd2e34c5"
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--all-targets",
+        "--target",
+        "aarch64-apple-darwin",
+        "--frozen",
+        "--manifest-path",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+        "--target-dir",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+        "--message-format=json"
+      ],
+      "cwd": "evidence/perf4-sha/product",
+      "exit_code": 0,
+      "diagnostics": 323,
+      "bin_warnings": 109,
+      "test_warnings": 214,
+      "record": "evidence/perf4-sha/clippy-final-arm-mac.json",
+      "record_sha256": "be331a881e6c886846bf09b4d2d74beb112f799223075c8a2d6b170c7713c1f7",
+      "stdout_sha256": "5813032e8ed5af81067b11243cbd82705c109c8744232164f7223eeb9a5ead42",
+      "stderr_sha256": "539e9184d9a7d0b40f9ad48b07f7e9b3f8da842d49897bce36c02f90819c34d4"
+    }
+  ],
+  "source_manifest_files": 56,
+  "safety_comment": {
+    "new_comments": 1,
+    "kind": "Required SAFETY line only",
+    "reason": "Unmodified existing clippy::undocumented_unsafe_blocks=deny emitted a real error before the line was added",
+    "evidence": "clippy-required-safety.json",
+    "preconditions": "Runtime SHA feature detection; SSE2 baseline on x86_64; no raw pointer loads/stores or ownership transfer"
+  },
+  "sampling": {
+    "primary_pairs": 5,
+    "actual_cli_pairs": 25,
+    "fixed_cold_pairs": 25,
+    "screen_samples_included": 0,
+    "excluded_samples": 0,
+    "extra_same_candidate_measurements": 0,
+    "all_raw_runs_preserved_in_reports": true
+  },
+  "limits": [
+    "Measured on SHA-capable Linux x86_64 only; forced-scalar digest/compression checks do not measure unsupported hardware",
+    "Cross-target Clippy for Windows and Intel/ARM macOS is compile/lint evidence; native execution on those systems remains outside this run",
+    "Resident SHA diagnostic is one pair and excludes file I/O; formal coordinate/CLI comparisons are separate",
+    "Screen coordinate probe used a different crate-name; formal probe used the exact baseline compile command; screen measurements were excluded",
+    "The consolidated native progress log ends during iteration24; final JSON and all50 individual resource/stdout/stderr runs,51 fixed runs and contracts/packages are complete. The truncated progress log is not used as completion evidence"
+  ],
+  "evidence_sha256": {
+    "qualification-plan.json": "5af5a80cc8913326408b8876a4b538ce9dbb7aa7fe26ed56a81288c223dbed56",
+    "primary-qualification.json": "bd2754bb1869edbf8dd6f827f148f18432f7e0d6164357bb2421f8d7f9e88a9b",
+    "screen-plan.json": "151f104786576e23929b59cf3bf9bb9cbbd8f6e40050dc7d3704b1f9cc313129",
+    "screen.json": "0697c58b9b9b6af46b3a008ac567547745ef7d36f2fc7022edb3b8b888684968",
+    "inputs.json": "adfdf6946ec7de3ab9ad35cece7d70c0f7790992c3a36d94709dca6dd7635b71",
+    "candidate.rs": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef",
+    "forced_scalar.rs": "7d7ba0e9d0d8f684138a3c4d5d143cd134ad914077242553b7b9792651575b59",
+    "bench.rs": "dcee3e8c4ef29cb92064bcc71c98e56c26c7f15c130998f7031da4b96ef95fb8",
+    "formal_prepare.py": "4b96f3f7dfb13ca7b2c051e71f7c418fad426410f12b88905f75001221a19eac",
+    "formal_primary.py": "feb246e3bcd446f06f1d7aae71af8e013c8edb0d763b11627a17a5d133f8b83f",
+    "final_build.py": "eef877ba132548e454c5746332be31696ebb0fed59c6ce08d35671bc0ca039e7",
+    "final_native.py": "819a8f3f66b030c4fefd0d86e1789343d1aadb3af8a8aa4fb9f31c1bac2ac0ce",
+    "final_fixed.py": "be4917fdc836040461d25a3d784a7ac709dddceff99c49c46557cbac98026d90",
+    "final-native/source-manifest.json": "511d281930b1d14eff41270628793fc3113ad70409602b17c6e6d0c2b9122cdb",
+    "final-native/build-validation.json": "9d38b86745df168f9459833ec38a45281b03f5b186038746862527c2af450fee",
+    "final-native/native-cli-validation.json": "e8e32e09e0c7a3a16eba02b027431cfed370903215adc0c3b4f5789defe7894a",
+    "final-native/fixed-probe-validation.json": "41f8ebaa0c9798a42c046a7ccac51114bd19613af0414bba10ab758417f7070f"
+  }
+}

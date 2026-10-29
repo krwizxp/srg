@@ -1,0 +1,85 @@
+{
+  "method": "Identical final sampling code with 1MiB/4096-page cache, same 10000 num64/supp input rows, fresh processes, native C CLOCK_MONOTONIC/wait4. Shared-host load.",
+  "runs": [
+    {
+      "exit_code": 0,
+      "wall_seconds": 2.326400656,
+      "max_rss_kib": 52752,
+      "user_seconds": 2.29562,
+      "system_seconds": 0.030473,
+      "major_page_faults": 0,
+      "minor_page_faults": 1839,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 9,
+      "scale": 32,
+      "repetition": 0,
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "output_records": 10000,
+      "valid_measurement": true
+    },
+    {
+      "exit_code": 0,
+      "wall_seconds": 2.381616354,
+      "max_rss_kib": 52748,
+      "user_seconds": 2.37293,
+      "system_seconds": 0.008384,
+      "major_page_faults": 0,
+      "minor_page_faults": 1838,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 7,
+      "scale": 32,
+      "repetition": 1,
+      "output_sha256": "99f39f6e73c6a933031b6f0aa35392a151752914d87efb75852559b55c189ab0",
+      "output_records": 8396,
+      "valid_measurement": false,
+      "exclusion": "Captured output is only a prefix although process exit was0; exclude this repetition instead of asserting complete output equality."
+    },
+    {
+      "exit_code": 0,
+      "wall_seconds": 89.497042121,
+      "max_rss_kib": 51036,
+      "user_seconds": 89.346206,
+      "system_seconds": 0.141317,
+      "major_page_faults": 0,
+      "minor_page_faults": 17906,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 334,
+      "scale": 4,
+      "repetition": 0,
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "output_records": 10000,
+      "valid_measurement": true
+    },
+    {
+      "exit_code": -15,
+      "wall_seconds": 18.969148962,
+      "max_rss_kib": 50968,
+      "user_seconds": 18.914784,
+      "system_seconds": 0.035175,
+      "major_page_faults": 0,
+      "minor_page_faults": 3843,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 232,
+      "scale": 4,
+      "repetition": 1,
+      "output_sha256": "4d2dc1337ee66e736a3cc1fc28d36917208bc18d2bea2b3c95457c36e4f761a9",
+      "output_records": 2139,
+      "valid_measurement": false
+    }
+  ],
+  "completed_runs": 2,
+  "same_output_for_completed_runs": true,
+  "summary": {
+    "32": {
+      "completed_runs": 1,
+      "seconds": 2.326400656,
+      "max_rss_kib": 52752
+    },
+    "4": {
+      "completed_runs": 1,
+      "seconds": 89.497042121,
+      "max_rss_kib": 51036
+    }
+  },
+  "adaptive_stop": "Planned five pairs; the first complete scale4 trial took89.497042121seconds versus scale32 at2.326400656seconds with identical10000 outputs. Reject scale4 and stop remaining repetitions; accepted final/nativeCLI comparisons retain five repetitions. Terminated or incomplete captures are excluded."
+}

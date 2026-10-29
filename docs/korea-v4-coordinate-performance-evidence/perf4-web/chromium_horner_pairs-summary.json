@@ -1,0 +1,88 @@
+{
+  "raw_report": "chromium_horner_pairs.json",
+  "method": "Five paired log-time ratios; two-sided95% Student-t interval with4degrees of freedom. t quantile solved using the closed df4 CDF.",
+  "source_identity": {
+    "baseline": {
+      "product_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+      "product_bytes": 33615,
+      "harness_sha256": "75f6d29b935f92629d22295940b0ed987bb447bd3bfce32215c4033069db2326",
+      "harness_bytes": 33752
+    },
+    "horner": {
+      "product_sha256": "16726a1d8f0df32528812616fa776e9ca60df3929dfc5d6af4406024ade28aa1",
+      "product_bytes": 33848,
+      "harness_sha256": "8c7f6fbdb344c70ffd3acac442927b5c5d53904bdae7a468fd693cf75c64b904",
+      "harness_bytes": 33985
+    }
+  },
+  "engines": {
+    "chromium": {
+      "before_ms": [
+        8972.300000000745,
+        8162.799999998882,
+        7878.5999999996275,
+        7689.5999999996275,
+        7949.300000000745
+      ],
+      "candidate_ms": [
+        7551.800000000745,
+        7470.9000000003725,
+        7589.5,
+        7590.4000000003725,
+        7720.200000001118
+      ],
+      "before_median_ms": 7949.300000000745,
+      "candidate_median_ms": 7589.5,
+      "median_reduction_percent": 4.526184695516733,
+      "faster_pairs": 5,
+      "paired_geometric_mean_ratio": 0.9341594908483565,
+      "paired_two_sided_95_t_interval_ratio": [
+        0.861976048540565,
+        1.0123877059224264
+      ],
+      "t_critical_df4": 2.7764451051977916,
+      "primary_performance_criterion_met": false,
+      "protected_bulk_nonregression_criterion_met": true,
+      "cold_before_ms": [
+        25.59999999962747,
+        24.299999998882413,
+        27,
+        29.199999999254942,
+        26.5
+      ],
+      "cold_candidate_ms": [
+        24.40000000037253,
+        24.40000000037253,
+        23.59999999962747,
+        24.699999999254942,
+        25.300000000745058
+      ],
+      "cold_mean_difference_ms": -2.0399999994784594,
+      "cold_two_sided_95_t_interval_difference_ms": [
+        -4.353963375000553,
+        0.27396337604363374
+      ],
+      "cold_allowance_ms_at_baseline_median": 1,
+      "cold_upper_interval_within_allowance": true,
+      "cold_interpretation": "Diagnostic interval on paired absolute cold differences. Broad intervals do not prove equivalence; no cold-speed claim is made.",
+      "all_bit_and_supp_matches": true,
+      "request_counts_including_html": {
+        "baseline": [
+          99,
+          99,
+          99,
+          99,
+          99
+        ],
+        "horner": [
+          99,
+          99,
+          99,
+          99,
+          99
+        ]
+      }
+    }
+  },
+  "interpretation": "Performance and protected-path results are separate from final functional validation and candidate acceptance."
+}

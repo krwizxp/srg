@@ -1,0 +1,536 @@
+{
+  "command": [
+    "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+    "clippy",
+    "--all-targets",
+    "--target",
+    "aarch64-apple-darwin",
+    "--frozen",
+    "--manifest-path",
+    "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+    "--target-dir",
+    "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+    "--message-format=json"
+  ],
+  "exit_code": 0,
+  "source_sha256": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef",
+  "policy_sha256": {
+    "Cargo.toml": "5b787aabfeecfe5d9a171310609781d992a7cf05003c3156369160c2a6dfdf7d",
+    "Cargo.lock": "4838d92097e0fba6df7e7fe3d2bf3ea5b9d8dfd4b97ba913e51d8186ae7cf947",
+    "clippy.toml": "a9f53eb0465ce77fb18248d18b7e4dca9759a240f867cffdf3b7fda5aa892102"
+  },
+  "baseline_policy_exact": true,
+  "diagnostic_count": 323,
+  "hash_diagnostics": [
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:89:26\n   |\n89 |         let lower_word = words[round.strict_sub(15)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1679,
+          "byte_start": 1652,
+          "column_end": 53,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 89,
+          "line_start": 89,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 26,
+              "text": "        let lower_word = words[round.strict_sub(15)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:90:26\n   |\n90 |         let upper_word = words[round.strict_sub(2)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1732,
+          "byte_start": 1706,
+          "column_end": 52,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 90,
+          "line_start": 90,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 52,
+              "highlight_start": 26,
+              "text": "        let upper_word = words[round.strict_sub(2)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:24\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2014,
+          "byte_start": 1987,
+          "column_end": 51,
+          "column_start": 24,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 51,
+              "highlight_start": 24,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:97:27\n   |\n97 |             .wrapping_add(words[round.strict_sub(7)])\n   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2100,
+          "byte_start": 2074,
+          "column_end": 53,
+          "column_start": 27,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 97,
+          "line_start": 97,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 27,
+              "text": "            .wrapping_add(words[round.strict_sub(7)])"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:9\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |         ^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1984,
+          "byte_start": 1972,
+          "column_end": 21,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 9,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:89:26\n   |\n89 |         let lower_word = words[round.strict_sub(15)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1679,
+          "byte_start": 1652,
+          "column_end": 53,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 89,
+          "line_start": 89,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 26,
+              "text": "        let lower_word = words[round.strict_sub(15)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:90:26\n   |\n90 |         let upper_word = words[round.strict_sub(2)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1732,
+          "byte_start": 1706,
+          "column_end": 52,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 90,
+          "line_start": 90,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 52,
+              "highlight_start": 26,
+              "text": "        let upper_word = words[round.strict_sub(2)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:24\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2014,
+          "byte_start": 1987,
+          "column_end": 51,
+          "column_start": 24,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 51,
+              "highlight_start": 24,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:97:27\n   |\n97 |             .wrapping_add(words[round.strict_sub(7)])\n   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2100,
+          "byte_start": 2074,
+          "column_end": 53,
+          "column_start": 27,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 97,
+          "line_start": 97,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 27,
+              "text": "            .wrapping_add(words[round.strict_sub(7)])"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:9\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |         ^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1984,
+          "byte_start": 1972,
+          "column_end": 21,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 9,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    }
+  ]
+}

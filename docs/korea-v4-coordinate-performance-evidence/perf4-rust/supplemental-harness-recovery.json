@@ -1,0 +1,24 @@
+{
+  "recorded_utc": "2026-10-29T05:52:50Z",
+  "kind": "Harness assertion corrected without discarding or repeating a child execution",
+  "original_script_sha256": "b4ccde2778788209bf035326dbd932050eaed4b34b12293fd131a35c06a5cdf2",
+  "original_report_sha256": "4def62644bac0e5ef7109b187a83b9802a697817410cbd68fbf11f9b314b2af1",
+  "preserved_first_child_metrics": {
+    "exit_code": 0,
+    "wall_seconds": 0.233557105,
+    "max_rss_kib": 69444,
+    "user_seconds": 0.826796,
+    "system_seconds": 0.028702,
+    "major_page_faults": 0,
+    "minor_page_faults": 6082,
+    "voluntary_context_switches": 69,
+    "involuntary_context_switches": 17
+  },
+  "stderr_text": "CPU가 RDSEED를 지원하여 RDSEED를 사용합니다.\n",
+  "reason": "Actual shipping CLI emits normal RDSEED informational stderr. The prior validator recorded it; the new harness incorrectly required empty stderr. Child exit was zero and the original output is retained.",
+  "recovery": "Retain the exact first after-6 child and timing, parse it, then execute before-6 and remaining pairs once each. Never relaunch after-6. Pair6 is separated by a harness repair pause, disclosed and not excluded.",
+  "missing_instrumentation": "First child cpu.stat before/after was only in process memory and was not persisted before the assertion; report unavailable rather than inventing values. Subsequent children persist stats immediately.",
+  "plan_changed": false,
+  "samples_discarded": 0,
+  "samples_repeated": 0
+}

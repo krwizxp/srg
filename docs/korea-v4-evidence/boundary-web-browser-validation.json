@@ -1,0 +1,177 @@
+{
+  "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+  "module_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "playwright": "1.62.1",
+  "engines": {
+    "chromium": {
+      "datasets": {
+        "simple": {
+          "points": 10198,
+          "mismatches": 0,
+          "elapsed_ms": 25.399999999441206,
+          "parts": 1,
+          "part_bytes": 7027,
+          "pages": 151,
+          "page_bytes": 8584
+        },
+        "multipart": {
+          "points": 151,
+          "mismatches": 0,
+          "elapsed_ms": 203.09999999962747,
+          "parts": 2,
+          "part_bytes": 822768,
+          "pages": 80,
+          "page_bytes": 1284456
+        },
+        "parity": {
+          "points": 76,
+          "mismatches": 0,
+          "elapsed_ms": 98.70000000018626,
+          "parts": 1,
+          "part_bytes": 405473,
+          "pages": 3030,
+          "page_bytes": 697632
+        }
+      },
+      "checks": [
+        "module_supplement_sequence",
+        "module_prefetch_determinism",
+        "module_retry_limit",
+        "zlib_checksum_error",
+        "ui_manual_supplement_dialog",
+        "ui_manual_cancel",
+        "ui_crypto_failure",
+        "ui_automatic_supplement",
+        "ui_clear_pending_geometry",
+        "ui_clear_cached_rejection_loop"
+      ],
+      "page_errors": [],
+      "version": "151.0.7922.34",
+      "observed_js_heap_bytes": 16080217,
+      "passed": true,
+      "observed_memory": {
+        "samples": 12,
+        "peak_descendant_rss_sum_bytes": 869609472,
+        "maximum_descendants": 8,
+        "page_bytes": 4096,
+        "interval_ms": 250,
+        "scope": "Sum of /proc resident pages for live descendants of the benchmark Node process; excludes Node itself. Shared resident pages can be counted more than once. This is an observation, not an exclusive-memory total or a JavaScript heap limit."
+      },
+      "cached_rejection_crypto_batches_before_clear": 11
+    },
+    "firefox": {
+      "datasets": {
+        "simple": {
+          "points": 10198,
+          "mismatches": 0,
+          "elapsed_ms": 449,
+          "parts": 1,
+          "part_bytes": 7027,
+          "pages": 151,
+          "page_bytes": 8584
+        },
+        "multipart": {
+          "points": 151,
+          "mismatches": 0,
+          "elapsed_ms": 424,
+          "parts": 2,
+          "part_bytes": 822768,
+          "pages": 80,
+          "page_bytes": 1284456
+        },
+        "parity": {
+          "points": 76,
+          "mismatches": 0,
+          "elapsed_ms": 4469,
+          "parts": 1,
+          "part_bytes": 405473,
+          "pages": 3030,
+          "page_bytes": 697632
+        }
+      },
+      "checks": [
+        "module_supplement_sequence",
+        "module_prefetch_determinism",
+        "module_retry_limit",
+        "zlib_checksum_error",
+        "ui_manual_supplement_dialog",
+        "ui_manual_cancel",
+        "ui_crypto_failure",
+        "ui_automatic_supplement",
+        "ui_clear_pending_geometry",
+        "ui_clear_cached_rejection_loop"
+      ],
+      "page_errors": [],
+      "version": "153.0",
+      "observed_js_heap_bytes": null,
+      "passed": true,
+      "observed_memory": {
+        "samples": 42,
+        "peak_descendant_rss_sum_bytes": 881856512,
+        "maximum_descendants": 7,
+        "page_bytes": 4096,
+        "interval_ms": 250,
+        "scope": "Sum of /proc resident pages for live descendants of the benchmark Node process; excludes Node itself. Shared resident pages can be counted more than once. This is an observation, not an exclusive-memory total or a JavaScript heap limit."
+      },
+      "cached_rejection_crypto_batches_before_clear": 11
+    },
+    "webkit": {
+      "datasets": {
+        "simple": {
+          "points": 10198,
+          "mismatches": 0,
+          "elapsed_ms": 53,
+          "parts": 1,
+          "part_bytes": 7027,
+          "pages": 151,
+          "page_bytes": 8584
+        },
+        "multipart": {
+          "points": 151,
+          "mismatches": 0,
+          "elapsed_ms": 341,
+          "parts": 2,
+          "part_bytes": 822768,
+          "pages": 80,
+          "page_bytes": 1284456
+        },
+        "parity": {
+          "points": 76,
+          "mismatches": 0,
+          "elapsed_ms": 131,
+          "parts": 1,
+          "part_bytes": 405473,
+          "pages": 3030,
+          "page_bytes": 697632
+        }
+      },
+      "checks": [
+        "module_supplement_sequence",
+        "module_prefetch_determinism",
+        "module_retry_limit",
+        "zlib_checksum_error",
+        "ui_manual_supplement_dialog",
+        "ui_manual_cancel",
+        "ui_crypto_failure",
+        "ui_automatic_supplement",
+        "ui_clear_pending_geometry",
+        "ui_clear_cached_rejection_loop"
+      ],
+      "page_errors": [],
+      "version": "26.5",
+      "observed_js_heap_bytes": null,
+      "passed": true,
+      "observed_memory": {
+        "samples": 30,
+        "peak_descendant_rss_sum_bytes": 537497600,
+        "maximum_descendants": 5,
+        "page_bytes": 4096,
+        "interval_ms": 250,
+        "scope": "Sum of /proc resident pages for live descendants of the benchmark Node process; excludes Node itself. Shared resident pages can be counted more than once. This is an observation, not an exclusive-memory total or a JavaScript heap limit."
+      },
+      "cached_rejection_crypto_batches_before_clear": 11
+    }
+  },
+  "cancellation_fixture": "A BigUint64Array provider returns 32 rejecting words per crypto call with a 2 ms synthetic cost; cancellation is scheduled at the next rendering opportunity after eight batches. The count is crypto batches, not consumed supplemental words.",
+  "page_error_scope": "Listeners observed the geometry-test and manual-dialog pages. Zero counts are not a global pageerror monitor for every new page in all UI scenarios. The separate actual Chromium 10k UI run monitored its full task page."
+}

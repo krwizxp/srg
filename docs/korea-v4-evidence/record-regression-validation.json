@@ -1,0 +1,14 @@
+{
+  "seed": 20261029,
+  "supplement_seed": 6004793983995241952,
+  "records": 1009,
+  "non_korea_fields_mismatches_after_provider_alignment": 0,
+  "mismatches": [],
+  "first_record_other_fields_same": true,
+  "shared_stream_later_records_changed_by_expected_consumption": 947,
+  "korea_additional_reads": 3029,
+  "baseline_shared_total_reads": 971,
+  "candidate_shared_total_reads": 3988,
+  "method": "Temporary source copies add a test-only provider harness; original production modules are unchanged. Per-record baseline replay starts at the final implementation's pre-record supplier position. All formatted fields except Korea and provider reason prefixes are compared byte for byte.",
+  "passed": true
+}

@@ -1,0 +1,9 @@
+{
+  "candidate": "bits-read plus bounded Adler arithmetic",
+  "status": "integrated; primary performance and decoder equivalence qualified, final shipping/target validation pending",
+  "path": "src/boundary_inflate.rs",
+  "before_sha256": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+  "after_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+  "qualification": "evidence/perf4-rust/bits-adler-qualification.json",
+  "correctness": "evidence/perf4-rust/bits-adler-state-validation.json"
+}

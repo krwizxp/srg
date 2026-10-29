@@ -5085,7 +5085,7 @@
 		}
 		let koreaModulePromise;
 		function loadKoreaModule() {
-			return koreaModulePromise ??= import("./korea_boundary.js?v=3").catch(error => {koreaModulePromise = null; throw error;});
+			return koreaModulePromise ??= import("./korea_boundary.js?v=4.1").catch(error => {koreaModulePromise = null; throw error;});
 		}
 		function prepareKorea(value) {
 			void loadKoreaModule().then(module => module.prepareKorea(value)).catch(() => { });
@@ -5458,6 +5458,14 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 						if (epoch !== outputEpoch) return;
 						let used = 0;
 						while (!step.done) {
+							if (performance.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+								await yieldToMain();
+								if (epoch !== outputEpoch) {
+									await conversion.return();
+									return;
+								}
+								lastYieldAt = performance.now();
+							}
 							invalidInput = suppInput;
 							let supplied = supplements.next();
 							invalidInput = null;
@@ -5477,7 +5485,11 @@ NMS 은하 좌표: ${paddedHex(data.galaxyX, 4)}:${paddedHex(data.galaxyY, 4)
 							step = await conversion.next({value: supplied.value, bitsRemaining: 64});
 							if (epoch !== outputEpoch) return;
 						}
-						if (cancelled) break;
+						if (cancelled) {
+							await conversion.return();
+							if (epoch !== outputEpoch) return;
+							break;
+						}
 						suppCount += used;
 						const outputBlock = formatOutput(step.value);
 						nextChunks.push((processed === 0

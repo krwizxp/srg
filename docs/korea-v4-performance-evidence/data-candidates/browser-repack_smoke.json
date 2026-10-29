@@ -1,0 +1,117 @@
+{
+  "records": 10000,
+  "repetitions": 1,
+  "variants": [
+    "before",
+    "65536-aligned",
+    "131072-aligned"
+  ],
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "ETag": null,
+    "Last-Modified": null,
+    "Content-Length": "specified"
+  },
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "source_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "inflater_sha256": null,
+  "raw": [
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 1,
+      "cold_first_ms": 25.800000000745058,
+      "warm_first_ms": 0.09999999962747097,
+      "total_10000_ms": 8241.299999998882,
+      "p95_record_ms": 4.799999998882413,
+      "maximum_record_ms": 23.399999998509884,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2232.1999999713153,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 772.0999999716878
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1043.7999999728054
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_bytes": 50310428
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "65536-aligned",
+      "repetition": 1,
+      "cold_first_ms": 23,
+      "warm_first_ms": 0.09999999962747097,
+      "total_10000_ms": 5382.5,
+      "p95_record_ms": 3,
+      "maximum_record_ms": 17.90000000037253,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2082.199999999255,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 112.80000003054738
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 960.2999999690801
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_bytes": 40896931
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "131072-aligned",
+      "repetition": 1,
+      "cold_first_ms": 24.300000000745058,
+      "warm_first_ms": 0,
+      "total_10000_ms": 5432.5,
+      "p95_record_ms": 3.100000001490116,
+      "maximum_record_ms": 25.100000001490116,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2075,
+        "fetch_headers_ms": 1876.3000000603497,
+        "hash_calls": 2075,
+        "hash_bytes": 241567872,
+        "hash_ms": 189.3000000771135
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 958.6999999750406
+      },
+      "cache": {
+        "parts": 32,
+        "part_bytes": 3757986,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 407,
+      "network_bytes": 46328166
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "file": "browser-ui-10000-candidate.txt",
+  "sha256": "15e3a0758068f475adececcaae06082165dd32f10c3b3d6623c417e006d52694",
+  "records": 10000,
+  "korea_coordinates": 10000,
+  "finite": true,
+  "independent_source_mask_sha256": "4e7802454d55937eac2ac0a25fb9ed4434196963b5d848441ce8c08c3f857baf",
+  "geos_outside": 0,
+  "same_num64_input_order": true,
+  "output_lines": 170000,
+  "passed": true
+}

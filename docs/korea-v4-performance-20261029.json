@@ -1,0 +1,1607 @@
+{
+  "schema": 2,
+  "date_utc": "2026-10-29T04:59:37.958428+00:00",
+  "date_display_timezone": "Asia/Seoul",
+  "repository": "krwizxp/srg",
+  "baseline_commit": "c2da4b054e9045c96d0d335c7f8ea20b0edcaa63",
+  "immediate_v4_baseline": {
+    "archive": {
+      "file": "srg-korea-v4-review.zip",
+      "bytes": 49920572,
+      "sha256": "ab4e26cef17289c77a3dae89d2ecebc64a5c489335585d1b11060206608b4363",
+      "source_files": 227,
+      "source_bytes": 51936937,
+      "archive_integrity": "passed",
+      "all_source_hashes_verified": true,
+      "git_index_unchanged": true,
+      "gate_counts": {
+        "total": 18,
+        "passed": 11,
+        "failed": 1,
+        "not_run": 6
+      }
+    },
+    "elf_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+    "javascript_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+    "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+    "index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17"
+  },
+  "user_request": "성능을 더 개선한 후 Nu 오류 9건은 예외로하세요.",
+  "status": "local_implementation_and_validation_complete_with_approved_nu_exception; six_native_platform_gates_and_remote_authorization_pending",
+  "instruction": {
+    "file": "SRG_KOREA_UNIFORM_REJECTION_IMPLEMENTATION.md",
+    "sha256": "b74f9262b150005db89f0d790748a7f5c1f5b4a1ca0833d664848e2cf2d7efc2",
+    "remote_write_rule": "Section 8.6 requires separate authorization for GitHub push and CI changes."
+  },
+  "remote_actions": {
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "pull_request_created": false,
+    "active_ci_changed": false,
+    "workflow_executed": false,
+    "proposal": {
+      "branch": "verify/korea-v4-20261029",
+      "pull_request_state": "draft",
+      "inactive_workflow": "docs/korea-v4-native-validation.yml",
+      "native_hosts": [
+        "x86_64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc",
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin"
+      ],
+      "merge_or_deployment_in_scope": false
+    }
+  },
+  "toolchain": {
+    "rust": "1.99.1",
+    "rustc_commit": "58cf8f9c3",
+    "rustc_commit_date": "2026-10-13",
+    "llvm": "23.1.1",
+    "selection": "Latest official stable verified at the start of code work; baseline and final used this pinned version.",
+    "actual_targets": [
+      "x86_64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin"
+    ],
+    "runtime_external_crates": 0,
+    "actual_pgo": false,
+    "node": "24.22.1",
+    "playwright": "1.62.1",
+    "chromium": "151.0.7922.34",
+    "firefox": "153.0",
+    "webkit": "26.5",
+    "vscode_html_formatter": "1.144.0",
+    "htmlvalidate": "11.17.0",
+    "nu": "26.10.12",
+    "python_geospatial": {
+      "python": "3.12.14",
+      "numpy": "2.5.4",
+      "shapely": "2.2.0",
+      "geos": "3.14.1",
+      "pyproj": "3.8.0",
+      "proj": "9.8.1",
+      "pyshp": "3.1.6"
+    }
+  },
+  "measurement_environment": {
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "cpu_count": 9,
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "cpu_max": "800000 100000",
+    "memory_max": "8589934592",
+    "hardware_rng_flags": [
+      "rdrand",
+      "rdseed"
+    ]
+  },
+  "source_sha256": {
+    "src/batch.rs": "b3ab97ea5ae986619dfb2fc0b8e2f45adcbe687567cba67c2bebc9060826d608",
+    "src/boundary_inflate/tests.rs": "44721b9e470ee675302fb3cb181fb0e3965a5b3885c43570db034cc60276f021",
+    "src/boundary_inflate.rs": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+    "src/buffmt.rs": "8d0666b556356912ac17014a901de9974df3fea4df84fbba12f52c73018ffb4b",
+    "src/command.rs": "7505eb3d1dbba1979cb9cf5525edf50b4803a0631d9d5a761a2fd4a62a8a652e",
+    "src/diagnostic.rs": "f39f584363edbbe4d980cf2cb865bd521f7b41a4169d148d19026d4655a8502e",
+    "src/file_output.rs": "606210bc3aa1eb1841a4b415672d5ea603a66c60ff0b8b9038fd829d97c89528",
+    "src/geo_uniform/tests.rs": "f2c5b3ca8da3d71a23de8b56dd1462597d4c51dc7750216f00d5cec9181c9085",
+    "src/geo_uniform.rs": "c6b23a3e051c58e1f130d1f6eee5757d5ca82ea8b34bd8bbf9ef1666dccab713",
+    "src/hardware_rng.rs": "168e71ba27da1062477ba54a87326b9532ff79dd9462d4789bb729e908c0741b",
+    "src/input.rs": "c5f08666735a3a8631d47daedaf0c0828ee2f46dd56ab6c04de1796ee3bb19c4",
+    "src/korea_boundary/data.rs": "c917746a9822c065eecc9926ee8ffac67df8ca9ebb226d432092d1e1ab34c6e8",
+    "src/korea_boundary/hash.rs": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6",
+    "src/korea_boundary/tests.rs": "166831d749c71c340764aad24d9cd89608dd13986adf4f02962b0d9ef2aaf32b",
+    "src/korea_boundary.rs": "423cf0e18384e3f9f63ea4c54decc98ec0b871831323282368b6ae010643bd65",
+    "src/ladder.rs": "f939367740d593fe518945dd04032eeaa09b71c408c973051d6aea1aaf6e81a0",
+    "src/main.rs": "76a6507bac5e6a5cec707276b5663f036b570ac80fe6f0c19aa52bacef889574",
+    "src/menu_app.rs": "fbd35def80c2abc8ee4945cbfddb4645ce27cb4b7cbd58528dd71e04545febfd",
+    "src/numeric.rs": "17bf4cfa30b1ebe27ecc4823cee8ad382c6d798ffa139b65249fe217a8b7ce04",
+    "src/output/progress.rs": "f98bf34f76df69ad2ad0ba79137cb91f0cb24563e29873509e94da0853e55cfb",
+    "src/output.rs": "1f175dff9f2a4a23ed99bc13ebd06e59285a428a6692d9b7b3d0360237107fda",
+    "src/random_data.rs": "8731a97ab9abe3ae57f6e6477e3c07e44e390debfede8af6d29e994afec0ae53",
+    "src/random_number.rs": "a7f588061e812991c8e634976184abf5b4d045a76682bba004f25e3677bd5eba",
+    "src/stop_input.rs": "42c5b3ac3495d35d67e4a33ee189dd3728a2ad208372bbe3453560c7686ef319",
+    "src/time/address.rs": "7dae096900d2f2aa9cb01d1a0a752633abe0f9f0130fb8acaeac762623f32c10",
+    "src/time/display.rs": "6f536a61a39734dce7c4b7c618911fd0008675acf513f69c862b45ab4d95ef7d",
+    "src/time/http_date.rs": "fa8dffde67907f5446f8367cfed15cdb348a5f1251c28434b53c7f9429ffbd93",
+    "src/time/macos_input/sys.rs": "1c3837344fdbcc2b8e990fed8843a37c405e416881a802f20797e101c760173b",
+    "src/time/macos_input.rs": "f3f4cd4d6144ea3c24e5e38cab40868f12c9d6b219d14ddf5a86421b5a50c59f",
+    "src/time/native_http/libcurl/sys.rs": "6ba4e8b9692b9d9a7629a97873940b814c00b42d0955b2ea66f1f149e1b3e57e",
+    "src/time/native_http/libcurl.rs": "f6731d586ee459b797ef315653f34681e3a1a12df5d08dd8afc541c2fec9394e",
+    "src/time/native_http/winhttp/sys.rs": "2deb68b6c3893b1028cd351463ca931df70e13068a139afb1bc6ecb9f536f2b5",
+    "src/time/native_http/winhttp.rs": "4cc4fa14594bf64a27c82feca6a1ee7ee75d7f22b538054f5d83e4a8aebd4421",
+    "src/time/native_http.rs": "dfeb7ab20b60f9b03214233ad46ce8e8240bccc77bc04d51af817c6bc0cf5785",
+    "src/time/timer_resolution/sys.rs": "858d8c789530b1c764db625a7b3ccedccdd367b8fee7512cdb83f3d08f596fee",
+    "src/time/timer_resolution.rs": "e9a1ec209e1d023f4f8d1cfd6ede60f0be359281f9f7f519f72a3b90689f174b",
+    "src/time/util.rs": "6dcedda5e128e248566164e2ca2deca210977ff1777e4cddfd8f07658252443b",
+    "src/time/wayland_input/sys.rs": "1d41dfaa81a36dfe7c553fc52a6773c4b6eb8356c663da2e2ccd064c59c88098",
+    "src/time/wayland_input.rs": "ca1f2d4ff6ebb8fcb654a58dacf0d0bd780de77ab900abd16c97060f658774f6",
+    "src/time/windows_input.rs": "ff97baaa4096affae8a8db6137da5bd9d258974f7c37320634e796d89c1029ce",
+    "src/time.rs": "bf80625757903b2d13c258f18aebb0f7c5979b907203c53cb32961ce6878e6bf",
+    "Cargo.toml": "5b787aabfeecfe5d9a171310609781d992a7cf05003c3156369160c2a6dfdf7d",
+    "Cargo.lock": "4838d92097e0fba6df7e7fe3d2bf3ea5b9d8dfd4b97ba913e51d8186ae7cf947",
+    "korea_boundary.js": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+    "revgeo.html": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+    "tools/build_korea_boundary.py": "307832a0cff9e58081cedb2506486af9f1d51ad3cb3377b693c37cf97ba15fbb",
+    "tools/pack_korea_boundary.py": "5d97be0d98f3d3ffb7d4cf9edb2ae54712f94f120251de0eca1a7306ce6958d7",
+    "tools/uniform_math.py": "4789d5100bbbe81b9742cc443e94f26d9072ad25fe3d20c5d507f06723fa788a",
+    "tools/verify_korea_boundary.py": "29cf09e4feb455ae9a52db1c537ae4bfef402db11a440d8acedcd052c7f455b9",
+    "tools/verify_reduced_lattice.py": "76a2f9b644762d7a7f900c843e03fedee812423b59d397370cfcf3e8f189f4b9",
+    "tools/reduced_lattice_exhaustive.c": "bdb97a713dc34d030ebca42e0cad512b335b9c4e76930d58ff8918008710ecbf",
+    "data/korea-boundary-v4/index.bin": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "data/korea-boundary-v4/manifest.json": "037796f19af191f3b0ae19f6d9ba270004fe7e36e03e981ae9d1a5135187a2c6",
+    "README.md": "a08b03dc72a2950515856af35d4f62e41b910b97d3430883789145ef486efefb",
+    "docs/korea-v4-format.md": "b72b11326c14a4893cba03e18e5edd1e7797f07c1d6edf68e4ef1b34ba77a491",
+    "docs/korea-v4-native-validation.yml": "840d87953e1b12a68be396d699c4592527ff10b4a00e44380defbb21361a1969"
+  },
+  "human_report": {
+    "path": "korea-v4-performance-20261029.md",
+    "sha256": "bd67d2cd68e6192172998e9f4ce9f0643a4c91e4d32b45eb814281e1e88182e9"
+  },
+  "data": {
+    "manifest": "../data/korea-boundary-v4/manifest.json",
+    "manifest_sha256": "037796f19af191f3b0ae19f6d9ba270004fe7e36e03e981ae9d1a5135187a2c6",
+    "geometry_validation": "../data/korea-boundary-v4/geometry-validation.json",
+    "geometry_validation_sha256": "fb997d9d6c520a7dc142b70bd1fdda7896aff13f0d99479ea6868a9f085daa2e",
+    "format": 4,
+    "source_sha256": "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428",
+    "source_crs": "EPSG:5179",
+    "mask_crs": "EPSG:4326",
+    "bounds": {
+      "west": 124.60971767856728,
+      "south": 33.11235575873201,
+      "east": 131.87278314710602,
+      "north": 38.61370930167485
+    },
+    "polygon_components": 13701,
+    "rings": 13713,
+    "source_vertices": 5205473,
+    "binary_files": 97,
+    "binary_bytes": 50276630,
+    "root_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "parts": 96,
+    "pages": 25348,
+    "all_vertices_bit_preserved": true,
+    "component_pairs_checked": 13701,
+    "equals": true,
+    "symmetric_difference_empty": true,
+    "source_and_reconstructed_valid": true,
+    "tile_classifications_verified": true,
+    "final_integrity_evidence": "korea-v4-evidence/final-data-integrity.json"
+  },
+  "contract": {
+    "initial_candidate": "Original num64 high 32 bits and low 32 bits, open cell centers, GRS80 equal-area rectangle",
+    "retry": "Every rejection reads exactly one new full supp64 for both axes",
+    "maximum_supplemental_words": 1024,
+    "initial_candidate_in_addition_to_supplemental_limit": true,
+    "mask_semantics": "covers: exterior and hole boundaries included; hole interiors excluded",
+    "uniformity": "Conditional equal weight over accepted finite candidates, assuming independent uniform input words; no claim of a continuous distribution or enumeration of 2^64 candidates.",
+    "other_fields": "Unchanged at aligned supplemental-stream starting positions; later shared-stream records may shift by approved new Korea supplemental consumption.",
+    "errors": "Source, decompression, integrity and provider errors propagate; no ocean fallback or coordinate relocation",
+    "preservation_evidence": "korea-v4-evidence/final-scope-review.json"
+  },
+  "scope_review": {
+    "comparison": "Immediate v4 checkpoint to selected final performance source",
+    "only_runtime_changes": [
+      "src/boundary_inflate.rs",
+      "src/korea_boundary/hash.rs"
+    ],
+    "javascript_html_generators_tests_math_callers_dependencies_profiles_and_active_ci_byte_identical": true,
+    "data_files_checked": 100,
+    "data_bin_files": 97,
+    "data_bin_bytes": 50276630,
+    "all_data_files_identical": true,
+    "historical_report_byte_identical": true,
+    "git_index_unchanged": true,
+    "active_ci_diff_empty": true,
+    "remote_writes": 0,
+    "native_workflow_proposal": {
+      "path": "docs/korea-v4-native-validation.yml",
+      "active": false,
+      "executions": 0
+    }
+  },
+  "validation_summary": {
+    "new_native_release_tests": 17,
+    "new_cli_measurement_runs": 20,
+    "new_cli_contract_checks": 14,
+    "fixed_10000_paired_repetitions": 5,
+    "fixed_100000_final_runs": 1,
+    "coordinate_bits_and_supplemental_counts_exact": true,
+    "actual_cli_geos_records": 122010,
+    "actual_cli_geos_by_version": {
+      "before": {
+        "records_checked": 56006,
+        "outside": 0
+      },
+      "after": {
+        "records_checked": 66004,
+        "outside": 0
+      }
+    },
+    "actual_cli_geos_outside": 0,
+    "actual_cli_initial_candidate_oracle_tolerance_degrees": 1e-12,
+    "new_web_ui_scenarios": 18,
+    "new_web_ui_engines": 3,
+    "new_web_ui_page_errors": 0,
+    "new_web_pageerror_listeners_attached_before_navigation": true,
+    "reused_inflater_qualification": {
+      "passed": true,
+      "method": "Exact compressed page bytes and declared raw lengths compared in page order; unchanged qualified inflater source. No repeated decompression or malformed-stream run.",
+      "inflater_source_sha256": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+      "qualified_evidence": "evidence/perf2-native/final-inflate-validation.json",
+      "qualified_evidence_sha256": "c648c65aa77ae078c12a1416b5934fe341b114bce765a0a72f4bc1f1a15e115e",
+      "qualified_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "final_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "compressed_page_order_and_bytes_identical": true,
+      "page_stream_sha256": "a3555467c9ba08faa9c20dfd7b1c2be831cb9b2a3f8920c7e8ba5c7ab6dd4644",
+      "page_stream_hash_framing": "For every page: little-endian u32 raw length, u32 compressed length, compressed bytes",
+      "pages": 25348,
+      "raw_bytes": 84560888,
+      "compressed_bytes": 49466682,
+      "reused_valid_fixtures": 10,
+      "reused_invalid_fixtures": 1499,
+      "error_output_sha256": "b0ba2d7d2754b4f02664812448ccec7757cc5883f949d423ee576524951a7c64",
+      "original_data_files_exact": 97,
+      "original_data_bytes_exact": 50276630,
+      "original_embed_bytes_exact": true,
+      "decision_sha256": "43dd9db6599db18c726ca041335ce16dee531443e3711eeb405623e32d50ede6"
+    },
+    "reused_web_full_tests": {
+      "evidence": "korea-v4-performance-evidence/web-final/restored-web-evidence-link.json",
+      "same_js_html_and_all_97_binaries": true,
+      "represented_as_newly_rerun": false
+    },
+    "unchanged_mathematics_geometry_and_other_field_evidence": {
+      "report": "korea-v4-validation-20261029.json",
+      "report_sha256": "16059907d8b18c5c6c89224ba35ab948bddd8c303ce3de4572470871e2f9e60b",
+      "same_math_and_geometry_bytes": true,
+      "represented_as_newly_rerun": false,
+      "original_summary": {
+        "release_tests_passed": 17,
+        "independent_predicate_points": 49254,
+        "predicate_mismatches": 0,
+        "source_components_reached_per_runtime": 13701,
+        "reachability_cases": 13711,
+        "reachability_failures": 0,
+        "fixed_random_final_outputs": 100000,
+        "geos_outside_outputs": 0,
+        "supplemental_consumption_mismatches": 0,
+        "candidate_rust_node_binary64_cases": 32774,
+        "candidate_binary64_mismatches": 0,
+        "orientation_fraction_and_binary64_cases": 8192,
+        "orientation_mismatches": 0,
+        "reduced_model_actual_enumerations": [
+          256,
+          65536,
+          4294967296
+        ],
+        "reduced_model_scope": "Independent synthetic mask and integer C loop, not a 2^64 product enumeration",
+        "web_node_contract_checks": 18,
+        "web_node_synthetic_geos_points": 10650,
+        "web_synthetic_geos_points_per_engine": 10425,
+        "web_ui_contract_checks_per_engine": 10,
+        "web_fixed_records_per_engine": 10000,
+        "web_bit_or_consumption_mismatches": 0,
+        "actual_cli_final_outputs_geos_checked": 56672,
+        "actual_cli_outside_outputs": 0,
+        "actual_browser_ui_records_geos_checked": 10000,
+        "actual_browser_ui_outside_outputs": 0,
+        "all_zlib_pages_independently_compared": 25348,
+        "zlib_corruption_tests": 1506,
+        "other_fields_aligned_records": 1009,
+        "other_fields_aligned_mismatches": 0
+      }
+    },
+    "final_html": {
+      "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+      "final_html_byte_identical_to_immediate_v4": true,
+      "formatter": {
+        "provider": "vscode.html-language-features",
+        "vscode": "1.144.0",
+        "file": "/workspace/scratch/20ca01e7d960/srg/revgeo.html",
+        "edits": 1,
+        "bytes": 188661
+      },
+      "checks": [
+        {
+          "name": "htmlvalidate",
+          "command": [
+            "node",
+            "/workspace/scratch/20ca01e7d960/web-tools/node_modules/html-validate/bin/html-validate.mjs",
+            "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+          ],
+          "exit_code": 0,
+          "stdout_bytes": 0,
+          "stderr_bytes": 0
+        },
+        {
+          "name": "nu",
+          "command": [
+            "java",
+            "-jar",
+            "/workspace/scratch/20ca01e7d960/web-tools/vnu-latest.jar",
+            "--format",
+            "json",
+            "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+          ],
+          "exit_code": 1,
+          "stdout_bytes": 0,
+          "stderr_bytes": 2683
+        }
+      ],
+      "htmlvalidate_status": "passed",
+      "nu_raw_status": "failed",
+      "nu_gate_status": "accepted_user_exception",
+      "nu_counts": {
+        "error": 9,
+        "warning": 0,
+        "unexpected_diagnostics": 0
+      },
+      "nu_messages": [
+        "CSS: “field-sizing”: Property “field-sizing” doesn't exist.",
+        "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+        "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+        "CSS: Unrecognized at-rule “@position-try”",
+        "CSS: “position-try-fallbacks”: Property “position-try-fallbacks” doesn't exist.",
+        "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+        "CSS: “position-area”: Property “position-area” doesn't exist.",
+        "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+        "CSS: “position-area”: Property “position-area” doesn't exist."
+      ],
+      "authorization": {
+        "user_message": "성능을 더 개선한 후 Nu 오류 9건은 예외로하세요.",
+        "scope": "Only these nine identical existing CSS diagnostics; no new diagnostics waived."
+      },
+      "validation_policy_unchanged": true
+    }
+  },
+  "gates": [
+    {
+      "id": "clippy:x86_64-unknown-linux-gnu",
+      "status": "passed",
+      "policy": "Unchanged repository policy, without -D warnings",
+      "evidence": "korea-v4-performance-evidence/final/static-validation.json"
+    },
+    {
+      "id": "clippy:x86_64-pc-windows-msvc",
+      "status": "passed",
+      "policy": "Unchanged repository policy, without -D warnings",
+      "evidence": "korea-v4-performance-evidence/final/static-validation.json"
+    },
+    {
+      "id": "clippy:x86_64-apple-darwin",
+      "status": "passed",
+      "policy": "Unchanged repository policy, without -D warnings",
+      "evidence": "korea-v4-performance-evidence/final/static-validation.json"
+    },
+    {
+      "id": "clippy:aarch64-apple-darwin",
+      "status": "passed",
+      "policy": "Unchanged repository policy, without -D warnings",
+      "evidence": "korea-v4-performance-evidence/final/static-validation.json"
+    },
+    {
+      "id": "native_release_build:x86_64-unknown-linux-gnu",
+      "status": "passed",
+      "evidence": "korea-v4-performance-evidence/native/build-validation.json"
+    },
+    {
+      "id": "native_release_tests:x86_64-unknown-linux-gnu",
+      "status": "passed",
+      "evidence": "korea-v4-performance-evidence/native/release-tests.log",
+      "tests_passed": 17
+    },
+    {
+      "id": "native_release_build:x86_64-pc-windows-msvc",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "native_release_tests:x86_64-pc-windows-msvc",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "native_release_build:x86_64-apple-darwin",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "native_release_tests:x86_64-apple-darwin",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "native_release_build:aarch64-apple-darwin",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "native_release_tests:aarch64-apple-darwin",
+      "status": "not_run",
+      "reason": "A native host is unavailable locally; hosted GitHub validation requires separate authorization under instruction section 8.6."
+    },
+    {
+      "id": "rustfmt",
+      "status": "passed",
+      "evidence": "korea-v4-performance-evidence/final/static-validation.json"
+    },
+    {
+      "id": "browser:chromium",
+      "status": "passed",
+      "evidence": [
+        "korea-v4-performance-evidence/web-final/restored-ui-validation.json",
+        "korea-v4-performance-evidence/web-final/restored-web-evidence-link.json"
+      ],
+      "new_ui_checks": 6,
+      "full_checks_reused_by_source_identity": true
+    },
+    {
+      "id": "browser:firefox",
+      "status": "passed",
+      "evidence": [
+        "korea-v4-performance-evidence/web-final/restored-ui-validation.json",
+        "korea-v4-performance-evidence/web-final/restored-web-evidence-link.json"
+      ],
+      "new_ui_checks": 6,
+      "full_checks_reused_by_source_identity": true
+    },
+    {
+      "id": "browser:webkit",
+      "status": "passed",
+      "evidence": [
+        "korea-v4-performance-evidence/web-final/restored-ui-validation.json",
+        "korea-v4-performance-evidence/web-final/restored-web-evidence-link.json"
+      ],
+      "new_ui_checks": 6,
+      "full_checks_reused_by_source_identity": true
+    },
+    {
+      "id": "htmlvalidate",
+      "status": "passed",
+      "evidence": "korea-v4-performance-evidence/final/html-validation.json"
+    },
+    {
+      "id": "nu_html_checker",
+      "status": "accepted_user_exception",
+      "errors": 9,
+      "baseline_errors": 9,
+      "baseline_messages_identical": true,
+      "policy_unchanged": true,
+      "evidence": "korea-v4-performance-evidence/final/html-validation.json",
+      "raw_exit_code": 1,
+      "raw_status": "failed",
+      "unexpected_diagnostics": 0,
+      "user_authorization": "성능을 더 개선한 후 Nu 오류 9건은 예외로하세요."
+    }
+  ],
+  "gate_counts": {
+    "total": 18,
+    "passed": 11,
+    "accepted_user_exception": 1,
+    "failed": 0,
+    "not_run": 6
+  },
+  "metrics": {
+    "M1_runtime": {
+      "fixed_corpus_10000": {
+        "method": "Five alternating fresh processes per version; identical frozen input, supplemental words and single-threaded source-copy driver. C CLOCK_MONOTONIC/fork/exec/wait4 measures child wall and peak RSS.",
+        "medians": {
+          "wall_seconds": {
+            "before": 1.329995008,
+            "after": 0.751792718,
+            "delta": -0.57820229,
+            "percent_change": -43.47401956564336
+          },
+          "max_rss_kib": {
+            "before": 52608,
+            "after": 52672,
+            "delta": 64,
+            "percent_change": 0.12165450121655041
+          },
+          "user_seconds": {
+            "before": 1.325752,
+            "after": 0.744175,
+            "delta": -0.581577,
+            "percent_change": -43.86770678075538
+          },
+          "system_seconds": {
+            "before": 0.004156,
+            "after": 0.007969,
+            "delta": 0.0038130000000000004,
+            "percent_change": 91.7468719923003
+          }
+        },
+        "wall_ranges": {
+          "before": {
+            "minimum": 1.28189925,
+            "maximum": 1.354202176
+          },
+          "after": {
+            "minimum": 0.70103865,
+            "maximum": 0.767199788
+          }
+        },
+        "all_latitude_bits_longitude_bits_supplemental_counts_identical": true,
+        "statistics": {
+          "before": {
+            "wall_seconds": {
+              "median": 1.329995008,
+              "minimum": 1.28189925,
+              "maximum": 1.354202176
+            },
+            "max_rss_kib": {
+              "median": 52608,
+              "minimum": 52592,
+              "maximum": 52684
+            },
+            "user_seconds": {
+              "median": 1.325752,
+              "minimum": 1.265505,
+              "maximum": 1.333922
+            },
+            "system_seconds": {
+              "median": 0.004156,
+              "minimum": 0.003919,
+              "maximum": 0.019919
+            }
+          },
+          "after": {
+            "wall_seconds": {
+              "median": 0.751792718,
+              "minimum": 0.70103865,
+              "maximum": 0.767199788
+            },
+            "max_rss_kib": {
+              "median": 52672,
+              "minimum": 52600,
+              "maximum": 52688
+            },
+            "user_seconds": {
+              "median": 0.744175,
+              "minimum": 0.692935,
+              "maximum": 0.758568
+            },
+            "system_seconds": {
+              "median": 0.007969,
+              "minimum": 0.003902,
+              "maximum": 0.008457
+            }
+          }
+        }
+      },
+      "fixed_corpus_100000": {
+        "exit_code": 0,
+        "wall_seconds": 5.446666226,
+        "max_rss_kib": 52844,
+        "output_lines": 100000,
+        "output_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+        "expected_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+        "all_coordinate_bits_and_supp_exact": true
+      },
+      "actual_cli": {
+        "method": "Actual frozen release ELF; generate 1 and generate 10000, five alternating fresh processes per version. Default parallel batch path, hardware RNG, UTF-8 BOM and 17 complete output fields checked.",
+        "medians": {
+          "1": {
+            "wall_seconds": {
+              "before": 0.008837206,
+              "after": 0.007268732,
+              "delta": -0.0015684740000000003,
+              "percent_change": -17.748528211292125
+            },
+            "max_rss_kib": {
+              "before": 6452,
+              "after": 6580,
+              "delta": 128,
+              "percent_change": 1.983880967141971
+            },
+            "user_seconds": {
+              "before": 0.004202,
+              "after": 0.003655,
+              "delta": -0.0005470000000000002,
+              "percent_change": -13.017610661589718
+            },
+            "system_seconds": {
+              "before": 0.004311,
+              "after": 0.003297,
+              "delta": -0.0010139999999999997,
+              "percent_change": -23.52122477383437
+            }
+          },
+          "10000": {
+            "wall_seconds": {
+              "before": 0.256388199,
+              "after": 0.138026439,
+              "delta": -0.11836175999999998,
+              "percent_change": -46.16505769830693
+            },
+            "max_rss_kib": {
+              "before": 69436,
+              "after": 69636,
+              "delta": 200,
+              "percent_change": 0.28803502505905243
+            },
+            "user_seconds": {
+              "before": 1.480503,
+              "after": 0.82713,
+              "delta": -0.6533729999999999,
+              "percent_change": -44.13182546742559
+            },
+            "system_seconds": {
+              "before": 0.027803,
+              "after": 0.008391,
+              "delta": -0.019412000000000002,
+              "percent_change": -69.81980361831457
+            }
+          }
+        },
+        "wall_ranges": {
+          "1": {
+            "before": {
+              "minimum": 0.008606137,
+              "maximum": 0.012728754
+            },
+            "after": {
+              "minimum": 0.006654366,
+              "maximum": 0.01038649
+            }
+          },
+          "10000": {
+            "before": {
+              "minimum": 0.198108447,
+              "maximum": 0.275304205
+            },
+            "after": {
+              "minimum": 0.119528558,
+              "maximum": 0.150933356
+            }
+          }
+        },
+        "successful_runs": 20,
+        "contract_checks": 14,
+        "all_contract_checks_passed": true,
+        "contract_cases": [
+          "menu_eof",
+          "manual_supp_eof",
+          "manual_success",
+          "korea_supplier_eof",
+          "korea_retry_limit",
+          "standalone_empty_cwd",
+          "menu_enter_cancel"
+        ],
+        "statistics": {
+          "before": {
+            "1": {
+              "wall_seconds": {
+                "median": 0.008837206,
+                "minimum": 0.008606137,
+                "maximum": 0.012728754
+              },
+              "max_rss_kib": {
+                "median": 6452,
+                "minimum": 6396,
+                "maximum": 7096
+              },
+              "user_seconds": {
+                "median": 0.004202,
+                "minimum": 0.002953,
+                "maximum": 0.008579
+              },
+              "system_seconds": {
+                "median": 0.004311,
+                "minimum": 0.0,
+                "maximum": 0.006061
+              }
+            },
+            "10000": {
+              "wall_seconds": {
+                "median": 0.256388199,
+                "minimum": 0.198108447,
+                "maximum": 0.275304205
+              },
+              "max_rss_kib": {
+                "median": 69436,
+                "minimum": 69104,
+                "maximum": 70120
+              },
+              "user_seconds": {
+                "median": 1.480503,
+                "minimum": 1.328626,
+                "maximum": 1.686883
+              },
+              "system_seconds": {
+                "median": 0.027803,
+                "minimum": 0.017289,
+                "maximum": 0.039753
+              }
+            }
+          },
+          "after": {
+            "1": {
+              "wall_seconds": {
+                "median": 0.007268732,
+                "minimum": 0.006654366,
+                "maximum": 0.01038649
+              },
+              "max_rss_kib": {
+                "median": 6580,
+                "minimum": 6580,
+                "maximum": 7480
+              },
+              "user_seconds": {
+                "median": 0.003655,
+                "minimum": 0.003217,
+                "maximum": 0.010295
+              },
+              "system_seconds": {
+                "median": 0.003297,
+                "minimum": 0.0,
+                "maximum": 0.003543
+              }
+            },
+            "10000": {
+              "wall_seconds": {
+                "median": 0.138026439,
+                "minimum": 0.119528558,
+                "maximum": 0.150933356
+              },
+              "max_rss_kib": {
+                "median": 69636,
+                "minimum": 69136,
+                "maximum": 69900
+              },
+              "user_seconds": {
+                "median": 0.82713,
+                "minimum": 0.771158,
+                "maximum": 0.857331
+              },
+              "system_seconds": {
+                "median": 0.008391,
+                "minimum": 0.0,
+                "maximum": 0.016431
+              }
+            }
+          }
+        }
+      },
+      "unchanged_web_observation": {
+        "product_byte_identical_to_immediate_v4": true,
+        "new_browser_optimization_claimed": false,
+        "source_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+        "runs": 5,
+        "runtime_ms": [
+          8394.5,
+          8261.199999999255,
+          8149.4000000003725,
+          8202.400000000373,
+          8672.199999999255
+        ],
+        "median_total_ms": 8261.199999999255,
+        "median_cold_first_ms": 27,
+        "median_warm_first_ms": 0.10000000149011612,
+        "median_p95_record_ms": 4.700000001117587,
+        "actual_http_requests": 98,
+        "actual_http_body_bytes_including_temporary_instrumented_module": 50310422,
+        "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+        "evidence": "korea-v4-performance-evidence/web-candidates/chromium_selected_pairs.json"
+      }
+    },
+    "M2_memory": {
+      "rust_cache_payload_plus_live_entry_accounting_bytes_per_worker": 1048576,
+      "rust_cache_max_pages": 4096,
+      "web_cache_limits": {
+        "compressed_parts": {
+          "entries": 8,
+          "payload_bytes": 4194304,
+          "pending": 8,
+          "pending_reservation_bytes": 524288
+        },
+        "decoded_pages": {
+          "entries": 4096,
+          "payload_bytes": 4194304,
+          "pending": 256,
+          "pending_reservation_bytes": 32768
+        },
+        "memory_scope": "These are explicit payload and entry bounds, not total browser heap, RSS, or browser HTTP-cache bounds."
+      },
+      "process_peak_rss_kib": {
+        "fixed_10000": {
+          "before": 52608,
+          "after": 52672,
+          "delta": 64,
+          "percent_change": 0.12165450121655041
+        },
+        "cli_10000": {
+          "before": 69436,
+          "after": 69636,
+          "delta": 200,
+          "percent_change": 0.28803502505905243
+        },
+        "cli_1": {
+          "before": 6452,
+          "after": 6580,
+          "delta": 128,
+          "percent_change": 1.983880967141971
+        }
+      },
+      "huffman_quick_table_bytes_per_tree": 1024,
+      "sha_schedule_array_extra_bytes": 192,
+      "array_sizes_are_not_measured_full_stack_frame_or_process_rss": true,
+      "separate_object_metadata_measurement_performed": false,
+      "browser_full_heap_or_process_rss_cap_claimed": false
+    },
+    "M3_size": {
+      "boundary_bin_bytes": {
+        "before": 50276630,
+        "after": 50276630,
+        "delta": 0
+      },
+      "original_v3_boundary_bytes": 103444465,
+      "native_binaries_and_packages": {
+        "elf": {
+          "before": 50944864,
+          "after": 50950272,
+          "delta": 5408,
+          "percent_change": 0.010615397854429887
+        },
+        "official_uncompressed_tar": {
+          "before": 50946560,
+          "after": 50952192,
+          "delta": 5632,
+          "percent_change": 0.01105472086830872
+        },
+        "same_method_zip_deflate9": {
+          "before": 49845095,
+          "after": 49846081,
+          "delta": 986,
+          "percent_change": 0.0019781284397168974
+        }
+      },
+      "package_hashes_and_payload_verification": {
+        "before": {
+          "tar_path": "evidence/perf2-native-512k/cli-runs/before-package/artifacts/srg-linux-x64.tar",
+          "tar_bytes": 50946560,
+          "tar_sha256": "c8fea311299bf663e1f97feb84a568c7d055f58414da0c746017179f22e2c99f",
+          "tar_contract": {
+            "members": 1,
+            "name": "srg-linux-x64",
+            "size": 50944864,
+            "mode_octal": "0o755",
+            "uid": 0,
+            "gid": 0,
+            "mtime": 0,
+            "embedded_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+            "matches_binary": true
+          },
+          "zip_path": "evidence/perf2-native-512k/cli-runs/before-package/artifacts/srg-linux-x64.zip",
+          "zip_bytes": 49845095,
+          "zip_sha256": "adcf84b5e8a2736c8faafeca39429cd2212fae108098d42df508ca34f811a089",
+          "zip_embedded_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+          "zip_matches_binary": true
+        },
+        "after": {
+          "tar_path": "evidence/perf2-native-512k/cli-runs/after-package/artifacts/srg-linux-x64.tar",
+          "tar_bytes": 50952192,
+          "tar_sha256": "9314561488682e30144952faf062ea8a061a995587799f703641c6872fda4c33",
+          "tar_contract": {
+            "members": 1,
+            "name": "srg-linux-x64",
+            "size": 50950272,
+            "mode_octal": "0o755",
+            "uid": 0,
+            "gid": 0,
+            "mtime": 0,
+            "embedded_sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e",
+            "matches_binary": true
+          },
+          "zip_path": "evidence/perf2-native-512k/cli-runs/after-package/artifacts/srg-linux-x64.zip",
+          "zip_bytes": 49846081,
+          "zip_sha256": "f740a4196d32dc10400d87f8268cfcb46745320fd121608cc498079c8528f643",
+          "zip_embedded_sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e",
+          "zip_matches_binary": true
+        }
+      }
+    },
+    "M4_tool_gates": {
+      "counts": {
+        "total": 18,
+        "passed": 11,
+        "accepted_user_exception": 1,
+        "failed": 0,
+        "not_run": 6
+      },
+      "clippy_bin_warnings": {
+        "before": 106,
+        "after": 109
+      },
+      "clippy_test_warnings": {
+        "before": 211,
+        "after": 214
+      },
+      "clippy_policy": "Existing warning/error policy retained. Exit 0 is not warning-free or -D warnings success.",
+      "native_not_run": [
+        "x86_64-pc-windows-msvc",
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin"
+      ],
+      "actual_pgo": false
+    },
+    "M5_behavior": {
+      "coordinates_binary64_exact": true,
+      "ordered_full_u64_supplement_consumption_exact": true,
+      "general_provider_error": "release unit tests",
+      "cli_eof_limit_cancel_and_atomicity": "14 CLI cases across two versions",
+      "new_approved_runtime_contract_changes": 0
+    },
+    "M6_findings": {
+      "new_functional_product_bugs_fixed_in_followup": 0,
+      "material_performance_regression_found": "64 KiB packing increased real request count and became 92.78% slower under a nominal 20 ms actual-response delay. Rolled back.",
+      "validation_observation_gap_closed": "Listeners attached before navigation for all 18 final UI pages."
+    },
+    "M7_code_lines": {
+      "method": "Same language groups and initial nonblank/non-comment code counts as first v4. No comments changed in the performance delta; added/deleted nonblank source lines provide the exact code-line delta. Generated embeds, tests and tools remain separate.",
+      "groups": {
+        "rust_runtime": {
+          "files": [
+            "src/boundary_inflate.rs",
+            "src/geo_uniform.rs",
+            "src/korea_boundary.rs",
+            "src/korea_boundary/hash.rs",
+            "src/random_data.rs"
+          ],
+          "before": {
+            "physical": 1532,
+            "code": 1528,
+            "bytes": 59097
+          },
+          "after": {
+            "physical": 1589,
+            "code": 1585,
+            "bytes": 61420
+          },
+          "code_delta": 57
+        },
+        "rust_tests": {
+          "files": [
+            "src/boundary_inflate/tests.rs",
+            "src/geo_uniform/tests.rs",
+            "src/korea_boundary/tests.rs"
+          ],
+          "before": {
+            "physical": 476,
+            "code": 476,
+            "bytes": 17084
+          },
+          "after": {
+            "physical": 476,
+            "code": 476,
+            "bytes": 17084
+          },
+          "code_delta": 0
+        },
+        "javascript": {
+          "files": [
+            "korea_boundary.js"
+          ],
+          "before": {
+            "physical": 713,
+            "code": 703,
+            "bytes": 33492
+          },
+          "after": {
+            "physical": 713,
+            "code": 703,
+            "bytes": 33492
+          },
+          "code_delta": 0
+        },
+        "html": {
+          "files": [
+            "revgeo.html"
+          ],
+          "before": {
+            "physical": 6129,
+            "code": 5737,
+            "bytes": 188661
+          },
+          "after": {
+            "physical": 6129,
+            "code": 5737,
+            "bytes": 188661
+          },
+          "code_delta": 0
+        },
+        "generated_rust": {
+          "files": [
+            "src/korea_boundary/data.rs"
+          ],
+          "before": {
+            "physical": 103,
+            "code": 103,
+            "bytes": 6571
+          },
+          "after": {
+            "physical": 103,
+            "code": 103,
+            "bytes": 6571
+          },
+          "code_delta": 0
+        },
+        "data_tools": {
+          "files": [
+            "tools/build_korea_boundary.py",
+            "tools/pack_korea_boundary.py",
+            "tools/uniform_math.py",
+            "tools/verify_korea_boundary.py"
+          ],
+          "before": {
+            "physical": 695,
+            "code": 643,
+            "bytes": 33223
+          },
+          "after": {
+            "physical": 695,
+            "code": 643,
+            "bytes": 33223
+          },
+          "code_delta": 0
+        },
+        "reduced_model_validation": {
+          "files": [
+            "tools/verify_reduced_lattice.py",
+            "tools/reduced_lattice_exhaustive.c"
+          ],
+          "before": {
+            "physical": 445,
+            "code": 411,
+            "bytes": 23712
+          },
+          "after": {
+            "physical": 445,
+            "code": 411,
+            "bytes": 23712
+          },
+          "code_delta": 0
+        }
+      }
+    },
+    "M8_regressions": {
+      "unresolved_functional_regressions_observed_in_executed_checks": 0,
+      "new_rss_median_increases_kib": {
+        "fixed_10000": 64,
+        "cli_10000": 200,
+        "cli_1": 128
+      },
+      "elf_size_increase_bytes": 5408,
+      "discarded_web_candidates": [
+        {
+          "candidate": "Preallocated bounded response buffer",
+          "status": "rejected",
+          "reason": "One-run original-data Chromium runtime increased1.18%.",
+          "evidence": "runtime_smoke.json"
+        },
+        {
+          "candidate": "Remove redundant async wrappers",
+          "status": "rejected",
+          "reason": "One-run improvement1.75% was below the5% criterion and within measurement noise.",
+          "evidence": "runtime_smoke.json"
+        },
+        {
+          "candidate": "64KiB tile-aligned parts with64compressed entries and unchanged4MiB payload budget",
+          "status": "rejected",
+          "reason": "Local performance improved, but actualHTTP request count grew98to733. The actual-request-only nominal20ms header-delay workload increased runtime92.78%; WebKit first-result latency also regressed in the five-completed-pair diagnostic.",
+          "evidence": [
+            "chromium_three_way.json",
+            "webkit_final_pairs.json",
+            "chromium_delay20.json"
+          ]
+        },
+        {
+          "candidate": "Original512KiB parts and8compressed entries plus quick9 lookup",
+          "status": "rejected",
+          "reason": "Final five-run Chromium median improved4.6470246453%, below the predefined5% adoption criterion. No further repetitions were added to seek a pass.",
+          "baseline_median_ms": 8261.199999999255,
+          "candidate_median_ms": 7877.300000000745,
+          "runtime_reduction_percent": 4.647024645312358,
+          "evidence": "chromium_selected_pairs.json"
+        }
+      ],
+      "all_platform_acceptance_complete": false,
+      "raw_nu_still_reports_nine_errors": true
+    }
+  },
+  "selected_candidates": [
+    {
+      "name": "Rust fixed Huffman trees reused through LazyLock and bounded 9-bit lookup with existing fallback",
+      "source": "src/boundary_inflate.rs"
+    },
+    {
+      "name": "Rust SHA-256 standard 64-word schedule instead of per-round 16-word rotation",
+      "source": "src/korea_boundary/hash.rs"
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "candidate": "Preallocated bounded response buffer",
+      "status": "rejected",
+      "reason": "One-run original-data Chromium runtime increased1.18%.",
+      "evidence": "runtime_smoke.json"
+    },
+    {
+      "candidate": "Remove redundant async wrappers",
+      "status": "rejected",
+      "reason": "One-run improvement1.75% was below the5% criterion and within measurement noise.",
+      "evidence": "runtime_smoke.json"
+    },
+    {
+      "candidate": "64KiB tile-aligned parts with64compressed entries and unchanged4MiB payload budget",
+      "status": "rejected",
+      "reason": "Local performance improved, but actualHTTP request count grew98to733. The actual-request-only nominal20ms header-delay workload increased runtime92.78%; WebKit first-result latency also regressed in the five-completed-pair diagnostic.",
+      "evidence": [
+        "chromium_three_way.json",
+        "webkit_final_pairs.json",
+        "chromium_delay20.json"
+      ]
+    },
+    {
+      "candidate": "Original512KiB parts and8compressed entries plus quick9 lookup",
+      "status": "rejected",
+      "reason": "Final five-run Chromium median improved4.6470246453%, below the predefined5% adoption criterion. No further repetitions were added to seek a pass.",
+      "baseline_median_ms": 8261.199999999255,
+      "candidate_median_ms": 7877.300000000745,
+      "runtime_reduction_percent": 4.647024645312358,
+      "evidence": "chromium_selected_pairs.json"
+    },
+    {
+      "name": "Common GRS80 constants/search changes",
+      "status": "not_adopted",
+      "reason": "No established material end-to-end gain; mathematical operation order retained.",
+      "evidence": "korea-v4-performance-evidence/candidates/math-diagnosis.json"
+    },
+    {
+      "name": "128 KiB packing",
+      "status": "not_adopted",
+      "reason": "Exploratory one-run observations only; original data layout selected after the 64 KiB latency regression."
+    },
+    {
+      "name": "32 KiB packing",
+      "status": "not_adopted",
+      "reason": "Cache-trace model only; no browser adoption claim."
+    }
+  ],
+  "nu_exception": {
+    "user_authorized": true,
+    "scope": "Exactly the nine existing matching CSS diagnostics; no other diagnostics or native gates waived.",
+    "raw_exit_code": 1,
+    "raw_status": "failed",
+    "acceptance_status": "accepted_user_exception",
+    "diagnostic_count": 9,
+    "unexpected_diagnostics": 0,
+    "messages": [
+      "CSS: “field-sizing”: Property “field-sizing” doesn't exist.",
+      "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+      "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+      "CSS: Unrecognized at-rule “@position-try”",
+      "CSS: “position-try-fallbacks”: Property “position-try-fallbacks” doesn't exist.",
+      "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+      "CSS: “position-area”: Property “position-area” doesn't exist.",
+      "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+      "CSS: “position-area”: Property “position-area” doesn't exist."
+    ],
+    "checker_policy_or_css_changed": false
+  },
+  "limitations": [
+    "Linux x86_64 native results only; Windows/macOS native tests were not run.",
+    "CLI uses hardware RNG and cannot pair input values or expose automatic supplemental word counts; fixed-corpus probes establish exact bits and counts separately.",
+    "Five-run medians describe this host. File cache was not evicted; first runs retained; no formal significance claim.",
+    "Single-record runs are short and hardware RNG dependent, with overlapping timing and RSS ranges.",
+    "Median peak RSS increases of 64 KiB in the fixed probe, 200 KiB in CLI 10000, and 128 KiB in CLI 1 are preserved in this report; memory improvement is not claimed.",
+    "Actual CLI 10000 uses the product default parallel batch path; deterministic probe is single-threaded, so their absolute timings are not directly comparable.",
+    "Packaging is official deterministic uncompressed TAR plus a supplementary equal-method DEFLATE9 ZIP; archive payload hashes checked.",
+    "Web candidate timings and synthetic server delay are not a GitHub Pages deployment measurement.",
+    "No browser optimization survived the prespecified acceptance criteria; original web bytes and original performance costs remain.",
+    "Final UI checks close the earlier pageerror observation gap but do not replace or relabel the historical full geometry checks.",
+    "Nu has an authorized acceptance exception, not a clean raw checker result.",
+    "Windows and both macOS targets need native build/tests; the inactive docs workflow is only a proposal."
+  ],
+  "evidence_files": [
+    {
+      "source": "evidence/perf2/plan.json",
+      "path": "korea-v4-performance-evidence/plan.json",
+      "bytes": 3327,
+      "sha256": "0e254b3e58cd36ad78f91790e53ad0cefec600966a7f80812674e1825a1b7177"
+    },
+    {
+      "source": "evidence/perf2/final-data-decision.json",
+      "path": "korea-v4-performance-evidence/final-data-decision.json",
+      "bytes": 2482,
+      "sha256": "43dd9db6599db18c726ca041335ce16dee531443e3711eeb405623e32d50ede6"
+    },
+    {
+      "source": "evidence/perf2-final/clippy-aarch64-apple-darwin.log",
+      "path": "korea-v4-performance-evidence/final/clippy-aarch64-apple-darwin.log",
+      "bytes": 98732,
+      "sha256": "e3192c033a06d6a83ef8c0c5fd80c5ad02f53744e468200064cf5426fc7797b3"
+    },
+    {
+      "source": "evidence/perf2-final/clippy-x86_64-apple-darwin.log",
+      "path": "korea-v4-performance-evidence/final/clippy-x86_64-apple-darwin.log",
+      "bytes": 98732,
+      "sha256": "2534cb5c191c7686754e8de5dbcc2949d62e344c72e3720080516a6c2aa69864"
+    },
+    {
+      "source": "evidence/perf2-final/clippy-x86_64-pc-windows-msvc.log",
+      "path": "korea-v4-performance-evidence/final/clippy-x86_64-pc-windows-msvc.log",
+      "bytes": 98746,
+      "sha256": "cff4c6880763e8ac1818cbdb0eb75faedcf8674c4b39d0a5ec9e2ee5b536f3b1"
+    },
+    {
+      "source": "evidence/perf2-final/clippy-x86_64-unknown-linux-gnu.log",
+      "path": "korea-v4-performance-evidence/final/clippy-x86_64-unknown-linux-gnu.log",
+      "bytes": 98732,
+      "sha256": "56117b05da62271abc29df6c27557fba10ce6d1eefd3487e8f1514c845d588bb"
+    },
+    {
+      "source": "evidence/perf2-final/format.log",
+      "path": "korea-v4-performance-evidence/final/format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "evidence/perf2-final/html-formatter.stderr",
+      "path": "korea-v4-performance-evidence/final/html-formatter.stderr",
+      "bytes": 29,
+      "sha256": "b0ca7ed68586eddf08dc033b3a6bcb90ce630d593e3a2e64e295a975bf1a3ecf"
+    },
+    {
+      "source": "evidence/perf2-final/html-formatter.stdout",
+      "path": "korea-v4-performance-evidence/final/html-formatter.stdout",
+      "bytes": 146,
+      "sha256": "e83dba8288e488c75a017d99be30003e7eda6906616b23e15e3e880d3d97001d"
+    },
+    {
+      "source": "evidence/perf2-final/html-htmlvalidate.stderr",
+      "path": "korea-v4-performance-evidence/final/html-htmlvalidate.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "evidence/perf2-final/html-htmlvalidate.stdout",
+      "path": "korea-v4-performance-evidence/final/html-htmlvalidate.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "evidence/perf2-final/html-nu.stderr",
+      "path": "korea-v4-performance-evidence/final/html-nu.stderr",
+      "bytes": 2683,
+      "sha256": "98a45adef2a926e55f909929b699915c35b846e17cf223f33627214a44d87e35"
+    },
+    {
+      "source": "evidence/perf2-final/html-nu.stdout",
+      "path": "korea-v4-performance-evidence/final/html-nu.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "evidence/perf2-final/html-validation.json",
+      "path": "korea-v4-performance-evidence/final/html-validation.json",
+      "bytes": 2156,
+      "sha256": "1e563341be5033824c3674d530aaeb2e3f84e7d2bd57d3992f47ff880ecc9479"
+    },
+    {
+      "source": "evidence/perf2-final/loc.json",
+      "path": "korea-v4-performance-evidence/final/loc.json",
+      "bytes": 2778,
+      "sha256": "8a0136d95a919cee93d99186fb3a64b59b9c2e5cf18566a8cd99a038f0c23828"
+    },
+    {
+      "source": "evidence/perf2-final/scope-review.json",
+      "path": "korea-v4-performance-evidence/final/scope-review.json",
+      "bytes": 665,
+      "sha256": "c66c70293a35b03509f5078d19962c221dc60e5a5f84fd857f84c5c66aa23b7e"
+    },
+    {
+      "source": "evidence/perf2-final/static-validation.json",
+      "path": "korea-v4-performance-evidence/final/static-validation.json",
+      "bytes": 6782,
+      "sha256": "8aea48cf5a9199b2ce50a543c6a21edb48cca09404cbd340f03b8d52f3597421"
+    },
+    {
+      "source": "evidence/perf2-native-512k/summary.json",
+      "path": "korea-v4-performance-evidence/native/summary.json",
+      "bytes": 15996,
+      "sha256": "ea7fa82d48f873a55208743c0dd90fa0de164e130144ca8f6c17f81c616518fe"
+    },
+    {
+      "source": "evidence/perf2-native-512k/build-validation.json",
+      "path": "korea-v4-performance-evidence/native/build-validation.json",
+      "bytes": 553,
+      "sha256": "43d711b3a88714c131e32972e77f46178aa959a94e7a397421319c6238d13e5b"
+    },
+    {
+      "source": "evidence/perf2-native-512k/fixed-probe-validation.json",
+      "path": "korea-v4-performance-evidence/native/fixed-probe-validation.json",
+      "bytes": 10796,
+      "sha256": "4d9abbc9c592cb0e89d19a333684c38b355b6f1247030d09198ae9ad7d7013a4"
+    },
+    {
+      "source": "evidence/perf2-native-512k/fixed-probe-identity.json",
+      "path": "korea-v4-performance-evidence/native/fixed-probe-identity.json",
+      "bytes": 2611,
+      "sha256": "7cc936f7af18a84abc1abf3e8c6a1b2625310c4579350775e2b15ec1b4850d75"
+    },
+    {
+      "source": "evidence/perf2-native-512k/native-cli-validation.json",
+      "path": "korea-v4-performance-evidence/native/native-cli-validation.json",
+      "bytes": 135935,
+      "sha256": "74d1ddd3c5f7a1e85b9cfeaa832ab828977853057ba86da89f26381d1cd8169f"
+    },
+    {
+      "source": "evidence/perf2-native-512k/reused-validation.json",
+      "path": "korea-v4-performance-evidence/native/reused-validation.json",
+      "bytes": 1364,
+      "sha256": "9048fd8d4f528159bcd7cb0e5ce37fa925f843f9f56a6facfc1a2d9e8d3f0216"
+    },
+    {
+      "source": "evidence/perf2-native-512k/frozen-source.json",
+      "path": "korea-v4-performance-evidence/native/frozen-source.json",
+      "bytes": 4932,
+      "sha256": "c025a39efb3cd1665ce6210157f2fff0ed0574dbb3ad9ad2797ff23b49d3d5f6"
+    },
+    {
+      "source": "evidence/perf2-native-512k/measurement-go.json",
+      "path": "korea-v4-performance-evidence/native/measurement-go.json",
+      "bytes": 166,
+      "sha256": "393ec93171b1446de1afa53400c236ad263a464829210da07cb25212f71d4dd5"
+    },
+    {
+      "source": "evidence/perf2-native-512k/release-build.log",
+      "path": "korea-v4-performance-evidence/native/release-build.log",
+      "bytes": 124,
+      "sha256": "666dbf7958de12f90a208c16a8d14c316bbf9e560fe63fd914c9c8e8e1e5ad79"
+    },
+    {
+      "source": "evidence/perf2-native-512k/release-tests.log",
+      "path": "korea-v4-performance-evidence/native/release-tests.log",
+      "bytes": 1754,
+      "sha256": "77795b914205465429fe411883ce38cfc7d53c3a945d0bd8de645f3510e20f1c"
+    },
+    {
+      "source": "evidence/perf2-native/final-inflate-validation.json",
+      "path": "korea-v4-performance-evidence/qualified-inflater/final-inflate-validation.json",
+      "bytes": 432,
+      "sha256": "c648c65aa77ae078c12a1416b5934fe341b114bce765a0a72f4bc1f1a15e115e"
+    },
+    {
+      "source": "evidence/perf2-native/final-inflate-oracle.json",
+      "path": "korea-v4-performance-evidence/qualified-inflater/final-inflate-oracle.json",
+      "bytes": 174,
+      "sha256": "7a604f2c3d35bd9dcd6389011d4ac37d0a778fa524e2d882665ed08db2ee629a"
+    },
+    {
+      "source": "evidence/perf2-math/sha/measurements.json",
+      "path": "korea-v4-performance-evidence/sha/measurements.json",
+      "bytes": 7329,
+      "sha256": "dd37a9a07198604c7fb73d6ecaa955880ee3947aae4a18f5f4ca71cfd3454a07"
+    },
+    {
+      "source": "evidence/perf2-math/math-diagnosis.json",
+      "path": "korea-v4-performance-evidence/candidates/math-diagnosis.json",
+      "bytes": 3236,
+      "sha256": "bc112c9a8807599b35f54f35b5114537f4f8b189e9e5421efc406c6688af94da"
+    },
+    {
+      "source": "evidence/perf2-web/preliminary-summary.json",
+      "path": "korea-v4-performance-evidence/web-candidates/preliminary-summary.json",
+      "bytes": 2488,
+      "sha256": "a8e2d6006204e3a94a2cfe8a169c4cf49ca2e91d0b35ada5fd56819891f4d71b"
+    },
+    {
+      "source": "evidence/perf2-web/runtime_smoke.json",
+      "path": "korea-v4-performance-evidence/web-candidates/runtime_smoke.json",
+      "bytes": 5033,
+      "sha256": "756a28e78316d09091a5e054f510e145f89b1eee2c79af0d7b73cf87778a2286"
+    },
+    {
+      "source": "evidence/perf2-web/inflate-peek-validation.json",
+      "path": "korea-v4-performance-evidence/web-candidates/inflate-peek-validation.json",
+      "bytes": 5339,
+      "sha256": "5c55793335a287a324f825dc181f919cceb77644059f44c57a361149ecb27822"
+    },
+    {
+      "source": "evidence/perf2-web/inflate-peek-node-validation.json",
+      "path": "korea-v4-performance-evidence/web-candidates/inflate-peek-node-validation.json",
+      "bytes": 1286,
+      "sha256": "e700485f3b1a4219f93e3fafc54b8ce38756a879fa9ce5d09ad4a0dc9d9b7000"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_three_way.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_three_way.json",
+      "bytes": 15805,
+      "sha256": "34db515b5d33da289e9d9a596b2c621612b0ee9c402f7a8006b29a6767a98f0b"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_delay20.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_delay20.json",
+      "bytes": 6242,
+      "sha256": "c057ca54853047aa777f91f8ebac344c4d4e8f647c870252dec90c49385912e5"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_delay20-before-requests.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_delay20-before-requests.json",
+      "bytes": 14155,
+      "sha256": "41f4fdee2c5e3e72d9d64da12f26ebbdb44e0087e45324193e2f3ef8e998c113"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_delay20-original_quick9-requests.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_delay20-original_quick9-requests.json",
+      "bytes": 15044,
+      "sha256": "8ed3679afa82588811281b1e92027973e8579c30f522fd54f034b4c5e13be3bd"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_delay20-final-requests.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_delay20-final-requests.json",
+      "bytes": 104503,
+      "sha256": "af2a242294ac99e94abbe6b9035e2bd7921e7a5f7fb83dd310a5a3c7a0c81c0c"
+    },
+    {
+      "source": "evidence/perf2-web/chromium_selected_pairs.json",
+      "path": "korea-v4-performance-evidence/web-candidates/chromium_selected_pairs.json",
+      "bytes": 10848,
+      "sha256": "4c78f81dcf542252acfbb0387582bb598a604abdca6791d12ab1dbf073b15df4"
+    },
+    {
+      "source": "evidence/perf2-data/browser-repack_smoke.json",
+      "path": "korea-v4-performance-evidence/data-candidates/browser-repack_smoke.json",
+      "bytes": 3077,
+      "sha256": "a34374be10cbc4055ff17ecfd9ab29002aba75ffb5319e780304fcfd8164d3f8"
+    },
+    {
+      "source": "evidence/perf2-data/browser-repack_webkit.json",
+      "path": "korea-v4-performance-evidence/data-candidates/browser-repack_webkit.json",
+      "bytes": 2765,
+      "sha256": "d70370df25b482ee76db2618b39ebc63a10a3c06f2635188f4fdb13cc45fa641"
+    },
+    {
+      "source": "evidence/perf2-data/cache-simulation.json",
+      "path": "korea-v4-performance-evidence/data-candidates/cache-simulation.json",
+      "bytes": 1681,
+      "sha256": "15907e44f874787abea470199540495691df8d8a4f3bcf3b3744a072fdbd8fa2"
+    },
+    {
+      "source": "evidence/perf2-data/rebuild-validation.json",
+      "path": "korea-v4-performance-evidence/data-candidates/rebuild-validation.json",
+      "bytes": 1516,
+      "sha256": "d1667864e3bdd3b16a08cf050fec57efa46a86a266fdfc947ce75584bf057230"
+    },
+    {
+      "source": "evidence/perf2-native/summary.json",
+      "path": "korea-v4-performance-evidence/candidates/native-64k-summary.json",
+      "bytes": 7887,
+      "sha256": "b0fa37e301479ccf9ced12d528d00257ddb0369c5389a40b3233c5f2cf6fc9d7"
+    },
+    {
+      "source": "evidence/perf2-web/webkit_final_pairs-initial-interrupted.json",
+      "path": "korea-v4-performance-evidence/web-candidates/webkit_final_pairs-initial-interrupted.json",
+      "bytes": 8735,
+      "sha256": "82d9efa6ae409bd6505d589f1b3a24f59b8ef32aa0a69b7624f89f05c79b484f"
+    },
+    {
+      "source": "evidence/perf2-web/webkit_final_pairs.json",
+      "path": "korea-v4-performance-evidence/web-candidates/webkit_final_pairs.json",
+      "bytes": 11600,
+      "sha256": "c088a8bc6ee99d37544c6f046a91ef5e40fb56e94e1899b2b537cc73d11041c5"
+    },
+    {
+      "source": "evidence/perf2-web/webkit_recovery_pair.json",
+      "path": "korea-v4-performance-evidence/web-candidates/webkit_recovery_pair.json",
+      "bytes": 3490,
+      "sha256": "8bfe0a6c0ad1f02ec366dd52e14786b3963cb5cc257a09fe00eef50053f83222"
+    },
+    {
+      "source": "evidence/perf2-web/restored-ui-validation.json",
+      "path": "korea-v4-performance-evidence/web-final/restored-ui-validation.json",
+      "bytes": 1927,
+      "sha256": "11a0934b517e9dfdf5e21df7576988eaf636c3f1f8db20b0aa695b1d927e91a7"
+    },
+    {
+      "source": "evidence/perf2-web/restored-web-evidence-link.json",
+      "path": "korea-v4-performance-evidence/web-final/restored-web-evidence-link.json",
+      "bytes": 21802,
+      "sha256": "84b7d875faa02530afd4f4107c115204251c3aa80ebb3f762956449563ff0c80"
+    },
+    {
+      "source": "evidence/perf2-web/web-decisions.json",
+      "path": "korea-v4-performance-evidence/web-final/web-decisions.json",
+      "bytes": 4309,
+      "sha256": "c684eb981ae3727d467306de27d46f4a56c2b6e746451c5a0a5d743420c472c9"
+    },
+    {
+      "source": "evidence/perf2-rust/candidate-summary.json",
+      "path": "korea-v4-performance-evidence/rust-diagnosis/candidate-summary.json",
+      "bytes": 2845,
+      "sha256": "3701b836e305143bbfb70161a746b24b549701978d80dd8f5478e101b523d63c"
+    },
+    {
+      "source": "evidence/perf2-rust/profile-10000.stderr",
+      "path": "korea-v4-performance-evidence/rust-diagnosis/profile-10000.stderr",
+      "bytes": 397,
+      "sha256": "7c4db698922b8fb576b4ee4958c4742b0f427e8915dce04dda332f1fb3566020"
+    },
+    {
+      "source": "evidence/perf2-rust/profile-10000.metrics.json",
+      "path": "korea-v4-performance-evidence/rust-diagnosis/profile-10000.metrics.json",
+      "bytes": 224,
+      "sha256": "938376ad87c35de823c75be6cf57f14ca0e9476486e7c2b326268a8d67808939"
+    },
+    {
+      "source": "evidence/perf2-web/performance-summary.json",
+      "path": "korea-v4-performance-evidence/web-candidates/performance-summary.json",
+      "bytes": 35205,
+      "sha256": "a6e102af791fdeb1276c165d26c7f619539226632d79f7c33f4888271247a7f4"
+    },
+    {
+      "source": "evidence/perf2-web/preflight-restoration-mismatch.json",
+      "path": "korea-v4-performance-evidence/web-candidates/preflight-restoration-mismatch.json",
+      "bytes": 1123,
+      "sha256": "553c26d8eeb23ecb48e6606a4020d4491eab61934da66e390541c850e6d8f7a1"
+    },
+    {
+      "source": "evidence/perf2-web/profile.json",
+      "path": "korea-v4-performance-evidence/web-candidates/profile.json",
+      "bytes": 2332,
+      "sha256": "f2c97e4e3d8e65b520006c16333e1a1853b5743a1cce41ce08edd665647a147b"
+    },
+    {
+      "source": "evidence/perf2-web/profile-baseline-chromium-1-trace.json",
+      "path": "korea-v4-performance-evidence/web-candidates/profile-baseline-chromium-1-trace.json",
+      "bytes": 165038,
+      "sha256": "d3330ae0bbf4c9c08d5b51fa9c885e088517160757549c9394ad5360fea2bea9"
+    },
+    {
+      "source": "evidence/perf2-native/fixed-probe-validation.json",
+      "path": "korea-v4-performance-evidence/candidates/native-64k-fixed-probe-validation.json",
+      "bytes": 10798,
+      "sha256": "92916a27f10e018d39d8f25fbdc16179bca656d8b57c7f780aa1f9c898d9b46f"
+    },
+    {
+      "source": "evidence/perf2-native/native-cli-validation.json",
+      "path": "korea-v4-performance-evidence/candidates/native-64k-cli-validation.json",
+      "bytes": 135137,
+      "sha256": "f756502d639c96ec9e159a2baf4ce3236d9d40429c690b38fc5446689ae9ccdb"
+    }
+  ]
+}

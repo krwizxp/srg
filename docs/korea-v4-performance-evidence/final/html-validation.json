@@ -1,0 +1,62 @@
+{
+  "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+  "final_html_byte_identical_to_immediate_v4": true,
+  "formatter": {
+    "provider": "vscode.html-language-features",
+    "vscode": "1.144.0",
+    "file": "/workspace/scratch/20ca01e7d960/srg/revgeo.html",
+    "edits": 1,
+    "bytes": 188661
+  },
+  "checks": [
+    {
+      "name": "htmlvalidate",
+      "command": [
+        "node",
+        "/workspace/scratch/20ca01e7d960/web-tools/node_modules/html-validate/bin/html-validate.mjs",
+        "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "name": "nu",
+      "command": [
+        "java",
+        "-jar",
+        "/workspace/scratch/20ca01e7d960/web-tools/vnu-latest.jar",
+        "--format",
+        "json",
+        "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+      ],
+      "exit_code": 1,
+      "stdout_bytes": 0,
+      "stderr_bytes": 2683
+    }
+  ],
+  "htmlvalidate_status": "passed",
+  "nu_raw_status": "failed",
+  "nu_gate_status": "accepted_user_exception",
+  "nu_counts": {
+    "error": 9,
+    "warning": 0,
+    "unexpected_diagnostics": 0
+  },
+  "nu_messages": [
+    "CSS: “field-sizing”: Property “field-sizing” doesn't exist.",
+    "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+    "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+    "CSS: Unrecognized at-rule “@position-try”",
+    "CSS: “position-try-fallbacks”: Property “position-try-fallbacks” doesn't exist.",
+    "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+    "CSS: “position-area”: Property “position-area” doesn't exist.",
+    "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+    "CSS: “position-area”: Property “position-area” doesn't exist."
+  ],
+  "authorization": {
+    "user_message": "성능을 더 개선한 후 Nu 오류 9건은 예외로하세요.",
+    "scope": "Only these nine identical existing CSS diagnostics; no new diagnostics waived."
+  },
+  "validation_policy_unchanged": true
+}

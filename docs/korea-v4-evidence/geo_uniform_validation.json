@@ -1,0 +1,35 @@
+{
+  "seed": 20261029,
+  "bounds": [
+    124,
+    32,
+    132,
+    40
+  ],
+  "candidate_binary64_agreement": {
+    "tested": 32774,
+    "mismatches": 0
+  },
+  "orientation_binary64_agreement": {
+    "tested": 8192,
+    "mismatches": 0
+  },
+  "orientation_exact_fraction_comparison": {
+    "tested": 8192,
+    "mismatches": 0
+  },
+  "independent_decimal_precision": 80,
+  "independent_decimal_candidates": 2054,
+  "latitude_error_limit_degrees": 1e-12,
+  "latitude_error_upper_bound_degrees": "2.9941025945593924998041799760900757053951761063802944479372125746341825234419299E-14",
+  "longitude_error_degrees": "0",
+  "probe_elapsed_seconds_including_process_io": {
+    "rust": 0.16894039399994654,
+    "node": 0.17005689899997378
+  },
+  "corpus_sha256": "1dbf20d44067809dc5783f7d561af9dd6571c790dd1847842278a18074147577",
+  "source_sha256": {
+    "geo_uniform.rs": "c6b23a3e051c58e1f130d1f6eee5757d5ca82ea8b34bd8bbf9ef1666dccab713",
+    "geo_uniform_v4.js": "bb291e6eb023ec5a3d37b499de51f96da1d13475264547041b5a7277dda387de"
+  }
+}

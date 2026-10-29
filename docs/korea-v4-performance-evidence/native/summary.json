@@ -1,0 +1,448 @@
+{
+  "schema": 1,
+  "completed_utc": "2026-10-29T04:56:03Z",
+  "passed": true,
+  "comparison": "Immediately preceding v4 to final v4 with optimized Rust inflater/SHA and unchanged original 512 KiB data. Original v3 is not the baseline in this report.",
+  "rejected_64k_candidate_evidence_preserved": "evidence/perf2-native/",
+  "binary_sha256": {
+    "before": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+    "after": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e"
+  },
+  "final_rust_sources_unchanged_since_build": true,
+  "final_data_manifest_verified_again_at_end": {
+    "bin_files": 97,
+    "bytes": 50276630,
+    "all_sha256_and_lengths_match": true
+  },
+  "measurement_gate": {
+    "root_explicit_measurement_go": true,
+    "root_static_checks_completed": true,
+    "other_team_heavy_cpu_work_held": true,
+    "started_utc": "2026-10-29T04:55:11Z"
+  },
+  "fixed_corpus_10000": {
+    "method": "Five alternating fresh processes per version; identical frozen input, supplemental words and single-threaded source-copy driver. C CLOCK_MONOTONIC/fork/exec/wait4 measures child wall and peak RSS.",
+    "medians": {
+      "wall_seconds": {
+        "before": 1.329995008,
+        "after": 0.751792718,
+        "delta": -0.57820229,
+        "percent_change": -43.47401956564336
+      },
+      "max_rss_kib": {
+        "before": 52608,
+        "after": 52672,
+        "delta": 64,
+        "percent_change": 0.12165450121655041
+      },
+      "user_seconds": {
+        "before": 1.325752,
+        "after": 0.744175,
+        "delta": -0.581577,
+        "percent_change": -43.86770678075538
+      },
+      "system_seconds": {
+        "before": 0.004156,
+        "after": 0.007969,
+        "delta": 0.0038130000000000004,
+        "percent_change": 91.7468719923003
+      }
+    },
+    "wall_ranges": {
+      "before": {
+        "minimum": 1.28189925,
+        "maximum": 1.354202176
+      },
+      "after": {
+        "minimum": 0.70103865,
+        "maximum": 0.767199788
+      }
+    },
+    "all_latitude_bits_longitude_bits_supplemental_counts_identical": true,
+    "statistics": {
+      "before": {
+        "wall_seconds": {
+          "median": 1.329995008,
+          "minimum": 1.28189925,
+          "maximum": 1.354202176
+        },
+        "max_rss_kib": {
+          "median": 52608,
+          "minimum": 52592,
+          "maximum": 52684
+        },
+        "user_seconds": {
+          "median": 1.325752,
+          "minimum": 1.265505,
+          "maximum": 1.333922
+        },
+        "system_seconds": {
+          "median": 0.004156,
+          "minimum": 0.003919,
+          "maximum": 0.019919
+        }
+      },
+      "after": {
+        "wall_seconds": {
+          "median": 0.751792718,
+          "minimum": 0.70103865,
+          "maximum": 0.767199788
+        },
+        "max_rss_kib": {
+          "median": 52672,
+          "minimum": 52600,
+          "maximum": 52688
+        },
+        "user_seconds": {
+          "median": 0.744175,
+          "minimum": 0.692935,
+          "maximum": 0.758568
+        },
+        "system_seconds": {
+          "median": 0.007969,
+          "minimum": 0.003902,
+          "maximum": 0.008457
+        }
+      }
+    }
+  },
+  "fixed_corpus_100000": {
+    "exit_code": 0,
+    "wall_seconds": 5.446666226,
+    "max_rss_kib": 52844,
+    "output_lines": 100000,
+    "output_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+    "expected_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+    "all_coordinate_bits_and_supp_exact": true
+  },
+  "cli": {
+    "method": "Actual frozen release ELF; generate 1 and generate 10000, five alternating fresh processes per version. Default parallel batch path, hardware RNG, UTF-8 BOM and 17 complete output fields checked.",
+    "medians": {
+      "1": {
+        "wall_seconds": {
+          "before": 0.008837206,
+          "after": 0.007268732,
+          "delta": -0.0015684740000000003,
+          "percent_change": -17.748528211292125
+        },
+        "max_rss_kib": {
+          "before": 6452,
+          "after": 6580,
+          "delta": 128,
+          "percent_change": 1.983880967141971
+        },
+        "user_seconds": {
+          "before": 0.004202,
+          "after": 0.003655,
+          "delta": -0.0005470000000000002,
+          "percent_change": -13.017610661589718
+        },
+        "system_seconds": {
+          "before": 0.004311,
+          "after": 0.003297,
+          "delta": -0.0010139999999999997,
+          "percent_change": -23.52122477383437
+        }
+      },
+      "10000": {
+        "wall_seconds": {
+          "before": 0.256388199,
+          "after": 0.138026439,
+          "delta": -0.11836175999999998,
+          "percent_change": -46.16505769830693
+        },
+        "max_rss_kib": {
+          "before": 69436,
+          "after": 69636,
+          "delta": 200,
+          "percent_change": 0.28803502505905243
+        },
+        "user_seconds": {
+          "before": 1.480503,
+          "after": 0.82713,
+          "delta": -0.6533729999999999,
+          "percent_change": -44.13182546742559
+        },
+        "system_seconds": {
+          "before": 0.027803,
+          "after": 0.008391,
+          "delta": -0.019412000000000002,
+          "percent_change": -69.81980361831457
+        }
+      }
+    },
+    "wall_ranges": {
+      "1": {
+        "before": {
+          "minimum": 0.008606137,
+          "maximum": 0.012728754
+        },
+        "after": {
+          "minimum": 0.006654366,
+          "maximum": 0.01038649
+        }
+      },
+      "10000": {
+        "before": {
+          "minimum": 0.198108447,
+          "maximum": 0.275304205
+        },
+        "after": {
+          "minimum": 0.119528558,
+          "maximum": 0.150933356
+        }
+      }
+    },
+    "successful_runs": 20,
+    "contract_checks": 14,
+    "all_contract_checks_passed": true,
+    "contract_cases": [
+      "menu_eof",
+      "manual_supp_eof",
+      "manual_success",
+      "korea_supplier_eof",
+      "korea_retry_limit",
+      "standalone_empty_cwd",
+      "menu_enter_cancel"
+    ],
+    "statistics": {
+      "before": {
+        "1": {
+          "wall_seconds": {
+            "median": 0.008837206,
+            "minimum": 0.008606137,
+            "maximum": 0.012728754
+          },
+          "max_rss_kib": {
+            "median": 6452,
+            "minimum": 6396,
+            "maximum": 7096
+          },
+          "user_seconds": {
+            "median": 0.004202,
+            "minimum": 0.002953,
+            "maximum": 0.008579
+          },
+          "system_seconds": {
+            "median": 0.004311,
+            "minimum": 0.0,
+            "maximum": 0.006061
+          }
+        },
+        "10000": {
+          "wall_seconds": {
+            "median": 0.256388199,
+            "minimum": 0.198108447,
+            "maximum": 0.275304205
+          },
+          "max_rss_kib": {
+            "median": 69436,
+            "minimum": 69104,
+            "maximum": 70120
+          },
+          "user_seconds": {
+            "median": 1.480503,
+            "minimum": 1.328626,
+            "maximum": 1.686883
+          },
+          "system_seconds": {
+            "median": 0.027803,
+            "minimum": 0.017289,
+            "maximum": 0.039753
+          }
+        }
+      },
+      "after": {
+        "1": {
+          "wall_seconds": {
+            "median": 0.007268732,
+            "minimum": 0.006654366,
+            "maximum": 0.01038649
+          },
+          "max_rss_kib": {
+            "median": 6580,
+            "minimum": 6580,
+            "maximum": 7480
+          },
+          "user_seconds": {
+            "median": 0.003655,
+            "minimum": 0.003217,
+            "maximum": 0.010295
+          },
+          "system_seconds": {
+            "median": 0.003297,
+            "minimum": 0.0,
+            "maximum": 0.003543
+          }
+        },
+        "10000": {
+          "wall_seconds": {
+            "median": 0.138026439,
+            "minimum": 0.119528558,
+            "maximum": 0.150933356
+          },
+          "max_rss_kib": {
+            "median": 69636,
+            "minimum": 69136,
+            "maximum": 69900
+          },
+          "user_seconds": {
+            "median": 0.82713,
+            "minimum": 0.771158,
+            "maximum": 0.857331
+          },
+          "system_seconds": {
+            "median": 0.008391,
+            "minimum": 0.0,
+            "maximum": 0.016431
+          }
+        }
+      }
+    }
+  },
+  "size_bytes": {
+    "elf": {
+      "before": 50944864,
+      "after": 50950272,
+      "delta": 5408,
+      "percent_change": 0.010615397854429887
+    },
+    "official_uncompressed_tar": {
+      "before": 50946560,
+      "after": 50952192,
+      "delta": 5632,
+      "percent_change": 0.01105472086830872
+    },
+    "same_method_zip_deflate9": {
+      "before": 49845095,
+      "after": 49846081,
+      "delta": 986,
+      "percent_change": 0.0019781284397168974
+    }
+  },
+  "geography": {
+    "geos_source_mask_sha256": "4e7802454d55937eac2ac0a25fb9ed4434196963b5d848441ce8c08c3f857baf",
+    "source_shp_sha256": "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428",
+    "records_checked": 122010,
+    "outside": 0,
+    "by_variant": {
+      "before": {
+        "records_checked": 56006,
+        "outside": 0
+      },
+      "after": {
+        "records_checked": 66004,
+        "outside": 0
+      }
+    },
+    "automatic_supplemental": {
+      "initial_candidates_outside": 37778,
+      "outside_initial_candidates_replaced": 37778,
+      "initial_candidates_inside": 12227,
+      "inside_initial_candidates_preserved": 12227,
+      "coordinate_tolerance_degrees": 1e-12,
+      "oracle": "closed-form GRS80 authalic integral with 52-step bisection; GEOS source covers",
+      "supplemental_count_observable": false
+    }
+  },
+  "validation": {
+    "release_tests": 17,
+    "reused_inflater_qualification": {
+      "passed": true,
+      "method": "Exact compressed page bytes and declared raw lengths compared in page order; unchanged qualified inflater source. No repeated decompression or malformed-stream run.",
+      "inflater_source_sha256": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+      "qualified_evidence": "evidence/perf2-native/final-inflate-validation.json",
+      "qualified_evidence_sha256": "c648c65aa77ae078c12a1416b5934fe341b114bce765a0a72f4bc1f1a15e115e",
+      "qualified_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "final_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "compressed_page_order_and_bytes_identical": true,
+      "page_stream_sha256": "a3555467c9ba08faa9c20dfd7b1c2be831cb9b2a3f8920c7e8ba5c7ab6dd4644",
+      "page_stream_hash_framing": "For every page: little-endian u32 raw length, u32 compressed length, compressed bytes",
+      "pages": 25348,
+      "raw_bytes": 84560888,
+      "compressed_bytes": 49466682,
+      "reused_valid_fixtures": 10,
+      "reused_invalid_fixtures": 1499,
+      "error_output_sha256": "b0ba2d7d2754b4f02664812448ccec7757cc5883f949d423ee576524951a7c64",
+      "original_data_files_exact": 97,
+      "original_data_bytes_exact": 50276630,
+      "original_embed_bytes_exact": true,
+      "decision_sha256": "43dd9db6599db18c726ca041335ce16dee531443e3711eeb405623e32d50ede6"
+    },
+    "fixed_100000_oracle": "Whole binary64 coordinate/supp-count output exactly matches previously GEOS-validated frozen source oracle, SHA 31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be. No repeated global geometry overlay.",
+    "manual_success_output_bytes_identical": true,
+    "manual_eof_and_retry_limit_keep_atomic_empty_output": true,
+    "packaged_elf_hashes_match": true
+  },
+  "limits": [
+    "Linux x86_64 native results only; Windows/macOS native tests were not run.",
+    "CLI uses hardware RNG and cannot pair input values or expose automatic supplemental word counts; fixed-corpus probes establish exact bits and counts separately.",
+    "Five-run medians describe this host. File cache was not evicted; first runs retained; no formal significance claim.",
+    "Single-record runs are short and hardware RNG dependent, with overlapping timing and RSS ranges.",
+    "Median peak RSS increases of 64 KiB in the fixed probe, 200 KiB in CLI 10000, and 128 KiB in CLI 1 are preserved in this report; memory improvement is not claimed.",
+    "Actual CLI 10000 uses the product default parallel batch path; deterministic probe is single-threaded, so their absolute timings are not directly comparable.",
+    "Packaging is official deterministic uncompressed TAR plus a supplementary equal-method DEFLATE9 ZIP; archive payload hashes checked."
+  ],
+  "evidence": {
+    "build-validation.json": "43d711b3a88714c131e32972e77f46178aa959a94e7a397421319c6238d13e5b",
+    "frozen-source.json": "c025a39efb3cd1665ce6210157f2fff0ed0574dbb3ad9ad2797ff23b49d3d5f6",
+    "measurement-go.json": "393ec93171b1446de1afa53400c236ad263a464829210da07cb25212f71d4dd5",
+    "fixed-probe-identity.json": "7cc936f7af18a84abc1abf3e8c6a1b2625310c4579350775e2b15ec1b4850d75",
+    "fixed-probe-validation.json": "4d9abbc9c592cb0e89d19a333684c38b355b6f1247030d09198ae9ad7d7013a4",
+    "native-cli-validation.json": "74d1ddd3c5f7a1e85b9cfeaa832ab828977853057ba86da89f26381d1cd8169f",
+    "reused-validation.json": "9048fd8d4f528159bcd7cb0e5ce37fa925f843f9f56a6facfc1a2d9e8d3f0216"
+  },
+  "packages": {
+    "before": {
+      "tar_path": "evidence/perf2-native-512k/cli-runs/before-package/artifacts/srg-linux-x64.tar",
+      "tar_bytes": 50946560,
+      "tar_sha256": "c8fea311299bf663e1f97feb84a568c7d055f58414da0c746017179f22e2c99f",
+      "tar_contract": {
+        "members": 1,
+        "name": "srg-linux-x64",
+        "size": 50944864,
+        "mode_octal": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "mtime": 0,
+        "embedded_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+        "matches_binary": true
+      },
+      "zip_path": "evidence/perf2-native-512k/cli-runs/before-package/artifacts/srg-linux-x64.zip",
+      "zip_bytes": 49845095,
+      "zip_sha256": "adcf84b5e8a2736c8faafeca39429cd2212fae108098d42df508ca34f811a089",
+      "zip_embedded_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+      "zip_matches_binary": true
+    },
+    "after": {
+      "tar_path": "evidence/perf2-native-512k/cli-runs/after-package/artifacts/srg-linux-x64.tar",
+      "tar_bytes": 50952192,
+      "tar_sha256": "9314561488682e30144952faf062ea8a061a995587799f703641c6872fda4c33",
+      "tar_contract": {
+        "members": 1,
+        "name": "srg-linux-x64",
+        "size": 50950272,
+        "mode_octal": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "mtime": 0,
+        "embedded_sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e",
+        "matches_binary": true
+      },
+      "zip_path": "evidence/perf2-native-512k/cli-runs/after-package/artifacts/srg-linux-x64.zip",
+      "zip_bytes": 49846081,
+      "zip_sha256": "f740a4196d32dc10400d87f8268cfcb46745320fd121608cc498079c8528f643",
+      "zip_embedded_sha256": "3d12310ba41743e7a667021beeec861004ff73fe3a64aa2e30935573f527b50e",
+      "zip_matches_binary": true
+    }
+  },
+  "final_source_sha256": {
+    "src/boundary_inflate.rs": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+    "src/korea_boundary/hash.rs": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6",
+    "src/korea_boundary.rs": "423cf0e18384e3f9f63ea4c54decc98ec0b871831323282368b6ae010643bd65",
+    "src/korea_boundary/data.rs": "c917746a9822c065eecc9926ee8ffac67df8ca9ebb226d432092d1e1ab34c6e8",
+    "src/geo_uniform.rs": "c6b23a3e051c58e1f130d1f6eee5757d5ca82ea8b34bd8bbf9ef1666dccab713",
+    "data/korea-boundary-v4/index.bin": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "data/korea-boundary-v4/manifest.json": "037796f19af191f3b0ae19f6d9ba270004fe7e36e03e981ae9d1a5135187a2c6"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "status": "single screening pair, not qualification",
+  "completed_utc": "2026-10-29T05:38:37Z",
+  "primary_workload": "same fixed 10000-coordinate whole sampler, source-copy probe",
+  "math_validation": {
+    "fixed_candidates": 395562,
+    "fixed_bits_exact": true,
+    "bounds_cases": 24,
+    "bounds_values_per_case": 8,
+    "extra_successes": 42,
+    "extra_errors": 150,
+    "all_errors_exact": true
+  },
+  "compiler": "Rust 1.99.1, opt-level 3, codegen-units 1, fat LTO, panic abort, strip symbols; same srg_perf4_probe crate name",
+  "runs": [
+    {
+      "exit_code": 0,
+      "wall_seconds": 0.762966878,
+      "max_rss_kib": 52560,
+      "user_seconds": 0.754366,
+      "system_seconds": 0.00845,
+      "major_page_faults": 0,
+      "minor_page_faults": 1837,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 2,
+      "variant": "before",
+      "binary_sha256": "f878cda5a1933fe0d071e52d100773d1e4a53b83a7a55d7e8ed3e2992f244c55",
+      "probe_bytes": 50629384,
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "all_coordinate_bits_and_supp_exact": true,
+      "stderr_bytes": 0
+    },
+    {
+      "exit_code": 0,
+      "wall_seconds": 0.744084731,
+      "max_rss_kib": 52616,
+      "user_seconds": 0.738986,
+      "system_seconds": 0.004238,
+      "major_page_faults": 0,
+      "minor_page_faults": 1838,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 16,
+      "variant": "stagnation",
+      "binary_sha256": "84595bbdc127a61263c1b43f4983123f5476515ab7111b3ec9336fa05b28412f",
+      "probe_bytes": 50629512,
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "all_coordinate_bits_and_supp_exact": true,
+      "stderr_bytes": 0
+    }
+  ],
+  "ratio": 0.9752516818954231,
+  "percent_reduction": 2.4748318104576894,
+  "limitations": [
+    "One fixed-order pair cannot establish an improvement or confidence interval.",
+    "No separate math-only runtime improvement claim is made."
+  ],
+  "product_files_modified": []
+}

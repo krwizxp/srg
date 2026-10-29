@@ -1,0 +1,61 @@
+{
+  "method": "Independent arithmetic over the frozen raw execution results; no new program timing runs. Two-sided95% Student-t intervals on paired log-time, and paired absolute delta. p95 is observed nearest-rank only for n>=20, not a population-tail guarantee.",
+  "primary_fixed10000": {
+    "before_seconds": {
+      "n": 5,
+      "median": 0.750092666,
+      "minimum": 0.722079501,
+      "maximum": 0.764128978,
+      "observed_nearest_rank_p95": null
+    },
+    "after_seconds": {
+      "n": 5,
+      "median": 0.611887254,
+      "minimum": 0.595917637,
+      "maximum": 0.639646896,
+      "observed_nearest_rank_p95": null
+    },
+    "faster_pairs": 5,
+    "ratio_95_t_interval": [
+      0.7810915509407825,
+      0.8792019375368135
+    ],
+    "mean_delta_seconds_95_t_interval": [
+      -0.16772721733395674,
+      -0.08739603026604326
+    ],
+    "median_reduction_percent": 18.4251117581251
+  },
+  "actual_cli10000": {
+    "before_seconds": {
+      "n": 25,
+      "median": 0.158006519,
+      "minimum": 0.129399407,
+      "maximum": 0.256230556,
+      "observed_nearest_rank_p95": 0.198137381
+    },
+    "after_seconds": {
+      "n": 25,
+      "median": 0.130281199,
+      "minimum": 0.100692907,
+      "maximum": 0.224867502,
+      "observed_nearest_rank_p95": 0.153050122
+    },
+    "faster_pairs": 23,
+    "ratio_95_t_interval": [
+      0.7656668637900576,
+      0.8968772560294158
+    ],
+    "mean_delta_seconds_95_t_interval": [
+      -0.04120768779241299,
+      -0.014012133487587008
+    ],
+    "median_reduction_percent": 17.546946907931073
+  },
+  "inputs_sha256": {
+    "evidence/perf4-sha/qualification-summary.json": "0fa608b808960de5d6aa11cfe54431464fb567208ac3f1b3f087585d57753724",
+    "evidence/perf4-sha/primary-qualification.json": "bd2754bb1869edbf8dd6f827f148f18432f7e0d6164357bb2421f8d7f9e88a9b",
+    "evidence/perf4-sha/final-native/native-cli-validation.json": "e8e32e09e0c7a3a16eba02b027431cfed370903215adc0c3b4f5789defe7894a"
+  },
+  "agrees_with_native_report": true
+}

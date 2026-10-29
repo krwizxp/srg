@@ -1,0 +1,84 @@
+{
+  "qualification": false,
+  "runs_per_variant": 1,
+  "records": [
+    {
+      "exit_code": 0,
+      "wall_seconds": 0.758346649,
+      "max_rss_kib": 52548,
+      "user_seconds": 0.737654,
+      "system_seconds": 0.019865,
+      "major_page_faults": 0,
+      "minor_page_faults": 1838,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 6,
+      "variant": "baseline",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/measure",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/baseline/smoke.metrics.json",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/baseline/probe"
+      ],
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "expected_equal": true
+    },
+    {
+      "exit_code": 0,
+      "wall_seconds": 0.695465862,
+      "max_rss_kib": 52548,
+      "user_seconds": 0.695239,
+      "system_seconds": 0.0,
+      "major_page_faults": 0,
+      "minor_page_faults": 1837,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 3,
+      "variant": "bits-read",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/measure",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/bits-read/smoke.metrics.json",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/bits-read/probe"
+      ],
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "expected_equal": true
+    },
+    {
+      "exit_code": 0,
+      "wall_seconds": 0.788707769,
+      "max_rss_kib": 52676,
+      "user_seconds": 0.780012,
+      "system_seconds": 0.008367,
+      "major_page_faults": 0,
+      "minor_page_faults": 1837,
+      "voluntary_context_switches": 1,
+      "involuntary_context_switches": 4,
+      "variant": "profile",
+      "command": [
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/measure",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/profile/smoke.metrics.json",
+        "/workspace/scratch/20ca01e7d960/evidence/perf4-rust/profile/probe"
+      ],
+      "output_sha256": "9989e450b87e15bcf916a88fc52f0c2c6861f2586c650cf6607badc634818db8",
+      "expected_equal": true,
+      "profile": {
+        "root_ns": 0,
+        "part_ns": 222490652,
+        "decode_ns": 426301810,
+        "inflate_ns": 382187277,
+        "cache_ns": 662115245,
+        "lookup_ns": 5009624,
+        "covers_ns": 684524016,
+        "math_ns": 90428011,
+        "part_calls": 96,
+        "decode_calls": 23656,
+        "cache_hits": 220,
+        "cache_misses": 23656,
+        "lookup_scanned": 7406943,
+        "lookup_calls": 23876,
+        "cache_evictions": 23309,
+        "max_cache_bytes": 1048576,
+        "max_cache_pages": 492,
+        "covers_calls": 39278,
+        "math_calls": 39278
+      }
+    }
+  ]
+}

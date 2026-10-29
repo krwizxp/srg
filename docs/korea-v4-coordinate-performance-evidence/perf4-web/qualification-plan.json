@@ -1,0 +1,87 @@
+{
+  "frozen_utc": "2026-10-29T05:37:47.994341+00:00",
+  "baseline": {
+    "path": "/workspace/scratch/20ca01e7d960/evidence/perf4-web/baseline.js",
+    "sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+    "bytes": 33615,
+    "physical_lines": 715,
+    "bytes_delta": 0,
+    "physical_lines_delta": 0,
+    "patch": "/workspace/scratch/20ca01e7d960/evidence/perf4-web/baseline.patch"
+  },
+  "candidate": {
+    "path": "/workspace/scratch/20ca01e7d960/evidence/perf4-web/combined.js",
+    "sha256": "c6a0bc2cc417fb07a64e67f8171e672637dd8cfbdfa8bb7747c07e1294c8cb9e",
+    "bytes": 33938,
+    "physical_lines": 722,
+    "bytes_delta": 323,
+    "physical_lines_delta": 7,
+    "patch": "/workspace/scratch/20ca01e7d960/evidence/perf4-web/combined.patch",
+    "components": [
+      "edge_reuse",
+      "horner"
+    ]
+  },
+  "objective": "Reduce repeated temporary array construction and traversal in edge covers and the fixed Horner polynomial without changing arithmetic grouping.",
+  "measurement": {
+    "engine": "Chromium 151.0.7922.34",
+    "records": 10000,
+    "pairs": 5,
+    "order": [
+      [
+        "baseline",
+        "combined"
+      ],
+      [
+        "combined",
+        "baseline"
+      ],
+      [
+        "baseline",
+        "combined"
+      ],
+      [
+        "combined",
+        "baseline"
+      ],
+      [
+        "baseline",
+        "combined"
+      ]
+    ],
+    "acceptance": "At least4 of5 paired candidate runtimes lower and upper endpoint of two-sided95% paired log-time Student-t confidence interval below ratio1.",
+    "protected_bulk_nonregression": "Other protected bulk paths upper95% paired ratio <=1.03.",
+    "cold_guard": "Allowed absolute variation <=1ms or3%, whichever is larger. Uncertain small timings are not labeled improvements.",
+    "stop_rule": "One qualification of5pairs; further sampling only resolves a concrete remaining risk, no threshold fishing.",
+    "instrumentation": "Only read-only cache-observation export appended; no fetch/hash/decoder wrappers.",
+    "single_sample_screen_limitation": "Screen selected the cohesive combined candidate; individual component gains are not established or added together."
+  },
+  "identities": {
+    "checkpoint": "/workspace/scratch/20ca01e7d960/evidence/perf4/before",
+    "html_sha256": "1c70e62ab52bae840b540f7ee9e9a6b6af5b54ac4f6e68d1ad56b1576134e83d",
+    "index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "input_sha256": "eb0839937956186a010c2600b50094f9576eea919568eeb6e268db1f3d5303e1",
+    "native_reference_sha256": "31c1a4b2ad83e9204bb4eb502ea3e06b578a1692d58b50449ca16c2ee01214be",
+    "num_seed": 20261029,
+    "supp_seed": "6004793983995241952"
+  },
+  "contract": [
+    "exact latitude/longitude f64bits",
+    "same supplemental word order and individual record counts",
+    "same requests, data bytes, cache budgets and LRU policy",
+    "same validation errors and all-page geometry validation",
+    "same public exports, async yields and cancellation ownership"
+  ],
+  "validation": [
+    "10k native bit/supp comparison in every timed run",
+    "independent GEOS covers corpus and18 existing protocol/error checks",
+    "unchanged byte-shuffle and inflater source linked by exact source equivalence",
+    "final3-engine bit/supp and actualUI/TXT scenarios after selection"
+  ],
+  "memory_scope": "Existing retained cache bounds are unchanged. Source removes repeated array construction, but no actual VM heap-allocation count has yet been measured; no numeric allocation reduction is claimed.",
+  "product_modified": false,
+  "unmeasured_candidates_on_hold": [
+    "unshuffle8",
+    "stagnation"
+  ]
+}

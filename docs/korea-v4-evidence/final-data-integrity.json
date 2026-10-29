@@ -1,0 +1,76 @@
+{
+  "checked_utc": "2026-10-29T04:02:51.537723+00:00",
+  "scope": "Read-only hashes, byte equality and active references; no geometry recomputation.",
+  "all_passed": true,
+  "checks": {
+    "manifest_version_4": true,
+    "exactly_97_bin_files": true,
+    "manifest_file_set_exact": true,
+    "all_manifest_lengths_and_hashes_match": true,
+    "manifest_total_bytes_match": true,
+    "root_hash_matches_manifest": true,
+    "root_header_and_end": true,
+    "root_source_identity_matches": true,
+    "root_part_hash_chain_complete": true,
+    "rust_root_pin_matches": true,
+    "rust_exact_ordered_references": true,
+    "rust_runtime_checks_root_pin": true,
+    "js_root_and_source_pins_match": true,
+    "js_v4_directory_and_part_naming": true,
+    "js_part_hash_from_root": true,
+    "html_imports_final_v4_module": true,
+    "preserved_boundary_validation_identical": true,
+    "no_active_runtime_v3_references": true,
+    "final_artifacts_match": true
+  },
+  "data": {
+    "directory": "data/korea-boundary-v4",
+    "manifest_sha256": "037796f19af191f3b0ae19f6d9ba270004fe7e36e03e981ae9d1a5135187a2c6",
+    "bin_files": 97,
+    "bin_bytes": 50276630,
+    "index_bytes": 499628,
+    "index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "parts": 96,
+    "pages": 25348,
+    "rust_root_pin": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "js_root_pin": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "source_sha256": "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428",
+    "file_errors": [],
+    "part_errors": []
+  },
+  "preserved_validation": {
+    "baseline": "srg-baseline/data/korea-boundary-v3/boundary-validation.json",
+    "final": "srg/data/korea-boundary-v4/boundary-validation.json",
+    "bytes": 6828,
+    "sha256": "25045b57eeaf4ddfa7023f1069f73e7f47458d39b8664c176661149299c69c68",
+    "baseline_sha256": "25045b57eeaf4ddfa7023f1069f73e7f47458d39b8664c176661149299c69c68",
+    "byte_identical": true
+  },
+  "runtime_v3_scan": {
+    "paths": "src/**/*.rs plus root *.js and *.html",
+    "files_scanned": 43,
+    "pattern": "korea[-_]boundary[-_]v3|SRGK[RPB]003|korea_boundary\\.js\\?v=3",
+    "matches": [],
+    "old_data_directory_present": false
+  },
+  "artifacts": {
+    "build/candidate/x86_64-unknown-linux-gnu/release/srg": {
+      "bytes": 50944864,
+      "expected_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+      "actual_sha256": "e4898c989daf0437d7fc1fffad37bfa6208a9976036e6db3fa6823802f024e59",
+      "matches": true
+    },
+    "srg/korea_boundary.js": {
+      "bytes": 33492,
+      "expected_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "actual_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "matches": true
+    },
+    "srg/revgeo.html": {
+      "bytes": 188661,
+      "expected_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+      "actual_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+      "matches": true
+    }
+  }
+}

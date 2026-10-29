@@ -1,0 +1,86 @@
+{
+  "reviewed_utc": "2026-10-29T05:46:36Z",
+  "scope": "Independent read-only full-diff review; no compiler, tests, benchmarks or CPU qualification executed in this review.",
+  "baseline_source_sha256": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+  "final_source_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+  "integrated_source_equals_qualified_source": true,
+  "diff_sha256": "73f60240d68b4410f678131e06ef6f3bacde998cb881dc9e46becbfb9e6b879a",
+  "implementation_defects_found": 0,
+  "bits_read_proof": {
+    "domain": "Fast branch only when count<=16 and a complete four-byte slice is available at floor(position/8). Remaining cases retain the exact previous loop.",
+    "bit_extraction": "Write position=8*i+r, 0<=r<=7, count=c. The old loop returns the c successive LSB-first bits starting at bit r of bytes[i..]. Little-endian u32 >> r masked by (1<<c)-1 returns the same sum. r+c<=23, so a four-byte slice provides every needed bit.",
+    "zero_count": "c=0 forms mask 0, returns 0 and advances by 0. If four bytes are unavailable, the unchanged zero-iteration fallback has the same behavior.",
+    "tail_and_truncation": "With fewer than four remaining bytes, the original per-bit loop is executed, including partial position advancement before the first missing byte and the same truncation diagnostic. The fast branch cannot encounter a missing requested bit.",
+    "position_and_usize": "count is bounded to0..16 before its usize cast, so conversion is exact on every supported target. Successful old reads advance position exactly count times; the fast branch advances by the same total. Production compressed-page slices are bounded by the512KiB part limit, keeping valid bit positions far below usize overflow. No new overflow-suppression path is introduced.",
+    "counts_over_16": "All counts>16 use the original loop unchanged. Current callers use fixed header/extra-bit counts no greater than16.",
+    "byte_order_alignment": "u32::from_le_bytes on a copied four-byte array is independent of host byte order and imposes no unaligned pointer access or unsafe operation. The byte slice is the existing DEFLATE body, excluding zlib header and Adler trailer.",
+    "error_priority_and_partial_output": "No new fallible decision occurs before the old path. For a fast successful read, values and final position are equal; failures occur only in the unchanged fallback. The inflater output write order and LZ loop are unchanged."
+  },
+  "adler_proof": {
+    "chunk_maximum": 1024,
+    "modulus": 65521,
+    "chunk_start_accumulators_maximum": 65520,
+    "byte_maximum": 255,
+    "first_maximum": 326640,
+    "second_maximum": 200982000,
+    "u32_maximum": 4294967295,
+    "first_bound": "65520 + 255*n, with0<=n<=1024",
+    "second_bound": "65520 + 65520*n + 255*n*(n+1)/2, with0<=n<=1024",
+    "conclusion": "Every intermediate addition is strictly below2^32, even for arbitrary corrupt decompressed bytes. wrapping_add and the prior strict_add are therefore identical. Chunking, modulo reductions, output range, trailing-data check and checksum comparison retain their exact order.",
+    "empty_output": "No chunks execute; initial sums1 and0 remain unchanged."
+  },
+  "unchanged_source_identities": {
+    "src/korea_boundary.rs": "423cf0e18384e3f9f63ea4c54decc98ec0b871831323282368b6ae010643bd65",
+    "src/korea_boundary/hash.rs": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6",
+    "src/geo_uniform.rs": "c6b23a3e051c58e1f130d1f6eee5757d5ca82ea8b34bd8bbf9ef1666dccab713",
+    "src/korea_boundary/data.rs": "c917746a9822c065eecc9926ee8ffac67df8ca9ebb226d432092d1e1ab34c6e8",
+    "data/korea-boundary-v4/index.bin": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "Cargo.toml": "5b787aabfeecfe5d9a171310609781d992a7cf05003c3156369160c2a6dfdf7d",
+    "Cargo.lock": "4838d92097e0fba6df7e7fe3d2bf3ea5b9d8dfd4b97ba913e51d8186ae7cf947"
+  },
+  "skill_scope_checks": {
+    "unsafe_added": false,
+    "code_comments_added": false,
+    "lint_suppressions_added": false,
+    "dependency_or_lock_changes": false,
+    "release_profile_changes": false,
+    "heap_allocations_added": 0,
+    "retained_state_added_bytes": 0,
+    "geometry_math_hash_pins_changed": false
+  },
+  "evidence": {
+    "full_state_validation": {
+      "path": "evidence/perf4-rust/bits-adler-state-validation.json",
+      "sha256": "07c684cf4382effe5f14fbde4934b5b177e10bca55a8e0c9d3d4396d91e0f833",
+      "source_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+      "valid_pages": 25348,
+      "valid_raw_bytes": 84560888,
+      "valid_fixtures": 10,
+      "invalid_fixtures": 1499,
+      "initial_output_sentinel": 165,
+      "full_output_buffers_error_strings_and_order_equal": true,
+      "output_sha256": "d1cd654fe499e9b7408ddff3b9ae75d3cd6810b19d00b6984e2cf44764dcb8f6"
+    },
+    "qualification": {
+      "path": "evidence/perf4-rust/bits-adler-qualification.json",
+      "sha256": "bfdc26049c8bf1bead3faf32505610a5a663a65ee2981cd6dae4e7c6d81099e2",
+      "source_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+      "faster_pairs": 5,
+      "paired_log_time_ratio": {
+        "geometric_mean": 0.9198659740484544,
+        "confidence_95_percent": [
+          0.8880990016534199,
+          0.9527692392816388
+        ],
+        "student_t_df": 4,
+        "student_t_critical": 2.7764451051977987
+      },
+      "primary_performance_criterion_met": true
+    }
+  },
+  "limits": [
+    "This review adds no new runtime evidence; it links the integrated byte-identical source to the existing qualification and full-state validation.",
+    "Root is completing final release, platform and integration gates separately."
+  ],
+  "product_files_modified": []
+}

@@ -1,0 +1,87 @@
+{
+  "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+  "formatter_preserved_previous_final_bytes": true,
+  "versions": {
+    "vscode": "1.144.0",
+    "provider": "vscode.html-language-features",
+    "htmlvalidate": "11.17.0",
+    "nu": "26.10.12"
+  },
+  "checks": [
+    {
+      "name": "formatter",
+      "command": [
+        "node",
+        "/workspace/scratch/20ca01e7d960/web-tools/format-html.cjs",
+        "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 146,
+      "stderr_bytes": 29
+    },
+    {
+      "name": "htmlvalidate",
+      "command": [
+        "node",
+        "/workspace/scratch/20ca01e7d960/web-tools/node_modules/html-validate/bin/html-validate.mjs",
+        "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "name": "nu-final",
+      "command": [
+        "java",
+        "-jar",
+        "/workspace/scratch/20ca01e7d960/web-tools/vnu-latest.jar",
+        "--format",
+        "json",
+        "/workspace/scratch/20ca01e7d960/srg/revgeo.html"
+      ],
+      "exit_code": 1,
+      "stdout_bytes": 0,
+      "stderr_bytes": 2683
+    },
+    {
+      "name": "nu-baseline",
+      "command": [
+        "java",
+        "-jar",
+        "/workspace/scratch/20ca01e7d960/web-tools/vnu-latest.jar",
+        "--format",
+        "json",
+        "/workspace/scratch/20ca01e7d960/srg-baseline/revgeo.html"
+      ],
+      "exit_code": 1,
+      "stdout_bytes": 0,
+      "stderr_bytes": 2764
+    }
+  ],
+  "nu_counts": {
+    "final": {
+      "error": 9,
+      "warning": 0,
+      "info": 0
+    },
+    "baseline": {
+      "error": 9,
+      "warning": 0,
+      "info": 0
+    }
+  },
+  "nu_messages": [
+    "CSS: “field-sizing”: Property “field-sizing” doesn't exist.",
+    "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+    "CSS: “anchor-name”: Property “anchor-name” doesn't exist.",
+    "CSS: Unrecognized at-rule “@position-try”",
+    "CSS: “position-try-fallbacks”: Property “position-try-fallbacks” doesn't exist.",
+    "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+    "CSS: “position-area”: Property “position-area” doesn't exist.",
+    "CSS: “position-anchor”: Property “position-anchor” doesn't exist.",
+    "CSS: “position-area”: Property “position-area” doesn't exist."
+  ],
+  "baseline_messages_identical": true,
+  "policy": "No rule disables, severity overrides or document exclusions. HTMLValidate CLI default configuration. Nu CLI full diagnostics; known baseline CSS errors remain failures."
+}

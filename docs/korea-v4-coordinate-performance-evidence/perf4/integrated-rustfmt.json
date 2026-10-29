@@ -1,0 +1,15 @@
+{
+  "completed_utc": "2026-10-29T06:07:15.874784+00:00",
+  "command": [
+    "cargo",
+    "+1.99.1",
+    "fmt",
+    "--all",
+    "--",
+    "--check"
+  ],
+  "cwd": "/workspace/scratch/20ca01e7d960/srg",
+  "exit_code": 0,
+  "log": "integrated-rustfmt.log",
+  "source_sha256": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef"
+}

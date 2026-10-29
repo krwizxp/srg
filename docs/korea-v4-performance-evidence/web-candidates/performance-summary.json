@@ -1,0 +1,1146 @@
+{
+  "current_product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "final_browser_decision": "Restored byte-identical v4 checkpoint; no second-round JavaScript or boundary-packing optimization adopted.",
+  "benchmarks": {
+    "chromium_three_way": {
+      "source": "chromium_three_way.json",
+      "stage": "rejected_64k_data_candidate",
+      "records": 10000,
+      "repetitions": 5,
+      "sources": {
+        "before": {
+          "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+          "product_bytes": 33492,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+          "harness_bytes": 33792
+        },
+        "data_only": {
+          "product_sha256": "9810f0a7b944c5ece22b6948dbd917dec4eaa315876abb7c702922dca17de67e",
+          "product_bytes": 33493,
+          "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+          "data_index_bytes": 538940,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "14bcb90fbc5d5a58ee42df71a91c085e5447b34b5a9f7ba7b9c66f12a47f03e2",
+          "harness_bytes": 33793
+        },
+        "final": {
+          "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+          "product_bytes": 33616,
+          "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+          "data_index_bytes": 538940,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+          "harness_bytes": 33916
+        }
+      },
+      "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+      "variants": {
+        "before": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            8960.5,
+            7952.9000000003725,
+            8285.199999999255,
+            8265.200000001118,
+            8137.4000000003725
+          ],
+          "median_ms": 8265.200000001118,
+          "minimum_ms": 7952.9000000003725,
+          "maximum_ms": 8960.5,
+          "cold_first_ms": [
+            25.200000001117587,
+            25.09999999962747,
+            24,
+            27.90000000037253,
+            24.300000000745058
+          ],
+          "median_cold_first_ms": 25.09999999962747,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 4.699999999254942,
+          "median_decode_ms": 1023.7999999914318,
+          "network_body_bytes": [
+            50310422,
+            50310422,
+            50310422,
+            50310422,
+            50310422
+          ],
+          "network_requests": [
+            98,
+            98,
+            98,
+            98,
+            98
+          ],
+          "hash_calls": [
+            2161,
+            2161,
+            2161,
+            2161,
+            2161
+          ],
+          "hash_bytes": [
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "data_only": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            5421.5999999996275,
+            5172.0999999996275,
+            5429.699999999255,
+            5631.200000001118,
+            5530.0999999996275
+          ],
+          "median_ms": 5429.699999999255,
+          "minimum_ms": 5172.0999999996275,
+          "maximum_ms": 5631.200000001118,
+          "cold_first_ms": [
+            27.399999998509884,
+            24.09999999962747,
+            27.899999998509884,
+            25.59999999962747,
+            24.90000000037253
+          ],
+          "median_cold_first_ms": 25.59999999962747,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 3,
+          "median_decode_ms": 1006.5000000093132,
+          "network_body_bytes": [
+            40896925,
+            40896925,
+            40896925,
+            40896925,
+            40896925
+          ],
+          "network_requests": [
+            733,
+            733,
+            733,
+            733,
+            733
+          ],
+          "hash_calls": [
+            2249,
+            2249,
+            2249,
+            2249,
+            2249
+          ],
+          "hash_bytes": [
+            127803595,
+            127803595,
+            127803595,
+            127803595,
+            127803595
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "final": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            5092.89999999851,
+            4861.9000000003725,
+            5116.300000000745,
+            4956,
+            4994.800000000745
+          ],
+          "median_ms": 4994.800000000745,
+          "minimum_ms": 4861.9000000003725,
+          "maximum_ms": 5116.300000000745,
+          "cold_first_ms": [
+            26.5,
+            24.200000001117587,
+            28.799999998882413,
+            23.90000000037253,
+            23.40000000037253
+          ],
+          "median_cold_first_ms": 24.200000001117587,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 2.700000001117587,
+          "median_decode_ms": 635.0000000689179,
+          "network_body_bytes": [
+            40897048,
+            40897048,
+            40897048,
+            40897048,
+            40897048
+          ],
+          "network_requests": [
+            733,
+            733,
+            733,
+            733,
+            733
+          ],
+          "hash_calls": [
+            2249,
+            2249,
+            2249,
+            2249,
+            2249
+          ],
+          "hash_bytes": [
+            127803595,
+            127803595,
+            127803595,
+            127803595,
+            127803595
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        }
+      },
+      "final_runtime_reduction_percent": 39.568310506701955,
+      "quick9_runtime_reduction_percent": 8.009650625238407,
+      "quick9_paired_runtime_reduction_percent": [
+        6.062785893484213,
+        5.997563852193055,
+        5.771957935034222,
+        11.990339536883498,
+        9.679752626515226
+      ],
+      "quick9_faster_pairs": 5,
+      "selected_product_variants": [
+        "before"
+      ],
+      "selected_product_runtime_reduction_percent": 0.0
+    },
+    "webkit_final_pairs": {
+      "source": "webkit_final_pairs.json",
+      "stage": "rejected_64k_data_candidate",
+      "records": 10000,
+      "repetitions": 5,
+      "sources": {
+        "before": {
+          "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+          "product_bytes": 33492,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+          "harness_bytes": 33792
+        },
+        "final": {
+          "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+          "product_bytes": 33616,
+          "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+          "data_index_bytes": 538940,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+          "harness_bytes": 33916
+        }
+      },
+      "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim. Four completed pairs used the initial WebKit process; an unexpected target closure interrupted the next baseline run. That run is excluded. The fifth completed pair used a fresh WebKit process and localhost server with identical sources, settings and corpus.",
+      "variants": {
+        "before": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            12595,
+            11557,
+            11377,
+            11310,
+            11491
+          ],
+          "median_ms": 11491,
+          "minimum_ms": 11310,
+          "maximum_ms": 12595,
+          "cold_first_ms": [
+            32,
+            109,
+            26,
+            238,
+            25
+          ],
+          "median_cold_first_ms": 32,
+          "median_warm_first_ms": 0,
+          "median_p95_record_ms": 7,
+          "median_decode_ms": 994,
+          "network_body_bytes": [
+            1112420948,
+            1112420948,
+            1112420948,
+            1112420948,
+            1112420948
+          ],
+          "network_requests": [
+            2162,
+            2162,
+            2162,
+            2162,
+            2162
+          ],
+          "hash_calls": [
+            2161,
+            2161,
+            2161,
+            2161,
+            2161
+          ],
+          "hash_bytes": [
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "final": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            5173,
+            5243,
+            5281,
+            5236,
+            4768
+          ],
+          "median_ms": 5236,
+          "minimum_ms": 4768,
+          "maximum_ms": 5281,
+          "cold_first_ms": [
+            197,
+            24,
+            171,
+            22,
+            238
+          ],
+          "median_cold_first_ms": 171,
+          "median_warm_first_ms": 0,
+          "median_p95_record_ms": 3,
+          "median_decode_ms": 597,
+          "network_body_bytes": [
+            127837511,
+            127837511,
+            127837511,
+            127837511,
+            127837511
+          ],
+          "network_requests": [
+            2250,
+            2250,
+            2250,
+            2250,
+            2250
+          ],
+          "hash_calls": [
+            2249,
+            2249,
+            2249,
+            2249,
+            2249
+          ],
+          "hash_bytes": [
+            127803595,
+            127803595,
+            127803595,
+            127803595,
+            127803595
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        }
+      },
+      "attempts": [
+        {
+          "file": "webkit_final_pairs-initial-interrupted.json",
+          "completed_pairs": 4,
+          "interrupted_run_not_counted": {
+            "variant": "before",
+            "repetition": 5,
+            "watchdog_ms": 90000,
+            "error": "page.evaluate: Target page, context or browser has been closed",
+            "completed_runs": 8,
+            "cause": "Unconfirmed target closure before the90-second per-run watchdog. Complete attempt duration was75.36seconds; successful8-run timed loops totaled67.77seconds. No result or PASS counted for interrupted run.",
+            "watchdog_fired": false,
+            "whole_attempt_elapsed_seconds_from_file_timestamps": 75.3616452217102
+          }
+        },
+        {
+          "file": "webkit_recovery_pair.json",
+          "completed_pairs": 1,
+          "fresh_browser_and_server": true
+        }
+      ],
+      "final_runtime_reduction_percent": 54.43390479505701,
+      "selected_product_variants": [
+        "before"
+      ],
+      "selected_product_runtime_reduction_percent": 0.0
+    },
+    "firefox_final_pair": {
+      "source": "firefox_final_pair.json",
+      "stage": "rejected_64k_data_candidate",
+      "records": 10000,
+      "repetitions": 1,
+      "sources": {
+        "before": {
+          "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+          "product_bytes": 33492,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+          "harness_bytes": 33792
+        },
+        "final": {
+          "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+          "product_bytes": 33616,
+          "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+          "data_index_bytes": 538940,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+          "harness_bytes": 33916
+        }
+      },
+      "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+      "variants": {
+        "before": {
+          "completed_runs": 1,
+          "runtime_ms": [
+            28362
+          ],
+          "median_ms": 28362,
+          "minimum_ms": 28362,
+          "maximum_ms": 28362,
+          "cold_first_ms": [
+            15
+          ],
+          "median_cold_first_ms": 15,
+          "median_warm_first_ms": 0,
+          "median_p95_record_ms": 17,
+          "median_decode_ms": 2279,
+          "network_body_bytes": [
+            50310422
+          ],
+          "network_requests": [
+            98
+          ],
+          "hash_calls": [
+            2161
+          ],
+          "hash_bytes": [
+            1112387156
+          ],
+          "decompressions": [
+            22714
+          ],
+          "supplemental_reads": [
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "final": {
+          "completed_runs": 1,
+          "runtime_ms": [
+            10958
+          ],
+          "median_ms": 10958,
+          "minimum_ms": 10958,
+          "maximum_ms": 10958,
+          "cold_first_ms": [
+            14
+          ],
+          "median_cold_first_ms": 14,
+          "median_warm_first_ms": 0,
+          "median_p95_record_ms": 6,
+          "median_decode_ms": 1369,
+          "network_body_bytes": [
+            40897048
+          ],
+          "network_requests": [
+            733
+          ],
+          "hash_calls": [
+            2249
+          ],
+          "hash_bytes": [
+            127803595
+          ],
+          "decompressions": [
+            22714
+          ],
+          "supplemental_reads": [
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        }
+      },
+      "final_runtime_reduction_percent": 61.36379662929272,
+      "selected_product_variants": [
+        "before"
+      ],
+      "selected_product_runtime_reduction_percent": 0.0
+    },
+    "chromium_delay20": {
+      "source": "chromium_delay20.json",
+      "stage": "decision_sensitivity_actual_http_delay",
+      "records": 10000,
+      "repetitions": 1,
+      "sources": {
+        "before": {
+          "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+          "product_bytes": 33492,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+          "harness_bytes": 33792
+        },
+        "original_quick9": {
+          "product_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+          "product_bytes": 33615,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "137ef33e56c413470c97abc418bf4f5139cc77e1a4b743eb6274da18edaf0dab",
+          "harness_bytes": 33915
+        },
+        "final": {
+          "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+          "product_bytes": 33616,
+          "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+          "data_index_bytes": 538940,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+          "harness_bytes": 33916
+        }
+      },
+      "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+      "variants": {
+        "before": {
+          "completed_runs": 1,
+          "runtime_ms": [
+            10717.900000000373
+          ],
+          "median_ms": 10717.900000000373,
+          "minimum_ms": 10717.900000000373,
+          "maximum_ms": 10717.900000000373,
+          "cold_first_ms": [
+            53.90000000037253
+          ],
+          "median_cold_first_ms": 53.90000000037253,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 5.099999999627471,
+          "median_decode_ms": 1104.8000000286847,
+          "network_body_bytes": [
+            50310422
+          ],
+          "network_requests": [
+            98
+          ],
+          "hash_calls": [
+            2161
+          ],
+          "hash_bytes": [
+            1112387156
+          ],
+          "decompressions": [
+            22714
+          ],
+          "supplemental_reads": [
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "original_quick9": {
+          "completed_runs": 1,
+          "runtime_ms": [
+            10011.10000000149
+          ],
+          "median_ms": 10011.10000000149,
+          "minimum_ms": 10011.10000000149,
+          "maximum_ms": 10011.10000000149,
+          "cold_first_ms": [
+            55.40000000037253
+          ],
+          "median_cold_first_ms": 55.40000000037253,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 4.599999999627471,
+          "median_decode_ms": 693.1000000108033,
+          "network_body_bytes": [
+            50310545
+          ],
+          "network_requests": [
+            98
+          ],
+          "hash_calls": [
+            2161
+          ],
+          "hash_bytes": [
+            1112387156
+          ],
+          "decompressions": [
+            22714
+          ],
+          "supplemental_reads": [
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "final": {
+          "completed_runs": 1,
+          "runtime_ms": [
+            20662
+          ],
+          "median_ms": 20662,
+          "minimum_ms": 20662,
+          "maximum_ms": 20662,
+          "cold_first_ms": [
+            52
+          ],
+          "median_cold_first_ms": 52,
+          "median_warm_first_ms": 0,
+          "median_p95_record_ms": 23.299999998882413,
+          "median_decode_ms": 679.6999999415129,
+          "network_body_bytes": [
+            40897048
+          ],
+          "network_requests": [
+            733
+          ],
+          "hash_calls": [
+            2249
+          ],
+          "hash_bytes": [
+            127803595
+          ],
+          "decompressions": [
+            22714
+          ],
+          "supplemental_reads": [
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 63,
+              "part_bytes": 3677584,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        }
+      },
+      "server_response_delay_ms": 20,
+      "delay_scope": "The local HTTP handler waits20ms for each actual request before response headers. Browser HTTP cache hits do not enter the server and receive no added delay. No bandwidth, DNS or TLS simulation. Each completed variant has a separate raw successful-response request log.",
+      "final_runtime_reduction_percent": -92.78030211141437,
+      "selected_product_variants": [
+        "before"
+      ],
+      "selected_product_runtime_reduction_percent": 0.0
+    },
+    "chromium_selected_pairs": {
+      "source": "chromium_selected_pairs.json",
+      "stage": "rejected_original_data_quick9_below_5_percent",
+      "records": 10000,
+      "repetitions": 5,
+      "sources": {
+        "before": {
+          "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+          "product_bytes": 33492,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+          "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+          "harness_bytes": 33792
+        },
+        "final": {
+          "product_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+          "product_bytes": 33615,
+          "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+          "data_index_bytes": 499628,
+          "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+          "harness_sha256": "137ef33e56c413470c97abc418bf4f5139cc77e1a4b743eb6274da18edaf0dab",
+          "harness_bytes": 33915
+        }
+      },
+      "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+      "variants": {
+        "before": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            8394.5,
+            8261.199999999255,
+            8149.4000000003725,
+            8202.400000000373,
+            8672.199999999255
+          ],
+          "median_ms": 8261.199999999255,
+          "minimum_ms": 8149.4000000003725,
+          "maximum_ms": 8672.199999999255,
+          "cold_first_ms": [
+            26.399999998509884,
+            26.899999998509884,
+            30.09999999962747,
+            27.300000000745058,
+            27
+          ],
+          "median_cold_first_ms": 27,
+          "median_warm_first_ms": 0.10000000149011612,
+          "median_p95_record_ms": 4.700000001117587,
+          "median_decode_ms": 1037.0999999046326,
+          "network_body_bytes": [
+            50310422,
+            50310422,
+            50310422,
+            50310422,
+            50310422
+          ],
+          "network_requests": [
+            98,
+            98,
+            98,
+            98,
+            98
+          ],
+          "hash_calls": [
+            2161,
+            2161,
+            2161,
+            2161,
+            2161
+          ],
+          "hash_bytes": [
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        },
+        "final": {
+          "completed_runs": 5,
+          "runtime_ms": [
+            7852.5999999996275,
+            7877.300000000745,
+            8030,
+            7870.5,
+            8088.9000000003725
+          ],
+          "median_ms": 7877.300000000745,
+          "minimum_ms": 7852.5999999996275,
+          "maximum_ms": 8088.9000000003725,
+          "cold_first_ms": [
+            32.30000000074506,
+            26.800000000745058,
+            24.799999998882413,
+            27.800000000745058,
+            23.5
+          ],
+          "median_cold_first_ms": 26.800000000745058,
+          "median_warm_first_ms": 0.09999999962747097,
+          "median_p95_record_ms": 4.400000000372529,
+          "median_decode_ms": 681.7999999243766,
+          "network_body_bytes": [
+            50310545,
+            50310545,
+            50310545,
+            50310545,
+            50310545
+          ],
+          "network_requests": [
+            98,
+            98,
+            98,
+            98,
+            98
+          ],
+          "hash_calls": [
+            2161,
+            2161,
+            2161,
+            2161,
+            2161
+          ],
+          "hash_bytes": [
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156,
+            1112387156
+          ],
+          "decompressions": [
+            22714,
+            22714,
+            22714,
+            22714,
+            22714
+          ],
+          "supplemental_reads": [
+            29278,
+            29278,
+            29278,
+            29278,
+            29278
+          ],
+          "bit_or_consumption_mismatches": 0,
+          "page_errors": [],
+          "final_cache_observations": [
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            },
+            {
+              "parts": 8,
+              "part_bytes": 4164157,
+              "pages": 1270,
+              "page_bytes": 4153088
+            }
+          ]
+        }
+      },
+      "final_runtime_reduction_percent": 4.647024645312358,
+      "selected_product_variants": [
+        "before"
+      ],
+      "selected_product_runtime_reduction_percent": 0.0
+    }
+  }
+}

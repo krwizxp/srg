@@ -1,0 +1,19 @@
+   Compiling srg v1.5.9 (/workspace/scratch/20ca01e7d960/srg-baseline)
+    Finished `release` profile [optimized] target(s) in 7.70s
+     Running unittests src/main.rs (/workspace/scratch/20ca01e7d960/build/baseline/release/deps/srg-31f20e5124c6a873)
+
+running 11 tests
+test geo_uniform::tests::invalid_geometry_cannot_produce_a_fallback ... ok
+test boundary_inflate::tests::decompresses_python_zlib_fixtures ... ok
+test geo_uniform::tests::jacobian_matches_independent_trigonometry ... ok
+test geo_uniform::tests::residual_positions_are_interior_and_orientation_survives ... ok
+test geo_uniform::tests::smallest_triangle_does_not_fold_distinct_inputs ... ok
+test boundary_inflate::tests::rejects_truncation_checksum_and_output_overflow ... ok
+test geo_uniform::tests::residual_positions_remain_open_above_binary64_integer_precision ... ok
+test korea_boundary::tests::all_u64_endpoints_are_valid_without_an_entropy_provider ... ok
+test korea_boundary::tests::single_word_mapping_matches_cross_language_fixtures ... ok
+test korea_boundary::tests::islands_and_border_region_remain_reachable ... ok
+test korea_boundary::tests::cached_records_preserve_fields_and_supplement_consumption ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

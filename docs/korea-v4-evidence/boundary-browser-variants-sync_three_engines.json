@@ -1,0 +1,117 @@
+{
+  "records": 10000,
+  "repetitions": 1,
+  "variants": [
+    "sync"
+  ],
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "ETag": null,
+    "Last-Modified": null,
+    "Content-Length": "specified"
+  },
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "source_sha256": "e50e8af98108d6a3c6768fde2c834a4a15e5a20e3a57eb98ed789d65da0be4eb",
+  "inflater_sha256": "32a22db9c035db05468e7f6ad3ab287ac6cfc8dfc9095143990c956b1e86870b",
+  "raw": [
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "sync",
+      "repetition": 1,
+      "cold_first_ms": 24.799999999813735,
+      "warm_first_ms": 0.09999999962747097,
+      "total_10000_ms": 7912.4000000003725,
+      "p95_record_ms": 4.5,
+      "maximum_record_ms": 26.09999999962747,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2107.500000016764,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 777.39999998454
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1035.8000000175089
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_bytes": 50310428
+    },
+    {
+      "engine": "firefox",
+      "browser_version": "153.0",
+      "variant": "sync",
+      "repetition": 1,
+      "cold_first_ms": 15,
+      "warm_first_ms": 0,
+      "total_10000_ms": 14883,
+      "p95_record_ms": 8,
+      "maximum_record_ms": 92,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 4208,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 1341
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1786
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_bytes": 50310428
+    },
+    {
+      "engine": "webkit",
+      "browser_version": "26.5",
+      "variant": "sync",
+      "repetition": 1,
+      "cold_first_ms": 197,
+      "warm_first_ms": 0,
+      "total_10000_ms": 10626,
+      "p95_record_ms": 6,
+      "maximum_record_ms": 26,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 7103,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 1082
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 881
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 2162,
+      "network_bytes": 1112420954
+    }
+  ],
+  "final_product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "final_source_equivalence": "Exact byte identity after removing test-only decoder timing/counter statements and probeCache export from each temporary sync module."
+}

@@ -1,0 +1,229 @@
+{
+  "measured_at_utc": "2026-10-29T04:31:56.566091+00:00",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "compiler_flags": [
+    "--edition=2024",
+    "-C",
+    "opt-level=3",
+    "-C",
+    "codegen-units=1",
+    "-C",
+    "lto=fat",
+    "-C",
+    "panic=abort",
+    "-C",
+    "strip=symbols"
+  ],
+  "timing_scope": "All 97 original v4 index/part SHA-256 computations, input bytes already resident; known vectors and file I/O are outside the timed interval. Each process validates all digests against independently generated hashlib/manifest expectations.",
+  "cycles": 5,
+  "order": "Alternating baseline/candidate order by cycle, sequential subprocesses.",
+  "inputs": {
+    "baseline_source_sha256": "07a7d3d2035653bc6852fe568ef66967de8d93b5fa2cb98105e7e11e30255bc7",
+    "candidate_source_sha256": "a0cdc8a5756e050b1e1851a42b5593b98f3eab503421df5363ca5aa885218804",
+    "asset_files": 97,
+    "asset_bytes": 50276630,
+    "known_vectors": {
+      "empty": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "abc": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "fips_448_bits": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+      "million_a": "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+    },
+    "additional_hashlib_vectors": 29,
+    "stack_schedule_bytes_before": 64,
+    "stack_schedule_bytes_after": 256,
+    "change": "Expand the standard 64-word schedule once per block, then zip words with the unchanged 64 round constants; remove the 16-word rotate and round>=16 branch."
+  },
+  "smoke": {
+    "baseline_ns": 364509289,
+    "candidate_ns": 224600034,
+    "asset_files": 97,
+    "asset_bytes": 50276630,
+    "vectors": 33,
+    "digest_mismatches": 0
+  },
+  "measurements": [
+    {
+      "mode": "baseline",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 370348390,
+      "megabytes_per_second": 135.75495764947163,
+      "digest_mismatches": 0,
+      "cycle": 1,
+      "position": 1
+    },
+    {
+      "mode": "candidate",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 214134345,
+      "megabytes_per_second": 234.79012673095482,
+      "digest_mismatches": 0,
+      "cycle": 1,
+      "position": 2
+    },
+    {
+      "mode": "candidate",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 196951577,
+      "megabytes_per_second": 255.27406668086746,
+      "digest_mismatches": 0,
+      "cycle": 2,
+      "position": 1
+    },
+    {
+      "mode": "baseline",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 362628794,
+      "megabytes_per_second": 138.64489205454547,
+      "digest_mismatches": 0,
+      "cycle": 2,
+      "position": 2
+    },
+    {
+      "mode": "baseline",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 344672731,
+      "megabytes_per_second": 145.86773329625547,
+      "digest_mismatches": 0,
+      "cycle": 3,
+      "position": 1
+    },
+    {
+      "mode": "candidate",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 198615363,
+      "megabytes_per_second": 253.13565496944966,
+      "digest_mismatches": 0,
+      "cycle": 3,
+      "position": 2
+    },
+    {
+      "mode": "candidate",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 206290062,
+      "megabytes_per_second": 243.71813897656398,
+      "digest_mismatches": 0,
+      "cycle": 4,
+      "position": 1
+    },
+    {
+      "mode": "baseline",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 346030210,
+      "megabytes_per_second": 145.29549313049864,
+      "digest_mismatches": 0,
+      "cycle": 4,
+      "position": 2
+    },
+    {
+      "mode": "baseline",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 368408220,
+      "megabytes_per_second": 136.46989201272436,
+      "digest_mismatches": 0,
+      "cycle": 5,
+      "position": 1
+    },
+    {
+      "mode": "candidate",
+      "asset_files": 97,
+      "asset_bytes": 50276630,
+      "vectors": 33,
+      "nanoseconds": 216443959,
+      "megabytes_per_second": 232.28474581727642,
+      "digest_mismatches": 0,
+      "cycle": 5,
+      "position": 2
+    }
+  ],
+  "summary": {
+    "baseline": {
+      "median_ns": 362628794,
+      "minimum_ns": 344672731,
+      "maximum_ns": 370348390,
+      "all_ns": [
+        370348390,
+        362628794,
+        344672731,
+        346030210,
+        368408220
+      ]
+    },
+    "candidate": {
+      "median_ns": 206290062,
+      "minimum_ns": 196951577,
+      "maximum_ns": 216443959,
+      "all_ns": [
+        214134345,
+        196951577,
+        198615363,
+        206290062,
+        216443959
+      ]
+    }
+  },
+  "median_time_reduction_percent": 43.11260842678698,
+  "median_throughput_factor": 1.7578587668464611,
+  "correctness": {
+    "actual_assets_all_match_hashlib_and_manifest": true,
+    "known_and_boundary_vectors_all_match_hashlib": true,
+    "vectors": 33,
+    "minimum_padding_boundary_lengths": [
+      55,
+      56,
+      57,
+      63,
+      64,
+      65,
+      119,
+      120,
+      121,
+      127,
+      128,
+      129
+    ],
+    "padding_length_endianness_digest_output_and_input_length_error_code_unchanged": true,
+    "schedule_equivalence": "Before baseline round r >= 16, rotating words[0..16] contains W[r-16..r]. The update uses offsets 0, 1, 9, 14, hence W[r-16] + sigma0(W[r-15]) + W[r-7] + sigma1(W[r-2]) modulo 2^32. The candidate stores the identical recurrence in words[r], then applies unchanged rounds and constants."
+  },
+  "resource_change": {
+    "heap_allocations_added": 0,
+    "schedule_array_bytes_before": 64,
+    "schedule_array_bytes_after": 256,
+    "schedule_array_byte_delta": 192,
+    "unsafe_intrinsics_dependencies_added": false,
+    "caveat": "Array storage delta is not a claim about total compiled stack-frame size or RSS."
+  },
+  "source_and_artifact_sha256": {
+    "baseline.rs": "07a7d3d2035653bc6852fe568ef66967de8d93b5fa2cb98105e7e11e30255bc7",
+    "candidate.rs": "a0cdc8a5756e050b1e1851a42b5593b98f3eab503421df5363ca5aa885218804",
+    "bench.rs": "71dde5b87953ea980c0334e5ef1740be4201902ceeb81524eda9391e430e4a0e",
+    "bench": "cbd9f93a48e4c4f5c0fc96e60dcb540965987196e41225c6859fa50e8441fcad",
+    "prepare.py": "9e5d3961a42875056efb3575c1e4b8217a191e80dfcebfc39c5d72dad62e41ab",
+    "measure.py": "f6f4149944f91cff4fe26605f054f434d5e776439b528264474755fb3265cd09",
+    "inputs.tsv": "cfd5f1fb8e74b5f34e37ac72053285965b6b50267cfe829885126e303ce0414d"
+  },
+  "nonblank_source_lines": {
+    "baseline.rs": 157,
+    "candidate.rs": 158
+  },
+  "recommendation": "Adopt the standard 64-word schedule after end-to-end integration measurement; bitwise digests are unchanged, the implementation removes the per-round rotate and branch, and no heap state or dependencies are added.",
+  "product_files_modified": []
+}

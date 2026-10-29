@@ -1,0 +1,21 @@
+{
+  "comparison": "Immediate v4 checkpoint to selected final performance source",
+  "only_runtime_changes": [
+    "src/boundary_inflate.rs",
+    "src/korea_boundary/hash.rs"
+  ],
+  "javascript_html_generators_tests_math_callers_dependencies_profiles_and_active_ci_byte_identical": true,
+  "data_files_checked": 100,
+  "data_bin_files": 97,
+  "data_bin_bytes": 50276630,
+  "all_data_files_identical": true,
+  "historical_report_byte_identical": true,
+  "git_index_unchanged": true,
+  "active_ci_diff_empty": true,
+  "remote_writes": 0,
+  "native_workflow_proposal": {
+    "path": "docs/korea-v4-native-validation.yml",
+    "active": false,
+    "executions": 0
+  }
+}

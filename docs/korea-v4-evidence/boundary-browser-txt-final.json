@@ -1,0 +1,25 @@
+{
+  "html_sha256": "625e7db05f6bd187f7f64342c81891b5925df6d4b67216015dbaf46fa9aeb0c2",
+  "module_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "scope": "The real file-import and coordinate extraction UI with every boundary module/data request blocked. This verifies the TXT path makes no such request.",
+  "engines": {
+    "chromium": {
+      "version": "151.0.7922.34",
+      "extracted_coordinates": 2,
+      "boundary_requests": 0,
+      "passed": true
+    },
+    "firefox": {
+      "version": "153.0",
+      "extracted_coordinates": 2,
+      "boundary_requests": 0,
+      "passed": true
+    },
+    "webkit": {
+      "version": "26.5",
+      "extracted_coordinates": 2,
+      "boundary_requests": 0,
+      "passed": true
+    }
+  }
+}

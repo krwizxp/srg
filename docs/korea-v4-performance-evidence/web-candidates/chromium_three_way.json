@@ -1,0 +1,550 @@
+{
+  "records": 10000,
+  "repetitions": 5,
+  "variants": [
+    "before",
+    "data_only",
+    "final"
+  ],
+  "profile": false,
+  "sources": {
+    "before": {
+      "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "product_bytes": 33492,
+      "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "data_index_bytes": 499628,
+      "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+      "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+      "harness_bytes": 33792
+    },
+    "data_only": {
+      "product_sha256": "9810f0a7b944c5ece22b6948dbd917dec4eaa315876abb7c702922dca17de67e",
+      "product_bytes": 33493,
+      "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "data_index_bytes": 538940,
+      "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+      "harness_sha256": "14bcb90fbc5d5a58ee42df71a91c085e5447b34b5a9f7ba7b9c66f12a47f03e2",
+      "harness_bytes": 33793
+    },
+    "final": {
+      "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+      "product_bytes": 33616,
+      "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "data_index_bytes": 538940,
+      "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+      "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+      "harness_bytes": 33916
+    }
+  },
+  "variant_roots": {
+    "before": "/workspace/scratch/20ca01e7d960/evidence/perf2/before",
+    "data_only": "/workspace/scratch/20ca01e7d960/srg",
+    "final": "/workspace/scratch/20ca01e7d960/srg"
+  },
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "Content-Length": "specified",
+    "ETag": null,
+    "Last-Modified": null
+  },
+  "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+  "raw": [
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 1,
+      "cold_first_ms": 25.200000001117587,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 8960.5,
+      "p95_record_ms": 5,
+      "maximum_record_ms": 45,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2182.3000000286847,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 777.5000000111759
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1023.7999999914318
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "data_only",
+      "repetition": 1,
+      "cold_first_ms": 27.399999998509884,
+      "warm_first_ms": 0.10000000149011612,
+      "total_ms": 5421.5999999996275,
+      "p95_record_ms": 3,
+      "maximum_record_ms": 19.5,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2134.4999999199063,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 120.69999999925494
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 978.4000000078231
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40896925,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 1,
+      "cold_first_ms": 26.5,
+      "warm_first_ms": 0,
+      "total_ms": 5092.89999999851,
+      "p95_record_ms": 2.799999998882413,
+      "maximum_record_ms": 24.5,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2124.4999999981374,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 121.9000000320375
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 639.5999999996275
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 2,
+      "cold_first_ms": 24.200000001117587,
+      "warm_first_ms": 0.19999999925494194,
+      "total_ms": 4861.9000000003725,
+      "p95_record_ms": 2.599999999627471,
+      "maximum_record_ms": 22.59999999962747,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 1987.099999992177,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 114.70000001974404
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 604.6999999321997
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "data_only",
+      "repetition": 2,
+      "cold_first_ms": 24.09999999962747,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 5172.0999999996275,
+      "p95_record_ms": 2.900000000372529,
+      "maximum_record_ms": 24.59999999962747,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2005.6999999806285,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 115.59999999217689
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 951.7999999541789
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40896925,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 2,
+      "cold_first_ms": 25.09999999962747,
+      "warm_first_ms": 0,
+      "total_ms": 7952.9000000003725,
+      "p95_record_ms": 4.400000000372529,
+      "maximum_record_ms": 28.200000001117587,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2026.899999987334,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 766.4000000171363
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1042.6999999787658
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "data_only",
+      "repetition": 3,
+      "cold_first_ms": 27.899999998509884,
+      "warm_first_ms": 0.2000000011175871,
+      "total_ms": 5429.699999999255,
+      "p95_record_ms": 3,
+      "maximum_record_ms": 18.5,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2084.300000043586,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 118.99999998137355
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1006.5000000093132
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40896925,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 3,
+      "cold_first_ms": 24,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 8285.199999999255,
+      "p95_record_ms": 4.700000001117587,
+      "maximum_record_ms": 17.200000001117587,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2114.7999999877065,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 770.5999999362975
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1032.8000001050532
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 3,
+      "cold_first_ms": 28.799999998882413,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 5116.300000000745,
+      "p95_record_ms": 2.800000000745058,
+      "maximum_record_ms": 27.199999999254942,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2197.000000031665,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 116.5999999716878
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 635.0000000689179
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 4,
+      "cold_first_ms": 23.90000000037253,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 4956,
+      "p95_record_ms": 2.699999999254942,
+      "maximum_record_ms": 33.5,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2039.7999999895692,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 119.19999998807907
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 638.1000001262873
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 4,
+      "cold_first_ms": 27.90000000037253,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 8265.200000001118,
+      "p95_record_ms": 4.699999999254942,
+      "maximum_record_ms": 18.40000000037253,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2155.899999950081,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 782.4000000208616
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1019.2999999821186
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "data_only",
+      "repetition": 4,
+      "cold_first_ms": 25.59999999962747,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 5631.200000001118,
+      "p95_record_ms": 3.100000001490116,
+      "maximum_record_ms": 29.199999999254942,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2164.7999999523163,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 121.50000000186265
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1011.7000000271946
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40896925,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "before",
+      "repetition": 5,
+      "cold_first_ms": 24.300000000745058,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 8137.4000000003725,
+      "p95_record_ms": 4.599999999627471,
+      "maximum_record_ms": 19.800000000745058,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 2043.5999999828637,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 765.4999999608845
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1010.3000000286847
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50310422,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "final",
+      "repetition": 5,
+      "cold_first_ms": 23.40000000037253,
+      "warm_first_ms": 0,
+      "total_ms": 4994.800000000745,
+      "p95_record_ms": 2.700000001117587,
+      "maximum_record_ms": 18.40000000037253,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2038.799999943003,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 119.99999999441206
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 615.5999999959022
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40897048,
+      "page_errors": []
+    },
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "data_only",
+      "repetition": 5,
+      "cold_first_ms": 24.90000000037253,
+      "warm_first_ms": 0,
+      "total_ms": 5530.0999999996275,
+      "p95_record_ms": 3.099999999627471,
+      "maximum_record_ms": 23,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 2136.899999992922,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 119.69999998435378
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1012.8999999687076
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 733,
+      "network_body_bytes": 40896925,
+      "page_errors": []
+    }
+  ]
+}

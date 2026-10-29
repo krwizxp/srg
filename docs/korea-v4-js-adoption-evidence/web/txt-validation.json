@@ -1,0 +1,31 @@
+{
+  "html_sha256": "1c70e62ab52bae840b540f7ee9e9a6b6af5b54ac4f6e68d1ad56b1576134e83d",
+  "module_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+  "scope": "The localhost-served real HTML with a local TXT file selected through the file input; every boundary module/data request is blocked. This verifies no boundary request is made. Opening the HTML via file:// is outside this test.",
+  "engines": {
+    "chromium": {
+      "version": "151.0.7922.34",
+      "extracted_coordinates": 2,
+      "malformed_txt_preserved_existing_coordinates": true,
+      "boundary_requests": 0,
+      "page_errors": [],
+      "passed": true
+    },
+    "firefox": {
+      "version": "153.0",
+      "extracted_coordinates": 2,
+      "malformed_txt_preserved_existing_coordinates": true,
+      "boundary_requests": 0,
+      "page_errors": [],
+      "passed": true
+    },
+    "webkit": {
+      "version": "26.5",
+      "extracted_coordinates": 2,
+      "malformed_txt_preserved_existing_coordinates": true,
+      "boundary_requests": 0,
+      "page_errors": [],
+      "passed": true
+    }
+  }
+}

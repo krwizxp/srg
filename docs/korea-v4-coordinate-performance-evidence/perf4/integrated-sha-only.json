@@ -1,0 +1,13 @@
+{
+  "integrated_utc": "2026-10-29T06:06:49.765598+00:00",
+  "selected": "SHA-only runtime-dispatched x86_64 SHA rounds plus original scalar fallback",
+  "hash_sha256": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef",
+  "inflater_restored_to_immediate_baseline_sha256": "3d5914e2265978f2085dc436739d85c6f8b069525fb0f15545fc52f0c8112dd5",
+  "provisional_inflater_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+  "provisional_inflater_reason": "Primary improved, but protected actual CLI pooled25 noninferiority remained unproven; rollback retains its complete evidence.",
+  "primary_qualification_sha256": "bd2754bb1869edbf8dd6f827f148f18432f7e0d6164357bb2421f8d7f9e88a9b",
+  "native_qualification_sha256": "e8e32e09e0c7a3a16eba02b027431cfed370903215adc0c3b4f5789defe7894a",
+  "all_local_qualification_criteria_passed": true,
+  "six_external_native_gates_still_not_run": true,
+  "remote_writes": []
+}

@@ -1,0 +1,189 @@
+{
+  "source_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+  "module_sha256": "32a22db9c035db05468e7f6ad3ab287ac6cfc8dfc9095143990c956b1e86870b",
+  "node": "v24.22.1",
+  "python_zlib": "1.3.2",
+  "exact_byte_matches": 25348,
+  "decoded_bytes": 84560888,
+  "corruption_tests": 1506,
+  "fixture_cases": [
+    {
+      "name": "stored",
+      "compressed_bytes": 139,
+      "raw_bytes": 128,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 139
+    },
+    {
+      "name": "fixed",
+      "compressed_bytes": 109,
+      "raw_bytes": 12000,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 109
+    },
+    {
+      "name": "dynamic",
+      "compressed_bytes": 104,
+      "raw_bytes": 10800,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 104
+    },
+    {
+      "name": "empty",
+      "compressed_bytes": 8,
+      "raw_bytes": 0,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 8
+    },
+    {
+      "name": "maximum_stored",
+      "compressed_bytes": 32779,
+      "raw_bytes": 32768,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 0
+    },
+    {
+      "name": "maximum_dynamic",
+      "compressed_bytes": 482,
+      "raw_bytes": 32768,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 482
+    },
+    {
+      "name": "distance_overlap",
+      "compressed_bytes": 53,
+      "raw_bytes": 32768,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 53
+    },
+    {
+      "name": "multiple_blocks",
+      "compressed_bytes": 82,
+      "raw_bytes": 3870,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 82
+    },
+    {
+      "name": "single_symbol_one_bit_distance",
+      "compressed_bytes": 48,
+      "raw_bytes": 0,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 48
+    },
+    {
+      "name": "empty_unused_distance",
+      "compressed_bytes": 48,
+      "raw_bytes": 0,
+      "all_bytes_equal": true,
+      "truncated_prefixes_rejected": 48
+    }
+  ],
+  "invalid_cases": [
+    {
+      "name": "reserved_block",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid block type"
+    },
+    {
+      "name": "invalid_literal_code",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid literal/length code"
+    },
+    {
+      "name": "invalid_distance_code",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid distance code"
+    },
+    {
+      "name": "backward_before_output",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid distance too far back"
+    },
+    {
+      "name": "invalid_literal_count",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: too many length or distance symbols"
+    },
+    {
+      "name": "oversubscribed_code_tree",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid code lengths set"
+    },
+    {
+      "name": "repeat_without_previous",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid bit length repeat"
+    },
+    {
+      "name": "repeat_overflow",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid bit length repeat"
+    },
+    {
+      "name": "missing_end_code",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid code -- missing end-of-block"
+    },
+    {
+      "name": "stored_length_complement",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid stored block lengths"
+    },
+    {
+      "name": "adler32",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: incorrect data check"
+    },
+    {
+      "name": "trailing_before_adler",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: incorrect data check"
+    },
+    {
+      "name": "concatenated_zlib",
+      "rejected": true,
+      "python_error": "truncated_or_trailing"
+    },
+    {
+      "name": "invalid_header",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: incorrect header check"
+    },
+    {
+      "name": "dictionary_not_supported",
+      "rejected": true,
+      "python_error": "Error 2 while decompressing data"
+    },
+    {
+      "name": "incomplete_code_alphabet",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid code lengths set"
+    },
+    {
+      "name": "incomplete_literal_tree",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid literal/lengths set"
+    },
+    {
+      "name": "incomplete_distance_tree",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid distances set"
+    },
+    {
+      "name": "single_symbol_two_bit_tree",
+      "rejected": true,
+      "python_error": "Error -3 while decompressing data: invalid literal/lengths set"
+    }
+  ],
+  "failures": [],
+  "actual_pages_seconds": 1.212963912,
+  "all_passed": true,
+  "completed_utc": "2026-10-29T03:45:33.424Z",
+  "maximum_output_allocation_bytes": 32768,
+  "huffman_table_entries_per_tree": {
+    "counts": 16,
+    "symbols": 288,
+    "offsets": 16,
+    "quick": 512
+  }
+}

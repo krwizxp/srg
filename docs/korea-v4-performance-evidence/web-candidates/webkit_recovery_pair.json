@@ -1,0 +1,111 @@
+{
+  "records": 10000,
+  "repetitions": 1,
+  "variants": [
+    "before",
+    "final"
+  ],
+  "profile": false,
+  "sources": {
+    "before": {
+      "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "product_bytes": 33492,
+      "data_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+      "data_index_bytes": 499628,
+      "data_root": "/workspace/scratch/20ca01e7d960/evidence/perf2/before/data/korea-boundary-v4",
+      "harness_sha256": "5c35a3fc3fcd1fe5e09d1a659cdace23ecc9863b6575bdffcbfc2cd7d1bf5470",
+      "harness_bytes": 33792
+    },
+    "final": {
+      "product_sha256": "6131a59d5070f30baea3b679060895fcc902f2ff2eef641a01a48c20fba1217d",
+      "product_bytes": 33616,
+      "data_index_sha256": "2fdddf815853ca08d6ad91f506585aedead865423d832749f4b53351ad5dd118",
+      "data_index_bytes": 538940,
+      "data_root": "/workspace/scratch/20ca01e7d960/srg/data/korea-boundary-v4",
+      "harness_sha256": "7ce05ae5c7ed81dd749360d96a3301f20871f43a17029b1b1566f162b5c3351e",
+      "harness_bytes": 33916
+    }
+  },
+  "variant_roots": {
+    "before": "/workspace/scratch/20ca01e7d960/evidence/perf2/before",
+    "data_only": "/workspace/scratch/20ca01e7d960/srg",
+    "final": "/workspace/scratch/20ca01e7d960/srg"
+  },
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "Content-Length": "specified",
+    "ETag": null,
+    "Last-Modified": null
+  },
+  "scope": "Fresh browser context per run, localhost HTTP, fixed num64/supp64, module-only. Cold means empty application caches in that new context; OS caches/browser executable remain warm. Cold import and first success precede timed 10k loop. Product plus temporary decoder timing counters and cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+  "raw": [
+    {
+      "engine": "webkit",
+      "browser_version": "26.5",
+      "variant": "before",
+      "repetition": 1,
+      "cold_first_ms": 25,
+      "warm_first_ms": 0,
+      "total_ms": 11491,
+      "p95_record_ms": 7,
+      "maximum_record_ms": 35,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 7596,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 1180
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 954
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 2162,
+      "network_body_bytes": 1112420948,
+      "page_errors": []
+    },
+    {
+      "engine": "webkit",
+      "browser_version": "26.5",
+      "variant": "final",
+      "repetition": 1,
+      "cold_first_ms": 238,
+      "warm_first_ms": 0,
+      "total_ms": 4768,
+      "p95_record_ms": 3,
+      "maximum_record_ms": 15,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2249,
+        "fetch_headers_ms": 3026,
+        "hash_calls": 2249,
+        "hash_bytes": 127803595,
+        "hash_ms": 260
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 594
+      },
+      "cache": {
+        "parts": 63,
+        "part_bytes": 3677584,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 2250,
+      "network_body_bytes": 127837511,
+      "page_errors": []
+    }
+  ]
+}

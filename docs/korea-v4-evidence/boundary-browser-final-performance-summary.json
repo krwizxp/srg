@@ -1,0 +1,110 @@
+{
+  "final_source_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "final_module_bytes": 33492,
+  "instrumented_source_sha256": "329ba0cf572b7cca5c2137f7c7c45b6198986a757900e811035da075ad0f1d04",
+  "instrumented_module_bytes": 33798,
+  "instrumented_sources_byte_identical_across_all_five_runs": true,
+  "engine": "Chromium 151.0.7922.34",
+  "records_per_run": 10000,
+  "repetitions": 5,
+  "runtime_ms": [
+    7912.4000000003725,
+    8355.700000000186,
+    8259.200000000186,
+    8448.799999999814,
+    8389.900000000373
+  ],
+  "median": {
+    "total_10000_ms": 8355.700000000186,
+    "cold_first_ms": 25.40000000037253,
+    "warm_first_ms": 0.09999999962747097,
+    "p95_record_ms": 4.7000000001862645
+  },
+  "minimum_runtime_ms": 7912.4000000003725,
+  "maximum_runtime_ms": 8448.799999999814,
+  "baseline_median_ms": 542.7000000001863,
+  "native_deflate_v4_median_ms": 19513.39999999944,
+  "final_over_baseline_ratio": 15.396535839316968,
+  "reduction_from_native_deflate_v4_percent": 57.179681654655646,
+  "supplemental_reads_per_run": 29278,
+  "bit_or_consumption_mismatches": 0,
+  "network_requests_per_run": 98,
+  "network_bytes_per_run": 50310428,
+  "fetch_and_sha_calls_per_run": 2161,
+  "sha_bytes_per_run": 1112387156,
+  "decompressions_per_run": 22714,
+  "median_decompression_ms": 1041.2999999877065,
+  "final_observed_cache": {
+    "parts": 8,
+    "part_bytes": 4164157,
+    "pages": 1270,
+    "page_bytes": 4153088
+  },
+  "other_engines_single_run": [
+    {
+      "engine": "firefox",
+      "browser_version": "153.0",
+      "variant": "sync",
+      "repetition": 1,
+      "cold_first_ms": 15,
+      "warm_first_ms": 0,
+      "total_10000_ms": 14883,
+      "p95_record_ms": 8,
+      "maximum_record_ms": 92,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 4208,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 1341
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 1786
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 98,
+      "network_bytes": 50310428
+    },
+    {
+      "engine": "webkit",
+      "browser_version": "26.5",
+      "variant": "sync",
+      "repetition": 1,
+      "cold_first_ms": 197,
+      "warm_first_ms": 0,
+      "total_10000_ms": 10626,
+      "p95_record_ms": 6,
+      "maximum_record_ms": 26,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 7103,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 1082
+      },
+      "decompression": {
+        "calls": 22714,
+        "ms": 881
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "network_requests": 2162,
+      "network_bytes": 1112420954
+    }
+  ],
+  "scope": "Identical final product plus temporary decoder timing counters and a cache-observation export; fresh context per run, immutable local HTTP with Content-Length, same fixed num64/supp64 corpus. Additional four repetitions ran after all browser QA jobs ended."
+}

@@ -47,3 +47,29 @@ fn rejects_truncation_checksum_and_output_overflow() {
         "Output limit ignored"
     );
 }
+#[test]
+fn rejects_incomplete_code_trees() -> Result<()> {
+    let cases: [&[u8]; 4] = [
+        include_bytes!("tests/incomplete_code_alphabet.zlib"),
+        include_bytes!("tests/incomplete_literal_tree.zlib"),
+        include_bytes!("tests/incomplete_distance_tree.zlib"),
+        include_bytes!("tests/single_symbol_two_bit_tree.zlib"),
+    ];
+    for compressed in cases {
+        if inflate(compressed, &mut []).is_ok() {
+            return Err("Incomplete Huffman tree accepted".into());
+        }
+    }
+    Ok(())
+}
+#[test]
+fn accepts_single_bit_leaf_and_unused_empty_distance() -> Result<()> {
+    let cases: [&[u8]; 2] = [
+        include_bytes!("tests/single_symbol_one_bit_distance.zlib"),
+        include_bytes!("tests/empty_unused_distance.zlib"),
+    ];
+    for compressed in cases {
+        (inflate(compressed, &mut [])? == 0).ok_or("Empty stream changed")?;
+    }
+    Ok(())
+}

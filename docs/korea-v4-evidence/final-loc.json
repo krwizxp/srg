@@ -1,0 +1,128 @@
+{
+  "scope": "Changed runtime modules plus HTML, tests, generated embed definitions and tools separately; unchanged repository modules are omitted symmetrically.",
+  "method": "Physical source lines and nonblank/non-comment-only lines; Python docstrings excluded using AST. Block comments preserve newline positions. No formatter-only savings claimed; tools/docs are not counted as runtime savings.",
+  "groups": {
+    "rust_runtime": {
+      "baseline": {
+        "physical": 1078,
+        "code": 1077,
+        "bytes": 42799
+      },
+      "final": {
+        "physical": 1532,
+        "code": 1528,
+        "bytes": 59097
+      },
+      "code_delta": 451,
+      "files": [
+        "src/boundary_inflate.rs",
+        "src/geo_uniform.rs",
+        "src/korea_boundary.rs",
+        "src/korea_boundary/hash.rs",
+        "src/random_data.rs"
+      ]
+    },
+    "rust_tests": {
+      "baseline": {
+        "physical": 303,
+        "code": 303,
+        "bytes": 9537
+      },
+      "final": {
+        "physical": 476,
+        "code": 476,
+        "bytes": 17084
+      },
+      "code_delta": 173,
+      "files": [
+        "src/boundary_inflate/tests.rs",
+        "src/geo_uniform/tests.rs",
+        "src/korea_boundary/tests.rs"
+      ]
+    },
+    "javascript": {
+      "baseline": {
+        "physical": 238,
+        "code": 238,
+        "bytes": 14598
+      },
+      "final": {
+        "physical": 713,
+        "code": 703,
+        "bytes": 33492
+      },
+      "code_delta": 465,
+      "files": [
+        "korea_boundary.js"
+      ]
+    },
+    "html": {
+      "baseline": {
+        "physical": 6117,
+        "code": 5725,
+        "bytes": 188322
+      },
+      "final": {
+        "physical": 6129,
+        "code": 5737,
+        "bytes": 188661
+      },
+      "code_delta": 12,
+      "files": [
+        "revgeo.html"
+      ]
+    },
+    "generated_rust": {
+      "baseline": {
+        "physical": 202,
+        "code": 202,
+        "bytes": 13071
+      },
+      "final": {
+        "physical": 103,
+        "code": 103,
+        "bytes": 6571
+      },
+      "code_delta": -99,
+      "files": [
+        "src/korea_boundary/data.rs"
+      ]
+    },
+    "data_tools": {
+      "baseline": {
+        "physical": 338,
+        "code": 309,
+        "bytes": 16574
+      },
+      "final": {
+        "physical": 695,
+        "code": 643,
+        "bytes": 33223
+      },
+      "code_delta": 334,
+      "files": [
+        "tools/build_korea_boundary.py",
+        "tools/pack_korea_boundary.py",
+        "tools/uniform_math.py",
+        "tools/verify_korea_boundary.py"
+      ]
+    },
+    "reduced_model_validation": {
+      "baseline": {
+        "physical": 0,
+        "code": 0,
+        "bytes": 0
+      },
+      "final": {
+        "physical": 445,
+        "code": 411,
+        "bytes": 23712
+      },
+      "code_delta": 411,
+      "files": [
+        "tools/verify_reduced_lattice.py",
+        "tools/reduced_lattice_exhaustive.c"
+      ]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "records": 10000,
+  "repetitions": 1,
+  "variants": [
+    "baseline"
+  ],
+  "profile": true,
+  "sources": {
+    "baseline": {
+      "product_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+      "product_bytes": 33492,
+      "harness_sha256": "dbd5e34fb890a3cb27cf4473c8aed678786a832b04670d283387dc5609c5d213",
+      "harness_bytes": 35178
+    }
+  },
+  "data_directory": "/workspace/scratch/20ca01e7d960/evidence/boundary-actual-scale32",
+  "corpus_num_seed": 20261029,
+  "corpus_supp_seed": "6004793983995241952",
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "Content-Length": "specified",
+    "ETag": null,
+    "Last-Modified": null
+  },
+  "scope": "Fresh context per run, localhost HTTP, fixed num64/supp64, module-only. Cold import and first success precede timed 10k loop. Product plus cache-observation export; optional profiling is diagnostic, not a benchmark claim.",
+  "raw": [
+    {
+      "engine": "chromium",
+      "browser_version": "151.0.7922.34",
+      "variant": "baseline",
+      "repetition": 1,
+      "cold_first_ms": 31.700000001117587,
+      "warm_first_ms": 0.09999999962747097,
+      "total_ms": 12656.599999999627,
+      "p95_record_ms": 7.100000001490116,
+      "maximum_record_ms": 69.20000000111759,
+      "reads": 29278,
+      "mismatches": 0,
+      "counters": {
+        "fetch_calls": 2161,
+        "fetch_headers_ms": 3208.3000000603497,
+        "hash_calls": 2161,
+        "hash_bytes": 1112387156,
+        "hash_ms": 899.6999999899417
+      },
+      "cache": {
+        "parts": 8,
+        "part_bytes": 4164157,
+        "pages": 1270,
+        "page_bytes": 4153088
+      },
+      "profile": {
+        "pages": 23876,
+        "downloads": 2161,
+        "cache": {
+          "parts": {
+            "hits": 20554,
+            "misses": 2160
+          },
+          "pages": {
+            "hits": 1162,
+            "misses": 22714
+          }
+        },
+        "candidate": {
+          "calls": 39280,
+          "ms": 183.00000000186265
+        },
+        "inflate": {
+          "calls": 22714,
+          "ms": 1221.000000005588
+        },
+        "body": {
+          "calls": 2161,
+          "ms": 6474.29999999702
+        }
+      },
+      "network_requests": 98,
+      "network_body_bytes": 50311808,
+      "page_errors": []
+    }
+  ]
+}

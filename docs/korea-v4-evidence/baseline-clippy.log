@@ -1,0 +1,1470 @@
+    Checking srg v1.5.9 (/workspace/scratch/20ca01e7d960/srg-baseline)
+error: integer literal has a better hexadecimal representation
+   --> src/korea_boundary/tests.rs:143:13
+    |
+143 |             18_446_744_073_709_551_615_u64,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider: `0xFFFF_FFFF_FFFF_FFFF_u64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#decimal_literal_representation
+    = note: `-D clippy::decimal-literal-representation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::decimal_literal_representation)]`
+
+error: integer literal has a better hexadecimal representation
+   --> src/korea_boundary.rs:142:26
+    |
+142 |         && part.len() <= 524_288)
+    |                          ^^^^^^^ help: consider: `0x0008_0000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#decimal_literal_representation
+
+error: integer literal has a better hexadecimal representation
+   --> src/korea_boundary.rs:142:26
+    |
+142 |         && part.len() <= 524_288)
+    |                          ^^^^^^^ help: consider: `0x0008_0000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#decimal_literal_representation
+    = note: `-D clippy::decimal-literal-representation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::decimal_literal_representation)]`
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:12:18
+   |
+12 | fn product_error(a: f64, b: f64, product: f64) -> f64 {
+   |                  ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+   = note: `-D clippy::min-ident-chars` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::min_ident_chars)]`
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:12:26
+   |
+12 | fn product_error(a: f64, b: f64, product: f64) -> f64 {
+   |                          ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: `split` shadows a previous, unrelated binding
+  --> src/geo_uniform.rs:16:9
+   |
+16 |     let split = 134_217_729.0_f64 * b;
+   |         ^^^^^
+   |
+note: previous binding is here
+  --> src/geo_uniform.rs:13:9
+   |
+13 |     let split = 134_217_729.0_f64 * a;
+   |         ^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#shadow_unrelated
+   = note: `-D clippy::shadow-unrelated` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::shadow_unrelated)]`
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:19:5
+   |
+19 |     ((ah * bh - product) + ah * bl + al * bh) + al * bl
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `al.mul_add(bl, (ah * bh - product) + ah * bl + al * bh)`
+   |
+   = note: the performance gain from `mul_add` may vary depending on the target architecture
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+   = note: `-D clippy::suboptimal-flops` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::suboptimal_flops)]`
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:19:5
+   |
+19 |     ((ah * bh - product) + ah * bl + al * bh) + al * bl
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `al.mul_add(bh, (ah * bh - product) + ah * bl)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:19:6
+   |
+19 |     ((ah * bh - product) + ah * bl + al * bh) + al * bl
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `ah.mul_add(bl, ah * bh - product)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:19:6
+   |
+19 |     ((ah * bh - product) + ah * bl + al * bh) + al * bl
+   |      ^^^^^^^^^^^^^^^^^^^ help: consider using: `ah.mul_add(bh, -product)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:38:25
+   |
+38 |             if error != 0.0 {
+   |                         ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+   = note: `-D clippy::default-numeric-fallback` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::default_numeric_fallback)]`
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:44:21
+   |
+44 |         if value != 0.0 || count == 0 {
+   |                     ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:21:16
+   |
+21 | fn determinant(a: f64, b: f64, c: f64, d: f64) -> f64 {
+   |                ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:21:24
+   |
+21 | fn determinant(a: f64, b: f64, c: f64, d: f64) -> f64 {
+   |                        ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:21:32
+   |
+21 | fn determinant(a: f64, b: f64, c: f64, d: f64) -> f64 {
+   |                                ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+  --> src/geo_uniform.rs:21:40
+   |
+21 | fn determinant(a: f64, b: f64, c: f64, d: f64) -> f64 {
+   |                                        ^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: indexing may panic
+  --> src/geo_uniform.rs:39:17
+   |
+39 |                 expansion[count] = error;
+   |                 ^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `.get(n)` or `.get_mut(n)` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing
+   = note: `-D clippy::indexing-slicing` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::indexing_slicing)]`
+
+error: indexing may panic
+  --> src/geo_uniform.rs:45:13
+   |
+45 |             expansion[count] = value;
+   |             ^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `.get(n)` or `.get_mut(n)` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:53:29
+   |
+53 |     let delta = (latitude - 36.0) * DEGREES;
+   |                             ^^^^ help: consider adding suffix: `36.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:56:12
+   |
+56 |         * (1.0
+   |            ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:58:21
+   |
+58 |                 * (-0.166_666_666_666_666_66
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.166_666_666_666_666_66_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:60:28
+   |
+60 |                         * (0.008_333_333_333_333_333
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.008_333_333_333_333_333_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:62:37
+   |
+62 | ...                   * (-0.000_198_412_698_412_698_4
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.000_198_412_698_412_698_4_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:64:44
+   |
+64 | ...                   * (2.755_731_922_398_589_3e-6
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `2.755_731_922_398_589_3e-6_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:65:57
+   |
+65 | ...                   + square * -2.505_210_838_544_172e-8)))));
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `2.505_210_838_544_172e-8_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:66:24
+   |
+66 |     let cosine_delta = 1.0
+   |                        ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:68:17
+   |
+68 |             * (-0.5
+   |                 ^^^ help: consider adding suffix: `0.5_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:70:24
+   |
+70 |                     * (0.041_666_666_666_666_664
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.041_666_666_666_666_664_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:72:33
+   |
+72 | ...                   * (-0.001_388_888_888_888_889
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.001_388_888_888_888_889_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:74:40
+   |
+74 | ...                   * (2.480_158_730_158_73e-5
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `2.480_158_730_158_73e-5_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:76:49
+   |
+76 | ...                   * (-2.755_731_922_398_589e-7
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `2.755_731_922_398_589e-7_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:77:60
+   |
+77 | ...                   + square * 2.087_675_698_786_81e-9)))));
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `2.087_675_698_786_81e-9_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:78:16
+   |
+78 |     let sine = 0.587_785_252_292_473_1 * cosine_delta + 0.809_016_994_374_947_5 * sine_delta;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.587_785_252_292_473_1_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:78:57
+   |
+78 |     let sine = 0.587_785_252_292_473_1 * cosine_delta + 0.809_016_994_374_947_5 * sine_delta;
+   |                                                         ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.809_016_994_374_947_5_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:79:18
+   |
+79 |     let cosine = 0.809_016_994_374_947_5 * cosine_delta - 0.587_785_252_292_473_1 * sine_delta;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.809_016_994_374_947_5_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:79:59
+   |
+79 |     let cosine = 0.809_016_994_374_947_5 * cosine_delta - 0.587_785_252_292_473_1 * sine_delta;
+   |                                                           ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `0.587_785_252_292_473_1_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:80:23
+   |
+80 |     let denominator = 1.0 - ECCENTRICITY_SQUARED * sine * sine;
+   |                       ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:56:11
+   |
+56 |           * (1.0
+   |  ___________^
+57 | |             + square
+58 | |                 * (-0.166_666_666_666_666_66
+59 | |                     + square
+...  |
+64 | |                                         * (2.755_731_922_398_589_3e-6
+65 | |                                             + square * -2.505_210_838_544_172e-8)))));
+   | |_____________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+56 ~         * square.mul_add(-0.166_666_666_666_666_66 + square
+57 +                         * (0.008_333_333_333_333_333
+58 +                             + square
+59 +                                 * (-0.000_198_412_698_412_698_4
+60 +                                     + square
+61 +                                         * (2.755_731_922_398_589_3e-6
+62 ~                                             + square * -2.505_210_838_544_172e-8))), 1.0);
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:58:19
+   |
+58 |                   * (-0.166_666_666_666_666_66
+   |  ___________________^
+59 | |                     + square
+60 | |                         * (0.008_333_333_333_333_333
+61 | |                             + square
+...  |
+64 | |                                         * (2.755_731_922_398_589_3e-6
+65 | |                                             + square * -2.505_210_838_544_172e-8)))));
+   | |____________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+58 ~                 * square.mul_add(0.008_333_333_333_333_333 + square
+59 +                                 * (-0.000_198_412_698_412_698_4
+60 +                                     + square
+61 +                                         * (2.755_731_922_398_589_3e-6
+62 ~                                             + square * -2.505_210_838_544_172e-8)), -0.166_666_666_666_666_66));
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:60:27
+   |
+60 |                           * (0.008_333_333_333_333_333
+   |  ___________________________^
+61 | |                             + square
+62 | |                                 * (-0.000_198_412_698_412_698_4
+63 | |                                     + square
+64 | |                                         * (2.755_731_922_398_589_3e-6
+65 | |                                             + square * -2.505_210_838_544_172e-8)))));
+   | |___________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+60 ~                         * square.mul_add(-0.000_198_412_698_412_698_4 + square
+61 +                                         * (2.755_731_922_398_589_3e-6
+62 ~                                             + square * -2.505_210_838_544_172e-8), 0.008_333_333_333_333_333)));
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:62:35
+   |
+62 |   ...                   * (-0.000_198_412_698_412_698_4
+   |  _________________________^
+63 | | ...                       + square
+64 | | ...                           * (2.755_731_922_398_589_3e-6
+65 | | ...                               + square * -2.505_210_838_544_172e-8)))));
+   | |________________________________________________________________________^ help: consider using: `square.mul_add(2.755_731_922_398_589_3e-6 + square * -2.505_210_838_544_172e-8, -0.000_198_412_698_412_698_4)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:64:43
+   |
+64 |   ...                   * (2.755_731_922_398_589_3e-6
+   |  _________________________^
+65 | | ...                       + square * -2.505_210_838_544_172e-8)))));
+   | |_______________________________________________________________^ help: consider using: `square.mul_add(-2.505_210_838_544_172e-8, 2.755_731_922_398_589_3e-6)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:66:24
+   |
+66 |       let cosine_delta = 1.0
+   |  ________________________^
+67 | |         + square
+68 | |             * (-0.5
+69 | |                 + square
+...  |
+76 | |                                             * (-2.755_731_922_398_589e-7
+77 | |                                                 + square * 2.087_675_698_786_81e-9)))));
+   | |_______________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+66 ~     let cosine_delta = square.mul_add(-0.5 + square
+67 +                     * (0.041_666_666_666_666_664
+68 +                         + square
+69 +                             * (-0.001_388_888_888_888_889
+70 +                                 + square
+71 +                                     * (2.480_158_730_158_73e-5
+72 +                                         + square
+73 +                                             * (-2.755_731_922_398_589e-7
+74 ~                                                 + square * 2.087_675_698_786_81e-9)))), 1.0);
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:68:15
+   |
+68 |               * (-0.5
+   |  _______________^
+69 | |                 + square
+70 | |                     * (0.041_666_666_666_666_664
+71 | |                         + square
+...  |
+76 | |                                             * (-2.755_731_922_398_589e-7
+77 | |                                                 + square * 2.087_675_698_786_81e-9)))));
+   | |_______________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+68 ~             * square.mul_add(0.041_666_666_666_666_664 + square
+69 +                             * (-0.001_388_888_888_888_889
+70 +                                 + square
+71 +                                     * (2.480_158_730_158_73e-5
+72 +                                         + square
+73 +                                             * (-2.755_731_922_398_589e-7
+74 ~                                                 + square * 2.087_675_698_786_81e-9))), -0.5);
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:70:23
+   |
+70 |                       * (0.041_666_666_666_666_664
+   |  _______________________^
+71 | |                         + square
+72 | |                             * (-0.001_388_888_888_888_889
+73 | |                                 + square
+...  |
+76 | |                                             * (-2.755_731_922_398_589e-7
+77 | |                                                 + square * 2.087_675_698_786_81e-9)))));
+   | |______________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+70 ~                     * square.mul_add(-0.001_388_888_888_888_889 + square
+71 +                                     * (2.480_158_730_158_73e-5
+72 +                                         + square
+73 +                                             * (-2.755_731_922_398_589e-7
+74 ~                                                 + square * 2.087_675_698_786_81e-9)), 0.041_666_666_666_666_664));
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:72:31
+   |
+72 |   ...                   * (-0.001_388_888_888_888_889
+   |  _________________________^
+73 | | ...                       + square
+74 | | ...                           * (2.480_158_730_158_73e-5
+75 | | ...                               + square
+76 | | ...                                   * (-2.755_731_922_398_589e-7
+77 | | ...                                       + square * 2.087_675_698_786_81e-9)))));
+   | |_______________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+help: consider using
+   |
+72 ~                             * square.mul_add(2.480_158_730_158_73e-5 + square
+73 +                                             * (-2.755_731_922_398_589e-7
+74 ~                                                 + square * 2.087_675_698_786_81e-9), -0.001_388_888_888_888_889)));
+   |
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:74:39
+   |
+74 |   ...                   * (2.480_158_730_158_73e-5
+   |  _________________________^
+75 | | ...                       + square
+76 | | ...                           * (-2.755_731_922_398_589e-7
+77 | | ...                               + square * 2.087_675_698_786_81e-9)))));
+   | |______________________________________________________________________^ help: consider using: `square.mul_add(-2.755_731_922_398_589e-7 + square * 2.087_675_698_786_81e-9, 2.480_158_730_158_73e-5)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:76:47
+   |
+76 |   ...                   * (-2.755_731_922_398_589e-7
+   |  _________________________^
+77 | | ...                       + square * 2.087_675_698_786_81e-9)))));
+   | |_____________________________________________________________^ help: consider using: `square.mul_add(2.087_675_698_786_81e-9, -2.755_731_922_398_589e-7)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:78:16
+   |
+78 |     let sine = 0.587_785_252_292_473_1 * cosine_delta + 0.809_016_994_374_947_5 * sine_delta;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `0.809_016_994_374_947_5f64.mul_add(sine_delta, 0.587_785_252_292_473_1 * cosine_delta)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:79:18
+   |
+79 |     let cosine = 0.809_016_994_374_947_5 * cosine_delta - 0.587_785_252_292_473_1 * sine_delta;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `0.587_785_252_292_473_1f64.mul_add(-sine_delta, 0.809_016_994_374_947_5 * cosine_delta)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:80:23
+   |
+80 |     let denominator = 1.0 - ECCENTRICITY_SQUARED * sine * sine;
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `(ECCENTRICITY_SQUARED * sine).mul_add(-sine, 1.0)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:91:21
+   |
+91 |     let mut total = 0.0;
+   |                     ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:93:19
+   |
+93 |         total += (2.0 * position * weight) * density(start + delta * position);
+   |                   ^^^ help: consider adding suffix: `2.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:93:9
+   |
+93 |         total += (2.0 * position * weight) * density(start + delta * position);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `total = f64::mul_add((2.0 * position * weight), density(start + delta * position), total)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:93:54
+   |
+93 |         total += (2.0 * position * weight) * density(start + delta * position);
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `delta.mul_add(position, start)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:100:60
+    |
+100 |     let horizontal = (float_from_u64(reversed >> 12_u32) + 0.5) / 4_503_599_627_370_496.0;
+    |                                                            ^^^ help: consider adding suffix: `0.5_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:100:67
+    |
+100 |     let horizontal = (float_from_u64(reversed >> 12_u32) + 0.5) / 4_503_599_627_370_496.0;
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^ help: consider adding suffix: `4_503_599_627_370_496.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:104:10
+    |
+104 |     let [a, b, c] = *vertices;
+    |          ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:104:13
+    |
+104 |     let [a, b, c] = *vertices;
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:104:16
+    |
+104 |     let [a, b, c] = *vertices;
+    |                ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:112:26
+    |
+112 |         if orientation > 0.0 {
+    |                          ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:113:21
+    |
+113 |             side >= 0.0
+    |                     ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:115:21
+    |
+115 |             side <= 0.0
+    |                     ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:122:21
+    |
+122 |     (orientation != 0.0 && orientation.is_finite() && count > 0 && rank < count)
+    |                     ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:128:13
+    |
+128 |     (span > 0.0).ok_or("대한민국 삼각형 위도 오류")?;
+    |             ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:132:23
+    |
+132 |     let upper_mass = (1.0 - fraction) * triangular_density(north[0], middle[0] - north[0]);
+    |                       ^^^ help: consider adding suffix: `1.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:138:17
+    |
+138 |         (north, 1.0 - (target - lower_mass) / upper_mass)
+    |                 ^^^ help: consider adding suffix: `1.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:143:14
+    |
+143 |     for _ in 0..4 {
+    |              ^ help: consider adding suffix: `0_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:143:17
+    |
+143 |     for _ in 0..4 {
+    |                 ^ help: consider adding suffix: `4_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:144:24
+    |
+144 |         if distance == 0.0 {
+    |                        ^^^ help: consider adding suffix: `0.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:148:45
+    |
+148 |         distance -= (mass - unit * mean) / (2.0 * distance * density(apex[0] + delta * distance));
+    |                                             ^^^ help: consider adding suffix: `2.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:156:42
+    |
+156 |     let center = [(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0];
+    |                                          ^^^ help: consider adding suffix: `3.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:156:70
+    |
+156 |     let center = [(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0];
+    |                                                                      ^^^ help: consider adding suffix: `3.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:157:14
+    |
+157 |     for _ in 0..8 {
+    |              ^ help: consider adding suffix: `0_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/geo_uniform.rs:157:17
+    |
+157 |     for _ in 0..8 {
+    |                 ^ help: consider adding suffix: `8_i32`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:120:10
+    |
+120 |     let [a, b, c] = *vertices;
+    |          ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:120:13
+    |
+120 |     let [a, b, c] = *vertices;
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+   --> src/geo_uniform.rs:120:16
+    |
+120 |     let [a, b, c] = *vertices;
+    |                ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:130:32
+    |
+130 |     let crossing = [middle[0], south[1] + fraction * (north[1] - south[1])];
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(fraction, north[1] - south[1], south[1])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:148:21
+    |
+148 |         distance -= (mass - unit * mean) / (2.0 * distance * density(apex[0] + delta * distance));
+    |                     ^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(unit, -mean, mass)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:148:70
+    |
+148 |         distance -= (mass - unit * mean) / (2.0 * distance * density(apex[0] + delta * distance));
+    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(delta, distance, apex[0])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:151:9
+    |
+151 |         apex[0] + distance * (middle[0] - apex[0]),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(distance, middle[0] - apex[0], apex[0])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:152:9
+    |
+152 |         apex[1] + distance * (middle[1] - apex[1]),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(distance, middle[1] - apex[1], apex[1])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:154:17
+    |
+154 |     let other = apex[1] + distance * (crossing[1] - apex[1]);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(distance, crossing[1] - apex[1], apex[1])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:155:31
+    |
+155 |     let mut point = [edge[0], edge[1] + horizontal * (other - edge[1])];
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `f64::mul_add(horizontal, other - edge[1], edge[1])`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions can be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:176:17
+    |
+176 |                 (vertex[0] - point[0]).powi(2) + (vertex[1] - point[1]).powi(2)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `(vertex[0] - point[0]).mul_add(vertex[0] - point[0], (vertex[1] - point[1]).powi(2))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: multiply and add expressions can be calculated more efficiently and accurately
+   --> src/geo_uniform.rs:176:17
+    |
+176 |                 (vertex[0] - point[0]).powi(2) + (vertex[1] - point[1]).powi(2)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `(vertex[1] - point[1]).mul_add(vertex[1] - point[1], (vertex[0] - point[0]).powi(2))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: used `panic!()` or assertion in a function that returns `Result`
+  --> src/boundary_inflate/tests.rs:4:1
+   |
+ 4 | / fn decompresses_python_zlib_fixtures() -> Result<()> {
+ 5 | |     let cases: [(&[u8], Vec<u8>); 3] = [
+ 6 | |         (include_bytes!("tests/stored.zlib"), (0_u8..128).collect()),
+...  |
+25 | |     Ok(())
+26 | | }
+   | |_^
+   |
+   = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+  --> src/boundary_inflate/tests.rs:19:9
+   |
+19 | /         assert_eq!(
+20 | |             output.get(..count),
+21 | |             Some(expected.as_slice()),
+22 | |             "Python zlib fixture differs"
+23 | |         );
+   | |_________^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+   = note: `-D clippy::panic-in-result-fn` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::panic_in_result_fn)]`
+
+error: redundant pattern matching
+  --> src/boundary_inflate/tests.rs:33:13
+   |
+33 |             matches!(inflate(source.split_at(length).0, &mut output), Err(_)),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_pattern_matching
+   = note: `-D clippy::redundant-pattern-matching` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::redundant_pattern_matching)]`
+help: consider using `is_err()`
+   |
+33 -             matches!(inflate(source.split_at(length).0, &mut output), Err(_)),
+33 +             inflate(source.split_at(length).0, &mut output).is_err(),
+   |
+
+error: redundant pattern matching
+  --> src/boundary_inflate/tests.rs:42:9
+   |
+42 |         matches!(inflate(&corrupted, &mut output), Err(_)),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_pattern_matching
+help: consider using `is_err()`
+   |
+42 -         matches!(inflate(&corrupted, &mut output), Err(_)),
+42 +         inflate(&corrupted, &mut output).is_err(),
+   |
+
+error: redundant pattern matching
+  --> src/boundary_inflate/tests.rs:46:9
+   |
+46 |         matches!(inflate(source, &mut [0_u8; 8]), Err(_)),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_pattern_matching
+help: consider using `is_err()`
+   |
+46 -         matches!(inflate(source, &mut [0_u8; 8]), Err(_)),
+46 +         inflate(source, &mut [0_u8; 8]).is_err(),
+   |
+
+error: incorrect ordering of items (module item groupings specify another order)
+  --> src/korea_boundary.rs:11:7
+   |
+11 | const MAX_PAGE_SIZE: usize = 15_876;
+   |       ^^^^^^^^^^^^^
+   |
+note: should be placed before `BoundaryCache`
+  --> src/korea_boundary.rs:8:19
+   |
+ 8 | pub(super) struct BoundaryCache {
+   |                   ^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#arbitrary_source_item_ordering
+   = note: `-D clippy::arbitrary-source-item-ordering` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::arbitrary_source_item_ordering)]`
+
+error: consider bringing this path into scope with the `use` keyword
+   --> src/korea_boundary.rs:108:5
+    |
+108 |     crate::geo_uniform::sample(&vertices, rank, count)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#absolute_paths
+    = note: `-D clippy::absolute-paths` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::absolute_paths)]`
+
+error: `cache` is shadowed
+   --> src/korea_boundary.rs:161:17
+    |
+161 |     if let Some(cache) = cache {
+    |                 ^^^^^
+    |
+note: previous binding is here
+   --> src/korea_boundary.rs:131:5
+    |
+131 |     cache: Option<&mut BoundaryCache>,
+    |     ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#shadow_reuse
+    = note: `-D clippy::shadow-reuse` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::shadow_reuse)]`
+
+error: type of pattern does not match the expression type
+   --> src/korea_boundary.rs:163:67
+    |
+163 |         let item = if let Some(position) = pages.iter().position(|(key, _)| *key == block) {
+    |                                                                   ^^^^^^^^
+    |
+    = help: explicitly match against a `&_` pattern and adjust the enclosed variable bindings
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#pattern_type_mismatch
+    = note: `-D clippy::pattern-type-mismatch` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::pattern_type_mismatch)]`
+
+error: this identifier consists of only a single character
+   --> src/korea_boundary.rs:206:29
+    |
+206 |         previous.map_or(0, |v| v.strict_add(1))
+    |                             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: this identifier consists of only a single character
+   --> src/korea_boundary.rs:210:20
+    |
+210 |         .and_then(|v| v.checked_add(1))
+    |                    ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#min_ident_chars
+
+error: incorrect ordering of items (must be alphabetically ordered)
+  --> src/random_data.rs:83:5
+   |
+83 |     boundary_cache: Option<&'provider_ref mut korea_boundary::BoundaryCache>,
+   |     ^^^^^^^^^^^^^^
+   |
+note: should be placed before `data`
+  --> src/random_data.rs:82:5
+   |
+82 |     data: RandomDataSet,
+   |     ^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#arbitrary_source_item_ordering
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+ --> src/geo_uniform/tests.rs:7:27
+  |
+7 |         let denominator = 1.0_f64 - 0.006_694_380_022_900_787_f64 * phi.sin().powi(2);
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `0.006_694_380_022_900_787_f64.mul_add(-phi.sin().powi(2), 1.0_f64)`
+  |
+  = note: the performance gain from `mul_add` may vary depending on the target architecture
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+  = note: `-D clippy::suboptimal-flops` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(clippy::suboptimal_flops)]`
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:21:18
+   |
+21 |                 (0.0..1.0).contains(&vertical) && vertical > 0.0,
+   |                  ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+   = note: `-D clippy::default-numeric-fallback` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::default_numeric_fallback)]`
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:21:23
+   |
+21 |                 (0.0..1.0).contains(&vertical) && vertical > 0.0,
+   |                       ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:21:62
+   |
+21 |                 (0.0..1.0).contains(&vertical) && vertical > 0.0,
+   |                                                              ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:25:18
+   |
+25 |                 (0.0..1.0).contains(&horizontal) && horizontal > 0.0,
+   |                  ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:25:23
+   |
+25 |                 (0.0..1.0).contains(&horizontal) && horizontal > 0.0,
+   |                       ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:25:66
+   |
+25 |                 (0.0..1.0).contains(&horizontal) && horizontal > 0.0,
+   |                                                                  ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: this function's return value is unnecessary
+  --> src/geo_uniform/tests.rs:40:1
+   |
+40 | fn invalid_geometry_cannot_produce_a_fallback() -> Result<()> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_wraps
+   = note: `-D clippy::unnecessary-wraps` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove the return type...
+   |
+40 - fn invalid_geometry_cannot_produce_a_fallback() -> Result<()> {
+40 + fn invalid_geometry_cannot_produce_a_fallback() -> () {
+   |
+help: ...and then remove returned values
+   |
+46 -     Ok(())
+   |
+
+error: used `panic!()` or assertion in a function that returns `Result`
+  --> src/geo_uniform/tests.rs:40:1
+   |
+40 | / fn invalid_geometry_cannot_produce_a_fallback() -> Result<()> {
+41 | |     let vertices = [[35.0_f64, 127.0_f64]; 3];
+42 | |     assert!(
+43 | |         sample(&vertices, 0, 1).is_err(),
+...  |
+46 | |     Ok(())
+47 | | }
+   | |_^
+   |
+   = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+  --> src/geo_uniform/tests.rs:42:5
+   |
+42 | /     assert!(
+43 | |         sample(&vertices, 0, 1).is_err(),
+44 | |         "A zero-area triangle must fail"
+45 | |     );
+   | |_____^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: used `panic!()` or assertion in a function that returns `Result`
+  --> src/geo_uniform/tests.rs:49:1
+   |
+49 | / fn smallest_triangle_does_not_fold_distinct_inputs() -> Result<()> {
+50 | |     let vertices = [
+51 | |         [34.501_653_444_045_03_f64, 127.5_f64],
+52 | |         [34.502_102_822_576_27_f64, 127.5_f64],
+...  |
+64 | |     Ok(())
+65 | | }
+   | |_^
+   |
+   = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+  --> src/geo_uniform/tests.rs:58:9
+   |
+58 | /         assert!(
+59 | |             point.latitude > previous,
+60 | |             "Distinct residual inputs collapsed to the same latitude"
+61 | |         );
+   | |_________^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:77:28
+   |
+77 |                 vertical > 0.0 && vertical < 1.0 && horizontal > 0.0 && horizontal < 1.0,
+   |                            ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:77:46
+   |
+77 |                 vertical > 0.0 && vertical < 1.0 && horizontal > 0.0 && horizontal < 1.0,
+   |                                              ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:77:66
+   |
+77 |                 vertical > 0.0 && vertical < 1.0 && horizontal > 0.0 && horizontal < 1.0,
+   |                                                                  ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+  --> src/geo_uniform/tests.rs:77:86
+   |
+77 |                 vertical > 0.0 && vertical < 1.0 && horizontal > 0.0 && horizontal < 1.0,
+   |                                                                                      ^^^ help: consider adding suffix: `1.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: multiply and add expressions may be calculated more efficiently and accurately
+  --> src/geo_uniform.rs:19:5
+   |
+19 |     ((ah * bh - product) + ah * bl + al * bh) + al * bl
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `al.mul_add(bl, (ah * bh - product) + ah * bl + al * bh)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#suboptimal_flops
+
+error: default numeric fallback might occur
+  --> src/geo_uniform.rs:38:25
+   |
+38 |             if error != 0.0 {
+   |                         ^^^ help: consider adding suffix: `0.0_f64`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: used `panic!()` or assertion in a function that returns `Result`
+  --> src/korea_boundary/tests.rs:4:1
+   |
+ 4 | / fn islands_and_border_region_remain_reachable() -> Result<()> {
+ 5 | |     let cases = [
+ 6 | |         (
+ 7 | |             1_712_113_391_928_591_u64,
+...  |
+64 | |     Ok(())
+65 | | }
+   | |_^
+   |
+   = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+  --> src/korea_boundary/tests.rs:58:9
+   |
+58 | /         assert!(
+59 | |             (south..=north).contains(&coordinate.latitude)
+60 | |                 && (west..=east).contains(&coordinate.longitude),
+61 | |             "Region fixture is outside its independently checked bounds"
+62 | |         );
+   | |_________^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: used `panic!()` or assertion in a function that returns `Result`
+   --> src/korea_boundary/tests.rs:67:1
+    |
+ 67 | / fn cached_records_preserve_fields_and_supplement_consumption() -> Result<()> {
+ 68 | |     use crate::{
+ 69 | |         output::{OutputTarget, format_data_into_buffer},
+ 70 | |         random_data::RandomDataSet,
+...   |
+112 | |     Ok(())
+113 | | }
+    | |_^
+    |
+    = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+   --> src/korea_boundary/tests.rs:86:17
+    |
+ 86 | /                 assert!(
+ 87 | |                     !reason.starts_with("대한민국"),
+ 88 | |                     "Domestic coordinates consumed supplemental entropy"
+ 89 | |                 );
+    | |_________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: `cache` shadows a previous, unrelated binding
+  --> src/korea_boundary/tests.rs:82:23
+   |
+82 |         let render = |cache: Option<&mut super::BoundaryCache>| -> Result<(Vec<u8>, usize)> {
+   |                       ^^^^^
+   |
+note: previous binding is here
+  --> src/korea_boundary/tests.rs:72:9
+   |
+72 |     let mut cache = super::BoundaryCache::default();
+   |         ^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#shadow_unrelated
+
+error: `mut value` shadows a previous, unrelated binding
+  --> src/korea_boundary/tests.rs:92:25
+   |
+92 |                 let mut value = seed;
+   |                         ^^^^^
+   |
+note: previous binding is here
+  --> src/korea_boundary/tests.rs:76:13
+   |
+76 |         let value = match iteration {
+   |             ^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#shadow_unrelated
+
+error: used `panic!()` or assertion in a function that returns `Result`
+   --> src/korea_boundary/tests.rs:115:1
+    |
+115 | / fn all_u64_endpoints_are_valid_without_an_entropy_provider() -> Result<()> {
+116 | |     for value in [0, 1, u64::MAX.strict_sub(1), u64::MAX] {
+117 | |         let point = sample(value, None)?;
+118 | |         assert!(
+...   |
+127 | |     Ok(())
+128 | | }
+    | |_^
+    |
+    = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+   --> src/korea_boundary/tests.rs:118:9
+    |
+118 | /         assert!(
+119 | |             (33.0..39.0).contains(&point.latitude),
+120 | |             "Latitude is outside Korea bounds"
+121 | |         );
+    | |_________^
+122 | /         assert!(
+123 | |             (124.0..132.0).contains(&point.longitude),
+124 | |             "Longitude is outside Korea bounds"
+125 | |         );
+    | |_________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: default numeric fallback might occur
+   --> src/korea_boundary/tests.rs:119:14
+    |
+119 |             (33.0..39.0).contains(&point.latitude),
+    |              ^^^^ help: consider adding suffix: `33.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/korea_boundary/tests.rs:119:20
+    |
+119 |             (33.0..39.0).contains(&point.latitude),
+    |                    ^^^^ help: consider adding suffix: `39.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/korea_boundary/tests.rs:123:14
+    |
+123 |             (124.0..132.0).contains(&point.longitude),
+    |              ^^^^^ help: consider adding suffix: `124.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: default numeric fallback might occur
+   --> src/korea_boundary/tests.rs:123:21
+    |
+123 |             (124.0..132.0).contains(&point.longitude),
+    |                     ^^^^^ help: consider adding suffix: `132.0_f64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#default_numeric_fallback
+
+error: used `panic!()` or assertion in a function that returns `Result`
+   --> src/korea_boundary/tests.rs:130:1
+    |
+130 | / fn single_word_mapping_matches_cross_language_fixtures() -> Result<()> {
+131 | |     let cases = [
+132 | |         [
+133 | |             0_u64,
+...   |
+171 | |     Ok(())
+172 | | }
+    | |_^
+    |
+    = help: `panic!()` or assertions should not be used in a function that returns `Result` as `Result` is expected to return an error instead of crashing
+note: return Err() instead of panicking
+   --> src/korea_boundary/tests.rs:165:9
+    |
+165 | /         assert_eq!(
+166 | |             [point.latitude.to_bits(), point.longitude.to_bits()],
+167 | |             [latitude, longitude],
+168 | |             "Single-word mapping changed"
+169 | |         );
+    | |_________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#panic_in_result_fn
+
+error: this function is only used once
+   --> src/boundary_inflate.rs:117:1
+    |
+117 | / fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
+118 | |     let literal_count = usize::try_from(bits.read(5)?.strict_add(257))
+119 | |         .map_err(|source| format!("경계 압축 코드 개수 오류: {source}"))?;
+120 | |     let distance_count = usize::try_from(bits.read(5)?.strict_add(1))
+...   |
+174 | |     Ok((Huffman::new(literal)?, Huffman::new(distance)?))
+175 | | }
+    | |_^
+    |
+note: used here
+   --> src/boundary_inflate.rs:215:21
+    |
+215 |                     dynamic_trees(&mut bits)?
+    |                     ^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+    = note: `-D clippy::single-call-fn` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::single_call_fn)]`
+
+error: this function is only used once
+   --> src/geo_uniform.rs:97:1
+    |
+ 97 | / fn residual_position(rank: u64, count: u64) -> [f64; 2] {
+ 98 | |     let vertical = ((float_from_u64(rank) + 0.5) / float_from_u64(count)).min(1.0_f64.next_down());
+ 99 | |     let reversed = rank.reverse_bits() ^ 0x9E37_79B9_7F4A_7C15_u64;
+100 | |     let horizontal = (float_from_u64(reversed >> 12_u32) + 0.5) / 4_503_599_627_370_496.0;
+101 | |     [vertical, horizontal]
+102 | | }
+    | |_^
+    |
+note: used here
+   --> src/geo_uniform.rs:133:34
+    |
+133 |     let [vertical, horizontal] = residual_position(rank, count);
+    |                                  ^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/geo_uniform.rs:103:1
+    |
+103 | / fn inside(vertices: &[[f64; 2]; 3], point: [f64; 2], orientation: f64) -> bool {
+104 | |     let [a, b, c] = *vertices;
+105 | |     [(a, b), (b, c), (c, a)].into_iter().all(|(start, end)| {
+106 | |         let side = determinant(
+...   |
+117 | |     })
+118 | | }
+    | |_^
+    |
+note: used here
+   --> src/geo_uniform.rs:158:12
+    |
+158 |         if inside(vertices, point, orientation) {
+    |            ^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/boundary_inflate.rs:176:1
+    |
+176 | / pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
+177 | |     let header = input.first_chunk::<2>().ok_or("경계 압축 헤더 오류")?;
+178 | |     (header[0] & 15 == 8
+179 | |         && header[0] >> 4_u32 <= 7
+...   |
+291 | |     Ok(written)
+292 | | }
+    | |_^
+    |
+note: used here
+   --> src/korea_boundary.rs:15:18
+    |
+ 15 |     let length = inflate(compressed, &mut shuffled)?;
+    |                  ^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/korea_boundary.rs:128:1
+    |
+128 | / fn select(
+129 | |     value: u64,
+130 | |     count: usize,
+131 | |     cache: Option<&mut BoundaryCache>,
+...   |
+181 | | }
+    | |_^
+    |
+note: used here
+   --> src/korea_boundary.rs:101:37
+    |
+101 |     let (begin, weight, vertices) = select(position, parts, cache)?;
+    |                                     ^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/geo_uniform.rs:119:1
+    |
+119 | / pub(super) fn sample(vertices: &[[f64; 2]; 3], rank: u64, count: u64) -> Result<Coordinates> {
+120 | |     let [a, b, c] = *vertices;
+121 | |     let orientation = determinant(b[1] - a[1], b[0] - a[0], c[1] - a[1], c[0] - a[0]);
+122 | |     (orientation != 0.0 && orientation.is_finite() && count > 0 && rank < count)
+...   |
+184 | |     })
+185 | | }
+    | |_^
+    |
+note: used here
+   --> src/korea_boundary.rs:108:5
+    |
+108 |     crate::geo_uniform::sample(&vertices, rank, count)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/korea_boundary.rs:77:1
+    |
+ 77 | / fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
+ 78 | |     let value = bytes
+ 79 | |         .get(offset..)
+ 80 | |         .and_then(|tail| tail.first_chunk::<4>())
+ 81 | |         .ok_or("대한민국 경계 데이터 구조 오류")?;
+ 82 | |     Ok(u32::from_le_bytes(*value))
+ 83 | | }
+    | |_^
+    |
+note: used here
+   --> src/korea_boundary.rs:111:21
+    |
+111 |     usize::try_from(read_u32(bytes, offset)?)
+    |                     ^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: this function is only used once
+   --> src/korea_boundary.rs:91:1
+    |
+ 91 | / pub(super) fn sample(value: u64, cache: Option<&mut BoundaryCache>) -> Result<Coordinates> {
+ 92 | |     DATA.starts_with(b"SRGKR003")
+ 93 | |         .ok_or("대한민국 경계 데이터 버전 오류")?;
+ 94 | |     let total = read_u64(DATA, 24)?;
+...   |
+108 | |     crate::geo_uniform::sample(&vertices, rank, count)
+109 | | }
+    | |_^
+    |
+note: used here
+   --> src/random_data.rs:123:13
+    |
+123 |             korea_boundary::sample(state.data.num_64, state.boundary_cache.as_deref_mut())?;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_call_fn
+
+error: could not compile `srg` (bin "srg") due to 100 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `srg` (bin "srg" test) due to 125 previous errors

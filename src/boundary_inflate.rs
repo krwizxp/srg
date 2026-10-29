@@ -1,4 +1,5 @@
 use crate::diagnostic::Result;
+use std::sync::LazyLock;
 #[cfg(test)]
 mod tests;
 const CODE_ORDER: [usize; 19] = [
@@ -19,15 +20,38 @@ const LENGTH_BASE: [usize; 29] = [
 const LENGTH_EXTRA: [u32; 29] = [
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
 ];
+static FIXED_TREES: LazyLock<Result<(Huffman, Huffman)>> = LazyLock::new(|| {
+    let mut lengths = [8_u8; 288];
+    lengths
+        .get_mut(144..256)
+        .ok_or("경계 고정 코드 오류")?
+        .fill(9);
+    lengths
+        .get_mut(256..280)
+        .ok_or("경계 고정 코드 오류")?
+        .fill(7);
+    Ok((
+        Huffman::new(&lengths, false)?,
+        Huffman::new(&[5; 32], false)?,
+    ))
+});
 struct Bits<'data> {
     bytes: &'data [u8],
     position: usize,
 }
 struct Huffman {
     counts: [u32; 16],
+    quick: [u16; 512],
     symbols: [u16; 288],
 }
 impl Bits<'_> {
+    fn peek_nine(&self) -> Option<u16> {
+        let bytes = self
+            .bytes
+            .get(self.position.strict_div(8)..)?
+            .first_chunk::<2>()?;
+        Some((u16::from_le_bytes(*bytes) >> (self.position & 7)) & 0x01FF)
+    }
     fn read(&mut self, count: u32) -> Result<u32> {
         let mut value = 0_u32;
         for shift in 0..count {
@@ -42,9 +66,10 @@ impl Bits<'_> {
     }
 }
 impl Huffman {
-    fn new(lengths: &[u8]) -> Result<Self> {
+    fn new(lengths: &[u8], require_complete: bool) -> Result<Self> {
         let mut result = Self {
             counts: [0; 16],
+            quick: [0; 512],
             symbols: [0; 288],
         };
         (lengths.len() <= result.symbols.len()).ok_or("경계 압축 코드 개수 오류")?;
@@ -74,6 +99,8 @@ impl Huffman {
                     );
             }
         }
+        (remaining == 0 || (!require_complete && lengths.iter().all(|&length| length <= 1)))
+            .ok_or("경계 압축 코드가 불완전합니다.")?;
         for (symbol, &length) in lengths.iter().enumerate() {
             if length == 0 {
                 continue;
@@ -90,9 +117,48 @@ impl Huffman {
                 u16::try_from(symbol).map_err(|source| format!("경계 압축 심볼 오류: {source}"))?;
             *offset = offset.strict_add(1);
         }
+        let mut first = 0_u32;
+        let mut index = 0_usize;
+        for length in 1_u32..=9 {
+            let count = *result
+                .counts
+                .get(usize::try_from(length).map_err(|source| format!("{source}"))?)
+                .ok_or("경계 압축 코드 길이 오류")?;
+            for offset in 0..count {
+                let symbol_index = index
+                    .strict_add(usize::try_from(offset).map_err(|source| format!("{source}"))?);
+                let symbol = *result
+                    .symbols
+                    .get(symbol_index)
+                    .ok_or("경계 압축 심볼 위치 오류")?;
+                let packed = u16::try_from((length << 9_u32) | u32::from(symbol))
+                    .map_err(|source| format!("{source}"))?;
+                let reversed =
+                    first.strict_add(offset).reverse_bits() >> u32::BITS.strict_sub(length);
+                let begin = usize::try_from(reversed).map_err(|source| format!("{source}"))?;
+                for slot in (begin..512).step_by(1_usize << length) {
+                    *result
+                        .quick
+                        .get_mut(slot)
+                        .ok_or("경계 압축 조회 위치 오류")? = packed;
+                }
+            }
+            index = index.strict_add(usize::try_from(count).map_err(|source| format!("{source}"))?);
+            first = first.strict_add(count).strict_mul(2);
+        }
         Ok(result)
     }
     fn symbol(&self, bits: &mut Bits<'_>) -> Result<u16> {
+        if let Some(prefix) = bits.peek_nine() {
+            let packed = *self
+                .quick
+                .get(usize::from(prefix))
+                .ok_or("경계 압축 조회 위치 오류")?;
+            if packed != 0 {
+                bits.position = bits.position.strict_add(usize::from(packed >> 9_u32));
+                return Ok(packed & 0x01FF);
+            }
+        }
         let mut code = 0_u32;
         let mut first = 0_u32;
         let mut index = 0_u32;
@@ -128,7 +194,7 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
             .get_mut(position)
             .ok_or("경계 압축 코드 순서 오류")? = bits.read(3)?.to_le_bytes()[0];
     }
-    let codes = Huffman::new(&code_lengths)?;
+    let codes = Huffman::new(&code_lengths, true)?;
     let total = literal_count.strict_add(distance_count);
     let mut lengths = [0_u8; 318];
     let mut filled = 0_usize;
@@ -171,7 +237,10 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
         .get(..total)
         .ok_or("경계 압축 코드 개수 오류")?
         .split_at(literal_count);
-    Ok((Huffman::new(literal)?, Huffman::new(distance)?))
+    Ok((
+        Huffman::new(literal, false)?,
+        Huffman::new(distance, false)?,
+    ))
 }
 pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
     let header = input.first_chunk::<2>().ok_or("경계 압축 헤더 오류")?;
@@ -200,22 +269,15 @@ pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
                 }
             }
             kind @ (1 | 2) => {
-                let (literal, distance) = if kind == 1 {
-                    let mut lengths = [8_u8; 288];
-                    lengths
-                        .get_mut(144..256)
-                        .ok_or("경계 고정 코드 오류")?
-                        .fill(9);
-                    lengths
-                        .get_mut(256..280)
-                        .ok_or("경계 고정 코드 오류")?
-                        .fill(7);
-                    (Huffman::new(&lengths)?, Huffman::new(&[5; 32])?)
+                let dynamic;
+                let trees = if kind == 1 {
+                    FIXED_TREES.as_ref().map_err(|source| format!("{source}"))?
                 } else {
-                    dynamic_trees(&mut bits)?
+                    dynamic = dynamic_trees(&mut bits)?;
+                    &dynamic
                 };
                 loop {
-                    let symbol = literal.symbol(&mut bits)?;
+                    let symbol = trees.0.symbol(&mut bits)?;
                     if symbol == 256 {
                         break;
                     }
@@ -236,7 +298,7 @@ pub(super) fn inflate(input: &[u8], output: &mut [u8]) -> Result<usize> {
                             )?)
                             .map_err(|source| format!("경계 압축 길이 오류: {source}"))?,
                         );
-                    let distance_index = usize::from(distance.symbol(&mut bits)?);
+                    let distance_index = usize::from(trees.1.symbol(&mut bits)?);
                     let backward = DISTANCE_BASE
                         .get(distance_index)
                         .ok_or("경계 압축 거리 코드 오류")?

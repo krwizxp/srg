@@ -1,0 +1,27 @@
+{
+  "records": [
+    {
+      "variant": "bits-adler",
+      "exit_code": 0,
+      "source_sha256": "58c554f143881a8c8237063319bcc70de8d4c5dd3f0a883f592083d27a246916",
+      "output_sha256": "d1cd654fe499e9b7408ddff3b9ae75d3cd6810b19d00b6984e2cf44764dcb8f6",
+      "output_bytes": 37438116,
+      "counts": {
+        "pages": 25348,
+        "raw_bytes": 84560888,
+        "cases": 1509
+      }
+    }
+  ],
+  "valid_pages": 25348,
+  "valid_page_bytes": 84560888,
+  "valid_fixtures": 10,
+  "invalid_fixtures": 1499,
+  "initial_output_sentinel": 165,
+  "full_output_buffers_error_strings_and_order_equal": {
+    "bits-adler": true
+  },
+  "harness_sha256": "ddd05cc8dff3625c42180ef50f665b411e53ebea60dc804fbb9a932799a1e8b1",
+  "oracle_sha256": "d9af202b42b4182c7b2fc1bc4a44410bf76a646cf8041b0d10e95f7e6d9b76a4",
+  "error_corpus_sha256": "7c6cc75bed5dc588f7dd91e0a1d02187819100b037df2d3df399ac0547e925c4"
+}

@@ -1,0 +1,59 @@
+{
+  "status": "prepared_not_executed",
+  "execution_permitted": false,
+  "syntax_validation": "Python ast.parse only; no runner invocation, compiler, input generation or validate run",
+  "scope": "Small reproducibility bundle only; no copied payloads, vector files or executables",
+  "normalized_input_rows": 1131,
+  "normalized_input_sha256": "4cbdd29cc8dc2dc5251a21f6774298b133276179f63c64d2964b38052ceffc1f",
+  "normalized_input_definition": "UTF-8 LF TSV containing original fields0(kind),1(name),3(digest); original absolute path field2 omitted",
+  "original_recipe_ast_identical_except_utf8_lf_io_keywords": true,
+  "original_source_sha256": {
+    "bench.rs": "dcee3e8c4ef29cb92064bcc71c98e56c26c7f15c130998f7031da4b96ef95fb8",
+    "baseline.rs": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6",
+    "candidate.rs": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef",
+    "forced_scalar.rs": "7d7ba0e9d0d8f684138a3c4d5d143cd134ad914077242553b7b9792651575b59",
+    "prepare_inputs.py": "6054d5640f250208845627543c9a3b94754f75829345188663f9dc12aad748fa",
+    "inputs.json": "adfdf6946ec7de3ab9ad35cece7d70c0f7790992c3a36d94709dca6dd7635b71"
+  },
+  "files": {
+    "README.md": {
+      "bytes": 3992,
+      "sha256": "2ba5afd725565e70ff3928b5379b8c6b3fda4e72fc5311987615d54c9bba271d"
+    },
+    "baseline.rs": {
+      "bytes": 4258,
+      "sha256": "4be2e4e2396bcf9bdf43ac6a3e8296f2fd77930c966897186a634df2d5b6c1e6"
+    },
+    "bench.rs": {
+      "bytes": 4307,
+      "sha256": "dcee3e8c4ef29cb92064bcc71c98e56c26c7f15c130998f7031da4b96ef95fb8"
+    },
+    "candidate.rs": {
+      "bytes": 6578,
+      "sha256": "90b580b4ff5c70529b7127a47742246141d39112add1efd361a9b10be092d8ef"
+    },
+    "forced_scalar.rs": {
+      "bytes": 6552,
+      "sha256": "7d7ba0e9d0d8f684138a3c4d5d143cd134ad914077242553b7b9792651575b59"
+    },
+    "inputs.json": {
+      "bytes": 4294,
+      "sha256": "adfdf6946ec7de3ab9ad35cece7d70c0f7790992c3a36d94709dca6dd7635b71"
+    },
+    "prepare_inputs.py": {
+      "bytes": 3565,
+      "sha256": "6054d5640f250208845627543c9a3b94754f75829345188663f9dc12aad748fa"
+    },
+    "run.py": {
+      "bytes": 11817,
+      "sha256": "80aad15889d95b1a14009d7bc2294dca2f6121ca17cfb70d7d53b5bc46014370"
+    }
+  },
+  "next_step": "Root reviews the bundle; execute validation once only after native benchmark CPU work finishes and the final source is integrated.",
+  "static_review_notes": [
+    "Relative rustc paths are made absolute before the temporary working directory is used; symlinks are not dereferenced so Rustup rustc shims keep their command name.",
+    "The regenerated input recipe AST differs only in explicit UTF-8/LF I/O keywords; the seed and all random calls are identical.",
+    "The only executable mode passed to the unchanged Rust harness is validate.",
+    "No compiler invocation or corpus regeneration was performed while preparing this bundle."
+  ]
+}

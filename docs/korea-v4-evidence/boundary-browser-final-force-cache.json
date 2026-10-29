@@ -1,0 +1,35 @@
+{
+  "engine": "WebKit",
+  "version": "26.5",
+  "records": 10000,
+  "source_sha256": "94f8206937d10cc03e992dd15b174ad20cf3707c979a8d482fe9e80bb9659785",
+  "temporary_source_sha256": "d2a86fcf56e55e0a808f3a06c3e285c17f6ecc4eddb87055b0d690125a4f0abb",
+  "change": "Only fetch cache mode force-cache; all integrity checks and application memory budgets unchanged.",
+  "headers": {
+    "Cache-Control": "public, max-age=3600, immutable",
+    "Content-Length": "specified",
+    "ETag": null,
+    "Last-Modified": null
+  },
+  "watchdog_ms": 90000,
+  "passed": true,
+  "measurement": {
+    "cold_first_ms": 27,
+    "warm_first_ms": 0,
+    "total_10000_ms": 11569,
+    "p95_record_ms": 7,
+    "maximum_record_ms": 56,
+    "reads": 29278,
+    "mismatches": 0
+  },
+  "network_requests": 2162,
+  "network_bytes": 1112420670,
+  "observed_memory": {
+    "samples": 50,
+    "peak_descendant_rss_sum_bytes": 623296512,
+    "maximum_descendants": 4,
+    "page_bytes": 4096,
+    "interval_ms": 250,
+    "scope": "Sum of /proc resident pages for live descendants of the benchmark Node process; excludes Node itself. Shared resident pages can be counted more than once. This is an observation, not an exclusive-memory total or a JavaScript heap limit."
+  }
+}

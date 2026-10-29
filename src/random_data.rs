@@ -119,8 +119,11 @@ impl RandomDataSet {
         state.fill_hangul_syllables()?;
         state.fill_coords();
         state.fill_nms_fields()?;
-        state.data.kor_coords =
-            korea_boundary::sample(state.data.num_64, state.boundary_cache.as_deref_mut())?;
+        state.data.kor_coords = korea_boundary::sample(
+            state.data.num_64,
+            state.next_supp,
+            state.boundary_cache.as_deref_mut(),
+        )?;
         state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
         state.data.euro_millions_main_numbers = state.euro_main.into_values();
         state.data.lotto_numbers = state.lotto.into_values();

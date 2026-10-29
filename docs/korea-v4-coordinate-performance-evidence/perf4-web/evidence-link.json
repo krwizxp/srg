@@ -1,0 +1,196 @@
+{
+  "current_source_identity": {
+    "js_sha256": "befe878c22c1ec2307ff36ed4f48c3a1aba8f40bf0c5bc8750bdd114077bb71c",
+    "html_sha256": "1c70e62ab52bae840b540f7ee9e9a6b6af5b54ac4f6e68d1ad56b1576134e83d",
+    "index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
+    "source_boundary_sha256": "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428",
+    "byte_identical_to_cycle_before": true,
+    "byte_identical_to_previously_verified_perf3_web": true
+  },
+  "unchanged_implementation": "Exact whole-module identity preserves math operation order, geometry parsing/covers, inflater validation, loader/hash checks, cache policy/bounds, supplemental consumption, public API and async/cancellation ordering. Exact HTML identity preserves the UI/TXT integration.",
+  "cache_limits": {
+    "compressed_entries": 8,
+    "compressed_payload_bytes": 4194304,
+    "decoded_entries": 4096,
+    "decoded_payload_bytes": 4194304,
+    "compressed_pending": 8,
+    "decoded_pending": 256
+  },
+  "prior_link": {
+    "path": "../perf3-web/evidence-link.json",
+    "sha256": "f748d9fda8ad833a716fc1bcaaab574ba76916ab3c3625096765a90f2f4c5454",
+    "previously_verified_binary_files": 97,
+    "previously_verified_binary_bytes": 50276630
+  },
+  "data_scope": "The current index is byte-identical and pins the same part and source hashes. To avoid interference with the native performance slot, this lightweight link does not rehash all97 current binary files. The parent owns any final whole-dataset byte comparison; the previous full-file identity evidence is linked above.",
+  "reused_functional_reports": [
+    {
+      "path": "../perf3-web/corpus-validation.json",
+      "report_sha256": "045484ec1477017549fafda3134bb4c66a6c244aa468f9e4890eb0517ae726fe",
+      "scope": "One functional verification of the fixed 10,000-record corpus per engine. Exact unmodified product module, no added exports or timing instrumentation; this is not an additional performance repetition.",
+      "engines": {
+        "chromium": {
+          "version": "151.0.7922.34",
+          "page_errors": [],
+          "crashed": false,
+          "watchdog_fired": false,
+          "records": 10000,
+          "supplemental_reads": 29278,
+          "coordinate_bit_mismatches": 0,
+          "consumption_mismatches": 0,
+          "public_exports": [
+            "prepareKorea",
+            "sampleKorea"
+          ],
+          "passed": true
+        },
+        "firefox": {
+          "version": "153.0",
+          "page_errors": [],
+          "crashed": false,
+          "watchdog_fired": false,
+          "records": 10000,
+          "supplemental_reads": 29278,
+          "coordinate_bit_mismatches": 0,
+          "consumption_mismatches": 0,
+          "public_exports": [
+            "prepareKorea",
+            "sampleKorea"
+          ],
+          "passed": true
+        },
+        "webkit": {
+          "version": "26.5",
+          "page_errors": [],
+          "crashed": false,
+          "watchdog_fired": false,
+          "records": 10000,
+          "supplemental_reads": 29278,
+          "coordinate_bit_mismatches": 0,
+          "consumption_mismatches": 0,
+          "public_exports": [
+            "prepareKorea",
+            "sampleKorea"
+          ],
+          "passed": true
+        }
+      }
+    },
+    {
+      "path": "../perf3-web/ui-validation.json",
+      "report_sha256": "6401969c6c4d1f6a815c0d4192673322ecd95c768b3c5cd13348412a5d9dfb4b",
+      "scope": "Six real UI scenarios per engine using the final quick9 HTML/JS and actual boundary dataset. Every pageerror listener is attached before navigation. Controlled crypto overrides are limited to error and cancellation cases.",
+      "engines": {
+        "chromium": {
+          "checks": [
+            "ui_manual_supplement_dialog",
+            "ui_manual_cancel",
+            "ui_crypto_failure",
+            "ui_automatic_supplement",
+            "ui_clear_pending_geometry",
+            "ui_clear_cached_rejection_loop"
+          ],
+          "page_errors": [],
+          "pageerror_observed_pages": 6,
+          "version": "151.0.7922.34",
+          "txt_download": {
+            "file": "/workspace/scratch/20ca01e7d960/evidence/perf3-web/ui-chromium.txt",
+            "bytes": 733,
+            "sha256": "b473a9ecba03a68188bda75be7ed65f1962e6dbdeb08c9d2863fdc699358efe2",
+            "records": 1,
+            "boundary_requests_after_completion": 0
+          },
+          "cached_rejection_crypto_batches_before_clear": 13,
+          "passed": true
+        },
+        "firefox": {
+          "checks": [
+            "ui_manual_supplement_dialog",
+            "ui_manual_cancel",
+            "ui_crypto_failure",
+            "ui_automatic_supplement",
+            "ui_clear_pending_geometry",
+            "ui_clear_cached_rejection_loop"
+          ],
+          "page_errors": [],
+          "pageerror_observed_pages": 6,
+          "version": "153.0",
+          "txt_download": {
+            "file": "/workspace/scratch/20ca01e7d960/evidence/perf3-web/ui-firefox.txt",
+            "bytes": 733,
+            "sha256": "b473a9ecba03a68188bda75be7ed65f1962e6dbdeb08c9d2863fdc699358efe2",
+            "records": 1,
+            "boundary_requests_after_completion": 0
+          },
+          "cached_rejection_crypto_batches_before_clear": 9,
+          "passed": true
+        },
+        "webkit": {
+          "checks": [
+            "ui_manual_supplement_dialog",
+            "ui_manual_cancel",
+            "ui_crypto_failure",
+            "ui_automatic_supplement",
+            "ui_clear_pending_geometry",
+            "ui_clear_cached_rejection_loop"
+          ],
+          "page_errors": [],
+          "pageerror_observed_pages": 6,
+          "version": "26.5",
+          "txt_download": {
+            "file": "/workspace/scratch/20ca01e7d960/evidence/perf3-web/ui-webkit.txt",
+            "bytes": 733,
+            "sha256": "b473a9ecba03a68188bda75be7ed65f1962e6dbdeb08c9d2863fdc699358efe2",
+            "records": 1,
+            "boundary_requests_after_completion": 0
+          },
+          "cached_rejection_crypto_batches_before_clear": 11,
+          "passed": true
+        }
+      }
+    },
+    {
+      "path": "../perf3-web/txt-validation.json",
+      "report_sha256": "35aa8dfccc0b75c5c575522c52b1a2b248368195bfb8f48a6aba6564cc2d0b79",
+      "scope": "The localhost-served real HTML with a local TXT file selected through the file input; every boundary module/data request is blocked. This verifies no boundary request is made. Opening the HTML via file:// is outside this test.",
+      "engines": {
+        "chromium": {
+          "version": "151.0.7922.34",
+          "extracted_coordinates": 2,
+          "malformed_txt_preserved_existing_coordinates": true,
+          "boundary_requests": 0,
+          "page_errors": [],
+          "passed": true
+        },
+        "firefox": {
+          "version": "153.0",
+          "extracted_coordinates": 2,
+          "malformed_txt_preserved_existing_coordinates": true,
+          "boundary_requests": 0,
+          "page_errors": [],
+          "passed": true
+        },
+        "webkit": {
+          "version": "26.5",
+          "extracted_coordinates": 2,
+          "malformed_txt_preserved_existing_coordinates": true,
+          "boundary_requests": 0,
+          "page_errors": [],
+          "passed": true
+        }
+      }
+    }
+  ],
+  "reused_checks": {
+    "engines": 3,
+    "fixed_records_per_engine": 10000,
+    "ui_scenarios_per_engine": 6,
+    "total_ui_scenarios": 18,
+    "txt_independent_scenarios_engines": 3
+  },
+  "new_browser_runs_for_evidence_reuse": 0,
+  "new_performance_runs_after_decision": 0,
+  "prepared_but_not_executed": "Candidate UI10k and supplementary Node/page harnesses remain preparation artifacts, not passed checks.",
+  "all_assertions_in_this_lightweight_scope_passed": true,
+  "all_task_owned_browser_cpu_jobs_finished": true
+}

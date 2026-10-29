@@ -1,0 +1,492 @@
+[
+  {
+    "path": "/original_quick9/korea_boundary.js",
+    "body_bytes": 33915,
+    "actual_response_delay_ms": 20.08275499999945
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/index.bin",
+    "body_bytes": 499628,
+    "actual_response_delay_ms": 20.215535000001182
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-082.bin",
+    "body_bytes": 518319,
+    "actual_response_delay_ms": 19.38169999999991
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-064.bin",
+    "body_bytes": 517136,
+    "actual_response_delay_ms": 20.564492000001337
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-062.bin",
+    "body_bytes": 522089,
+    "actual_response_delay_ms": 20.586263999999574
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-088.bin",
+    "body_bytes": 523723,
+    "actual_response_delay_ms": 20.33341400000063
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-007.bin",
+    "body_bytes": 515789,
+    "actual_response_delay_ms": 19.663634999998976
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-093.bin",
+    "body_bytes": 523443,
+    "actual_response_delay_ms": 20.19487499999923
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-083.bin",
+    "body_bytes": 518611,
+    "actual_response_delay_ms": 20.49536700000135
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-018.bin",
+    "body_bytes": 521017,
+    "actual_response_delay_ms": 20.228414999999586
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-043.bin",
+    "body_bytes": 520135,
+    "actual_response_delay_ms": 20.515548000001218
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-030.bin",
+    "body_bytes": 515447,
+    "actual_response_delay_ms": 20.356589000000895
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-006.bin",
+    "body_bytes": 518935,
+    "actual_response_delay_ms": 20.21016200000122
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-069.bin",
+    "body_bytes": 520889,
+    "actual_response_delay_ms": 20.241579999999885
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-028.bin",
+    "body_bytes": 522289,
+    "actual_response_delay_ms": 20.229591999999684
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-019.bin",
+    "body_bytes": 521912,
+    "actual_response_delay_ms": 20.196055999998862
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-041.bin",
+    "body_bytes": 519685,
+    "actual_response_delay_ms": 20.186201999998957
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-051.bin",
+    "body_bytes": 523929,
+    "actual_response_delay_ms": 20.248125000000073
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-087.bin",
+    "body_bytes": 521528,
+    "actual_response_delay_ms": 19.736048999999184
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-070.bin",
+    "body_bytes": 519583,
+    "actual_response_delay_ms": 20.322627999999895
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-026.bin",
+    "body_bytes": 520175,
+    "actual_response_delay_ms": 20.21923699999934
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-058.bin",
+    "body_bytes": 524084,
+    "actual_response_delay_ms": 20.22253599999931
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-014.bin",
+    "body_bytes": 524083,
+    "actual_response_delay_ms": 20.197978999998668
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-080.bin",
+    "body_bytes": 524224,
+    "actual_response_delay_ms": 20.200854000000618
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-063.bin",
+    "body_bytes": 523012,
+    "actual_response_delay_ms": 20.207494000000224
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-092.bin",
+    "body_bytes": 522681,
+    "actual_response_delay_ms": 20.40629799999988
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-095.bin",
+    "body_bytes": 285197,
+    "actual_response_delay_ms": 20.20386800000051
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-057.bin",
+    "body_bytes": 522838,
+    "actual_response_delay_ms": 19.380317999999534
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-023.bin",
+    "body_bytes": 515697,
+    "actual_response_delay_ms": 20.199862999999823
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-065.bin",
+    "body_bytes": 523364,
+    "actual_response_delay_ms": 20.22728400000051
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-081.bin",
+    "body_bytes": 515486,
+    "actual_response_delay_ms": 20.213819000000512
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-073.bin",
+    "body_bytes": 517500,
+    "actual_response_delay_ms": 20.413565000000744
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-024.bin",
+    "body_bytes": 523155,
+    "actual_response_delay_ms": 20.20998800000052
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-066.bin",
+    "body_bytes": 515612,
+    "actual_response_delay_ms": 19.273715999999695
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-034.bin",
+    "body_bytes": 523775,
+    "actual_response_delay_ms": 20.24457000000075
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-021.bin",
+    "body_bytes": 517697,
+    "actual_response_delay_ms": 20.307694999999512
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-091.bin",
+    "body_bytes": 523206,
+    "actual_response_delay_ms": 20.244129000000612
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-052.bin",
+    "body_bytes": 522748,
+    "actual_response_delay_ms": 20.606104000000414
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-008.bin",
+    "body_bytes": 522378,
+    "actual_response_delay_ms": 20.505934000000707
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-036.bin",
+    "body_bytes": 523870,
+    "actual_response_delay_ms": 20.239951999999903
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-037.bin",
+    "body_bytes": 516560,
+    "actual_response_delay_ms": 20.272922000000108
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-005.bin",
+    "body_bytes": 524134,
+    "actual_response_delay_ms": 20.189696999999796
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-039.bin",
+    "body_bytes": 521081,
+    "actual_response_delay_ms": 20.166643000000477
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-042.bin",
+    "body_bytes": 518481,
+    "actual_response_delay_ms": 20.356939999999668
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-072.bin",
+    "body_bytes": 523302,
+    "actual_response_delay_ms": 20.198750999999902
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-050.bin",
+    "body_bytes": 524018,
+    "actual_response_delay_ms": 20.168234000000666
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-000.bin",
+    "body_bytes": 516366,
+    "actual_response_delay_ms": 20.255055999999968
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-085.bin",
+    "body_bytes": 518049,
+    "actual_response_delay_ms": 20.215306000000055
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-061.bin",
+    "body_bytes": 524151,
+    "actual_response_delay_ms": 20.215154999999868
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-077.bin",
+    "body_bytes": 522499,
+    "actual_response_delay_ms": 20.292841999998927
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-047.bin",
+    "body_bytes": 524259,
+    "actual_response_delay_ms": 20.20106399999895
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-045.bin",
+    "body_bytes": 523534,
+    "actual_response_delay_ms": 20.20440899999994
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-055.bin",
+    "body_bytes": 517244,
+    "actual_response_delay_ms": 20.384610999999495
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-032.bin",
+    "body_bytes": 524178,
+    "actual_response_delay_ms": 20.398261000000275
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-094.bin",
+    "body_bytes": 523640,
+    "actual_response_delay_ms": 19.238444000000527
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-025.bin",
+    "body_bytes": 519573,
+    "actual_response_delay_ms": 20.243216999999277
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-084.bin",
+    "body_bytes": 516843,
+    "actual_response_delay_ms": 20.19314200000008
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-079.bin",
+    "body_bytes": 524202,
+    "actual_response_delay_ms": 20.20386299999882
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-016.bin",
+    "body_bytes": 524204,
+    "actual_response_delay_ms": 20.238241000000926
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-038.bin",
+    "body_bytes": 520240,
+    "actual_response_delay_ms": 20.236878000001525
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-046.bin",
+    "body_bytes": 520501,
+    "actual_response_delay_ms": 20.24572100000114
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-029.bin",
+    "body_bytes": 519321,
+    "actual_response_delay_ms": 20.24676300000101
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-002.bin",
+    "body_bytes": 520389,
+    "actual_response_delay_ms": 19.269420999999056
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-074.bin",
+    "body_bytes": 519128,
+    "actual_response_delay_ms": 20.190247999998974
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-090.bin",
+    "body_bytes": 523885,
+    "actual_response_delay_ms": 20.271560000001045
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-054.bin",
+    "body_bytes": 523076,
+    "actual_response_delay_ms": 21.466150000000198
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-027.bin",
+    "body_bytes": 518549,
+    "actual_response_delay_ms": 20.324799999998504
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-020.bin",
+    "body_bytes": 520385,
+    "actual_response_delay_ms": 19.280887999999322
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-053.bin",
+    "body_bytes": 523484,
+    "actual_response_delay_ms": 20.202305999999226
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-012.bin",
+    "body_bytes": 524033,
+    "actual_response_delay_ms": 20.327174000000014
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-078.bin",
+    "body_bytes": 523657,
+    "actual_response_delay_ms": 19.274520000000848
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-004.bin",
+    "body_bytes": 523078,
+    "actual_response_delay_ms": 20.281707000000097
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-040.bin",
+    "body_bytes": 520031,
+    "actual_response_delay_ms": 20.20430000000124
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-089.bin",
+    "body_bytes": 522733,
+    "actual_response_delay_ms": 20.1956169999994
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-076.bin",
+    "body_bytes": 521422,
+    "actual_response_delay_ms": 20.652154999999766
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-059.bin",
+    "body_bytes": 520114,
+    "actual_response_delay_ms": 19.293593000000328
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-015.bin",
+    "body_bytes": 521386,
+    "actual_response_delay_ms": 20.225161999998818
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-035.bin",
+    "body_bytes": 522250,
+    "actual_response_delay_ms": 20.381768000001102
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-049.bin",
+    "body_bytes": 523672,
+    "actual_response_delay_ms": 20.3912820000005
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-060.bin",
+    "body_bytes": 520927,
+    "actual_response_delay_ms": 20.235498000000007
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-003.bin",
+    "body_bytes": 522400,
+    "actual_response_delay_ms": 20.203278999999384
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-086.bin",
+    "body_bytes": 517109,
+    "actual_response_delay_ms": 20.201445999999123
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-056.bin",
+    "body_bytes": 522980,
+    "actual_response_delay_ms": 20.238822000001164
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-048.bin",
+    "body_bytes": 523913,
+    "actual_response_delay_ms": 20.224911999999676
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-001.bin",
+    "body_bytes": 517713,
+    "actual_response_delay_ms": 19.308069000000614
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-022.bin",
+    "body_bytes": 516279,
+    "actual_response_delay_ms": 20.286004000001412
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-011.bin",
+    "body_bytes": 521406,
+    "actual_response_delay_ms": 20.234705999999278
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-013.bin",
+    "body_bytes": 516396,
+    "actual_response_delay_ms": 20.39328000000023
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-033.bin",
+    "body_bytes": 524243,
+    "actual_response_delay_ms": 20.51157400000011
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-068.bin",
+    "body_bytes": 523600,
+    "actual_response_delay_ms": 19.238875999999436
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-010.bin",
+    "body_bytes": 514954,
+    "actual_response_delay_ms": 20.319558999999572
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-075.bin",
+    "body_bytes": 522398,
+    "actual_response_delay_ms": 20.21333400000003
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-017.bin",
+    "body_bytes": 518109,
+    "actual_response_delay_ms": 20.20228700000189
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-067.bin",
+    "body_bytes": 522282,
+    "actual_response_delay_ms": 20.349678999999014
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-044.bin",
+    "body_bytes": 522324,
+    "actual_response_delay_ms": 20.424671999997372
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-071.bin",
+    "body_bytes": 519390,
+    "actual_response_delay_ms": 20.216763999997056
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-031.bin",
+    "body_bytes": 516989,
+    "actual_response_delay_ms": 19.303212999999232
+  },
+  {
+    "path": "/original_quick9/data/korea-boundary-v4/part-009.bin",
+    "body_bytes": 520697,
+    "actual_response_delay_ms": 20.22555199999988
+  }
+]

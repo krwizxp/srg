@@ -1,0 +1,1474 @@
+{
+  "command": [
+    "/workspace/scratch/20ca01e7d960/toolchains/rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+    "clippy",
+    "--all-targets",
+    "--target",
+    "x86_64-unknown-linux-gnu",
+    "--frozen",
+    "--manifest-path",
+    "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/product/Cargo.toml",
+    "--target-dir",
+    "/workspace/scratch/20ca01e7d960/evidence/perf4-sha/clippy-target",
+    "--message-format=json"
+  ],
+  "exit_code": 101,
+  "source_sha256": "845647773758b00258a619692d4c04df4eccda70d1fd94fa7d57c398ca9375ba",
+  "policy_sha256": {
+    "Cargo.toml": "5b787aabfeecfe5d9a171310609781d992a7cf05003c3156369160c2a6dfdf7d",
+    "Cargo.lock": "4838d92097e0fba6df7e7fe3d2bf3ea5b9d8dfd4b97ba913e51d8186ae7cf947",
+    "clippy.toml": "a9f53eb0465ce77fb18248d18b7e4dca9759a240f867cffdf3b7fda5aa892102"
+  },
+  "baseline_policy_exact": true,
+  "diagnostic_count": 335,
+  "hash_diagnostics": [
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:14\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |              ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n    = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "`-W clippy::similar-names` implied by `-W clippy::pedantic`",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4032,
+          "byte_start": 4027,
+          "column_end": 19,
+          "column_start": 14,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 19,
+              "highlight_start": 14,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:21\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                     ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4039,
+          "byte_start": 4034,
+          "column_end": 26,
+          "column_start": 21,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 26,
+              "highlight_start": 21,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:28\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                            ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4046,
+          "byte_start": 4041,
+          "column_end": 33,
+          "column_start": 28,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 33,
+              "highlight_start": 28,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:35\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                                   ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4053,
+          "byte_start": 4048,
+          "column_end": 40,
+          "column_start": 35,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 40,
+              "highlight_start": 35,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:14\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |              ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n    = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "`-W clippy::similar-names` implied by `-W clippy::pedantic`",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4032,
+          "byte_start": 4027,
+          "column_end": 19,
+          "column_start": 14,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 19,
+              "highlight_start": 14,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:21\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                     ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4039,
+          "byte_start": 4034,
+          "column_end": 26,
+          "column_start": 21,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 26,
+              "highlight_start": 21,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:28\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                            ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4046,
+          "byte_start": 4041,
+          "column_end": 33,
+          "column_start": 28,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 33,
+              "highlight_start": 28,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: binding's name is too similar to existing binding\n   --> src/korea_boundary/hash.rs:165:35\n    |\n165 |         let [word0, word1, word2, word3] = *block;\n    |                                   ^^^^^\n    |\nnote: existing binding defined here\n   --> src/korea_boundary/hash.rs:141:39\n    |\n141 | fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {\n    |                                       ^^^^^\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "existing binding defined here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 3401,
+              "byte_start": 3396,
+              "column_end": 44,
+              "column_start": 39,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 141,
+              "line_start": 141,
+              "suggested_replacement": null,
+              "suggestion_applicability": null,
+              "text": [
+                {
+                  "highlight_end": 44,
+                  "highlight_start": 39,
+                  "text": "fn compress_sha(state: &mut [u32; 8], words: &[u32; 64]) {"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "binding's name is too similar to existing binding",
+      "spans": [
+        {
+          "byte_end": 4053,
+          "byte_start": 4048,
+          "column_end": 40,
+          "column_start": 35,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 165,
+          "line_start": 165,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 40,
+              "highlight_start": 35,
+              "text": "        let [word0, word1, word2, word3] = *block;"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::similar_names",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:89:26\n   |\n89 |         let lower_word = words[round.strict_sub(15)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1679,
+          "byte_start": 1652,
+          "column_end": 53,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 89,
+          "line_start": 89,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 26,
+              "text": "        let lower_word = words[round.strict_sub(15)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:90:26\n   |\n90 |         let upper_word = words[round.strict_sub(2)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1732,
+          "byte_start": 1706,
+          "column_end": 52,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 90,
+          "line_start": 90,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 52,
+              "highlight_start": 26,
+              "text": "        let upper_word = words[round.strict_sub(2)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:24\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2014,
+          "byte_start": 1987,
+          "column_end": 51,
+          "column_start": 24,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 51,
+              "highlight_start": 24,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:97:27\n   |\n97 |             .wrapping_add(words[round.strict_sub(7)])\n   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2100,
+          "byte_start": 2074,
+          "column_end": 53,
+          "column_start": 27,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 97,
+          "line_start": 97,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 27,
+              "text": "            .wrapping_add(words[round.strict_sub(7)])"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:9\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |         ^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1984,
+          "byte_start": 1972,
+          "column_end": 21,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 9,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: consider moving the `;` inside the block for consistent formatting\n   --> src/korea_boundary/hash.rs:102:9\n    |\n102 |         unsafe { compress_sha(state, &words) };\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#semicolon_inside_block\n    = note: requested on the command line with `-W clippy::semicolon-inside-block`\nhelp: put the `;` here\n    |\n102 -         unsafe { compress_sha(state, &words) };\n102 +         unsafe { compress_sha(state, &words); }\n    |\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#semicolon_inside_block",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "requested on the command line with `-W clippy::semicolon-inside-block`",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "put the `;` here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 2265,
+              "byte_start": 2264,
+              "column_end": 48,
+              "column_start": 47,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 102,
+              "line_start": 102,
+              "suggested_replacement": "",
+              "suggestion_applicability": "MachineApplicable",
+              "text": [
+                {
+                  "highlight_end": 48,
+                  "highlight_start": 47,
+                  "text": "        unsafe { compress_sha(state, &words) };"
+                }
+              ]
+            },
+            {
+              "byte_end": 2262,
+              "byte_start": 2262,
+              "column_end": 45,
+              "column_start": 45,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 102,
+              "line_start": 102,
+              "suggested_replacement": ";",
+              "suggestion_applicability": "MachineApplicable",
+              "text": [
+                {
+                  "highlight_end": 45,
+                  "highlight_start": 45,
+                  "text": "        unsafe { compress_sha(state, &words) };"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "level": "warning",
+      "message": "consider moving the `;` inside the block for consistent formatting",
+      "spans": [
+        {
+          "byte_end": 2265,
+          "byte_start": 2226,
+          "column_end": 48,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 102,
+          "line_start": 102,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 48,
+              "highlight_start": 9,
+              "text": "        unsafe { compress_sha(state, &words) };"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::semicolon_inside_block",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "error: unsafe block missing a safety comment\n   --> src/korea_boundary/hash.rs:102:9\n    |\n102 |         unsafe { compress_sha(state, &words) };\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: consider adding a safety comment on the preceding line\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#undocumented_unsafe_blocks\n    = note: requested on the command line with `-D clippy::undocumented-unsafe-blocks`\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider adding a safety comment on the preceding line",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#undocumented_unsafe_blocks",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "requested on the command line with `-D clippy::undocumented-unsafe-blocks`",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "error",
+      "message": "unsafe block missing a safety comment",
+      "spans": [
+        {
+          "byte_end": 2264,
+          "byte_start": 2226,
+          "column_end": 47,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 102,
+          "line_start": 102,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 47,
+              "highlight_start": 9,
+              "text": "        unsafe { compress_sha(state, &words) };"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::undocumented_unsafe_blocks",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:89:26\n   |\n89 |         let lower_word = words[round.strict_sub(15)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1679,
+          "byte_start": 1652,
+          "column_end": 53,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 89,
+          "line_start": 89,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 26,
+              "text": "        let lower_word = words[round.strict_sub(15)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:90:26\n   |\n90 |         let upper_word = words[round.strict_sub(2)];\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1732,
+          "byte_start": 1706,
+          "column_end": 52,
+          "column_start": 26,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 90,
+          "line_start": 90,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 52,
+              "highlight_start": 26,
+              "text": "        let upper_word = words[round.strict_sub(2)];"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:24\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2014,
+          "byte_start": 1987,
+          "column_end": 51,
+          "column_start": 24,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 51,
+              "highlight_start": 24,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:97:27\n   |\n97 |             .wrapping_add(words[round.strict_sub(7)])\n   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 2100,
+          "byte_start": 2074,
+          "column_end": 53,
+          "column_start": 27,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 97,
+          "line_start": 97,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 53,
+              "highlight_start": 27,
+              "text": "            .wrapping_add(words[round.strict_sub(7)])"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: indexing may panic\n  --> src/korea_boundary/hash.rs:95:9\n   |\n95 |         words[round] = words[round.strict_sub(16)]\n   |         ^^^^^^^^^^^^\n   |\n   = help: consider using `.get(n)` or `.get_mut(n)` instead\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider using `.get(n)` or `.get_mut(n)` instead",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#indexing_slicing",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "warning",
+      "message": "indexing may panic",
+      "spans": [
+        {
+          "byte_end": 1984,
+          "byte_start": 1972,
+          "column_end": 21,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 95,
+          "line_start": 95,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 9,
+              "text": "        words[round] = words[round.strict_sub(16)]"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::indexing_slicing",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "warning: consider moving the `;` inside the block for consistent formatting\n   --> src/korea_boundary/hash.rs:102:9\n    |\n102 |         unsafe { compress_sha(state, &words) };\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#semicolon_inside_block\n    = note: requested on the command line with `-W clippy::semicolon-inside-block`\nhelp: put the `;` here\n    |\n102 -         unsafe { compress_sha(state, &words) };\n102 +         unsafe { compress_sha(state, &words); }\n    |\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#semicolon_inside_block",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "requested on the command line with `-W clippy::semicolon-inside-block`",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "put the `;` here",
+          "rendered": null,
+          "spans": [
+            {
+              "byte_end": 2265,
+              "byte_start": 2264,
+              "column_end": 48,
+              "column_start": 47,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 102,
+              "line_start": 102,
+              "suggested_replacement": "",
+              "suggestion_applicability": "MachineApplicable",
+              "text": [
+                {
+                  "highlight_end": 48,
+                  "highlight_start": 47,
+                  "text": "        unsafe { compress_sha(state, &words) };"
+                }
+              ]
+            },
+            {
+              "byte_end": 2262,
+              "byte_start": 2262,
+              "column_end": 45,
+              "column_start": 45,
+              "expansion": null,
+              "file_name": "src/korea_boundary/hash.rs",
+              "is_primary": true,
+              "label": null,
+              "line_end": 102,
+              "line_start": 102,
+              "suggested_replacement": ";",
+              "suggestion_applicability": "MachineApplicable",
+              "text": [
+                {
+                  "highlight_end": 45,
+                  "highlight_start": 45,
+                  "text": "        unsafe { compress_sha(state, &words) };"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "level": "warning",
+      "message": "consider moving the `;` inside the block for consistent formatting",
+      "spans": [
+        {
+          "byte_end": 2265,
+          "byte_start": 2226,
+          "column_end": 48,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 102,
+          "line_start": 102,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 48,
+              "highlight_start": 9,
+              "text": "        unsafe { compress_sha(state, &words) };"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::semicolon_inside_block",
+        "explanation": null
+      }
+    },
+    {
+      "rendered": "error: unsafe block missing a safety comment\n   --> src/korea_boundary/hash.rs:102:9\n    |\n102 |         unsafe { compress_sha(state, &words) };\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: consider adding a safety comment on the preceding line\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#undocumented_unsafe_blocks\n    = note: requested on the command line with `-D clippy::undocumented-unsafe-blocks`\n\n",
+      "$message_type": "diagnostic",
+      "children": [
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "consider adding a safety comment on the preceding line",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "help",
+          "message": "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#undocumented_unsafe_blocks",
+          "rendered": null,
+          "spans": []
+        },
+        {
+          "children": [],
+          "code": null,
+          "level": "note",
+          "message": "requested on the command line with `-D clippy::undocumented-unsafe-blocks`",
+          "rendered": null,
+          "spans": []
+        }
+      ],
+      "level": "error",
+      "message": "unsafe block missing a safety comment",
+      "spans": [
+        {
+          "byte_end": 2264,
+          "byte_start": 2226,
+          "column_end": 47,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "src/korea_boundary/hash.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 102,
+          "line_start": 102,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 47,
+              "highlight_start": 9,
+              "text": "        unsafe { compress_sha(state, &words) };"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "code": "clippy::undocumented_unsafe_blocks",
+        "explanation": null
+      }
+    }
+  ]
+}

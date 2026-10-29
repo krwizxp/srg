@@ -1,0 +1,26 @@
+{
+  "domain": "C=2^64 equally likely complete words; M accepted grid centres; R=C-M",
+  "assumptions": [
+    "Every candidate uses both axes from the same word",
+    "Every supplementary word is independent and uniform",
+    "Membership is deterministic for the immutable boundary version"
+  ],
+  "per_accepted_word_first_success_after_k_rejections": "R^k/C^(k+1)",
+  "with_supplemental_limit_L": "P(output=j and success)=(1-(R/C)^(L+1))/M",
+  "conditional_result": "P(output=j | success)=1/M for every accepted j",
+  "limit_failure_probability": "(R/C)^(L+1)",
+  "production_supplemental_limit": 1024,
+  "exact_exhaustive_reduced_candidate_counts": [
+    256,
+    65536,
+    4294967296
+  ],
+  "exact_exhaustive_two_word_path_count_for_8_bit_total_words": 65536,
+  "actual_2_to_64_candidate_enumeration_claimed": false,
+  "all_accepted_reduced_points_have_identical_weight": true,
+  "continuous_uniformity_claimed": false,
+  "evidence": [
+    "reduced-lattice-validation.json",
+    "reduced-lattice-two-word-paths.json"
+  ]
+}
