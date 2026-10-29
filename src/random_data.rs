@@ -1,9 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 use super::hardware_rng::HardwareRng;
-#[cfg(target_arch = "x86_64")]
-use crate::diagnostic::AppError;
 use crate::{
-    diagnostic::Result,
+    diagnostic::{AppError, Result},
     korea_boundary,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
