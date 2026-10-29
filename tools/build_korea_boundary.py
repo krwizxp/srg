@@ -15,13 +15,13 @@ from shapely.geometry import box, shape
 
 
 from pack_korea_boundary import pack_flat
-from uniform_math import proposal_weights
+from uniform_math import surface_weights
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source', type=Path)
-    parser.add_argument('--output', type=Path, default=Path('data/korea-boundary-v2.bin'))
+    parser.add_argument('--output', type=Path, default=Path('data/korea-boundary-v3.bin'))
     args = parser.parse_args()
     source_sha = hashlib.sha256(args.source.read_bytes()).hexdigest()
     if source_sha != '5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428':
@@ -96,7 +96,7 @@ def main():
                 faces = []
                 batch = [next(ordered) for _ in range(count)]
                 points = np.asarray([struct.unpack_from('<6d', record, 8) for record in batch]).reshape(count, 3, 2)
-                weights = proposal_weights(points)
+                weights = surface_weights(points)
                 for coordinates, weight in zip(points.reshape(count, 6), weights, strict=True):
                     width = int(weight)
                     running += width
@@ -120,10 +120,10 @@ def main():
                 output.write(compressed)
                 index.append((end, offset, count, len(compressed)))
             output.seek(0)
-            output.write(struct.pack('<8s4IQ', b'SRGKR002', block_count, records, 14, 256, running))
+            output.write(struct.pack('<8s4IQ', b'SRGKR003', block_count, records, 14, 256, running))
             for row in index:
                 output.write(struct.pack('<QQII', *row))
-    result = {'version': 2, 'geometry_payload_sha256': geometry.hexdigest(), 'codec': 'zlib: byte-shuffled f64 vertices, width-u64 + three-u16 vertex indices', 'source_sha256': source_sha, 'source_crs': 'EPSG:5179', 'triangulation_crs': 'EPSG:4326', 'hot_area_threshold_m2': 10000, 'triangle_order': 'Stable geographical order within original GRS80 geodesic area >= 10000 m2 first, then smaller faces', 'triangles': records, 'blocks': block_count, 'tile_count': tiles, 'vertices_simplified': False, 'polygon_components': len(components), 'planar_coverage_error_deg2': abs(total_planar_area - mask.area), 'max_tile_coverage_error_deg2': max_coverage_error, 'total_weight_units': running, 'bytes': args.output.stat().st_size, 'sha256': hashlib.sha256(args.output.read_bytes()).hexdigest(), 'versions': {'shapely': shapely.__version__, 'geos': shapely.geos_version_string, 'pyproj': pyproj.__version__, 'numpy': np.__version__}}
+    result = {'version': 3, 'geometry_payload_sha256': geometry.hexdigest(), 'codec': 'zlib: byte-shuffled f64 vertices, width-u64 + three-u16 vertex indices', 'source_sha256': source_sha, 'source_crs': 'EPSG:5179', 'triangulation_crs': 'EPSG:4326', 'hot_area_threshold_m2': 10000, 'triangle_order': 'Stable geographical order within original GRS80 geodesic area >= 10000 m2 first, then smaller faces', 'triangles': records, 'blocks': block_count, 'tile_count': tiles, 'vertices_simplified': False, 'polygon_components': len(components), 'planar_coverage_error_deg2': abs(total_planar_area - mask.area), 'max_tile_coverage_error_deg2': max_coverage_error, 'total_weight_units': running, 'bytes': args.output.stat().st_size, 'sha256': hashlib.sha256(args.output.read_bytes()).hexdigest(), 'versions': {'shapely': shapely.__version__, 'geos': shapely.geos_version_string, 'pyproj': pyproj.__version__, 'numpy': np.__version__}}
     args.output.with_suffix('.json').write_text(json.dumps(result, indent=2) + '\n')
     pack_flat(args.output, result)
     args.output.unlink()

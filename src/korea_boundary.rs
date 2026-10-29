@@ -88,39 +88,24 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
         .ok_or("대한민국 경계 데이터 구조 오류")?;
     Ok(u64::from_le_bytes(*value))
 }
-pub(super) fn sample<F>(
-    mut value: u64,
-    mut cache: Option<&mut BoundaryCache>,
-    next: &mut F,
-) -> Result<Coordinates>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
-    DATA.starts_with(b"SRGKR002")
+pub(super) fn sample(value: u64, cache: Option<&mut BoundaryCache>) -> Result<Coordinates> {
+    DATA.starts_with(b"SRGKR003")
         .ok_or("대한민국 경계 데이터 버전 오류")?;
     let total = read_u64(DATA, 24)?;
     let parts = index_count(DATA, 8)?;
     (total > 0 && parts == PARTS.len() && DATA.len() == 32_usize.strict_add(parts.strict_mul(16)))
         .ok_or("대한민국 경계 인덱스 오류")?;
-    let limit = u64::MAX.strict_sub(total.strict_sub(1));
-    for _ in 0..1_024 {
-        let position = value.rem_euclid(total);
-        if value.strict_sub(position) > limit {
-            value = next("대한민국 좌표 선택")?;
-            continue;
-        }
-        let (weight, vertices) = select(position, parts, cache.as_deref_mut())?;
-        let words = [
-            next("대한민국 좌표")?,
-            next("대한민국 좌표")?,
-            next("대한민국 좌표")?,
-        ];
-        if let Some(point) = crate::geo_uniform::propose(&vertices, weight, words)? {
-            return Ok(point);
-        }
-        value = next("대한민국 좌표 재추출")?;
-    }
-    Err("대한민국 균등 좌표 추출 시도 한도를 초과했습니다.".into())
+    let scaled = u128::from(value).strict_mul(u128::from(total)) >> 64_u32;
+    let position =
+        u64::try_from(scaled).map_err(|source| format!("좌표 입력 구간 오류: {source}"))?;
+    let (begin, weight, vertices) = select(position, parts, cache)?;
+    let first = (u128::from(begin) << 64_u32).div_ceil(u128::from(total));
+    let end = (u128::from(begin.strict_add(weight)) << 64_u32).div_ceil(u128::from(total));
+    let rank = u64::try_from(u128::from(value).strict_sub(first))
+        .map_err(|source| format!("좌표 입력 순번 오류: {source}"))?;
+    let count = u64::try_from(end.strict_sub(first))
+        .map_err(|source| format!("좌표 입력 개수 오류: {source}"))?;
+    crate::geo_uniform::sample(&vertices, rank, count)
 }
 fn index_count(bytes: &[u8], offset: usize) -> Result<usize> {
     usize::try_from(read_u32(bytes, offset)?)
@@ -144,13 +129,13 @@ fn select(
     value: u64,
     count: usize,
     cache: Option<&mut BoundaryCache>,
-) -> Result<(u64, [[f64; 2]; 3])> {
+) -> Result<(u64, u64, [[f64; 2]; 3])> {
     let part_index = search(DATA, 32, count, value)?;
     let root_entry = 32_usize.strict_add(part_index.strict_mul(16));
     let part = PARTS.get(part_index).ok_or("경계 조각 번호 오류")?;
     let blocks = index_count(part, 8)?;
     let declared = index_count(DATA, root_entry.strict_add(8))?;
-    (part.starts_with(b"SRGKP002")
+    (part.starts_with(b"SRGKP003")
         && blocks > 0
         && blocks == index_count(DATA, root_entry.strict_add(12))?
         && part.len() == declared
@@ -198,7 +183,7 @@ fn pick(
     value: u64,
     page: &[u8; MAX_PAGE_SIZE],
     previous: Option<u64>,
-) -> Result<(u64, [[f64; 2]; 3])> {
+) -> Result<(u64, u64, [[f64; 2]; 3])> {
     let vertices = usize::from(read_u16(page, 0)?);
     let triangles = usize::from(read_u16(page, 2)?);
     let records = 4_usize.strict_add(vertices.strict_mul(16));
@@ -237,5 +222,5 @@ fn pick(
             f64::from_bits(read_u64(page, offset.strict_add(8))?),
         ];
     }
-    Ok((weight, points))
+    Ok((begin, weight, points))
 }

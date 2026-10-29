@@ -6,7 +6,6 @@ ECCENTRICITY_SQUARED = 0.006694380022900787
 SURFACE_SCALE = 12309072078.888908
 SIN_CENTER = 0.5877852522924731
 COS_CENTER = 0.8090169943749475
-ENVELOPE_FACTOR = 1.0000000000009095
 
 
 def density(latitude):
@@ -49,7 +48,22 @@ def determinant(a, b, c, d):
     return sum(expansion)
 
 
-def proposal_weights(points):
+QUADRATURE = [
+    (0.06943184420297371, 0.17392742256872692),
+    (0.33000947820757187, 0.32607257743127305),
+    (0.6699905217924281, 0.32607257743127305),
+    (0.9305681557970262, 0.17392742256872692),
+]
+
+
+def triangular_density(start, delta):
+    total = np.zeros_like(start)
+    for position, weight in QUADRATURE:
+        total += (2.0 * position * weight) * density(start + delta * position)
+    return total
+
+
+def surface_weights(points):
     a = points[:, 1, 1] - points[:, 0, 1]
     b = points[:, 1, 0] - points[:, 0, 0]
     c = points[:, 2, 1] - points[:, 0, 1]
@@ -61,7 +75,11 @@ def proposal_weights(points):
     for i in np.flatnonzero(uncertain):
         det[i] = determinant(float(a[i]), float(b[i]), float(c[i]), float(d[i]))
     area = np.abs(det) * 0.5
-    envelope = area * SURFACE_SCALE * density(points[:, :, 0].min(axis=1)) * ENVELOPE_FACTOR * 1000000.0
-    if not np.all(np.isfinite(envelope)) or not np.all(envelope > 0):
-        raise ValueError('Invalid triangle proposal envelope')
-    return np.ceil(envelope).astype(np.uint64) + 2
+    latitudes = np.sort(points[:, :, 0], axis=1)
+    south, middle, north = latitudes.T
+    fraction = (middle - south) / (north - south)
+    mean = fraction * triangular_density(south, middle - south) + (1.0 - fraction) * triangular_density(north, middle - north)
+    mass = area * SURFACE_SCALE * mean * 100000000.0
+    if not np.all(np.isfinite(mass)) or not np.all(mass > 0):
+        raise ValueError('Invalid triangle surface mass')
+    return np.maximum(1, np.rint(mass)).astype(np.uint64)

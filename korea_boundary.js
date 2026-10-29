@@ -2,7 +2,6 @@ const MAX_U64 = (1n << 64n) - 1n;
 const MAX_PAGE = 15876;
 const DEGREES = 0.017453292519943295;
 const ECCENTRICITY_SQUARED = 0.006694380022900787;
-const SURFACE_SCALE = 12309072078.888908;
 let boundaryPromise;
 let preparation;
 let requestedPreparation;
@@ -41,23 +40,74 @@ function density(latitude) {
     const denominator=1-ECCENTRICITY_SQUARED*sine*sine;
     return cosine/(denominator*denominator);
 }
-function unit(word) { return (Number(word>>12n)+0.5)/4503599627370496; }
-function propose(vertices,weight,words) {
+const QUADRATURE = [
+    [0.06943184420297371,0.17392742256872692],
+    [0.33000947820757187,0.32607257743127305],
+    [0.6699905217924281,0.32607257743127305],
+    [0.9305681557970262,0.17392742256872692]
+];
+function triangularDensity(start,delta) {
+    let total=0;
+    for(const [position,weight] of QUADRATURE)total+=(2*position*weight)*density(start+delta*position);
+    return total;
+}
+function reverse32(value) {
+    value=(value>>>1&0x55555555)|(value&0x55555555)<<1;
+    value=(value>>>2&0x33333333)|(value&0x33333333)<<2;
+    value=(value>>>4&0x0F0F0F0F)|(value&0x0F0F0F0F)<<4;
+    value=(value>>>8&0x00FF00FF)|(value&0x00FF00FF)<<8;
+    return ((value>>>16)|(value<<16))>>>0;
+}
+function residualPosition(rank,count) {
+    const vertical=Math.min((Number(rank)+0.5)/Number(count),1-Number.EPSILON/2);
+    const upper=(reverse32(Number(rank&0xFFFFFFFFn))^0x9E3779B9)>>>0;
+    const lower=(reverse32(Number(rank>>32n))^0x7F4A7C15)>>>12;
+    const horizontal=(upper*1048576+lower+0.5)/4503599627370496;
+    return [vertical,horizontal];
+}
+function inside(vertices,point,orientation) {
     const [a,b,c]=vertices;
-    const det=determinant(b[1]-a[1],b[0]-a[0],c[1]-a[1],c[0]-a[0]);
-    const area=Math.abs(det)*0.5;
-    if(!(area>0&&Number.isFinite(area)&&weight>0n))throw new Error("대한민국 삼각형 면적 오류");
-    let u=unit(words[0]),v=unit(words[1]);
-    if(u+v>1){u=1-u;v=1-v;}
-    const latitude=(a[0]+u*(b[0]-a[0]))+v*(c[0]-a[0]);
-    const longitude=(a[1]+u*(b[1]-a[1]))+v*(c[1]-a[1]);
-    for(const [start,end]of[[a,b],[b,c],[c,a]]) {
-        const side=determinant(end[1]-start[1],end[0]-start[0],longitude-start[1],latitude-start[0]);
-        if(det>0&&side<0||det<0&&side>0)return null;
+    return [[a,b],[b,c],[c,a]].every(([start,end])=>{
+        const side=determinant(end[1]-start[1],end[0]-start[0],point[1]-start[1],point[0]-start[0]);
+        return orientation>0?side>=0:side<=0;
+    });
+}
+function adjacent(value,up) {
+    const buffer=new ArrayBuffer(8),data=new DataView(buffer);
+    data.setFloat64(0,value);data.setBigUint64(0,data.getBigUint64(0)+(up?1n:-1n));
+    return data.getFloat64(0);
+}
+function mapTriangle(vertices,rank,count) {
+    const [a,b,c]=vertices;
+    const orientation=determinant(b[1]-a[1],b[0]-a[0],c[1]-a[1],c[0]-a[0]);
+    if(!(orientation!==0&&Number.isFinite(orientation)&&count>0n&&rank>=0n&&rank<count))throw new Error("대한민국 삼각형 면적 또는 입력 구간 오류");
+    const [south,middle,north]=[...vertices].sort((left,right)=>left[0]-right[0]);
+    const span=north[0]-south[0];
+    if(!(span>0))throw new Error("대한민국 삼각형 위도 오류");
+    const fraction=(middle[0]-south[0])/span;
+    const crossing=[middle[0],south[1]+fraction*(north[1]-south[1])];
+    const lowerMass=fraction*triangularDensity(south[0],middle[0]-south[0]);
+    const upperMass=(1-fraction)*triangularDensity(north[0],middle[0]-north[0]);
+    const [vertical,horizontal]=residualPosition(rank,count),target=vertical*(lowerMass+upperMass);
+    const [apex,unit]=target<lowerMass?[south,target/lowerMass]:[north,1-(target-lowerMass)/upperMass];
+    const delta=middle[0]-apex[0],mean=triangularDensity(apex[0],delta);
+    let distance=Math.sqrt(Math.max(0,Math.min(1,unit)));
+    for(let i=0;i<4;i++){
+        if(distance===0)break;
+        const mass=distance*distance*triangularDensity(apex[0],delta*distance);
+        distance-=(mass-unit*mean)/(2*distance*density(apex[0]+delta*distance));
     }
-    const probability=((area*SURFACE_SCALE)*density(latitude))*1000000/Number(weight);
-    if(!(probability>0&&probability<=1&&Number.isFinite(probability)))throw new Error("대한민국 면적 수락 확률 오류");
-    return unit(words[2])<probability?[latitude,longitude]:null;
+    const edge=[apex[0]+distance*(middle[0]-apex[0]),apex[1]+distance*(middle[1]-apex[1])];
+    const other=apex[1]+distance*(crossing[1]-apex[1]);
+    const point=[edge[0],edge[1]+horizontal*(other-edge[1])];
+    const center=[(a[0]+b[0]+c[0])/3,(a[1]+b[1]+c[1])/3];
+    for(let i=0;i<8;i++){
+        if(inside(vertices,point,orientation))return point;
+        for(let axis=0;axis<2;axis++)point[axis]=adjacent(point[axis],point[axis]<center[axis]);
+    }
+    let nearest=a,best=Infinity;
+    for(const vertex of vertices){const square=(vertex[0]-point[0])**2+(vertex[1]-point[1])**2;if(square<best){nearest=vertex;best=square;}}
+    return [...nearest];
 }
 async function boundedBytes(response,maximum) {
     if(!response.body)throw new Error("대한민국 경계 응답 본문 오류");
@@ -82,10 +132,10 @@ function search(data,start,count,value) {
 }
 async function loadBoundary() {
     if(!boundaryPromise)boundaryPromise=(async()=>{
-        const response=await fetch(new URL("./data/korea-boundary-v2/index.bin",import.meta.url));
+        const response=await fetch(new URL("./data/korea-boundary-v3/index.bin",import.meta.url));
         if(!response.ok)throw new Error('대한민국 경계 데이터 불러오기 실패: HTTP '+response.status);
         const bytes=await boundedBytes(response,65536),data=new DataView(bytes.buffer);
-        if(bytes.length<32||new TextDecoder().decode(bytes.subarray(0,8))!=="SRGKR002")throw new Error("대한민국 경계 데이터 버전 오류");
+        if(bytes.length<32||new TextDecoder().decode(bytes.subarray(0,8))!=="SRGKR003")throw new Error("대한민국 경계 데이터 버전 오류");
         const count=data.getUint32(8,true),triangles=data.getUint32(12,true),total=data.getBigUint64(24,true);
         if(!count||32+count*16!==bytes.length||!triangles||triangles>20000000||data.getUint32(16,true)!==14||data.getUint32(20,true)!==256||!total)throw new Error("대한민국 경계 인덱스 오류");
         let previous=-1n,blocks=0;const firstBlocks=[];
@@ -102,10 +152,10 @@ async function loadBoundary() {
 async function loadPart(boundary,number) {
     if(parts.has(number)){const value=parts.get(number);parts.delete(number);parts.set(number,value);return value;}
     const pending=(async()=>{
-        const name=String(number).padStart(3,"0"),response=await fetch(new URL("./data/korea-boundary-v2/part-"+name+".bin",import.meta.url));
+        const name=String(number).padStart(3,"0"),response=await fetch(new URL("./data/korea-boundary-v3/part-"+name+".bin",import.meta.url));
         if(!response.ok)throw new Error('대한민국 경계 블록 불러오기 실패: HTTP '+response.status);
         const bytes=await boundedBytes(response,524288),data=new DataView(bytes.buffer),root=32+number*16;
-        if(bytes.length<16||bytes.length!==boundary.data.getUint32(root+8,true)||new TextDecoder().decode(bytes.subarray(0,8))!=="SRGKP002")throw new Error("대한민국 경계 조각 구조 오류");
+        if(bytes.length<16||bytes.length!==boundary.data.getUint32(root+8,true)||new TextDecoder().decode(bytes.subarray(0,8))!=="SRGKP003")throw new Error("대한민국 경계 조각 구조 오류");
         const count=data.getUint32(8,true),first=data.getUint32(12,true);
         if(count!==boundary.data.getUint32(root+12,true)||first!==boundary.firstBlocks[number]||16+count*16>=bytes.length)throw new Error("대한민국 경계 블록 개수 오류");
         let previous=number?boundary.data.getBigUint64(root-16,true):-1n,offset=16+count*16;
@@ -162,26 +212,15 @@ async function selected(boundary,value) {
     const begin=low?page.data.getBigUint64(record-14,true)+1n:page.previous+1n;
     const vertices=[];
     for(let corner=0;corner<3;corner++){const v=page.data.getUint16(record+8+corner*2,true);vertices.push([page.data.getFloat64(4+v*16,true),page.data.getFloat64(12+v*16,true)]);}
-    return {weight:end-begin+1n,vertices};
-}
-function entropy(request) {
-    const value=request?.value;
-    if(typeof value!=="bigint"||value<0n||value>MAX_U64)throw new RangeError("64비트 보완 난수 범위를 벗어났습니다.");
-    return value;
+    return {begin,weight:end-begin+1n,vertices};
 }
 export async function* sampleKorea(value) {
     if(typeof value!=="bigint"||value<0n||value>MAX_U64)throw new RangeError("64비트 난수 범위를 벗어났습니다.");
-    const boundary=await loadBoundary(),limit=MAX_U64-(boundary.total-1n);
-    for(let attempt=0;attempt<1024;attempt++){
-        const position=value%boundary.total;
-        if(value-position>limit){value=entropy(yield);continue;}
-        const triangle=await selected(boundary,position);
-        const words=[entropy(yield),entropy(yield),entropy(yield)];
-        const point=propose(triangle.vertices,triangle.weight,words);
-        if(point)return point;
-        value=entropy(yield);
-    }
-    throw new Error("대한민국 균등 좌표 추출 시도 한도를 초과했습니다.");
+    const boundary=await loadBoundary(),position=value*boundary.total>>64n;
+    const triangle=await selected(boundary,position);
+    const first=((triangle.begin<<64n)+boundary.total-1n)/boundary.total;
+    const end=(((triangle.begin+triangle.weight)<<64n)+boundary.total-1n)/boundary.total;
+    return mapTriangle(triangle.vertices,value-first,end-first);
 }
 export function prepareKorea(value) {
     requestedPreparation=value;
@@ -191,8 +230,7 @@ export function prepareKorea(value) {
             current=requestedPreparation;
             const boundary=await loadBoundary();
             if(typeof current==="bigint"&&current>=0n&&current<=MAX_U64){
-                const position=current%boundary.total,limit=MAX_U64-(boundary.total-1n);
-                if(current-position<=limit)await selected(boundary,position);
+                await selected(boundary,current*boundary.total>>64n);
             }
         }while(current!==requestedPreparation);
     })().finally(()=>{preparation=null});
