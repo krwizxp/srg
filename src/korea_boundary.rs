@@ -17,7 +17,10 @@ const HEADER_SIZE: usize = 128;
 const KOREA_SUPP_RETRY_LIMIT: usize = 1024;
 const KOREA_TILE_BYTES: &[u8] = include_bytes!("../data/korea-boundary-v4/tile-select-v5.bin");
 const KOREA_TILE_COUNT: usize = 79113;
-const KOREA_TILE_SHA256: [u8; 32] = [73, 47, 219, 238, 231, 231, 166, 72, 22, 215, 234, 144, 197, 124, 181, 119, 54, 133, 251, 249, 110, 11, 149, 145, 26, 139, 124, 220, 251, 242, 174, 139];
+const KOREA_TILE_SHA256: [u8; 32] = [
+    73, 47, 219, 238, 231, 231, 166, 72, 22, 215, 234, 144, 197, 124, 181, 119, 54, 133, 251, 249,
+    110, 11, 149, 145, 26, 139, 124, 220, 251, 242, 174, 139,
+];
 const MAX_PAGE_SIZE: usize = 32_768;
 const MAX_PART_SIZE: usize = 0x0008_0000;
 static BOUNDARY: LazyLock<Result<BoundaryIndex>> = LazyLock::new(|| {
@@ -559,8 +562,12 @@ fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
     if selector >= KOREA_TILE_COUNT.strict_mul(2) {
         return Ok(None);
     }
-    let tile = u64::from(*index.sampler_tiles
-        .get(selector / 2).ok_or("대한민국 좌표 타일 선택 범위 오류")?);
+    let tile = u64::from(
+        *index
+            .sampler_tiles
+            .get(selector / 2)
+            .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
+    );
     let vertical = ((tile >> 9) << 23) | ((value >> 23) & 0x7f_ffff);
     let horizontal = ((tile & 511) << 23) | (value & 0x7f_ffff);
     Ok(Some((vertical << 32) | horizontal))

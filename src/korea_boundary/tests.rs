@@ -1,6 +1,6 @@
 use super::{
-    BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT, PARTS,
-    hash, sample, remap_tile, KOREA_TILE_COUNT,
+    BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT,
+    KOREA_TILE_COUNT, PARTS, hash, remap_tile, sample,
 };
 use crate::{diagnostic::Result, geo_uniform::candidate, random_data::Coordinates};
 const SEOUL: u64 = 15_033_626_022_739_801_206;
@@ -11,21 +11,40 @@ fn encode_tile_candidate(original: u64) -> Result<u64> {
     let horizontal = original & 0xffff_ffff;
     let tile = ((vertical >> 23) << 9) | (horizontal >> 23);
     let index = BOUNDARY.as_ref().map_err(|error| format!("{error}"))?;
-    let rank = index.sampler_tiles.binary_search(&u32::try_from(tile).map_err(|_| "Tile index overflow")?)
+    let rank = index
+        .sampler_tiles
+        .binary_search(&u32::try_from(tile).map_err(|_| "Tile index overflow")?)
         .map_err(|_| "Fixture point omitted from tile cover")?;
     let lower = ((vertical & 0x7f_ffff) << 23) | (horizontal & 0x7f_ffff);
     Ok(((u64::try_from(rank).map_err(|_| "Tile rank overflow")? * 2) << 46) | lower)
 }
 #[test]
 fn tile_mapping_preserves_original_centers() -> Result<()> {
-    for original in [SEOUL, DOKDO, 13_965_754_644_534_248_813,
-        19_555_846_072_170_497, 16_289_122_984_369_905_278] {
+    for original in [
+        SEOUL,
+        DOKDO,
+        13_965_754_644_534_248_813,
+        19_555_846_072_170_497,
+        16_289_122_984_369_905_278,
+    ] {
         let encoded = encode_tile_candidate(original)?;
-        (remap_tile(encoded, BOUNDARY.as_ref().map_err(|error| format!("{error}"))?)? == Some(original)).ok_or("Mapped grid point changed")?;
-        (remap_tile(encoded | (1_u64 << 46), BOUNDARY.as_ref().map_err(|error| format!("{error}"))?)? == Some(original))
-            .ok_or("Second tile selection alias changed")?;
+        (remap_tile(
+            encoded,
+            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+        )? == Some(original))
+        .ok_or("Mapped grid point changed")?;
+        (remap_tile(
+            encoded | (1_u64 << 46),
+            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+        )? == Some(original))
+        .ok_or("Second tile selection alias changed")?;
     }
-    (remap_tile(u64::MAX, BOUNDARY.as_ref().map_err(|error| format!("{error}"))?)?.is_none()).ok_or("Rejected selector was accepted")?;
+    (remap_tile(
+        u64::MAX,
+        BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+    )?
+    .is_none())
+    .ok_or("Rejected selector was accepted")?;
     Ok(())
 }
 #[test]
@@ -143,7 +162,11 @@ fn rejection_consumes_one_new_complete_word_each_time() -> Result<()> {
         let mut provider = |reason: &'static str| -> Result<u64> {
             (reason == "대한민국 좌표 재추출").ok_or("Supplemental reason changed")?;
             calls = calls.strict_add(1);
-            Ok(if calls == rejected { accepted } else { u64::MAX })
+            Ok(if calls == rejected {
+                accepted
+            } else {
+                u64::MAX
+            })
         };
         let initial = if rejected == 0 { accepted } else { u64::MAX };
         let actual = sample(initial, &mut provider, None)?;
