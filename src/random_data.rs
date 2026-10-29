@@ -147,19 +147,18 @@ impl<const N: usize> UniqueNumbers<N> {
 }
 impl RandomDataBuildState<'_> {
     fn is_basic_complete(&self) -> bool {
-        self.numeric_password_digits >= LOTTO_COUNT_U8
-            && usize::from(self.password_len) == PASSWORD_BYTE_LEN
-            && self.lotto.is_full()
+        usize::from(self.password_len) == PASSWORD_BYTE_LEN
             && self.lotto7.is_full()
+            && self.lotto.is_full()
             && self.euro_main.is_full()
     }
     fn is_complete(&self) -> bool {
-        self.is_basic_complete()
-            && self.euro_lucky.is_full()
-            && self.data.hangul_syllables.iter().all(|&c| c != '\0')
-            && self.data.planet_number != 0
+        self.korea.is_complete()
+            && self.is_basic_complete()
             && self.data.solar_system_index != 0
-            && self.korea.is_complete()
+            && self.data.planet_number != 0
+            && self.data.hangul_syllables.iter().all(|&c| c != '\0')
+            && self.euro_lucky.is_full()
     }
     fn check_complete(&self) -> Result<()> {
         if !self.is_basic_complete() {
@@ -178,9 +177,9 @@ impl RandomDataBuildState<'_> {
     }
     fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
         self.fill_required_fields_from_u64(value);
-        self.fill_lucky_stars_from_u64(value);
         self.fill_hangul_from_u64(value, initial);
         self.fill_nms_from_u64(value, initial);
+        self.fill_lucky_stars_from_u64(value);
         if !initial {
             self.korea.offer_supplement(value)?;
         }

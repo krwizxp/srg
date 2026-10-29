@@ -5003,18 +5003,17 @@
 		}
 		function isBasicComplete(data) {
 			return (
-				data.pinDigits >= 6 &&
-				data.lotto.values.length === data.lotto.limit &&
-				data.lotto7.values.length === data.lotto7.limit &&
 				data.password.length >= 8 &&
+				data.lotto7.values.length === data.lotto7.limit &&
+				data.lotto.values.length === data.lotto.limit &&
 				data.euroMain.values.length === data.euroMain.limit
 			);
 		}
 		function isComplete(data, korea) {
-			return isBasicComplete(data) &&
-				data.euroLucky.values.length === data.euroLucky.limit &&
+			return korea.done && isBasicComplete(data) &&
+				data.system !== 0 && data.planet !== 0 &&
 				data.hangul.every(Boolean) &&
-				data.planet !== 0 && data.system !== 0 && korea.done;
+				data.euroLucky.values.length === data.euroLucky.limit;
 		}
 		function parseU64(raw) {
 			const input = raw.trim();
@@ -5087,9 +5086,8 @@
 			numbers.values.sort((a, b) => a - b);
 			return true;
 		}
-		function fillNumbers(v, data) {
+		function fillNumbers(data) {
 			if (isBasicComplete(data)) return;
-			bitsView.setBigUint64(0, v, false);
 			for (const byte of bytesView) {
 				if (byte > 249) continue;
 				if (data.pinDigits < 6) {
@@ -5113,8 +5111,7 @@
 				if (byte <= 251 && addLotteryNumber(byte, 12, data.euroLucky)) return;
 			}
 		}
-		function fillHangul(v, data, initial) {
-			bitsView.setBigUint64(0, v, false);
+		function fillHangul(data, initial) {
 			for (let i = 0; i < 4; i++) {
 				if (data.hangul[i]) continue;
 				for (let offset = 0; offset < (initial ? 1 : 4); offset++) {
@@ -5144,10 +5141,11 @@
 			}
 		}
 		function fillWord(v, data, initial) {
-			fillNumbers(v, data);
-			fillLuckyStars(v, data);
-			fillHangul(v, data, initial);
+			bitsView.setBigUint64(0, v, false);
+			fillNumbers(data);
+			fillHangul(data, initial);
 			fillNms(v, data, initial);
+			fillLuckyStars(v, data);
 		}
 		function fillFixedCoordinates(num, data) {
 			bitsView.setBigUint64(0, num, false);
