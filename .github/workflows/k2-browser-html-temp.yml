@@ -1,0 +1,71 @@
+name: Temporary K2 browser and HTML validation
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  browser-html:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout pinned revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install validation tools
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.57.0 html-validate@latest
+          node --version
+          ./node_modules/.bin/playwright --version
+          ./node_modules/.bin/html-validate --version
+      - name: Install real Chromium Firefox WebKit engines
+        run: ./node_modules/.bin/playwright install --with-deps chromium firefox webkit
+      - name: Run real three-engine UI tests on HTTP origin
+        id: browser
+        continue-on-error: true
+        run: node tools/_k2_browser_check_temp.mjs
+      - name: Download Nu Html Checker
+        run: |
+          mkdir -p validation-evidence
+          curl -fLsS --retry 2 --connect-timeout 20 --max-time 180 \
+            https://github.com/validator/validator/releases/download/latest/vnu.jar \
+            -o "$RUNNER_TEMP/vnu.jar"
+          java -jar "$RUNNER_TEMP/vnu.jar" --version > validation-evidence/nu-version.txt 2>&1 || true
+      - name: Run HTMLValidate on unchanged deployed HTML
+        shell: bash
+        run: |
+          set +e
+          ./node_modules/.bin/html-validate revgeo.html --formatter json > validation-evidence/htmlvalidate.stdout 2> validation-evidence/htmlvalidate.stderr
+          rc=$?
+          echo "$rc" > validation-evidence/htmlvalidate.exit
+          echo "HTMLValidate raw exit: $rc"
+          exit 0
+      - name: Run Nu Html Checker separately on same HTML
+        shell: bash
+        run: |
+          set +e
+          java -jar "$RUNNER_TEMP/vnu.jar" --format json revgeo.html > validation-evidence/nu.stdout 2> validation-evidence/nu.stderr
+          rc=$?
+          echo "$rc" > validation-evidence/nu.exit
+          echo "Nu raw exit: $rc"
+          exit 0
+      - name: Verify historical Nu exceptions and HTMLValidate
+        run: node tools/_k2_html_check_temp.mjs
+      - name: Require all three engines and all 21 UI checks
+        if: always()
+        run: |
+          node -e "const fs=require('fs');const p='validation-evidence/three-browser-results.json';if(!fs.existsSync(p))process.exit(1);const x=JSON.parse(fs.readFileSync(p));console.log(x.summary);if(x.summary.passed!==21||x.summary.failed!==0||x.summary.engines.length!==3)process.exit(1)"
+      - name: Upload validation artifacts including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: k2-three-browser-html-validation
+          path: validation-evidence/
+          if-no-files-found: warn
+          retention-days: 14
