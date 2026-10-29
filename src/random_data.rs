@@ -153,11 +153,11 @@ impl RandomDataBuildState<'_> {
             && self.euro_main.is_full()
     }
     fn is_complete(&self) -> bool {
-        self.korea.is_complete()
-            && self.is_basic_complete()
-            && self.data.solar_system_index != 0
-            && self.data.planet_number != 0
+        self.is_basic_complete()
+            && self.korea.is_complete()
             && self.data.hangul_syllables.iter().all(|&c| c != '\0')
+            && self.data.planet_number != 0
+            && self.data.solar_system_index != 0
             && self.euro_lucky.is_full()
     }
     fn check_complete(&self) -> Result<()> {
