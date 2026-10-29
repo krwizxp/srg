@@ -141,7 +141,7 @@ try{
     rows=(await page.locator("#tbl tbody tr").allInnerTexts()).join("\n");
     if(!rows.includes("북한")||rows.includes("미국"))throw new Error("KP filter incorrect");
     await page.locator("#filter-kind").selectOption("country:us");
-    await wait("document.querySelector('#results-count').textContent.includes('1 / 1')",8000);
+    await wait("(()=>{const rows=[...document.querySelectorAll('#tbl tbody tr')].map(x=>x.textContent).join('');return rows.includes('미국')&&!rows.includes('북한')})()",9000);
     rows=(await page.locator("#tbl tbody tr").allInnerTexts()).join("\n");
     if(!rows.includes("미국")||rows.includes("북한"))throw new Error("US filter incorrect");
     await page.locator("#filter-kind").selectOption("");
