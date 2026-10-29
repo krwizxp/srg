@@ -1,9 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 use super::hardware_rng::HardwareRng;
-#[cfg(target_arch = "x86_64")]
-use crate::diagnostic::AppError;
 use crate::{
-    diagnostic::Result,
+    diagnostic::{AppError, Result},
     korea_boundary,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
@@ -98,11 +96,15 @@ impl RandomDataSet {
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
-        let mut used_supplements = Vec::new();
+        let mut local_cache = korea_boundary::BoundaryCache::default();
+        let mut korea = korea_boundary::SampleState::new(
+            self.num_64,
+            boundary_cache.unwrap_or(&mut local_cache),
+        )?;
         let mut data = {
-            let mut record_supplement = |reason| {
+            let mut next_shared = |reason| {
                 let value = next_supp(reason)?;
-                used_supplements.push(value);
+                korea.offer_supplement(value)?;
                 Ok(value)
             };
             let mut state = RandomDataBuildState {
@@ -111,7 +113,7 @@ impl RandomDataSet {
                 euro_main: UniqueNumbers::new(),
                 lotto: UniqueNumbers::new(),
                 lotto7: UniqueNumbers::new(),
-                next_supp: &mut record_supplement,
+                next_supp: &mut next_shared,
                 numeric_password_digits: 0,
                 password_len: 0,
                 supplemental: RandomBitBuffer {
@@ -130,15 +132,12 @@ impl RandomDataSet {
             state.data.lotto7_numbers = state.lotto7.into_values();
             state.data
         };
-        let mut shared = used_supplements.into_iter();
-        data.kor_coords = korea_boundary::sample(
-            data.num_64,
-            &mut |reason| match shared.next() {
-                Some(value) => Ok(value),
-                None => next_supp(reason),
-            },
-            boundary_cache,
-        )?;
+        while !korea.is_complete() {
+            let value = next_supp("대한민국 좌표 재추출")
+                .map_err(|source| AppError::context("대한민국 좌표 보완 난수 공급 실패", source))?;
+            korea.offer_supplement(value)?;
+        }
+        data.kor_coords = korea.finish()?;
         Ok(data)
     }
 }

@@ -1,7 +1,7 @@
 use self::data::{INDEX as DATA, INDEX_SHA256, PARTS};
 use crate::{
     boundary_inflate::inflate,
-    diagnostic::{AppError, Result},
+    diagnostic::Result,
     geo_uniform::{candidate, orientation},
     random_data::Coordinates,
 };
@@ -9,6 +9,8 @@ use alloc::collections::VecDeque;
 use std::sync::{LazyLock, OnceLock};
 mod data;
 mod hash;
+#[cfg(test)]
+use crate::diagnostic::AppError;
 #[cfg(test)]
 mod tests;
 const CACHE_BYTES: usize = 0x0010_0000;
@@ -572,6 +574,57 @@ fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
     let horizontal = ((tile & 511) << 23) | (value & 0x7f_ffff);
     Ok(Some((vertical << 32) | horizontal))
 }
+pub(super) struct SampleState<'cache> {
+    active_cache: &'cache mut BoundaryCache,
+    index: &'static BoundaryIndex,
+    point: Option<Coordinates>,
+    supplemental_reads: usize,
+}
+impl<'cache> SampleState<'cache> {
+    pub(super) fn new(value: u64, active_cache: &'cache mut BoundaryCache) -> Result<Self> {
+        let index = BOUNDARY
+            .as_ref()
+            .map_err(|source| format!("대한민국 경계 초기화 실패: {source}"))?;
+        let mut state = Self {
+            active_cache,
+            index,
+            point: None,
+            supplemental_reads: 0,
+        };
+        state.try_word(value)?;
+        Ok(state)
+    }
+    pub(super) const fn is_complete(&self) -> bool {
+        self.point.is_some()
+    }
+    fn try_word(&mut self, value: u64) -> Result<()> {
+        if let Some(mapped) = remap_tile(value, self.index)? {
+            let point = candidate(mapped, self.index.bounds)?;
+            if self.index.covers(&point, self.active_cache)? {
+                self.point = Some(point);
+            }
+        }
+        Ok(())
+    }
+    pub(super) fn offer_supplement(&mut self, value: u64) -> Result<()> {
+        if self.is_complete() {
+            return Ok(());
+        }
+        if self.supplemental_reads == KOREA_SUPP_RETRY_LIMIT {
+            return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());
+        }
+        self.supplemental_reads = self.supplemental_reads.strict_add(1);
+        self.try_word(value)?;
+        if self.supplemental_reads == KOREA_SUPP_RETRY_LIMIT && !self.is_complete() {
+            return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());
+        }
+        Ok(())
+    }
+    pub(super) fn finish(self) -> Result<Coordinates> {
+        Ok(self.point.ok_or("대한민국 좌표 보완 난수 시도 횟수 초과")?)
+    }
+}
+#[cfg(test)]
 pub(super) fn sample<F>(
     value: u64,
     next_supp: &mut F,
@@ -580,24 +633,12 @@ pub(super) fn sample<F>(
 where
     F: FnMut(&'static str) -> Result<u64>,
 {
-    let index = BOUNDARY
-        .as_ref()
-        .map_err(|source| format!("대한민국 경계 초기화 실패: {source}"))?;
     let mut local = BoundaryCache::default();
-    let active_cache = cache.unwrap_or(&mut local);
-    let mut proposed = value;
-    for reads in 0..=KOREA_SUPP_RETRY_LIMIT {
-        if let Some(mapped) = remap_tile(proposed, index)? {
-            let point = candidate(mapped, index.bounds)?;
-            if index.covers(&point, active_cache)? {
-                return Ok(point);
-            }
-        }
-        if reads == KOREA_SUPP_RETRY_LIMIT {
-            return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());
-        }
-        proposed = next_supp("대한민국 좌표 재추출")
+    let mut state = SampleState::new(value, cache.unwrap_or(&mut local))?;
+    while !state.is_complete() {
+        let value = next_supp("대한민국 좌표 재추출")
             .map_err(|source| AppError::context("대한민국 좌표 보완 난수 공급 실패", source))?;
+        state.offer_supplement(value)?;
     }
-    Err("대한민국 좌표 보완 난수 시도 횟수 초과".into())
+    state.finish()
 }

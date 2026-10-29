@@ -5099,12 +5099,13 @@
 			return false;
 		}
 		const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
-		function* receiveSupplement(reused) {
+		async function* receiveSupplement(korea) {
 			const word = yield;
-			reused.push(word.value);
+			if (!korea.result.done)
+				korea.result = await korea.sampler.next({ value: word.value, bitsRemaining: 64 });
 			return word;
 		}
-		function* extractNmsBits(bits, num, shifts, maxValue, supplement, reused) {
+		async function* extractNmsBits(bits, num, shifts, maxValue, supplement, korea) {
 			const mask = (1n << BigInt(bits)) - 1n;
 			const maxBig = BigInt(maxValue);
 			for (const shift of shifts) {
@@ -5113,7 +5114,7 @@
 			}
 			for (let attempt = 0; attempt < SUPPLEMENT_LIMIT; attempt++) {
 				if (!supplement.current || supplement.current.bitsRemaining < bits)
-					supplement.current = yield* receiveSupplement(reused);
+					supplement.current = yield* receiveSupplement(korea);
 				const current = supplement.current;
 				current.bitsRemaining -= bits;
 				const value = (current.value >> BigInt(current.bitsRemaining)) & mask;
@@ -5132,125 +5133,119 @@
 			const data = createDataSet(num);
 			let complete = fillNumbers(num, data);
 			const supplement = { current: null };
-			const reused = [];
-			for (
-				let attempt = 0;
-				!complete && attempt < SUPPLEMENT_LIMIT;
-				attempt++
-			) {
-				const newSupp = yield* receiveSupplement(reused);
-				complete = fillNumbers(newSupp.value, data);
-				supplement.current = newSupp;
-			}
-			if (!complete)
-				throw supplementLimitError("기본 필드");
-			let luckyStarSource = reverseBitsU64(
-				supplement.current?.value ?? num,
-			);
-			luckyStarLoop: for (
-				let attempt = 0;
-				attempt < SUPPLEMENT_LIMIT;
-				attempt++
-			) {
-				bitsView.setBigUint64(0, luckyStarSource, false);
-				for (const byte of bytesView) {
-					if (byte > 251)
-						continue;
-					if (addLotteryNumber(byte, 12, data.euroLucky))
-						break luckyStarLoop;
-				}
-				if (attempt + 1 >= SUPPLEMENT_LIMIT)
-					break;
-				const newSupp = yield* receiveSupplement(reused);
-				luckyStarSource = reverseBitsU64(newSupp.value);
-				supplement.current = newSupp;
-			}
-			if (data.euroLucky.values.length !== data.euroLucky.limit)
-				throw supplementLimitError("유로밀리언 럭키 스타");
-			const hangul = new Array(4);
-			for (let i = 0; i < hangul.length; i++) {
-				bitsView.setBigUint64(0, num, false);
-				let index = bitsView.getUint16(i * 2, false);
+			const korea = { sampler: sampleKorea(num), result: null };
+			korea.result = await korea.sampler.next();
+			try {
 				for (
 					let attempt = 0;
-					index > HANGUL_MAX &&
+					!complete && attempt < SUPPLEMENT_LIMIT;
+					attempt++
+				) {
+					const newSupp = yield* receiveSupplement(korea);
+					complete = fillNumbers(newSupp.value, data);
+					supplement.current = newSupp;
+				}
+				if (!complete)
+					throw supplementLimitError("기본 필드");
+				let luckyStarSource = reverseBitsU64(
+					supplement.current?.value ?? num,
+				);
+				luckyStarLoop: for (
+					let attempt = 0;
 					attempt < SUPPLEMENT_LIMIT;
 					attempt++
 				) {
-					if (supplement.current === null)
-						supplement.current = yield* receiveSupplement(reused);
-					const supp = supplement.current;
-					bitsView.setBigUint64(0, supp.value, false);
-					for (
-						let offset = 0;
-						offset < bytesView.length;
-						offset += 2
-					) {
-						const candidate = bitsView.getUint16(offset, false);
-						if (candidate <= HANGUL_MAX) {
-							index = candidate;
-							break;
-						}
+					bitsView.setBigUint64(0, luckyStarSource, false);
+					for (const byte of bytesView) {
+						if (byte > 251)
+							continue;
+						if (addLotteryNumber(byte, 12, data.euroLucky))
+							break luckyStarLoop;
 					}
-					if (
+					if (attempt + 1 >= SUPPLEMENT_LIMIT)
+						break;
+					const newSupp = yield* receiveSupplement(korea);
+					luckyStarSource = reverseBitsU64(newSupp.value);
+					supplement.current = newSupp;
+				}
+				if (data.euroLucky.values.length !== data.euroLucky.limit)
+					throw supplementLimitError("유로밀리언 럭키 스타");
+				const hangul = new Array(4);
+				for (let i = 0; i < hangul.length; i++) {
+					bitsView.setBigUint64(0, num, false);
+					let index = bitsView.getUint16(i * 2, false);
+					for (
+						let attempt = 0;
 						index > HANGUL_MAX &&
-						attempt + 1 < SUPPLEMENT_LIMIT
-					)
-						supplement.current = yield* receiveSupplement(reused);
+						attempt < SUPPLEMENT_LIMIT;
+						attempt++
+					) {
+						if (supplement.current === null)
+							supplement.current = yield* receiveSupplement(korea);
+						const supp = supplement.current;
+						bitsView.setBigUint64(0, supp.value, false);
+						for (
+							let offset = 0;
+							offset < bytesView.length;
+							offset += 2
+						) {
+							const candidate = bitsView.getUint16(offset, false);
+							if (candidate <= HANGUL_MAX) {
+								index = candidate;
+								break;
+							}
+						}
+						if (
+							index > HANGUL_MAX &&
+							attempt + 1 < SUPPLEMENT_LIMIT
+						)
+							supplement.current = yield* receiveSupplement(korea);
+					}
+					if (index > HANGUL_MAX)
+						throw supplementLimitError("한글 음절");
+					hangul[i] = String.fromCodePoint(
+						HANGUL_BASE + (index % HANGUL_MODULUS),
+					);
 				}
-				if (index > HANGUL_MAX)
-					throw supplementLimitError("한글 음절");
-				hangul[i] = String.fromCodePoint(
-					HANGUL_BASE + (index % HANGUL_MODULUS),
+				data.hangul = hangul;
+				bitsView.setBigUint64(0, num, false);
+				const upper32 = bitsView.getUint32(0, false);
+				const portalBits = bitsView.getUint32(3, false);
+				const upperRatio = upper32 * U32_MAX_INV;
+				const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
+				data.world = [
+					affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
+					affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
+				];
+				const planetIndex = yield* extractNmsBits(
+					4, num, NMS_PLANET_SHIFTS, 11,
+					supplement, korea,
 				);
-			}
-			data.hangul = hangul;
-			bitsView.setBigUint64(0, num, false);
-			const upper32 = bitsView.getUint32(0, false);
-			const portalBits = bitsView.getUint32(3, false);
-			const upperRatio = upper32 * U32_MAX_INV;
-			const lowerRatio = bitsView.getUint32(4, false) * U32_MAX_INV;
-			data.world = [
-				affineF64(upperRatio, 6333186975989760n, -45, -6333186975989760n, -46, -90),
-				affineF64(lowerRatio, 6333186975989760n, -44, -6333186975989760n, -45, -180),
-			];
-			const planetIndex = yield* extractNmsBits(
-				4, num, NMS_PLANET_SHIFTS, 11,
-				supplement, reused,
-			);
-			data.planet = planetIndex % 6 + 1;
-			const systemIndex = yield* extractNmsBits(
-				12, num, NMS_SYSTEM_SHIFTS, 3834,
-				supplement, reused,
-			);
-			data.system = systemIndex % 767 + 1;
-			data.portalY = upper32 & 0xff;
-			data.portalZ = (portalBits >>> 12) & 0xfff;
-			data.portalX = portalBits & 0xfff;
-			data.galaxyX = (data.portalX + 0x7ff) & 0xfff;
-			data.galaxyY = (data.portalY + 0x7f) & 0xff;
-			data.galaxyZ = (data.portalZ + 0x7ff) & 0xfff;
-			let glyphs = GLYPHS[data.planet & 0xf];
-			for (let shift = 8; shift >= 0; shift -= 4)
-				glyphs += GLYPHS[(data.system >> shift) & 0xf];
-			for (let shift = 28; shift >= 0; shift -= 4)
-				glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
-			data.glyphs = glyphs;
-			const sampler = sampleKorea(num);
-			let result = await sampler.next();
-			let index = 0;
-			try {
-				while (!result.done) {
-					let next;
-					if (index < reused.length) next = { value: reused[index++], bitsRemaining: 64 };
-					else next = yield;
-					result = await sampler.next(next);
-				}
-				data.korea = result.value;
+				data.planet = planetIndex % 6 + 1;
+				const systemIndex = yield* extractNmsBits(
+					12, num, NMS_SYSTEM_SHIFTS, 3834,
+					supplement, korea,
+				);
+				data.system = systemIndex % 767 + 1;
+				data.portalY = upper32 & 0xff;
+				data.portalZ = (portalBits >>> 12) & 0xfff;
+				data.portalX = portalBits & 0xfff;
+				data.galaxyX = (data.portalX + 0x7ff) & 0xfff;
+				data.galaxyY = (data.portalY + 0x7f) & 0xff;
+				data.galaxyZ = (data.portalZ + 0x7ff) & 0xfff;
+				let glyphs = GLYPHS[data.planet & 0xf];
+				for (let shift = 8; shift >= 0; shift -= 4)
+					glyphs += GLYPHS[(data.system >> shift) & 0xf];
+				for (let shift = 28; shift >= 0; shift -= 4)
+					glyphs += GLYPHS[(portalBits >>> shift) & 0xf];
+				data.glyphs = glyphs;
+				while (!korea.result.done)
+					yield* receiveSupplement(korea);
+				data.korea = korea.result.value;
+				return data;
 			} finally {
-				if (!result.done) await sampler.return();
+				if (!korea.result.done) await korea.sampler.return();
 			}
-			return data;
 		}
 		function paddedHex(value, width) {
 			return value.toString(16).toUpperCase().padStart(width, "0");

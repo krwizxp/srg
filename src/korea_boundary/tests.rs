@@ -1,6 +1,6 @@
 use super::{
     BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT, PARTS,
-    hash, remap_tile, sample,
+    SampleState, hash, remap_tile, sample,
 };
 use crate::{diagnostic::Result, geo_uniform::candidate, random_data::Coordinates};
 const SEOUL: u64 = 15_033_626_022_739_801_206;
@@ -45,6 +45,41 @@ fn tile_mapping_preserves_original_centers() -> Result<()> {
     )?
     .is_none())
     .ok_or("Rejected selector was accepted")?;
+    Ok(())
+}
+#[test]
+fn live_sampler_skips_completed_coordinates() -> Result<()> {
+    let accepted = encode_tile_candidate(DOKDO)?;
+    let mut cache = BoundaryCache::default();
+    let mut sampler = SampleState::new(u64::MAX, &mut cache)?;
+    (!sampler.is_complete()).ok_or("Invalid starting candidate accepted")?;
+    sampler.offer_supplement(accepted)?;
+    sampler.is_complete().ok_or("Valid supplement rejected")?;
+    sampler.offer_supplement(u64::MAX)?;
+    let point = sampler.finish()?;
+    ((point.latitude - 37.240_777_800_018_755_f64).abs() < 1e-12_f64)
+        .ok_or("Completed coordinate was overwritten")?;
+    let mut immediate = SampleState::new(accepted, &mut cache)?;
+    immediate
+        .is_complete()
+        .ok_or("Valid initial candidate rejected")?;
+    immediate.offer_supplement(u64::MAX)?;
+    Ok(())
+}
+#[test]
+fn live_sampler_respects_rejection_limit() -> Result<()> {
+    let mut cache = BoundaryCache::default();
+    let mut sampler = SampleState::new(u64::MAX, &mut cache)?;
+    for _ in 1..KOREA_SUPP_RETRY_LIMIT {
+        sampler.offer_supplement(u64::MAX)?;
+    }
+    let failure = sampler
+        .offer_supplement(u64::MAX)
+        .err()
+        .ok_or("Retry limit not enforced")?;
+    format!("{failure}")
+        .contains("보완 난수 시도 횟수 초과")
+        .ok_or("Wrong rejection limit error")?;
     Ok(())
 }
 #[test]
