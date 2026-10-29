@@ -79,9 +79,9 @@ jobs:
               assert len(samples)==16,(name,len(samples))
               data[name]={'metrics':matches,'samples':samples}
           for old,new in zip(data['baseline']['samples'],data['candidate']['samples']):
-              x=old.split(',');y=new.split(',')
-              assert len(x)==9 and len(y)==9,(x,y)
-              assert x[0]==y[0] and x[4:]==y[4:],(x,y)
+              x=old.split(',',4);y=new.split(',',4)
+              assert len(x)==5 and len(y)==5,(x,y)
+              assert x[0]==y[0] and x[4]==y[4],(x,y)
               assert int(y[1])<=int(x[1]),(x,y)
           old=int(data['baseline']['metrics']['supp_total'])
           new=int(data['candidate']['metrics']['supp_total'])

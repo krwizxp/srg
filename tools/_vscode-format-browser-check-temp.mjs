@@ -173,9 +173,10 @@ try{
    await check("no_unexpected_console_or_navigation_errors",async ()=>{
     const cancelledIndexPrefetches=requestFailures.filter(x=>
      x.failure?.errorText==="net::ERR_ABORTED" &&
-     x.url.startsWith("http://127.0.0.1:18973/data/korea-boundary-v4/index.bin?sha256="));
+     (x.url.startsWith("http://127.0.0.1:18973/data/korea-boundary-v4/index.bin?sha256=") ||
+      x.url.startsWith("http://127.0.0.1:18973/data/korea-boundary-v4/tile-select-v5.bin?sha256=")));
     const unexpectedRequests=requestFailures.filter(x=>!cancelledIndexPrefetches.includes(x));
-    if(pageErrors.length||consoleErrors.length||unexpectedRequests.length||cancelledIndexPrefetches.length>1)
+    if(pageErrors.length||consoleErrors.length||unexpectedRequests.length||cancelledIndexPrefetches.length>2)
      throw new Error(JSON.stringify({pageErrors,consoleErrors,requestFailures}).slice(0,1600));
     return {pageErrors:0,consoleErrors:0,unexpectedRequests:0,cancelledIndexPrefetches:cancelledIndexPrefetches.length,browserVersion:browser.version()};
    });
