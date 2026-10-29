@@ -1,0 +1,96 @@
+name: Temporary unified supplement Rust native validation
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  native:
+    name: ${{ matrix.os }} native release and lint
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, windows-latest, macos-26-intel, macos-26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install and pin latest stable Rust 1.99.1
+        shell: bash
+        run: |
+          set -e
+          rustup toolchain install stable --profile minimal --component clippy --component rustfmt --no-self-update
+          test "$(rustc +stable --version | awk '{print $2}')" = "1.99.1"
+          rustup toolchain install 1.99.1 --profile minimal --component clippy --component rustfmt --no-self-update
+          rustc +1.99.1 -Vv
+      - name: Install Linux link headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Format changed Rust in runner and validate
+        shell: bash
+        run: |
+          cargo +1.99.1 fmt --all
+          cargo +1.99.1 fmt --all -- --check
+          git diff --check
+          git diff --stat
+      - name: Clippy full target checks
+        run: cargo +1.99.1 clippy --all-targets --frozen
+      - name: Native release tests
+        run: cargo +1.99.1 test --release --frozen
+      - name: Native release binary
+        run: cargo +1.99.1 build --release --frozen --bin srg
+      - name: Linux hardware RNG production CLI smoke test
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 90s ./target/release/srg generate 100 > "$RUNNER_TEMP/srg-100.stdout" 2> "$RUNNER_TEMP/srg-100.stderr"
+          test -s random_data.txt
+          sha256sum random_data.txt
+  measure:
+    name: Native 10k full field fixtures
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install pinned compiler and link headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --no-self-update
+          test "$(rustc +stable --version | awk '{print $2}')" = "1.99.1"
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --no-self-update
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Append bounded temporary instrumentation and validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p unified-evidence
+          cargo +1.99.1 fmt --all
+          cp src/random_data.rs unified-evidence/random_data.formatted.rs
+          git diff -- src/random_data.rs > unified-evidence/rustfmt.patch
+          git diff --check
+          cat tools/_unified_rust_probe_temp.rs >> src/korea_boundary/tests.rs
+          cargo +1.99.1 test --release --frozen --bin srg verify_unified_shared_stream_ten_thousand -- --nocapture --test-threads=1 2>&1 | tee unified-evidence/probe.log
+          grep SRG_UNIFIED_SAMPLE unified-evidence/probe.log | sed -n '1,128p' > unified-evidence/samples.tsv
+          grep SRG_UNIFIED_METRIC unified-evidence/probe.log | tail -1 > unified-evidence/metrics.txt
+          test "$(wc -l < unified-evidence/samples.tsv)" -eq 128
+          grep -q 'records=10000' unified-evidence/metrics.txt
+          git rev-parse HEAD > unified-evidence/commit.txt
+          rustc +1.99.1 -Vv > unified-evidence/rust-version.txt
+          cat unified-evidence/metrics.txt
+      - name: Upload Rust measurement and fixtures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unified-supp-rust-measure
+          path: unified-evidence/
+          if-no-files-found: warn
+          retention-days: 14

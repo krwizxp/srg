@@ -9,7 +9,6 @@ use core::array;
 use std::process;
 const ASCII_PRINTABLE_LEN: u8 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
-const BYTE_BITS: u8 = 64;
 const EURO_LUCKY_MODULUS: u8 = 12;
 const EURO_MAIN_MODULUS: u8 = 50;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
@@ -31,10 +30,14 @@ const LOTTO_COUNT: usize = 6;
 const LOTTO_COUNT_U8: u8 = 6;
 const NMS_COORD_MASK: u64 = 0x0FFF;
 const NMS_PLANET_MAX_VALUE: u64 = 11;
-const NMS_PLANET_FIELD: (u8, u64) = (4, 0x0f);
+const NMS_PLANET_MASK: u64 = 0x0f;
+const NMS_PLANET_SHIFTS: [u8; 3] = [52, 4, 0];
+const NMS_PLANET_SUPP_SHIFTS: [u8; 4] = [60, 56, 52, 48];
 const NMS_PLANET_MODULUS: u64 = 6;
 const NMS_SOLAR_SYSTEM_MAX_VALUE: u64 = 3834;
-const NMS_SOLAR_SYSTEM_FIELD: (u8, u64) = (12, 0x0fff);
+const NMS_SOLAR_SYSTEM_MASK: u64 = 0x0fff;
+const NMS_SOLAR_SYSTEM_SHIFTS: [u8; 1] = [40];
+const NMS_SOLAR_SYSTEM_SUPP_SHIFTS: [u8; 4] = [36, 24, 12, 0];
 const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
 const PASSWORD_BYTE_LEN: usize = 8;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
@@ -65,27 +68,18 @@ pub(super) struct RandomDataSet {
     pub solar_system_index: u16,
     pub world_coords: Coordinates,
 }
-struct RandomBitBuffer {
-    bits_remaining: u8,
-    value: u64,
-}
 struct UniqueNumbers<const N: usize> {
     count: u8,
     seen: u64,
 }
-struct RandomDataBuildState<'provider_ref, F>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
+struct RandomDataBuildState {
     data: RandomDataSet,
     euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
     euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
     lotto: UniqueNumbers<LOTTO_COUNT>,
     lotto7: UniqueNumbers<LOTTO7_COUNT>,
-    next_supp: &'provider_ref mut F,
     numeric_password_digits: u8,
     password_len: u8,
-    supplemental: RandomBitBuffer,
 }
 impl RandomDataSet {
     pub(super) fn populate<F>(
@@ -96,48 +90,38 @@ impl RandomDataSet {
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
+        let initial = self.num_64;
         let mut local_cache = korea_boundary::BoundaryCache::default();
         let mut korea = korea_boundary::SampleState::new(
-            self.num_64,
+            initial,
             boundary_cache.unwrap_or(&mut local_cache),
         )?;
-        let mut data = {
-            let mut next_shared = |reason| {
-                let value = next_supp(reason)?;
-                korea.offer_supplement(value)?;
-                Ok(value)
-            };
-            let mut state = RandomDataBuildState {
-                data: self,
-                euro_lucky: UniqueNumbers::new(),
-                euro_main: UniqueNumbers::new(),
-                lotto: UniqueNumbers::new(),
-                lotto7: UniqueNumbers::new(),
-                next_supp: &mut next_shared,
-                numeric_password_digits: 0,
-                password_len: 0,
-                supplemental: RandomBitBuffer {
-                    bits_remaining: 0,
-                    value: 0,
-                },
-            };
-            state.fill_required_fields()?;
-            state.fill_lucky_stars()?;
-            state.fill_hangul_syllables()?;
-            state.fill_coords();
-            state.fill_nms_fields()?;
-            state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
-            state.data.euro_millions_main_numbers = state.euro_main.into_values();
-            state.data.lotto_numbers = state.lotto.into_values();
-            state.data.lotto7_numbers = state.lotto7.into_values();
-            state.data
+        let mut fields = RandomDataBuildState {
+            data: self,
+            euro_lucky: UniqueNumbers::new(),
+            euro_main: UniqueNumbers::new(),
+            lotto: UniqueNumbers::new(),
+            lotto7: UniqueNumbers::new(),
+            numeric_password_digits: 0,
+            password_len: 0,
         };
-        while !korea.is_complete() {
-            let value = next_supp("대한민국 좌표 재추출")
-                .map_err(|source| AppError::context("대한민국 좌표 보완 난수 공급 실패", source))?;
-            korea.offer_supplement(value)?;
+        fields.fill_coords();
+        fields.offer_word(initial, true);
+        for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
+            if fields.is_complete() && korea.is_complete() {
+                break;
+            }
+            let word = next_supp("미완성 필드 보완")?;
+            fields.offer_word(word, false);
+            korea.offer_supplement(word)?;
         }
+        fields.check_complete()?;
+        let mut data = fields.data;
         data.kor_coords = korea.finish()?;
+        data.euro_millions_lucky_stars = fields.euro_lucky.into_values();
+        data.euro_millions_main_numbers = fields.euro_main.into_values();
+        data.lotto_numbers = fields.lotto.into_values();
+        data.lotto7_numbers = fields.lotto7.into_values();
         Ok(data)
     }
 }
@@ -169,10 +153,42 @@ impl<const N: usize> UniqueNumbers<N> {
         self.is_full()
     }
 }
-impl<F> RandomDataBuildState<'_, F>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
+impl RandomDataBuildState {
+    fn is_basic_complete(&self) -> bool {
+        self.numeric_password_digits >= LOTTO_COUNT_U8
+            && usize::from(self.password_len) == PASSWORD_BYTE_LEN
+            && self.lotto.is_full()
+            && self.lotto7.is_full()
+            && self.euro_main.is_full()
+    }
+    fn is_complete(&self) -> bool {
+        self.is_basic_complete()
+            && self.euro_lucky.is_full()
+            && self.data.hangul_syllables.iter().all(|&c| c != '\0')
+            && self.data.planet_number != 0
+            && self.data.solar_system_index != 0
+    }
+    fn check_complete(&self) -> Result<()> {
+        if !self.is_basic_complete() {
+            return Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into());
+        }
+        if !self.euro_lucky.is_full() {
+            return Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into());
+        }
+        if self.data.hangul_syllables.contains(&'\0') {
+            return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
+        }
+        if self.data.planet_number == 0 || self.data.solar_system_index == 0 {
+            return Err("NMS 보완 난수 시도 횟수를 초과했습니다.".into());
+        }
+        Ok(())
+    }
+    fn offer_word(&mut self, value: u64, initial: bool) {
+        self.fill_required_fields_from_u64(value);
+        self.fill_lucky_stars_from_u64(value);
+        self.fill_hangul_from_u64(value, initial);
+        self.fill_nms_from_u64(value, initial);
+    }
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
         let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
@@ -190,108 +206,53 @@ where
         self.data.galaxy_y = galaxy_coord::<0x7F, 0xFF>(u16::from(self.data.nms_portal_yy));
         self.data.galaxy_z = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_zzz);
     }
-    fn fill_hangul_syllables(&mut self) -> Result<()> {
-        let mut hangul = ['\0'; HANGUL_SYLLABLE_COUNT];
-        for (slot, shift) in hangul.iter_mut().zip(HANGUL_SHIFTS) {
-            let mut syllable_index = u32::from(low_u16_from_u64(self.data.num_64 >> shift));
-            for attempts_remaining in (0..SUPPLEMENTAL_RETRY_LIMIT).rev() {
-                if syllable_index <= HANGUL_SYLLABLE_MAX {
-                    break;
-                }
-                let supp_value = if self.supplemental.bits_remaining == 0 {
-                    self.next_supplemental("한글 음절 보완")?
-                } else {
-                    self.supplemental.value
-                };
-                if let Some(candidate) = HANGUL_SHIFTS.into_iter().find_map(|supp_shift| {
-                    let candidate = u32::from(low_u16_from_u64(supp_value >> supp_shift));
-                    (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
-                }) {
-                    syllable_index = candidate;
-                    break;
-                }
-                if attempts_remaining == 0 {
-                    break;
-                }
-                self.next_supplemental("한글 음절 보완 재시도")?;
-            }
-            (syllable_index <= HANGUL_SYLLABLE_MAX)
-                .ok_or("한글 음절 보완 난수 시도 횟수를 초과했습니다.")?;
-            let code_point = HANGUL_BASE_CODE_POINT
-                .strict_add(syllable_index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
-            *slot = char::from_u32(code_point).unwrap_or_else(|| process::abort());
+    fn fill_lucky_stars_from_u64(&mut self, value: u64) {
+        if self.euro_lucky.is_full() {
+            return;
         }
-        self.data.hangul_syllables = hangul;
-        Ok(())
-    }
-    fn fill_lucky_stars(&mut self) -> Result<()> {
-        let lucky_star_base = if self.supplemental.bits_remaining == 0 {
-            self.data.num_64
-        } else {
-            self.supplemental.value
-        };
-        let mut lucky_star_source = lucky_star_base.reverse_bits();
-        for attempts_remaining in (0..SUPPLEMENTAL_RETRY_LIMIT).rev() {
-            for byte in lucky_star_source.to_be_bytes() {
-                if byte > INPUT_BYTE_MAX_FOR_LUCKY_STAR {
-                    continue;
-                }
-                if self.euro_lucky.push(byte, EURO_LUCKY_MODULUS) {
-                    return Ok(());
-                }
-            }
-            if attempts_remaining == 0 {
-                break;
-            }
-            lucky_star_source = self
-                .next_supplemental("유로밀리언 럭키 스타 보완")?
-                .reverse_bits();
-        }
-        Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into())
-    }
-    fn fill_nms_fields(&mut self) -> Result<()> {
-        let num = self.data.num_64;
-        self.data.planet_number = low_u8_from_u64(
-            extract_valid_bits_for_nms(
-                num,
-                &[52, 4, 0],
-                NMS_PLANET_FIELD,
-                NMS_PLANET_MAX_VALUE,
-                "NMS 행성 번호 보완",
-                &mut self.supplemental,
-                self.next_supp,
-            )?
-            .rem_euclid(NMS_PLANET_MODULUS)
-            .strict_add(1),
-        );
-        self.data.solar_system_index = low_u16_from_u64(
-            extract_valid_bits_for_nms(
-                num,
-                &[40],
-                NMS_SOLAR_SYSTEM_FIELD,
-                NMS_SOLAR_SYSTEM_MAX_VALUE,
-                "NMS 태양계 번호 보완",
-                &mut self.supplemental,
-                self.next_supp,
-            )?
-            .rem_euclid(NMS_SOLAR_SYSTEM_MODULUS)
-            .strict_add(1),
-        );
-        Ok(())
-    }
-    fn fill_required_fields(&mut self) -> Result<()> {
-        if self.fill_required_fields_from_u64(self.data.num_64) {
-            return Ok(());
-        }
-        for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-            let new_supp = self.next_supplemental("기본 필드 보완")?;
-            if self.fill_required_fields_from_u64(new_supp) {
-                return Ok(());
+        for byte in value.reverse_bits().to_be_bytes() {
+            if byte <= INPUT_BYTE_MAX_FOR_LUCKY_STAR
+                && self.euro_lucky.push(byte, EURO_LUCKY_MODULUS)
+            {
+                return;
             }
         }
-        Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into())
     }
-    fn fill_required_fields_from_u64(&mut self, value: u64) -> bool {
+    fn fill_hangul_from_u64(&mut self, value: u64, initial: bool) {
+        for (position, slot) in self.data.hangul_syllables.iter_mut().enumerate() {
+            if *slot != '\0' {
+                continue;
+            }
+            let shifts = HANGUL_SHIFTS.into_iter().cycle().skip(position);
+            let limit = if initial { 1 } else { HANGUL_SYLLABLE_COUNT };
+            let index = shifts.take(limit).find_map(|shift| {
+                let candidate = u32::from(low_u16_from_u64(value >> shift));
+                (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
+            });
+            if let Some(index) = index {
+                let point = HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
+                *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
+            }
+        }
+    }
+    fn fill_nms_from_u64(&mut self, value: u64, initial: bool) {
+        if self.data.planet_number == 0 {
+            let shifts = if initial { &NMS_PLANET_SHIFTS[..] } else { &NMS_PLANET_SUPP_SHIFTS[..] };
+            if let Some(candidate) = nms_candidate(value, shifts, NMS_PLANET_MASK, NMS_PLANET_MAX_VALUE) {
+                self.data.planet_number = low_u8_from_u64(candidate.rem_euclid(NMS_PLANET_MODULUS).strict_add(1));
+            }
+        }
+        if self.data.solar_system_index == 0 {
+            let shifts = if initial { &NMS_SOLAR_SYSTEM_SHIFTS[..] } else { &NMS_SOLAR_SYSTEM_SUPP_SHIFTS[..] };
+            if let Some(candidate) = nms_candidate(value, shifts, NMS_SOLAR_SYSTEM_MASK, NMS_SOLAR_SYSTEM_MAX_VALUE) {
+                self.data.solar_system_index = low_u16_from_u64(candidate.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS).strict_add(1));
+            }
+        }
+    }
+    fn fill_required_fields_from_u64(&mut self, value: u64) {
+        if self.is_basic_complete() {
+            return;
+        }
         for byte in value.to_be_bytes() {
             if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
                 continue;
@@ -318,23 +279,17 @@ where
                     }
                 }
             }
-            if usize::from(self.password_len) >= PASSWORD_BYTE_LEN
-                && self.lotto7.is_full()
-                && self.lotto.is_full()
-                && self.euro_main.is_full()
-            {
-                return true;
+            if self.is_basic_complete() {
+                return;
             }
         }
-        false
     }
-    fn next_supplemental(&mut self, reason: &'static str) -> Result<u64> {
-        self.supplemental = RandomBitBuffer {
-            bits_remaining: BYTE_BITS,
-            value: (self.next_supp)(reason)?,
-        };
-        Ok(self.supplemental.value)
-    }
+}
+fn nms_candidate(value: u64, shifts: &[u8], mask: u64, max: u64) -> Option<u64> {
+    shifts.iter().find_map(|&shift| {
+        let candidate = (value >> shift) & mask;
+        (candidate <= max).then_some(candidate)
+    })
 }
 const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
     // Callers supply 8-bit or 12-bit fields; shift the origin within that field.
@@ -354,35 +309,4 @@ pub(super) fn generate_random_data_with_rng(
         ..Default::default()
     }
     .populate(&mut next_supp, boundary_cache)
-}
-fn extract_valid_bits_for_nms(
-    num: u64,
-    shifts: &[u8],
-    bit_field: (u8, u64),
-    max_value: u64,
-    reason: &'static str,
-    supplemental: &mut RandomBitBuffer,
-    next_supp: &mut impl FnMut(&'static str) -> Result<u64>,
-) -> Result<u64> {
-    let (bits, mask) = bit_field;
-    if let Some(extracted_value) = shifts.iter().find_map(|&shift| {
-        let value = (num >> shift) & mask;
-        (value <= max_value).then_some(value)
-    }) {
-        return Ok(extracted_value);
-    }
-    for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-        if supplemental.bits_remaining < bits {
-            *supplemental = RandomBitBuffer {
-                bits_remaining: BYTE_BITS,
-                value: next_supp(reason)?,
-            };
-        }
-        supplemental.bits_remaining = supplemental.bits_remaining.strict_sub(bits);
-        let extracted = (supplemental.value >> supplemental.bits_remaining) & mask;
-        if extracted <= max_value {
-            return Ok(extracted);
-        }
-    }
-    Err("NMS 보완 난수 시도 횟수를 초과했습니다.".into())
 }

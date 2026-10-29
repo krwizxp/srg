@@ -1,0 +1,167 @@
+name: Temporary all-field unified shared-supp HTML validation
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout pinned product source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Remove whitespace-only lines before formatting
+        shell: bash
+        run: |
+          mkdir -p vscode-format-evidence format-workspace/.vscode
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          source=Path("revgeo.html")
+          original=source.read_bytes()
+          assert len(original)>0 and hashlib.sha256(original).digest()
+          assert b"\r" not in original
+          lines=original.decode("utf-8").splitlines(keepends=True)
+          blanks=sum(not line.strip() for line in lines)
+          assert blanks==391, blanks
+          out="".join(line for line in lines if line.strip())
+          assert len(out)>0 and len(out)<len(original)
+          Path("format-workspace/revgeo.html").write_text(out,encoding="utf-8",newline="")
+          Path("vscode-format-evidence/revgeo.step1.no-empty-lines.html").write_text(out,encoding="utf-8",newline="")
+          print("Removed",blanks,"blank lines",len(lines),"->",len(out.splitlines()))
+          PY
+          cat > format-workspace/.vscode/settings.json <<'JSON'
+          {
+            "editor.defaultFormatter": "vscode.html-language-features",
+            "[html]": {
+              "editor.defaultFormatter": "vscode.html-language-features"
+            },
+            "html.format.enable": true,
+            "editor.insertSpaces": false,
+            "editor.tabSize": 4,
+            "editor.detectIndentation": false,
+            "editor.formatOnSave": false,
+            "files.eol": "\n",
+            "files.insertFinalNewline": false
+          }
+          JSON
+      - name: Provision official Visual Studio Code editor and Xvfb
+        shell: bash
+        run: |
+          set -e
+          if ! command -v code >/dev/null 2>&1; then
+            curl -fLsS --retry 2 --connect-timeout 20 --max-time 240 \
+              https://update.code.visualstudio.com/latest/linux-deb-x64/stable \
+              -o "$RUNNER_TEMP/vscode-stable.deb"
+            sudo apt-get update
+            sudo apt-get install -y "$RUNNER_TEMP/vscode-stable.deb"
+          fi
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb xauth
+          fi
+          code --version --no-sandbox | tee vscode-format-evidence/vscode-version.txt
+      - name: Format Document using vscode.html-language-features
+        shell: bash
+        run: |
+          set -e
+          export SRG_FORMAT_FILE="$PWD/format-workspace/revgeo.html"
+          export SRG_FORMAT_EVIDENCE="$PWD/vscode-format-evidence"
+          export SRG_FORMAT_INPUT_SHA="$(sha256sum "$SRG_FORMAT_FILE" | cut -d' ' -f1)"
+          mkdir -p "$RUNNER_TEMP/srg-vscode-user"
+          set +e
+          timeout 210s xvfb-run -a code \
+            --no-sandbox --disable-gpu --disable-telemetry --disable-workspace-trust \
+            --skip-welcome --new-window --wait \
+            --user-data-dir="$RUNNER_TEMP/srg-vscode-user" \
+            --extensions-dir="$PWD/tools" \
+            "$PWD/format-workspace" "$PWD/format-workspace/revgeo.html" \
+            > vscode-format-evidence/vscode.stdout 2> vscode-format-evidence/vscode.stderr
+          status=$?
+          set -e
+          printf '%s\n' "$status" > vscode-format-evidence/vscode-process.exit
+          if test -f vscode-format-evidence/vscode-format-error.txt; then
+            cat vscode-format-evidence/vscode-format-error.txt
+            exit 1
+          fi
+          test "$status" -eq 0
+          test -s vscode-format-evidence/vscode-format-report.json
+          test -s vscode-format-evidence/revgeo.step2.vscode-formatted.html
+          cat vscode-format-evidence/vscode-format-report.json
+      - name: Prepare formatted candidate and test dependencies
+        shell: bash
+        run: |
+          set -e
+          cp revgeo.html revgeo.before-format.html
+          cp vscode-format-evidence/revgeo.step2.vscode-formatted.html revgeo.html
+          npm install --no-save --no-package-lock --no-audit --no-fund typescript@5.9.3 html-validate@latest playwright@1.57.0
+          python3 - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          before=sha256(Path('revgeo.before-format.html').read_bytes()).hexdigest()
+          after=sha256(Path('revgeo.html').read_bytes()).hexdigest()
+          for name in ['tools/_vscode-format-ast-check-temp.mjs','tools/_vscode-format-html-check-temp.mjs','tools/_vscode-format-browser-check-temp.mjs']:
+              file=Path(name)
+              source=file.read_text(encoding='utf8')
+              source=source.replace('8fa68e67cb4dbf54a22cdf7af16350ccc95ebbff9072ba2528a07f96e8679aee',before if 'ast-check' in name else after)
+              source=source.replace('bfd03ebc06cda0b76f6c6a294c9ba9ddce322833ab1e9d2e1174f5a2b7ca68cd',after)
+              file.write_text(source,encoding='utf8')
+          print('Input SHA-256',before,'Formatted SHA-256',after)
+          PY
+          node tools/_vscode-format-ast-check-temp.mjs
+          node tools/_unified_web_invariants_temp.mjs
+          ./node_modules/.bin/html-validate --version | tee vscode-format-evidence/htmlvalidate-version.txt
+          ./node_modules/.bin/playwright --version | tee vscode-format-evidence/playwright-version.txt
+          git diff --check
+          git diff --stat
+      - name: Validate Nu and HTMLValidate independently on final HTML
+        shell: bash
+        run: |
+          mkdir -p validation-evidence
+          curl -fLsS --retry 2 --connect-timeout 20 --max-time 180 \
+            https://github.com/validator/validator/releases/download/latest/vnu.jar \
+            -o "$RUNNER_TEMP/vnu.jar"
+          java -jar "$RUNNER_TEMP/vnu.jar" --version > validation-evidence/nu-version.txt 2>&1 || true
+          set +e
+          ./node_modules/.bin/html-validate revgeo.html --formatter json > validation-evidence/htmlvalidate.stdout 2> validation-evidence/htmlvalidate.stderr
+          html_rc=$?
+          java -jar "$RUNNER_TEMP/vnu.jar" --format json revgeo.html > validation-evidence/nu.stdout 2> validation-evidence/nu.stderr
+          nu_rc=$?
+          set -e
+          printf '%s\n' "$html_rc" > validation-evidence/htmlvalidate.exit
+          printf '%s\n' "$nu_rc" > validation-evidence/nu.exit
+          node tools/_vscode-format-html-check-temp.mjs
+          cp validation-evidence/html-validator-results.json vscode-format-evidence/html-validator-results.json
+      - name: Install Chromium Firefox and WebKit for real browser tests
+        shell: bash
+        run: ./node_modules/.bin/playwright install --with-deps chromium firefox webkit
+      - name: Recheck real browser UI flows against formatted HTML
+        shell: bash
+        run: |
+          node tools/_vscode-format-browser-check-temp.mjs
+          node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('validation-evidence/three-browser-results.json','utf8'));if(x.summary.passed!==21||x.summary.failed!==0||x.summary.engines.length!==3)process.exit(1);console.log(x.summary);"
+          cp validation-evidence/three-browser-results.json vscode-format-evidence/three-browser-results.json
+      - name: Commit validated formatted HTML on temporary branch
+        shell: bash
+        run: |
+          set -e
+          test "$GITHUB_HEAD_REF" = "verify/unified-supp-20261029"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- revgeo.html
+          git diff --cached --check
+          git commit -m "Apply VS Code built-in formatter to unified all-field supp generator"
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
+      - name: Publish original and formatted versions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unified-supp-vscode-browser-html
+          path: vscode-format-evidence/
+          retention-days: 14
+          if-no-files-found: error
