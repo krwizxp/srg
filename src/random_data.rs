@@ -72,7 +72,8 @@ struct UniqueNumbers<const N: usize> {
     count: u8,
     seen: u64,
 }
-struct RandomDataBuildState {
+struct RandomDataBuildState<'cache> {
+    korea: korea_boundary::SampleState<'cache>,
     data: RandomDataSet,
     euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
     euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
@@ -92,11 +93,11 @@ impl RandomDataSet {
     {
         let initial = self.num_64;
         let mut local_cache = korea_boundary::BoundaryCache::default();
-        let mut korea = korea_boundary::SampleState::new(
-            initial,
-            boundary_cache.unwrap_or(&mut local_cache),
-        )?;
         let mut fields = RandomDataBuildState {
+            korea: korea_boundary::SampleState::new(
+                initial,
+                boundary_cache.unwrap_or(&mut local_cache),
+            )?,
             data: self,
             euro_lucky: UniqueNumbers::new(),
             euro_main: UniqueNumbers::new(),
@@ -106,23 +107,14 @@ impl RandomDataSet {
             password_len: 0,
         };
         fields.fill_coords();
-        fields.offer_word(initial, true);
+        fields.offer_word(initial, true)?;
         for _ in 0..SUPPLEMENTAL_RETRY_LIMIT {
-            if fields.is_complete() && korea.is_complete() {
+            if fields.is_complete() {
                 break;
             }
-            let word = next_supp("미완성 필드 보완")?;
-            fields.offer_word(word, false);
-            korea.offer_supplement(word)?;
+            fields.offer_word(next_supp("미완성 필드 보완")?, false)?;
         }
-        fields.check_complete()?;
-        let mut data = fields.data;
-        data.kor_coords = korea.finish()?;
-        data.euro_millions_lucky_stars = fields.euro_lucky.into_values();
-        data.euro_millions_main_numbers = fields.euro_main.into_values();
-        data.lotto_numbers = fields.lotto.into_values();
-        data.lotto7_numbers = fields.lotto7.into_values();
-        Ok(data)
+        fields.finish()
     }
 }
 impl<const N: usize> UniqueNumbers<N> {
@@ -153,7 +145,7 @@ impl<const N: usize> UniqueNumbers<N> {
         self.is_full()
     }
 }
-impl RandomDataBuildState {
+impl RandomDataBuildState<'_> {
     fn is_basic_complete(&self) -> bool {
         self.numeric_password_digits >= LOTTO_COUNT_U8
             && usize::from(self.password_len) == PASSWORD_BYTE_LEN
@@ -167,6 +159,7 @@ impl RandomDataBuildState {
             && self.data.hangul_syllables.iter().all(|&c| c != '\0')
             && self.data.planet_number != 0
             && self.data.solar_system_index != 0
+            && self.korea.is_complete()
     }
     fn check_complete(&self) -> Result<()> {
         if !self.is_basic_complete() {
@@ -183,11 +176,25 @@ impl RandomDataBuildState {
         }
         Ok(())
     }
-    fn offer_word(&mut self, value: u64, initial: bool) {
+    fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
         self.fill_required_fields_from_u64(value);
         self.fill_lucky_stars_from_u64(value);
         self.fill_hangul_from_u64(value, initial);
         self.fill_nms_from_u64(value, initial);
+        if !initial {
+            self.korea.offer_supplement(value)?;
+        }
+        Ok(())
+    }
+    fn finish(self) -> Result<RandomDataSet> {
+        self.check_complete()?;
+        let mut data = self.data;
+        data.kor_coords = self.korea.finish()?;
+        data.euro_millions_lucky_stars = self.euro_lucky.into_values();
+        data.euro_millions_main_numbers = self.euro_main.into_values();
+        data.lotto_numbers = self.lotto.into_values();
+        data.lotto7_numbers = self.lotto7.into_values();
+        Ok(data)
     }
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
@@ -230,22 +237,40 @@ impl RandomDataBuildState {
                 (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
             });
             if let Some(index) = index {
-                let point = HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
+                let point =
+                    HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
                 *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
             }
         }
     }
     fn fill_nms_from_u64(&mut self, value: u64, initial: bool) {
         if self.data.planet_number == 0 {
-            let shifts = if initial { &NMS_PLANET_SHIFTS[..] } else { &NMS_PLANET_SUPP_SHIFTS[..] };
-            if let Some(candidate) = nms_candidate(value, shifts, NMS_PLANET_MASK, NMS_PLANET_MAX_VALUE) {
-                self.data.planet_number = low_u8_from_u64(candidate.rem_euclid(NMS_PLANET_MODULUS).strict_add(1));
+            let shifts = if initial {
+                &NMS_PLANET_SHIFTS[..]
+            } else {
+                &NMS_PLANET_SUPP_SHIFTS[..]
+            };
+            if let Some(candidate) =
+                nms_candidate(value, shifts, NMS_PLANET_MASK, NMS_PLANET_MAX_VALUE)
+            {
+                self.data.planet_number =
+                    low_u8_from_u64(candidate.rem_euclid(NMS_PLANET_MODULUS).strict_add(1));
             }
         }
         if self.data.solar_system_index == 0 {
-            let shifts = if initial { &NMS_SOLAR_SYSTEM_SHIFTS[..] } else { &NMS_SOLAR_SYSTEM_SUPP_SHIFTS[..] };
-            if let Some(candidate) = nms_candidate(value, shifts, NMS_SOLAR_SYSTEM_MASK, NMS_SOLAR_SYSTEM_MAX_VALUE) {
-                self.data.solar_system_index = low_u16_from_u64(candidate.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS).strict_add(1));
+            let shifts = if initial {
+                &NMS_SOLAR_SYSTEM_SHIFTS[..]
+            } else {
+                &NMS_SOLAR_SYSTEM_SUPP_SHIFTS[..]
+            };
+            if let Some(candidate) = nms_candidate(
+                value,
+                shifts,
+                NMS_SOLAR_SYSTEM_MASK,
+                NMS_SOLAR_SYSTEM_MAX_VALUE,
+            ) {
+                self.data.solar_system_index =
+                    low_u16_from_u64(candidate.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS).strict_add(1));
             }
         }
     }
