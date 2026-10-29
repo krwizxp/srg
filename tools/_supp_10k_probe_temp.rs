@@ -1,6 +1,6 @@
 #[cfg(target_arch = "x86_64")]
 #[test]
-fn measure_supp_for_ten_thousand_real_random_records() -> crate::diagnostic::Result<()> {
+fn measure_supp_for_ten_thousand_real_random_records() -> Result<()> {
     use crate::{
         hardware_rng::{HardwareRandomSource, HardwareRng},
         korea_boundary::BoundaryCache,
@@ -35,7 +35,7 @@ fn measure_supp_for_ten_thousand_real_random_records() -> crate::diagnostic::Res
         let num64 = rng.next_u64()?;
         let mut used_supp = 0_usize;
         let mut used_korea = 0_usize;
-        let mut next_supp = |reason: &'static str| -> crate::diagnostic::Result<u64> {
+        let mut next_supp = |reason: &'static str| -> Result<u64> {
             let value = rng.next_u64()?;
             used_supp += 1;
             if reason == KOREA_REASON {
