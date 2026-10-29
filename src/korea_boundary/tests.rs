@@ -1,6 +1,6 @@
 use super::{
     BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT,
-    KOREA_TILE_COUNT, PARTS, hash, remap_tile, sample,
+    PARTS, hash, remap_tile, sample,
 };
 use crate::{diagnostic::Result, geo_uniform::candidate, random_data::Coordinates};
 const SEOUL: u64 = 15_033_626_022_739_801_206;

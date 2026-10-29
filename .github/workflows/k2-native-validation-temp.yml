@@ -29,6 +29,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
       - name: Rust formatting
         run: cargo +stable fmt --all -- --check
+      - name: Native Clippy checks
+        run: cargo +stable clippy --all-targets --frozen
       - name: Native release tests
         run: cargo +stable test --frozen --release
       - name: Native release build
