@@ -165,10 +165,13 @@ try:
         execute("android-awake", [android_adb, "-s", serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP"])
         execute("android-stay-awake", [android_adb, "-s", serial, "shell", "settings", "put", "global", "stay_on_while_plugged_in", "3"])
         execute("android-chrome-package", [android_adb, "-s", serial, "shell", "dumpsys", "package", "com.android.chrome"])
+        execute("android-connectivity-before", [android_adb, "-s", serial, "shell", "dumpsys", "connectivity"])
+        execute("android-wifi-before", [android_adb, "-s", serial, "shell", "cmd", "wifi", "status"])
         execute("android-reverse", [android_adb, "-s", serial, "reverse", "tcp:" + str(args.port), "tcp:" + str(args.port)])
         code, _ = execute("android-browser", [shutil.which("node") or "node", str(here / "android_browser.mjs"),
                                               *browser_arguments("android")], check=False, timeout=420)
         results.append({"name": "android", "exitCode": code})
+        execute("android-connectivity-after", [android_adb, "-s", serial, "shell", "dumpsys", "connectivity"])
     else:
         if platform.system() != "Darwin":
             raise RuntimeError("Apple Simulator validation requires macOS and Xcode")

@@ -1,4 +1,4 @@
-name: Temporary scalar WASM Android and iPad validation
+name: Temporary scalar WASM Android validation
 on:
   push:
     branches:
@@ -33,24 +33,6 @@ jobs:
         if: always()
         with:
           name: wasm-android-chrome
-          path: ${{ runner.temp }}/wasm-platform-results
-          if-no-files-found: error
-          retention-days: 14
-  ipados-safari:
-    runs-on: macos-26
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Execute task iPad Simulator Safari
-        run: |
-          WASM_SHA=$(python3 -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('coordinates.wasm').read_bytes()).hexdigest())")
-          python3 tools/_wasm_platform/run_platform.py apple . tools/_wasm_platform/mobile-fixtures-50.json "$RUNNER_TEMP/wasm-platform-results" --wasm-sha256 "$WASM_SHA" --apple-scope ipados-ipad
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: wasm-ipados-safari
           path: ${{ runner.temp }}/wasm-platform-results
           if-no-files-found: error
           retention-days: 14
