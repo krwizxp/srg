@@ -5,7 +5,7 @@ fn measure_unified_supplements_ten_thousand() -> Result<()> {
     let mut total = 0_usize;
     let mut korea = 0_usize;
     let mut first_with_none = 0_usize;
-    let mut cache = super::BoundaryCache::default();
+    let mut cache = BoundaryCache::default();
     let mut examples = Vec::new();
     let started = std::time::Instant::now();
     let mut saved_checksum = 0_u64;
