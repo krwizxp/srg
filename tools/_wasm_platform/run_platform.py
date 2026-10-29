@@ -25,6 +25,7 @@ parser.add_argument("--engine", default="chromium")
 parser.add_argument("--channel")
 parser.add_argument("--android-image", default="system-images;android-37.0;google_apis;x86_64")
 parser.add_argument("--ios-runtime", default="com.apple.CoreSimulator.SimRuntime.iOS-26-5")
+parser.add_argument("--apple-scope", choices=["all", "macos-safari", "ios-iphone", "ipados-ipad"], default="all")
 parser.add_argument("--port", type=int, default=18974)
 args = parser.parse_args()
 root = pathlib.Path(args.product_root).resolve()
@@ -105,6 +106,7 @@ def run_safari(folder, udid=None, device_name=None):
         command += ["--device-udid", udid, "--device-name", device_name]
     code, _ = execute(folder, command, check=False, timeout=420)
     results.append({"name": folder, "exitCode": code})
+    return code
 
 try:
     sources = {}
@@ -140,6 +142,7 @@ try:
         env["PATH"] = str(sdk / "platform-tools") + os.pathsep + str(sdk / "emulator") + os.pathsep + env["PATH"]
         execute("sdk-licenses", [sdkmanager, "--licenses"], timeout=180, input_text="y\n" * 100)
         execute("sdk-install", [sdkmanager, "emulator", "platform-tools", args.android_image], timeout=1200, input_text="y\n" * 100)
+        execute("emulator-linked-libraries", ["ldd", sdk / "emulator/qemu/linux-x86_64/qemu-system-x86_64"], check=False)
         execute("emulator-version", [sdk / "emulator/emulator", "-version"])
         execute("adb-version", [android_adb, "version"])
         _, existing = execute("adb-devices-before", [android_adb, "devices"])
@@ -186,9 +189,12 @@ try:
             with urllib.request.urlopen("http://127.0.0.1:4444/status", timeout=5) as response:
                 return response.status == 200
         wait_for("SafariDriver", driver_ready, 30)
-        execute("open-desktop-safari", ["open", "-a", "Safari"])
-        run_safari("macos-safari")
+        if args.apple_scope in ["all", "macos-safari"]:
+            execute("open-desktop-safari", ["open", "-a", "Safari"])
+            run_safari("macos-safari")
         for name, expected in [("ios-iphone", "iPhone 17"), ("ipados-ipad", "iPad (A16)")]:
+            if args.apple_scope not in ["all", name]:
+                continue
             device_type = next((item for item in types if item["name"] == expected), None)
             if device_type is None:
                 raise RuntimeError("Required device type unavailable: " + expected)
@@ -199,7 +205,13 @@ try:
             execute("boot-" + name, ["xcrun", "simctl", "boot", udid])
             execute("boot-ready-" + name, ["xcrun", "simctl", "bootstatus", udid, "-b"], timeout=300)
             execute("open-" + name, ["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid])
-            run_safari(name, udid, "SRG-WASM-" + name)
+            execute("launch-safari-" + name, ["xcrun", "simctl", "launch", udid, "com.apple.mobilesafari"])
+            if run_safari(name, udid, "SRG-WASM-" + name):
+                execute("failure-screenshot-" + name, ["xcrun", "simctl", "io", udid, "screenshot",
+                        str(output / (name + "-setup-failure.png"))], check=False)
+                execute("failure-system-log-" + name, ["xcrun", "simctl", "spawn", udid, "log", "show",
+                        "--last", "5m", "--style", "compact", "--predicate",
+                        'process == "MobileSafari" OR process == "webinspectord"'], check=False, timeout=60)
             execute("shutdown-" + name, ["xcrun", "simctl", "shutdown", udid])
 except Exception as error:
     failure = str(error)
@@ -242,10 +254,11 @@ finally:
         cleanup.append({"httpServerClosed": True})
     cleanup_failed = any(item.get("stopped") is False or item.get("deleted") is False
                          or item.get("taskAvdDeleted") is False or "androidStopError" in item for item in cleanup)
-    required_runs = 3 if args.platform == "apple" else 1
+    required_runs = 3 if args.platform == "apple" and args.apple_scope == "all" else 1
     complete = not failure and not cleanup_failed and len(results) == required_runs and all(item["exitCode"] == 0 for item in results)
     summary = {"platform": args.platform, "host": platform.platform(), "machine": platform.machine(),
                "complete": complete, "failure": failure, "requiredRuns": required_runs,
+               "appleScope": args.apple_scope if args.platform == "apple" else None,
                "results": results, "commands": commands, "cleanup": cleanup,
                "wasmMime": "application/octet-stream", "crossOriginIsolationHeaders": False}
     (output / "platform-summary.json").write_text(json.dumps(summary, indent=2) + "\n")

@@ -1,35 +1,12 @@
-name: Temporary scalar WASM platform validation
+name: Temporary scalar WASM Android and iPad validation
 on:
   push:
     branches:
-      - verify/coordinate-wasm-20261030
+      - verify/coordinate-wasm-platform-20261030
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  windows-edge:
-    runs-on: windows-2025
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Install isolated browser automation dependency
-        shell: bash
-        run: npm install --prefix "$RUNNER_TEMP/srg-wasm-browser-tools" --no-audit --no-fund playwright@1.62.1
-      - name: Execute installed Microsoft Edge
-        shell: bash
-        run: |
-          export SRG_PLAYWRIGHT_MODULE="$RUNNER_TEMP/srg-wasm-browser-tools/node_modules/playwright/index.mjs"
-          WASM_SHA=$(python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('coordinates.wasm').read_bytes()).hexdigest())")
-          python tools/_wasm_platform/run_platform.py desktop . tools/_wasm_platform/mobile-fixtures-50.json "$RUNNER_TEMP/wasm-platform-results" --wasm-sha256 "$WASM_SHA" --engine chromium --channel msedge
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: wasm-windows-edge
-          path: ${{ runner.temp }}/wasm-platform-results
-          if-no-files-found: error
-          retention-days: 14
   android-chrome:
     runs-on: ubuntu-26.04
     timeout-minutes: 40
@@ -39,6 +16,12 @@ jobs:
           persist-credentials: false
       - name: Install isolated browser automation dependency
         run: npm install --prefix "$RUNNER_TEMP/srg-wasm-browser-tools" --no-audit --no-fund playwright@1.62.1
+      - name: Install Android emulator runtime library
+        run: |
+          mkdir -p "$RUNNER_TEMP/wasm-platform-results"
+          sudo apt-get update > "$RUNNER_TEMP/wasm-platform-results/emulator-runtime-apt-update.log" 2>&1
+          sudo apt-get install -y --no-install-recommends libpulse0 > "$RUNNER_TEMP/wasm-platform-results/emulator-runtime-apt-install.log" 2>&1
+          dpkg-query -W libpulse0 > "$RUNNER_TEMP/wasm-platform-results/emulator-runtime-package-version.log"
       - name: Enable KVM device access on disposable runner
         run: sudo chmod a+rw /dev/kvm
       - name: Provision task AVD and execute Android Chrome
@@ -53,21 +36,21 @@ jobs:
           path: ${{ runner.temp }}/wasm-platform-results
           if-no-files-found: error
           retention-days: 14
-  apple-safari:
+  ipados-safari:
     runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Execute macOS Safari and task iPhone and iPad simulators
+      - name: Execute task iPad Simulator Safari
         run: |
           WASM_SHA=$(python3 -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('coordinates.wasm').read_bytes()).hexdigest())")
-          python3 tools/_wasm_platform/run_platform.py apple . tools/_wasm_platform/mobile-fixtures-50.json "$RUNNER_TEMP/wasm-platform-results" --wasm-sha256 "$WASM_SHA"
+          python3 tools/_wasm_platform/run_platform.py apple . tools/_wasm_platform/mobile-fixtures-50.json "$RUNNER_TEMP/wasm-platform-results" --wasm-sha256 "$WASM_SHA" --apple-scope ipados-ipad
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-apple-safari
+          name: wasm-ipados-safari
           path: ${{ runner.temp }}/wasm-platform-results
           if-no-files-found: error
           retention-days: 14
