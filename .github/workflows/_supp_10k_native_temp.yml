@@ -1,0 +1,60 @@
+name: Temporary Rust 10000-record supp measurement
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  measure:
+    name: Native Rust hardware RNG supplement count
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout measured revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install latest stable Rust
+        run: rustup toolchain install stable --profile minimal --no-self-update
+      - name: Install native link libraries
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Prepare isolated test-only instrumentation
+        shell: bash
+        run: |
+          set -e
+          mkdir -p supp-10k-evidence
+          cp src/korea_boundary/tests.rs supp-10k-evidence/tests-original.rs
+          cat tools/_supp_10k_probe_temp.rs >> src/korea_boundary/tests.rs
+          rustc +stable -Vv > supp-10k-evidence/rust-toolchain.txt
+          printf '%s\n' "target=x86_64-unknown-linux-gnu" "count=10000" "method=RandomDataSet.populate with HardwareRng.next_u64" > supp-10k-evidence/setup.txt
+          git rev-parse HEAD >> supp-10k-evidence/setup.txt
+          git hash-object src/korea_boundary.rs src/random_data.rs src/hardware_rng.rs >> supp-10k-evidence/setup.txt
+      - name: Generate exactly 10000 records in actual release Rust code
+        shell: bash
+        run: |
+          set -eo pipefail
+          timeout 720s cargo +stable test --release --frozen --bin srg measure_supp_for_ten_thousand_real_random_records -- --nocapture --test-threads=1 2>&1 | tee supp-10k-evidence/full-run.log
+          grep 'SRG_SUPP_10000_JSON=' supp-10k-evidence/full-run.log | tail -n 1 | sed 's/^.*SRG_SUPP_10000_JSON=//' > supp-10k-evidence/metrics.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("supp-10k-evidence/metrics.json")
+          x=json.loads(p.read_text())
+          assert x["records"]==10_000
+          assert x["initial_64bit_words"]==10_000
+          assert x["supp_all"]==x["supp_korea"]+x["supp_other"]
+          assert x["total_hardware_u64"]==10_000+x["supp_all"]
+          assert x["supp_korea"]==x["by_reason"]["\uB300\uD55C\uBBFC\uAD6D \uC88C\uD45C \uC7AC\uCD94\uCD9C"]
+          assert sum(x["by_reason"].values())==x["supp_all"]
+          assert x["rng_initial"] in ("rdseed","rdrand")
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload measurement and toolchain evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: srg-rust-supp-10000
+          path: supp-10k-evidence/
+          if-no-files-found: error
+          retention-days: 14
