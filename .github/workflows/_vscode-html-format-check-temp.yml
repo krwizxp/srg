@@ -1,0 +1,125 @@
+name: Temporary VS Code built-in HTML formatting
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout pinned product source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Remove whitespace-only lines before formatting
+        shell: bash
+        run: |
+          mkdir -p vscode-format-evidence format-workspace/.vscode
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          source=Path("revgeo.html")
+          original=source.read_bytes()
+          assert hashlib.sha256(original).hexdigest()=="8fa68e67cb4dbf54a22cdf7af16350ccc95ebbff9072ba2528a07f96e8679aee"
+          assert b"\r" not in original
+          lines=original.decode("utf-8").splitlines(keepends=True)
+          blanks=sum(not line.strip() for line in lines)
+          assert blanks==391, blanks
+          out="".join(line for line in lines if line.strip())
+          assert hashlib.sha256(out.encode()).hexdigest()=="07d1e472405bff8ab9ac8d90e700a7a23b791b6d8e56054a47ece1ef16081946"
+          Path("format-workspace/revgeo.html").write_text(out,encoding="utf-8",newline="")
+          Path("vscode-format-evidence/revgeo.step1.no-empty-lines.html").write_text(out,encoding="utf-8",newline="")
+          print("Removed",blanks,"blank lines",len(lines),"->",len(out.splitlines()))
+          PY
+          cat > format-workspace/.vscode/settings.json <<'JSON'
+          {
+            "editor.defaultFormatter": "vscode.html-language-features",
+            "[html]": {
+              "editor.defaultFormatter": "vscode.html-language-features"
+            },
+            "html.format.enable": true,
+            "editor.insertSpaces": false,
+            "editor.tabSize": 4,
+            "editor.detectIndentation": false,
+            "editor.formatOnSave": false,
+            "files.eol": "\n",
+            "files.insertFinalNewline": false
+          }
+          JSON
+      - name: Provision official Visual Studio Code editor and Xvfb
+        shell: bash
+        run: |
+          set -e
+          if ! command -v code >/dev/null 2>&1; then
+            curl -fLsS --retry 2 --connect-timeout 20 --max-time 240 \
+              https://update.code.visualstudio.com/latest/linux-deb-x64/stable \
+              -o "$RUNNER_TEMP/vscode-stable.deb"
+            sudo apt-get update
+            sudo apt-get install -y "$RUNNER_TEMP/vscode-stable.deb"
+          fi
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb xauth
+          fi
+          code --version --no-sandbox | tee vscode-format-evidence/vscode-version.txt
+      - name: Format Document using vscode.html-language-features
+        shell: bash
+        run: |
+          set -e
+          export SRG_FORMAT_FILE="$PWD/format-workspace/revgeo.html"
+          export SRG_FORMAT_EVIDENCE="$PWD/vscode-format-evidence"
+          mkdir -p "$RUNNER_TEMP/srg-vscode-user"
+          set +e
+          timeout 210s xvfb-run -a code \
+            --no-sandbox --disable-gpu --disable-telemetry --disable-workspace-trust \
+            --skip-welcome --new-window --wait \
+            --user-data-dir="$RUNNER_TEMP/srg-vscode-user" \
+            --extensions-dir="$PWD/tools" \
+            "$PWD/format-workspace" "$PWD/format-workspace/revgeo.html" \
+            > vscode-format-evidence/vscode.stdout 2> vscode-format-evidence/vscode.stderr
+          status=$?
+          set -e
+          printf '%s\n' "$status" > vscode-format-evidence/vscode-process.exit
+          if test -f vscode-format-evidence/vscode-format-error.txt; then
+            cat vscode-format-evidence/vscode-format-error.txt
+            exit 1
+          fi
+          test "$status" -eq 0
+          test -s vscode-format-evidence/vscode-format-report.json
+          test -s vscode-format-evidence/revgeo.step2.vscode-formatted.html
+          cat vscode-format-evidence/vscode-format-report.json
+      - name: Check formatter output script syntax and file structure
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          import re, hashlib, json
+          orig=Path("revgeo.html").read_text(encoding="utf-8")
+          formatted=Path("vscode-format-evidence/revgeo.step2.vscode-formatted.html").read_text(encoding="utf-8")
+          assert "<!DOCTYPE html>" in formatted.upper().replace("<!DOCTYPE HTML>","<!DOCTYPE html>")
+          assert len(re.findall(r"<script\b",formatted,re.I))==len(re.findall(r"<script\b",orig,re.I))
+          assert len(re.findall(r"<style\b",formatted,re.I))==len(re.findall(r"<style\b",orig,re.I))
+          assert len(re.findall(r"<textarea\b",formatted,re.I))==len(re.findall(r"<textarea\b",orig,re.I))
+          assert "korea_boundary.js?v=5" in formatted
+          assert 'id="filter-kind"' in formatted
+          assert "tile-select-v5.bin" not in orig
+          for label in ["북한","미국","대한민국","전체"]:
+            assert label in formatted
+          scripts=re.findall(r'<script\b[^>]*>([\s\S]*?)</script>',formatted,re.I)
+          assert scripts
+          Path("vscode-format-evidence/formatted-inline.mjs").write_text(scripts[-1],encoding="utf-8")
+          print("Format output bytes",len(formatted.encode()),"sha",hashlib.sha256(formatted.encode()).hexdigest())
+          PY
+          node --check vscode-format-evidence/formatted-inline.mjs
+      - name: Publish original and formatted versions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: srg-vscode-builtin-format-step1-step2
+          path: vscode-format-evidence/
+          retention-days: 14
+          if-no-files-found: error
