@@ -5216,12 +5216,12 @@
 			];
 			const planetIndex = yield* extractNmsBits(
 				4, num, NMS_PLANET_SHIFTS, 11,
-					supplement, reused,
+				supplement, reused,
 			);
 			data.planet = planetIndex % 6 + 1;
 			const systemIndex = yield* extractNmsBits(
 				12, num, NMS_SYSTEM_SHIFTS, 3834,
-					supplement, reused,
+				supplement, reused,
 			);
 			data.system = systemIndex % 767 + 1;
 			data.portalY = upper32 & 0xff;
