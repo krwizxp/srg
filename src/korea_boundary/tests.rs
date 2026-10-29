@@ -1,11 +1,52 @@
 use super::{
     BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT, PARTS,
-    hash, sample,
+    hash, remap_tile, sample,
 };
 use crate::{diagnostic::Result, geo_uniform::candidate, random_data::Coordinates};
 const SEOUL: u64 = 15_033_626_022_739_801_206;
 const WEST_SEA: u64 = 8_160_136_085_698_478_266;
 const DOKDO: u64 = 13_962_275_557_818_425_490;
+fn encode_tile_candidate(original: u64) -> Result<u64> {
+    let vertical = original >> 32;
+    let horizontal = original & 0xffff_ffff;
+    let tile = ((vertical >> 23) << 9) | (horizontal >> 23);
+    let index = BOUNDARY.as_ref().map_err(|error| format!("{error}"))?;
+    let rank = index
+        .sampler_tiles
+        .binary_search(&u32::try_from(tile).map_err(|_| "Tile index overflow")?)
+        .map_err(|_| "Fixture point omitted from tile cover")?;
+    let lower = ((vertical & 0x7f_ffff) << 23) | (horizontal & 0x7f_ffff);
+    Ok(((u64::try_from(rank).map_err(|_| "Tile rank overflow")? * 2) << 46) | lower)
+}
+#[test]
+fn tile_mapping_preserves_original_centers() -> Result<()> {
+    for original in [
+        SEOUL,
+        DOKDO,
+        13_965_754_644_534_248_813,
+        19_555_846_072_170_497,
+        16_289_122_984_369_905_278,
+    ] {
+        let encoded = encode_tile_candidate(original)?;
+        (remap_tile(
+            encoded,
+            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+        )? == Some(original))
+        .ok_or("Mapped grid point changed")?;
+        (remap_tile(
+            encoded | (1_u64 << 46),
+            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+        )? == Some(original))
+        .ok_or("Second tile selection alias changed")?;
+    }
+    (remap_tile(
+        u64::MAX,
+        BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+    )?
+    .is_none())
+    .ok_or("Rejected selector was accepted")?;
+    Ok(())
+}
 #[test]
 fn hash_matches_independent_sha256_vectors() -> Result<()> {
     let cases: [(&[u8], &str); 3] = [
@@ -106,7 +147,7 @@ fn independent_grid_candidates_reach_mainland_and_islands() -> Result<()> {
     for (value, latitude, longitude) in cases {
         let mut denied =
             |_| -> Result<u64> { Err("Accepted initial candidate requested entropy".into()) };
-        let point = sample(value, &mut denied, None)?;
+        let point = sample(encode_tile_candidate(value)?, &mut denied, None)?;
         ((point.latitude - latitude).abs() < 1e-12_f64
             && (point.longitude - longitude).abs() < 1e-12_f64)
             .ok_or("Independent high-precision candidate mismatch")?;
@@ -115,14 +156,19 @@ fn independent_grid_candidates_reach_mainland_and_islands() -> Result<()> {
 }
 #[test]
 fn rejection_consumes_one_new_complete_word_each_time() -> Result<()> {
+    let accepted = encode_tile_candidate(DOKDO)?;
     for rejected in [0_usize, 1, 2, 3, 1024] {
         let mut calls = 0_usize;
         let mut provider = |reason: &'static str| -> Result<u64> {
             (reason == "대한민국 좌표 재추출").ok_or("Supplemental reason changed")?;
             calls = calls.strict_add(1);
-            Ok(if calls == rejected { DOKDO } else { WEST_SEA })
+            Ok(if calls == rejected {
+                accepted
+            } else {
+                u64::MAX
+            })
         };
-        let initial = if rejected == 0 { DOKDO } else { WEST_SEA };
+        let initial = if rejected == 0 { accepted } else { u64::MAX };
         let actual = sample(initial, &mut provider, None)?;
         (calls == rejected).ok_or("Unexpected supplemental read count")?;
         ((actual.latitude - 37.240_777_800_018_755_f64).abs() < 1e-12_f64
@@ -136,16 +182,16 @@ fn retry_limit_and_provider_failures_are_errors() -> Result<()> {
     let mut calls = 0_usize;
     let mut repeated = |_| -> Result<u64> {
         calls = calls.strict_add(1);
-        Ok(WEST_SEA)
+        Ok(u64::MAX)
     };
-    let failure = match sample(WEST_SEA, &mut repeated, None) {
+    let failure = match sample(u64::MAX, &mut repeated, None) {
         Ok(_) => return Err("Rejected candidates became a coordinate".into()),
         Err(error) => error,
     };
     (calls == KOREA_SUPP_RETRY_LIMIT && failure.to_string().contains("시도 횟수 초과"))
         .ok_or("Supplemental retry bound changed")?;
     let mut unavailable = |_| -> Result<u64> { Err("fixture entropy source failed".into()) };
-    let failure = match sample(WEST_SEA, &mut unavailable, None) {
+    let failure = match sample(u64::MAX, &mut unavailable, None) {
         Ok(_) => return Err("Provider failure became a coordinate".into()),
         Err(error) => error,
     };
@@ -243,7 +289,7 @@ fn all_bit_extremes_are_finite_and_rejection_can_recover() -> Result<()> {
         let point = candidate(value, index.bounds)?;
         (point.latitude.is_finite() && point.longitude.is_finite())
             .ok_or("Nonfinite extreme candidate")?;
-        let mut provider = |_| -> Result<u64> { Ok(SEOUL) };
+        let mut provider = |_| -> Result<u64> { encode_tile_candidate(SEOUL) };
         let accepted = sample(value, &mut provider, None)?;
         index
             .covers(&accepted, &mut BoundaryCache::default())?

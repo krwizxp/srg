@@ -15,6 +15,12 @@ const CACHE_BYTES: usize = 0x0010_0000;
 const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
 const KOREA_SUPP_RETRY_LIMIT: usize = 1024;
+const KOREA_TILE_BYTES: &[u8] = include_bytes!("../data/korea-boundary-v4/tile-select-v5.bin");
+const KOREA_TILE_COUNT: usize = 79113;
+const KOREA_TILE_SHA256: [u8; 32] = [
+    73, 47, 219, 238, 231, 231, 166, 72, 22, 215, 234, 144, 197, 124, 181, 119, 54, 133, 251, 249,
+    110, 11, 149, 145, 26, 139, 124, 220, 251, 242, 174, 139,
+];
 const MAX_PAGE_SIZE: usize = 32_768;
 const MAX_PART_SIZE: usize = 0x0008_0000;
 static BOUNDARY: LazyLock<Result<BoundaryIndex>> = LazyLock::new(|| {
@@ -35,6 +41,7 @@ struct BoundaryIndex {
     vertex_count: usize,
     source_hash: [u8; 32],
     tiles: Box<[Tile]>,
+    sampler_tiles: Box<[u32]>,
     parts: Box<[Part]>,
 }
 struct Tile {
@@ -196,6 +203,7 @@ impl BoundaryIndex {
                 .ok_or("대한민국 경계 조각 개수 오류")?;
         }
         (next_page == page_count).ok_or("대한민국 경계 전체 블록 개수 오류")?;
+        let sampler_tiles = validate_tile_index()?;
         Ok(Self {
             bounds,
             columns,
@@ -205,6 +213,7 @@ impl BoundaryIndex {
             vertex_count,
             source_hash,
             tiles: tiles.into_boxed_slice(),
+            sampler_tiles,
             parts: parts.into_boxed_slice(),
         })
     }
@@ -535,6 +544,34 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
 fn read_f64(bytes: &[u8], offset: usize) -> Result<f64> {
     Ok(f64::from_bits(read_u64(bytes, offset)?))
 }
+fn validate_tile_index() -> Result<Box<[u32]>> {
+    (KOREA_TILE_BYTES.len() == 32_768 && hash::digest(KOREA_TILE_BYTES)? == KOREA_TILE_SHA256)
+        .ok_or("대한민국 좌표 타일 인덱스 SHA-256 오류")?;
+    let mut selected = Vec::with_capacity(KOREA_TILE_COUNT);
+    for tile in 0..262_144_usize {
+        let byte = KOREA_TILE_BYTES[tile >> 3];
+        if byte & (1_u8 << (tile & 7)) != 0 {
+            selected.push(u32::try_from(tile).map_err(|_| "대한민국 타일 번호 오류")?);
+        }
+    }
+    (selected.len() == KOREA_TILE_COUNT).ok_or("대한민국 좌표 타일 개수 오류")?;
+    Ok(selected.into_boxed_slice())
+}
+fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
+    let selector = usize::try_from(value >> 46).map_err(|_| "대한민국 타일 선택값 오류")?;
+    if selector >= KOREA_TILE_COUNT.strict_mul(2) {
+        return Ok(None);
+    }
+    let tile = u64::from(
+        *index
+            .sampler_tiles
+            .get(selector / 2)
+            .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
+    );
+    let vertical = ((tile >> 9) << 23) | ((value >> 23) & 0x7f_ffff);
+    let horizontal = ((tile & 511) << 23) | (value & 0x7f_ffff);
+    Ok(Some((vertical << 32) | horizontal))
+}
 pub(super) fn sample<F>(
     value: u64,
     next_supp: &mut F,
@@ -550,9 +587,11 @@ where
     let active_cache = cache.unwrap_or(&mut local);
     let mut proposed = value;
     for reads in 0..=KOREA_SUPP_RETRY_LIMIT {
-        let point = candidate(proposed, index.bounds)?;
-        if index.covers(&point, active_cache)? {
-            return Ok(point);
+        if let Some(mapped) = remap_tile(proposed, index)? {
+            let point = candidate(mapped, index.bounds)?;
+            if index.covers(&point, active_cache)? {
+                return Ok(point);
+            }
         }
         if reads == KOREA_SUPP_RETRY_LIMIT {
             return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());

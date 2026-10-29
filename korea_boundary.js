@@ -308,6 +308,8 @@ function candidate(value, bounds) {
 }
 const MAX_U64 = (1n << 64n) - 1n;
 const INDEX_SHA256 = "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17";
+const TILE_SHA256 = "492fdbeee7e7a64816d7ea90c57cb5773685fbf96e0b95911a8b7cdcfbf2ae8b";
+const TILE_COUNT = 79113;
 const SOURCE_SHA256 = "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428";
 const MAX_INDEX_BYTES = 8388608;
 const MAX_PART_BYTES = 524288;
@@ -408,7 +410,21 @@ async function cached(cache, key, load, byteLength) {
 }
 async function loadBoundary() {
     if (!boundaryPromise) boundaryPromise = (async () => {
-        const bytes = await download("index.bin", MAX_INDEX_BYTES, INDEX_SHA256);
+        const [bytes, tileBytes] = await Promise.all([
+            download("index.bin", MAX_INDEX_BYTES, INDEX_SHA256),
+            download("tile-select-v5.bin", 32768, TILE_SHA256),
+        ]);
+        requireBoundary(tileBytes.length === 32768,
+            "대한민국 좌표 타일 인덱스 길이 오류");
+        const tileIndex = new Uint32Array(TILE_COUNT);
+        let selected = 0;
+        for (let tile = 0; tile < 262144; tile++) {
+            if (tileBytes[tile >>> 3] & (1 << (tile & 7))) {
+                requireBoundary(selected < TILE_COUNT, "대한민국 좌표 타일 개수 오류");
+                tileIndex[selected++] = tile;
+            }
+        }
+        requireBoundary(selected === TILE_COUNT, "대한민국 좌표 타일 개수 오류");
         requireBoundary(bytes.length >= 128 && magic(bytes, "SRGKR004"),
             "대한민국 경계 데이터 버전 오류");
         const data = new DataView(bytes.buffer);
@@ -466,7 +482,7 @@ async function loadBoundary() {
             nextPage += count;
         }
         requireBoundary(nextPage === pageCount, "대한민국 경계 조각 페이지 누락");
-        return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows,
+        return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, tileIndex,
             tileCount, partCount, partOffset, pageCount, polygons, rings, vertices};
     })().catch(error => {
         boundaryPromise = null;
@@ -675,14 +691,25 @@ async function covers(boundary, point) {
     }
     return boundaryHit || parity;
 }
+function remapTile(value, boundary) {
+    const selector = Number(value >> 46n);
+    if (selector >= TILE_COUNT * 2) return null;
+    const tile = boundary.tileIndex[Math.floor(selector / 2)];
+    const vertical = Math.floor(tile / 512) * 8388608 + Number((value >> 23n) & 0x7fffffn);
+    const horizontal = (tile % 512) * 8388608 + Number(value & 0x7fffffn);
+    return (BigInt(vertical) << 32n) | BigInt(horizontal);
+}
 export async function* sampleKorea(value) {
     requireBoundary(typeof value === "bigint" && value >= 0n && value <= MAX_U64,
         "64비트 난수 범위를 벗어났습니다.");
     const boundary = await loadBoundary();
     let candidateValue = value;
     for (let supplementalReads = 0; supplementalReads <= SUPPLEMENT_LIMIT; supplementalReads++) {
-        const point = candidate(candidateValue, boundary.bounds);
-        if (await covers(boundary, point)) return point;
+        const mapped = remapTile(candidateValue, boundary);
+        if (mapped !== null) {
+            const point = candidate(mapped, boundary.bounds);
+            if (await covers(boundary, point)) return point;
+        }
         requireBoundary(supplementalReads < SUPPLEMENT_LIMIT,
             "대한민국 좌표 보완 난수 시도 횟수 초과");
         const supplement = yield;
@@ -700,10 +727,13 @@ export function prepareKorea(value) {
             current = requestedPreparation;
             const boundary = await loadBoundary();
             if (typeof current === "bigint" && current >= 0n && current <= MAX_U64) {
-                const tile = tilePosition(boundary, candidate(current, boundary.bounds));
-                if (boundary.data.getUint32(128 + tile * 12, true) === 2) {
-                    for await (const _page of tilePages(boundary, tile)) {
-                        if (current !== requestedPreparation) break;
+                const mapped = remapTile(current, boundary);
+                if (mapped !== null) {
+                    const tile = tilePosition(boundary, candidate(mapped, boundary.bounds));
+                    if (boundary.data.getUint32(128 + tile * 12, true) === 2) {
+                        for await (const _page of tilePages(boundary, tile)) {
+                            if (current !== requestedPreparation) break;
+                        }
                     }
                 }
             }
