@@ -80,7 +80,6 @@ where
     F: FnMut(&'static str) -> Result<u64>,
 {
     data: RandomDataSet,
-    boundary_cache: Option<&'provider_ref mut korea_boundary::BoundaryCache>,
     euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
     euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
     lotto: UniqueNumbers<LOTTO_COUNT>,
@@ -100,7 +99,7 @@ impl RandomDataSet {
         F: FnMut(&'static str) -> Result<u64>,
     {
         let mut used_supplements = Vec::new();
-        let (mut data, cache) = {
+        let mut data = {
             let mut record_supplement = |reason| {
                 let value = next_supp(reason)?;
                 used_supplements.push(value);
@@ -108,7 +107,6 @@ impl RandomDataSet {
             };
             let mut state = RandomDataBuildState {
                 data: self,
-                boundary_cache,
                 euro_lucky: UniqueNumbers::new(),
                 euro_main: UniqueNumbers::new(),
                 lotto: UniqueNumbers::new(),
@@ -130,7 +128,7 @@ impl RandomDataSet {
             state.data.euro_millions_main_numbers = state.euro_main.into_values();
             state.data.lotto_numbers = state.lotto.into_values();
             state.data.lotto7_numbers = state.lotto7.into_values();
-            (state.data, state.boundary_cache)
+            state.data
         };
         let mut shared = used_supplements.into_iter();
         data.kor_coords = korea_boundary::sample(
@@ -139,7 +137,7 @@ impl RandomDataSet {
                 Some(value) => Ok(value),
                 None => next_supp(reason),
             },
-            cache,
+            boundary_cache,
         )?;
         Ok(data)
     }
