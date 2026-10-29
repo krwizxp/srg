@@ -2697,7 +2697,6 @@
 						</div><select aria-label="구분" id="filter-kind">
 							<option value="">전체</option>
 							<option value="kr"> 대한민국 </option>
-							<option value="kp"> 북한 </option>
 							<option value="에러"> 조회 실패 </option>
 						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
 							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
@@ -3359,10 +3358,10 @@
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
 		function addCountryFilter(result) {
-			if (result.kind !== "WORLD" || !result.countryName) return;
-			const value = "country:" + (result.countryCode || norm(result.countryName));
+			if (result.kind !== "KP" && (result.kind !== "WORLD" || !result.countryName)) return;
+			const value = result.kind === "KP" ? "kp" : "country:" + (result.countryCode || norm(result.countryName));
 			if ([...filterKind.options].some(option => option.value === value)) return;
-			const option = new Option(result.countryName, value);
+			const option = new Option(result.kind === "KP" ? "북한" : result.countryName, value);
 			option.dataset.country = "true";
 			const before = [...filterKind.options].find(current =>
 				current.dataset.country === "true" && option.text.localeCompare(current.text, "ko") < 0);
@@ -3398,7 +3397,7 @@
 		}
 		let filterState = readFilters();
 		function resetCountryFilter() {
-			const selected = filterKind.value.startsWith("country:");
+			const selected = filterKind.selectedOptions[0]?.dataset.country === "true";
 			for (const option of filterKind.querySelectorAll("option[data-country]")) option.remove();
 			if (selected) {
 				filterKind.value = "";
