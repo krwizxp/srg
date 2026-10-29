@@ -2695,10 +2695,9 @@
 							<input aria-keyshortcuts="/" aria-label="주소, 좌표, 지물 검색" enterkeyhint="search" id="filter-q"
 								inputmode="search" placeholder="주소, 좌표, 지물 검색" type="search">
 						</div><select aria-label="구분" id="filter-kind">
-							<option value="">구분: 전체</option>
+							<option value="">전체</option>
 							<option value="kr"> 대한민국 </option>
 							<option value="kp"> 북한 </option>
-							<option value="world"> 세계 </option>
 							<option value="에러"> 조회 실패 </option>
 						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
 							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
@@ -3034,7 +3033,7 @@
 			CACHE_DB_NAME: "srg-revgeo-cache",
 			CACHE_DB_VERSION: 4,
 			CACHE_STORE: "nominatim-reverse",
-			CACHE_PARSER_VERSION: 2,
+			CACHE_PARSER_VERSION: 3,
 			CACHE_MAX: 10_000,
 			CACHE_TTL_MS: 30 * 24 * 60 * 60 * 1000,
 			RESPONSE_MAX_BYTES: 1024 * 1024,
@@ -3185,8 +3184,11 @@
 			const addr = parsed?.addr;
 			return !!addr && typeof parsed === "object" && typeof addr === "object" &&
 				["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(key => boundedText(addr[key])) &&
-				(parsed.kind === undefined || boundedText(parsed.kind));
+				(parsed.kind === undefined || boundedText(parsed.kind)) &&
+				(parsed.countryCode === undefined || boundedText(parsed.countryCode)) &&
+				(parsed.countryName === undefined || boundedText(parsed.countryName));
 		}
+		const countryNames = new Intl.DisplayNames("ko", {type: "region"});
 		function parseGeocode(data) {
 			const gc = Array.isArray(data?.features)
 				? data.features[0]?.properties?.geocoding : null;
@@ -3196,6 +3198,7 @@
 				};
 			const label = text(gc.label);
 			const country = text(gc.country_code).toLowerCase();
+			const countryCode = /^[a-z]{2}$/.test(country) ? country : "";
 			const admin = typeof gc.admin === "object" ? gc.admin : null;
 			const fields = {
 				level2: text(admin?.level2),
@@ -3246,6 +3249,10 @@
 			return {
 				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
 				kind,
+				countryCode: kind === "WORLD" ? countryCode : "",
+				countryName: kind === "WORLD"
+					? fields.country || (countryCode ? countryNames.of(countryCode.toUpperCase()) : "")
+					: "",
 			};
 		}
 		const REVERSE_URL =
@@ -3351,6 +3358,16 @@
 		on(themeToggle, "click", () => {
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
+		function addCountryFilter(result) {
+			if (result.kind !== "WORLD" || !result.countryName) return;
+			const value = "country:" + (result.countryCode || norm(result.countryName));
+			if ([...filterKind.options].some(option => option.value === value)) return;
+			const option = new Option(result.countryName, value);
+			option.dataset.country = "true";
+			const before = [...filterKind.options].find(current =>
+				current.dataset.country === "true" && option.text.localeCompare(current.text, "ko") < 0);
+			filterKind.insertBefore(option, before || filterKind.lastElementChild);
+		}
 		let filterStatus = "all";
 		const rowTemplate = query("tr", byId("tmpl-row").content);
 		const RX_COMMA_WS = /\s*,\s*/g;
@@ -3380,14 +3397,26 @@
 				? null : {status: filterStatus, ...fields, query, hasFields};
 		}
 		let filterState = readFilters();
+		function resetCountryFilter() {
+			const selected = filterKind.value.startsWith("country:");
+			for (const option of filterKind.querySelectorAll("option[data-country]")) option.remove();
+			if (selected) {
+				filterKind.value = "";
+				filterState = readFilters();
+				updateFilterSummary();
+			}
+		}
 		function matchesFilter(r, f) {
 			if (!r.result) return false;
 			if (!f) return true;
 			if (f.status !== "all" && resultStatus(r.result) !== f.status) return false;
 			const hasFields = f.hasFields ?? !!(f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
 			if (!hasFields && !f.query) return true;
+			const kindKey = r.result.kind === "WORLD" && (r.result.countryCode || r.result.countryName)
+				? "country:" + (r.result.countryCode || norm(r.result.countryName))
+				: (r.result.kind || r.set).toLowerCase();
 			const fields = r._search ??= [
-				(r.result.kind || r.set).toLowerCase(),
+				kindKey,
 				norm(r.result.addr?.sido),
 				norm(r.result.addr?.sigungu),
 				norm(r.result.addr?.eupmyeon),
@@ -3404,7 +3433,7 @@
 				return false;
 			const query = f.query;
 			if (!query) return true;
-			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
+			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${norm(r.result.countryName)}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
 			if (typeof query === "string") return hay.includes(query);
 			const isOr = query instanceof Set;
 			for (const token of query)
@@ -3654,6 +3683,7 @@
 			setRecords(records, status = "idle") {
 				resetElapsed();
 				this.records = records;
+				resetCountryFilter();
 				this.bulkConfirmed =
 					records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
 				return this.reset(status);
@@ -4592,8 +4622,9 @@
 			return !!(addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag));
 		}
 		const resultStatus = result => result.error ? "failed" : hasAddress(result) ? "done" : "missing";
-		const KIND_LABELS = {KR: "대한민국", KP: "북한", WORLD: "세계", 에러: "조회 실패"};
-		const kindLabel = kind => KIND_LABELS[kind] || kind;
+		const KIND_LABELS = {KR: "대한민국", KP: "북한", 에러: "조회 실패"};
+		const kindLabel = (kind, countryName) =>
+			kind === "WORLD" ? countryName || "국가 미확인" : KIND_LABELS[kind] || kind;
 		const STATUS_LABELS = {done: "주소 확인", missing: "주소 없음", failed: "조회 실패"};
 		function resultTitle({addr, error}) {
 			return error ? "조회 실패" :
@@ -4606,7 +4637,7 @@
 			const addr = result.addr;
 			const status = resultStatus(result);
 			const statusLabel = STATUS_LABELS[status];
-			const kind = kindLabel(result.kind || record.set);
+			const kind = kindLabel(result.kind || record.set, result.countryName);
 			const selected = index === selectedIndex;
 			tr.dataset.record = index;
 			tr.dataset.selected = selected;
@@ -4635,6 +4666,7 @@
 		function commitResult(index, parsed, render) {
 			const r = state.records[index];
 			r.result = parsed;
+			addCountryFilter(parsed);
 			state.processed++;
 			if (parsed.error) state.cntFail++;
 			else if (!hasAddress(parsed)) state.cntNoAddress++;
@@ -4684,7 +4716,9 @@
 						const result = r.result;
 						const lat = r.latStr;
 						const lon = r.lonStr;
-						let line = `${csvEsc(result.kind || r.set)},${rowIndex + 1},"${/^[+-]/.test(lat) ? "'" : ""}${lat}, ${lon}",`;
+						const exportKind = (result.kind || r.set) === "WORLD"
+							? kindLabel("WORLD", result.countryName) : result.kind || r.set;
+						let line = `${csvEsc(exportKind)},${rowIndex + 1},"${/^[+-]/.test(lat) ? "'" : ""}${lat}, ${lon}",`;
 						const addr = result.addr;
 						line += (addr
 							? [addr.sido, addr.sigungu, addr.eupmyeon, addr.tag].map(csvEsc).join(",")
