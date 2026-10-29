@@ -1,0 +1,35 @@
+name: Temporary Korea k2 Native Validation
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  rust-check:
+    name: ${{ matrix.os }} native Rust tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 28
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-26.04
+          - macos-26-intel
+          - macos-26
+          - windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install Rust stable and components
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+      - name: Install Linux curl development headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Rust formatting
+        run: cargo +stable fmt --all -- --check
+      - name: Native release tests
+        run: cargo +stable test --frozen --release
+      - name: Native release build
+        run: cargo +stable build --frozen --release --bin srg
