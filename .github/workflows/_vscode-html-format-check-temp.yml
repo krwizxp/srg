@@ -4,16 +4,17 @@ on:
     branches:
       - main
 permissions:
-  contents: read
+  contents: write
 jobs:
   format:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - name: Checkout pinned product source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
+          persist-credentials: true
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Remove whitespace-only lines before formatting
         shell: bash
         run: |
@@ -91,30 +92,56 @@ jobs:
           test -s vscode-format-evidence/vscode-format-report.json
           test -s vscode-format-evidence/revgeo.step2.vscode-formatted.html
           cat vscode-format-evidence/vscode-format-report.json
-      - name: Check formatter output script syntax and file structure
+      - name: Prepare formatted candidate and test dependencies
         shell: bash
         run: |
           set -e
-          python - <<'PY'
-          from pathlib import Path
-          import re, hashlib, json
-          orig=Path("revgeo.html").read_text(encoding="utf-8")
-          formatted=Path("vscode-format-evidence/revgeo.step2.vscode-formatted.html").read_text(encoding="utf-8")
-          assert "<!DOCTYPE html>" in formatted.upper().replace("<!DOCTYPE HTML>","<!DOCTYPE html>")
-          assert len(re.findall(r"<script\b",formatted,re.I))==len(re.findall(r"<script\b",orig,re.I))
-          assert len(re.findall(r"<style\b",formatted,re.I))==len(re.findall(r"<style\b",orig,re.I))
-          assert len(re.findall(r"<textarea\b",formatted,re.I))==len(re.findall(r"<textarea\b",orig,re.I))
-          assert "korea_boundary.js?v=5" in formatted
-          assert 'id="filter-kind"' in formatted
-          assert "tile-select-v5.bin" not in orig
-          for label in ["북한","미국","대한민국","전체"]:
-            assert label in formatted
-          scripts=re.findall(r'<script\b[^>]*>([\s\S]*?)</script>',formatted,re.I)
-          assert scripts
-          Path("vscode-format-evidence/formatted-inline.mjs").write_text(scripts[-1],encoding="utf-8")
-          print("Format output bytes",len(formatted.encode()),"sha",hashlib.sha256(formatted.encode()).hexdigest())
-          PY
-          node --check vscode-format-evidence/formatted-inline.mjs
+          cp revgeo.html revgeo.before-format.html
+          cp vscode-format-evidence/revgeo.step2.vscode-formatted.html revgeo.html
+          npm install --no-save --no-package-lock --no-audit --no-fund typescript@5.9.3 html-validate@latest playwright@1.57.0
+          node tools/_vscode-format-ast-check-temp.mjs
+          ./node_modules/.bin/html-validate --version | tee vscode-format-evidence/htmlvalidate-version.txt
+          ./node_modules/.bin/playwright --version | tee vscode-format-evidence/playwright-version.txt
+          git diff --check
+          git diff --stat
+      - name: Validate Nu and HTMLValidate independently on final HTML
+        shell: bash
+        run: |
+          mkdir -p validation-evidence
+          curl -fLsS --retry 2 --connect-timeout 20 --max-time 180 \
+            https://github.com/validator/validator/releases/download/latest/vnu.jar \
+            -o "$RUNNER_TEMP/vnu.jar"
+          java -jar "$RUNNER_TEMP/vnu.jar" --version > validation-evidence/nu-version.txt 2>&1 || true
+          set +e
+          ./node_modules/.bin/html-validate revgeo.html --formatter json > validation-evidence/htmlvalidate.stdout 2> validation-evidence/htmlvalidate.stderr
+          html_rc=$?
+          java -jar "$RUNNER_TEMP/vnu.jar" --format json revgeo.html > validation-evidence/nu.stdout 2> validation-evidence/nu.stderr
+          nu_rc=$?
+          set -e
+          printf '%s\n' "$html_rc" > validation-evidence/htmlvalidate.exit
+          printf '%s\n' "$nu_rc" > validation-evidence/nu.exit
+          node tools/_vscode-format-html-check-temp.mjs
+          cp validation-evidence/html-validator-results.json vscode-format-evidence/html-validator-results.json
+      - name: Install Chromium Firefox and WebKit for real browser tests
+        shell: bash
+        run: ./node_modules/.bin/playwright install --with-deps chromium firefox webkit
+      - name: Recheck real browser UI flows against formatted HTML
+        shell: bash
+        run: |
+          node tools/_vscode-format-browser-check-temp.mjs
+          node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('validation-evidence/three-browser-results.json','utf8'));if(x.summary.passed!==21||x.summary.failed!==0||x.summary.engines.length!==3)process.exit(1);console.log(x.summary);"
+          cp validation-evidence/three-browser-results.json vscode-format-evidence/three-browser-results.json
+      - name: Commit validated formatted HTML on temporary branch
+        shell: bash
+        run: |
+          set -e
+          test "$GITHUB_HEAD_REF" = "verify/revgeo-format-vscode-20261029b"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- revgeo.html
+          git diff --cached --check
+          git commit -m "Format revgeo HTML using VS Code built-in provider"
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
       - name: Publish original and formatted versions
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
