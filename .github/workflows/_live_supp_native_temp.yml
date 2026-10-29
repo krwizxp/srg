@@ -1,0 +1,95 @@
+name: Temporary live Korea coordinate sampling native verification
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  cross-platform:
+    name: ${{ matrix.os }} Rust release and tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-26.04
+          - windows-latest
+          - macos-26-intel
+          - macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install latest Rust stable
+        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt --no-self-update
+      - name: Install Linux link headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Format check
+        run: cargo +stable fmt --all -- --check
+      - name: Static Clippy check
+        run: cargo +stable clippy --all-targets --frozen
+      - name: Rust release native tests
+        run: cargo +stable test --frozen --release
+      - name: Rust release native build
+        run: cargo +stable build --frozen --release --bin srg
+  measure:
+    name: Deterministic 10000 immediate versus deferred sampler
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Install Rust stable and Linux headers
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Run deterministic candidate and original benchmarks with same corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p supp-shared-evidence
+          cp src/random_data.rs "$RUNNER_TEMP/candidate-random-data.rs"
+          cat tools/_shared_supp_probe_temp.rs >> src/korea_boundary/tests.rs
+          git rev-parse HEAD > supp-shared-evidence/git-sha.txt
+          rustc +stable -Vv > supp-shared-evidence/toolchain.txt
+          cargo +stable test --release --frozen --bin srg measure_unified_supplements_ten_thousand -- --nocapture --test-threads=1 2>&1 | tee supp-shared-evidence/candidate.log
+          git show 1663a47fc2985cdf902c07d11344ae68667ad78a:src/random_data.rs > src/random_data.rs
+          test "$(git hash-object src/random_data.rs)" = "b1c08a159d99bb5d52ac488e8efb9575b4ea12ef"
+          cargo +stable test --release --frozen --bin srg measure_unified_supplements_ten_thousand -- --nocapture --test-threads=1 2>&1 | tee supp-shared-evidence/baseline.log
+          cp "$RUNNER_TEMP/candidate-random-data.rs" src/random_data.rs
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,json
+          directory=Path('supp-shared-evidence')
+          data={}
+          for name in ['candidate','baseline']:
+              s=(directory/(name+'.log')).read_text()
+              metrics=re.findall(r'SRG_INTEGRATED_METRICS[^\n]*',s)
+              assert len(metrics)==1,(name,len(metrics))
+              matches=dict(re.findall(r'(\w+)=([\w\d]+)',metrics[0]))
+              assert int(matches['records'])==10000
+              samples=re.findall(r'SRG_INTEGRATED_SAMPLE ([^\n]+)',s)
+              assert len(samples)==16,(name,len(samples))
+              data[name]={'metrics':matches,'samples':samples}
+          assert data['baseline']['samples']==data['candidate']['samples'], 'Output differs for fixed Rust corpus'
+          for key in ['records','supp_total','supp_fresh_korea','supp_zero','checksum']:
+              assert data['baseline']['metrics'][key]==data['candidate']['metrics'][key], (key,data)
+          data['consumption_identical']=True
+          (directory/'comparison.json').write_text(json.dumps(data,ensure_ascii=False,indent=2))
+          print('Live and deferred 10K exact supplement counts:',data['candidate']['metrics']['supp_total'])
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: live-supp-native-comparison
+          path: supp-shared-evidence/
+          retention-days: 14
+          if-no-files-found: warn
