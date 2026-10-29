@@ -3,7 +3,7 @@ use self::timer_resolution::{
     CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, SYNCHRONIZE_ACCESS, TIMER_MODIFY_STATE_ACCESS, sys,
 };
 use self::util::{blend_rtt, parse_u32_digits};
-use crate::{IS_TERMINAL, buffmt::ByteCursor, stop_input::StopInput};
+use crate::{IS_TERMINAL, buffmt::ByteCursor, diagnostic::AppError, stop_input::StopInput};
 use alloc::borrow::Cow;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
@@ -461,6 +461,11 @@ impl From<io::Error> for TimeError {
 impl From<SystemTimeError> for TimeError {
     fn from(err: SystemTimeError) -> Self {
         Self::new_with_source(TimeErrorKind::Time, "", err)
+    }
+}
+impl From<TimeError> for AppError {
+    fn from(source: TimeError) -> Self {
+        Self::context("시간 처리 오류", source)
     }
 }
 impl fmt::Display for TimeError {

@@ -22,6 +22,7 @@ mod batch;
 mod boundary_inflate;
 mod buffmt;
 mod command;
+mod coordinate_core;
 mod diagnostic;
 mod file_output;
 mod geo_uniform;

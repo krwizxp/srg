@@ -1,9 +1,9 @@
 use self::data::{INDEX as DATA, INDEX_SHA256, PARTS};
 use crate::{
     boundary_inflate::inflate,
+    coordinate_core::{self, Coordinates, chain_relation, decode_tiles, parity_relation},
     diagnostic::Result,
-    geo_uniform::{candidate, orientation},
-    random_data::Coordinates,
+    geo_uniform::candidate,
 };
 use alloc::collections::VecDeque;
 use std::sync::{LazyLock, OnceLock};
@@ -18,7 +18,6 @@ const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
 const KOREA_SUPP_RETRY_LIMIT: usize = 1024;
 const KOREA_TILE_BYTES: &[u8] = include_bytes!("../data/korea-boundary-v4/tile-select-v5.bin");
-const KOREA_TILE_COUNT: usize = 79113;
 const KOREA_TILE_SHA256: [u8; 32] = [
     73, 47, 219, 238, 231, 231, 166, 72, 22, 215, 234, 144, 197, 124, 181, 119, 54, 133, 251, 249,
     110, 11, 149, 145, 26, 139, 124, 220, 251, 242, 174, 139,
@@ -423,10 +422,7 @@ impl BoundaryIndex {
                             .zip(endpoints.first())
                             .is_none_or(|(previous, next)| previous < *next))
                     .ok_or("대한민국 경계 교차 블록 순서 오류")?;
-                    parity ^= *base
-                        ^ !endpoints
-                            .partition_point(|edge| *edge <= point.latitude)
-                            .is_multiple_of(2);
+                    parity ^= parity_relation(endpoints, *base, point.latitude, |value| *value);
                     if let Some(last) = endpoints.last() {
                         last_endpoint = Some(*last);
                     }
@@ -456,26 +452,10 @@ impl BoundaryIndex {
                     ));
                     (offset > 0).ok_or("대한민국 경계 교차 블록 누락")?;
                     chains_started = true;
-                    for pair in vertices.windows(2) {
-                        let [start, end] = pair else {
-                            return Err("대한민국 경계 선분 오류".into());
-                        };
-                        let within = point.longitude >= start[0].min(end[0])
-                            && point.longitude <= start[0].max(end[0])
-                            && point.latitude >= start[1].min(end[1])
-                            && point.latitude <= start[1].max(end[1]);
-                        let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
-                        if within || crosses {
-                            let side = orientation(*start, *end, [point.longitude, point.latitude]);
-                            boundary |= within && side == 0.0_f64;
-                            parity ^= crosses
-                                && if end[1] > start[1] {
-                                    side > 0.0_f64
-                                } else {
-                                    side < 0.0_f64
-                                };
-                        }
-                    }
+                    let (page_parity, page_boundary) =
+                        chain_relation(vertices, point, |value| *value)?;
+                    parity ^= page_parity;
+                    boundary |= page_boundary;
                 }
             }
         }
@@ -549,30 +529,10 @@ fn read_f64(bytes: &[u8], offset: usize) -> Result<f64> {
 fn validate_tile_index() -> Result<Box<[u32]>> {
     (KOREA_TILE_BYTES.len() == 32_768 && hash::digest(KOREA_TILE_BYTES)? == KOREA_TILE_SHA256)
         .ok_or("대한민국 좌표 타일 인덱스 SHA-256 오류")?;
-    let mut selected = Vec::with_capacity(KOREA_TILE_COUNT);
-    for tile in 0..262_144_usize {
-        let byte = KOREA_TILE_BYTES[tile >> 3];
-        if byte & (1_u8 << (tile & 7)) != 0 {
-            selected.push(u32::try_from(tile).map_err(|_| "대한민국 타일 번호 오류")?);
-        }
-    }
-    (selected.len() == KOREA_TILE_COUNT).ok_or("대한민국 좌표 타일 개수 오류")?;
-    Ok(selected.into_boxed_slice())
+    decode_tiles(KOREA_TILE_BYTES)
 }
 fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
-    let selector = usize::try_from(value >> 46).map_err(|_| "대한민국 타일 선택값 오류")?;
-    if selector >= KOREA_TILE_COUNT.strict_mul(2) {
-        return Ok(None);
-    }
-    let tile = u64::from(
-        *index
-            .sampler_tiles
-            .get(selector / 2)
-            .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
-    );
-    let vertical = ((tile >> 9) << 23) | ((value >> 23) & 0x7f_ffff);
-    let horizontal = ((tile & 511) << 23) | (value & 0x7f_ffff);
-    Ok(Some((vertical << 32) | horizontal))
+    coordinate_core::remap_tile(value, &index.sampler_tiles)
 }
 pub(super) struct SampleState<'cache> {
     active_cache: &'cache mut BoundaryCache,

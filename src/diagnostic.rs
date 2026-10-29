@@ -1,4 +1,3 @@
-use crate::time::TimeError;
 use alloc::borrow::Cow;
 use core::{
     error::Error,
@@ -97,11 +96,6 @@ impl From<&'static str> for AppError {
 impl From<IoError> for AppError {
     fn from(source: IoError) -> Self {
         Self::context("I/O 오류", source)
-    }
-}
-impl From<TimeError> for AppError {
-    fn from(source: TimeError) -> Self {
-        Self::context("시간 처리 오류", source)
     }
 }
 pub(super) const fn terminal_safe<T>(value: &T) -> impl Display + '_

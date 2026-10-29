@@ -2,7 +2,7 @@ use super::{
     BOUNDARY, BoundaryCache, BoundaryIndex, DATA, INDEX_SHA256, KOREA_SUPP_RETRY_LIMIT, PARTS,
     SampleState, hash, remap_tile, sample,
 };
-use crate::{diagnostic::Result, geo_uniform::candidate, random_data::Coordinates};
+use crate::{coordinate_core::Coordinates, diagnostic::Result, geo_uniform::candidate};
 const SEOUL: u64 = 15_033_626_022_739_801_206;
 const WEST_SEA: u64 = 8_160_136_085_698_478_266;
 const DOKDO: u64 = 13_962_275_557_818_425_490;

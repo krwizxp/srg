@@ -1,6 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 use super::hardware_rng::HardwareRng;
 use crate::{
+    coordinate_core::{Coordinates, world_coordinates},
     diagnostic::{AppError, Result},
     korea_boundary,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
@@ -41,12 +42,6 @@ const NMS_SOLAR_SYSTEM_SUPP_SHIFTS: [u8; 4] = [36, 24, 12, 0];
 const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
 const PASSWORD_BYTE_LEN: usize = 8;
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
-const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
-#[derive(Default)]
-pub(super) struct Coordinates {
-    pub latitude: f64,
-    pub longitude: f64,
-}
 #[derive(Default)]
 pub(super) struct RandomDataSet {
     pub euro_millions_lucky_stars: [u8; EURO_MILLIONS_LUCKY_COUNT],
@@ -196,16 +191,8 @@ impl RandomDataBuildState<'_> {
         Ok(data)
     }
     fn fill_coords(&mut self) {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
-        let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
-        let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
-        let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
-        let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
-        self.data.world_coords = Coordinates {
-            latitude: 180.0_f64.mul_add(upper_ratio, -90.0),
-            longitude: 360.0_f64.mul_add(lower_ratio, -180.0),
-        };
-        self.data.nms_portal_yy = low_u8_from_u32(upper_32_bits);
+        self.data.world_coords = world_coordinates(self.data.num_64);
+        self.data.nms_portal_yy = low_u8_from_u64(self.data.num_64 >> 32);
         self.data.nms_portal_zzz = low_u16_from_u64((self.data.num_64 >> 20) & NMS_COORD_MASK);
         self.data.nms_portal_xxx = low_u16_from_u64((self.data.num_64 >> 8) & NMS_COORD_MASK);
         self.data.galaxy_x = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_xxx);

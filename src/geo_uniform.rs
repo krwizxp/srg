@@ -1,4 +1,4 @@
-use crate::{diagnostic::Result, random_data::Coordinates};
+use crate::{coordinate_core::Coordinates, diagnostic::Result};
 #[cfg(test)]
 mod tests;
 const DEGREES: f64 = 0.017_453_292_519_943_295;

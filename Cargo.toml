@@ -12,6 +12,10 @@ repository = "https://github.com/krwizxp/srg"
 keywords = ["random", "rng", "cli", "time-sync", "utilities"]
 categories = ["command-line-utilities", "date-and-time", "encoding"]
 
+[lib]
+name = "coordinates"
+crate-type = ["cdylib"]
+
 [lints.rust]
 absolute_paths_not_starting_with_crate = "deny"
 ambiguous_negative_literals = "deny"

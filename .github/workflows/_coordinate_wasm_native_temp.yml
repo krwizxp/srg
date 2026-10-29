@@ -1,0 +1,113 @@
+name: Coordinate WASM native and reproducibility validation
+on:
+  push:
+    branches:
+      - verify/coordinate-wasm-20261030
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    name: ${{ matrix.target }} / Rust 1.99.1
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-26.04
+            target: x86_64-unknown-linux-gnu
+            binary_name: srg-linux-x64
+            live_hardware: --live-hardware
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+            binary_name: srg-windows-x64
+            live_hardware: ""
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+            binary_name: srg-macos-x64
+            live_hardware: ""
+          - os: macos-26
+            target: aarch64-apple-darwin
+            binary_name: srg-macos-arm64
+            live_hardware: ""
+    steps:
+      - name: Checkout exact validation commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create evidence directory
+        shell: bash
+        run: mkdir -p "${{ runner.temp }}/coordinate-wasm-native-evidence"
+      - name: Verify native Windows Server 2025 x64
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $operatingSystem = Get-CimInstance Win32_OperatingSystem
+          $record = [ordered]@{
+            Caption = $operatingSystem.Caption
+            Version = $operatingSystem.Version
+            BuildNumber = $operatingSystem.BuildNumber
+            ProductType = $operatingSystem.ProductType
+            OSArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+            ProcessArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+            Is64BitOperatingSystem = [Environment]::Is64BitOperatingSystem
+            Is64BitProcess = [Environment]::Is64BitProcess
+            ImageOS = $env:ImageOS
+            ImageVersion = $env:ImageVersion
+          }
+          $record | ConvertTo-Json | Set-Content -Encoding utf8 "${{ runner.temp }}/coordinate-wasm-native-evidence/windows-host.json"
+          if ($record.Caption -notlike '*Windows Server 2025*' -or $record.OSArchitecture -ne 'X64' -or $record.ProcessArchitecture -ne 'X64' -or -not $record.Is64BitOperatingSystem -or -not $record.Is64BitProcess) {
+            throw 'Native Windows Server 2025 x64 validation host required'
+          }
+      - name: Install pinned Rust components
+        shell: bash
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy --target "${{ matrix.target }}" --no-self-update
+      - name: Install project Linux native dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Validate baseline and candidate
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+        run: >-
+          python tools/_wasm_native_validate_temp.py
+          --target "${{ matrix.target }}"
+          --binary-name "${{ matrix.binary_name }}"
+          --baseline ab6a346fe30782b0fe3e1880ff8d675537f7b00d
+          --toolchain 1.99.1
+          --out "${{ runner.temp }}/coordinate-wasm-native-evidence"
+          ${{ matrix.live_hardware }}
+      - name: Upload all validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coordinate-wasm-native-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/coordinate-wasm-native-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
+  wasm-reproduce:
+    name: wasm32-unknown-unknown / Rust 1.99.1
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned compiler and scalar WASM target
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown --no-self-update
+      - name: Reproduce tracked module and validate shared scalar ABI
+        run: python3 tools/_wasm_repro_validate_temp.py --toolchain 1.99.1 --out "${{ runner.temp }}/coordinate-wasm-repro-evidence"
+      - name: Preserve full reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coordinate-wasm-reproduction-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/coordinate-wasm-repro-evidence
+          if-no-files-found: error
+          retention-days: 14

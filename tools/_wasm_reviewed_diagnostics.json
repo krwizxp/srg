@@ -1,0 +1,143 @@
+{
+  "baseline": "ab6a346fe30782b0fe3e1880ff8d675537f7b00d",
+  "candidate": "B shared slice operations",
+  "frozen_before_remote_ci": true,
+  "project_lint_policy_changed": false,
+  "explanation": "Native coordinate_core numeric and pattern diagnostics moved from korea_boundary; five shared functions create single_call_fn warnings once per native build target. No suppression or redundant calls. A standalone WASM build reports existing shared numerical/inflate diagnostics and small ABI glue diagnostics. All raw diagnostics and additions/removals are retained.",
+  "reviewed_additions": [
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::decimal_literal_representation",
+      "message": "integer literal has a better hexadecimal representation",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::default_numeric_fallback",
+      "message": "default numeric fallback might occur",
+      "count": 10
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::integer_division",
+      "message": "integer division",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::integer_division_remainder_used",
+      "message": "use of `/` has been disallowed in this context",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::map_err_ignore",
+      "message": "`map_err(|_|...` wildcard pattern discards the original error",
+      "count": 4
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::pattern_type_mismatch",
+      "message": "type of pattern does not match the expression type",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::single_call_fn",
+      "message": "this function is only used once",
+      "count": 10
+    }
+  ],
+  "wasm_warnings": [
+    {
+      "file": "src/boundary_inflate.rs",
+      "code": "clippy::single_call_fn",
+      "message": "this function is only used once",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::decimal_literal_representation",
+      "message": "integer literal has a better hexadecimal representation",
+      "count": 1
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::default_numeric_fallback",
+      "message": "default numeric fallback might occur",
+      "count": 5
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::integer_division",
+      "message": "integer division",
+      "count": 1
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::integer_division_remainder_used",
+      "message": "use of `/` has been disallowed in this context",
+      "count": 1
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::map_err_ignore",
+      "message": "`map_err(|_|...` wildcard pattern discards the original error",
+      "count": 2
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::pattern_type_mismatch",
+      "message": "type of pattern does not match the expression type",
+      "count": 1
+    },
+    {
+      "file": "src/coordinate_core.rs",
+      "code": "clippy::single_call_fn",
+      "message": "this function is only used once",
+      "count": 5
+    },
+    {
+      "file": "src/diagnostic.rs",
+      "code": "clippy::single_call_fn",
+      "message": "this function is only used once",
+      "count": 1
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::default_numeric_fallback",
+      "message": "default numeric fallback might occur",
+      "count": 48
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::indexing_slicing",
+      "message": "indexing may panic",
+      "count": 2
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::min_ident_chars",
+      "message": "this identifier consists of only a single character",
+      "count": 6
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::shadow_unrelated",
+      "message": "`split` shadows a previous, unrelated binding",
+      "count": 1
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::single_call_fn",
+      "message": "this function is only used once",
+      "count": 2
+    },
+    {
+      "file": "src/geo_uniform.rs",
+      "code": "clippy::suboptimal_flops",
+      "message": "multiply and add expressions may be calculated more efficiently and accurately",
+      "count": 21
+    }
+  ]
+}

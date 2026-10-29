@@ -1,315 +1,8 @@
-const INFLATE_CODE_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
-const INFLATE_DISTANCE_BASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
-const INFLATE_DISTANCE_EXTRA = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
-const INFLATE_LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
-const INFLATE_LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+import {boundedBytes, loadCoordinateCore} from "./coordinates_wasm.js";
 
-function inflateRequire(condition, message) {
-    if (!condition) throw new Error(message);
-}
-
-class InflateBits {
-    constructor(bytes) {
-        this.bytes = bytes;
-        this.position = 0;
-        this.length = bytes.length * 8;
-    }
-
-    peek(count) {
-        inflateRequire(this.position + count <= this.length, "경계 압축 데이터가 잘렸습니다.");
-        const index = Math.floor(this.position / 8);
-        return ((this.bytes[index] | this.bytes[index + 1] << 8 | this.bytes[index + 2] << 16)
-            >>> (this.position % 8)) & ((1 << count) - 1);
-    }
-
-    read(count) {
-        const value = this.peek(count);
-        this.position += count;
-        return value;
-    }
-}
-
-function inflateHuffman(lengths, complete = false) {
-    inflateRequire(lengths.length <= 288, "경계 압축 코드 개수 오류");
-    const counts = new Uint16Array(16);
-    const symbols = new Uint16Array(288);
-    const offsets = new Uint16Array(16);
-    const quick = new Uint16Array(512);
-    for (const length of lengths) {
-        inflateRequire(length <= 15, "경계 압축 코드 길이 오류");
-        counts[length]++;
-    }
-    let remaining = 1;
-    for (let length = 1; length < 16; length++) {
-        remaining = remaining * 2 - counts[length];
-        inflateRequire(remaining >= 0, "경계 압축 코드가 중복됩니다.");
-        if (length > 1) offsets[length] = offsets[length - 1] + counts[length - 1];
-    }
-    inflateRequire(remaining === 0 || (!complete && counts[0] + counts[1] === lengths.length), "경계 압축 코드가 불완전합니다.");
-    for (let symbol = 0; symbol < lengths.length; symbol++) {
-        const length = lengths[symbol];
-        if (length !== 0) symbols[offsets[length]++] = symbol;
-    }
-    let first = 0;
-    let index = 0;
-    for (let length = 1; length < 16; length++) {
-        for (let offset = 0; offset < counts[length]; offset++) {
-            if (length <= 9) {
-                let code = first + offset;
-                let reversed = 0;
-                for (let bit = 0; bit < length; bit++) {
-                    reversed = (reversed << 1) | (code & 1);
-                    code >>>= 1;
-                }
-                const packed = (length << 9) | symbols[index + offset];
-                for (let slot = reversed; slot < 512; slot += 1 << length) quick[slot] = packed;
-            }
-        }
-        index += counts[length];
-        first = (first + counts[length]) * 2;
-    }
-    return {counts, symbols, quick};
-}
-
-function inflateSymbol(tree, bits) {
-    if (bits.position + 9 <= bits.length) {
-        const index = bits.position >>> 3;
-        const packed = tree.quick[((bits.bytes[index] | bits.bytes[index + 1] << 8)
-            >>> (bits.position & 7)) & 511];
-        if (packed !== 0) {
-            bits.position += packed >>> 9;
-            return packed & 511;
-        }
-    }
-    let code = 0;
-    let first = 0;
-    let index = 0;
-    for (let length = 1; length < 16; length++) {
-        code |= bits.read(1);
-        const count = tree.counts[length];
-        if (code < first + count) return tree.symbols[index + code - first];
-        index += count;
-        first = (first + count) * 2;
-        code <<= 1;
-    }
-    throw new Error("경계 압축 허프먼 코드 오류");
-}
-
-function inflateDynamic(bits) {
-    const literalCount = bits.read(5) + 257;
-    const distanceCount = bits.read(5) + 1;
-    const codeCount = bits.read(4) + 4;
-    inflateRequire(literalCount <= 286, "경계 압축 코드 개수 오류");
-    const codeLengths = new Uint8Array(19);
-    for (let index = 0; index < codeCount; index++) codeLengths[INFLATE_CODE_ORDER[index]] = bits.read(3);
-    const codes = inflateHuffman(codeLengths, true);
-    const total = literalCount + distanceCount;
-    const lengths = new Uint8Array(total);
-    let filled = 0;
-    while (filled < total) {
-        const symbol = inflateSymbol(codes, bits);
-        let value;
-        let count;
-        if (symbol <= 15) {
-            value = symbol;
-            count = 1;
-        } else if (symbol === 16) {
-            inflateRequire(filled > 0, "경계 압축 코드 반복 오류");
-            value = lengths[filled - 1];
-            count = bits.read(2) + 3;
-        } else if (symbol === 17 || symbol === 18) {
-            value = 0;
-            count = symbol === 17 ? bits.read(3) + 3 : bits.read(7) + 11;
-        } else {
-            throw new Error("경계 압축 코드 길이 오류");
-        }
-        const next = filled + count;
-        inflateRequire(next <= total, "경계 압축 코드 반복 한도 오류");
-        lengths.fill(value, filled, next);
-        filled = next;
-    }
-    inflateRequire(lengths[256] !== 0, "경계 압축 종료 코드 오류");
-    return [inflateHuffman(lengths.subarray(0, literalCount)), inflateHuffman(lengths.subarray(literalCount))];
-}
-
-let inflateFixedTrees;
-
-function inflate(input, maximum = 32768) {
-    inflateRequire(input instanceof Uint8Array && input.length >= 6, "경계 압축 길이 오류");
-    inflateRequire(Number.isSafeInteger(maximum) && maximum >= 0 && maximum <= 32768, "경계 압축 출력 한도 오류");
-    inflateRequire((input[0] & 15) === 8 && (input[0] >>> 4) <= 7 && (input[1] & 32) === 0
-        && ((input[0] << 8) | input[1]) % 31 === 0, "경계 압축 형식 오류");
-    const tail = input.length - 4;
-    const bits = new InflateBits(input.subarray(2, tail));
-    const output = new Uint8Array(maximum);
-    let written = 0;
-    for (;;) {
-        const finalBlock = bits.read(1) !== 0;
-        const kind = bits.read(2);
-        if (kind === 0) {
-            bits.position = Math.ceil(bits.position / 8) * 8;
-            const length = bits.read(16);
-            inflateRequire((length ^ bits.read(16)) === 65535, "경계 압축 저장 블록 오류");
-            inflateRequire(written + length <= maximum, "경계 압축 출력 한도 오류");
-            for (let index = 0; index < length; index++) output[written++] = bits.read(8);
-        } else if (kind === 1 || kind === 2) {
-            if (kind === 1 && !inflateFixedTrees) {
-                const lengths = new Uint8Array(288).fill(8);
-                lengths.fill(9, 144, 256);
-                lengths.fill(7, 256, 280);
-                inflateFixedTrees = [inflateHuffman(lengths), inflateHuffman(new Uint8Array(32).fill(5))];
-            }
-            const [literal, distance] = kind === 1 ? inflateFixedTrees : inflateDynamic(bits);
-            for (;;) {
-                const symbol = inflateSymbol(literal, bits);
-                if (symbol === 256) break;
-                if (symbol < 256) {
-                    inflateRequire(written < maximum, "경계 압축 출력 한도 오류");
-                    output[written++] = symbol;
-                    continue;
-                }
-                const index = symbol - 257;
-                inflateRequire(index < INFLATE_LENGTH_BASE.length, "경계 압축 길이 코드 오류");
-                const length = INFLATE_LENGTH_BASE[index] + bits.read(INFLATE_LENGTH_EXTRA[index]);
-                const distanceIndex = inflateSymbol(distance, bits);
-                inflateRequire(distanceIndex < INFLATE_DISTANCE_BASE.length, "경계 압축 거리 코드 오류");
-                const backward = INFLATE_DISTANCE_BASE[distanceIndex] + bits.read(INFLATE_DISTANCE_EXTRA[distanceIndex]);
-                inflateRequire(backward <= written, "경계 압축 참조 위치 오류");
-                inflateRequire(written + length <= maximum, "경계 압축 출력 한도 오류");
-                for (let index = 0; index < length; index++) {
-                    output[written] = output[written - backward];
-                    written++;
-                }
-            }
-        } else {
-            throw new Error("경계 압축 블록 형식 오류");
-        }
-        if (finalBlock) break;
-    }
-    inflateRequire(Math.ceil(bits.position / 8) === bits.bytes.length, "경계 압축 잔여 데이터 오류");
-    let first = 1;
-    let second = 0;
-    for (let begin = 0; begin < written; begin += 1024) {
-        const end = Math.min(begin + 1024, written);
-        for (let index = begin; index < end; index++) {
-            first += output[index];
-            second += first;
-        }
-        first %= 65521;
-        second %= 65521;
-    }
-    const checksum = ((input[tail] << 24) | (input[tail + 1] << 16) | (input[tail + 2] << 8) | input[tail + 3]) >>> 0;
-    inflateRequire((((second << 16) | first) >>> 0) === checksum, "경계 압축 체크섬 오류");
-    return output.subarray(0, written);
-}
-
-const DEGREES = 0.017453292519943295;
-const ECCENTRICITY_SQUARED = 0.006694380022900787;
-function productError(a, b, product) {
-    const splitA = 134217729 * a;
-    const ah = splitA - (splitA - a);
-    const al = a - ah;
-    const splitB = 134217729 * b;
-    const bh = splitB - (splitB - b);
-    const bl = b - bh;
-    return ((ah * bh - product) + ah * bl + al * bh) + al * bl;
-}
-function orientation(start, end, point) {
-    const a = end[0] - start[0];
-    const b = end[1] - start[1];
-    const c = point[0] - start[0];
-    const d = point[1] - start[1];
-    const left = a * d;
-    const right = b * c;
-    const approximate = left - right;
-    if (Math.abs(approximate) > 3.3306690738754716e-16 * (Math.abs(left) + Math.abs(right))) {
-        return approximate;
-    }
-    const expansion = [0, 0, 0, 0];
-    let length = 0;
-    for (let value of [productError(a, d, left), left, -productError(b, c, right), -right]) {
-        let count = 0;
-        const previous = expansion.slice();
-        for (let index = 0; index < length; index++) {
-            const entry = previous[index];
-            const total = value + entry;
-            const virtualValue = total - value;
-            const error = (value - (total - virtualValue)) + (entry - virtualValue);
-            if (error !== 0) {
-                expansion[count] = error;
-                count++;
-            }
-            value = total;
-        }
-        if (value !== 0 || count === 0) {
-            expansion[count] = value;
-            count++;
-        }
-        length = count;
-    }
-    let result = 0;
-    for (let index = 0; index < length; index++) {
-        result += expansion[index];
-    }
-    return result;
-}
-function cumulativeArea(latitude) {
-    const delta = (latitude - 36) * DEGREES;
-    const square = delta * delta;
-    const sineDelta = delta * (1 + square * (-0.16666666666666666
-        + square * (0.008333333333333333
-            + square * (-0.0001984126984126984
-                + square * (2.7557319223985893e-6
-                    + square * -2.505210838544172e-8)))));
-    const cosineDelta = 1 + square * (-0.5
-        + square * (0.041666666666666664
-            + square * (-0.001388888888888889
-                + square * (2.48015873015873e-5
-                    + square * (-2.755731922398589e-7
-                        + square * 2.08767569878681e-9)))));
-    const sine = 0.5877852522924731 * cosineDelta + 0.8090169943749475 * sineDelta;
-    const squareEccentricSine = ECCENTRICITY_SQUARED * sine * sine;
-    let polynomial = 9 / 17;
-    for (const coefficient of [8 / 15, 7 / 13, 6 / 11, 5 / 9, 4 / 7, 3 / 5, 2 / 3, 1]) {
-        polynomial = coefficient + squareEccentricSine * polynomial;
-    }
-    return sine * polynomial;
-}
-function candidate(value, bounds) {
-    if (typeof value !== "bigint" || value < 0n || value > 0xffffffffffffffffn) {
-        throw new Error("대한민국 등면적 좌표 입력 오류");
-    }
-    const [west, south, east, north] = bounds;
-    if (!(bounds.length === 4 && bounds.every(Number.isFinite)
-        && west >= -180 && east <= 180 && west < east
-        && south >= 32 && north <= 40 && south < north)) {
-        throw new Error("대한민국 등면적 좌표 범위 오류");
-    }
-    const vertical = (Number(value >> 32n) + 0.5) / 4294967296;
-    const horizontal = (Number(value & 0xffffffffn) + 0.5) / 4294967296;
-    const southArea = cumulativeArea(south);
-    const target = southArea + vertical * (cumulativeArea(north) - southArea);
-    let lower = south;
-    let upper = north;
-    for (let iteration = 0; iteration < 52; iteration++) {
-        const middle = lower + (upper - lower) * 0.5;
-        if (cumulativeArea(middle) < target) {
-            lower = middle;
-        } else {
-            upper = middle;
-        }
-    }
-    const latitude = lower + (upper - lower) * 0.5;
-    const longitude = west + horizontal * (east - west);
-    if (!(latitude > south && latitude < north && longitude > west && longitude < east)) {
-        throw new Error("대한민국 등면적 좌표 역산 오류");
-    }
-    return [latitude, longitude];
-}
 const MAX_U64 = (1n << 64n) - 1n;
 const INDEX_SHA256 = "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17";
 const TILE_SHA256 = "492fdbeee7e7a64816d7ea90c57cb5773685fbf96e0b95911a8b7cdcfbf2ae8b";
-const TILE_COUNT = 79113;
 const SOURCE_SHA256 = "5060f88241e2d80b87f052b4b83296ef59cd7f4ee066a9330bc2ea580bc55428";
 const MAX_INDEX_BYTES = 8388608;
 const MAX_PART_BYTES = 524288;
@@ -330,33 +23,6 @@ function hexBytes(bytes) {
 }
 function magic(bytes, expected) {
     return bytes.length >= 8 && new TextDecoder().decode(bytes.subarray(0, 8)) === expected;
-}
-async function boundedBytes(response, maximum) {
-    requireBoundary(response.body !== null, "대한민국 경계 응답 본문 오류");
-    const reader = response.body.getReader();
-    const chunks = [];
-    let size = 0;
-    try {
-        for (;;) {
-            const {value, done} = await reader.read();
-            if (done) break;
-            size += value.length;
-            requireBoundary(size <= maximum, "대한민국 경계 데이터 크기 한도를 초과했습니다.");
-            chunks.push(value);
-        }
-    } catch (error) {
-        await reader.cancel().catch(() => {});
-        throw error;
-    } finally {
-        reader.releaseLock();
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return bytes;
 }
 async function download(name, maximum, digest) {
     requireBoundary(typeof globalThis.crypto?.subtle?.digest === "function",
@@ -410,21 +76,12 @@ async function cached(cache, key, load, byteLength) {
 }
 async function loadBoundary() {
     if (!boundaryPromise) boundaryPromise = (async () => {
-        const [bytes, tileBytes] = await Promise.all([
+        const [bytes, tileBytes, core] = await Promise.all([
             download("index.bin", MAX_INDEX_BYTES, INDEX_SHA256),
             download("tile-select-v5.bin", 32768, TILE_SHA256),
+            loadCoordinateCore(),
         ]);
-        requireBoundary(tileBytes.length === 32768,
-            "대한민국 좌표 타일 인덱스 길이 오류");
-        const tileIndex = new Uint32Array(TILE_COUNT);
-        let selected = 0;
-        for (let tile = 0; tile < 262144; tile++) {
-            if (tileBytes[tile >>> 3] & (1 << (tile & 7))) {
-                requireBoundary(selected < TILE_COUNT, "대한민국 좌표 타일 개수 오류");
-                tileIndex[selected++] = tile;
-            }
-        }
-        requireBoundary(selected === TILE_COUNT, "대한민국 좌표 타일 개수 오류");
+        core.setTiles(tileBytes);
         requireBoundary(bytes.length >= 128 && magic(bytes, "SRGKR004"),
             "대한민국 경계 데이터 버전 오류");
         const data = new DataView(bytes.buffer);
@@ -482,7 +139,7 @@ async function loadBoundary() {
             nextPage += count;
         }
         requireBoundary(nextPage === pageCount, "대한민국 경계 조각 페이지 누락");
-        return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, tileIndex,
+        return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, core,
             tileCount, partCount, partOffset, pageCount, polygons, rings, vertices};
     })().catch(error => {
         boundaryPromise = null;
@@ -557,7 +214,7 @@ async function loadPage(boundary, tile, pageNumber) {
         const start = part.data.getUint32(entry, true);
         const length = part.data.getUint32(entry + 4, true);
         const rawLength = part.data.getUint32(entry + 8, true);
-        const raw = inflate(part.bytes.subarray(start, start + length), rawLength);
+        const raw = boundary.core.inflate(part.bytes.subarray(start, start + length), rawLength);
         requireBoundary(raw.length === rawLength && magic(raw, "SRGKB004"),
             "대한민국 경계 압축 페이지 길이 또는 버전 오류");
         const data = new DataView(raw.buffer);
@@ -658,46 +315,14 @@ async function covers(boundary, point) {
     const tile = tilePosition(boundary, point);
     const state = boundary.data.getUint32(128 + tile * 12, true);
     if (state !== 2) return state === 1;
-    const location = [longitude, latitude];
     let parity = false;
     let boundaryHit = false;
     for await (const page of tilePages(boundary, tile)) {
-        if (page.kind === 0) {
-            let lower = 0;
-            let upper = page.count;
-            while (lower < upper) {
-                const middle = Math.floor((lower + upper) / 2);
-                if (page.data.getFloat64(32 + middle * 8, true) <= latitude) lower = middle + 1;
-                else upper = middle;
-            }
-            parity = parity !== Boolean(page.base ^ (lower & 1));
-            continue;
-        }
-        let start = [page.data.getFloat64(40, true), page.data.getFloat64(48, true)];
-        for (let index = 1; index <= page.count; index++) {
-            const end = [page.data.getFloat64(40 + index * 16, true),
-                page.data.getFloat64(48 + index * 16, true)];
-            if (latitude >= Math.min(start[1], end[1]) && latitude <= Math.max(start[1], end[1])) {
-                const side = orientation(start, end, location);
-                if (side === 0 && longitude >= Math.min(start[0], end[0])
-                    && longitude <= Math.max(start[0], end[0])) boundaryHit = true;
-                if ((start[1] > latitude) !== (end[1] > latitude)) {
-                    const crossing = end[1] > start[1] ? side > 0 : side < 0;
-                    parity = parity !== crossing;
-                }
-            }
-            start = end;
-        }
+        const relation = boundary.core.pageRelation(page, latitude, longitude);
+        parity = parity !== Boolean(relation & 1);
+        boundaryHit ||= Boolean(relation & 2);
     }
     return boundaryHit || parity;
-}
-function remapTile(value, boundary) {
-    const selector = Number(value >> 46n);
-    if (selector >= TILE_COUNT * 2) return null;
-    const tile = boundary.tileIndex[Math.floor(selector / 2)];
-    const vertical = Math.floor(tile / 512) * 8388608 + Number((value >> 23n) & 0x7fffffn);
-    const horizontal = (tile % 512) * 8388608 + Number(value & 0x7fffffn);
-    return (BigInt(vertical) << 32n) | BigInt(horizontal);
 }
 export async function* sampleKorea(value) {
     requireBoundary(typeof value === "bigint" && value >= 0n && value <= MAX_U64,
@@ -705,11 +330,8 @@ export async function* sampleKorea(value) {
     const boundary = await loadBoundary();
     let candidateValue = value;
     for (let supplementalReads = 0; supplementalReads <= SUPPLEMENT_LIMIT; supplementalReads++) {
-        const mapped = remapTile(candidateValue, boundary);
-        if (mapped !== null) {
-            const point = candidate(mapped, boundary.bounds);
-            if (await covers(boundary, point)) return point;
-        }
+        const point = boundary.core.candidate(candidateValue, boundary.bounds);
+        if (point !== null && await covers(boundary, point)) return point;
         requireBoundary(supplementalReads < SUPPLEMENT_LIMIT,
             "대한민국 좌표 보완 난수 시도 횟수 초과");
         const supplement = yield;
@@ -727,9 +349,9 @@ export function prepareKorea(value) {
             current = requestedPreparation;
             const boundary = await loadBoundary();
             if (typeof current === "bigint" && current >= 0n && current <= MAX_U64) {
-                const mapped = remapTile(current, boundary);
-                if (mapped !== null) {
-                    const tile = tilePosition(boundary, candidate(mapped, boundary.bounds));
+                const point = boundary.core.candidate(current, boundary.bounds);
+                if (point !== null) {
+                    const tile = tilePosition(boundary, point);
                     if (boundary.data.getUint32(128 + tile * 12, true) === 2) {
                         for await (const _page of tilePages(boundary, tile)) {
                             if (current !== requestedPreparation) break;
@@ -742,4 +364,9 @@ export function prepareKorea(value) {
         preparation = null;
     });
     return preparation;
+}
+
+export async function loadCoordinates() {
+    const core = await loadCoordinateCore();
+    return {sampleKorea, prepareKorea, worldCoordinates: core.world};
 }

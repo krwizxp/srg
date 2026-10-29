@@ -64,9 +64,25 @@ srg time-observe <host> <seconds>
 
 ## revgeo.html
 
-`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 HTML 도구입니다. 기존 파일의 좌표 추출·주소 조회는 경계 데이터 없이도 동작합니다. 난수의 국내 좌표 변환에는 `korea_boundary.js`와 `data/korea-boundary-v4/`를 같은 경로 구조로 함께 배포해야 합니다. 최신 정식 Chrome, Edge, Firefox, Safari를 지원 기준으로 사용합니다.
+`revgeo.html`은 SRG에서 생성한 좌표를 브라우저에서 확인하고 정리하는 HTML 도구입니다. 기존 파일의 좌표 추출·주소 조회는 좌표 계산 모듈과 경계 데이터 없이도 동작합니다. 난수의 좌표 변환에는 `korea_boundary.js`, `coordinates_wasm.js`, `coordinates.wasm`과 `data/korea-boundary-v4/`를 같은 경로 구조로 함께 배포해야 합니다. 최신 정식 Chrome, Edge, Firefox, Safari를 지원 기준으로 사용하며 Windows, macOS, Linux, Android, iOS/iPadOS에서 표준 브라우저 API를 사용합니다.
 
 브라우저와 홈 화면 아이콘은 `icon.svg` 한 파일을 사용합니다. iOS/iPadOS에서는 SVG 아이콘을 지원하는 Safari 26 이상을 기준으로 합니다.
+
+대한민국 등면적 좌표, 타일 선택, 경계 판정과 압축 해제, 세계 좌표 계산은 CLI와 같은 Rust 소스를 WebAssembly로 컴파일합니다. 브라우저는 경계 데이터를 필요한 조각만 내려받고 기존 크기 제한과 무결성 검사를 적용합니다. SIMD, 스레드, 공유 메모리나 교차 출처 격리는 필요하지 않습니다. 난수 생성은 기존 Web Crypto 경로를 사용합니다.
+
+좌표 변환은 HTTPS에서 사용합니다. 로컬 개발에서는 `localhost` HTTP 서버를 사용할 수 있습니다. 계산 모듈은 처음 변환할 때 불러오며 SHA-256과 ABI 버전을 확인합니다. 기존 결과 파일을 읽거나 주소를 조회할 때는 WASM을 불러오지 않습니다.
+
+### 웹 좌표 모듈 빌드
+
+Rust 공유 계산 코드를 수정하면 WASM과 로더의 해시를 함께 갱신합니다.
+
+```bash
+rustup target add wasm32-unknown-unknown --toolchain stable
+python3 tools/build_coordinates_wasm.py --toolchain stable
+```
+
+검증에 사용한 컴파일러는 `1.99.1`이며 재현할 때 두 명령의 `stable`을 `1.99.1`로 지정합니다. 빌드 도구는 기존 release 설정으로 `--lib`를 빌드하고 `coordinates.wasm`을 복사한 뒤 `coordinates_wasm.js`의 해시를 갱신합니다. CLI 빌드·배포는 기존 `--bin srg` 경로를 사용합니다.
+
 
 ### 주요 기능
 
