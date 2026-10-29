@@ -99,36 +99,49 @@ impl RandomDataSet {
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
-        let mut state = RandomDataBuildState {
-            data: self,
-            boundary_cache,
-            euro_lucky: UniqueNumbers::new(),
-            euro_main: UniqueNumbers::new(),
-            lotto: UniqueNumbers::new(),
-            lotto7: UniqueNumbers::new(),
-            next_supp,
-            numeric_password_digits: 0,
-            password_len: 0,
-            supplemental: RandomBitBuffer {
-                bits_remaining: 0,
-                value: 0,
-            },
+        let mut used_supplements = Vec::new();
+        let (mut data, cache) = {
+            let mut record_supplement = |reason| {
+                let value = next_supp(reason)?;
+                used_supplements.push(value);
+                Ok(value)
+            };
+            let mut state = RandomDataBuildState {
+                data: self,
+                boundary_cache,
+                euro_lucky: UniqueNumbers::new(),
+                euro_main: UniqueNumbers::new(),
+                lotto: UniqueNumbers::new(),
+                lotto7: UniqueNumbers::new(),
+                next_supp: &mut record_supplement,
+                numeric_password_digits: 0,
+                password_len: 0,
+                supplemental: RandomBitBuffer {
+                    bits_remaining: 0,
+                    value: 0,
+                },
+            };
+            state.fill_required_fields()?;
+            state.fill_lucky_stars()?;
+            state.fill_hangul_syllables()?;
+            state.fill_coords();
+            state.fill_nms_fields()?;
+            state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
+            state.data.euro_millions_main_numbers = state.euro_main.into_values();
+            state.data.lotto_numbers = state.lotto.into_values();
+            state.data.lotto7_numbers = state.lotto7.into_values();
+            (state.data, state.boundary_cache)
         };
-        state.fill_required_fields()?;
-        state.fill_lucky_stars()?;
-        state.fill_hangul_syllables()?;
-        state.fill_coords();
-        state.fill_nms_fields()?;
-        state.data.kor_coords = korea_boundary::sample(
-            state.data.num_64,
-            state.next_supp,
-            state.boundary_cache.as_deref_mut(),
+        let mut shared = used_supplements.into_iter();
+        data.kor_coords = korea_boundary::sample(
+            data.num_64,
+            &mut |reason| match shared.next() {
+                Some(value) => Ok(value),
+                None => next_supp(reason),
+            },
+            cache,
         )?;
-        state.data.euro_millions_lucky_stars = state.euro_lucky.into_values();
-        state.data.euro_millions_main_numbers = state.euro_main.into_values();
-        state.data.lotto_numbers = state.lotto.into_values();
-        state.data.lotto7_numbers = state.lotto7.into_values();
-        Ok(state.data)
+        Ok(data)
     }
 }
 impl<const N: usize> UniqueNumbers<N> {

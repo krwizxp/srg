@@ -1,0 +1,101 @@
+name: Temporary shared-supp native Rust verification
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  cross-platform:
+    name: ${{ matrix.os }} Rust release and tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-26.04
+          - windows-latest
+          - macos-26-intel
+          - macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install latest Rust stable
+        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt --no-self-update
+      - name: Install Linux link headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Format check
+        run: cargo +stable fmt --all -- --check
+      - name: Static Clippy check
+        run: cargo +stable clippy --all-targets --frozen
+      - name: Rust release native tests
+        run: cargo +stable test --frozen --release
+      - name: Rust release native build
+        run: cargo +stable build --frozen --release --bin srg
+  measure:
+    name: Deterministic 10000 baseline versus integrated
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Install Rust stable and Linux headers
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+      - name: Run deterministic candidate and original benchmarks with same corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p supp-shared-evidence
+          cp src/random_data.rs "$RUNNER_TEMP/candidate-random-data.rs"
+          cat tools/_shared_supp_probe_temp.rs >> src/korea_boundary/tests.rs
+          git rev-parse HEAD > supp-shared-evidence/git-sha.txt
+          rustc +stable -Vv > supp-shared-evidence/toolchain.txt
+          cargo +stable test --release --frozen --bin srg measure_unified_supplements_ten_thousand -- --nocapture --test-threads=1 2>&1 | tee supp-shared-evidence/candidate.log
+          git show 4eb3916932fe5bf4a01763943cd7066a9a2e3c1e:src/random_data.rs > src/random_data.rs
+          test "$(git hash-object src/random_data.rs)" = "1fb176c2977c7b4f0b7f5a05394ce549257d537d"
+          cargo +stable test --release --frozen --bin srg measure_unified_supplements_ten_thousand -- --nocapture --test-threads=1 2>&1 | tee supp-shared-evidence/baseline.log
+          cp "$RUNNER_TEMP/candidate-random-data.rs" src/random_data.rs
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,json
+          directory=Path('supp-shared-evidence')
+          data={}
+          for name in ['candidate','baseline']:
+              s=(directory/(name+'.log')).read_text()
+              metrics=re.findall(r'SRG_INTEGRATED_METRICS[^\n]*',s)
+              assert len(metrics)==1,(name,len(metrics))
+              matches=dict(re.findall(r'(\w+)=([\w\d]+)',metrics[0]))
+              assert int(matches['records'])==10000
+              samples=re.findall(r'SRG_INTEGRATED_SAMPLE ([^\n]+)',s)
+              assert len(samples)==16,(name,len(samples))
+              data[name]={'metrics':matches,'samples':samples}
+          for old,new in zip(data['baseline']['samples'],data['candidate']['samples']):
+              x=old.split(',');y=new.split(',')
+              assert len(x)==9 and len(y)==9,(x,y)
+              assert x[0]==y[0] and x[4:]==y[4:],(x,y)
+              assert int(y[1])<=int(x[1]),(x,y)
+          old=int(data['baseline']['metrics']['supp_total'])
+          new=int(data['candidate']['metrics']['supp_total'])
+          assert new<old,(old,new)
+          data['saved']=old-new
+          data['reduction_percent']=100*(old-new)/old
+          (directory/'comparison.json').write_text(json.dumps(data,ensure_ascii=False,indent=2))
+          print('Supp count',old,'->',new,'saved',old-new,'percentage',data['reduction_percent'])
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: shared-supp-native-comparison
+          path: supp-shared-evidence/
+          retention-days: 14
+          if-no-files-found: warn
