@@ -297,31 +297,31 @@ def main():
     args = parser.parse_args()
     output_directory = args.output_directory.resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
-    executable = output_directory / 'reduced_lattice_exhaustive'
+    executable = output_directory / ('reduced_lattice_exhaustive.exe' if sys.platform == 'win32' else 'reduced_lattice_exhaustive')
     compile_command = [
-        'cc', '-O3', '-march=native', '-std=c11', '-Wall', '-Wextra', '-Werror',
-        str(SOURCE_DIRECTORY / 'reduced_lattice_exhaustive.c'), '-o', str(executable),
+        'rustc', '--edition=2024', '-C', 'opt-level=3', '-C', 'target-cpu=native',
+        str(SOURCE_DIRECTORY / 'reduced_lattice_exhaustive.rs'), '-o', str(executable),
     ]
     total_started = time.perf_counter()
     subprocess.run(compile_command, check=True)
     compile_seconds = time.perf_counter() - total_started
-    c_outputs = {
+    rust_outputs = {
         4: 'reduced-lattice-word8-exhaustive.json',
         8: 'reduced-lattice-axis8-exhaustive.json',
         16: 'reduced-lattice-axis16-exhaustive.json',
     }
-    c_started = time.perf_counter()
-    for bits, name in c_outputs.items():
+    rust_started = time.perf_counter()
+    for bits, name in rust_outputs.items():
         result = subprocess.run([str(executable), str(bits)], check=True,
                                 capture_output=True, text=True)
         save(output_directory, name, json.loads(result.stdout))
-    c_execution_seconds = time.perf_counter() - c_started
+    rust_execution_seconds = time.perf_counter() - rust_started
     started = time.perf_counter()
     models, proofs, statistics = [], [], []
     path_proof = None
     for model_index, bits in enumerate([4, 8, 16]):
         oracle_result, oracle = factorized_oracle(bits)
-        c = json.loads((output_directory / c_outputs[bits]).read_text())
+        c = json.loads((output_directory / rust_outputs[bits]).read_text())
         for key in ["accepted_candidates", "rejected_candidates", "component_counts",
                     "accepted_word_sum_mod_2_64", "accepted_word_square_sum_mod_2_64", "accepted_word_xor"]:
             assert c[key] == oracle_result[key], (bits, key, c[key], oracle_result[key])
@@ -329,16 +329,16 @@ def main():
         categories = full_python_oracle(bits, oracle) if bits <= 8 else None
         if bits == 4:
             path_proof = enumerate_two_words(categories)
-        models.append({"independent_decimal_geos_oracle": oracle_result, "c_exhaustive_enumeration": c,
+        models.append({"independent_decimal_geos_oracle": oracle_result, "rust_exhaustive_enumeration": c,
                        "python_geos_decimal_full_2d_points_enumerated": 2**(2*bits) if bits <= 8 else 0,
-                       "c_and_independent_oracle_counts_and_checksums_agree": True})
+                       "rust_and_independent_oracle_counts_and_checksums_agree": True})
         proofs.append(weighted_proof(c["visited_candidates"], c["accepted_candidates"]))
         statistics.append(rejection_simulation(bits, 20261029 + model_index, oracle, categories))
         print(f"Verified axis_bits={bits}: candidates={c['visited_candidates']}, accepted={c['accepted_candidates']}", flush=True)
     save(output_directory, "reduced-lattice-two-word-paths.json", path_proof)
     report = {
         "status": "all_exact_checks_passed",
-        "specification_interpretation": "The required 8-bit and 16-bit axes mean 2^16 and 2^32 candidate words. Both were exhaustively iterated by the independent C program. A supplementary 8-bit total-word (4+4-axis) model also exhausts all two-word paths.",
+        "specification_interpretation": "The required 8-bit and 16-bit axes mean 2^16 and 2^32 candidate words. Both were exhaustively iterated by the independent Rust program. A supplementary 8-bit total-word (4+4-axis) model also exhausts all two-word paths.",
         "mask": {"coordinate_system": "normalized equal-area rectangle [0,1]², axes longitude and Q(latitude)",
                  "mainland": "[0,3/4]² minus open hole (1/4,1/2)²",
                  "island_a": "[7/8,1] x [3/4,1]", "island_b": "[7/8,15/16] x [1/8,3/16]",
@@ -354,17 +354,17 @@ def main():
                    "The exact accepted-grid count of the real Korea mask was not computed from its continuous area.",
                    "Uniformity requires independent uniform initial and supplementary words; arbitrary manual inputs have no such statistical guarantee.",
                    "Statistical p-values are regression checks. Exact equal weighting follows from enumeration and the independent algebraic proof.",
-                   "The independent C program is a synthetic oracle, not a claim that every production code path was exercised by 2^32 native conversions."],
-        "compiler": subprocess.run(["cc", "--version"], capture_output=True, text=True, check=True).stdout.splitlines()[0],
+                   "The independent Rust program is a synthetic oracle, not a claim that every production code path was exercised by 2^32 native conversions."],
+        "compiler": subprocess.run(["rustc", "--version"], capture_output=True, text=True, check=True).stdout.splitlines()[0],
         "compile_command": compile_command,
         "validation_command": [sys.executable, *sys.argv],
         "software": {"numpy": np.__version__, "shapely": shapely.__version__, "GEOS": shapely.geos_version_string,
                      "decimal_precision": getcontext().prec, "mpmath_precision": mp.mp.dps},
         "source_sha256": {name: hashlib.sha256((SOURCE_DIRECTORY/name).read_bytes()).hexdigest()
-                          for name in ["verify_reduced_lattice.py", "reduced_lattice_exhaustive.c"]},
+                          for name in ["verify_reduced_lattice.py", "reduced_lattice_exhaustive.rs"]},
         "executable_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
         "compile_elapsed_seconds": compile_seconds,
-        "c_execution_elapsed_seconds": c_execution_seconds,
+        "c_execution_elapsed_seconds": rust_execution_seconds,
         "python_verification_elapsed_seconds": time.perf_counter() - started,
         "total_elapsed_seconds": time.perf_counter() - total_started,
     }
@@ -384,7 +384,7 @@ def main():
         "evidence": ["reduced-lattice-validation.json", "reduced-lattice-two-word-paths.json"],
     }
     save(output_directory, "finite-lattice-proof.json", concise)
-    print(json.dumps({"status": report["status"], "models": [m["c_exhaustive_enumeration"] for m in models],
+    print(json.dumps({"status": report["status"], "models": [m["rust_exhaustive_enumeration"] for m in models],
                       "statistical_tests": [{"axis_bits": x["axis_bits"], "component_p": x["component_frequency_test"]["p_value"],
                            "full_point_p": x.get("every_accepted_grid_point_frequency_test", {}).get("p_value")}
                           for x in statistics], "seconds": report["python_verification_elapsed_seconds"]}, indent=2), flush=True)
