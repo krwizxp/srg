@@ -49,6 +49,41 @@ jobs:
         env:
           CARGO_TARGET_DIR: target/${{ matrix.target }}
         run: cargo +stable run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
+      - name: Verify production-only Rust compilation and behavior
+        shell: bash
+        run: |
+          rustc +stable -Vv
+          rustup +stable component add rustfmt clippy
+          cargo +stable fmt --all -- --check
+          cargo +stable clippy --frozen --all-targets --target "${{ matrix.target }}"
+          cargo +stable test --release --frozen --bin srg --target "${{ matrix.target }}"
+          executable="target/${{ matrix.target }}/release/srg"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then executable=".exe"; executable="target/${{ matrix.target }}/release/srg.exe"; fi
+          "$executable" --version
+          "$executable" --help
+          if [[ "$RUNNER_ARCH" == "X64" ]]; then
+            if "$executable" random-integer 2 1; then
+              echo "Invalid numeric bounds unexpectedly accepted" >&2
+              exit 1
+            fi
+          fi
+          test ! -e src/boundary_inflate/tests.rs
+          test ! -e src/korea_boundary/tests.rs
+          test ! -e src/geo_uniform/tests.rs
+          test ! -d src/boundary_inflate/tests
+          test -f data/korea-boundary-v4/index.bin
+          test -f data/korea-boundary-v4/tile-select-v5.bin
+          test -f data/korea-boundary-v4/atlas-8.bin
+          test "$(find data/korea-boundary-v4 -name 'part-*.bin' | wc -l)" -eq 96
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            node --check korea_boundary.js
+            cargo +stable build --release --frozen --example manual_workflow
+            if grep -qw rdrand /proc/cpuinfo; then
+              mkdir -p artifacts
+              (cd artifacts && "../$executable" generate 1) >/dev/null
+              test -s artifacts/random_data.txt
+            fi
+          fi
       - name: Upload Release Binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
