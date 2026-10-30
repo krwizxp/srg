@@ -253,7 +253,7 @@ function orientation(start, end, point) {
     }
     return result;
 }
-function cumulativeArea(latitude) {
+function cumulativeArea(latitude, withDerivative = false) {
     const delta = (latitude - 36) * DEGREES;
     const square = delta * delta;
     const sineDelta = delta * (1 + square * (-0.16666666666666666
@@ -273,10 +273,15 @@ function cumulativeArea(latitude) {
     for (const coefficient of [8 / 15, 7 / 13, 6 / 11, 5 / 9, 4 / 7, 3 / 5, 2 / 3, 1]) {
         polynomial = coefficient + squareEccentricSine * polynomial;
     }
-    return sine * polynomial;
+    const area = sine * polynomial;
+    if (!withDerivative) return area;
+    const cosine = 0.8090169943749475 * cosineDelta - 0.5877852522924731 * sineDelta;
+    const denominator = 1 - squareEccentricSine;
+    return [area, DEGREES * cosine / (denominator * denominator)];
 }
 function candidate(value, bounds) {
-    if (typeof value !== "bigint" || value < 0n || value > 0xffffffffffffffffn) {
+    if (!Array.isArray(value) || value.length !== 2
+        || value.some(word => !Number.isInteger(word) || word < 0 || word > 0xffffffff)) {
         throw new Error("대한민국 등면적 좌표 입력 오류");
     }
     const [west, south, east, north] = bounds;
@@ -285,21 +290,15 @@ function candidate(value, bounds) {
         && south >= 32 && north <= 40 && south < north)) {
         throw new Error("대한민국 등면적 좌표 범위 오류");
     }
-    const vertical = (Number(value >> 32n) + 0.5) / 4294967296;
-    const horizontal = (Number(value & 0xffffffffn) + 0.5) / 4294967296;
+    const vertical = (value[0] + 0.5) / 4294967296;
+    const horizontal = (value[1] + 0.5) / 4294967296;
     const southArea = cumulativeArea(south);
     const target = southArea + vertical * (cumulativeArea(north) - southArea);
-    let lower = south;
-    let upper = north;
-    for (let iteration = 0; iteration < 52; iteration++) {
-        const middle = lower + (upper - lower) * 0.5;
-        if (cumulativeArea(middle) < target) {
-            lower = middle;
-        } else {
-            upper = middle;
-        }
+    let latitude = south + (north - south) * vertical;
+    for (let iteration = 0; iteration < 3; iteration++) {
+        const [area, derivative] = cumulativeArea(latitude, true);
+        latitude -= (area - target) / derivative;
     }
-    const latitude = lower + (upper - lower) * 0.5;
     const longitude = west + horizontal * (east - west);
     if (!(latitude > south && latitude < north && longitude > west && longitude < east)) {
         throw new Error("대한민국 등면적 좌표 역산 오류");
@@ -823,7 +822,7 @@ function remapTile(value, boundary) {
     const tile = boundary.tileIndex[Math.floor(selector / 3)];
     const vertical = Math.floor(tile / 512) * 8388608 + Number((value >> 23n) & 0x7fffffn);
     const horizontal = (tile % 512) * 8388608 + Number(value & 0x7fffffn);
-    return (BigInt(vertical) << 32n) | BigInt(horizontal);
+    return [vertical, horizontal];
 }
 export async function* sampleKorea(value) {
     requireBoundary(typeof value === "bigint" && value >= 0n && value <= MAX_U64,
@@ -855,9 +854,10 @@ export function prepareKorea(value) {
             if (typeof current === "bigint" && current >= 0n && current <= MAX_U64) {
                 const mapped = remapTile(current, boundary);
                 if (mapped !== null) {
-                    const tile = tilePosition(boundary, candidate(mapped, boundary.bounds));
+                    const point = candidate(mapped, boundary.bounds);
+                    const tile = tilePosition(boundary, point);
                     if (boundary.data.getUint32(128 + tile * 12, true) === 2
-                        && (!boundary.atlas || atlasState(boundary, candidate(mapped, boundary.bounds), tile) === 2)) {
+                        && (!boundary.atlas || atlasState(boundary, point, tile) === 2)) {
                         for await (const _page of tilePages(boundary, tile)) {
                             if (current !== requestedPreparation) break;
                         }

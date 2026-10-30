@@ -49,7 +49,7 @@ pub(super) fn orientation(start: [f64; 2], end: [f64; 2], point: [f64; 2]) -> f6
     }
     expansion.iter().take(length).sum()
 }
-fn cumulative_area(latitude: f64) -> f64 {
+fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
     let delta = (latitude - 36.0) * DEGREES;
     let square = delta * delta;
     let sine_delta = delta
@@ -90,7 +90,12 @@ fn cumulative_area(latitude: f64) -> f64 {
     ] {
         polynomial = coefficient + square_eccentric_sine * polynomial;
     }
-    sine * polynomial
+    let cosine = 0.809_016_994_374_947_5 * cosine_delta - 0.587_785_252_292_473_1 * sine_delta;
+    let denominator = 1.0 - square_eccentric_sine;
+    (
+        sine * polynomial,
+        DEGREES * cosine / (denominator * denominator),
+    )
 }
 pub(super) fn candidate(value: u64, bounds: [f64; 4]) -> Result<Coordinates> {
     let [west, south, east, north] = bounds;
@@ -105,19 +110,13 @@ pub(super) fn candidate(value: u64, bounds: [f64; 4]) -> Result<Coordinates> {
     let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
     let vertical = (f64::from(u32::from_be_bytes([b0, b1, b2, b3])) + 0.5) / 4_294_967_296.0;
     let horizontal = (f64::from(u32::from_be_bytes([b4, b5, b6, b7])) + 0.5) / 4_294_967_296.0;
-    let south_area = cumulative_area(south);
-    let target = south_area + vertical * (cumulative_area(north) - south_area);
-    let mut lower = south;
-    let mut upper = north;
-    for _ in 0..52 {
-        let middle = lower + (upper - lower) * 0.5;
-        if cumulative_area(middle) < target {
-            lower = middle;
-        } else {
-            upper = middle;
-        }
+    let south_area = cumulative_area_and_derivative(south).0;
+    let target = south_area + vertical * (cumulative_area_and_derivative(north).0 - south_area);
+    let mut latitude = south + (north - south) * vertical;
+    for _ in 0..3 {
+        let (area, derivative) = cumulative_area_and_derivative(latitude);
+        latitude -= (area - target) / derivative;
     }
-    let latitude = lower + (upper - lower) * 0.5;
     let longitude = west + horizontal * (east - west);
     (latitude > south && latitude < north && longitude > west && longitude < east)
         .ok_or("대한민국 등면적 좌표 역산 오류")?;
