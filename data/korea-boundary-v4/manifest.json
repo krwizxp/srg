@@ -592,7 +592,7 @@
     }
   },
   "sampler": {
-    "version": 5,
+    "version": 6,
     "method": "conservative equal-area 512x512 tile rejection",
     "bit_per_tile": "little-endian bit within each byte",
     "file": "tile-select-v5.bin",
@@ -600,11 +600,11 @@
     "sha256": "492fdbeee7e7a64816d7ea90c57cb5773685fbf96e0b95911a8b7cdcfbf2ae8b",
     "tile_count": 79113,
     "selector_bits": 18,
-    "selection_multiplier": 2,
-    "selected_slot_limit": 158226,
+    "selection_multiplier": 3,
+    "selected_slot_limit": 237339,
     "intra_tile_bits_per_axis": 23,
     "grid_bits_per_axis": 32,
     "source_root_index_sha256": "8cb20a5c0da9c3d6225efb0323e24a4f992eb3029a772da3a71a55d3f503bf17",
-    "safety": "Each original grid cell maps to one tile selected twice; original polygon covers is authoritative."
+    "safety": "Each original grid cell maps to one tile selected three times; original polygon covers is authoritative."
   }
 }

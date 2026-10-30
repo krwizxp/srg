@@ -16,7 +16,10 @@ fn encode_tile_candidate(original: u64) -> Result<u64> {
         .binary_search(&u32::try_from(tile).map_err(|_| "Tile index overflow")?)
         .map_err(|_| "Fixture point omitted from tile cover")?;
     let lower = ((vertical & 0x7f_ffff) << 23) | (horizontal & 0x7f_ffff);
-    Ok(((u64::try_from(rank).map_err(|_| "Tile rank overflow")? * 2) << 46) | lower)
+    let selector = u64::try_from(rank)
+        .map_err(|error| format!("Tile rank overflow: {error}"))?
+        .strict_mul(3);
+    Ok((selector << 46) | lower)
 }
 #[test]
 fn tile_mapping_preserves_original_centers() -> Result<()> {
@@ -28,16 +31,13 @@ fn tile_mapping_preserves_original_centers() -> Result<()> {
         16_289_122_984_369_905_278,
     ] {
         let encoded = encode_tile_candidate(original)?;
-        (remap_tile(
-            encoded,
-            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
-        )? == Some(original))
-        .ok_or("Mapped grid point changed")?;
-        (remap_tile(
-            encoded | (1_u64 << 46),
-            BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
-        )? == Some(original))
-        .ok_or("Second tile selection alias changed")?;
+        for alias in 0_u64..3 {
+            (remap_tile(
+                encoded.strict_add(alias << 46),
+                BOUNDARY.as_ref().map_err(|error| format!("{error}"))?,
+            )? == Some(original))
+            .ok_or("Tile selection alias changed the original grid point")?;
+        }
     }
     (remap_tile(
         u64::MAX,
@@ -45,6 +45,46 @@ fn tile_mapping_preserves_original_centers() -> Result<()> {
     )?
     .is_none())
     .ok_or("Rejected selector was accepted")?;
+    Ok(())
+}
+#[test]
+fn tile_mapping_assigns_three_aliases_per_tile() -> Result<()> {
+    let index = BOUNDARY.as_ref().map_err(|error| format!("{error}"))?;
+    let mut aliases = vec![0_u8; index.sampler_tiles.len()];
+    let mut rejected = 0_u32;
+    for selector in 0_u64..0x0004_0000 {
+        let Some(mapped) = remap_tile((selector << 46_u32) | 0x3fff_ffff_ffff, index)? else {
+            rejected = rejected.strict_add(1);
+            continue;
+        };
+        let vertical = mapped >> 32_u32;
+        let horizontal = mapped & 0xffff_ffff;
+        (vertical & 0x7f_ffff == 0x7f_ffff && horizontal & 0x7f_ffff == 0x7f_ffff)
+            .ok_or("Tile mapping changed the low coordinate bits")?;
+        let tile = ((vertical >> 23_u32) << 9_u32) | (horizontal >> 23_u32);
+        let rank = index
+            .sampler_tiles
+            .binary_search(
+                &u32::try_from(tile).map_err(|error| format!("Mapped tile overflow: {error}"))?,
+            )
+            .map_err(|insertion| {
+                format!(
+                    "Mapped tile is absent from the conservative cover at insertion {insertion}"
+                )
+            })?;
+        let count = aliases.get_mut(rank).ok_or("Mapped tile rank overflow")?;
+        *count = count.strict_add(1);
+    }
+    (aliases.iter().all(|&count| count == 3) && rejected == 24_805)
+        .ok_or("Tile selection multiplicity is not uniformly three")?;
+    remap_tile((237_338_u64 << 46_u32) | 0x3fff_ffff_ffff, index)?
+        .is_some()
+        .ok_or("Last allocated selector was rejected")?;
+    for value in [237_339_u64 << 46_u32, u64::MAX] {
+        remap_tile(value, index)?
+            .is_none()
+            .ok_or("Unallocated selector was accepted")?;
+    }
     Ok(())
 }
 #[test]

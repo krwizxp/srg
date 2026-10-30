@@ -561,13 +561,13 @@ fn validate_tile_index() -> Result<Box<[u32]>> {
 }
 fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
     let selector = usize::try_from(value >> 46).map_err(|_| "대한민국 타일 선택값 오류")?;
-    if selector >= KOREA_TILE_COUNT.strict_mul(2) {
+    if selector >= KOREA_TILE_COUNT.strict_mul(3) {
         return Ok(None);
     }
     let tile = u64::from(
         *index
             .sampler_tiles
-            .get(selector / 2)
+            .get(selector / 3)
             .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
     );
     let vertical = ((tile >> 9) << 23) | ((value >> 23) & 0x7f_ffff);

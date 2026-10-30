@@ -5187,7 +5187,7 @@
 		}
 		let koreaModulePromise;
 		function loadKoreaModule() {
-			return koreaModulePromise ??= import("./korea_boundary.js?v=5").catch(error => { koreaModulePromise = null; throw error; });
+			return koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => { koreaModulePromise = null; throw error; });
 		}
 		function prepareKorea(value) {
 			void loadKoreaModule().then(module => module.prepareKorea(value)).catch(() => { });

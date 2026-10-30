@@ -693,8 +693,8 @@ async function covers(boundary, point) {
 }
 function remapTile(value, boundary) {
     const selector = Number(value >> 46n);
-    if (selector >= TILE_COUNT * 2) return null;
-    const tile = boundary.tileIndex[Math.floor(selector / 2)];
+    if (selector >= TILE_COUNT * 3) return null;
+    const tile = boundary.tileIndex[Math.floor(selector / 3)];
     const vertical = Math.floor(tile / 512) * 8388608 + Number((value >> 23n) & 0x7fffffn);
     const horizontal = (tile % 512) * 8388608 + Number(value & 0x7fffffn);
     return (BigInt(vertical) << 32n) | BigInt(horizontal);
