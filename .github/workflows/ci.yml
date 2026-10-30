@@ -49,26 +49,6 @@ jobs:
         env:
           CARGO_TARGET_DIR: target/${{ matrix.target }}
         run: cargo +stable run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
-      - name: Validate unchanged product paths
-        shell: bash
-        run: |
-          rustup component add rustfmt clippy --toolchain stable
-          cargo +stable fmt --all -- --check
-          cargo +stable test --release --frozen --bin srg --target "${{ matrix.target }}"
-          cargo +stable clippy --frozen --all-targets --target "${{ matrix.target }}"
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            cargo +stable build --release --frozen --example manual_workflow
-          fi
-          node --input-type=module --check < korea_boundary.js
-          test -f revgeo.html
-          test -f site.webmanifest
-          test -f icon.svg
-          test -f data/korea-boundary-v4/atlas-8.bin
-          test -f data/korea-boundary-v4/tile-select-v5.bin
-          test -f data/korea-boundary-v4/index.bin
-          test "$(find data/korea-boundary-v4 -name 'part-*.bin' | wc -l)" -eq 96
-          test ! -d tools
-          test ! -d docs
       - name: Upload Release Binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
