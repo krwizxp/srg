@@ -70,7 +70,7 @@ try{
                 let oldMilliseconds=0,newMilliseconds=0;
                 const N=180;
                 const passTimings=[];
-                for(let pass=0;pass<5;pass++){
+                for(let pass=0;pass<21;pass++){
                 const oldStart=oldMilliseconds,newStart=newMilliseconds;
                 for(let i=0;i<N;i++){
                     const word=next();

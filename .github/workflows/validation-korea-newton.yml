@@ -59,3 +59,5 @@ jobs:
           validation/node_modules/.bin/playwright install --with-deps chromium firefox webkit
       - name: Compare real boundary sampling
         run: node validation/verify_browser.mjs
+      - name: Measure browser numeric core
+        run: node validation/verify_core_browser.mjs
