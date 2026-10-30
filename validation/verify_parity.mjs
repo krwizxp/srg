@@ -13,7 +13,7 @@ function extract(src) {
 const old = extract(oldSource);
 const now = extract(newSource);
 const output = "validation/korea-probe" + (process.platform === "win32" ? ".exe" : "");
-const compile = spawnSync("rustc", ["+1.99.1", "-O", "validation/geo_candidate_verify.rs", "-o", output], {encoding:"utf8"});
+const compile = spawnSync("rustc", ["+1.99.1", "--edition=2024", "-O", "validation/geo_candidate_verify.rs", "-o", output], {encoding:"utf8"});
 if (compile.status !== 0) throw Error("Rust compile: " + compile.stderr);
 const execution = spawnSync(output.startsWith("/") ? output : "./" + output, [], {encoding:"utf8", maxBuffer: 8*1024*1024});
 if (execution.status !== 0) throw Error("Rust run: " + execution.stderr);
