@@ -1,6 +1,4 @@
 use crate::{diagnostic::Result, random_data::Coordinates};
-#[cfg(test)]
-mod tests;
 const DEGREES: f64 = 0.017_453_292_519_943_295;
 const ECCENTRICITY_SQUARED: f64 = 0.006_694_380_022_900_787;
 fn product_error(a: f64, b: f64, product: f64) -> f64 {

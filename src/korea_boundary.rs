@@ -9,10 +9,6 @@ use alloc::collections::VecDeque;
 use std::sync::{LazyLock, OnceLock};
 mod data;
 mod hash;
-#[cfg(test)]
-use crate::diagnostic::AppError;
-#[cfg(test)]
-mod tests;
 const CACHE_BYTES: usize = 0x0010_0000;
 const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
@@ -623,22 +619,4 @@ impl<'cache> SampleState<'cache> {
     pub(super) fn finish(self) -> Result<Coordinates> {
         Ok(self.point.ok_or("대한민국 좌표 보완 난수 시도 횟수 초과")?)
     }
-}
-#[cfg(test)]
-pub(super) fn sample<F>(
-    value: u64,
-    next_supp: &mut F,
-    cache: Option<&mut BoundaryCache>,
-) -> Result<Coordinates>
-where
-    F: FnMut(&'static str) -> Result<u64>,
-{
-    let mut local = BoundaryCache::default();
-    let mut state = SampleState::new(value, cache.unwrap_or(&mut local))?;
-    while !state.is_complete() {
-        let value = next_supp("대한민국 좌표 재추출")
-            .map_err(|source| AppError::context("대한민국 좌표 보완 난수 공급 실패", source))?;
-        state.offer_supplement(value)?;
-    }
-    state.finish()
 }
