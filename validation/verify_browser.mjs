@@ -69,6 +69,9 @@ try{
                 let totalSupplementsOld=0,totalSupplementsNew=0;
                 let oldMilliseconds=0,newMilliseconds=0;
                 const N=180;
+                const passTimings=[];
+                for(let pass=0;pass<5;pass++){
+                const oldStart=oldMilliseconds,newStart=newMilliseconds;
                 for(let i=0;i<N;i++){
                     const word=next();
                     let oldResult,newResult;
@@ -96,7 +99,9 @@ try{
                     if(Math.floor(lat0*1000)!==Math.floor(lat1*1000)||Math.floor(lon0*1000)!==Math.floor(lon1*1000))regionChanges++;
                     if(!(lat1>=33.0&&lat1<39&&lon1>=124&&lon1<132))throw Error("coordinate escaped bounds");
                 }
-                return {N,maxLatitudeDifference,maxLongitudeDifference,attemptChanges,regionChanges,totalSupplementsOld,totalSupplementsNew,oldMilliseconds,newMilliseconds};
+                passTimings.push({pass,oldMs:oldMilliseconds-oldStart,newMs:newMilliseconds-newStart});
+                }
+                return {N,passTimings,maxLatitudeDifference,maxLongitudeDifference,attemptChanges,regionChanges,totalSupplementsOld,totalSupplementsNew,oldMilliseconds,newMilliseconds};
             },undefined,{timeout:240000});
             const summary={browser:engineName,version:browser.version(),...result};
             console.log(JSON.stringify(summary));
