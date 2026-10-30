@@ -1,0 +1,45 @@
+name: Temporary Newton Korea validation
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validation-korea-newton.yml'
+      - 'korea_boundary.js'
+      - 'src/geo_uniform.rs'
+      - 'validation/**'
+permissions:
+  contents: read
+jobs:
+  native:
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, windows-2025, macos-26-intel, macos-26]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout full baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --no-self-update
+      - name: Install Rust tooling
+        run: rustup component add rustfmt clippy --toolchain 1.99.1
+      - name: Install Linux libcurl
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Display versions
+        run: |
+          rustc +1.99.1 -Vv
+          node --version
+      - name: Check Rust formatting
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Rust Clippy
+        run: cargo +1.99.1 clippy --all-targets --frozen
+      - name: Rust release tests
+        run: cargo +1.99.1 test --release --frozen
+      - name: Rust release build
+        run: cargo +1.99.1 build --release --frozen --bin srg
+      - name: Verify parity uniformity and speed
+        run: node validation/verify_parity.mjs
