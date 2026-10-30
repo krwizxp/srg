@@ -60,6 +60,12 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then
             cc -O3 -march=native -std=c11 -Wall -Wextra -Werror tools/_temp_reduced_lattice.c -o ./_temp_reduced_lattice
             node tools/_temp_verify_reduced_lattice.mjs ./reduced_lattice_exhaustive.exe ./_temp_reduced_lattice
+            python3 -m venv "$RUNNER_TEMP/korea-verify-venv"
+            "$RUNNER_TEMP/korea-verify-venv/bin/python" -m pip install -r tools/requirements-korea-validation.txt
+            "$RUNNER_TEMP/korea-verify-venv/bin/python" tools/verify_reduced_lattice.py --output-directory "$RUNNER_TEMP/korea-verify-full"
+            /usr/bin/time -v ./reduced_lattice_exhaustive.exe 16 >/dev/null
+            /usr/bin/time -v ./_temp_reduced_lattice 16 >/dev/null
+            stat -c '%n %s' ./reduced_lattice_exhaustive.exe ./_temp_reduced_lattice
           else
             node tools/_temp_verify_reduced_lattice.mjs ./reduced_lattice_exhaustive.exe
           fi
