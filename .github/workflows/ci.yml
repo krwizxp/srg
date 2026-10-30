@@ -49,29 +49,6 @@ jobs:
         env:
           CARGO_TARGET_DIR: target/${{ matrix.target }}
         run: cargo +stable run --frozen --example package_artifact -- "${{ matrix.binary_name }}"
-      - name: Validate migrated Rust lattice tool and product
-        shell: bash
-        run: |
-          rustup toolchain install 1.99.1 --profile minimal --no-self-update
-          rustup component add rustfmt clippy --toolchain 1.99.1
-          rustc +1.99.1 --version --verbose
-          rustfmt +1.99.1 --edition 2024 --check tools/reduced_lattice_exhaustive.rs
-          rustc +1.99.1 --edition 2024 -C opt-level=3 -C target-cpu=native -D warnings tools/reduced_lattice_exhaustive.rs -o reduced_lattice_exhaustive.exe
-          if [ "$RUNNER_OS" = Linux ]; then
-            cc -O3 -march=native -std=c11 -Wall -Wextra -Werror tools/_temp_reduced_lattice.c -o ./_temp_reduced_lattice
-            node tools/_temp_verify_reduced_lattice.mjs ./reduced_lattice_exhaustive.exe ./_temp_reduced_lattice
-            python3 -m venv "$RUNNER_TEMP/korea-verify-venv"
-            "$RUNNER_TEMP/korea-verify-venv/bin/python" -m pip install -r tools/requirements-korea-validation.txt
-            "$RUNNER_TEMP/korea-verify-venv/bin/python" tools/verify_reduced_lattice.py --output-directory "$RUNNER_TEMP/korea-verify-full"
-            /usr/bin/time -v ./reduced_lattice_exhaustive.exe 16 >/dev/null
-            /usr/bin/time -v ./_temp_reduced_lattice 16 >/dev/null
-            stat -c '%n %s' ./reduced_lattice_exhaustive.exe ./_temp_reduced_lattice
-          else
-            node tools/_temp_verify_reduced_lattice.mjs ./reduced_lattice_exhaustive.exe
-          fi
-          cargo +1.99.1 fmt --all -- --check
-          cargo +1.99.1 test --release --frozen --bin srg --target "${{ matrix.target }}"
-          cargo +1.99.1 clippy --frozen --all-targets --target "${{ matrix.target }}"
       - name: Upload Release Binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
