@@ -35,10 +35,7 @@ fn main() {
                 && cy <= 3 * n / 2
                 && !(cx > n / 2 && cx < n && cy > n / 2 && cy < n);
             let is_island_a = cx >= 7 * n / 4 && cy >= 3 * n / 2;
-            let is_island_b = cx >= 7 * n / 4
-                && cx <= 15 * n / 8
-                && cy >= n / 4
-                && cy <= 3 * n / 8;
+            let is_island_b = cx >= 7 * n / 4 && cx <= 15 * n / 8 && cy >= n / 4 && cy <= 3 * n / 8;
             let inside = is_mainland || is_island_a || is_island_b;
             visited += 1;
             accepted += u64::from(inside);
