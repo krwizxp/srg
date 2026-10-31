@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Pin current stable Rust
         run: |
           rustup toolchain install 1.99.1 --profile minimal --no-self-update
