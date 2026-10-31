@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
       - name: Install latest pinned Rust 1.99.1 with Clippy and rustfmt
         run: |
-          rustup toolchain install 1.99.1 --profile minimal --component clippy rustfmt --no-self-update
+          rustup toolchain install 1.99.1 --profile minimal --component clippy --component rustfmt --no-self-update
           rustc +1.99.1 -Vv
           cargo +1.99.1 --version
           rustup component list --toolchain 1.99.1 --installed
