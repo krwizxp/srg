@@ -1,7 +1,7 @@
 import { convertNumber, formatOutput } from "./srg_random.js?v=1";
 import { sampleKorea } from "./korea_boundary.js?v=6";
 
-async function convertBatch({ start, values }) {
+async function convertBatch({ runId, start, values }) {
     const blocks = new Array(values.length);
     let supplements = 0;
     const buffer = new BigUint64Array(32);
@@ -25,12 +25,12 @@ async function convertBatch({ start, values }) {
         }
         blocks[i] = formatOutput(step.value);
     }
-    return { start, blocks, supplements };
+    return { runId, start, blocks, supplements };
 }
 self.onmessage = async ({ data }) => {
     try {
         self.postMessage(await convertBatch(data));
     } catch (error) {
-        self.postMessage({ error: error instanceof Error ? error.message : String(error) });
+        self.postMessage({ runId: data?.runId, error: error instanceof Error ? error.message : String(error) });
     }
 };
