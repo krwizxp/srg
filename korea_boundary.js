@@ -279,7 +279,8 @@ function cumulativeArea(latitude, withDerivative = false) {
     const denominator = 1 - squareEccentricSine;
     return [area, DEGREES * cosine / (denominator * denominator)];
 }
-function candidate(value, bounds) {
+function candidate(value, boundary) {
+    const bounds = boundary.bounds;
     if (!Array.isArray(value) || value.length !== 2
         || value.some(word => !Number.isInteger(word) || word < 0 || word > 0xffffffff)) {
         throw new Error("대한민국 등면적 좌표 입력 오류");
@@ -292,8 +293,8 @@ function candidate(value, bounds) {
     }
     const vertical = (value[0] + 0.5) / 4294967296;
     const horizontal = (value[1] + 0.5) / 4294967296;
-    const southArea = cumulativeArea(south);
-    const target = southArea + vertical * (cumulativeArea(north) - southArea);
+    const southArea = boundary.southArea;
+    const target = southArea + vertical * (boundary.northArea - southArea);
     let latitude = south + (north - south) * vertical;
     for (let iteration = 0; iteration < 3; iteration++) {
         const [area, derivative] = cumulativeArea(latitude, true);
@@ -482,27 +483,21 @@ function decodeAtlas(bytes, boundary) {
         requireBoundary((value & (value >>> 1) & 0x55) === 0,
             "대한민국 세부 격자 상태 오류");
     }
-    const mixedTiles = new Uint16Array(mixedCount);
+    const mixedOrdinal = new Uint16Array(boundary.tileCount).fill(65535);
     let ordinal = 0;
     for (let tile = 0; tile < boundary.tileCount; tile++) {
         if (boundary.data.getUint32(128 + tile * 12, true) === 2) {
             requireBoundary(ordinal < mixedCount, "대한민국 세부 격자 개수 오류");
-            mixedTiles[ordinal++] = tile;
+            mixedOrdinal[tile] = ordinal++;
         }
     }
     requireBoundary(ordinal === mixedCount, "대한민국 세부 격자 개수 오류");
-    return {subdivision, states, mixedTiles};
+    return {subdivision, states, mixedOrdinal};
 }
 function atlasState(boundary, point, tile) {
-    const {subdivision, states, mixedTiles} = boundary.atlas;
-    let lower = 0;
-    let upper = mixedTiles.length;
-    while (lower < upper) {
-        const middle = Math.floor((lower + upper) / 2);
-        if (mixedTiles[middle] < tile) lower = middle + 1;
-        else upper = middle;
-    }
-    requireBoundary(mixedTiles[lower] === tile, "대한민국 세부 격자 소유 범위 오류");
+    const {subdivision, states, mixedOrdinal} = boundary.atlas;
+    const lower = mixedOrdinal[tile];
+    requireBoundary(lower !== 65535, "대한민국 세부 격자 소유 범위 오류");
     const row = Math.floor(tile / boundary.columns);
     const column = tile % boundary.columns;
     const fineColumn = Math.min(subdivision - 1,
@@ -518,7 +513,7 @@ function atlasState(boundary, point, tile) {
 
 const ATLAS_SHA256 = "a55dcf2e37a4500d6c30de3f5dad42131758415bcfafac79e88d76fb88b0e84d";
 function requestAtlas(boundary) {
-    if (boundary.atlasRequested || ++boundary.mixedChecks < 12) return;
+    if (boundary.atlasRequested || ++boundary.mixedChecks < 1) return;
     boundary.atlasRequested = true;
     setTimeout(async () => {
         try {
@@ -576,6 +571,8 @@ async function loadBoundary() {
             && columns === Math.ceil(east * scale) - Math.floor(west * scale)
             && rows === Math.ceil(north * scale) - Math.floor(south * scale),
         "대한민국 경계 격자 범위 오류");
+        const southArea = cumulativeArea(south);
+        const northArea = cumulativeArea(north);
         let nextPage = 0;
         for (let tile = 0; tile < tileCount; tile++) {
             const entry = 128 + tile * 12;
@@ -588,6 +585,7 @@ async function loadBoundary() {
         }
         requireBoundary(nextPage === pageCount, "대한민국 경계 타일 페이지 누락");
         const partOffset = 128 + tileCount * 12;
+        const pagePart = partCount <= 256 ? new Uint8Array(pageCount) : new Uint16Array(pageCount);
         nextPage = 0;
         for (let number = 0; number < partCount; number++) {
             const entry = partOffset + number * 48;
@@ -598,11 +596,12 @@ async function loadBoundary() {
                 && data.getUint32(entry + 12, true) === 0
                 && size > 64 + count * 12 && size <= MAX_PART_BYTES,
             "대한민국 경계 조각 인덱스 오류");
+            pagePart.fill(number, nextPage, nextPage + count);
             nextPage += count;
         }
         requireBoundary(nextPage === pageCount, "대한민국 경계 조각 페이지 누락");
         return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, tileIndex,
-            tileCount, partCount, partOffset, pageCount, polygons, rings, vertices,
+            tileCount, partCount, partOffset, pageCount, pagePart, southArea, northArea, polygons, rings, vertices,
             atlas: null, atlasRequested: false, atlasUnavailable: false, mixedChecks: 0};
     })().catch(error => {
         boundaryPromise = null;
@@ -611,17 +610,9 @@ async function loadBoundary() {
     return boundaryPromise;
 }
 function partNumber(boundary, page) {
-    let lower = 0;
-    let upper = boundary.partCount;
-    while (lower < upper) {
-        const middle = Math.floor((lower + upper) / 2);
-        const entry = boundary.partOffset + middle * 48;
-        const end = boundary.data.getUint32(entry, true) + boundary.data.getUint32(entry + 4, true);
-        if (end <= page) lower = middle + 1;
-        else upper = middle;
-    }
-    requireBoundary(lower < boundary.partCount, "대한민국 경계 페이지 범위 오류");
-    return lower;
+    requireBoundary(Number.isInteger(page) && page >= 0 && page < boundary.pageCount,
+        "대한민국 경계 페이지 범위 오류");
+    return boundary.pagePart[page];
 }
 async function loadPart(boundary, number) {
     return cached(parts, number, async () => {
@@ -816,12 +807,16 @@ async function covers(boundary, point) {
     requestAtlas(boundary);
     return boundaryHit || parity;
 }
+const remapWords = new DataView(new ArrayBuffer(8));
 function remapTile(value, boundary) {
-    const selector = Number(value >> 46n);
-    if (selector >= TILE_COUNT * 3) return null;
-    const tile = boundary.tileIndex[Math.floor(selector / 3)];
-    const vertical = Math.floor(tile / 512) * 8388608 + Number((value >> 23n) & 0x7fffffn);
-    const horizontal = (tile % 512) * 8388608 + Number(value & 0x7fffffn);
+    remapWords.setBigUint64(0, value, false);
+    const high = remapWords.getUint32(0, false);
+    const low = remapWords.getUint32(4, false);
+    const selector = high >>> 10;
+    if (selector >= TILE_COUNT * 53) return null;
+    const tile = boundary.tileIndex[Math.floor(selector / 53)];
+    const vertical = Math.floor(tile / 512) * 8388608 + (high & 0x3ff) * 8192 + (low >>> 21) * 4 + 2;
+    const horizontal = (tile % 512) * 8388608 + (low & 0x1fffff) * 4 + 2;
     return [vertical, horizontal];
 }
 export async function* sampleKorea(value) {
@@ -832,8 +827,10 @@ export async function* sampleKorea(value) {
     for (let supplementalReads = 0; supplementalReads <= SUPPLEMENT_LIMIT; supplementalReads++) {
         const mapped = remapTile(candidateValue, boundary);
         if (mapped !== null) {
-            const point = candidate(mapped, boundary.bounds);
-            if (await covers(boundary, point)) return point;
+            const point = candidate(mapped, boundary);
+            const tile = tilePosition(boundary, point);
+            const state = boundary.data.getUint32(128 + tile * 12, true);
+            if (state === 1 || (state === 2 && await covers(boundary, point))) return point;
         }
         requireBoundary(supplementalReads < SUPPLEMENT_LIMIT,
             "대한민국 좌표 보완 난수 시도 횟수 초과");
@@ -854,7 +851,7 @@ export function prepareKorea(value) {
             if (typeof current === "bigint" && current >= 0n && current <= MAX_U64) {
                 const mapped = remapTile(current, boundary);
                 if (mapped !== null) {
-                    const point = candidate(mapped, boundary.bounds);
+                    const point = candidate(mapped, boundary);
                     const tile = tilePosition(boundary, point);
                     if (boundary.data.getUint32(128 + tile * 12, true) === 2
                         && (!boundary.atlas || atlasState(boundary, point, tile) === 2)) {

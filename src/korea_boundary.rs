@@ -556,18 +556,18 @@ fn validate_tile_index() -> Result<Box<[u32]>> {
     Ok(selected.into_boxed_slice())
 }
 fn remap_tile(value: u64, index: &BoundaryIndex) -> Result<Option<u64>> {
-    let selector = usize::try_from(value >> 46).map_err(|_| "대한민국 타일 선택값 오류")?;
-    if selector >= KOREA_TILE_COUNT.strict_mul(3) {
+    let selector = usize::try_from(value >> 42).map_err(|_| "대한민국 타일 선택값 오류")?;
+    if selector >= KOREA_TILE_COUNT.strict_mul(53) {
         return Ok(None);
     }
     let tile = u64::from(
         *index
             .sampler_tiles
-            .get(selector / 3)
+            .get(selector / 53)
             .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
     );
-    let vertical = ((tile >> 9) << 23) | ((value >> 23) & 0x7f_ffff);
-    let horizontal = ((tile & 511) << 23) | (value & 0x7f_ffff);
+    let vertical = ((tile >> 9) << 23) | (((value >> 21) & 0x1f_ffff) << 2) | 2;
+    let horizontal = ((tile & 511) << 23) | ((value & 0x1f_ffff) << 2) | 2;
     Ok(Some((vertical << 32) | horizontal))
 }
 pub(super) struct SampleState<'cache> {
