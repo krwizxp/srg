@@ -1,0 +1,51 @@
+name: Temporary Web Worker 10000-input comparison
+on:
+  pull_request:
+    paths:
+      - 'srg_random.js'
+      - 'srg_parallel.js'
+      - 'srg_worker.js'
+      - 'validation/bench_workers.mjs'
+      - '.github/workflows/validation-workers.yml'
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Pin current stable Rust
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustc +1.99.1 -Vv
+          lscpu | head -n 22
+      - name: Browser test tools
+        run: |
+          npm install --prefix validation --no-save playwright
+          validation/node_modules/.bin/playwright install --with-deps chromium firefox webkit
+      - name: Validate script syntax
+        run: |
+          node --check srg_random.js
+          node --check srg_parallel.js
+          node --check srg_worker.js
+          node --check validation/bench_workers.mjs
+      - name: Build Rust comparator and generate deterministic input results
+        run: |
+          cp validation/bench10000.rs src/bench10000.rs
+          rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/bench10000.rs -o validation/bench10000
+          validation/bench10000 > validation/rust-10k.log
+      - name: Compare 1 2 4 workers to serial and Rust
+        run: node validation/bench_workers.mjs | tee validation/worker-bench.log
+      - name: Save benchmark proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: srg-web-worker-trial
+          path: |
+            validation/rust-10k.log
+            validation/worker-bench.log
+          if-no-files-found: warn
+          retention-days: 14
