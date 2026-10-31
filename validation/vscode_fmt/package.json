@@ -1,0 +1,9 @@
+{
+  "name": "srg-temp-html-format",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "srg-validation",
+  "engines": {
+    "vscode": ">=1.80.0"
+  }
+}

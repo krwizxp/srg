@@ -1,0 +1,55 @@
+name: Temporary VS Code HTML format and strict validators
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validation-html-workers.yml'
+      - 'validation/vscode_fmt/**'
+      - 'revgeo.html'
+permissions:
+  contents: write
+jobs:
+  html:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact validation head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Remove whitespace-only HTML source lines
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path("revgeo.html")
+          source=path.read_text()
+          lines=source.splitlines(keepends=True)
+          cleaned="".join(line for line in lines if line.strip())
+          path.write_text(cleaned)
+          print(f"HTML_BLANK_LINES_REMOVED={len(lines)-len(cleaned.splitlines())}")
+          PY
+      - name: Install exact VS Code formatter runtime and validators
+        run: |
+          npm install --prefix validation --no-save @vscode/test-electron html-validate vnu-jar
+          command -v xvfb-run || (sudo apt-get update && sudo apt-get install --no-install-recommends -y xvfb xauth)
+          java -version
+      - name: VS Code built-in HTML Format Document
+        run: |
+          xvfb-run -a node validation/vscode_fmt/launch.cjs
+          git diff --stat
+      - name: Nu Html Checker
+        run: |
+          jar=$(find validation/node_modules/vnu-jar -name vnu.jar -print -quit)
+          test -n "$jar"
+          java -jar "$jar" --errors-only revgeo.html
+      - name: HTMLValidate
+        run: validation/node_modules/.bin/html-validate revgeo.html
+      - name: Commit and push formatted HTML only to temporary validation branch
+        run: |
+          if ! git diff --quiet -- revgeo.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add revgeo.html
+            git commit -m "Format worker-integrated HTML using VS Code built-in provider"
+            git push origin HEAD:refs/heads/validation/web-worker-20261031
+          fi
