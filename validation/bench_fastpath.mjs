@@ -3,15 +3,20 @@ import {createServer} from "node:http";
 import {resolve,sep} from "node:path";
 import {chromium,firefox,webkit} from "playwright";
 
-const source=readFileSync("korea_boundary.js","utf8");
+const released=readFileSync("korea_boundary.js","utf8");
 const earlyOriginal="++boundary.mixedChecks < 12";
 const fastOriginal="            if (await covers(boundary, point)) return point;";
-if(!source.includes(earlyOriginal)||!source.includes(fastOriginal))throw Error("sampler hook changed");
-const early=source.replace(earlyOriginal,"++boundary.mixedChecks < 1");
 const fastCode="            const tile = tilePosition(boundary, point);\n            const state = boundary.data.getUint32(128 + tile * 12, true);\n            if (state === 1 || (state === 2 && await covers(boundary, point))) return point;";
+if(!released.includes("++boundary.mixedChecks < 1")||!released.includes(fastCode))throw Error("optimized product source differs");
+const source=released.replace("++boundary.mixedChecks < 1",earlyOriginal).replace(fastCode,fastOriginal);
+const early=source.replace(earlyOriginal,"++boundary.mixedChecks < 1");
 const fast=source.replace(fastOriginal,fastCode);
 const both=early.replace(fastOriginal,fastCode);
-const modes=new Map([["baseline",source],["early",early],["fast",fast],["both",both]]);
+const cacheMarker="byteLimit: 4194304";
+if(source.split(cacheMarker).length-1!==2)throw Error("cache limits unavailable");
+const cache1m=source.replaceAll(cacheMarker,"byteLimit: 1048576");
+const cache8m=source.replaceAll(cacheMarker,"byteLimit: 8388608");
+const modes=new Map([["baseline",source],["early",early],["fast",fast],["both",both],["cache1m",cache1m],["cache8m",cache8m]]);
 const root=process.cwd();
 const server=createServer((req,res)=>{
     const path=new URL(req.url,"http://127.0.0.1").pathname;
@@ -38,8 +43,8 @@ try{
         const browser=await engine.launch({headless:true});
         try{
             const results={};
-            const order=browserName==="chromium"?["baseline","early","fast","both"]:
-                browserName==="firefox"?["both","fast","early","baseline"]:["fast","baseline","both","early"];
+            const order=browserName==="chromium"?["baseline","early","fast","both","cache8m","cache1m"]:
+                browserName==="firefox"?["cache1m","cache8m","both","fast","early","baseline"]:["fast","baseline","cache1m","both","early","cache8m"];
             for(const mode of order){
                 const context=await browser.newContext();
                 const count={binRequests:0,binBytes:0};
@@ -83,7 +88,7 @@ try{
                     results[mode]={durationMs:data.ms,supplementalReads:data.supplementalReads,coords:data.coords,...count};
                 }finally{await context.close();}
             }
-            for(const variant of ["early","fast","both"]){
+            for(const variant of ["early","fast","both","cache1m","cache8m"]){
                 const baseline=results.baseline.coords,now=results[variant].coords;
                 let different=0;for(let i=0;i<baseline.length;i++)if(baseline[i]!==now[i])different++;
                 results[variant].mismatches=different;

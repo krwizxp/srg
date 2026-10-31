@@ -513,7 +513,7 @@ function atlasState(boundary, point, tile) {
 
 const ATLAS_SHA256 = "a55dcf2e37a4500d6c30de3f5dad42131758415bcfafac79e88d76fb88b0e84d";
 function requestAtlas(boundary) {
-    if (boundary.atlasRequested || ++boundary.mixedChecks < 12) return;
+    if (boundary.atlasRequested || ++boundary.mixedChecks < 1) return;
     boundary.atlasRequested = true;
     setTimeout(async () => {
         try {
@@ -788,11 +788,10 @@ async function covers(boundary, point) {
             parity = parity !== Boolean(page.base ^ (lower & 1));
             continue;
         }
-        const start = [page.data.getFloat64(40, true), page.data.getFloat64(48, true)];
-        const end = [0, 0];
+        let start = [page.data.getFloat64(40, true), page.data.getFloat64(48, true)];
         for (let index = 1; index <= page.count; index++) {
-            end[0] = page.data.getFloat64(40 + index * 16, true);
-            end[1] = page.data.getFloat64(48 + index * 16, true);
+            const end = [page.data.getFloat64(40 + index * 16, true),
+                page.data.getFloat64(48 + index * 16, true)];
             if (latitude >= Math.min(start[1], end[1]) && latitude <= Math.max(start[1], end[1])) {
                 const side = orientation(start, end, location);
                 if (side === 0 && longitude >= Math.min(start[0], end[0])
@@ -802,8 +801,7 @@ async function covers(boundary, point) {
                     parity = parity !== crossing;
                 }
             }
-            start[0] = end[0];
-            start[1] = end[1];
+            start = end;
         }
     }
     requestAtlas(boundary);
@@ -830,7 +828,9 @@ export async function* sampleKorea(value) {
         const mapped = remapTile(candidateValue, boundary);
         if (mapped !== null) {
             const point = candidate(mapped, boundary);
-            if (await covers(boundary, point)) return point;
+            const tile = tilePosition(boundary, point);
+            const state = boundary.data.getUint32(128 + tile * 12, true);
+            if (state === 1 || (state === 2 && await covers(boundary, point))) return point;
         }
         requireBoundary(supplementalReads < SUPPLEMENT_LIMIT,
             "대한민국 좌표 보완 난수 시도 횟수 초과");
