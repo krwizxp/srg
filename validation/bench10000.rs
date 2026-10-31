@@ -3,7 +3,7 @@ mod diagnostic {
     pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
     pub struct AppError;
     impl AppError {
-        pub fn context(message: &'static str, cause: impl std::error::Error + Send + Sync + 'static) -> Box<dyn std::error::Error + Send + Sync> {
+        pub fn context(message: &'static str, cause: Box<dyn std::error::Error + Send + Sync>) -> Box<dyn std::error::Error + Send + Sync> {
             Box::new(std::io::Error::other(format!("{message}: {cause}")))
         }
     }
