@@ -46,7 +46,7 @@ testWorker=replaceOne(testWorker,
 testWorker=replaceOne(testWorker,
     "return { start, blocks, supplements };",
     "return { start, blocks, supplements, reads };");
-testWorker+=String.raw
+testWorker += "const __mask = (1n << 64n) - 1n;\nfunction splitmix64(state) {\n    state.value = (state.value + 0x9e3779b97f4a7c15n) & __mask;\n    let x = state.value;\n    x = ((x ^ (x >> 30n)) * 0xbf58476d1ce4e5b9n) & __mask;\n    x = ((x ^ (x >> 27n)) * 0x94d049bb133111ebn) & __mask;\n    return (x ^ (x >> 31n)) & __mask;\n}\n";
 const server=createServer((req,res)=>{
     const pathname=new URL(req.url,"http://127.0.0.1").pathname;
     const special=pathname==="/srg_parallel.js"?testParallel:pathname==="/srg_worker.js"?testWorker:null;
