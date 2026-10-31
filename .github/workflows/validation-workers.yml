@@ -8,6 +8,7 @@ on:
       - 'revgeo.html'
       - 'validation/verify_worker_ui.mjs'
       - 'validation/verify_worker_fallback.mjs'
+      - 'validation/verify_full_output.mjs'
       - 'validation/bench_workers.mjs'
       - '.github/workflows/validation-workers.yml'
 permissions:
@@ -44,6 +45,10 @@ jobs:
         run: |
           set -o pipefail
           node validation/bench_workers.mjs | tee validation/worker-bench.log
+      - name: Compare all 10000 formatted outputs against original inline module
+        run: |
+          set -o pipefail
+          node validation/verify_full_output.mjs | tee validation/full-output-parity.log
       - name: Verify actual UI automatic workers and manually supplied supplement ordering
         run: |
           set -o pipefail
@@ -62,5 +67,6 @@ jobs:
             validation/worker-bench.log
             validation/worker-ui.log
             validation/worker-fallback.log
+            validation/full-output-parity.log
           if-no-files-found: warn
           retention-days: 14
