@@ -1,0 +1,41 @@
+name: Temporary geo optimization Rust verification
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validation-geo-rust.yml"
+      - "validation/geo_*"
+      - "srg_parallel.js"
+      - "srg_worker.js"
+      - "korea_boundary.js"
+permissions:
+  contents: read
+jobs:
+  rust_checks:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install latest pinned Rust 1.99.1 with Clippy and rustfmt
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component clippy rustfmt --no-self-update
+          rustc +1.99.1 -Vv
+          cargo +1.99.1 --version
+          rustup component list --toolchain 1.99.1 --installed
+          uname -a
+          lscpu | head -n 24
+      - name: Install Linux native libcurl
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Verify Rust formatting
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Verify strict existing Rust and Clippy lint policy
+        run: cargo +1.99.1 clippy --frozen --all-targets --all-features -- -D warnings
+      - name: Verify Rust release tests
+        run: cargo +1.99.1 test --release --frozen --all-targets
+      - name: Verify shipping Rust release
+        run: cargo +1.99.1 build --release --frozen --bin srg
+      - name: Rust release size
+        run: |
+          ls -lh target/release/srg
+          sha256sum target/release/srg
