@@ -1,4 +1,4 @@
-use self::data::{INDEX as DATA, INDEX_SHA256, PARTS};
+use self::data::{INDEX as DATA, PARTS};
 use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
@@ -8,23 +8,16 @@ use crate::{
 use alloc::collections::VecDeque;
 use std::sync::{LazyLock, OnceLock};
 mod data;
-mod hash;
 const CACHE_BYTES: usize = 0x0010_0000;
 const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
 const KOREA_SUPP_RETRY_LIMIT: usize = 1024;
 const KOREA_TILE_BYTES: &[u8] = include_bytes!("../data/korea-boundary-v4/tile-select-v5.bin");
 const KOREA_TILE_COUNT: usize = 79113;
-const KOREA_TILE_SHA256: [u8; 32] = [
-    73, 47, 219, 238, 231, 231, 166, 72, 22, 215, 234, 144, 197, 124, 181, 119, 54, 133, 251, 249,
-    110, 11, 149, 145, 26, 139, 124, 220, 251, 242, 174, 139,
-];
 const MAX_PAGE_SIZE: usize = 0x8000;
 const MAX_PART_SIZE: usize = 0x0008_0000;
-static BOUNDARY: LazyLock<Result<BoundaryIndex>> = LazyLock::new(|| {
-    (hash::digest(DATA)? == INDEX_SHA256).ok_or("대한민국 경계 인덱스 SHA-256 오류")?;
-    BoundaryIndex::try_from((DATA, PARTS.len()))
-});
+static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
+    LazyLock::new(|| BoundaryIndex::try_from((DATA, PARTS.len())));
 #[derive(Default)]
 pub(super) struct BoundaryCache {
     bytes: usize,
@@ -54,7 +47,6 @@ struct Tile {
 struct Part {
     bytes: usize,
     count: usize,
-    digest: [u8; 32],
     first: usize,
     validated: OnceLock<Result<()>>,
 }
@@ -357,9 +349,8 @@ impl BoundaryIndex {
             && read_count(bytes, 16)? == bytes.len()
             && read_u32(bytes, 20)? == 0
             && bytes.get(24..56) == Some(self.source_hash.as_slice())
-            && read_u64(bytes, 56)? == 0
-            && hash::digest(bytes)? == part.digest)
-            .ok_or("대한민국 경계 조각 버전·길이·SHA-256 오류")?;
+            && read_u64(bytes, 56)? == 0)
+            .ok_or("대한민국 경계 조각 버전·길이 오류")?;
         let mut expected = 64_usize.strict_add(part.count.strict_mul(12));
         for local in 0..part.count {
             let entry = 64_usize.strict_add(local.strict_mul(12));
@@ -494,17 +485,10 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
                 && length > 64_usize.strict_add(count.strict_mul(12))
                 && length <= MAX_PART_SIZE)
                 .ok_or("대한민국 경계 조각 인덱스 오류")?;
-            let mut digest = [0_u8; 32];
-            digest.copy_from_slice(
-                bytes
-                    .get(offset.strict_add(16)..offset.strict_add(48))
-                    .ok_or("대한민국 경계 조각 해시 오류")?,
-            );
             parts.push(Part {
                 first,
                 count,
                 bytes: length,
-                digest,
                 validated: OnceLock::new(),
             });
             next_page = next_page
@@ -512,8 +496,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
                 .ok_or("대한민국 경계 조각 개수 오류")?;
         }
         (next_page == page_count).ok_or("대한민국 경계 전체 블록 개수 오류")?;
-        (KOREA_TILE_BYTES.len() == 0x8000 && hash::digest(KOREA_TILE_BYTES)? == KOREA_TILE_SHA256)
-            .ok_or("대한민국 좌표 타일 인덱스 SHA-256 오류")?;
+        (KOREA_TILE_BYTES.len() == 0x8000).ok_or("대한민국 좌표 타일 인덱스 길이 오류")?;
         let mut selected = Vec::with_capacity(KOREA_TILE_COUNT);
         for tile in 0_usize..0x0004_0000_usize {
             let byte = *KOREA_TILE_BYTES

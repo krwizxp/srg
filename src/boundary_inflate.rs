@@ -55,14 +55,21 @@ impl Bits<'_> {
         Some((u16::from_le_bytes(*bytes) >> (self.position & 7)) & 0x01FF)
     }
     fn read(&mut self, count: u32) -> Result<u32> {
+        let bit_count = usize::try_from(count)
+            .map_err(|source| format!("경계 압축 비트 개수 오류: {source}"))?;
         let mut value = 0_u32;
-        for shift in 0..count {
-            let byte = self
+        let mut shift = 0_usize;
+        while shift < bit_count {
+            let offset = self.position & 7_usize;
+            let width = bit_count.strict_sub(shift).min(8_usize.strict_sub(offset));
+            let byte = *self
                 .bytes
                 .get(self.position.strict_div(8))
                 .ok_or("경계 압축 데이터가 잘렸습니다.")?;
-            value |= u32::from((byte >> (self.position & 7)) & 1) << shift;
-            self.position = self.position.strict_add(1);
+            let mask = (1_u32 << width).strict_sub(1);
+            value |= ((u32::from(byte) >> offset) & mask) << shift;
+            self.position = self.position.strict_add(width);
+            shift = shift.strict_add(width);
         }
         Ok(value)
     }

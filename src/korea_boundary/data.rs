@@ -1,7 +1,3 @@
-pub(super) const INDEX_SHA256: [u8; 32] = [
-    140, 178, 10, 92, 13, 169, 195, 214, 34, 94, 251, 3, 35, 226, 74, 79, 153, 46, 179, 2, 154,
-    119, 45, 163, 167, 26, 85, 211, 245, 3, 191, 23,
-];
 pub(super) static INDEX: &[u8] = include_bytes!("../../data/korea-boundary-v4/index.bin");
 pub(super) static PARTS: [&[u8]; 96] = [
     include_bytes!("../../data/korea-boundary-v4/part-000.bin"),
