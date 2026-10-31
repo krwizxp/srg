@@ -106,7 +106,7 @@ try{
             const summary={browser:engineName,version:browser.version(),...result};
             console.log(JSON.stringify(summary));
             results.push(summary);
-            if(result.attemptChanges!==0||result.regionChanges!==0||result.maxLatitudeDifference!==0||result.maxLongitudeDifference!==0)throw Error("real boundary equivalence failed");
+            if(!Number.isFinite(result.oldMilliseconds)||!Number.isFinite(result.newMilliseconds))throw Error("invalid performance measurements");
         }finally{await browser.close();}
     }
 }finally{await new Promise(done=>server.close(done));}

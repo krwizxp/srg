@@ -814,11 +814,11 @@ function remapTile(value, boundary) {
     remapWords.setBigUint64(0, value, false);
     const high = remapWords.getUint32(0, false);
     const low = remapWords.getUint32(4, false);
-    const selector = high >>> 14;
-    if (selector >= TILE_COUNT * 3) return null;
-    const tile = boundary.tileIndex[Math.floor(selector / 3)];
-    const vertical = Math.floor(tile / 512) * 8388608 + (high & 0x3fff) * 512 + (low >>> 23);
-    const horizontal = (tile % 512) * 8388608 + (low & 0x7fffff);
+    const selector = high >>> 10;
+    if (selector >= TILE_COUNT * 53) return null;
+    const tile = boundary.tileIndex[Math.floor(selector / 53)];
+    const vertical = Math.floor(tile / 512) * 8388608 + (high & 0x3ff) * 8192 + (low >>> 21) * 4 + 2;
+    const horizontal = (tile % 512) * 8388608 + (low & 0x1fffff) * 4 + 2;
     return [vertical, horizontal];
 }
 export async function* sampleKorea(value) {

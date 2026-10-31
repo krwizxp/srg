@@ -28,5 +28,13 @@ jobs:
         run: node validation/bench_isolated.mjs
       - name: Compare deflate and polygon allocation approaches
         run: node validation/bench_expanded.mjs
-      - name: Compare full real-boundary behavior against pinned main
+      - name: Install latest stable Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --no-self-update
+      - name: Compile production Rust polygon sampler probe
+        run: |
+          rustc +1.99.1 --edition=2024 -O validation/probe_sampler.rs -o validation/probe_sampler
+          validation/probe_sampler > validation/probe-output.txt
+      - name: Compare production Rust and browser polygon results
+        run: node validation/verify_rust_web.mjs
+      - name: Compare old and new end-to-end mapping behavior
         run: node validation/verify_browser.mjs
