@@ -1,0 +1,121 @@
+name: Clean temporary validation branches and Actions
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/temporary-cleanup-20261101.yml]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SRG_TEMP_BRANCHES: '{"validation/full-audit-20261031-gpt6":"5ea3eaa91c7116e334ebe4a5bef107fca5442130","validation/native-candidates-20261101":"cc9a037313e715d583e5678f880a63c0786165d3","validation/newton-korea-uniform-20261031":"f56b296af4115de6609a7a245aed0aaac0d5d7db","validation/rust-web-10k-benchmark-20261031":"41b6649d4f04a2fbe740b653fca1fa4a9ad73039","validation/srg-coordinate-all-candidates-20261031":"6c9e2e7d29d37d0183dfb07ef49c56114060779b","validation/web-bottlenecks-20261031":"12e8cd8ffc4bd41d56e586d52b48b917e45545a3","validation/web-worker-20261031":"37c5cbff38d38d0ef8dc965469898503dfe0b11e"}'
+    steps:
+      - name: Remove only identified temporary resources
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+          
+          repository=os.environ['GITHUB_REPOSITORY']
+          assert repository=='krwizxp/srg'
+          assert os.environ['GITHUB_REF']=='refs/heads/main'
+          prefix='/repos/'+repository
+          allowed=json.loads(os.environ['SRG_TEMP_BRANCHES'])
+          assert allowed and all(name.startswith('validation/') for name in allowed)
+          receipt={'repository':repository,'run_id':int(os.environ['GITHUB_RUN_ID']),'deleted_branches':[],'deleted_runs':[],'deleted_artifacts':[],'disabled_workflows':[],'success':False}
+          def api(method,path,data=None):
+              assert path.startswith(prefix+'/')
+              payload=None if data is None else json.dumps(data).encode()
+              request=urllib.request.Request('https://api.github.com'+path,data=payload,method=method,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'srg-authorized-temporary-resource-cleanup'})
+              try:
+                  with urllib.request.urlopen(request,timeout=45) as response:
+                      body=response.read();return json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  if method=='DELETE' and error.code==404:return None
+                  message=error.read().decode('utf-8','replace')
+                  raise RuntimeError(f'{method} {path}: HTTP {error.code}: {message}') from None
+          def all_pages(path,key=None):
+              result=[]
+              for page in range(1,101):
+                  data=api('GET',path+('?' if '?' not in path else '&')+'per_page=100&page='+str(page))
+                  entries=data[key] if key else data
+                  result.extend(entries)
+                  if len(entries)<100:return result
+              raise RuntimeError('bounded pagination exceeded')
+          try:
+              branches=all_pages(prefix+'/branches')
+              for branch in branches:
+                  name=branch['name']
+                  if name=='main':continue
+                  assert name in allowed,'Unexpected branch; preserve and review: '+name
+                  assert branch['commit']['sha']==allowed[name],'Temporary branch changed concurrently: '+name
+              runs=all_pages(prefix+'/actions/runs','workflow_runs')
+              main_ids={run['id'] for run in runs if run.get('head_branch')=='main'}
+              main_workflows={run['workflow_id'] for run in runs if run.get('head_branch')=='main'}
+              targets=[run for run in runs if run.get('head_branch') in allowed]
+              target_ids={run['id'] for run in targets}
+              target_workflows={run['workflow_id'] for run in targets}-main_workflows
+              artifacts=all_pages(prefix+'/actions/artifacts','artifacts')
+              related=lambda artifact:((artifact.get('workflow_run') or {}).get('head_branch') in allowed or (artifact.get('workflow_run') or {}).get('id') in target_ids)
+              receipt.update({'main_runs_before':len(main_ids),'temporary_runs_before':len(targets),'temporary_artifacts_before':sum(related(item) for item in artifacts)})
+              for branch in branches:
+                  name=branch['name']
+                  if name not in allowed:continue
+                  path=prefix+'/git/refs/heads/'+urllib.parse.quote(name,safe='/')
+                  current=api('GET',prefix+'/git/ref/heads/'+urllib.parse.quote(name,safe='/'))
+                  assert current['object']['sha']==allowed[name]
+                  api('DELETE',path)
+                  receipt['deleted_branches'].append({'name':name,'sha':allowed[name]})
+                  print('Deleted temporary branch',name,flush=True)
+              for index,run in enumerate(targets):
+                  identity=str(run['id'])
+                  if run['status']!='completed':
+                      api('POST',prefix+'/actions/runs/'+identity+'/cancel')
+                      for attempt in range(60):
+                          fresh=api('GET',prefix+'/actions/runs/'+identity)
+                          if fresh['status']=='completed':break
+                          time.sleep(2)
+                      else:raise RuntimeError('cancellation did not finish')
+                  api('DELETE',prefix+'/actions/runs/'+identity)
+                  receipt['deleted_runs'].append({'id':run['id'],'branch':run['head_branch'],'name':run['name']})
+                  if (index+1)%20==0:print('Deleted temporary runs',index+1,'/',len(targets),flush=True)
+              for artifact in all_pages(prefix+'/actions/artifacts','artifacts'):
+                  if related(artifact):
+                      api('DELETE',prefix+'/actions/artifacts/'+str(artifact['id']))
+                      receipt['deleted_artifacts'].append(artifact['id'])
+              for workflow in all_pages(prefix+'/actions/workflows','workflows'):
+                  if workflow['id'] in target_workflows and workflow['state']=='active':
+                      api('PUT',prefix+'/actions/workflows/'+str(workflow['id'])+'/disable')
+                      receipt['disabled_workflows'].append({'id':workflow['id'],'name':workflow['name'],'path':workflow['path']})
+              final_branches=all_pages(prefix+'/branches')
+              final_runs=all_pages(prefix+'/actions/runs','workflow_runs')
+              final_artifacts=all_pages(prefix+'/actions/artifacts','artifacts')
+              receipt['remaining_temporary_branches']=[item['name'] for item in final_branches if item['name'] in allowed]
+              receipt['remaining_temporary_runs']=[item['id'] for item in final_runs if item.get('head_branch') in allowed]
+              receipt['remaining_temporary_artifacts']=[item['id'] for item in final_artifacts if related(item)]
+              receipt['main_runs_preserved']=main_ids.issubset({item['id'] for item in final_runs if item.get('head_branch')=='main'})
+              assert not receipt['remaining_temporary_branches'] and not receipt['remaining_temporary_runs'] and not receipt['remaining_temporary_artifacts']
+              assert receipt['main_runs_preserved']
+              receipt['success']=True
+              print(json.dumps({key:value for key,value in receipt.items() if key not in ['deleted_runs','deleted_artifacts']},indent=2),flush=True)
+          finally:
+              Path('cleanup-result.json').write_text(json.dumps(receipt,indent=2),encoding='utf-8')
+          PY
+      - name: Retain cleanup receipt on main
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: temporary-validation-cleanup-receipt
+          path: cleanup-result.json
+          if-no-files-found: error
+          retention-days: 14
