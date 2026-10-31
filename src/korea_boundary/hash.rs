@@ -80,21 +80,33 @@ const ROUND: [u32; 64] = [
     0xC671_78F2,
 ];
 
-fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
+fn compress(state: &mut [u32; 8], block: &[u8; 64]) -> Result<()> {
     let mut words = [0_u32; 64];
     for (word, bytes) in words.iter_mut().zip(block.as_chunks::<4>().0) {
         *word = u32::from_be_bytes(*bytes);
     }
     for round in 16_usize..64 {
-        let lower_word = words[round.strict_sub(15)];
-        let upper_word = words[round.strict_sub(2)];
+        let lower_word = *words
+            .get(round.strict_sub(15))
+            .ok_or("경계 SHA-256 메시지 위치 오류")?;
+        let upper_word = *words
+            .get(round.strict_sub(2))
+            .ok_or("경계 SHA-256 메시지 위치 오류")?;
         let lower =
             lower_word.rotate_right(7) ^ lower_word.rotate_right(18) ^ (lower_word >> 3_u32);
         let upper =
             upper_word.rotate_right(17) ^ upper_word.rotate_right(19) ^ (upper_word >> 10_u32);
-        words[round] = words[round.strict_sub(16)]
+        let previous = *words
+            .get(round.strict_sub(16))
+            .ok_or("경계 SHA-256 메시지 위치 오류")?;
+        let seventh = *words
+            .get(round.strict_sub(7))
+            .ok_or("경계 SHA-256 메시지 위치 오류")?;
+        *words
+            .get_mut(round)
+            .ok_or("경계 SHA-256 메시지 위치 오류")? = previous
             .wrapping_add(lower)
-            .wrapping_add(words[round.strict_sub(7)])
+            .wrapping_add(seventh)
             .wrapping_add(upper);
     }
     #[cfg(target_arch = "x86_64")]
@@ -103,7 +115,7 @@ fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
         unsafe {
             compress_sha(state, &words);
         }
-        return;
+        return Ok(());
     }
     let [
         mut aa,
@@ -137,6 +149,7 @@ fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
     for (destination, value) in state.iter_mut().zip([aa, bb, cc, dd, ee, ff, gg, hh]) {
         *destination = destination.wrapping_add(value);
     }
+    Ok(())
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -197,7 +210,7 @@ pub(super) fn digest(bytes: &[u8]) -> Result<[u8; 32]> {
     let mut state = INITIAL;
     let (blocks, tail) = bytes.as_chunks::<64>();
     for block in blocks {
-        compress(&mut state, block);
+        compress(&mut state, block)?;
     }
     let mut padding = [0_u8; 128];
     padding
@@ -216,7 +229,7 @@ pub(super) fn digest(bytes: &[u8]) -> Result<[u8; 32]> {
         .as_chunks::<64>()
         .0
     {
-        compress(&mut state, block);
+        compress(&mut state, block)?;
     }
     let mut result = [0_u8; 32];
     for (destination, word) in result.as_chunks_mut::<4>().0.iter_mut().zip(state) {

@@ -1,7 +1,7 @@
 #[cfg(target_arch = "x86_64")]
-use super::hardware_rng::HardwareRng;
+use super::{diagnostic::AppError, hardware_rng::HardwareRng};
 use crate::{
-    diagnostic::{AppError, Result},
+    diagnostic::Result,
     korea_boundary,
     numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
 };
@@ -73,10 +73,10 @@ struct UniqueNumbers<const N: usize> {
     seen: u64,
 }
 struct RandomDataBuildState<'cache> {
-    korea: korea_boundary::SampleState<'cache>,
     data: RandomDataSet,
     euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
     euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
+    korea: korea_boundary::SampleState<'cache>,
     lotto: UniqueNumbers<LOTTO_COUNT>,
     lotto7: UniqueNumbers<LOTTO7_COUNT>,
     numeric_password_digits: u8,
@@ -94,10 +94,10 @@ impl RandomDataSet {
         let initial = self.num_64;
         let mut local_cache = korea_boundary::BoundaryCache::default();
         let mut fields = RandomDataBuildState {
-            korea: korea_boundary::SampleState::new(
+            korea: korea_boundary::SampleState::try_from((
                 initial,
                 boundary_cache.unwrap_or(&mut local_cache),
-            )?,
+            ))?,
             data: self,
             euro_lucky: UniqueNumbers::new(),
             euro_main: UniqueNumbers::new(),
@@ -146,20 +146,6 @@ impl<const N: usize> UniqueNumbers<N> {
     }
 }
 impl RandomDataBuildState<'_> {
-    fn is_basic_complete(&self) -> bool {
-        usize::from(self.password_len) == PASSWORD_BYTE_LEN
-            && self.lotto7.is_full()
-            && self.lotto.is_full()
-            && self.euro_main.is_full()
-    }
-    fn is_complete(&self) -> bool {
-        self.is_basic_complete()
-            && self.korea.is_complete()
-            && self.data.hangul_syllables.iter().all(|&c| c != '\0')
-            && self.data.planet_number != 0
-            && self.data.solar_system_index != 0
-            && self.euro_lucky.is_full()
-    }
     fn check_complete(&self) -> Result<()> {
         if !self.is_basic_complete() {
             return Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into());
@@ -174,26 +160,6 @@ impl RandomDataBuildState<'_> {
             return Err("NMS 보완 난수 시도 횟수를 초과했습니다.".into());
         }
         Ok(())
-    }
-    fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
-        self.fill_required_fields_from_u64(value);
-        self.fill_hangul_from_u64(value, initial);
-        self.fill_nms_from_u64(value, initial);
-        self.fill_lucky_stars_from_u64(value);
-        if !initial {
-            self.korea.offer_supplement(value)?;
-        }
-        Ok(())
-    }
-    fn finish(self) -> Result<RandomDataSet> {
-        self.check_complete()?;
-        let mut data = self.data;
-        data.kor_coords = self.korea.finish()?;
-        data.euro_millions_lucky_stars = self.euro_lucky.into_values();
-        data.euro_millions_main_numbers = self.euro_main.into_values();
-        data.lotto_numbers = self.lotto.into_values();
-        data.lotto7_numbers = self.lotto7.into_values();
-        Ok(data)
     }
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
@@ -212,6 +178,24 @@ impl RandomDataBuildState<'_> {
         self.data.galaxy_y = galaxy_coord::<0x7F, 0xFF>(u16::from(self.data.nms_portal_yy));
         self.data.galaxy_z = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_zzz);
     }
+    fn fill_hangul_from_u64(&mut self, value: u64, initial: bool) {
+        for (position, slot) in self.data.hangul_syllables.iter_mut().enumerate() {
+            if *slot != '\0' {
+                continue;
+            }
+            let shifts = HANGUL_SHIFTS.into_iter().cycle().skip(position);
+            let limit = if initial { 1 } else { HANGUL_SYLLABLE_COUNT };
+            let candidate_index = shifts.take(limit).find_map(|shift| {
+                let candidate = u32::from(low_u16_from_u64(value >> shift));
+                (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
+            });
+            if let Some(index) = candidate_index {
+                let point =
+                    HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
+                *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
+            }
+        }
+    }
     fn fill_lucky_stars_from_u64(&mut self, value: u64) {
         if self.euro_lucky.is_full() {
             return;
@@ -221,24 +205,6 @@ impl RandomDataBuildState<'_> {
                 && self.euro_lucky.push(byte, EURO_LUCKY_MODULUS)
             {
                 return;
-            }
-        }
-    }
-    fn fill_hangul_from_u64(&mut self, value: u64, initial: bool) {
-        for (position, slot) in self.data.hangul_syllables.iter_mut().enumerate() {
-            if *slot != '\0' {
-                continue;
-            }
-            let shifts = HANGUL_SHIFTS.into_iter().cycle().skip(position);
-            let limit = if initial { 1 } else { HANGUL_SYLLABLE_COUNT };
-            let index = shifts.take(limit).find_map(|shift| {
-                let candidate = u32::from(low_u16_from_u64(value >> shift));
-                (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
-            });
-            if let Some(index) = index {
-                let point =
-                    HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
-                *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
             }
         }
     }
@@ -307,6 +273,44 @@ impl RandomDataBuildState<'_> {
                 return;
             }
         }
+    }
+    fn finish(self) -> Result<RandomDataSet> {
+        self.check_complete()?;
+        let mut data = self.data;
+        data.kor_coords = self.korea.finish()?;
+        data.euro_millions_lucky_stars = self.euro_lucky.into_values();
+        data.euro_millions_main_numbers = self.euro_main.into_values();
+        data.lotto_numbers = self.lotto.into_values();
+        data.lotto7_numbers = self.lotto7.into_values();
+        Ok(data)
+    }
+    fn is_basic_complete(&self) -> bool {
+        usize::from(self.password_len) == PASSWORD_BYTE_LEN
+            && self.lotto7.is_full()
+            && self.lotto.is_full()
+            && self.euro_main.is_full()
+    }
+    fn is_complete(&self) -> bool {
+        self.is_basic_complete()
+            && self.korea.is_complete()
+            && self
+                .data
+                .hangul_syllables
+                .iter()
+                .all(|&character| character != '\0')
+            && self.data.planet_number != 0
+            && self.data.solar_system_index != 0
+            && self.euro_lucky.is_full()
+    }
+    fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
+        self.fill_required_fields_from_u64(value);
+        self.fill_hangul_from_u64(value, initial);
+        self.fill_nms_from_u64(value, initial);
+        self.fill_lucky_stars_from_u64(value);
+        if !initial {
+            self.korea.offer_supplement(value)?;
+        }
+        Ok(())
     }
 }
 fn nms_candidate(value: u64, shifts: &[u8], mask: u64, max: u64) -> Option<u64> {

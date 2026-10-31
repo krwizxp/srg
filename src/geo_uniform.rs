@@ -1,127 +1,175 @@
-use crate::{diagnostic::Result, random_data::Coordinates};
-const DEGREES: f64 = 0.017_453_292_519_943_295;
-const ECCENTRICITY_SQUARED: f64 = 0.006_694_380_022_900_787;
-fn product_error(a: f64, b: f64, product: f64) -> f64 {
-    let split = 134_217_729.0_f64 * a;
-    let ah = split - (split - a);
-    let al = a - ah;
-    let split = 134_217_729.0_f64 * b;
-    let bh = split - (split - b);
-    let bl = b - bh;
-    ((ah * bh - product) + ah * bl + al * bh) + al * bl
+use crate::{
+    diagnostic::{AppError, Result},
+    random_data::Coordinates,
+};
+const DEGREES: f64 = 0.017_453_292_519_943_295_f64;
+const ECCENTRICITY_SQUARED: f64 = 0.006_694_380_022_900_787_f64;
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) enum Orientation {
+    Negative,
+    Positive,
+    Unordered,
+    Zero,
 }
-pub(super) fn orientation(start: [f64; 2], end: [f64; 2], point: [f64; 2]) -> f64 {
-    let a = end[0] - start[0];
-    let b = end[1] - start[1];
-    let c = point[0] - start[0];
-    let d = point[1] - start[1];
-    let left = a * d;
-    let right = b * c;
-    let approximate = left - right;
-    if approximate.abs() > 3.330_669_073_875_471_6e-16 * (left.abs() + right.abs()) {
-        return approximate;
-    }
-    let mut expansion = [0.0_f64; 4];
-    let mut length = 0_usize;
-    for mut value in [
-        product_error(a, d, left),
-        left,
-        -product_error(b, c, right),
-        -right,
-    ] {
-        let mut count = 0_usize;
-        let previous = expansion;
-        for entry in previous.into_iter().take(length) {
-            let total = value + entry;
-            let virtual_value = total - value;
-            let error = (value - (total - virtual_value)) + (entry - virtual_value);
-            if error != 0.0 {
-                expansion[count] = error;
-                count = count.strict_add(1);
-            }
-            value = total;
+impl TryFrom<(u64, [f64; 4])> for Coordinates {
+    type Error = AppError;
+    fn try_from((value, bounds): (u64, [f64; 4])) -> Result<Self> {
+        let [west, south, east, north] = bounds;
+        (bounds.into_iter().all(f64::is_finite)
+            && west >= -180.0_f64
+            && east <= 180.0_f64
+            && west < east
+            && south >= 32.0_f64
+            && north <= 40.0_f64
+            && south < north)
+            .ok_or("대한민국 등면적 좌표 범위 오류")?;
+        let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
+        let vertical =
+            (f64::from(u32::from_be_bytes([b0, b1, b2, b3])) + 0.5_f64) / 4_294_967_296.0_f64;
+        let horizontal =
+            (f64::from(u32::from_be_bytes([b4, b5, b6, b7])) + 0.5_f64) / 4_294_967_296.0_f64;
+        let south_area = cumulative_area_and_derivative(south).0;
+        let area_span = cumulative_area_and_derivative(north).0 - south_area;
+        let area_offset = vertical * area_span;
+        let target = south_area + area_offset;
+        let latitude_offset = (north - south) * vertical;
+        let mut latitude = south + latitude_offset;
+        for _ in 0_usize..3_usize {
+            let (area, derivative) = cumulative_area_and_derivative(latitude);
+            latitude -= (area - target) / derivative;
         }
-        if value != 0.0 || count == 0 {
-            expansion[count] = value;
-            count = count.strict_add(1);
-        }
-        length = count;
+        let longitude_offset = horizontal * (east - west);
+        let longitude = west + longitude_offset;
+        (latitude > south && latitude < north && longitude > west && longitude < east)
+            .ok_or("대한민국 등면적 좌표 역산 오류")?;
+        Ok(Self {
+            latitude,
+            longitude,
+        })
     }
-    expansion.iter().take(length).sum()
+}
+impl TryFrom<([f64; 2], [f64; 2], [f64; 2])> for Orientation {
+    type Error = AppError;
+    fn try_from((start, end, point): ([f64; 2], [f64; 2], [f64; 2])) -> Result<Self> {
+        let dx = end[0] - start[0];
+        let dy = end[1] - start[1];
+        let px = point[0] - start[0];
+        let py = point[1] - start[1];
+        let left = dx * py;
+        let right = dy * px;
+        let approximate = left - right;
+        let determinant: f64 =
+            if approximate.abs() > 3.330_669_073_875_471_6e-16_f64 * (left.abs() + right.abs()) {
+                approximate
+            } else {
+                let mut expansion = [0.0_f64; 4];
+                let mut length = 0_usize;
+                for mut value in [
+                    product_error(dx, py, left),
+                    left,
+                    -product_error(dy, px, right),
+                    -right,
+                ] {
+                    let mut count = 0_usize;
+                    let previous = expansion;
+                    for entry in previous.into_iter().take(length) {
+                        let total = value + entry;
+                        let virtual_value = total - value;
+                        let error = (value - (total - virtual_value)) + (entry - virtual_value);
+                        if error != 0.0_f64 {
+                            *expansion
+                                .get_mut(count)
+                                .ok_or("대한민국 경계 좌표 누산 범위 오류")? = error;
+                            count = count.strict_add(1);
+                        }
+                        value = total;
+                    }
+                    if value != 0.0_f64 || count == 0 {
+                        *expansion
+                            .get_mut(count)
+                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = value;
+                        count = count.strict_add(1);
+                    }
+                    length = count;
+                }
+                expansion.iter().take(length).sum()
+            };
+        Ok(if determinant < 0.0_f64 {
+            Self::Negative
+        } else if determinant > 0.0_f64 {
+            Self::Positive
+        } else if determinant == 0.0_f64 {
+            Self::Zero
+        } else {
+            Self::Unordered
+        })
+    }
 }
 fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
-    let delta = (latitude - 36.0) * DEGREES;
+    let delta = (latitude - 36.0_f64) * DEGREES;
     let square = delta * delta;
-    let sine_delta = delta
-        * (1.0
-            + square
-                * (-0.166_666_666_666_666_66
-                    + square
-                        * (0.008_333_333_333_333_333
-                            + square
-                                * (-0.000_198_412_698_412_698_4
-                                    + square
-                                        * (2.755_731_922_398_589_3e-6
-                                            + square * -2.505_210_838_544_172e-8)))));
-    let cosine_delta = 1.0
-        + square
-            * (-0.5
-                + square
-                    * (0.041_666_666_666_666_664
-                        + square
-                            * (-0.001_388_888_888_888_889
-                                + square
-                                    * (2.480_158_730_158_73e-5
-                                        + square
-                                            * (-2.755_731_922_398_589e-7
-                                                + square * 2.087_675_698_786_81e-9)))));
-    let sine = 0.587_785_252_292_473_1 * cosine_delta + 0.809_016_994_374_947_5 * sine_delta;
-    let square_eccentric_sine = ECCENTRICITY_SQUARED * sine * sine;
-    let mut polynomial = 9.0 / 17.0;
+    let mut sine_polynomial = -2.505_210_838_544_172e-8_f64;
     for coefficient in [
-        8.0 / 15.0,
-        7.0 / 13.0,
-        6.0 / 11.0,
-        5.0 / 9.0,
-        4.0 / 7.0,
-        3.0 / 5.0,
-        2.0 / 3.0,
-        1.0,
+        2.755_731_922_398_589_3e-6_f64,
+        -0.000_198_412_698_412_698_4_f64,
+        0.008_333_333_333_333_333_f64,
+        -0.166_666_666_666_666_66_f64,
+        1.0_f64,
     ] {
-        polynomial = coefficient + square_eccentric_sine * polynomial;
+        let term = square * sine_polynomial;
+        sine_polynomial = coefficient + term;
     }
-    let cosine = 0.809_016_994_374_947_5 * cosine_delta - 0.587_785_252_292_473_1 * sine_delta;
-    let denominator = 1.0 - square_eccentric_sine;
-    (
-        sine * polynomial,
-        DEGREES * cosine / (denominator * denominator),
-    )
+    let sine_delta = delta * sine_polynomial;
+    let mut cosine_polynomial = 2.087_675_698_786_81e-9_f64;
+    for coefficient in [
+        -2.755_731_922_398_589e-7_f64,
+        2.480_158_730_158_73e-5_f64,
+        -0.001_388_888_888_888_889_f64,
+        0.041_666_666_666_666_664_f64,
+        -0.5_f64,
+        1.0_f64,
+    ] {
+        let term = square * cosine_polynomial;
+        cosine_polynomial = coefficient + term;
+    }
+    let cosine_delta = cosine_polynomial;
+    let cosine_part = 0.587_785_252_292_473_1_f64 * cosine_delta;
+    let sine_part = 0.809_016_994_374_947_5_f64 * sine_delta;
+    let sine = cosine_part + sine_part;
+    let square_eccentric_sine = ECCENTRICITY_SQUARED * sine * sine;
+    let mut polynomial = 9.0_f64 / 17.0_f64;
+    for coefficient in [
+        8.0_f64 / 15.0_f64,
+        7.0_f64 / 13.0_f64,
+        6.0_f64 / 11.0_f64,
+        5.0_f64 / 9.0_f64,
+        4.0_f64 / 7.0_f64,
+        3.0_f64 / 5.0_f64,
+        2.0_f64 / 3.0_f64,
+        1.0_f64,
+    ] {
+        let contribution = square_eccentric_sine * polynomial;
+        polynomial = coefficient + contribution;
+    }
+    let longitude_cosine_term = 0.809_016_994_374_947_5_f64 * cosine_delta;
+    let longitude_sine_term = 0.587_785_252_292_473_1_f64 * sine_delta;
+    let cosine = longitude_cosine_term - longitude_sine_term;
+    let denominator = 1.0_f64 - square_eccentric_sine;
+    let numerator = DEGREES * cosine;
+    let denominator_squared = denominator * denominator;
+    (sine * polynomial, numerator / denominator_squared)
 }
-pub(super) fn candidate(value: u64, bounds: [f64; 4]) -> Result<Coordinates> {
-    let [west, south, east, north] = bounds;
-    (bounds.into_iter().all(f64::is_finite)
-        && west >= -180.0
-        && east <= 180.0
-        && west < east
-        && south >= 32.0
-        && north <= 40.0
-        && south < north)
-        .ok_or("대한민국 등면적 좌표 범위 오류")?;
-    let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
-    let vertical = (f64::from(u32::from_be_bytes([b0, b1, b2, b3])) + 0.5) / 4_294_967_296.0;
-    let horizontal = (f64::from(u32::from_be_bytes([b4, b5, b6, b7])) + 0.5) / 4_294_967_296.0;
-    let south_area = cumulative_area_and_derivative(south).0;
-    let target = south_area + vertical * (cumulative_area_and_derivative(north).0 - south_area);
-    let mut latitude = south + (north - south) * vertical;
-    for _ in 0..3 {
-        let (area, derivative) = cumulative_area_and_derivative(latitude);
-        latitude -= (area - target) / derivative;
-    }
-    let longitude = west + horizontal * (east - west);
-    (latitude > south && latitude < north && longitude > west && longitude < east)
-        .ok_or("대한민국 등면적 좌표 역산 오류")?;
-    Ok(Coordinates {
-        latitude,
-        longitude,
-    })
+fn product_error(left: f64, right: f64, product: f64) -> f64 {
+    let split_left = 134_217_729.0_f64 * left;
+    let ah = split_left - (split_left - left);
+    let al = left - ah;
+    let split_right = 134_217_729.0_f64 * right;
+    let bh = split_right - (split_right - right);
+    let bl = right - bh;
+    let high_product = ah * bh;
+    let high_error = high_product - product;
+    let cross_left = ah * bl;
+    let cross_right = al * bh;
+    let low_product = al * bl;
+    ((high_error + cross_left) + cross_right) + low_product
 }
