@@ -32,7 +32,6 @@
 				transform: rotate(360deg)
 			}
 		}
-
 		:root {
 			color-scheme: light dark;
 			--page: light-dark(#f5f5f7, #000);
@@ -74,21 +73,17 @@
 			scrollbar-width: thin;
 			scrollbar-color: var(--control) transparent
 		}
-
 		:root[data-theme=light] {
 			color-scheme: light
 		}
-
 		:root[data-theme=dark] {
 			color-scheme: dark
 		}
-
 		*,
 		::after,
 		::before {
 			box-sizing: border-box
 		}
-
 		body,
 		dd,
 		dl,
@@ -98,35 +93,29 @@
 		pre {
 			margin: 0
 		}
-
 		button,
 		input,
 		select,
 		textarea {
 			font: inherit
 		}
-
 		button,
 		select,
 		.drop-zone input {
 			cursor: pointer
 		}
-
 		button {
 			color: inherit
 		}
-
 		.map-links a,
 		button {
 			-webkit-tap-highlight-color: transparent;
 			transition: border-color .15s
 		}
-
 		a {
 			color: var(--accent);
 			text-underline-offset: 3px
 		}
-
 		svg {
 			flex-shrink: 0;
 			vertical-align: middle;
@@ -138,33 +127,27 @@
 			fill: none;
 			stroke: currentColor
 		}
-
 		[hidden] {
 			display: none !important
 		}
-
 		.drop-zone:focus-within,
 		.map-preview:has(:focus-visible),
 		:is(button, input, textarea, select, a, [tabindex]):focus-visible {
 			outline: 2px solid var(--focus);
 			outline-offset: 3px
 		}
-
 		::selection {
 			background: var(--tint);
 			color: var(--fg)
 		}
-
 		body,
 		html {
 			background: var(--page)
 		}
-
 		html {
 			min-width: 320px;
 			-webkit-text-size-adjust: 100%
 		}
-
 		body {
 			color: var(--fg);
 			font-size: var(--text-body);
@@ -173,7 +156,6 @@
 			word-break: keep-all;
 			min-height: 100dvh
 		}
-
 		.coords-empty,
 		.coords-head,
 		.drop-zone,
@@ -196,7 +178,6 @@
 			display: flex;
 			align-items: center
 		}
-
 		.coords-head,
 		.header-inner,
 		.progress-heading,
@@ -205,7 +186,6 @@
 		.sheet-heading {
 			justify-content: space-between
 		}
-
 		.input-actions,
 		.map-recovery,
 		.status-row {
@@ -213,7 +193,6 @@
 			flex-wrap: wrap;
 			gap: 8px
 		}
-
 		.filters :is(input, select),
 		.rng-generator input[type=number],
 		.settings select,
@@ -221,7 +200,6 @@
 			background: var(--surface);
 			border: 1px solid var(--control)
 		}
-
 		#output,
 		.coords-panel,
 		.job-panel,
@@ -232,15 +210,12 @@
 			background: var(--surface);
 			border: 1px solid var(--line)
 		}
-
 		:is(input, textarea)[aria-invalid=true] {
 			border-color: var(--danger)
 		}
-
 		#coords:focus-visible {
 			outline-offset: -3px
 		}
-
 		#counts,
 		#detail-town,
 		#results-count,
@@ -258,7 +233,6 @@
 			font-size: var(--text-secondary);
 			color: var(--muted)
 		}
-
 		.coords-cell,
 		.segmented button,
 		.step-label,
@@ -268,7 +242,6 @@
 			line-height: 1.5;
 			color: var(--muted)
 		}
-
 		#detail-coordinates,
 		#detail-tag,
 		#detail-title,
@@ -285,7 +258,6 @@
 		td {
 			overflow-wrap: anywhere
 		}
-
 		.drop-zone input,
 		.track>progress {
 			position: absolute;
@@ -294,7 +266,6 @@
 			height: 100%;
 			opacity: 0
 		}
-
 		.button,
 		.copyright,
 		.credits a,
@@ -302,25 +273,21 @@
 			display: inline-flex;
 			align-items: center
 		}
-
 		.button,
 		.copyright,
 		.kind-badge,
 		.table-hint {
 			justify-content: center
 		}
-
 		.coords-empty,
 		.drop-zone,
 		.map-load {
 			justify-content: center;
 			gap: 12px
 		}
-
 		.site-header {
 			border-bottom: 1px solid var(--line)
 		}
-
 		.header-inner {
 			gap: 24px;
 			min-height: 88px;
@@ -328,38 +295,32 @@
 			margin: auto;
 			padding-block: max(16px, env(safe-area-inset-top)) 16px
 		}
-
 		.header-tools,
 		.site-brand {
 			gap: 12px
 		}
-
 		.site-brand {
 			text-decoration: none;
 			color: var(--fg);
 			min-width: 44px;
 			min-height: 44px
 		}
-
 		.brand-mark {
 			width: 42px;
 			height: 42px;
 			flex: none
 		}
-
 		.input-card,
 		.results,
 		.site-brand>div,
 		.table-zone {
 			min-width: 0
 		}
-
 		.site-brand h1 {
 			display: inline;
 			font-size: 1.2rem;
 			letter-spacing: 0
 		}
-
 		.steps {
 			display: flex;
 			gap: 24px;
@@ -367,16 +328,13 @@
 			margin: 0;
 			list-style: none
 		}
-
 		.step-label,
 		.theme-toggle :is(.theme-moon, .theme-sun) {
 			display: none
 		}
-
 		.steps li {
 			gap: 8px
 		}
-
 		.steps span {
 			display: grid;
 			place-items: center;
@@ -386,17 +344,14 @@
 			border-radius: 50%;
 			font-size: .75rem
 		}
-
 		.steps [aria-current=step] span {
 			border-color: var(--button-fill)
 		}
-
 		.tool-capsule {
 			display: flex;
 			padding: 3px;
 			border-radius: var(--radius-pill)
 		}
-
 		.mobile-nav,
 		.tool-capsule {
 			isolation: isolate;
@@ -406,7 +361,6 @@
 			-webkit-backdrop-filter: blur(20px) saturate(1.8);
 			backdrop-filter: blur(20px) saturate(1.8)
 		}
-
 		.icon-button {
 			border: 0;
 			border-radius: 50%;
@@ -418,16 +372,13 @@
 			min-height: 44px;
 			padding: 0
 		}
-
 		:is(.icon-button, .segmented button):active:not(:disabled) {
 			background: var(--secondary-active)
 		}
-
 		button:disabled {
 			opacity: .42;
 			cursor: not-allowed
 		}
-
 		#app {
 			display: grid;
 			grid-template-columns: 304px minmax(0, 1fr);
@@ -436,13 +387,11 @@
 			max-width: 1680px;
 			margin: 26px auto 0
 		}
-
 		.card-label {
 			font-size: 1.75rem;
 			font-weight: 600;
 			letter-spacing: 0
 		}
-
 		.segmented {
 			display: flex;
 			align-items: stretch;
@@ -451,7 +400,6 @@
 			border-radius: var(--radius-control);
 			background: var(--press-bg)
 		}
-
 		.segmented button {
 			flex: 1;
 			min-width: 0;
@@ -462,22 +410,18 @@
 			color: var(--fg);
 			background: 0 0
 		}
-
 		.segmented :is([aria-selected=true], [aria-pressed=true]) {
 			background: var(--surface);
 			color: var(--fg);
 			font-weight: 600;
 			box-shadow: 0 1px 4px #00000014
 		}
-
 		.segmented :is([aria-selected=true], [aria-pressed=true]):active:not(:disabled) {
 			background: var(--surface)
 		}
-
 		.input-tabs {
 			margin: 18px 0
 		}
-
 		.drop-zone {
 			position: relative;
 			flex-direction: column;
@@ -488,21 +432,17 @@
 			border: 1px dashed var(--control);
 			border-radius: var(--radius-card)
 		}
-
 		.drop-zone.is-dragging,
 		.drop-zone:active:not(:has(input:disabled)) {
 			border-color: var(--accent);
 			background: var(--tint)
 		}
-
 		.drop-zone:has(input:disabled) {
 			opacity: .55
 		}
-
 		.drop-zone input:disabled {
 			cursor: not-allowed
 		}
-
 		.drop-text>svg {
 			display: block;
 			width: 30px;
@@ -510,11 +450,9 @@
 			margin: 0 auto 14px;
 			color: var(--accent)
 		}
-
 		#drop-filename {
 			font-size: 1rem
 		}
-
 		#detail-tag,
 		#progress-percent,
 		.code-view,
@@ -528,7 +466,6 @@
 		td {
 			font-size: .875rem
 		}
-
 		.button,
 		.map-links a {
 			gap: 8px;
@@ -545,13 +482,11 @@
 			text-align: center;
 			text-decoration: none
 		}
-
 		.button:active:not(:disabled) {
 			background: var(--button-active);
 			border-color: transparent;
 			color: #fff
 		}
-
 		.steps [aria-current=step] span,
 		.primary,
 		#filter-count,
@@ -559,122 +494,101 @@
 			background: var(--button-fill);
 			color: #fff
 		}
-
 		.primary {
 			border-color: transparent
 		}
-
 		#progress-percent,
 		.file-cue,
 		.steps [aria-current=step] {
 			color: var(--accent);
 			font-weight: 600
 		}
-
 		.danger {
 			color: var(--danger);
 			background: var(--danger-bg);
 			border-color: var(--danger)
 		}
-
 		.danger:active:not(:disabled) {
 			color: var(--danger);
 			background: var(--danger-active);
 			border-color: var(--danger)
 		}
-
 		#parse {
 			width: 100%;
 			margin-top: 12px
 		}
-
 		.coords-panel,
 		.job-panel {
 			border-color: transparent;
 			margin-top: 20px;
 			border-radius: var(--radius-card)
 		}
-
 		.coords-panel {
 			min-width: 0;
 			overflow: hidden
 		}
-
 		.coords-head {
 			flex-wrap: wrap;
 			padding: 13px 16px;
 			border-bottom: 1px solid var(--line);
 			gap: 8px
 		}
-
 		.label {
 			font-weight: 600;
 			color: var(--fg)
 		}
-
 		.coords-head svg {
 			width: 16px;
 			height: 16px;
 			color: var(--accent);
 			margin-right: 4px
 		}
-
 		.coords-panel[data-empty=true] .coords-head {
 			border-bottom: 0
 		}
-
 		.coords-empty {
 			min-height: 72px;
 			padding: 12px 18px 18px;
 			text-align: center
 		}
-
 		.coords-empty svg {
 			width: 22px;
 			height: 22px;
 			color: var(--accent)
 		}
-
 		.code-view {
 			overflow: auto;
 			scrollbar-width: thin;
 			font-family: var(--mono)
 		}
-
 		.coords-tools {
 			display: none;
 			gap: 8px;
 			padding: 8px 16px 14px
 		}
-
 		.coords-panel[data-empty=false] .coords-tools {
 			display: flex
 		}
-
 		.coords-tools .button {
 			flex: 1;
 			padding-inline: 12px;
 			overflow-wrap: anywhere
 		}
-
 		.code-content {
 			display: block;
 			padding: 12px;
 			font: inherit
 		}
-
 		#coords {
 			display: grid;
 			grid-template-columns: 34px minmax(0, 1fr);
 			height: 172px
 		}
-
 		#coords .code-content {
 			min-width: max-content;
 			padding: 10px 8px;
 			line-height: 1.625rem
 		}
-
 		#coord-line-numbers {
 			padding: 10px 0;
 			line-height: 1.625rem;
@@ -682,21 +596,17 @@
 			color: var(--muted);
 			user-select: none
 		}
-
 		.job-panel {
 			padding: 18px
 		}
-
 		.progress-pending {
 			display: none;
 			font-weight: 600;
 			margin-bottom: 8px
 		}
-
 		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) .progress-pending {
 			display: block
 		}
-
 		.track {
 			--pct: 0;
 			height: 6px;
@@ -705,12 +615,10 @@
 			overflow: hidden;
 			position: relative
 		}
-
 		.track>progress:not([value]) {
 			opacity: 1;
 			accent-color: var(--accent)
 		}
-
 		.fill {
 			display: block;
 			width: calc(var(--pct)*1%);
@@ -718,69 +626,56 @@
 			background: var(--accent);
 			border-radius: inherit
 		}
-
 		#counts {
 			display: block;
 			margin-top: 10px
 		}
-
 		.status {
 			flex-basis: 100%;
 			font-size: var(--text-address);
 			line-height: 1.6;
 			color: var(--muted)
 		}
-
 		.status.info {
 			color: var(--accent)
 		}
-
 		.status.warn {
 			color: var(--warning)
 		}
-
 		.elapsed-time {
 			color: var(--muted);
 			gap: 4px
 		}
-
 		.elapsed-time svg {
 			width: 14px;
 			height: 14px
 		}
-
 		.input-actions {
 			margin-top: 16px
 		}
-
 		.input-actions .button {
 			flex: 1
 		}
-
 		.rng-fields {
 			display: grid;
 			grid-template-columns: minmax(0, 1fr);
 			gap: 16px
 		}
-
 		.rng-generator {
 			display: grid;
 			gap: 12px
 		}
-
 		.rng-generator .check-label {
 			display: flex;
 			align-items: center;
 			gap: 8px
 		}
-
 		.field {
 			display: flex;
 			flex-direction: column;
 			gap: 8px;
 			min-width: 0
 		}
-
 		textarea {
 			display: block;
 			width: 100%;
@@ -792,42 +687,35 @@
 			font-family: var(--mono);
 			line-height: 1.75
 		}
-
 		input::placeholder,
 		textarea::placeholder {
 			color: var(--muted);
 			opacity: 1
 		}
-
 		.note {
 			line-height: 1.6;
 			white-space: pre-wrap
 		}
-
 		.confirm-actions,
 		.rng-actions {
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 			gap: 8px
 		}
-
 		#runBtn,
 		#useOutput {
 			grid-column: 1/-1
 		}
-
 		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn {
 			color: var(--fg);
 			background: var(--press-bg);
 			border-color: transparent
 		}
-
 		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):active:not(:disabled),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
 			background: var(--secondary-active)
 		}
-
 		#clearBtn {
 			justify-self: start;
 			padding-inline: 12px;
@@ -835,58 +723,47 @@
 			background: transparent;
 			border-color: transparent
 		}
-
 		#clearBtn:active:not(:disabled) {
 			background: var(--danger-hover)
 		}
-
 		#output {
 			margin-top: 8px;
 			height: 150px;
 			border-radius: var(--radius-control)
 		}
-
 		.results-card {
 			border-radius: var(--radius-large)
 		}
-
 		.filterbar,
 		.results-heading {
 			flex-wrap: wrap;
 			gap: 16px;
 			padding: 26px 28px 18px
 		}
-
 		.filterbar {
 			gap: 12px;
 			padding: 0 28px 18px
 		}
-
 		.filterbar .segmented {
 			min-width: 300px
 		}
-
 		.segmented strong {
 			font-weight: 500;
 			margin-left: 3px
 		}
-
 		.remaining-note {
 			margin-left: auto
 		}
-
 		search {
 			display: block;
 			padding: 0 28px 20px
 		}
-
 		.filters {
 			display: grid;
 			grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
 			gap: 12px;
 			align-items: start
 		}
-
 		.filters :is(input, select),
 		.rng-generator input[type=number],
 		.settings select {
@@ -897,37 +774,30 @@
 			min-width: 0;
 			padding: 8px 12px
 		}
-
 		.search-field {
 			position: relative;
 			min-width: 0
 		}
-
 		.search-field>svg {
 			position: absolute;
 			top: 12px;
 			left: 12px;
 			color: var(--muted)
 		}
-
 		.search-field>input {
 			padding-left: 40px;
 			background: var(--panel);
 			border-color: transparent
 		}
-
 		.search-field>input::-webkit-search-cancel-button {
 			cursor: pointer
 		}
-
 		.filter-trigger {
 			position: relative
 		}
-
 		.filter-trigger:is([data-active=true], :has(+ #filter-dialog[open])) {
 			background: var(--tint)
 		}
-
 		#filter-count {
 			display: grid;
 			place-items: center;
@@ -938,41 +808,34 @@
 			font-size: .75rem;
 			font-weight: 600
 		}
-
 		#filter-dialog {
 			width: min(380px, calc(100vw - 24px))
 		}
-
 		#filter-dialog:modal[data-edit-viewport] {
 			position: fixed;
 			top: var(--filter-viewport-top);
 			bottom: calc(100% - var(--filter-viewport-top) - var(--filter-viewport-height));
 			max-height: calc(var(--filter-viewport-height) - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)))
 		}
-
 		#filter-dialog .sheet-heading,
 		.settings .sheet-heading {
 			margin-bottom: 18px
 		}
-
 		.filter-grid {
 			display: grid;
 			gap: 12px;
 			width: 100%
 		}
-
 		.filter-grid label {
 			display: grid;
 			gap: 8px;
 			font-size: .8125rem
 		}
-
 		.results-grid {
 			display: grid;
 			grid-template-columns: minmax(0, 1fr) 280px;
 			border-top: 1px solid var(--line)
 		}
-
 		.table-wrap {
 			position: relative;
 			overflow: auto;
@@ -981,24 +844,20 @@
 			scroll-margin-top: 16px;
 			scrollbar-width: thin
 		}
-
 		.table-wrap:not(.has-results) {
 			min-height: 280px
 		}
-
 		table {
 			border-spacing: 0;
 			width: 100%;
 			table-layout: fixed;
 			text-align: left
 		}
-
 		td,
 		th {
 			border-bottom: 1px solid var(--line);
 			padding: 10px
 		}
-
 		th {
 			position: sticky;
 			top: 0;
@@ -1007,42 +866,33 @@
 			font-weight: 500;
 			background: var(--panel)
 		}
-
 		td {
 			height: 76px
 		}
-
 		td:first-child,
 		th:first-child {
 			text-align: center;
 			color: var(--muted)
 		}
-
 		col:nth-child(1) {
 			width: 44px
 		}
-
 		col:nth-child(2) {
 			width: auto
 		}
-
 		col:nth-child(3) {
 			width: 26%
 		}
-
 		col:nth-child(4) {
 			width: 102px
 		}
-
 		col:nth-child(5) {
 			width: 98px
 		}
-
 		tr[data-selected=true] td:first-child {
 			box-shadow: inset 3px 0 var(--accent);
 			color: var(--accent)
 		}
-
 		.location-button {
 			display: block;
 			border: 0;
@@ -1055,13 +905,11 @@
 			text-align: left;
 			line-height: 1.6
 		}
-
 		.address-main,
 		.address-sub {
 			display: block;
 			unicode-bidi: plaintext
 		}
-
 		.location-button::after {
 			content: "";
 			display: none;
@@ -1075,18 +923,14 @@
 			color: var(--muted);
 			transform: rotate(45deg)
 		}
-
 		.location-button:dir(rtl)::after {
 			transform: rotate(-45deg)
 		}
-
 		.address-main {
 			font-size: var(--text-address);
 			font-weight: 600
 		}
-
 		@media screen {
-
 			.location-button :is(.address-main, .address-sub),
 			.row-error,
 			#detail-title {
@@ -1096,13 +940,11 @@
 				overflow: hidden;
 				white-space: normal
 			}
-
 			#detail-title {
 				-webkit-line-clamp: 3;
 				unicode-bidi: plaintext
 			}
 		}
-
 		#rng-error,
 		#error,
 		#supp-error,
@@ -1113,11 +955,9 @@
 		.row-error {
 			color: var(--danger)
 		}
-
 		.coords-cell {
 			font-family: var(--mono)
 		}
-
 		.kind-badge,
 		.result-state {
 			display: inline-block;
@@ -1125,7 +965,6 @@
 			font-size: .8125rem;
 			white-space: normal
 		}
-
 		.kind-badge {
 			padding: 3px 6px;
 			border-radius: 8px;
@@ -1135,12 +974,10 @@
 			word-break: normal;
 			overflow-wrap: normal
 		}
-
 		.status.success,
 		.result-state {
 			color: var(--success)
 		}
-
 		.table-hint {
 			display: none;
 			position: absolute;
@@ -1149,34 +986,28 @@
 			align-items: center;
 			text-align: center
 		}
-
 		.filter-empty-hint {
 			position: static;
 			min-height: 240px;
 			flex-direction: column;
 			gap: 12px
 		}
-
 		.filter-empty-hint .button {
 			max-width: 100%;
 			overflow-wrap: anywhere
 		}
-
 		.table-wrap.has-results:has(tbody:empty) {
 			min-height: 240px
 		}
-
 		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions),
 		.track:has(progress:not([value]))>.fill,
 		.table-wrap.has-results:has(tbody:empty) table {
 			display: none
 		}
-
 		.table-wrap.has-results:has(tbody:empty) .filter-empty-hint,
 		.table-wrap:not(.has-results) .empty-hint {
 			display: flex
 		}
-
 		.map-feedback[data-loading=true]::before,
 		.table-wrap[data-running]:not(.has-results) .empty-hint::before {
 			content: "";
@@ -1187,40 +1018,33 @@
 			border-radius: 50%;
 			animation: spin 1s linear infinite
 		}
-
 		.table-wrap[data-running]:not(.has-results) .empty-hint::before {
 			margin-right: 12px
 		}
-
 		.results-footer {
 			flex-wrap: wrap;
 			gap: 12px;
 			padding: 14px 18px
 		}
-
 		.page-numbers,
 		.result-pages {
 			justify-content: center;
 			flex-wrap: wrap;
 			gap: 4px
 		}
-
 		.result-pages .button {
 			padding: 8px;
 			border-color: transparent
 		}
-
 		.page-number[aria-current=page] {
 			font-weight: 600
 		}
-
 		.result-state[data-status=missing],
 		.credits a,
 		.page-ellipsis,
 		dt {
 			color: var(--muted)
 		}
-
 		.inspector {
 			min-width: 0;
 			padding: 20px;
@@ -1228,37 +1052,31 @@
 			background: var(--panel);
 			border-bottom-right-radius: var(--radius-large)
 		}
-
 		.progress-heading,
 		.inspector-eyebrow {
 			margin-bottom: 12px
 		}
-
 		#detail-title {
 			font-size: 1.25rem;
 			font-weight: 600;
 			letter-spacing: 0
 		}
-
 		.address-sub,
 		#detail-town {
 			margin-top: 3px
 		}
-
 		.inspector-empty {
 			max-width: 20ch;
 			margin-inline: auto;
 			padding-top: 64px;
 			text-align: center
 		}
-
 		.map-preview {
 			margin: 18px 0;
 			min-height: 166px;
 			border-radius: var(--radius-control);
 			overflow: hidden
 		}
-
 		.map-load {
 			flex-direction: column;
 			width: 100%;
@@ -1269,104 +1087,85 @@
 			padding: 16px;
 			font-size: .875rem
 		}
-
 		tr[data-record][data-selected=true],
 		.map-load:active:not(:disabled) {
 			background: var(--tint)
 		}
-
 		.map-load svg {
 			width: 32px;
 			height: 32px
 		}
-
 		.map-feedback {
 			padding: 16px;
 			justify-content: center;
 			gap: 8px
 		}
-
 		.map-recovery {
 			margin: 8px 0 18px
 		}
-
 		.map-recovery>* {
 			flex: 1 1 10rem;
 			overflow-wrap: anywhere
 		}
-
 		#detail-map {
 			border: 0;
 			width: 100%;
 			height: 190px;
 			display: block
 		}
-
 		.full-address {
 			margin-top: 6px;
 			display: flex;
 			align-items: start;
 			gap: 8px
 		}
-
 		#detail-full {
 			flex: 1;
 			min-width: 0
 		}
-
 		#copy-address {
 			flex: none;
 			margin-top: -9px
 		}
-
 		.detail-fields {
 			padding: 12px 0;
 			border-top: 1px solid var(--line);
 			border-bottom: 1px solid var(--line)
 		}
-
 		.detail-fields>div {
 			display: grid;
 			grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
 			gap: 8px;
 			margin: 10px 0
 		}
-
 		@media (max-width:420px) {
 			.detail-fields>div {
 				grid-template-columns: 1fr;
 				gap: 2px
 			}
-
 			.detail-fields dd {
 				text-align: start
 			}
 		}
-
 		dd {
 			text-align: right
 		}
-
 		.detail-fields,
 		.detail-tags {
 			margin-top: 18px
 		}
-
 		#detail-tag {
 			margin-top: 7px
 		}
-
 		#detail-coordinates {
 			margin-top: 12px;
 			font: .875rem/1.7 var(--mono);
 			color: var(--muted)
 		}
-
 		.open-map {
 			width: 100%;
 			margin-top: 18px
 		}
-
 		.page-footer {
 			display: flex;
 			gap: 8px;
@@ -1375,7 +1174,6 @@
 			padding-block: 18px 24px;
 			margin: auto
 		}
-
 		.copyright {
 			flex: none;
 			min-width: 1em;
@@ -1383,46 +1181,38 @@
 			font-size: 1rem;
 			line-height: 1.5
 		}
-
 		.credits a {
 			min-height: 44px;
 			max-width: 100%;
 			text-decoration-color: var(--control)
 		}
-
 		.credits a:focus-visible {
 			color: var(--accent);
 			text-decoration-color: currentColor
 		}
-
 		.credits a[href*="opendatacommons.org/licenses/odbl"] {
 			min-width: 44px;
 			justify-content: center
 		}
-
 		.credits,
 		.usage-policy {
 			flex-wrap: wrap;
 			align-items: baseline
 		}
-
 		.credits {
 			display: flex;
 			column-gap: .65rem;
 			row-gap: 0;
 			min-width: 0
 		}
-
 		.usage-policy {
 			display: inline-flex;
 			column-gap: .35em
 		}
-
 		td:nth-child(4),
 		.usage-policy>a {
 			white-space: nowrap
 		}
-
 		.map-popover,
 		dialog {
 			--overlay-top: 22px;
@@ -1438,7 +1228,6 @@
 			border-radius: var(--radius-large);
 			box-shadow: 0 20px 60px #0003
 		}
-
 		.map-popover,
 		.settings {
 			position: fixed;
@@ -1446,25 +1235,20 @@
 			margin: 0;
 			z-index: 40
 		}
-
 		.settings {
 			--popover-width: 300px;
 			width: min(var(--popover-width), calc(100vw - 24px))
 		}
-
 		.map-popover {
 			--popover-width: 340px;
 			width: min(var(--popover-width), calc(100vw - 24px))
 		}
-
 		.settings-button {
 			anchor-name: --settings-trigger
 		}
-
 		#detail-map-links {
 			anchor-name: --map-trigger
 		}
-
 		@position-try --popover-viewport {
 			position-anchor: auto;
 			position-area: none;
@@ -1473,9 +1257,7 @@
 			max-width: calc(100vw - 24px);
 			max-height: calc(100dvh - 24px)
 		}
-
 		@media (min-width:801px) {
-
 			.map-popover,
 			.settings {
 				inset: auto;
@@ -1486,31 +1268,26 @@
 				overscroll-behavior: contain;
 				position-try-fallbacks: flip-block, --popover-viewport
 			}
-
 			.settings {
 				position-anchor: --settings-trigger;
 				position-area: bottom span-left
 			}
-
 			.map-popover {
 				position-anchor: --map-trigger;
 				position-area: top span-left;
 				margin-block: 12px 8px
 			}
-
 			body:has(#display-settings[open]) .site-header {
 				position: sticky;
 				top: 0;
 				z-index: 30;
 				background: var(--page)
 			}
-
 			body:has(#map-popover:popover-open) #detail-map-links {
 				position: sticky;
 				bottom: 12px;
 				z-index: 30
 			}
-
 			body:has(#display-settings[open]) .settings-button,
 			body:has(#map-popover:popover-open) #detail-map-links {
 				background: var(--tint);
@@ -1518,18 +1295,15 @@
 				color: var(--accent);
 				box-shadow: 0 0 0 2px var(--tint)
 			}
-
 			#display-settings[open],
 			#map-popover:popover-open {
 				border: 2px solid var(--accent)
 			}
 		}
-
 		.settings label {
 			display: block;
 			margin: 16px 0 8px
 		}
-
 		textarea,
 		.filters :is(input, select),
 		.rng-generator input[type=number],
@@ -1539,7 +1313,6 @@
 			color: var(--fg);
 			font-size: 1rem
 		}
-
 		.map-links a {
 			justify-content: flex-start;
 			min-width: 0;
@@ -1548,56 +1321,45 @@
 			text-align: start;
 			overflow-wrap: anywhere
 		}
-
 		.map-links a:active {
 			background: var(--secondary-active)
 		}
-
 		.map-links {
 			display: grid;
 			grid-template-columns: 1fr;
 			gap: 4px
 		}
-
 		#supp-dialog {
 			width: 560px
 		}
-
 		.supp-form {
 			display: grid;
 			gap: 16px
 		}
-
 		.supp-form h2,
 		.sheet-heading h2 {
 			font-size: 1.25rem;
 			font-weight: 600
 		}
-
 		.supp-form .rng-actions {
 			display: flex;
 			flex-wrap: wrap;
 			justify-content: flex-end
 		}
-
 		dialog::backdrop {
 			background: #0006
 		}
-
 		#detail-sheet {
 			width: min(440px, calc(100vw - 24px))
 		}
-
 		.sheet-heading {
 			margin-bottom: 8px
 		}
-
 		.sheet-heading h2 {
 			min-width: 0;
 			overflow-wrap: anywhere;
 			unicode-bidi: plaintext
 		}
-
 		:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading,
 		.supp-form>.sheet-heading {
 			position: sticky;
@@ -1609,32 +1371,26 @@
 			padding: var(--overlay-top) var(--overlay-end) 12px var(--overlay-start);
 			background: var(--surface)
 		}
-
 		.sheet-heading .icon-button {
 			flex: none
 		}
-
 		#help-dialog {
 			width: 480px
 		}
-
 		#help-dialog ol {
 			padding-left: 24px;
 			line-height: 1.6
 		}
-
 		#help-dialog details {
 			margin-top: 16px;
 			padding-top: 12px;
 			border-top: 1px solid var(--line);
 			line-height: 1.6
 		}
-
 		#help-dialog summary {
 			cursor: pointer;
 			font-weight: 600
 		}
-
 		.ui-notice {
 			position: fixed;
 			bottom: 24px;
@@ -1651,20 +1407,16 @@
 			box-shadow: 0 8px 24px #0002;
 			gap: 12px
 		}
-
 		#ui-notice-text {
 			min-width: 0;
 			overflow-wrap: anywhere
 		}
-
 		.ui-notice .icon-button:active:not(:disabled) {
 			background: light-dark(#424245, #d2d2d7)
 		}
-
 		.ui-notice .icon-button:focus-visible {
 			outline-color: currentColor
 		}
-
 		dialog .ui-notice {
 			position: static;
 			transform: none;
@@ -1673,27 +1425,22 @@
 			max-width: none;
 			box-shadow: none
 		}
-
 		.confirm-actions {
 			margin-top: 24px
 		}
-
 		.confirm-actions .button {
 			padding-inline: 12px;
 			overflow-wrap: anywhere
 		}
-
 		[role=alertdialog] {
 			position: fixed;
 			inset: 0;
 			margin: auto;
 			width: min(380px, calc(100vw - 32px))
 		}
-
 		[role=alertdialog] .sheet-heading {
 			justify-content: flex-start
 		}
-
 		#detail-full[dir=auto],
 		.address-main[dir=auto],
 		.address-sub[dir=auto],
@@ -1701,17 +1448,14 @@
 		[role=alertdialog] .sheet-heading {
 			text-align: start
 		}
-
 		[role=alertdialog]>p {
 			line-height: 1.6
 		}
-
 		.status-row,
 		#help-dialog li+li,
 		#bulk-dialog p {
 			margin-top: 12px
 		}
-
 		.coords-panel[data-empty=true] #coords,
 		.coords-panel[data-empty=true] .coords-head>span:last-child,
 		.coords-panel[data-empty=false] .coords-empty,
@@ -1721,7 +1465,6 @@
 		.mobile-job-slot {
 			display: none
 		}
-
 		.theme-toggle[data-next-theme=dark] .theme-moon,
 		.theme-toggle[data-next-theme=light] .theme-sun,
 		.file-cue,
@@ -1729,7 +1472,6 @@
 		.mobile-job-slot:not(:empty) {
 			display: block
 		}
-
 		.sr-only {
 			position: absolute !important;
 			width: 1px !important;
@@ -1741,80 +1483,64 @@
 			white-space: nowrap !important;
 			border: 0 !important
 		}
-
 		@media (max-width:1230px) {
 			:root {
 				--page-gutter: 20px
 			}
-
 			.steps,
 			.inspector {
 				display: none
 			}
-
 			.step-label {
 				display: block
 			}
-
 			#app {
 				grid-template-columns: 280px minmax(0, 1fr);
 				gap: 20px
 			}
-
 			.results-grid {
 				grid-template-columns: 1fr
 			}
-
 			.filterbar,
 			.results-heading,
 			search {
 				padding-inline: 22px
 			}
-
 			.filters {
 				grid-template-columns: minmax(0, 1fr) auto
 			}
-
 			.search-field {
 				grid-column: 1/-1
 			}
-
 			.remaining-note {
 				margin-left: 0
 			}
 		}
-
 		@media (max-width:800px) {
 			.header-inner {
 				min-height: 68px;
 				padding-block: max(10px, env(safe-area-inset-top)) 10px;
 				gap: 12px
 			}
-
 			.site-header {
 				border: 0
 			}
-
 			.brand-mark {
 				width: 32px;
 				height: 32px
 			}
-
 			#app,
 			table,
 			tbody,
 			.location-button::after {
 				display: block
 			}
-
 			.drop-zone {
 				border-style: solid
 			}
-
 			.drop-zone .drop-text>svg {
 				margin-bottom: 10px
 			}
-
 			.step-label,
 			.filter-trigger>span:not(#filter-count),
 			body[data-mobiletab=input] .results,
@@ -1823,57 +1549,45 @@
 			td:nth-child(1) {
 				display: none
 			}
-
 			.header-tools {
 				gap: 4px
 			}
-
 			#app {
 				margin-top: 10px
 			}
-
 			.coords-head {
 				padding-inline: 18px
 			}
-
 			#coords-expand {
 				display: inline-flex
 			}
-
 			.coords-panel[data-expanded=false] #coords {
 				height: 100px;
 				overflow: hidden
 			}
-
 			.coords-panel[data-expanded=true] #coords {
 				height: min(320px, 50dvh);
 				overflow: auto
 			}
-
 			.job-panel {
 				padding: 18px 20px
 			}
-
 			.results-card {
 				border: 0;
 				border-radius: 0;
 				background: 0 0
 			}
-
 			.results-heading {
 				gap: 12px;
 				padding: 0 0 18px
 			}
-
 			#desktop-export-slot {
 				margin-left: auto
 			}
-
 			.filterbar {
 				padding: 0 0 16px;
 				gap: 8px
 			}
-
 			.filterbar .segmented {
 				display: grid;
 				grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1881,30 +1595,24 @@
 				width: 100%;
 				border-radius: var(--radius-card)
 			}
-
 			.input-tabs,
 			.input-tabs button,
 			.search-field>input {
 				border-radius: var(--radius-pill)
 			}
-
 			.filterbar .segmented button {
 				border-radius: calc(var(--radius-card) - 4px)
 			}
-
 			search {
 				padding: 0 0 18px
 			}
-
 			.filters {
 				grid-template-columns: minmax(0, 1fr) 44px;
 				gap: 8px
 			}
-
 			.filter-trigger {
 				padding: 10px
 			}
-
 			#filter-count {
 				position: absolute;
 				top: -6px;
@@ -1913,26 +1621,21 @@
 				min-width: 22px;
 				height: 22px
 			}
-
 			.results-grid {
 				border: 0;
 				display: block
 			}
-
 			.table-wrap {
 				overflow: visible;
 				min-height: 280px;
 				max-height: none
 			}
-
 			.table-wrap:not(:has(tbody>tr)) {
 				min-height: 96px
 			}
-
 			.table-wrap:not(:has(tbody>tr))+.results-footer {
 				display: none
 			}
-
 			thead {
 				position: absolute;
 				width: 1px;
@@ -1940,12 +1643,10 @@
 				overflow: hidden;
 				clip-path: inset(50%)
 			}
-
 			tbody {
 				display: grid;
 				gap: 12px
 			}
-
 			tr[data-record] {
 				display: grid;
 				grid-template-columns: minmax(0, 1fr) auto;
@@ -1955,88 +1656,71 @@
 				border: 1px solid transparent;
 				border-radius: var(--radius-card)
 			}
-
 			tr[data-record][data-selected=true] {
 				border-color: var(--accent);
 				box-shadow: inset 3px 0 var(--accent)
 			}
-
 			td {
 				display: block;
 				padding: 0;
 				height: auto;
 				border: 0
 			}
-
 			td:nth-child(2) {
 				grid-column: 1;
 				grid-row: 1;
 				min-width: 0
 			}
-
 			td:nth-child(3) {
 				grid-column: 1;
 				grid-row: 2
 			}
-
 			td:nth-child(4),
 			td:nth-child(5) {
 				grid-column: 2;
 				grid-row: 1;
 				text-align: right
 			}
-
 			td:nth-child(5) {
 				grid-row: 2;
 				align-self: end
 			}
-
 			.site-brand h1,
 			.address-main {
 				font-size: 1rem
 			}
-
 			.location-button {
 				padding-inline-end: 22px
 			}
-
 			.coords-cell {
 				direction: ltr;
 				unicode-bidi: isolate
 			}
-
 			.coords-cell,
 			.kind-badge,
 			.result-state {
 				font-size: .875rem
 			}
-
 			.coords-cell span {
 				display: inline
 			}
-
 			.coords-cell span:first-child::after {
 				content: ", "
 			}
-
 			.table-hint {
 				inset: 0
 			}
-
 			.results-footer {
 				padding: 16px 0;
 				justify-content: center
 			}
-
 			#results-count {
 				text-align: center;
 				width: 100%
 			}
-
 			:is(#page-prev, #page-next)>span {
 				display: none
 			}
-
 			.mobile-bottom {
 				position: fixed;
 				z-index: 25;
@@ -2051,14 +1735,12 @@
 				padding-block: 6px max(6px, env(safe-area-inset-bottom));
 				isolation: isolate
 			}
-
 			.mobile-nav,
 			.mobile-nav button {
 				position: relative;
 				display: flex;
 				border-radius: var(--radius-pill)
 			}
-
 			.mobile-nav {
 				flex: 0 1 220px;
 				min-width: 0;
@@ -2066,7 +1748,6 @@
 				gap: 2px;
 				padding: 4px
 			}
-
 			.mobile-nav::before {
 				content: "";
 				position: absolute;
@@ -2078,11 +1759,9 @@
 				transform: translateX(var(--selection-x, 0px));
 				transition: transform .2s ease
 			}
-
 			body[data-mobiletab=results] .mobile-nav::before {
 				--selection-x: calc(100% + 2px)
 			}
-
 			.mobile-nav button {
 				flex: 1;
 				min-width: 44px;
@@ -2099,38 +1778,30 @@
 				color: var(--fg);
 				background: 0 0
 			}
-
 			.mobile-nav button svg {
 				width: 26px;
 				height: 26px;
 				fill: currentColor;
 				stroke: none
 			}
-
 			.mobile-nav [aria-selected=true] {
 				color: var(--accent)
 			}
-
 			.mobile-nav button:active:not(:disabled) {
 				background: var(--press-bg)
 			}
-
 			.page-footer {
 				padding-block: 22px calc(7rem + env(safe-area-inset-bottom))
 			}
-
 			.ui-notice {
 				bottom: calc(7rem + env(safe-area-inset-bottom))
 			}
-
 			.mobile-job-slot .job-panel {
 				margin: 0 0 18px
 			}
-
 			.mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
 				display: none
 			}
-
 			:is(dialog, #detail-sheet):not([role=alertdialog]),
 			.map-popover {
 				inset: auto 0 0;
@@ -2141,12 +1812,10 @@
 				--overlay-bottom: max(22px, env(safe-area-inset-bottom));
 				border-radius: var(--radius-large) var(--radius-large) 0 0
 			}
-
 			.map-popover {
 				width: auto;
 				max-width: none
 			}
-
 			:is(dialog, #detail-sheet):not([role=alertdialog]) {
 				position: fixed;
 				width: 100%;
@@ -2154,22 +1823,18 @@
 				overscroll-behavior: contain;
 				-webkit-overflow-scrolling: touch
 			}
-
 			#filter-dialog:modal[data-edit-viewport] {
 				top: auto;
 				max-height: calc(var(--filter-viewport-height) - max(16px, env(safe-area-inset-top)))
 			}
-
 			#detail-sheet {
 				max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
 			}
-
 			#detail-sheet>.sheet-heading {
 				touch-action: none;
 				user-select: none;
 				cursor: grab
 			}
-
 			#detail-sheet>.sheet-heading::before {
 				content: "";
 				position: absolute;
@@ -2183,50 +1848,40 @@
 				pointer-events: none
 			}
 		}
-
 		@media (max-width:374px) {
 			:root {
 				--page-gutter: 12px
 			}
-
 			.site-brand,
 			.mobile-bottom {
 				gap: 8px
 			}
-
 			.site-brand h1 {
 				font-size: .875rem
 			}
-
 			.tool-capsule {
 				padding: 1px
 			}
-
 			.brand-mark {
 				width: 28px;
 				height: 28px
 			}
-
 			.mobile-nav button {
 				padding-inline: 6px
 			}
-
 			.page-numbers,
 			.result-pages {
 				gap: 1px
 			}
 		}
-
 		@media (max-width:319px) {
 			html {
 				min-width: 0
 			}
-
 			.header-inner {
 				flex-wrap: wrap
 			}
 		}
-
 		#app,
 		.header-inner,
 		.mobile-bottom,
@@ -2234,93 +1889,74 @@
 			padding-left: max(var(--page-gutter), env(safe-area-inset-left));
 			padding-right: max(var(--page-gutter), env(safe-area-inset-right))
 		}
-
 		@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-
 			.mobile-nav,
 			.tool-capsule {
 				background: var(--surface)
 			}
 		}
-
 		@media (hover:hover) and (pointer:fine) {
-
 			:is(.icon-button, .segmented button):hover:not(:active):not(:disabled),
 			.mobile-nav button:hover:not(:active):not(:disabled),
 			.map-links a:hover:not(:active) {
 				background: var(--press-bg)
 			}
-
 			.segmented :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
 				background: var(--surface)
 			}
-
 			.drop-zone:hover:not(:active):not(:has(input:disabled)),
 			.map-load:hover:not(:active):not(:disabled) {
 				background: var(--tint)
 			}
-
 			.drop-zone:hover:not(:active):not(:has(input:disabled)) {
 				border-color: var(--accent)
 			}
-
 			.button:hover:not(:active):not(:disabled) {
 				background: var(--button-hover);
 				border-color: transparent;
 				color: #fff
 			}
-
 			.danger:hover:not(:active):not(:disabled) {
 				color: var(--danger);
 				background: var(--danger-hover);
 				border-color: var(--danger)
 			}
-
 			:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):hover:not(:active):not(:disabled),
 			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
 				color: var(--fg);
 				background: var(--secondary-hover);
 				border-color: transparent
 			}
-
 			#clearBtn:hover:not(:active):not(:disabled) {
 				background: var(--danger-bg);
 				border-color: transparent
 			}
-
 			tr[data-record]:hover:not(:active):not([data-selected=true]) {
 				background: var(--panel)
 			}
-
 			.credits a:hover:not(:active) {
 				color: var(--accent);
 				text-decoration-color: currentColor
 			}
-
 			.ui-notice .icon-button:hover:not(:active):not(:disabled) {
 				background: light-dark(#424245, #d2d2d7)
 			}
 		}
-
 		@keyframes overlay-appear {
 			from {
 				opacity: 0;
 				transform: translateY(8px)
 			}
-
 			to {
 				opacity: 1;
 				transform: none
 			}
 		}
-
 		:is(#detail-sheet, #filter-dialog, #help-dialog, #supp-dialog, .settings)[open],
 		.map-popover:popover-open {
 			animation: overlay-appear .16s ease-out
 		}
-
 		@media (prefers-reduced-motion:reduce) {
-
 			*,
 			::after,
 			::before {
@@ -2329,10 +1965,8 @@
 				scroll-behavior: auto !important
 			}
 		}
-
 		@media (prefers-reduced-transparency:reduce),
 		(prefers-contrast:more) {
-
 			.mobile-nav,
 			.tool-capsule {
 				background: var(--surface);
@@ -2340,19 +1974,16 @@
 				backdrop-filter: none
 			}
 		}
-
 		@media (prefers-contrast:more) {
 			:root {
 				--line: var(--control);
 				--control: var(--fg);
 				--muted: var(--fg)
 			}
-
 			.mobile-nav,
 			.tool-capsule {
 				border-color: var(--fg)
 			}
-
 			.coords-panel,
 			.job-panel,
 			.kind-badge,
@@ -2360,38 +1991,30 @@
 			tr[data-record] {
 				border-color: var(--fg)
 			}
-
 			tr[data-record][data-selected=true] {
 				border-color: var(--accent)
 			}
 		}
-
 		@media (forced-colors:active) {
-
 			.mobile-nav,
 			.tool-capsule {
 				border-color: ButtonText
 			}
-
 			.fill {
 				background: Highlight
 			}
-
 			.mobile-nav [aria-selected=true],
 			.segmented :is([aria-selected=true], [aria-pressed=true]),
 			tr[data-selected=true] {
 				outline: 2px solid Highlight
 			}
 		}
-
 		@media print {
-
 			:root,
 			:root[data-theme] {
 				color-scheme: light;
 				--page: #fff
 			}
-
 			#export,
 			.filterbar,
 			.input-card,
@@ -2404,7 +2027,6 @@
 			search {
 				display: none !important
 			}
-
 			#app,
 			.results,
 			.results-grid,
@@ -2413,24 +2035,19 @@
 				margin: 0;
 				padding: 0
 			}
-
 			.results-card {
 				border: 0
 			}
-
 			.table-wrap {
 				overflow: visible;
 				max-height: none
 			}
-
 			table {
 				display: table
 			}
-
 			colgroup {
 				display: table-column-group
 			}
-
 			thead {
 				display: table-header-group;
 				position: static;
@@ -2439,25 +2056,20 @@
 				overflow: visible;
 				clip-path: none
 			}
-
 			tbody {
 				display: table-row-group
 			}
-
 			tbody tr[data-record] {
 				display: table-row
 			}
-
 			tbody td {
 				display: table-cell;
 				border-bottom: 1px solid #ccc;
 				padding: 8px
 			}
-
 			tbody td:first-child {
 				display: table-cell
 			}
-
 			.page-footer {
 				padding: 20px
 			}
@@ -2642,12 +2254,12 @@
 							type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none" />
-							</svg> 일시정지 </button><button class="button primary" command="--resume" commandfor="app"
-							disabled hidden id="resume" type="button">
+							</svg> 일시정지 </button><button class="button primary" command="--resume" commandfor="app" disabled hidden
+							id="resume" type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none" />
-							</svg> 재개 </button><button class="button" command="--stop" commandfor="app" disabled hidden
-							id="stop" type="button">
+							</svg> 재개 </button><button class="button" command="--stop" commandfor="app" disabled hidden id="stop"
+							type="button">
 							<svg aria-hidden="true" viewbox="0 0 24 24">
 								<rect fill="currentColor" height="14" rx="1.5" stroke="none" width="14" x="5" y="5" />
 							</svg> 중지 </button></div>
@@ -2728,8 +2340,8 @@
 									<svg aria-hidden="true" viewBox="0 0 24 24">
 										<path d="M20 7v5h-5M4 17v-5h5" />
 										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
-									</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close"
-									commandfor="filter-dialog" id="filter-close" type="button">완료</button>
+									</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close" commandfor="filter-dialog"
+									id="filter-close" type="button">완료</button>
 							</div>
 						</dialog>
 					</div>
@@ -5232,73 +4844,73 @@
 						}
 					}
 					if (!convertedInWorkers) {
-					for (const token of u64Tokens(num64Input.value)) {
-						if (epoch !== outputEpoch)
-							return;
-						invalidInput = num64Input;
-						if (processed >= GENERATION_LIMIT)
-							throw new InputError(
-								`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`,
-							);
-						const num = parseU64(token);
-						invalidInput = null;
-						sampleKorea ??= (await loadKoreaModule()).sampleKorea;
-						if (epoch !== outputEpoch) return;
-						const conversion = convertNumber(num, sampleKorea);
-						let step = await conversion.next();
-						if (epoch !== outputEpoch) return;
-						let used = 0;
-						while (!step.done) {
-							if (performance.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
-								await yieldToMain();
-								if (epoch !== outputEpoch) {
-									await conversion.return();
-									return;
-								}
-								lastYieldAt = performance.now();
-							}
-							invalidInput = suppInput;
-							let supplied = supplements.next();
-							invalidInput = null;
-							if (supplied.done) {
-								const values = autoSupp.checked
-									? generateRandomValues(32)
-									: await requestSupplements();
-								if (epoch !== outputEpoch) return;
-								if (values === null) {
-									cancelled = true;
-									break;
-								}
-								supplements = values.values();
-								supplied = supplements.next();
-							}
-							used++;
-							step = await conversion.next({ value: supplied.value, bitsRemaining: 64 });
-							if (epoch !== outputEpoch) return;
-						}
-						if (cancelled) {
-							await conversion.return();
-							if (epoch !== outputEpoch) return;
-							break;
-						}
-						suppCount += used;
-						const outputBlock = formatOutput(step.value);
-						nextChunks.push((processed === 0
-							? outputBlock
-							: `\n${outputBlock}`));
-						processed++;
-						const now = performance.now();
-						if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
-							if (now - lastMetaAt >= META_INTERVAL_MS) {
-								updateProgress("처리 중");
-								lastMetaAt = now;
-							}
-							await yieldToMain();
+						for (const token of u64Tokens(num64Input.value)) {
 							if (epoch !== outputEpoch)
 								return;
-							lastYieldAt = performance.now();
+							invalidInput = num64Input;
+							if (processed >= GENERATION_LIMIT)
+								throw new InputError(
+									`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`,
+								);
+							const num = parseU64(token);
+							invalidInput = null;
+							sampleKorea ??= (await loadKoreaModule()).sampleKorea;
+							if (epoch !== outputEpoch) return;
+							const conversion = convertNumber(num, sampleKorea);
+							let step = await conversion.next();
+							if (epoch !== outputEpoch) return;
+							let used = 0;
+							while (!step.done) {
+								if (performance.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+									await yieldToMain();
+									if (epoch !== outputEpoch) {
+										await conversion.return();
+										return;
+									}
+									lastYieldAt = performance.now();
+								}
+								invalidInput = suppInput;
+								let supplied = supplements.next();
+								invalidInput = null;
+								if (supplied.done) {
+									const values = autoSupp.checked
+										? generateRandomValues(32)
+										: await requestSupplements();
+									if (epoch !== outputEpoch) return;
+									if (values === null) {
+										cancelled = true;
+										break;
+									}
+									supplements = values.values();
+									supplied = supplements.next();
+								}
+								used++;
+								step = await conversion.next({ value: supplied.value, bitsRemaining: 64 });
+								if (epoch !== outputEpoch) return;
+							}
+							if (cancelled) {
+								await conversion.return();
+								if (epoch !== outputEpoch) return;
+								break;
+							}
+							suppCount += used;
+							const outputBlock = formatOutput(step.value);
+							nextChunks.push((processed === 0
+								? outputBlock
+								: `\n${outputBlock}`));
+							processed++;
+							const now = performance.now();
+							if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
+								if (now - lastMetaAt >= META_INTERVAL_MS) {
+									updateProgress("처리 중");
+									lastMetaAt = now;
+								}
+								await yieldToMain();
+								if (epoch !== outputEpoch)
+									return;
+								lastYieldAt = performance.now();
+							}
 						}
-					}
 					}
 					if (!cancelled && processed === 0) {
 						invalidInput = num64Input;
