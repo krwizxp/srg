@@ -40,9 +40,13 @@ jobs:
           rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/bench10000.rs -o validation/bench10000
           validation/bench10000 > validation/rust-10k.log
       - name: Compare 1 2 4 workers to serial and Rust
-        run: node validation/bench_workers.mjs | tee validation/worker-bench.log
+        run: |
+          set -o pipefail
+          node validation/bench_workers.mjs | tee validation/worker-bench.log
       - name: Verify actual UI automatic workers and manually supplied supplement ordering
-        run: node validation/verify_worker_ui.mjs | tee validation/worker-ui.log
+        run: |
+          set -o pipefail
+          node validation/verify_worker_ui.mjs | tee validation/worker-ui.log
       - name: Save benchmark proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

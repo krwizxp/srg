@@ -62,7 +62,7 @@ try{
                 saveEnabled:!document.getElementById("saveOutput").disabled,
             }),run.started);
             const [download]=await Promise.all([page.waitForEvent("download"),page.locator("#saveOutput").click()]);
-            const saved=readFileSync(await download.path(),"utf8");
+            const saved=readFileSync(await download.path(),"utf8").replace(/^\uFEFF/,"");
             const matches=[...saved.matchAll(/^64비트 난수: ([0-9]+)/gm)];
             let orderMismatch=0;
             for(let i=0;i<inputs.length&&i<matches.length;i++)
