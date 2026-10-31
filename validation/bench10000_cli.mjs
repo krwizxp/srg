@@ -10,6 +10,7 @@ const repetitions=[];
 let error=null;
 try{
     for(let i=0;i<3;i++){
+        rmSync(join(dir,"random_data.txt"),{force:true});
         const start=performance.now();
         const result=spawnSync(executable,["generate","10000"],{
             cwd:dir,stdio:["ignore","pipe","pipe"],encoding:"utf8",timeout:240000,maxBuffer:10*1024*1024
