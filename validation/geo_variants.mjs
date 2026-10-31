@@ -1,4 +1,4 @@
-import {readFileSync} from "node:fs";
+import {readFileSync,existsSync} from "node:fs";
 import {createHash} from "node:crypto";
 
 const originals = new Map([
@@ -57,6 +57,8 @@ function pageLatitude(source){
     return source;
 }
 function enlargeAtlas(subdivision){
+    const refinedPath="validation/geo_atlas"+subdivision+".bin";
+    if(existsSync(refinedPath))return new Uint8Array(readFileSync(refinedPath));
     if(subdivision!==16&&subdivision!==32)throw Error("unsupported trial size");
     const view=new DataView(atlasOriginal.buffer,atlasOriginal.byteOffset,atlasOriginal.byteLength);
     const originalSubdivision=view.getUint32(12,true);

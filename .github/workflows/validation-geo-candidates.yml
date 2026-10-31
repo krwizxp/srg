@@ -36,12 +36,17 @@ jobs:
           node --version
           node --check validation/geo_variants.mjs
           node --check validation/geo_bench.mjs
+          node --check validation/geo_atlas.mjs
       - name: Compile real Rust production-module comparator
         run: |
           cp validation/geo_rust.rs src/geo_bench.rs
           rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/geo_bench.rs -o validation/geo_rust_bench
           validation/geo_rust_bench > validation/geo_rust.log
           mv validation/bench10000_rust_full.txt validation/geo_rust_full.txt
+      - name: Generate certified 16x16 and 32x32 geography atlas variants
+        run: |
+          set -o pipefail
+          node validation/geo_atlas.mjs | tee validation/geo_atlas.log
       - name: Evaluate P1 P2 P3 P4 individually and combined
         run: |
           set -o pipefail
@@ -53,6 +58,7 @@ jobs:
           name: geo-candidates-${{ matrix.browser }}
           path: |
             validation/geo_rust.log
+            validation/geo_atlas.log
             validation/geo_bench_${{ matrix.browser }}.log
           if-no-files-found: warn
           retention-days: 14
