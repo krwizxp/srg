@@ -1,0 +1,52 @@
+name: Temporary 10000 random inputs Rust browser benchmark
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validation-bench-10000.yml'
+      - 'validation/bench10000*'
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout pinned main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned stable Rust
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustc +1.99.1 -Vv
+          lscpu | head -n 20
+          uname -a
+      - name: Install Linux linking dependencies
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
+      - name: Install disposable browser test tools
+        run: |
+          npm install --prefix validation --no-save playwright
+          validation/node_modules/.bin/playwright install --with-deps chromium firefox webkit
+          node -v
+      - name: Compile native production-module benchmark and release CLI
+        run: |
+          cp validation/bench10000.rs src/bench10000.rs
+          rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/bench10000.rs -o validation/srg-bench-10000
+          cargo +1.99.1 build --release --frozen --bin srg
+      - name: Benchmark deterministic Rust 10000 inputs
+        run: validation/srg-bench-10000 | tee validation/bench10000_rust_results.log
+      - name: Benchmark real production CLI 10000 output records
+        run: node validation/bench10000_cli.mjs
+      - name: Benchmark Chromium Firefox and WebKit 10000 inputs
+        run: node validation/bench10000_web.mjs
+      - name: Preserve reproducible benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: srg-10000-20261031
+          path: |
+            validation/bench10000_rust_results.log
+            validation/bench10000_rust_coords.txt
+            validation/bench10000_rust_full.txt
+          if-no-files-found: warn
+          retention-days: 14
