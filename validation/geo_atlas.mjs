@@ -6,7 +6,7 @@ import {createHash} from "node:crypto";
 if(typeof Uint8Array.fromBase64!=="function")
     Uint8Array.fromBase64=text=>Uint8Array.from(Buffer.from(text,"base64"));
 const source=readFileSync("korea_boundary.js","utf8");
-const temp=resolve("validation/geo_boundary_private.mjs");
+const temp=resolve("geo_boundary_private.mjs");
 const originalFetch=globalThis.fetch;
 writeFileSync(temp,source+"\nexport {loadBoundary,decodeAtlas,tilePages,covers};\n");
 globalThis.fetch=async url=>{
