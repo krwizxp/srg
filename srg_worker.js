@@ -16,10 +16,10 @@ async function convertBatch({ start, values, deterministic }) {
     const reads = new Array(values.length);
     let supplements = 0;
     const buffer = new BigUint64Array(32);
+    let offset = buffer.length;
     for (let i = 0; i < values.length; i++) {
         const value = values[i];
         const stream = { value: value ^ SALT };
-        let offset = buffer.length;
         let recordSupplements = 0;
         const convert = convertNumber(value, sampleKorea);
         let step = await convert.next();

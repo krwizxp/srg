@@ -5,6 +5,8 @@ on:
       - 'srg_random.js'
       - 'srg_parallel.js'
       - 'srg_worker.js'
+      - 'revgeo.html'
+      - 'validation/verify_worker_ui.mjs'
       - 'validation/bench_workers.mjs'
       - '.github/workflows/validation-workers.yml'
 permissions:
@@ -39,6 +41,8 @@ jobs:
           validation/bench10000 > validation/rust-10k.log
       - name: Compare 1 2 4 workers to serial and Rust
         run: node validation/bench_workers.mjs | tee validation/worker-bench.log
+      - name: Verify actual UI automatic workers and manually supplied supplement ordering
+        run: node validation/verify_worker_ui.mjs | tee validation/worker-ui.log
       - name: Save benchmark proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -47,5 +51,6 @@ jobs:
           path: |
             validation/rust-10k.log
             validation/worker-bench.log
+            validation/worker-ui.log
           if-no-files-found: warn
           retention-days: 14
