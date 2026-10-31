@@ -34,6 +34,7 @@ jobs:
           command -v xvfb-run || (sudo apt-get update && sudo apt-get install --no-install-recommends -y xvfb xauth)
           java -version
       - name: VS Code built-in HTML Format Document
+        id: format
         run: |
           xvfb-run -a node validation/vscode_fmt/launch.cjs
           git diff --stat
@@ -43,8 +44,11 @@ jobs:
           test -n "$jar"
           java -jar "$jar" --errors-only revgeo.html
       - name: HTMLValidate
+        id: htmlvalidate
+        if: always()
         run: validation/node_modules/.bin/html-validate revgeo.html
       - name: Commit and push formatted HTML only to temporary validation branch
+        if: ${{ always() && steps.format.outcome == 'success' && steps.htmlvalidate.outcome == 'success' }}
         run: |
           if ! git diff --quiet -- revgeo.html; then
             git config user.name "github-actions[bot]"
