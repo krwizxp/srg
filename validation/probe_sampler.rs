@@ -29,7 +29,12 @@ fn main() -> diagnostic::Result<()> {
     let mut writer = io::BufWriter::new(io::stdout().lock());
     let mut seed = 0x123456789abcdef0_u64;
     let mut cache = korea_boundary::BoundaryCache::default();
-    for _ in 0..750 {
+    let samples = std::env::var("SRG_SAMPLE_COUNT")
+        .ok()
+        .map(|value| value.parse::<usize>())
+        .transpose()?
+        .unwrap_or(750);
+    for _ in 0..samples {
         let word = splitmix(&mut seed);
         let mut supplemental = word ^ 0xa5a5a5a5a5a5a5a5;
         let mut sampler = korea_boundary::SampleState::new(word, &mut cache)?;

@@ -32,9 +32,24 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --no-self-update
       - name: Compile production Rust polygon sampler probe
         run: |
-          rustc +1.99.1 --edition=2024 -O validation/probe_sampler.rs -o validation/probe_sampler
+          sed '/^#\[path = /d' validation/probe_sampler.rs > src/probe_sampler.rs
+          rustc +1.99.1 --edition=2024 -O src/probe_sampler.rs -o validation/probe_sampler
           validation/probe_sampler > validation/probe-output.txt
+      - name: Check Rust formatting and Clippy
+        run: |
+          rustup component add rustfmt clippy --toolchain 1.99.1
+          cargo +1.99.1 fmt --all -- --check
+          cargo +1.99.1 clippy --all-targets --frozen
+          cargo +1.99.1 test --release --frozen
       - name: Compare production Rust and browser polygon results
         run: node validation/verify_rust_web.mjs
       - name: Compare old and new end-to-end mapping behavior
         run: node validation/verify_browser.mjs
+      - name: Check 120k Rust geography distribution before and after
+        run: |
+          git worktree add --detach /tmp/srg-baseline d749b386c7a0aad665cb8686ddbd78abcc894cb8
+          cp src/probe_sampler.rs /tmp/srg-baseline/src/probe_sampler.rs
+          rustc +1.99.1 --edition=2024 -O /tmp/srg-baseline/src/probe_sampler.rs -o validation/baseline-probe
+          SRG_SAMPLE_COUNT=120000 validation/baseline-probe > validation/baseline-distribution.txt
+          SRG_SAMPLE_COUNT=120000 validation/probe_sampler > validation/candidate-distribution.txt
+          node validation/verify_distribution.mjs
