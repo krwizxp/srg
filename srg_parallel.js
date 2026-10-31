@@ -1,13 +1,12 @@
-export async function convertParallel(values, { workers = 4, deterministic = false, onProgress, signal } = {}) {
+export async function convertParallel(values, { workers = 4, onProgress, signal } = {}) {
     if (!Array.isArray(values) || values.some(value => typeof value !== "bigint"))
         throw new TypeError("64비트 난수 배열이 필요합니다.");
-    if (!values.length) return { blocks: [], supplements: 0, reads: [] };
+    if (!values.length) return { blocks: [], supplements: 0 };
     if (signal?.aborted) throw new DOMException("작업이 중단됐습니다.", "AbortError");
     const batchSize = 128;
     const count = Math.min(Math.max(1, Math.trunc(workers) || 1), Math.ceil(values.length / batchSize), 4);
     const pool = [];
     const blocks = new Array(values.length);
-    const reads = new Array(values.length);
     let completed = 0;
     let supplementalReads = 0;
     let nextStart = 0;
@@ -27,14 +26,14 @@ export async function convertParallel(values, { workers = 4, deterministic = fal
                     finishedWorkers++;
                     if (finishedWorkers === pool.length && !settled) {
                         settled = true;
-                        resolve({ blocks, supplements: supplementalReads, reads });
+                        resolve({ blocks, supplements: supplementalReads });
                     }
                     return;
                 }
                 const start = nextStart;
                 const end = Math.min(values.length, start + batchSize);
                 nextStart = end;
-                worker.postMessage({ start, values: values.slice(start, end), deterministic });
+                worker.postMessage({ start, values: values.slice(start, end) });
             };
             try {
                 for (let i = 0; i < count; i++)
@@ -52,10 +51,8 @@ export async function convertParallel(values, { workers = 4, deterministic = fal
                             rejectPending(new Error("Web Worker 응답 형식 오류"));
                             return;
                         }
-                        for (let i = 0; i < data.blocks.length; i++) {
+                        for (let i = 0; i < data.blocks.length; i++)
                             blocks[data.start + i] = data.blocks[i];
-                            reads[data.start + i] = data.reads[i];
-                        }
                         completed += data.blocks.length;
                         supplementalReads += data.supplements;
                         if (onProgress) {

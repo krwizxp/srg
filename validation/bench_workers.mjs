@@ -6,8 +6,55 @@ import {chromium,firefox,webkit} from "playwright";
 const expected=readFileSync("validation/bench10000_rust_full.txt","utf8").trim().split(/\r?\n/);
 if(expected.length!==10000)throw Error("Rust results missing");
 const root=process.cwd();
+
+function replaceOne(source, original, replacement) {
+    if(source.split(original).length!==2)throw Error("Test-only worker hook no longer matches production source");
+    return source.replace(original,replacement);
+}
+const productionParallel=readFileSync("srg_parallel.js","utf8");
+const productionWorker=readFileSync("srg_worker.js","utf8");
+let testParallel=replaceOne(productionParallel,
+    "workers = 4, onProgress, signal",
+    "workers = 4, deterministic = false, onProgress, signal");
+testParallel=replaceOne(testParallel,
+    "const blocks = new Array(values.length);",
+    "const blocks = new Array(values.length);\n    const reads = new Array(values.length);");
+testParallel=replaceOne(testParallel,
+    "resolve({ blocks, supplements: supplementalReads });",
+    "resolve({ blocks, supplements: supplementalReads, reads });");
+testParallel=replaceOne(testParallel,
+    "worker.postMessage({ start, values: values.slice(start, end) });",
+    "worker.postMessage({ start, values: values.slice(start, end), deterministic });");
+testParallel=replaceOne(testParallel,
+    "for (let i = 0; i < data.blocks.length; i++)\n                            blocks[data.start + i] = data.blocks[i];",
+    "for (let i = 0; i < data.blocks.length; i++) {\n                            blocks[data.start + i] = data.blocks[i];\n                            reads[data.start + i] = data.reads[i];\n                        }");
+let testWorker=replaceOne(productionWorker,
+    "async function convertBatch({ start, values }) {",
+    "async function convertBatch({ start, values, deterministic }) {");
+testWorker=replaceOne(testWorker,
+    "const blocks = new Array(values.length);",
+    "const blocks = new Array(values.length);\n    const reads = new Array(values.length);");
+testWorker=replaceOne(testWorker,
+    "const value = values[i];",
+    "const value = values[i];\n        const stream = { value: value ^ 0xa5a5a5a5a5a5a5a5n };");
+testWorker=replaceOne(testWorker,
+    "            if (offset === buffer.length) {\n                crypto.getRandomValues(buffer);\n                offset = 0;\n            }\n            const word = buffer[offset++];",
+    "            let word;\n            if (deterministic) word = splitmix64(stream);\n            else {\n                if (offset === buffer.length) {\n                    crypto.getRandomValues(buffer);\n                    offset = 0;\n                }\n                word = buffer[offset++];\n            }");
+testWorker=replaceOne(testWorker,
+    "blocks[i] = formatOutput(step.value);",
+    "blocks[i] = formatOutput(step.value);\n        reads[i] = recordSupplements;");
+testWorker=replaceOne(testWorker,
+    "return { start, blocks, supplements };",
+    "return { start, blocks, supplements, reads };");
+testWorker+=String.raw
 const server=createServer((req,res)=>{
     const pathname=new URL(req.url,"http://127.0.0.1").pathname;
+    const special=pathname==="/srg_parallel.js"?testParallel:pathname==="/srg_worker.js"?testWorker:null;
+    if(special!==null) {
+        res.writeHead(200,{"Content-Type":"text/javascript","Content-Length":Buffer.byteLength(special),"Cache-Control":"no-store"});
+        res.end(special);
+        return;
+    }
     const path=resolve(root,pathname.slice(1)||"revgeo.html");
     if(!path.startsWith(root+sep)){res.writeHead(403);res.end();return;}
     try{
@@ -79,7 +126,7 @@ try{
                         };
                         const samples=[];
                         let reference=null;
-                        for(let repeat=0;repeat<3;repeat++){
+                        for(let repeat=0;repeat<5;repeat++){
                             const result=await bench(()=>workerCount?convertParallel(inputs,{workers:workerCount,deterministic:true}):single());
                             if(reference){
                                 for(let i=0;i<inputs.length;i++)if(reference.blocks[i]!==result.blocks[i])throw Error("warm run output changed at "+i);
@@ -97,7 +144,7 @@ try{
                         });
                         const sort=samples.slice().sort((a,b)=>a-b);
                         const expectedSupplemental=reference.supplements;
-                        return {workerCount,medianMs:sort[1],minMs:sort[0],maxMs:sort[2],samplesMs:samples,substituteWords:expectedSupplemental,results:resultLines,first:reference.blocks[0],last:reference.blocks.at(-1)};
+                        return {workerCount,medianMs:sort[2],minMs:sort[0],maxMs:sort[4],samplesMs:samples,substituteWords:expectedSupplemental,results:resultLines,first:reference.blocks[0],last:reference.blocks.at(-1)};
                     },{workerCount});
                     let mismatches=0;
                     const examples=[];
