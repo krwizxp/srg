@@ -1,7 +1,7 @@
 const vscode = require("vscode");
 const fs = require("node:fs");
 const path = require("node:path");
-module.exports = async () => {
+async function run() {
     const htmlPath = path.resolve("revgeo.html");
     const document = await vscode.workspace.openTextDocument(vscode.Uri.file(htmlPath));
     await vscode.window.showTextDocument(document, { preview: false });
@@ -18,4 +18,5 @@ module.exports = async () => {
     if (!finalHtml.includes('import { convertParallel } from "./srg_parallel.js?v=1";'))
         throw new Error("The VS Code formatting pass lost the Worker integration");
     console.log("VSCODE_HTML_FORMAT_SAVED "+JSON.stringify({bytes:finalHtml.length,extension:formatter.id,version:formatter.packageJSON.version}));
-};
+}
+module.exports = { run };
