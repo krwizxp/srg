@@ -1,0 +1,58 @@
+name: Temporary SRG coordinate candidate comparisons
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validation-geo-candidates.yml"
+      - "validation/geo_*"
+      - "korea_boundary.js"
+      - "srg_parallel.js"
+      - "srg_worker.js"
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 50
+    env:
+      GEO_BROWSER: ${{ matrix.browser }}
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install official current Rust with pinned version
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustc +1.99.1 -Vv
+          lscpu | head -n 25
+      - name: Provision browser and test tools
+        run: |
+          npm install --prefix validation --no-save playwright
+          validation/node_modules/.bin/playwright install --with-deps "${{ matrix.browser }}"
+          node --version
+          node --check validation/geo_variants.mjs
+          node --check validation/geo_bench.mjs
+      - name: Compile real Rust production-module comparator
+        run: |
+          cp validation/geo_rust.rs src/geo_bench.rs
+          rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/geo_bench.rs -o validation/geo_rust_bench
+          validation/geo_rust_bench > validation/geo_rust.log
+          mv validation/bench10000_rust_full.txt validation/geo_rust_full.txt
+      - name: Evaluate P1 P2 P3 P4 individually and combined
+        run: |
+          set -o pipefail
+          node validation/geo_bench.mjs | tee validation/geo_bench_${{ matrix.browser }}.log
+      - name: Preserve trial evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: geo-candidates-${{ matrix.browser }}
+          path: |
+            validation/geo_rust.log
+            validation/geo_bench_${{ matrix.browser }}.log
+          if-no-files-found: warn
+          retention-days: 14
