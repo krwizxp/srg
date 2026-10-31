@@ -1,0 +1,52 @@
+name: Temporary fast 1000-input independent geo candidate screening
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validation-geo-fast.yml"
+permissions:
+  contents: read
+jobs:
+  screen:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium,firefox,webkit]
+    env:
+      GEO_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.99.1
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustc +1.99.1 -Vv
+      - name: Provision relevant browser
+        run: |
+          npm install --prefix validation --no-save playwright
+          validation/node_modules/.bin/playwright install --with-deps "${{ matrix.browser }}"
+      - name: Generate actual conservative atlas16 and atlas32
+        run: |
+          node validation/geo_atlas.mjs > validation/geo_atlas_fast.log
+      - name: Produce Rust baseline and run short independent candidate screen
+        run: |
+          cp validation/geo_rust.rs src/geo_bench.rs
+          rustc +1.99.1 --edition=2024 -C opt-level=3 -C codegen-units=1 -C lto=fat -C panic=abort src/geo_bench.rs -o validation/geo_rust_bench
+          validation/geo_rust_bench > validation/geo_rust_fast.log
+          mv validation/bench10000_rust_full.txt validation/geo_rust_full.txt
+          cp validation/geo_bench.mjs validation/fast_geo_bench.mjs
+          node -e 'const fs=require("fs");let s=fs.readFileSync("validation/fast_geo_bench.mjs","utf8"); s=s.replace("for(const n of [1000,10000]){","for(const n of [1000]){").replace("phase===\"prod\"?6:1","phase===\"prod\"?3:1").replace("production.times.slice(1)","production.times.slice(1)"); if(s.includes("for(const n of [1000,10000]){"))throw Error("screen not reduced");fs.writeFileSync("validation/fast_geo_bench.mjs",s);'
+          set -o pipefail
+          node validation/fast_geo_bench.mjs | tee validation/geo_fast_${{ matrix.browser }}.log
+      - name: Preserve screening evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: geo-fast-${{ matrix.browser }}
+          path: |
+            validation/geo_fast_${{ matrix.browser }}.log
+            validation/geo_atlas_fast.log
+          if-no-files-found: warn
+          retention-days: 14
