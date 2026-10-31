@@ -1,6 +1,7 @@
 import {readFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
 import {chromium,firefox,webkit} from "playwright";
-const moduleText=readFileSync("korea_boundary.js","utf8");
+const moduleText=execFileSync("git",["show","d749b386c7a0aad665cb8686ddbd78abcc894cb8:korea_boundary.js"],{encoding:"utf8"});
 const coreText=moduleText.slice(moduleText.indexOf("const DEGREES ="),moduleText.indexOf("const MAX_U64 ="));
 const bootstrap=moduleText.match(/Uint8Array\.fromBase64\("([A-Za-z0-9+/=]+)"\)/)[1];
 const compact=Buffer.from(bootstrap,"base64");

@@ -22,7 +22,11 @@ jobs:
         run: |
           npm install --prefix validation --no-save playwright
           validation/node_modules/.bin/playwright install --with-deps chromium firefox webkit
+      - name: Check JavaScript syntax
+        run: node --check korea_boundary.js
       - name: Benchmark independent candidates
         run: node validation/bench_isolated.mjs
       - name: Compare deflate and polygon allocation approaches
         run: node validation/bench_expanded.mjs
+      - name: Compare full real-boundary behavior against pinned main
+        run: node validation/verify_browser.mjs
