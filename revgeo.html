@@ -1830,12 +1830,12 @@
 			#detail-sheet {
 				max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
 			}
-			#detail-sheet>.sheet-heading {
+			:is(#detail-sheet, #map-popover, #help-dialog, #display-settings, #filter-dialog)>.sheet-heading {
 				touch-action: none;
 				user-select: none;
 				cursor: grab
 			}
-			#detail-sheet>.sheet-heading::before {
+			:is(#detail-sheet, #map-popover, #help-dialog, #display-settings, #filter-dialog)>.sheet-heading::before {
 				content: "";
 				position: absolute;
 				top: 8px;
@@ -5378,59 +5378,70 @@
 			buttons[next].focus();
 			selectRecord(Number(buttons[next].dataset.record), false);
 		});
-		const detailHeading = query(".sheet-heading", detailSheet);
-		let detailDrag = null;
-		let detailMotion = null;
-		function resetDetailDrag() {
-			const pointerId = detailDrag?.id;
-			detailDrag = null;
-			detailMotion?.cancel();
-			detailMotion = null;
-			detailSheet.style.removeProperty("translate");
-			if (pointerId !== undefined && detailHeading.hasPointerCapture(pointerId))
-				detailHeading.releasePointerCapture(pointerId);
+		function enableSheetDrag(sheet, dismiss = () => sheet.close()) {
+			const heading = query(".sheet-heading", sheet);
+			const popover = sheet.hasAttribute("popover");
+			const isOpen = () => popover ? sheet.matches(":popover-open") : sheet.open;
+			let drag = null;
+			let motion = null;
+			function reset() {
+				const pointerId = drag?.id;
+				drag = null;
+				motion?.cancel();
+				motion = null;
+				sheet.style.removeProperty("translate");
+				if (pointerId !== undefined && heading.hasPointerCapture(pointerId))
+					heading.releasePointerCapture(pointerId);
+			}
+			function finish(event, shouldDismiss = false) {
+				if (!drag || event.pointerId !== drag.id) return;
+				const offset = drag.offset;
+				reset();
+				if (!isOpen() || !mobileMedia.matches) return;
+				const animation = sheet.animate([
+					{ translate: `0 ${offset}px` },
+					{ translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px` },
+				], { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180, easing: "ease-out" });
+				motion = animation;
+				animation.finished.then(() => {
+					if (motion !== animation) return;
+					motion = null;
+					if (shouldDismiss && isOpen()) dismiss();
+				}, () => { });
+			}
+			on(heading, "pointerdown", event => {
+				if (!mobileMedia.matches || !isOpen() || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
+				event.preventDefault();
+				const offset = parseFloat(getComputedStyle(sheet).translate.split(" ")[1]) || 0;
+				reset();
+				drag = { id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset };
+				sheet.style.translate = `0 ${offset}px`;
+				heading.setPointerCapture(event.pointerId);
+			});
+			on(window, "pointermove", event => {
+				if (!drag || event.pointerId !== drag.id) return;
+				if (!(event.buttons & 1)) return finish(event);
+				drag.offset = Math.max(0, drag.startOffset + event.clientY - drag.y);
+				sheet.style.translate = `0 ${drag.offset}px`;
+			});
+			on(window, "pointerup", event => {
+				if (!drag || event.pointerId !== drag.id) return;
+				const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+				finish(event, dy > 80 && dy > Math.abs(dx) * 1.4);
+			});
+			on(window, "pointercancel", finish);
+			on(heading, "lostpointercapture", finish);
+			on(window, "blur", reset);
+			on(window, "resize", reset);
+			on(sheet, "beforetoggle", reset);
+			on(sheet, "close", reset);
 		}
-		function finishDetailDrag(event, dismiss = false) {
-			if (!detailDrag || event.pointerId !== detailDrag.id) return;
-			const offset = detailDrag.offset;
-			resetDetailDrag();
-			if (!detailSheet.open || !mobileMedia.matches) return;
-			const motion = detailSheet.animate([
-				{ translate: `0 ${offset}px` },
-				{ translate: `0 ${dismiss ? detailSheet.offsetHeight : 0}px` },
-			], { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180, easing: "ease-out" });
-			detailMotion = motion;
-			motion.finished.then(() => {
-				if (detailMotion !== motion) return;
-				detailMotion = null;
-				if (dismiss && detailSheet.open) detailSheet.close();
-			}, () => { });
-		}
-		on(detailHeading, "pointerdown", event => {
-			if (!mobileMedia.matches || !detailSheet.open || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
-			event.preventDefault();
-			const offset = parseFloat(getComputedStyle(detailSheet).translate.split(" ")[1]) || 0;
-			resetDetailDrag();
-			detailDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset };
-			detailSheet.style.translate = `0 ${offset}px`;
-			detailHeading.setPointerCapture(event.pointerId);
-		});
-		on(window, "pointermove", event => {
-			if (!detailDrag || event.pointerId !== detailDrag.id) return;
-			if (!(event.buttons & 1)) return finishDetailDrag(event);
-			detailDrag.offset = Math.max(0, detailDrag.startOffset + event.clientY - detailDrag.y);
-			detailSheet.style.translate = `0 ${detailDrag.offset}px`;
-		});
-		on(window, "pointerup", event => {
-			if (!detailDrag || event.pointerId !== detailDrag.id) return;
-			const dx = event.clientX - detailDrag.x, dy = event.clientY - detailDrag.y;
-			finishDetailDrag(event, dy > 80 && dy > Math.abs(dx) * 1.4);
-		});
-		on(window, "pointercancel", finishDetailDrag);
-		on(window, "blur", resetDetailDrag);
-		on(window, "resize", resetDetailDrag);
+		enableSheetDrag(detailSheet);
+		enableSheetDrag(mapPopover, () => mapPopover.hidePopover());
+		enableSheetDrag(byId("help-dialog"));
+		enableSheetDrag(settings, closeSettings);
+		enableSheetDrag(filterDialog, closeFilters);
 		on(detailSheet, "close", () => {
-			resetDetailDrag();
 			mapPopover.hidePopover();
 			unloadMap();
 			inspector.append(detailContent);
