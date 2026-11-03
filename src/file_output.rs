@@ -241,7 +241,6 @@ impl OutputFile {
         };
         write_slice_to_console(buffer.split_at(output_len).0).map_err(Into::into)
     }
-
     #[cfg(target_arch = "x86_64")]
     pub(super) const fn writer(&mut self) -> &mut File {
         &mut self.file

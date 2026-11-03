@@ -227,7 +227,6 @@ impl Client {
                 }
             };
             handle.setopt_str(CURLOPT_PROTOCOLS_STR, protocol.as_ptr(), context)?;
-
             let body_data = (&raw mut body_target).cast::<c_void>();
             let header_data = (&raw mut header_target).cast::<c_void>();
             handle.setopt_ptr(CURLOPT_WRITEDATA, body_data, context)?;
