@@ -771,20 +771,30 @@ async function covers(boundary, point) {
             parity = parity !== Boolean(page.base ^ (lower & 1));
             continue;
         }
-        let start = [page.data.getFloat64(40, true), page.data.getFloat64(48, true)];
+        let startX = page.data.getFloat64(40, true);
+        let startY = page.data.getFloat64(48, true);
         for (let index = 1; index <= page.count; index++) {
-            const end = [page.data.getFloat64(40 + index * 16, true),
-                page.data.getFloat64(48 + index * 16, true)];
-            if (latitude >= Math.min(start[1], end[1]) && latitude <= Math.max(start[1], end[1])) {
-                const side = orientation(start, end, location);
-                if (side === 0 && longitude >= Math.min(start[0], end[0])
-                    && longitude <= Math.max(start[0], end[0])) boundaryHit = true;
-                if ((start[1] > latitude) !== (end[1] > latitude)) {
-                    const crossing = end[1] > start[1] ? side > 0 : side < 0;
-                    parity = parity !== crossing;
+            const endX = page.data.getFloat64(40 + index * 16, true);
+            const endY = page.data.getFloat64(48 + index * 16, true);
+            const minY = Math.min(startY, endY);
+            const maxY = Math.max(startY, endY);
+            if (latitude >= minY && latitude <= maxY) {
+                const minX = Math.min(startX, endX);
+                const maxX = Math.max(startX, endX);
+                const spansLatitude = (startY > latitude) !== (endY > latitude);
+                if (spansLatitude && longitude < minX) {
+                    parity = !parity;
+                } else if (longitude <= maxX) {
+                    const side = orientation([startX, startY], [endX, endY], location);
+                    if (side === 0 && longitude >= minX) boundaryHit = true;
+                    if (spansLatitude) {
+                        const crossing = endY > startY ? side > 0 : side < 0;
+                        parity = parity !== crossing;
+                    }
                 }
             }
-            start = end;
+            startX = endX;
+            startY = endY;
         }
     }
     requestAtlas(boundary);

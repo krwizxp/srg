@@ -306,23 +306,18 @@ fn unrank_combination<const K: usize>(mut rank: u32, max_n: u32) -> [u8; K] {
     let mut out = [0_u8; K];
     let mut upper = max_n;
     for slot_num in (1..=K).rev() {
-        let choose = u32::try_from(slot_num).unwrap_or_else(|_| process::abort());
-        let mut low = choose.strict_sub(1);
-        let mut high = upper;
-        while low.strict_add(1) < high {
-            let mid = low.strict_add(high.strict_sub(low).div_euclid(2));
-            if combination_count(mid, slot_num) <= rank {
-                low = mid;
-            } else {
-                high = mid;
-            }
+        let mut value = upper.strict_sub(1);
+        let mut combinations = combination_count(value, slot_num);
+        while combinations > rank {
+            value = value.strict_sub(1);
+            combinations = combination_count(value, slot_num);
         }
-        rank = rank.strict_sub(combination_count(low, slot_num));
+        rank = rank.strict_sub(combinations);
         let slot = out
             .get_mut(slot_num.strict_sub(1))
             .unwrap_or_else(|| process::abort());
-        *slot = low_u8_from_u32(low.strict_add(1));
-        upper = low;
+        *slot = low_u8_from_u32(value.strict_add(1));
+        upper = value;
     }
     out
 }
