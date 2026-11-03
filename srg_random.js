@@ -1,50 +1,44 @@
+const BINOMIAL_VALUES = Uint32Array.from({length: 408}, (_, index) => binomial(Math.floor(index / 8), index % 8));
 const U64_MAX = (1n << 64n) - 1n;
 const U32_MAX_INV = 1 / 4294967295;
 const HANGUL_BASE = 0xac00;
-const NMS_PLANET_SHIFTS = [52n, 4n, 0n];
-const NMS_PLANET_SUPP_SHIFTS = [60n, 56n, 52n, 48n];
-const NMS_SYSTEM_SHIFTS = [40n];
-const NMS_SYSTEM_SUPP_SHIFTS = [36n, 24n, 12n, 0n];
-const HANGUL_MAX = 55859;
-const HANGUL_MODULUS = 11172;
+const HANGUL_MODULUS = 11172n;
+const EURO_MAIN_COMB = BigInt(binomial(50, 5));
+const LOTTO_COMB = BigInt(binomial(45, 6));
+const LOTTO7_COMB = BigInt(binomial(37, 7));
+const EURO_LUCKY_COMB = BigInt(binomial(12, 2));
+const LOTTO_BUNDLE_MODULUS = LOTTO_COMB * LOTTO7_COMB * EURO_LUCKY_COMB * 6n;
+const EURO_PIN_NMS_MODULUS = EURO_MAIN_COMB * 1000000n * 767n;
+const HANGUL_QUAD_MODULUS = HANGUL_MODULUS ** 4n;
+const PASSWORD_OCTET_MODULUS = 94n ** 8n;
+const LOTTO_BUNDLE_LIMIT = U64_MAX / LOTTO_BUNDLE_MODULUS * LOTTO_BUNDLE_MODULUS;
+const EURO_PIN_NMS_LIMIT = U64_MAX / EURO_PIN_NMS_MODULUS * EURO_PIN_NMS_MODULUS;
+const HANGUL_QUAD_LIMIT = U64_MAX / HANGUL_QUAD_MODULUS * HANGUL_QUAD_MODULUS;
+const PASSWORD_OCTET_LIMIT = U64_MAX / PASSWORD_OCTET_MODULUS * PASSWORD_OCTET_MODULUS;
 const SUPPLEMENT_LIMIT = 1024;
 const GLYPHS = [..."🌅🐦👫🦕🌘🎈⛵🕷🦋🌀🧊🐟⛺🚀🌳🔯"];
 const U64_BOUND_TEXT = `최소값 예: 0 또는 0x0, 최대값 예: ${U64_MAX} 또는 0x${U64_MAX.toString(16).toUpperCase()}`;
 const U64_FORMAT_ERROR = `올바른 난수 형식이 아닙니다 (${U64_BOUND_TEXT}).`;
 const U64_TEXT_LIMIT = 64;
-const createLottery = (length) => ({
-	limit: length,
-	values: [],
-});
 function createDataSet(num64) {
 	return {
 		number: num64,
-		lotto: createLottery(6),
-		lotto7: createLottery(7),
-		euroMain: createLottery(5),
-		euroLucky: createLottery(2),
+		lotto: {values: []},
+		lotto7: {values: []},
+		euroMain: {values: []},
+		euroLucky: {values: []},
 		pin: 0,
 		password: [],
-		pinDigits: 0,
-		hangul: ["", "", "", ""],
+		hangul: [],
 		planet: 0,
 		system: 0,
 	};
 }
 function isBasicComplete(data) {
-	return (
-		data.pinDigits >= 6 &&
-		data.lotto.values.length === data.lotto.limit &&
-		data.lotto7.values.length === data.lotto7.limit &&
-		data.password.length >= 8 &&
-		data.euroMain.values.length === data.euroMain.limit
-	);
+	return data.password.length === 8 && data.planet !== 0 && data.system !== 0;
 }
 function isComplete(data, korea) {
-	return isBasicComplete(data) &&
-		data.euroLucky.values.length === data.euroLucky.limit &&
-		data.hangul.every(Boolean) &&
-		data.planet !== 0 && data.system !== 0 && korea.done;
+	return isBasicComplete(data) && data.hangul.length === 4 && korea.done;
 }
 function parseU64(raw) {
 	const input = raw.trim();
@@ -97,87 +91,103 @@ function formatCoordinate(value) {
 	const str = Object.is(value, -0) ? "-0" : String(value);
 	return str.includes("e") ? decimalFormatter(value) : str;
 }
-function reverseBitsU64(v) {
-	bitsView.setBigUint64(0, v, false);
-	for (let offset = 0; offset < 8; offset += 4) {
-		let x = bitsView.getUint32(offset, false);
-		x = ((x >>> 1) & 0x5555_5555) | ((x & 0x5555_5555) << 1);
-		x = ((x >>> 2) & 0x3333_3333) | ((x & 0x3333_3333) << 2);
-		x = ((x >>> 4) & 0x0f0f_0f0f) | ((x & 0x0f0f_0f0f) << 4);
-		bitsView.setUint32(offset, x, false);
-	}
-	return bitsView.getBigUint64(0, true);
+function binomial(total, choose) {
+	if (choose > total) return 0;
+	let result = 1;
+	for (let step = 1; step <= choose; step++)
+		result = result * (total - choose + step) / step;
+	return result;
 }
-function addLotteryNumber(byte, modulus, numbers) {
-	if (numbers.values.length >= numbers.limit) return true;
-	const number = (byte % modulus) + 1;
-	if (numbers.values.includes(number)) return false;
-	numbers.values.push(number);
-	if (numbers.values.length !== numbers.limit) return false;
-	numbers.values.sort((a, b) => a - b);
-	return true;
-}
-function fillNumbers(v, data) {
-	if (isBasicComplete(data)) return;
-	bitsView.setBigUint64(0, v, false);
-	for (const byte of bytesView) {
-		if (byte > 249) continue;
-		if (data.pinDigits < 6) {
-			data.pin = data.pin * 10 + (byte % 10);
-			data.pinDigits++;
+function unrankCombination(rank, maximum, count) {
+	const out = new Array(count);
+	let upper = maximum - 1;
+	for (let choose = count; choose > 0; choose--) {
+		let combinations = BINOMIAL_VALUES[upper * 8 + choose];
+		while (combinations > rank) {
+			upper--;
+			combinations = BINOMIAL_VALUES[upper * 8 + choose];
 		}
-		addLotteryNumber(byte, 50, data.euroMain);
-		if (byte <= 224) {
-			addLotteryNumber(byte, 45, data.lotto);
-			if (byte <= 221) addLotteryNumber(byte, 37, data.lotto7);
-			if (byte <= 187 && data.password.length < 8)
-				data.password.push(String.fromCodePoint((byte % 94) + 33));
-		}
-		if (isBasicComplete(data)) return;
+		rank -= combinations;
+		out[choose - 1] = upper + 1;
+		upper--;
 	}
+	return out;
 }
-function fillLuckyStars(v, data) {
-	if (data.euroLucky.values.length === data.euroLucky.limit) return;
-	bitsView.setBigUint64(0, reverseBitsU64(v), false);
-	for (const byte of bytesView) {
-		if (byte <= 251 && addLotteryNumber(byte, 12, data.euroLucky)) return;
-	}
+function multiplyUpper32(left, right) {
+	const leftLower = left & 0xffff;
+	const rightLower = right & 0xffff;
+	const leftUpper = left >>> 16;
+	const rightUpper = right >>> 16;
+	const lowerProduct = leftLower * rightLower;
+	const middle = leftUpper * rightLower + (lowerProduct >>> 16);
+	const cross = leftLower * rightUpper + (middle & 0xffff);
+	return leftUpper * rightUpper + (middle >>> 16) + (cross >>> 16);
 }
-function fillHangul(v, data, initial) {
-	bitsView.setBigUint64(0, v, false);
+function mixWord(value, salt) {
+	bitsView.setBigUint64(0, value + salt);
+	let upper = bitsView.getUint32(0);
+	let lower = bitsView.getUint32(4);
+	lower ^= (lower >>> 30) | (upper << 2);
+	upper ^= upper >>> 30;
+	let productUpper = Math.imul(upper, 0x1ce4e5b9) + Math.imul(lower, 0xbf58476d) + multiplyUpper32(lower, 0x1ce4e5b9);
+	lower = Math.imul(lower, 0x1ce4e5b9);
+	upper = productUpper >>> 0;
+	lower ^= (lower >>> 27) | (upper << 5);
+	upper ^= upper >>> 27;
+	productUpper = Math.imul(upper, 0x133111eb) + Math.imul(lower, 0x94d049bb) + multiplyUpper32(lower, 0x133111eb);
+	lower = Math.imul(lower, 0x133111eb);
+	upper = productUpper >>> 0;
+	lower ^= (lower >>> 31) | (upper << 1);
+	upper ^= upper >>> 31;
+	return (BigInt(upper >>> 0) << 32n) | BigInt(lower >>> 0);
+}
+function fillLottoBundle(value, data) {
+	if (data.planet) return;
+	const mixed = mixWord(value, 0xd1b54a32d192ed03n);
+	if (mixed >= LOTTO_BUNDLE_LIMIT) return;
+	let remainder = mixed % LOTTO_BUNDLE_MODULUS;
+	data.planet = Number(remainder % 6n) + 1;
+	remainder /= 6n;
+	data.euroLucky.values = unrankCombination(Number(remainder % EURO_LUCKY_COMB), 12, 2);
+	remainder /= EURO_LUCKY_COMB;
+	data.lotto.values = unrankCombination(Number(remainder % LOTTO_COMB), 45, 6);
+	data.lotto7.values = unrankCombination(Number(remainder / LOTTO_COMB), 37, 7);
+}
+function fillEuroPinNms(value, data) {
+	if (data.system) return;
+	const mixed = mixWord(value, 0x9e3779b97f4a7c15n);
+	if (mixed >= EURO_PIN_NMS_LIMIT) return;
+	let remainder = mixed % EURO_PIN_NMS_MODULUS;
+	data.system = Number(remainder % 767n) + 1;
+	remainder /= 767n;
+	data.pin = Number(remainder % 1000000n);
+	data.euroMain.values = unrankCombination(Number(remainder / 1000000n), 50, 5);
+}
+function fillHangul(value, data) {
+	if (data.hangul.length === 4) return;
+	const mixed = mixWord(value, 0x3c6ef372fe94f82an);
+	if (mixed >= HANGUL_QUAD_LIMIT) return;
+	let remainder = mixed % HANGUL_QUAD_MODULUS;
 	for (let i = 0; i < 4; i++) {
-		if (data.hangul[i]) continue;
-		for (let offset = 0; offset < (initial ? 1 : 4); offset++) {
-			const index = bitsView.getUint16(((i + offset) % 4) * 2, false);
-			if (index <= HANGUL_MAX) {
-				data.hangul[i] = String.fromCodePoint(HANGUL_BASE + index % HANGUL_MODULUS);
-				break;
-			}
-		}
+		data.hangul.push(String.fromCodePoint(HANGUL_BASE + Number(remainder % HANGUL_MODULUS)));
+		remainder /= HANGUL_MODULUS;
 	}
 }
-function nmsCandidate(v, shifts, mask, maximum) {
-	for (const shift of shifts) {
-		const candidate = (v >> shift) & mask;
-		if (candidate <= maximum) return Number(candidate);
-	}
-	return null;
-}
-function fillNms(v, data, initial) {
-	if (!data.planet) {
-		const candidate = nmsCandidate(v, initial ? NMS_PLANET_SHIFTS : NMS_PLANET_SUPP_SHIFTS, 15n, 11n);
-		if (candidate !== null) data.planet = candidate % 6 + 1;
-	}
-	if (!data.system) {
-		const candidate = nmsCandidate(v, initial ? NMS_SYSTEM_SHIFTS : NMS_SYSTEM_SUPP_SHIFTS, 4095n, 3834n);
-		if (candidate !== null) data.system = candidate % 767 + 1;
+function fillPassword(value, data) {
+	if (data.password.length === 8) return;
+	const mixed = mixWord(value, 0xa5a5a5a55a5a5a5an);
+	if (mixed >= PASSWORD_OCTET_LIMIT) return;
+	let remainder = mixed % PASSWORD_OCTET_MODULUS;
+	for (let i = 0; i < 8; i++) {
+		data.password.push(String.fromCodePoint(33 + Number(remainder % 94n)));
+		remainder /= 94n;
 	}
 }
-function fillWord(v, data, initial) {
-	fillNumbers(v, data);
-	fillHangul(v, data, initial);
-	fillNms(v, data, initial);
-	fillLuckyStars(v, data);
+function fillWord(value, data) {
+	fillLottoBundle(value, data);
+	fillEuroPinNms(value, data);
+	fillHangul(value, data);
+	fillPassword(value, data);
 }
 function fillFixedCoordinates(num, data) {
 	bitsView.setBigUint64(0, num, false);
@@ -209,9 +219,7 @@ function finishNmsGlyphs(num, data) {
 const supplementLimitError = name => new Error(`${name} 보완 난수 시도 횟수를 초과했습니다.`);
 function incompleteName(data, korea) {
 	if (!isBasicComplete(data)) return "기본 필드";
-	if (data.euroLucky.values.length !== data.euroLucky.limit) return "유로밀리언 럭키 스타";
-	if (!data.hangul.every(Boolean)) return "한글 음절";
-	if (!data.planet || !data.system) return "NMS";
+	if (data.hangul.length !== 4) return "한글 음절";
 	if (!korea.done) return "대한민국 좌표";
 	return "미완성 필드";
 }
@@ -221,10 +229,10 @@ async function* convertNumber(num, sampleKorea) {
 	const sampler = sampleKorea(num);
 	let korea = await sampler.next();
 	try {
-		fillWord(num, data, true);
+		fillWord(num, data);
 		for (let attempt = 0; !isComplete(data, korea) && attempt < SUPPLEMENT_LIMIT; attempt++) {
 			const supp = yield;
-			fillWord(supp.value, data, false);
+			fillWord(supp.value, data);
 			if (!korea.done)
 				korea = await sampler.next({ value: supp.value, bitsRemaining: 64 });
 		}
@@ -239,6 +247,12 @@ async function* convertNumber(num, sampleKorea) {
 function paddedHex(value, width) {
 	return value.toString(16).toUpperCase().padStart(width, "0");
 }
+function groupBytes(text, width) {
+	let grouped = text.slice(0, width);
+	for (let offset = width; offset < text.length; offset += width)
+		grouped += " " + text.slice(offset, offset + width);
+	return grouped;
+}
 function formatOutput(data) {
 	const v = data.number;
 	bitsView.setBigUint64(0, v, false);
@@ -246,9 +260,9 @@ function formatOutput(data) {
 	const hex = bytes.toHex().toUpperCase();
 	return `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
 		})
-2진수: ${v.toString(2).padStart(64, "0").match(/.{8}/g).join(" ")}
+2진수: ${groupBytes(v.toString(2).padStart(64, "0"), 8)}
 8진수: ${v.toString(8)}
-16진수: ${hex.match(/../g).join(" ")}
+16진수: ${groupBytes(hex, 2)}
 Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
 바이트 배열: ${bytes.join(" ")}
 6자리 숫자 비밀번호: ${String(data.pin).padStart(6, "0")}

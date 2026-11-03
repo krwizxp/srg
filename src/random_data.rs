@@ -3,43 +3,75 @@ use super::{diagnostic::AppError, hardware_rng::HardwareRng};
 use crate::{
     diagnostic::Result,
     korea_boundary,
-    numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64},
+    numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64, low_u32_from_u64},
 };
-use core::array;
 use std::process;
-const ASCII_PRINTABLE_LEN: u8 = 94;
+const ASCII_PRINTABLE_LEN: u64 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
-const EURO_LUCKY_MODULUS: u8 = 12;
-const EURO_MAIN_MODULUS: u8 = 50;
+const BINOMIAL_VALUES: [[u32; 8]; 51] = {
+    let mut values = [[0; 8]; 51];
+    let mut rows: &mut [[u32; 8]] = &mut values;
+    let mut total = 0_u32;
+    while let Some((row, remaining_rows)) = rows.split_first_mut() {
+        let mut cells: &mut [u32] = row;
+        let mut choose = 0_u32;
+        while let Some((cell, remaining_cells)) = cells.split_first_mut() {
+            *cell = binomial(total, choose);
+            choose = choose.strict_add(1);
+            cells = remaining_cells;
+        }
+        total = total.strict_add(1);
+        rows = remaining_rows;
+    }
+    values
+};
+const EURO_LUCKY_COMB: u64 = binomial(EURO_LUCKY_MAX, 2) as u64;
+const EURO_LUCKY_MAX: u32 = 12;
+const EURO_MAIN_COMB: u64 = binomial(EURO_MAIN_MAX, 5) as u64;
+const EURO_MAIN_MAX: u32 = 50;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
+const EURO_PIN_NMS_LIMIT: u64 = u64::MAX
+    .div_euclid(EURO_PIN_NMS_MODULUS)
+    .strict_mul(EURO_PIN_NMS_MODULUS);
+const EURO_PIN_NMS_MODULUS: u64 = EURO_MAIN_COMB
+    .strict_mul(NUMERIC_PASSWORD_MODULUS)
+    .strict_mul(NMS_SOLAR_SYSTEM_MODULUS);
 const HANGUL_BASE_CODE_POINT: u32 = 0xAC00;
+const HANGUL_QUAD_LIMIT: u64 = u64::MAX
+    .div_euclid(HANGUL_QUAD_MODULUS)
+    .strict_mul(HANGUL_QUAD_MODULUS);
+const HANGUL_QUAD_MODULUS: u64 = HANGUL_SYLLABLE_MODULUS.strict_pow(4);
 const HANGUL_SYLLABLE_COUNT: usize = 4;
-const HANGUL_SYLLABLE_MAX: u32 = 55_859;
-const HANGUL_SYLLABLE_MODULUS: u32 = 11_172;
-const HANGUL_SHIFTS: [u32; HANGUL_SYLLABLE_COUNT] = [48_u32, 32, 16, 0];
-const INPUT_BYTE_MAX_FOR_EURO_MAIN: u8 = 249;
-const INPUT_BYTE_MAX_FOR_LOTTO: u8 = 224;
-const INPUT_BYTE_MAX_FOR_LOTTO7: u8 = 221;
-const INPUT_BYTE_MAX_FOR_LUCKY_STAR: u8 = 251;
-const INPUT_BYTE_MAX_FOR_PASSWORD: u8 = 187;
-const LOTTO_MODULUS: u8 = 45;
-const LOTTO7_COUNT: usize = 7;
-const LOTTO7_MODULUS: u8 = 37;
+const HANGUL_SYLLABLE_MODULUS: u64 = 11_172;
+const LOTTO_BUNDLE_LIMIT: u64 = u64::MAX
+    .div_euclid(LOTTO_BUNDLE_MODULUS)
+    .strict_mul(LOTTO_BUNDLE_MODULUS);
+const LOTTO_BUNDLE_MODULUS: u64 = LOTTO_COMB
+    .strict_mul(LOTTO7_COMB)
+    .strict_mul(EURO_LUCKY_COMB)
+    .strict_mul(NMS_PLANET_MODULUS);
+const LOTTO_COMB: u64 = binomial(LOTTO_MAX, 6) as u64;
 const LOTTO_COUNT: usize = 6;
-const LOTTO_COUNT_U8: u8 = 6;
+const LOTTO_MAX: u32 = 45;
+const LOTTO7_COMB: u64 = binomial(LOTTO7_MAX, 7) as u64;
+const LOTTO7_COUNT: usize = 7;
+const LOTTO7_MAX: u32 = 37;
+const MIX_MUL_A: u64 = 0xBF58_476D_1CE4_E5B9;
+const MIX_MUL_B: u64 = 0x94D0_49BB_1331_11EB;
+const MIX_SALT_EURO: u64 = 0x9E37_79B9_7F4A_7C15;
+const MIX_SALT_HANGUL: u64 = 0x3C6E_F372_FE94_F82A;
+const MIX_SALT_LOTTO: u64 = 0xD1B5_4A32_D192_ED03;
+const MIX_SALT_PASSWORD: u64 = 0xA5A5_A5A5_5A5A_5A5A;
 const NMS_COORD_MASK: u64 = 0x0FFF;
-const NMS_PLANET_MAX_VALUE: u64 = 11;
-const NMS_PLANET_MASK: u64 = 0x0f;
-const NMS_PLANET_SHIFTS: [u8; 3] = [52, 4, 0];
-const NMS_PLANET_SUPP_SHIFTS: [u8; 4] = [60, 56, 52, 48];
 const NMS_PLANET_MODULUS: u64 = 6;
-const NMS_SOLAR_SYSTEM_MAX_VALUE: u64 = 3834;
-const NMS_SOLAR_SYSTEM_MASK: u64 = 0x0fff;
-const NMS_SOLAR_SYSTEM_SHIFTS: [u8; 1] = [40];
-const NMS_SOLAR_SYSTEM_SUPP_SHIFTS: [u8; 4] = [36, 24, 12, 0];
 const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
+const NUMERIC_PASSWORD_MODULUS: u64 = 1_000_000;
 const PASSWORD_BYTE_LEN: usize = 8;
+const PASSWORD_OCTET_LIMIT: u64 = u64::MAX
+    .div_euclid(PASSWORD_OCTET_MODULUS)
+    .strict_mul(PASSWORD_OCTET_MODULUS);
+const PASSWORD_OCTET_MODULUS: u64 = ASCII_PRINTABLE_LEN.strict_pow(8);
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
 #[derive(Default)]
@@ -68,19 +100,9 @@ pub(super) struct RandomDataSet {
     pub solar_system_index: u16,
     pub world_coords: Coordinates,
 }
-struct UniqueNumbers<const N: usize> {
-    count: u8,
-    seen: u64,
-}
 struct RandomDataBuildState<'cache> {
     data: RandomDataSet,
-    euro_lucky: UniqueNumbers<EURO_MILLIONS_LUCKY_COUNT>,
-    euro_main: UniqueNumbers<EURO_MILLIONS_MAIN_COUNT>,
     korea: korea_boundary::SampleState<'cache>,
-    lotto: UniqueNumbers<LOTTO_COUNT>,
-    lotto7: UniqueNumbers<LOTTO7_COUNT>,
-    numeric_password_digits: u8,
-    password_len: u8,
 }
 impl RandomDataSet {
     pub(super) fn populate<F>(
@@ -99,12 +121,6 @@ impl RandomDataSet {
                 boundary_cache.unwrap_or(&mut local_cache),
             ))?,
             data: self,
-            euro_lucky: UniqueNumbers::new(),
-            euro_main: UniqueNumbers::new(),
-            lotto: UniqueNumbers::new(),
-            lotto7: UniqueNumbers::new(),
-            numeric_password_digits: 0,
-            password_len: 0,
         };
         fields.fill_coords();
         fields.offer_word(initial, true)?;
@@ -117,47 +133,13 @@ impl RandomDataSet {
         fields.finish()
     }
 }
-impl<const N: usize> UniqueNumbers<N> {
-    fn into_values(self) -> [u8; N] {
-        let mut seen = self.seen;
-        array::from_fn(|_| {
-            let number = low_u8_from_u32(seen.trailing_zeros());
-            seen ^= seen.isolate_lowest_one();
-            number
-        })
-    }
-    fn is_full(&self) -> bool {
-        usize::from(self.count) == N
-    }
-    const fn new() -> Self {
-        Self { count: 0, seen: 0 }
-    }
-    fn push(&mut self, byte: u8, modulus: u8) -> bool {
-        if self.is_full() {
-            return true;
-        }
-        let mask = 1_u64 << byte.rem_euclid(modulus).strict_add(1);
-        if (self.seen & mask) != 0 {
-            return false;
-        }
-        self.seen |= mask;
-        self.count = self.count.strict_add(1);
-        self.is_full()
-    }
-}
 impl RandomDataBuildState<'_> {
     fn check_complete(&self) -> Result<()> {
         if !self.is_basic_complete() {
             return Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into());
         }
-        if !self.euro_lucky.is_full() {
-            return Err("유로밀리언 럭키 스타 보완 난수 시도 횟수를 초과했습니다.".into());
-        }
         if self.data.hangul_syllables.contains(&'\0') {
             return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
-        }
-        if self.data.planet_number == 0 || self.data.solar_system_index == 0 {
-            return Err("NMS 보완 난수 시도 횟수를 초과했습니다.".into());
         }
         Ok(())
     }
@@ -178,146 +160,122 @@ impl RandomDataBuildState<'_> {
         self.data.galaxy_y = galaxy_coord::<0x7F, 0xFF>(u16::from(self.data.nms_portal_yy));
         self.data.galaxy_z = galaxy_coord::<0x7FF, 0xFFF>(self.data.nms_portal_zzz);
     }
-    fn fill_hangul_from_u64(&mut self, value: u64, initial: bool) {
-        for (position, slot) in self.data.hangul_syllables.iter_mut().enumerate() {
-            if *slot != '\0' {
-                continue;
-            }
-            let shifts = HANGUL_SHIFTS.into_iter().cycle().skip(position);
-            let limit = if initial { 1 } else { HANGUL_SYLLABLE_COUNT };
-            let candidate_index = shifts.take(limit).find_map(|shift| {
-                let candidate = u32::from(low_u16_from_u64(value >> shift));
-                (candidate <= HANGUL_SYLLABLE_MAX).then_some(candidate)
-            });
-            if let Some(index) = candidate_index {
-                let point =
-                    HANGUL_BASE_CODE_POINT.strict_add(index.rem_euclid(HANGUL_SYLLABLE_MODULUS));
-                *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
-            }
-        }
-    }
-    fn fill_lucky_stars_from_u64(&mut self, value: u64) {
-        if self.euro_lucky.is_full() {
+    fn fill_euro_pin_nms_from_u64(&mut self, value: u64) {
+        if self.data.solar_system_index != 0 {
             return;
         }
-        for byte in value.reverse_bits().to_be_bytes() {
-            if byte <= INPUT_BYTE_MAX_FOR_LUCKY_STAR
-                && self.euro_lucky.push(byte, EURO_LUCKY_MODULUS)
-            {
-                return;
-            }
-        }
-    }
-    fn fill_nms_from_u64(&mut self, value: u64, initial: bool) {
-        if self.data.planet_number == 0 {
-            let shifts = if initial {
-                &NMS_PLANET_SHIFTS[..]
-            } else {
-                &NMS_PLANET_SUPP_SHIFTS[..]
-            };
-            if let Some(candidate) =
-                nms_candidate(value, shifts, NMS_PLANET_MASK, NMS_PLANET_MAX_VALUE)
-            {
-                self.data.planet_number =
-                    low_u8_from_u64(candidate.rem_euclid(NMS_PLANET_MODULUS).strict_add(1));
-            }
-        }
-        if self.data.solar_system_index == 0 {
-            let shifts = if initial {
-                &NMS_SOLAR_SYSTEM_SHIFTS[..]
-            } else {
-                &NMS_SOLAR_SYSTEM_SUPP_SHIFTS[..]
-            };
-            if let Some(candidate) = nms_candidate(
-                value,
-                shifts,
-                NMS_SOLAR_SYSTEM_MASK,
-                NMS_SOLAR_SYSTEM_MAX_VALUE,
-            ) {
-                self.data.solar_system_index =
-                    low_u16_from_u64(candidate.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS).strict_add(1));
-            }
-        }
-    }
-    fn fill_required_fields_from_u64(&mut self, value: u64) {
-        if self.is_basic_complete() {
+        let mixed = mix_word(value, MIX_SALT_EURO);
+        if mixed >= EURO_PIN_NMS_LIMIT {
             return;
         }
-        for byte in value.to_be_bytes() {
-            if byte > INPUT_BYTE_MAX_FOR_EURO_MAIN {
-                continue;
-            }
-            if self.numeric_password_digits < LOTTO_COUNT_U8 {
-                let digit = u32::from(byte.rem_euclid(10));
-                self.data.numeric_password =
-                    self.data.numeric_password.strict_mul(10).strict_add(digit);
-                self.numeric_password_digits = self.numeric_password_digits.strict_add(1);
-            }
-            self.euro_main.push(byte, EURO_MAIN_MODULUS);
-            if byte <= INPUT_BYTE_MAX_FOR_LOTTO {
-                self.lotto.push(byte, LOTTO_MODULUS);
-                if byte <= INPUT_BYTE_MAX_FOR_LOTTO7 {
-                    self.lotto7.push(byte, LOTTO7_MODULUS);
-                    if byte <= INPUT_BYTE_MAX_FOR_PASSWORD
-                        && let Some(slot) =
-                            self.data.password.get_mut(usize::from(self.password_len))
-                    {
-                        *slot = byte
-                            .rem_euclid(ASCII_PRINTABLE_LEN)
-                            .strict_add(ASCII_PRINTABLE_START);
-                        self.password_len = self.password_len.strict_add(1);
-                    }
-                }
-            }
-            if self.is_basic_complete() {
-                return;
-            }
+        let rem = mixed.rem_euclid(EURO_PIN_NMS_MODULUS);
+        let solar_rem = rem.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS);
+        let rem_pin_euro = rem.div_euclid(NMS_SOLAR_SYSTEM_MODULUS);
+        let pin_rem = rem_pin_euro.rem_euclid(NUMERIC_PASSWORD_MODULUS);
+        let euro_rank = low_u32_from_u64(rem_pin_euro.div_euclid(NUMERIC_PASSWORD_MODULUS));
+        self.data.solar_system_index = low_u16_from_u64(solar_rem.strict_add(1));
+        self.data.numeric_password = low_u32_from_u64(pin_rem);
+        self.data.euro_millions_main_numbers =
+            unrank_combination::<EURO_MILLIONS_MAIN_COUNT>(euro_rank, EURO_MAIN_MAX);
+    }
+    fn fill_hangul_from_u64(&mut self, value: u64) {
+        if !self.data.hangul_syllables.contains(&'\0') {
+            return;
+        }
+        let mixed = mix_word(value, MIX_SALT_HANGUL);
+        if mixed >= HANGUL_QUAD_LIMIT {
+            return;
+        }
+        let mut rem = mixed.rem_euclid(HANGUL_QUAD_MODULUS);
+        for slot in &mut self.data.hangul_syllables {
+            let offset = low_u32_from_u64(rem.rem_euclid(HANGUL_SYLLABLE_MODULUS));
+            rem = rem.div_euclid(HANGUL_SYLLABLE_MODULUS);
+            let point = HANGUL_BASE_CODE_POINT.strict_add(offset);
+            *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
+        }
+    }
+    fn fill_lotto_bundle_from_u64(&mut self, value: u64) {
+        if self.data.planet_number != 0 {
+            return;
+        }
+        let mixed = mix_word(value, MIX_SALT_LOTTO);
+        if mixed >= LOTTO_BUNDLE_LIMIT {
+            return;
+        }
+        let rem = mixed.rem_euclid(LOTTO_BUNDLE_MODULUS);
+        let planet_rem = rem.rem_euclid(NMS_PLANET_MODULUS);
+        let rem_after_planet = rem.div_euclid(NMS_PLANET_MODULUS);
+        let lucky_rank = low_u32_from_u64(rem_after_planet.rem_euclid(EURO_LUCKY_COMB));
+        let rem_lottos = rem_after_planet.div_euclid(EURO_LUCKY_COMB);
+        let korea_lotto_rank = low_u32_from_u64(rem_lottos.rem_euclid(LOTTO_COMB));
+        let japan_lotto_rank = low_u32_from_u64(rem_lottos.div_euclid(LOTTO_COMB));
+        self.data.planet_number = low_u8_from_u64(planet_rem.strict_add(1));
+        self.data.euro_millions_lucky_stars =
+            unrank_combination::<EURO_MILLIONS_LUCKY_COUNT>(lucky_rank, EURO_LUCKY_MAX);
+        self.data.lotto_numbers = unrank_combination::<LOTTO_COUNT>(korea_lotto_rank, LOTTO_MAX);
+        self.data.lotto7_numbers = unrank_combination::<LOTTO7_COUNT>(japan_lotto_rank, LOTTO7_MAX);
+    }
+    fn fill_password_from_u64(&mut self, value: u64) {
+        if !self.data.password.contains(&0) {
+            return;
+        }
+        let mixed = mix_word(value, MIX_SALT_PASSWORD);
+        if mixed >= PASSWORD_OCTET_LIMIT {
+            return;
+        }
+        let mut rem = mixed.rem_euclid(PASSWORD_OCTET_MODULUS);
+        for slot in &mut self.data.password {
+            let offset = low_u8_from_u64(rem.rem_euclid(ASCII_PRINTABLE_LEN));
+            rem = rem.div_euclid(ASCII_PRINTABLE_LEN);
+            *slot = ASCII_PRINTABLE_START.strict_add(offset);
         }
     }
     fn finish(self) -> Result<RandomDataSet> {
         self.check_complete()?;
         let mut data = self.data;
         data.kor_coords = self.korea.finish()?;
-        data.euro_millions_lucky_stars = self.euro_lucky.into_values();
-        data.euro_millions_main_numbers = self.euro_main.into_values();
-        data.lotto_numbers = self.lotto.into_values();
-        data.lotto7_numbers = self.lotto7.into_values();
         Ok(data)
     }
     fn is_basic_complete(&self) -> bool {
-        usize::from(self.password_len) == PASSWORD_BYTE_LEN
-            && self.lotto7.is_full()
-            && self.lotto.is_full()
-            && self.euro_main.is_full()
+        !self.data.password.contains(&0)
+            && self.data.planet_number != 0
+            && self.data.solar_system_index != 0
     }
     fn is_complete(&self) -> bool {
         self.is_basic_complete()
+            && !self.data.hangul_syllables.contains(&'\0')
             && self.korea.is_complete()
-            && self
-                .data
-                .hangul_syllables
-                .iter()
-                .all(|&character| character != '\0')
-            && self.data.planet_number != 0
-            && self.data.solar_system_index != 0
-            && self.euro_lucky.is_full()
     }
     fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
-        self.fill_required_fields_from_u64(value);
-        self.fill_hangul_from_u64(value, initial);
-        self.fill_nms_from_u64(value, initial);
-        self.fill_lucky_stars_from_u64(value);
+        self.fill_lotto_bundle_from_u64(value);
+        self.fill_euro_pin_nms_from_u64(value);
+        self.fill_hangul_from_u64(value);
+        self.fill_password_from_u64(value);
         if !initial {
             self.korea.offer_supplement(value)?;
         }
         Ok(())
     }
 }
-fn nms_candidate(value: u64, shifts: &[u8], mask: u64, max: u64) -> Option<u64> {
-    shifts.iter().find_map(|&shift| {
-        let candidate = (value >> shift) & mask;
-        (candidate <= max).then_some(candidate)
-    })
+const fn binomial(total: u32, choose: u32) -> u32 {
+    if choose > total {
+        return 0;
+    }
+    let mut result = 1_u32;
+    let mut step = 1_u32;
+    while step <= choose {
+        let factor = total.strict_sub(choose).strict_add(step);
+        result = result.strict_mul(factor).div_euclid(step);
+        step = step.strict_add(1);
+    }
+    result
+}
+fn combination_count(total: u32, choose: usize) -> u32 {
+    BINOMIAL_VALUES
+        .get(usize::try_from(total).unwrap_or_else(|_| process::abort()))
+        .and_then(|row| row.get(choose))
+        .copied()
+        .unwrap_or_else(|| process::abort())
 }
 const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
     // Callers supply 8-bit or 12-bit fields; shift the origin within that field.
@@ -337,4 +295,34 @@ pub(super) fn generate_random_data_with_rng(
         ..Default::default()
     }
     .populate(&mut next_supp, boundary_cache)
+}
+const fn mix_word(value: u64, salt: u64) -> u64 {
+    let mut state = value.wrapping_add(salt);
+    state = (state ^ (state >> 30_u32)).wrapping_mul(MIX_MUL_A);
+    state = (state ^ (state >> 27_u32)).wrapping_mul(MIX_MUL_B);
+    state ^ (state >> 31_u32)
+}
+fn unrank_combination<const K: usize>(mut rank: u32, max_n: u32) -> [u8; K] {
+    let mut out = [0_u8; K];
+    let mut upper = max_n;
+    for slot_num in (1..=K).rev() {
+        let choose = u32::try_from(slot_num).unwrap_or_else(|_| process::abort());
+        let mut low = choose.strict_sub(1);
+        let mut high = upper;
+        while low.strict_add(1) < high {
+            let mid = low.strict_add(high.strict_sub(low).div_euclid(2));
+            if combination_count(mid, slot_num) <= rank {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        rank = rank.strict_sub(combination_count(low, slot_num));
+        let slot = out
+            .get_mut(slot_num.strict_sub(1))
+            .unwrap_or_else(|| process::abort());
+        *slot = low_u8_from_u32(low.strict_add(1));
+        upper = low;
+    }
+    out
 }

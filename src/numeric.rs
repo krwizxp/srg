@@ -15,3 +15,8 @@ pub(super) const fn low_u16_from_u64(value: u64) -> u16 {
     let [b0, b1, ..] = value.to_le_bytes();
     u16::from_le_bytes([b0, b1])
 }
+
+pub(super) const fn low_u32_from_u64(value: u64) -> u32 {
+    let [b0, b1, b2, b3, ..] = value.to_le_bytes();
+    u32::from_le_bytes([b0, b1, b2, b3])
+}

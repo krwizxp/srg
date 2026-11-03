@@ -200,7 +200,12 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_line("한글 음절 4글자: ".as_bytes(), |buffer_cur| {
             let (chunks, _) = buffer_cur.take(12).as_chunks_mut::<3>();
             for (&ch, chunk) in data.hangul_syllables.iter().zip(chunks) {
-                ch.encode_utf8(chunk);
+                let [b0, b1, ..] = u32::from(ch).to_le_bytes();
+                *chunk = [
+                    0xE0_u8 | (b1 >> 4_u8),
+                    0x80_u8 | ((b1 & 0x0F_u8) << 2_u8) | (b0 >> 6_u8),
+                    0x80_u8 | (b0 & 0x3F_u8),
+                ];
             }
         });
         self.cursor.write_bytes("대한민국 위경도: ".as_bytes());

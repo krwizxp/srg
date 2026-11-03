@@ -51,6 +51,17 @@ impl HardwareRng {
     }
     fn rdseed_random(&self) -> Result<u64> {
         let mut value = 0_u64;
+        // SAFETY: callers only use this after confirming `rdseed` support.
+        if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+            return Ok(value);
+        }
+        if self.rdrand_supported
+            && let Ok(fallback) = Self::rdrand_random()
+        {
+            self.fallback_notice_pending
+                .fetch_or(true, Ordering::Release);
+            return Ok(fallback);
+        }
         if Self::try_rdseed(&mut value) {
             return Ok(value);
         }
@@ -70,6 +81,13 @@ impl HardwareRng {
             if Self::try_rdseed(&mut value) {
                 return Ok(value);
             }
+            if self.rdrand_supported
+                && let Ok(fallback) = Self::rdrand_random()
+            {
+                self.fallback_notice_pending
+                    .fetch_or(true, Ordering::Release);
+                return Ok(fallback);
+            }
             match self.source() {
                 HardwareRandomSource::RdSeed => yield_now(),
                 HardwareRandomSource::RdRand => return Self::rdrand_random(),
@@ -80,7 +98,8 @@ impl HardwareRng {
         }
         self.rdseed_active.store(false, Ordering::Relaxed);
         if self.rdrand_supported {
-            self.fallback_notice_pending.store(true, Ordering::Relaxed);
+            self.fallback_notice_pending
+                .fetch_or(true, Ordering::Release);
             return Self::rdrand_random();
         }
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
@@ -120,8 +139,15 @@ impl HardwareRng {
         Ok(())
     }
     pub(super) fn write_rdseed_fallback_notice(&self, err: &mut dyn Write) -> Result<()> {
-        if self.fallback_notice_pending.swap(false, Ordering::Relaxed) {
-            writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
+        if self.fallback_notice_pending.swap(false, Ordering::Acquire) {
+            if self.source() == HardwareRandomSource::RdSeed {
+                writeln!(
+                    err,
+                    "RDSEED 일시 재시도 중 RDRAND를 사용했습니다. 다음 호출은 RDSEED를 우선 시도합니다."
+                )?;
+            } else {
+                writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
+            }
         }
         Ok(())
     }

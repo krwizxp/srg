@@ -3,6 +3,7 @@ use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
     geo_uniform::Orientation,
+    numeric::low_u16_from_u64,
     random_data::Coordinates,
 };
 use alloc::collections::VecDeque;
@@ -11,9 +12,11 @@ mod data;
 const CACHE_BYTES: usize = 0x0010_0000;
 const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
+const IEEE_F64_MANTISSA_ALIGN: f64 = 4_503_599_627_370_496.0_f64;
 const KOREA_SUPP_RETRY_LIMIT: usize = 1024;
 const KOREA_TILE_BYTES: &[u8] = include_bytes!("../data/korea-boundary-v4/tile-select-v5.bin");
 const KOREA_TILE_COUNT: usize = 79113;
+const MAX_GRID_DIMENSION_F64: f64 = 4096.0_f64;
 const MAX_PAGE_SIZE: usize = 0x8000;
 const MAX_PART_SIZE: usize = 0x0008_0000;
 static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
@@ -30,6 +33,9 @@ struct CachedPage {
 struct BoundaryIndex {
     bounds: [f64; 4],
     columns: Box<[f64]>,
+    divisor: f64,
+    grid_south: f64,
+    grid_west: f64,
     parts: Box<[Part]>,
     polygon_count: usize,
     ring_count: usize,
@@ -82,16 +88,8 @@ impl BoundaryIndex {
             return Ok(false);
         }
         let width = self.columns.len().strict_sub(1);
-        let column = self
-            .columns
-            .partition_point(|edge| *edge <= point.longitude)
-            .min(width)
-            .strict_sub(1);
-        let row = self
-            .rows
-            .partition_point(|edge| *edge <= point.latitude)
-            .min(self.rows.len().strict_sub(1))
-            .strict_sub(1);
+        let column = grid_axis_index(&self.columns, self.grid_west, self.divisor, point.longitude);
+        let row = grid_axis_index(&self.rows, self.grid_south, self.divisor, point.latitude);
         let tile_number = row.strict_mul(width).strict_add(column);
         let tile = self
             .tiles
@@ -157,25 +155,33 @@ impl BoundaryIndex {
                             let &[start, end] = pair else {
                                 return Err("대한민국 경계 선분 오류".into());
                             };
-                            let within = point.longitude >= start[0].min(end[0])
-                                && point.longitude <= start[0].max(end[0])
-                                && point.latitude >= start[1].min(end[1])
-                                && point.latitude <= start[1].max(end[1]);
-                            let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
-                            if within || crosses {
-                                let side = Orientation::try_from((
-                                    start,
-                                    end,
-                                    [point.longitude, point.latitude],
-                                ))?;
-                                boundary |= within && side == Orientation::Zero;
-                                parity ^= crosses
-                                    && if end[1] > start[1] {
-                                        side == Orientation::Positive
-                                    } else {
-                                        side == Orientation::Negative
-                                    };
+                            let min_lat = start[1].min(end[1]);
+                            let max_lat = start[1].max(end[1]);
+                            if point.latitude < min_lat || point.latitude > max_lat {
+                                continue;
                             }
+                            let min_lon = start[0].min(end[0]);
+                            let max_lon = start[0].max(end[0]);
+                            if point.longitude > max_lon {
+                                continue;
+                            }
+                            let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
+                            if point.longitude < min_lon {
+                                parity ^= crosses;
+                                continue;
+                            }
+                            let side = Orientation::try_from((
+                                start,
+                                end,
+                                [point.longitude, point.latitude],
+                            ))?;
+                            boundary |= side == Orientation::Zero;
+                            parity ^= crosses
+                                && if end[1] > start[1] {
+                                    side == Orientation::Positive
+                                } else {
+                                    side == Orientation::Negative
+                                };
                         }
                         Ok(())
                     })();
@@ -514,6 +520,9 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         Ok(Self {
             bounds,
             columns,
+            divisor,
+            grid_south,
+            grid_west,
             rows,
             polygon_count,
             ring_count,
@@ -536,7 +545,7 @@ impl BoundaryCache {
         let item = if let Some(position) = self
             .pages
             .iter()
-            .position(|&(number, _)| number == page_number)
+            .rposition(|&(number, _)| number == page_number)
         {
             self.pages
                 .remove(position)
@@ -611,7 +620,6 @@ impl SampleState<'_> {
         Ok(())
     }
 }
-
 impl<'cache> TryFrom<(u64, &'cache mut BoundaryCache)> for SampleState<'cache> {
     type Error = AppError;
     fn try_from((value, active_cache): (u64, &'cache mut BoundaryCache)) -> Result<Self> {
@@ -628,7 +636,28 @@ impl<'cache> TryFrom<(u64, &'cache mut BoundaryCache)> for SampleState<'cache> {
         Ok(state)
     }
 }
-
+fn grid_axis_index(edges: &[f64], origin: f64, divisor: f64, coordinate: f64) -> usize {
+    let max_cell = edges.len().strict_sub(2);
+    let scaled = ((coordinate - origin) * divisor)
+        .floor()
+        .clamp(0.0_f64, MAX_GRID_DIMENSION_F64);
+    let aligned_bits = (scaled + IEEE_F64_MANTISSA_ALIGN).to_bits() & 0x1FFF_u64;
+    let approx = usize::from(low_u16_from_u64(aligned_bits)).min(max_cell);
+    if edges
+        .get(approx.strict_add(1))
+        .is_some_and(|&next_edge| next_edge <= coordinate)
+    {
+        approx.strict_add(1).min(max_cell)
+    } else if approx > 0
+        && edges
+            .get(approx)
+            .is_some_and(|&curr_edge| curr_edge > coordinate)
+    {
+        approx.strict_sub(1)
+    } else {
+        approx
+    }
+}
 fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
     let value = bytes
         .get(offset..)
