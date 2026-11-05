@@ -1,4 +1,7 @@
 const BINOMIAL_VALUES = Uint32Array.from({length: 408}, (_, index) => binomial(Math.floor(index / 8), index % 8));
+const BYTE_BIN = Array.from({length: 256}, (_, index) => index.toString(2).padStart(8, "0"));
+const BYTE_HEX = Array.from({length: 256}, (_, index) => index.toString(16).toUpperCase().padStart(2, "0"));
+const ASCII_CHARS = Array.from({length: 94}, (_, index) => String.fromCodePoint(33 + index));
 const U64_MAX = (1n << 64n) - 1n;
 const U32_MAX_INV = 1 / 4294967295;
 const HANGUL_BASE = 0xac00;
@@ -179,7 +182,7 @@ function fillPassword(value, data) {
 	if (mixed >= PASSWORD_OCTET_LIMIT) return;
 	let remainder = mixed % PASSWORD_OCTET_MODULUS;
 	for (let i = 0; i < 8; i++) {
-		data.password.push(String.fromCodePoint(33 + Number(remainder % 94n)));
+		data.password.push(ASCII_CHARS[Number(remainder % 94n)]);
 		remainder /= 94n;
 	}
 }
@@ -247,24 +250,26 @@ async function* convertNumber(num, sampleKorea) {
 function paddedHex(value, width) {
 	return value.toString(16).toUpperCase().padStart(width, "0");
 }
-function groupBytes(text, width) {
-	let grouped = text.slice(0, width);
-	for (let offset = width; offset < text.length; offset += width)
-		grouped += " " + text.slice(offset, offset + width);
-	return grouped;
-}
 function formatOutput(data) {
 	const v = data.number;
 	bitsView.setBigUint64(0, v, false);
-	const bytes = bytesView;
-	const hex = bytes.toHex().toUpperCase();
+	const b0 = bytesView[0];
+	const b1 = bytesView[1];
+	const b2 = bytesView[2];
+	const b3 = bytesView[3];
+	const b4 = bytesView[4];
+	const b5 = bytesView[5];
+	const b6 = bytesView[6];
+	const b7 = bytesView[7];
+	const h0 = BYTE_HEX[b0], h1 = BYTE_HEX[b1], h2 = BYTE_HEX[b2], h3 = BYTE_HEX[b3];
+	const h4 = BYTE_HEX[b4], h5 = BYTE_HEX[b5], h6 = BYTE_HEX[b6], h7 = BYTE_HEX[b7];
 	return `64비트 난수: ${v} (유부호 정수: ${BigInt.asIntN(64, v)
 		})
-2진수: ${groupBytes(v.toString(2).padStart(64, "0"), 8)}
+2진수: ${BYTE_BIN[b0]} ${BYTE_BIN[b1]} ${BYTE_BIN[b2]} ${BYTE_BIN[b3]} ${BYTE_BIN[b4]} ${BYTE_BIN[b5]} ${BYTE_BIN[b6]} ${BYTE_BIN[b7]}
 8진수: ${v.toString(8)}
-16진수: ${groupBytes(hex, 2)}
-Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
-바이트 배열: ${bytes.join(" ")}
+16진수: ${h0} ${h1} ${h2} ${h3} ${h4} ${h5} ${h6} ${h7}
+Hex 코드: #${h0}${h1}${h2} #${h3}${h4}${h5}
+바이트 배열: ${b0} ${b1} ${b2} ${b3} ${b4} ${b5} ${b6} ${b7}
 6자리 숫자 비밀번호: ${String(data.pin).padStart(6, "0")}
 8자리 비밀번호: ${data.password.join("")}
 로또 번호: ${data.lotto.values.join(" ")}
@@ -274,7 +279,7 @@ Hex 코드: #${hex.slice(0, 6)} #${hex.slice(6, 12)}
 한글 음절 4글자: ${data.hangul.join("")}
 대한민국 위경도: ${formatCoordinate(data.korea[0])}, ${formatCoordinate(data.korea[1])}
 세계 위경도: ${formatCoordinate(data.world[0])}, ${formatCoordinate(data.world[1])}
-NMS 은하 번호: ${bytes[0] + 1}
+NMS 은하 번호: ${b0 + 1}
 NMS 포탈 주소: ${data.planet} ${paddedHex(data.system, 3)
 		} ${paddedHex(data.portalY, 2)} ${paddedHex(data.portalZ, 3)
 		} ${paddedHex(data.portalX, 3)} (${data.glyphs
