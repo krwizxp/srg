@@ -151,10 +151,7 @@ impl BoundaryIndex {
                         ));
                         (offset > 0).ok_or("대한민국 경계 교차 블록 누락")?;
                         chains_started = true;
-                        for pair in vertices.windows(2) {
-                            let &[start, end] = pair else {
-                                return Err("대한민국 경계 선분 오류".into());
-                            };
+                        for &[start, end] in vertices.array_windows::<2>() {
                             let min_lat = start[1].min(end[1]);
                             let max_lat = start[1].max(end[1]);
                             if point.latitude < min_lat || point.latitude > max_lat {

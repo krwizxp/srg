@@ -4,6 +4,7 @@ use alloc::{borrow::Cow, string::String};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
+    mem::DropGuard,
     ptr::{NonNull, null_mut},
     slice, str,
 };
@@ -69,12 +70,6 @@ pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
 }
 struct EasyHandle(NonNull<Curl>);
-struct TransferOptions<'handle>(&'handle EasyHandle);
-impl Drop for TransferOptions<'_> {
-    fn drop(&mut self) {
-        self.0.reset();
-    }
-}
 #[derive(Default)]
 struct CurlBodySink {
     bytes_seen: usize,
@@ -132,12 +127,6 @@ impl EasyHandle {
         // SAFETY: self.0 is configured with callbacks and buffers that live until the call returns.
         unsafe { sys::curl_easy_perform(self.as_ptr()) }
     }
-    fn reset(&self) {
-        // SAFETY: self.0 is a valid easy handle; reset clears options while keeping libcurl caches.
-        unsafe {
-            sys::curl_easy_reset(self.as_ptr());
-        }
-    }
     fn setopt_callback(
         &self,
         option: CurlOption,
@@ -189,7 +178,12 @@ impl Client {
         let (perform_code, request_start, scheme_result) = {
             let mut body_target = CurlWriteTarget::Body(&mut body_sink);
             let mut header_target = CurlWriteTarget::Header(&mut header_capture);
-            let _options = TransferOptions(handle);
+            let _options = DropGuard::new(&*handle, |reset_handle| {
+                // SAFETY: reset_handle is valid; reset clears options while keeping libcurl caches.
+                unsafe {
+                    sys::curl_easy_reset(reset_handle.as_ptr());
+                }
+            });
             handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
             handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
             handle.setopt_str(CURLOPT_URL, server.request_target.as_ptr(), context)?;
@@ -305,8 +299,7 @@ impl CurlHeaderCapture {
             return false;
         }
         self.bytes_seen = next_len;
-        let without_lf = bytes.strip_suffix(b"\n").unwrap_or(bytes);
-        let line = without_lf.strip_suffix(b"\r").unwrap_or(without_lf);
+        let line = bytes.trim_suffix(b"\n").trim_suffix(b"\r");
         if line.starts_with(b"HTTP/") {
             self.current_block = Some(FreshTimeHeaders::default());
             return true;
