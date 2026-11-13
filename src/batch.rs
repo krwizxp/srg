@@ -9,6 +9,7 @@ use crate::{
     stop_input::StopInput,
 };
 use core::{
+    mem::DropGuard,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::Duration,
 };
@@ -231,7 +232,10 @@ pub(super) fn regenerate_with_count(
                     last_progress = Instant::now();
                 }
             }
-            rng.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
+            let rng_guard = DropGuard::new(&*rng, |active_rng| {
+                active_rng.set_pending_read_interruption(false);
+            });
+            rng_guard.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
             let mut combined = None;
             let mut worker_panic = None;
             let mut worker_error = None;
@@ -249,7 +253,7 @@ pub(super) fn regenerate_with_count(
                     Ok(Ok(None) | Err(_)) | Err(_) => {}
                 }
             }
-            rng.set_pending_read_interruption(false);
+            drop(rng_guard);
             if let Some(panic_payload) = worker_panic {
                 resume_unwind(panic_payload);
             }

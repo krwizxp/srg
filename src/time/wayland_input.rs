@@ -4,6 +4,7 @@ use alloc::borrow::Cow;
 use core::{
     ffi::{CStr, c_char, c_int, c_short, c_uint, c_ulong, c_void},
     marker::{PhantomData, PhantomPinned},
+    mem::DropGuard,
     ptr::{NonNull, null_mut},
     slice,
     time::Duration,
@@ -254,16 +255,19 @@ impl EiSession {
         let mut pong = None;
         loop {
             // SAFETY: context is live and ei_get_event returns an owned event reference or null.
-            let Some(event) = NonNull::new(unsafe { (self.api.get_event)(self.context.as_ptr()) })
+            let Some(raw_event) =
+                NonNull::new(unsafe { (self.api.get_event)(self.context.as_ptr()) })
             else {
                 return Ok(pong);
             };
-            let result = self.handle_event(event);
-            // SAFETY: event is owned by this loop iteration and is unreferenced exactly once.
-            unsafe {
-                (self.api.event_unref)(event.as_ptr());
-            }
-            if let Some(event_pong) = result?
+            let event_unref = self.api.event_unref;
+            let event = DropGuard::new(raw_event, |owned_event| {
+                // SAFETY: owned_event is owned by this loop iteration and is unreferenced exactly once.
+                unsafe {
+                    event_unref(owned_event.as_ptr());
+                }
+            });
+            if let Some(event_pong) = self.handle_event(*event)?
                 && pong.replace(event_pong).is_some()
             {
                 return Err(Cow::Borrowed("중복 libei PONG 이벤트가 발생했습니다."));
@@ -373,19 +377,22 @@ impl EiSession {
                 "Wayland 입력 전달 제한 시간 계산 실패",
             )))?;
         // SAFETY: context is a live libei sender context.
-        let ping = NonNull::new(unsafe { (self.api.new_ping)(self.context.as_ptr()) })
+        let raw_ping = NonNull::new(unsafe { (self.api.new_ping)(self.context.as_ptr()) })
             .ok_or(SendError::Before(Cow::Borrowed("ei_new_ping 실패")))?;
+        let ping_unref = self.api.ping_unref;
+        let ping = DropGuard::new(raw_ping, |owned_ping| {
+            // SAFETY: owned_ping was returned by ei_new_ping and is unreferenced exactly once here.
+            unsafe {
+                ping_unref(owned_ping.as_ptr());
+            }
+        });
         self.api.send_action(self.action, self.context, device.raw);
         // SAFETY: ping is a live synchronization object owned by this send operation.
         unsafe {
             (self.api.ping)(ping.as_ptr());
         }
-        let result = self.wait_for_delivery(ping, deadline);
-        // SAFETY: ping was returned by ei_new_ping and is unreferenced exactly once here.
-        unsafe {
-            (self.api.ping_unref)(ping.as_ptr());
-        }
-        result.map_err(SendError::Partial)
+        self.wait_for_delivery(*ping, deadline)
+            .map_err(SendError::Partial)
     }
     fn wait_for_delivery(
         &mut self,
