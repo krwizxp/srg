@@ -94,11 +94,9 @@ impl TryFrom<&Path> for OutputFile {
         };
         let metadata = file.metadata()?;
         #[cfg(target_os = "windows")]
-        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG != 0 {
-            return Err(AppError::message(
-                "출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.",
-            ));
-        }
+        (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG == 0).ok_or_else(|| {
+            AppError::message("출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.")
+        })?;
         metadata
             .is_file()
             .ok_or_else(|| AppError::message("출력 경로는 일반 파일이어야 합니다."))?;
@@ -114,9 +112,7 @@ impl TryFrom<&Path> for OutputFile {
                         FILE_STANDARD_INFO_SIZE,
                     )
                 };
-                if status == 0_i32 {
-                    return Err(IoError::last_os_error().into());
-                }
+                (status != 0_i32).ok_or_else(|| AppError::from(IoError::last_os_error()))?;
                 u64::from(standard_info.number_of_links)
             }}
             any(target_os = "linux", target_os = "macos") => {

@@ -125,9 +125,7 @@ impl Client {
                     WINHTTP_TIMEOUT_MILLIS,
                 )
             };
-            if timeout_ok == 0_i32 {
-                return Err(Self::last_error("WinHttpSetTimeouts", context));
-            }
+            (timeout_ok != 0_i32).ok_or_else(|| Self::last_error("WinHttpSetTimeouts", context))?;
             if let Err(code) = Self::try_set_dword_option(
                 &session,
                 WINHTTP_OPTION_SECURE_PROTOCOLS,
@@ -322,20 +320,20 @@ impl Client {
                 ));
             }
             let header_bytes = bytes as usize;
-            if header_bytes > HTTP_HEAD_MAX_HEADER_BYTES {
-                return Err(error(
+            (header_bytes <= HTTP_HEAD_MAX_HEADER_BYTES).ok_or_else(|| {
+                error(
                     context,
                     format!(
                         "{name} 헤더가 허용 한도({HTTP_HEAD_MAX_HEADER_BYTES} bytes)를 초과했습니다."
                     ),
-                ));
-            }
-            if !header_bytes.is_multiple_of(2) {
-                return Err(error(
+                )
+            })?;
+            header_bytes.is_multiple_of(2).ok_or_else(|| {
+                error(
                     context,
                     format!("{name} 헤더 UTF-16 길이가 올바르지 않습니다."),
-                ));
-            }
+                )
+            })?;
             let units = header_bytes.div_euclid(2);
             let mut header = if fetch_error.is_none() {
                 short_buffer
@@ -363,12 +361,9 @@ impl Client {
                     .ok_or_else(|| Self::last_error("WinHttpQueryHeaders header", context))?;
                 wide_buffer.as_slice()
             };
-            if index <= current_index {
-                return Err(error(
-                    context,
-                    format!("{name} 헤더 index가 진행되지 않았습니다."),
-                ));
-            }
+            (index > current_index).ok_or_else(|| {
+                error(context, format!("{name} 헤더 index가 진행되지 않았습니다."))
+            })?;
             while let Some((&0, rest)) = header.split_last() {
                 header = rest;
             }

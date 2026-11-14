@@ -132,10 +132,7 @@ impl OutputFormatter<'_, '_, '_> {
         });
         self.write_labeled_line("8진수: ".as_bytes(), |buffer_cur| {
             let octal_len = usize::from(low_u8_from_u32(
-                u64::BITS
-                    .strict_sub(number64.leading_zeros())
-                    .div_ceil(OCTAL_SHIFT_BITS)
-                    .max(1),
+                number64.bit_width().div_ceil(OCTAL_SHIFT_BITS).max(1),
             ));
             let mut octal_number = number64;
             for slot in buffer_cur.take(octal_len).iter_mut().rev() {

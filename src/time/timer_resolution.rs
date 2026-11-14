@@ -27,12 +27,12 @@ impl HighResTimerGuard {
                     0,
                 )
             };
-            if set_ok == 0_i32 {
-                return Err(io::Error::other(format!(
+            (set_ok != 0_i32).ok_or_else(|| {
+                io::Error::other(format!(
                     "SetWaitableTimerEx 실패: {}",
                     io::Error::last_os_error()
-                )));
-            }
+                ))
+            })?;
             // SAFETY: handle remains valid while waiting.
             let wait_status =
                 unsafe { sys::wait_for_single_object(self.handle.as_ptr(), INFINITE) };
