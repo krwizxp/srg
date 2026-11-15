@@ -323,9 +323,6 @@ const pages = {entries: new Map(), bytes: 0, pending: 0, entryLimit: 4096,
 function requireBoundary(condition, message) {
     if (!condition) throw new Error(message);
 }
-function hexBytes(bytes) {
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-}
 function magic(bytes, expected) {
     return bytes.length >= 8 && new TextDecoder().decode(bytes.subarray(0, 8)) === expected;
 }
@@ -458,8 +455,8 @@ function decodeAtlas(bytes, boundary) {
         && data.getUint32(20, true) === boundary.tileCount
         && stateBytes === mixedCount * subdivision * subdivision / 4
         && bytes.length === 96 + stateBytes && data.getUint32(92, true) === 0
-        && hexBytes(bytes.subarray(24, 56)) === INDEX_SHA256
-        && hexBytes(bytes.subarray(56, 88)) === SOURCE_SHA256,
+        && bytes.subarray(24, 56).toHex() === INDEX_SHA256
+        && bytes.subarray(56, 88).toHex() === SOURCE_SHA256,
     "대한민국 세부 격자 인덱스 오류");
     const states = bytes.subarray(96);
     for (const value of states) {
@@ -540,7 +537,7 @@ async function loadBoundary() {
             && polygons > 0 && rings >= polygons && vertices >= rings * 4 && vertices <= 20000000
             && [1, 2, 4, 8, 16, 32, 64, 128, 256].includes(scale)
             && bytes.length === 128 + tileCount * 12 + partCount * 48
-            && hexBytes(bytes.subarray(96, 128)) === SOURCE_SHA256,
+            && bytes.subarray(96, 128).toHex() === SOURCE_SHA256,
         "대한민국 경계 루트 인덱스 오류");
         const gridWest = data.getFloat64(48, true);
         const gridSouth = data.getFloat64(56, true);
@@ -603,7 +600,7 @@ async function loadPart(boundary, number) {
         const expectedFirst = boundary.data.getUint32(root, true);
         const expectedCount = boundary.data.getUint32(root + 4, true);
         const expectedSize = boundary.data.getUint32(root + 8, true);
-        const digest = hexBytes(boundary.bytes.subarray(root + 16, root + 48));
+        const digest = boundary.bytes.subarray(root + 16, root + 48).toHex();
         const name = "part-" + String(number).padStart(3, "0") + ".bin";
         const bytes = await download(name, MAX_PART_BYTES, digest);
         requireBoundary(bytes.length === expectedSize && magic(bytes, "SRGKP004"),
@@ -613,7 +610,7 @@ async function loadPart(boundary, number) {
             && data.getUint32(12, true) === expectedCount
             && data.getUint32(16, true) === expectedSize
             && data.getUint32(20, true) === 0
-            && hexBytes(bytes.subarray(24, 56)) === SOURCE_SHA256
+            && bytes.subarray(24, 56).toHex() === SOURCE_SHA256
             && data.getBigUint64(56, true) === 0n,
         "대한민국 경계 조각 버전 혼합 또는 헤더 오류");
         let offset = 64 + expectedCount * 12;
