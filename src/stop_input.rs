@@ -114,9 +114,7 @@ impl TryFrom<Option<usize>> for StopInput {
         } else {
             // SAFETY: GetStdHandle returns the process standard input handle.
             let file = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
-            if file.is_null() || file.addr() == usize::MAX {
-                return Err(io::Error::last_os_error());
-            }
+            (!file.is_null() && file.addr() != usize::MAX).ok_or_else(io::Error::last_os_error)?;
             // SAFETY: file is the process standard input handle.
             let file_type = unsafe { GetFileType(file) };
             matches!(file_type, FILE_TYPE_DISK | FILE_TYPE_PIPE)

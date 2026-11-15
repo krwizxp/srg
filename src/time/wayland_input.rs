@@ -640,9 +640,8 @@ impl PreparedInput {
             // SAFETY: context is new and libei takes ownership of the descriptor on every result.
             let setup_result =
                 unsafe { (ei.api.setup_backend_fd)(ei.context.as_ptr(), eis_fd.into_raw_fd()) };
-            if setup_result < 0_i32 {
-                return Err(format!("ei_setup_backend_fd 실패: {setup_result}").into());
-            }
+            (setup_result >= 0_i32)
+                .ok_or_else(|| Cow::Owned(format!("ei_setup_backend_fd 실패: {setup_result}")))?;
             ei.poll_fd()?;
             let mut prepared = WaylandInput { ei, portal };
             if !prepared.wait_until_ready(deadline, &mut should_cancel)? {
