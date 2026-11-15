@@ -3362,10 +3362,10 @@
 		function addCountryFilter(result) {
 			if (result.kind !== "KP" && (result.kind !== "WORLD" || !result.countryName)) return;
 			const value = result.kind === "KP" ? "kp" : "country:" + (result.countryCode || norm(result.countryName));
-			if ([...filterKind.options].some(option => option.value === value)) return;
+			if (Iterator.from(filterKind.options).some(option => option.value === value)) return;
 			const option = new Option(result.kind === "KP" ? "북한" : result.countryName, value);
 			option.dataset.country = "true";
-			const before = [...filterKind.options].find(current =>
+			const before = Iterator.from(filterKind.options).find(current =>
 				current.dataset.country === "true" && option.text.localeCompare(current.text, "ko") < 0);
 			filterKind.insertBefore(option, before || filterKind.lastElementChild);
 		}
