@@ -4850,7 +4850,7 @@
 			if (
 				state.processed === 0 ||
 				e.defaultPrevented ||
-				query("dialog[open]") ||
+				query("dialog:open") ||
 				e.altKey || e.shiftKey || e.ctrlKey || e.metaKey ||
 				(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable], .manual-rng")) ||
 				e.key !== "/"
