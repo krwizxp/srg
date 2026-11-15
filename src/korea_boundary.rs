@@ -584,15 +584,13 @@ impl SampleState<'_> {
         if self.is_complete() {
             return Ok(());
         }
-        if self.supplemental_reads == KOREA_SUPP_RETRY_LIMIT {
-            return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());
-        }
+        (self.supplemental_reads != KOREA_SUPP_RETRY_LIMIT)
+            .ok_or("대한민국 좌표 보완 난수 시도 횟수 초과")?;
         self.supplemental_reads = self.supplemental_reads.strict_add(1);
         self.try_word(value)?;
-        if self.supplemental_reads == KOREA_SUPP_RETRY_LIMIT && !self.is_complete() {
-            return Err("대한민국 좌표 보완 난수 시도 횟수 초과".into());
-        }
-        Ok(())
+        (self.supplemental_reads != KOREA_SUPP_RETRY_LIMIT || self.is_complete())
+            .ok_or("대한민국 좌표 보완 난수 시도 횟수 초과")
+            .map_err(Into::into)
     }
     fn try_word(&mut self, value: u64) -> Result<()> {
         let selector = usize::try_from(value >> 42_i32)

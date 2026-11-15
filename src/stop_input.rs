@@ -119,11 +119,8 @@ impl TryFrom<Option<usize>> for StopInput {
             }
             // SAFETY: file is the process standard input handle.
             let file_type = unsafe { GetFileType(file) };
-            if !matches!(file_type, FILE_TYPE_DISK | FILE_TYPE_PIPE) {
-                return Err(io::Error::other(
-                    "지원하지 않는 Windows 표준 입력 유형입니다.",
-                ));
-            }
+            matches!(file_type, FILE_TYPE_DISK | FILE_TYPE_PIPE)
+                .ok_or_else(|| io::Error::other("지원하지 않는 Windows 표준 입력 유형입니다."))?;
             StopInputBackend::Stream {
                 file,
                 pipe: file_type == FILE_TYPE_PIPE,
@@ -289,12 +286,12 @@ impl StopInput {
         let Some(remaining) = self.input_bytes_remaining.as_mut() else {
             return Ok(());
         };
-        if *remaining == 0 {
-            return Err(io::Error::new(
+        (*remaining != 0).ok_or_else(|| {
+            io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "서버 시간 종료 입력이 너무 깁니다.",
-            ));
-        }
+            )
+        })?;
         *remaining = remaining.strict_sub(1);
         Ok(())
     }

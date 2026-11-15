@@ -135,13 +135,11 @@ impl RandomDataSet {
 }
 impl RandomDataBuildState<'_> {
     fn check_complete(&self) -> Result<()> {
-        if !self.is_basic_complete() {
-            return Err("기본 필드 보완 난수 시도 횟수를 초과했습니다.".into());
-        }
-        if self.data.hangul_syllables.contains(&'\0') {
-            return Err("한글 음절 보완 난수 시도 횟수를 초과했습니다.".into());
-        }
-        Ok(())
+        self.is_basic_complete()
+            .ok_or("기본 필드 보완 난수 시도 횟수를 초과했습니다.")?;
+        (!self.data.hangul_syllables.contains(&'\0'))
+            .ok_or("한글 음절 보완 난수 시도 횟수를 초과했습니다.")
+            .map_err(Into::into)
     }
     fn fill_coords(&mut self) {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();

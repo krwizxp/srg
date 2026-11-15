@@ -69,11 +69,8 @@ pub(super) fn read_line_reuse_limited<'buffer>(
         }
     }
     drop(stdin_lock);
-    if bytes.last() == Some(&b'\n') {
-        bytes.pop();
-        if bytes.last() == Some(&b'\r') {
-            bytes.pop();
-        }
+    if bytes.pop_if(|byte| *byte == b'\n').is_some() {
+        bytes.pop_if(|byte| *byte == b'\r');
     }
     *buffer = String::from_utf8(bytes)
         .map_err(|source| IoError::new(io::ErrorKind::InvalidData, source))?;
