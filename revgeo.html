@@ -5045,10 +5045,10 @@
 					try {const token = u64Tokens(num64Input.value).next(); if (!token.done) prepareKorea(parseU64(token.value));} catch { }
 				}, 200);
 			});
-			const inputCount = input => {
+			const inputCount = ({value}) => {
 				let count = 0;
-				const tokens = input.value.matchAll(RX_U64_TOKEN);
-				while (count <= GENERATION_LIMIT && !tokens.next().done) count++;
+				const pattern = new RegExp(RX_U64_TOKEN);
+				while (count <= GENERATION_LIMIT && pattern.test(value)) count++;
 				return count;
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
