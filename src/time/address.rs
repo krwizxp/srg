@@ -73,7 +73,7 @@ impl FromStr for ParsedServer {
         });
         (!host_part.is_empty() && !host_part.contains(['[', ']']))
             .ok_or(TimeError::parse(ERR_HOST))?;
-        let host_is_ipv6 = colon_count > 1 && matches!(host_part.parse(), Ok(net::IpAddr::V6(_)));
+        let host_is_ipv6 = colon_count > 1 && host_part.parse::<net::Ipv6Addr>().is_ok();
         (!bracketed && (explicit_port.is_some() || colon_count == 0) || host_is_ipv6)
             .ok_or(TimeError::parse(ERR_HOST))?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
