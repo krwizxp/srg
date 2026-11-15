@@ -5047,7 +5047,7 @@
 			});
 			const inputCount = input => {
 				let count = 0;
-				const tokens = u64Tokens(input.value);
+				const tokens = input.value.matchAll(RX_U64_TOKEN);
 				while (count <= GENERATION_LIMIT && !tokens.next().done) count++;
 				return count;
 			};

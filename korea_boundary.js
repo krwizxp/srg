@@ -229,9 +229,8 @@ function orientation(start, end, point) {
     let length = 0;
     for (let value of [productError(a, d, left), left, -productError(b, c, right), -right]) {
         let count = 0;
-        const previous = expansion.slice();
         for (let index = 0; index < length; index++) {
-            const entry = previous[index];
+            const entry = expansion[index];
             const total = value + entry;
             const virtualValue = total - value;
             const error = (value - (total - virtualValue)) + (entry - virtualValue);
