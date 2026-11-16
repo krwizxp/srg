@@ -924,7 +924,7 @@
 			position: relative
 		}
 
-		.filter-trigger:is([data-active=true], :has(+ #filter-dialog[open])) {
+		.filter-trigger:is([data-active=true], :has(+ #filter-dialog:open)) {
 			background: var(--tint)
 		}
 
@@ -1498,28 +1498,28 @@
 				margin-block: 12px 8px
 			}
 
-			body:has(#display-settings[open]) .site-header {
+			body:has(#display-settings:open) .site-header {
 				position: sticky;
 				top: 0;
 				z-index: 30;
 				background: var(--page)
 			}
 
-			body:has(#map-popover:popover-open) #detail-map-links {
+			#detail-map-links:has(+ #map-popover:popover-open) {
 				position: sticky;
 				bottom: 12px;
 				z-index: 30
 			}
 
-			body:has(#display-settings[open]) .settings-button,
-			body:has(#map-popover:popover-open) #detail-map-links {
+			body:has(#display-settings:open) .settings-button,
+			#detail-map-links:has(+ #map-popover:popover-open) {
 				background: var(--tint);
 				border-color: var(--accent);
 				color: var(--accent);
 				box-shadow: 0 0 0 2px var(--tint)
 			}
 
-			#display-settings[open],
+			#display-settings:open,
 			#map-popover:popover-open {
 				border: 2px solid var(--accent)
 			}
@@ -2314,7 +2314,7 @@
 			}
 		}
 
-		:is(#detail-sheet, #filter-dialog, #help-dialog, #supp-dialog, .settings)[open],
+		dialog[open]:not([role=alertdialog]),
 		.map-popover:popover-open {
 			animation: overlay-appear .16s ease-out
 		}
