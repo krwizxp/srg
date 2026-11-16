@@ -47,7 +47,10 @@
 			--button-hover: #0076df;
 			--button-active: #006edb;
 			--focus: light-dark(#0071e3, #2997ff);
+			--accent-active: light-dark(#0055b3, #5cb0ff);
 			--tint: light-dark(#eaf3ff, #0b2030);
+			--tint-hover: light-dark(#e3effe, #0e2638);
+			--tint-active: light-dark(#d9e9ff, #122f46);
 			--danger: light-dark(#b4232f, #ff817b);
 			--danger-bg: light-dark(#fff2f4, #3b2024);
 			--danger-hover: light-dark(#ffe5e9, #4a262a);
@@ -59,6 +62,7 @@
 			--press-bg: light-dark(#e8e8ed, #333336);
 			--secondary-hover: light-dark(#dedee3, #3e3e42);
 			--secondary-active: light-dark(#d2d2d7, #48484c);
+			--spring: cubic-bezier(.22, 1, .36, 1);
 			--text-body: 1.0625rem;
 			--text-address: .9375rem;
 			--text-secondary: .875rem;
@@ -69,7 +73,7 @@
 			--radius-pill: 980px;
 			--mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 			--page-gutter: 28px;
-			font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", "Noto Sans CJK KR", sans-serif;
+			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", "Noto Sans CJK KR", sans-serif;
 			font-size: 100%;
 			scrollbar-width: thin;
 			scrollbar-color: var(--control) transparent
@@ -318,7 +322,13 @@
 		}
 
 		.site-header {
-			border-bottom: 1px solid var(--line)
+			position: sticky;
+			top: 0;
+			z-index: 30;
+			background: var(--glass);
+			border-bottom: 1px solid var(--line);
+			-webkit-backdrop-filter: blur(20px) saturate(1.8);
+			backdrop-filter: blur(20px) saturate(1.8)
 		}
 
 		.header-inner {
@@ -394,11 +404,12 @@
 		.tool-capsule {
 			display: flex;
 			padding: 3px;
-			border-radius: var(--radius-pill)
+			border: 1px solid var(--line);
+			border-radius: var(--radius-pill);
+			background: var(--panel)
 		}
 
-		.mobile-nav,
-		.tool-capsule {
+		.mobile-nav {
 			isolation: isolate;
 			border: 1px solid var(--line);
 			background: var(--glass);
@@ -440,16 +451,36 @@
 		.card-label {
 			font-size: 1.75rem;
 			font-weight: 600;
-			letter-spacing: 0
+			letter-spacing: -.022em
 		}
 
 		.segmented {
+			position: relative;
+			isolation: isolate;
 			display: flex;
 			align-items: stretch;
 			gap: 4px;
 			padding: 4px;
-			border-radius: var(--radius-control);
+			border-radius: var(--radius-pill);
 			background: var(--press-bg)
+		}
+
+		.input-tabs::before {
+			content: "";
+			position: absolute;
+			inset: 4px auto 4px 4px;
+			width: calc(50% - 6px);
+			border-radius: inherit;
+			background: var(--surface);
+			box-shadow: 0 1px 4px #00000014;
+			transform: translateX(0);
+			transition: transform .24s var(--spring);
+			z-index: -1;
+			pointer-events: none
+		}
+
+		.input-tabs:has(#manual-tab[aria-selected=true])::before {
+			transform: translateX(calc(100% + 4px))
 		}
 
 		.segmented button {
@@ -457,10 +488,11 @@
 			min-width: 0;
 			min-height: 44px;
 			border: 0;
-			border-radius: calc(var(--radius-control) - 4px);
+			border-radius: var(--radius-pill);
 			padding: 8px;
 			color: var(--fg);
-			background: 0 0
+			background: 0 0;
+			transition: background-color .18s var(--spring), color .18s var(--spring), box-shadow .18s var(--spring)
 		}
 
 		.segmented :is([aria-selected=true], [aria-pressed=true]) {
@@ -472,6 +504,11 @@
 
 		.segmented :is([aria-selected=true], [aria-pressed=true]):active:not(:disabled) {
 			background: var(--surface)
+		}
+
+		.input-tabs :is([aria-selected=true], [aria-pressed=true]) {
+			background: 0 0;
+			box-shadow: none
 		}
 
 		.input-tabs {
@@ -535,21 +572,22 @@
 			min-width: 44px;
 			min-height: 44px;
 			padding: 11px 20px;
-			border: 1px solid var(--accent);
+			border: 1px solid transparent;
 			border-radius: var(--radius-pill);
 			color: var(--accent);
-			background: transparent;
+			background: var(--tint);
 			font-size: .875rem;
-			font-weight: 400;
+			font-weight: 500;
 			line-height: 1.28578;
 			text-align: center;
-			text-decoration: none
+			text-decoration: none;
+			transition: background-color .16s var(--spring), border-color .16s var(--spring), color .16s var(--spring)
 		}
 
 		.button:active:not(:disabled) {
-			background: var(--button-active);
+			background: var(--tint-active);
 			border-color: transparent;
-			color: #fff
+			color: var(--accent-active)
 		}
 
 		.steps [aria-current=step] span,
@@ -562,6 +600,11 @@
 
 		.primary {
 			border-color: transparent
+		}
+
+		:is(.primary, .page-number[aria-current=page]):active:not(:disabled) {
+			background: var(--button-active);
+			color: #fff
 		}
 
 		#progress-percent,
@@ -590,7 +633,6 @@
 
 		.coords-panel,
 		.job-panel {
-			border-color: transparent;
 			margin-top: 20px;
 			border-radius: var(--radius-card)
 		}
@@ -771,7 +813,51 @@
 		.rng-generator .check-label {
 			display: flex;
 			align-items: center;
-			gap: 8px
+			justify-content: space-between;
+			gap: 12px;
+			min-height: 44px;
+			padding: 6px 14px;
+			border: 1px solid var(--line);
+			border-radius: var(--radius-control);
+			background: var(--surface);
+			cursor: pointer;
+			user-select: none
+		}
+
+		#auto-supp {
+			-webkit-appearance: none;
+			appearance: none;
+			position: relative;
+			width: 51px;
+			height: 31px;
+			flex: none;
+			margin: 0;
+			border: 1px solid transparent;
+			border-radius: var(--radius-pill);
+			background: var(--control);
+			transition: background-color .2s var(--spring);
+			cursor: pointer
+		}
+
+		#auto-supp::before {
+			content: "";
+			position: absolute;
+			top: 1px;
+			left: 1px;
+			width: 27px;
+			height: 27px;
+			border-radius: 50%;
+			background: #fff;
+			box-shadow: 0 1px 3px #0004;
+			transition: transform .2s var(--spring)
+		}
+
+		#auto-supp:checked {
+			background: var(--button-fill)
+		}
+
+		#auto-supp:checked::before {
+			transform: translateX(20px)
 		}
 
 		.field {
@@ -842,7 +928,7 @@
 
 		#output {
 			margin-top: 8px;
-			height: 150px;
+			height: 172px;
 			border-radius: var(--radius-control)
 		}
 
@@ -898,6 +984,16 @@
 			padding: 8px 12px
 		}
 
+		:is(.filters, .settings) select {
+			-webkit-appearance: none;
+			appearance: none;
+			padding-right: 34px;
+			background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E");
+			background-repeat: no-repeat;
+			background-position: right 10px center;
+			background-size: 16px 16px
+		}
+
 		.search-field {
 			position: relative;
 			min-width: 0
@@ -912,6 +1008,7 @@
 
 		.search-field>input {
 			padding-left: 40px;
+			border-radius: var(--radius-pill);
 			background: var(--panel);
 			border-color: transparent
 		}
@@ -1127,8 +1224,8 @@
 		}
 
 		.kind-badge {
-			padding: 3px 6px;
-			border-radius: 8px;
+			padding: 3px 8px;
+			border-radius: var(--radius-pill);
 			border: 1px solid transparent;
 			background: var(--press-bg);
 			font-weight: 500;
@@ -1237,7 +1334,7 @@
 		#detail-title {
 			font-size: 1.25rem;
 			font-weight: 600;
-			letter-spacing: 0
+			letter-spacing: -.016em
 		}
 
 		.address-sub,
@@ -1305,7 +1402,7 @@
 		.full-address {
 			margin-top: 6px;
 			display: flex;
-			align-items: start;
+			align-items: center;
 			gap: 8px
 		}
 
@@ -1316,7 +1413,7 @@
 
 		#copy-address {
 			flex: none;
-			margin-top: -9px
+			background: var(--press-bg)
 		}
 
 		.detail-fields {
@@ -1499,10 +1596,7 @@
 			}
 
 			body:has(#display-settings:open) .site-header {
-				position: sticky;
-				top: 0;
-				z-index: 30;
-				background: var(--page)
+				z-index: 30
 			}
 
 			#detail-map-links:has(+ #map-popover:popover-open) {
@@ -1521,7 +1615,13 @@
 
 			#display-settings:open,
 			#map-popover:popover-open {
-				border: 2px solid var(--accent)
+				background: var(--glass);
+				-webkit-backdrop-filter: blur(20px) saturate(1.8);
+				backdrop-filter: blur(20px) saturate(1.8)
+			}
+
+			:is(#display-settings:open, #map-popover:popover-open)>.sheet-heading {
+				background: 0 0
 			}
 		}
 
@@ -1544,6 +1644,7 @@
 			justify-content: flex-start;
 			min-width: 0;
 			padding: 12px 14px;
+			background: 0 0;
 			border-color: transparent;
 			text-align: start;
 			overflow-wrap: anywhere
@@ -1574,10 +1675,8 @@
 			font-weight: 600
 		}
 
-		.supp-form .rng-actions {
-			display: flex;
-			flex-wrap: wrap;
-			justify-content: flex-end
+		.supp-form .rng-actions button[type=submit] {
+			grid-column: 1/-1
 		}
 
 		dialog::backdrop {
@@ -1607,11 +1706,13 @@
 			margin-block-start: calc(-1*var(--overlay-top));
 			margin-inline: calc(-1*var(--overlay-start)) calc(-1*var(--overlay-end));
 			padding: var(--overlay-top) var(--overlay-end) 12px var(--overlay-start);
-			background: var(--surface)
+			background: var(--surface);
+			border-bottom: 1px solid var(--line)
 		}
 
 		.sheet-heading .icon-button {
-			flex: none
+			flex: none;
+			background: var(--press-bg)
 		}
 
 		#help-dialog {
@@ -1643,8 +1744,8 @@
 			z-index: 60;
 			max-width: calc(100vw - 32px);
 			width: max-content;
-			padding: 8px 12px 8px 18px;
-			border-radius: var(--radius-control);
+			padding: 6px 8px 6px 18px;
+			border-radius: var(--radius-pill);
 			background: light-dark(#1d1d1f, #f5f5f7);
 			color: light-dark(#f5f5f7, #1d1d1f);
 			border: 1px solid light-dark(#424245, #d2d2d7);
@@ -1687,18 +1788,17 @@
 			position: fixed;
 			inset: 0;
 			margin: auto;
-			width: min(380px, calc(100vw - 32px))
+			width: min(320px, calc(100vw - 32px));
+			text-align: center
 		}
 
 		[role=alertdialog] .sheet-heading {
-			justify-content: flex-start
+			justify-content: center
 		}
 
 		#detail-full[dir=auto],
 		.address-main[dir=auto],
-		.address-sub[dir=auto],
-		[role=alertdialog]>p,
-		[role=alertdialog] .sheet-heading {
+		.address-sub[dir=auto] {
 			text-align: start
 		}
 
@@ -1792,7 +1892,7 @@
 			}
 
 			.site-header {
-				border: 0
+				border-bottom: 1px solid var(--line)
 			}
 
 			.brand-mark {
@@ -1958,7 +2058,7 @@
 
 			tr[data-record][data-selected=true] {
 				border-color: var(--accent);
-				box-shadow: inset 3px 0 var(--accent)
+				box-shadow: 0 0 0 1px var(--accent)
 			}
 
 			td {
@@ -2076,7 +2176,7 @@
 				width: calc(50% - 5px);
 				background: var(--tint);
 				transform: translateX(var(--selection-x, 0px));
-				transition: transform .2s ease
+				transition: transform .24s var(--spring)
 			}
 
 			body[data-mobiletab=results] .mobile-nav::before {
@@ -2237,8 +2337,10 @@
 
 		@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
 
+			.site-header,
 			.mobile-nav,
-			.tool-capsule {
+			#display-settings:open,
+			#map-popover:popover-open {
 				background: var(--surface)
 			}
 		}
@@ -2255,6 +2357,10 @@
 				background: var(--surface)
 			}
 
+			.input-tabs :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
+				background: 0 0
+			}
+
 			.drop-zone:hover:not(:active):not(:has(input:disabled)),
 			.map-load:hover:not(:active):not(:disabled) {
 				background: var(--tint)
@@ -2265,8 +2371,13 @@
 			}
 
 			.button:hover:not(:active):not(:disabled) {
-				background: var(--button-hover);
+				background: var(--tint-hover);
 				border-color: transparent;
+				color: var(--accent)
+			}
+
+			:is(.primary, .page-number[aria-current=page]):hover:not(:active):not(:disabled) {
+				background: var(--button-hover);
 				color: #fff
 			}
 
@@ -2305,7 +2416,7 @@
 		@keyframes overlay-appear {
 			from {
 				opacity: 0;
-				transform: translateY(8px)
+				transform: translateY(8px) scale(.98)
 			}
 
 			to {
@@ -2314,9 +2425,9 @@
 			}
 		}
 
-		dialog[open]:not([role=alertdialog]),
+		dialog[open],
 		.map-popover:popover-open {
-			animation: overlay-appear .16s ease-out
+			animation: overlay-appear .22s var(--spring)
 		}
 
 		@media (prefers-reduced-motion:reduce) {
@@ -2333,8 +2444,10 @@
 		@media (prefers-reduced-transparency:reduce),
 		(prefers-contrast:more) {
 
+			.site-header,
 			.mobile-nav,
-			.tool-capsule {
+			#display-settings:open,
+			#map-popover:popover-open {
 				background: var(--surface);
 				-webkit-backdrop-filter: none;
 				backdrop-filter: none
@@ -2357,6 +2470,8 @@
 			.job-panel,
 			.kind-badge,
 			.inspector,
+			.rng-generator .check-label,
+			#auto-supp,
 			tr[data-record] {
 				border-color: var(--fg)
 			}
@@ -2369,8 +2484,23 @@
 		@media (forced-colors:active) {
 
 			.mobile-nav,
-			.tool-capsule {
+			.tool-capsule,
+			.rng-generator .check-label,
+			#auto-supp {
 				border-color: ButtonText
+			}
+
+			#auto-supp::before {
+				background: ButtonText
+			}
+
+			#auto-supp:checked {
+				background: Highlight;
+				border-color: Highlight
+			}
+
+			#auto-supp:checked::before {
+				background: HighlightText
 			}
 
 			.fill {
@@ -2542,7 +2672,8 @@
 							<button class="button" id="generate-num64" type="button">기본 난수 생성</button>
 							<button class="button" id="generate-supp" type="button">보조 난수 생성</button>
 						</div>
-						<label class="check-label"><input id="auto-supp" type="checkbox">보조 난수 자동 생성</label>
+						<label class="check-label"><span>보조 난수 자동 생성</span><input id="auto-supp" role="switch"
+								type="checkbox"></label>
 						<p class="note" id="rng-error" role="alert" aria-atomic="true"></p>
 					</section>
 					<div class="field">
@@ -5789,7 +5920,7 @@
 				const animation = sheet.animate([
 					{translate: `0 ${offset}px`},
 					{translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`},
-				], {duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180, easing: "ease-out"});
+				], {duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
 				motion = animation;
 				animation.finished.then(() => {
 					if (motion !== animation) return;
