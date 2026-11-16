@@ -1900,10 +1900,6 @@
 				gap: 12px
 			}
 
-			.site-header {
-				border-bottom: 1px solid var(--line)
-			}
-
 			.brand-mark {
 				width: 32px;
 				height: 32px
@@ -2523,6 +2519,15 @@
 			}
 		}
 
+		@media (max-width:800px),
+		(hover:none) and (pointer:coarse) {
+			.site-header {
+				background: var(--page);
+				-webkit-backdrop-filter: none;
+				backdrop-filter: none
+			}
+		}
+
 		@media print {
 
 			:root,
@@ -2836,8 +2841,6 @@
 								inputmode="search" placeholder="주소, 좌표, 지물 검색" type="search">
 						</div><select aria-label="구분" id="filter-kind">
 							<option value="">전체</option>
-							<option value="kr"> 대한민국 </option>
-							<option value="world">국가 미확인</option>
 							<option value="에러"> 조회 실패 </option>
 						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
 							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
@@ -3500,11 +3503,13 @@
 		on(themeToggle, "click", () => {
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
-		function addCountryFilter(result) {
-			if (result.kind !== "KP" && (result.kind !== "WORLD" || !result.countryName)) return;
-			const value = result.kind === "KP" ? "kp" : "country:" + (result.countryCode || norm(result.countryName));
+		function addCountryFilter(record) {
+			const {result} = record;
+			const kind = result.kind || record.set;
+			if (kind === "에러") return;
+			const value = countryFilterValue(record);
 			if (Iterator.from(filterKind.options).some(option => option.value === value)) return;
-			const option = new Option(result.kind === "KP" ? "북한" : result.countryName, value);
+			const option = new Option(kindLabel(kind, result.countryName), value);
 			option.dataset.country = "true";
 			const before = Iterator.from(filterKind.options).find(current =>
 				current.dataset.country === "true" && option.text.localeCompare(current.text, "ko") < 0);
@@ -3514,6 +3519,10 @@
 		const rowTemplate = query("tr", byId("tmpl-row").content);
 		const RX_COMMA_WS = /\s*,\s*/g;
 		const norm = s => s == null ? "" : s.trim().toLowerCase().replace(RX_COMMA_WS, ",");
+		const countryFilterValue = ({result, set}) =>
+			result.kind === "WORLD" && (result.countryCode || result.countryName)
+				? "country:" + (result.countryCode || norm(result.countryName))
+				: (result.kind || set).toLowerCase();
 		function readFilters() {
 			const q = norm(filterQuery.value);
 			let query = null;
@@ -3553,11 +3562,8 @@
 			if (!f) return true;
 			if (f.status !== "all" && resultStatus(r.result) !== f.status) return false;
 			if (!f.hasFields && !f.query) return true;
-			const kindKey = r.result.kind === "WORLD" && (r.result.countryCode || r.result.countryName)
-				? "country:" + (r.result.countryCode || norm(r.result.countryName))
-				: (r.result.kind || r.set).toLowerCase();
 			const fields = r._search ??= [
-				kindKey,
+				countryFilterValue(r),
 				norm(r.result.addr?.sido),
 				norm(r.result.addr?.sigungu),
 				norm(r.result.addr?.eupmyeon),
@@ -4807,7 +4813,7 @@
 		function commitResult(index, parsed, render) {
 			const r = state.records[index];
 			r.result = parsed;
-			addCountryFilter(parsed);
+			addCountryFilter(r);
 			state.processed++;
 			if (parsed.error) state.cntFail++;
 			else if (!hasAddress(parsed)) state.cntNoAddress++;
