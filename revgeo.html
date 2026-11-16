@@ -1350,16 +1350,22 @@
 		}
 
 		.map-preview {
+			display: grid;
+			grid-template-rows: 190px;
 			margin: 18px 0;
-			min-height: 166px;
 			border-radius: var(--radius-control);
 			overflow: hidden
+		}
+
+		.map-preview>* {
+			grid-area: 1/1;
+			min-width: 0;
+			min-height: 0
 		}
 
 		.map-load {
 			flex-direction: column;
 			width: 100%;
-			min-height: 166px;
 			background: 0 0;
 			border: 0;
 			color: var(--accent);
@@ -1378,6 +1384,9 @@
 		}
 
 		.map-feedback {
+			z-index: 1;
+			background: var(--surface);
+			overflow: auto;
 			padding: 16px;
 			justify-content: center;
 			gap: 8px
@@ -1395,7 +1404,7 @@
 		#detail-map {
 			border: 0;
 			width: 100%;
-			height: 190px;
+			height: 100%;
 			display: block
 		}
 
@@ -2828,6 +2837,7 @@
 						</div><select aria-label="구분" id="filter-kind">
 							<option value="">전체</option>
 							<option value="kr"> 대한민국 </option>
+							<option value="world">국가 미확인</option>
 							<option value="에러"> 조회 실패 </option>
 						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
 							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
@@ -3542,8 +3552,7 @@
 			if (!r.result) return false;
 			if (!f) return true;
 			if (f.status !== "all" && resultStatus(r.result) !== f.status) return false;
-			const hasFields = f.hasFields ?? !!(f.kind || f.sido || f.sigungu || f.emd || f.tag || f.fullAddr);
-			if (!hasFields && !f.query) return true;
+			if (!f.hasFields && !f.query) return true;
 			const kindKey = r.result.kind === "WORLD" && (r.result.countryCode || r.result.countryName)
 				? "country:" + (r.result.countryCode || norm(r.result.countryName))
 				: (r.result.kind || r.set).toLowerCase();
@@ -3556,7 +3565,7 @@
 				norm(r.result.error || r.result.addr?.fullAddr),
 				undefined,
 			];
-			if (hasFields && !((!f.kind || fields[0] === f.kind) &&
+			if (f.hasFields && !((!f.kind || fields[0] === f.kind) &&
 				(!f.sido || fields[1].includes(f.sido)) &&
 				(!f.sigungu || fields[2].includes(f.sigungu)) &&
 				(!f.emd || fields[3].includes(f.emd)) &&
