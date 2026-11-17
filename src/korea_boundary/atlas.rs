@@ -3,16 +3,17 @@ use crate::{
     diagnostic::{AppError, Result},
     random_data::Coordinates,
 };
-pub(super) const DATA: &[u8] = include_bytes!("../../data/korea-boundary-v4/atlas-8.bin");
+pub(super) const DATA: &[u8] = include_bytes!("../../data/korea-boundary-v4/atlas-16.bin");
 const HEADER_SIZE: usize = 96;
 const INDEX_HASH: [u8; 32] = [
     0x8C, 0xB2, 0x0A, 0x5C, 0x0D, 0xA9, 0xC3, 0xD6, 0x22, 0x5E, 0xFB, 0x03, 0x23, 0xE2, 0x4A, 0x4F,
     0x99, 0x2E, 0xB3, 0x02, 0x9A, 0x77, 0x2D, 0xA3, 0xA7, 0x1A, 0x55, 0xD3, 0xF5, 0x03, 0xBF, 0x17,
 ];
-const SUBDIVISION: usize = 8;
-const SUBDIVISION_F64: f64 = 8.0_f64;
-const SUBDIVISION_OFFSETS: [f64; 9] = [
-    0.0_f64, 1.0_f64, 2.0_f64, 3.0_f64, 4.0_f64, 5.0_f64, 6.0_f64, 7.0_f64, 8.0_f64,
+const SUBDIVISION: usize = 16;
+const SUBDIVISION_F64: f64 = 16.0_f64;
+const SUBDIVISION_OFFSETS: [f64; 17] = [
+    0.0_f64, 1.0_f64, 2.0_f64, 3.0_f64, 4.0_f64, 5.0_f64, 6.0_f64, 7.0_f64, 8.0_f64, 9.0_f64,
+    10.0_f64, 11.0_f64, 12.0_f64, 13.0_f64, 14.0_f64, 15.0_f64, 16.0_f64,
 ];
 pub(super) struct Atlas<'data> {
     ordinals: Box<[u16]>,
@@ -71,7 +72,7 @@ impl<'data> TryFrom<(&'data [u8], &[Tile], [u8; 32])> for Atlas<'data> {
             && mixed_count <= tiles.len()
             && tiles.len() <= usize::from(u16::MAX).strict_add(1)
             && read_count(bytes, 20)? == tiles.len()
-            && state_bytes == mixed_count.strict_mul(16)
+            && state_bytes == mixed_count.strict_mul(64)
             && bytes.len() == HEADER_SIZE.strict_add(state_bytes)
             && read_count(bytes, 92)? == 0
             && bytes.get(24..56) == Some(INDEX_HASH.as_slice())

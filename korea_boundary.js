@@ -448,7 +448,7 @@ function decodeAtlas(bytes, boundary) {
     const mixedCount = data.getUint32(16, true);
     const stateBytes = data.getUint32(88, true);
     requireBoundary(data.getUint32(8, true) === 96
-        && subdivision === 8
+        && subdivision === 16
         && mixedCount > 0 && mixedCount <= boundary.tileCount
         && boundary.tileCount <= 65536
         && data.getUint32(20, true) === boundary.tileCount
@@ -490,13 +490,13 @@ function atlasState(boundary, point, tile) {
     return (states[index >>> 2] >>> ((index & 3) * 2)) & 3;
 }
 
-const ATLAS_SHA256 = "a55dcf2e37a4500d6c30de3f5dad42131758415bcfafac79e88d76fb88b0e84d";
+const ATLAS_SHA256 = "05f08e37f53c50f493c49ecaa28c637675fe9d2ae651ef09233c22841dcfe9ef";
 function requestAtlas(boundary) {
     if (boundary.atlasRequested || ++boundary.mixedChecks < 1) return;
     boundary.atlasRequested = true;
     setTimeout(async () => {
         try {
-            const bytes = await download("atlas-8.bin", 41328, ATLAS_SHA256);
+            const bytes = await download("atlas-16.bin", 165024, ATLAS_SHA256);
             boundary.atlas = decodeAtlas(bytes, boundary);
         } catch {
             boundary.atlasUnavailable = true;
