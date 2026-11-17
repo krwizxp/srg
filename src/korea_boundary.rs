@@ -8,6 +8,7 @@ use crate::{
 };
 use alloc::collections::VecDeque;
 use std::sync::{LazyLock, OnceLock};
+mod atlas;
 mod data;
 const CACHE_BYTES: usize = 0x0010_0000;
 const CACHE_PAGES: usize = 4096;
@@ -31,6 +32,7 @@ struct CachedPage {
     decoded: DecodedPage,
 }
 struct BoundaryIndex {
+    atlas: atlas::Atlas<'static>,
     bounds: [f64; 4],
     columns: Box<[f64]>,
     divisor: f64,
@@ -97,6 +99,11 @@ impl BoundaryIndex {
             .ok_or("대한민국 경계 타일 선택 오류")?;
         if tile.state != 2 {
             return Ok(tile.state == 1);
+        }
+        match self.atlas.state(self, point, tile_number)? {
+            0 => return Ok(false),
+            1 => return Ok(true),
+            _ => {}
         }
         let mut parity = false;
         let mut boundary = false;
@@ -515,6 +522,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         (selected.len() == KOREA_TILE_COUNT).ok_or("대한민국 좌표 타일 개수 오류")?;
         let sampler_tiles = selected.into_boxed_slice();
         Ok(Self {
+            atlas: atlas::Atlas::try_from((atlas::DATA, tiles.as_slice(), source_hash))?,
             bounds,
             columns,
             divisor,
