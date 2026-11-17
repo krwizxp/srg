@@ -45,7 +45,7 @@ struct HuffmanTrees {
     distance: Huffman,
     literal: Huffman,
 }
-pub(super) struct InflatedPage(Vec<u8>);
+pub(super) struct InflatedPage<'output>(&'output [u8]);
 impl Bits<'_> {
     fn peek_nine(&self) -> Option<u16> {
         let bytes = self
@@ -189,9 +189,9 @@ impl Huffman {
         Err("경계 압축 허프먼 코드 오류".into())
     }
 }
-impl AsRef<[u8]> for InflatedPage {
+impl AsRef<[u8]> for InflatedPage<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
+        self.0
     }
 }
 impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
@@ -258,10 +258,9 @@ impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
         Ok(Self { distance, literal })
     }
 }
-impl TryFrom<(&[u8], usize)> for InflatedPage {
+impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
     type Error = AppError;
-    fn try_from((input, capacity): (&[u8], usize)) -> Result<Self> {
-        let mut output = vec![0_u8; capacity];
+    fn try_from((input, output): (&[u8], &'output mut [u8])) -> Result<Self> {
         let header = input.first_chunk::<2>().ok_or("경계 압축 헤더 오류")?;
         (header[0] & 15 == 8
             && header[0] >> 4_u32 <= 7
@@ -369,7 +368,6 @@ impl TryFrom<(&[u8], usize)> for InflatedPage {
             .ok_or("경계 압축 체크섬 길이 오류")?;
         (((second << 16_u32) | first) == u32::from_be_bytes(*expected))
             .ok_or("경계 압축 체크섬 오류")?;
-        output.truncate(written);
-        Ok(Self(output))
+        Ok(Self(output.get(..written).ok_or("경계 압축 출력 오류")?))
     }
 }

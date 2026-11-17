@@ -26,6 +26,7 @@ static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
 pub(super) struct BoundaryCache {
     bytes: usize,
     pages: VecDeque<(usize, CachedPage)>,
+    scratch: Vec<u8>,
 }
 struct CachedPage {
     bytes: usize,
@@ -211,8 +212,10 @@ impl BoundaryIndex {
         tile_number: usize,
         bytes: &[u8],
         raw_size: usize,
+        scratch: &mut Vec<u8>,
     ) -> Result<CachedPage> {
-        let decoded = InflatedPage::try_from((bytes, MAX_PAGE_SIZE))?;
+        scratch.resize(MAX_PAGE_SIZE, 0);
+        let decoded = InflatedPage::try_from((bytes, scratch.as_mut_slice()))?;
         let raw = decoded.as_ref();
         let length = raw.len();
         (length == raw_size
@@ -304,7 +307,12 @@ impl BoundaryIndex {
             _ => Err("대한민국 경계 블록 종류 오류".into()),
         }
     }
-    fn page(&self, page_number: usize, tile_number: usize) -> Result<CachedPage> {
+    fn page(
+        &self,
+        page_number: usize,
+        tile_number: usize,
+        scratch: &mut Vec<u8>,
+    ) -> Result<CachedPage> {
         let part_number = self
             .parts
             .partition_point(|part| part.first <= page_number)
@@ -332,7 +340,7 @@ impl BoundaryIndex {
         let compressed = bytes
             .get(start..start.strict_add(size))
             .ok_or("대한민국 경계 블록 위치 오류")?;
-        self.decode_page(page_number, tile_number, compressed, raw_size)
+        self.decode_page(page_number, tile_number, compressed, raw_size, scratch)
     }
     fn tile_bounds(&self, tile_number: usize) -> Result<[f64; 4]> {
         let width = self.columns.len().strict_sub(1);
@@ -556,7 +564,7 @@ impl BoundaryCache {
                 .remove(position)
                 .ok_or("대한민국 경계 캐시 위치 오류")?
         } else {
-            let decoded = index.page(page_number, tile_number)?;
+            let decoded = index.page(page_number, tile_number, &mut self.scratch)?;
             let additional = decoded.bytes;
             while self.pages.len() >= CACHE_PAGES || self.bytes.strict_add(additional) > CACHE_BYTES
             {
