@@ -33,8 +33,10 @@ static FIXED_TREES: LazyLock<Result<HuffmanTrees>> = LazyLock::new(|| {
     Ok(HuffmanTrees { distance, literal })
 });
 struct Bits<'data> {
+    bit_buffer: u64,
+    bit_count: u32,
     bytes: &'data [u8],
-    position: usize,
+    cursor: usize,
 }
 struct Huffman {
     counts: [u32; 16],
@@ -47,31 +49,59 @@ struct HuffmanTrees {
 }
 pub(super) struct InflatedPage<'output>(&'output [u8]);
 impl Bits<'_> {
-    fn peek_nine(&self) -> Option<u16> {
-        let bytes = self
-            .bytes
-            .get(self.position.strict_div(8)..)?
-            .first_chunk::<2>()?;
-        Some((u16::from_le_bytes(*bytes) >> (self.position & 7)) & 0x01FF)
+    const fn align_to_byte(&mut self) {
+        let drop_bits = self.bit_count & 7_u32;
+        self.bit_buffer >>= drop_bits;
+        self.bit_count = self.bit_count.strict_sub(drop_bits);
+    }
+    const fn consume(&mut self, count: u32) {
+        self.bit_buffer >>= count;
+        self.bit_count = self.bit_count.strict_sub(count);
+    }
+    const fn is_exhausted(&self) -> bool {
+        self.cursor == self.bytes.len() && self.bit_count < 8
+    }
+    fn peek_nine(&mut self) -> Option<u16> {
+        self.refill(9);
+        if self.bit_count < 9 {
+            return None;
+        }
+        let [low, high, ..] = self.bit_buffer.to_le_bytes();
+        Some(u16::from_le_bytes([low, high]) & 0x01FF)
     }
     fn read(&mut self, count: u32) -> Result<u32> {
-        let bit_count = usize::try_from(count)
-            .map_err(|source| format!("경계 압축 비트 개수 오류: {source}"))?;
-        let mut value = 0_u32;
-        let mut shift = 0_usize;
-        while shift < bit_count {
-            let offset = self.position & 7_usize;
-            let width = bit_count.strict_sub(shift).min(8_usize.strict_sub(offset));
-            let byte = *self
-                .bytes
-                .get(self.position.strict_div(8))
-                .ok_or("경계 압축 데이터가 잘렸습니다.")?;
-            let mask = (1_u32 << width).strict_sub(1);
-            value |= ((u32::from(byte) >> offset) & mask) << shift;
-            self.position = self.position.strict_add(width);
-            shift = shift.strict_add(width);
+        if count == 0 {
+            return Ok(0);
         }
-        Ok(value)
+        self.refill(count);
+        (self.bit_count >= count).ok_or("경계 압축 데이터가 잘렸습니다.")?;
+        let mask = (1_u64 << count).strict_sub(1);
+        let [b0, b1, b2, b3, ..] = (self.bit_buffer & mask).to_le_bytes();
+        self.consume(count);
+        Ok(u32::from_le_bytes([b0, b1, b2, b3]))
+    }
+    fn refill(&mut self, needed: u32) {
+        if self.bit_count >= needed {
+            return;
+        }
+        if let Some(&chunk) = self
+            .bytes
+            .get(self.cursor..)
+            .and_then(|tail| tail.first_chunk::<4>())
+        {
+            self.bit_buffer |= u64::from(u32::from_le_bytes(chunk)) << self.bit_count;
+            self.cursor = self.cursor.strict_add(4);
+            self.bit_count = self.bit_count.strict_add(32);
+            return;
+        }
+        while self.bit_count < needed {
+            let Some(&byte) = self.bytes.get(self.cursor) else {
+                break;
+            };
+            self.bit_buffer |= u64::from(byte) << self.bit_count;
+            self.cursor = self.cursor.strict_add(1);
+            self.bit_count = self.bit_count.strict_add(8);
+        }
     }
 }
 impl Huffman {
@@ -164,7 +194,7 @@ impl Huffman {
                 .get(usize::from(prefix))
                 .ok_or("경계 압축 조회 위치 오류")?;
             if packed != 0 {
-                bits.position = bits.position.strict_add(usize::from(packed >> 9_u32));
+                bits.consume(u32::from(packed >> 9_u32));
                 return Ok(packed & 0x01FF);
             }
         }
@@ -269,15 +299,17 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
         .ok_or("경계 압축 형식 오류")?;
         let tail = input.len().checked_sub(4).ok_or("경계 압축 길이 오류")?;
         let mut bits = Bits {
+            bit_buffer: 0,
+            bit_count: 0,
             bytes: input.get(2..tail).ok_or("경계 압축 길이 오류")?,
-            position: 0,
+            cursor: 0,
         };
         let mut written = 0_usize;
         loop {
             let final_block = bits.read(1)? != 0;
             match bits.read(2)? {
                 0 => {
-                    bits.position = bits.position.next_multiple_of(8);
+                    bits.align_to_byte();
                     let length = bits.read(16)?;
                     (length ^ bits.read(16)? == 0xFFFF).ok_or("경계 압축 저장 블록 오류")?;
                     for _ in 0..length {
@@ -361,7 +393,7 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                 break;
             }
         }
-        (bits.position.div_ceil(8) == bits.bytes.len()).ok_or("경계 압축 잔여 데이터 오류")?;
+        bits.is_exhausted().ok_or("경계 압축 잔여 데이터 오류")?;
         let mut first = 1_u32;
         let mut second = 0_u32;
         for chunk in output
