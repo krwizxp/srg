@@ -3097,12 +3097,14 @@
 		on(themeToggle, "click", () => {
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
+		const seenCountryFilters = new Set(Iterator.from(filterKind.options).map(option => option.value));
 		function addCountryFilter(record) {
 			const {result} = record;
 			const kind = result.kind || record.set;
 			if (kind === "에러") return;
 			const value = countryFilterValue(record);
-			if (Iterator.from(filterKind.options).some(option => option.value === value)) return;
+			if (seenCountryFilters.has(value)) return;
+			seenCountryFilters.add(value);
 			const option = new Option(kindLabel(kind, result.countryName), value);
 			option.dataset.country = "true";
 			const before = Iterator.from(filterKind.options).find(current =>
@@ -3144,7 +3146,10 @@
 		let filterState = readFilters();
 		function resetCountryFilter() {
 			const selected = filterKind.selectedOptions[0]?.dataset.country === "true";
-			for (const option of filterKind.querySelectorAll("option[data-country]")) option.remove();
+			for (const option of filterKind.querySelectorAll("option[data-country]")) {
+				seenCountryFilters.delete(option.value);
+				option.remove();
+			}
 			if (selected) {
 				filterKind.value = "";
 				filterState = readFilters();

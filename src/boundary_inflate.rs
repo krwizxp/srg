@@ -330,14 +330,28 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                                 )
                                 .map_err(|source| format!("경계 압축 거리 오류: {source}"))?,
                             );
-                        for _ in 0..length {
-                            let source = written
-                                .checked_sub(backward)
-                                .and_then(|position| output.get(position))
-                                .copied()
-                                .ok_or("경계 압축 참조 위치 오류")?;
-                            *output.get_mut(written).ok_or("경계 압축 출력 한도 오류")? = source;
-                            written = written.strict_add(1);
+                        let source_start = written
+                            .checked_sub(backward)
+                            .ok_or("경계 압축 참조 위치 오류")?;
+                        (written.strict_add(length) <= output.len())
+                            .ok_or("경계 압축 출력 한도 오류")?;
+                        if backward >= length {
+                            output.copy_within(
+                                source_start..source_start.strict_add(length),
+                                written,
+                            );
+                            written = written.strict_add(length);
+                        } else {
+                            let mut copied = 0_usize;
+                            while copied < length {
+                                let step = backward.max(copied).min(length.strict_sub(copied));
+                                output.copy_within(
+                                    source_start..source_start.strict_add(step),
+                                    written,
+                                );
+                                written = written.strict_add(step);
+                                copied = copied.strict_add(step);
+                            }
                         }
                     }
                 }

@@ -2,7 +2,7 @@ use self::data::{INDEX as DATA, PARTS};
 use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
-    geo_uniform::Orientation,
+    geo_uniform::{BoundaryAreaBounds, Orientation},
     numeric::low_u16_from_u64,
     random_data::Coordinates,
 };
@@ -33,6 +33,7 @@ struct CachedPage {
     decoded: DecodedPage,
 }
 struct BoundaryIndex {
+    area_bounds: BoundaryAreaBounds,
     atlas: atlas::Atlas<'static>,
     bounds: [f64; 4],
     columns: Box<[f64]>,
@@ -268,18 +269,35 @@ impl BoundaryIndex {
                     && length == 40_usize.strict_add(count.strict_add(1).strict_mul(16)))
                 .ok_or("대한민국 경계 링 인덱스 오류")?;
                 let words = count.strict_add(1).strict_mul(2);
+                let payload = raw.get(40..).ok_or("대한민국 경계 정점 길이 오류")?;
+                let mut plane_iter = payload.chunks_exact(words);
+                let planes = [
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
+                ];
                 let mut vertices = Vec::with_capacity(count.strict_add(1));
                 let [west, south, east, north] = self.bounds;
                 for position in 0..=count {
+                    let base_word = position.strict_mul(2);
                     let mut point = [0.0_f64; 2];
                     for (axis, coordinate) in point.iter_mut().enumerate() {
-                        let word = position.strict_mul(2).strict_add(axis);
-                        let mut number = [0_u8; 8];
-                        for (lane, byte) in number.iter_mut().enumerate() {
-                            let offset =
-                                40_usize.strict_add(lane.strict_mul(words)).strict_add(word);
-                            *byte = *raw.get(offset).ok_or("대한민국 경계 정점 길이 오류")?;
-                        }
+                        let word = base_word.strict_add(axis);
+                        let number = [
+                            *planes[0].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[1].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[2].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[3].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[4].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[5].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[6].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                            *planes[7].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
+                        ];
                         *coordinate = f64::from_le_bytes(number);
                     }
                     (point[0] >= west
@@ -530,6 +548,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         (selected.len() == KOREA_TILE_COUNT).ok_or("대한민국 좌표 타일 개수 오류")?;
         let sampler_tiles = selected.into_boxed_slice();
         Ok(Self {
+            area_bounds: BoundaryAreaBounds::try_from(bounds)?,
             atlas: atlas::Atlas::try_from((atlas::DATA, tiles.as_slice(), source_hash))?,
             bounds,
             columns,
@@ -624,7 +643,7 @@ impl SampleState<'_> {
         let vertical = ((tile >> 9_i32) << 23_i32) | (((value >> 21_i32) & 0x1f_ffff) << 2_i32) | 2;
         let horizontal = ((tile & 511) << 23_i32) | ((value & 0x1f_ffff) << 2_i32) | 2;
         let mapped = (vertical << 32_u32) | horizontal;
-        let point = Coordinates::try_from((mapped, self.index.bounds))?;
+        let point = Coordinates::try_from((mapped, self.index.area_bounds))?;
         if self.index.covers(&point, self.active_cache)? {
             self.point = Some(point);
         }

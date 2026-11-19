@@ -4,6 +4,15 @@ use crate::{
 };
 const DEGREES: f64 = 0.017_453_292_519_943_295_f64;
 const ECCENTRICITY_SQUARED: f64 = 0.006_694_380_022_900_787_f64;
+#[derive(Clone, Copy)]
+pub(super) struct BoundaryAreaBounds {
+    area_span: f64,
+    east: f64,
+    north: f64,
+    south: f64,
+    south_area: f64,
+    west: f64,
+}
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum Orientation {
     Negative,
@@ -11,9 +20,9 @@ pub(super) enum Orientation {
     Unordered,
     Zero,
 }
-impl TryFrom<(u64, [f64; 4])> for Coordinates {
+impl TryFrom<[f64; 4]> for BoundaryAreaBounds {
     type Error = AppError;
-    fn try_from((value, bounds): (u64, [f64; 4])) -> Result<Self> {
+    fn try_from(bounds: [f64; 4]) -> Result<Self> {
         let [west, south, east, north] = bounds;
         (bounds.into_iter().all(f64::is_finite)
             && west >= -180.0_f64
@@ -23,24 +32,40 @@ impl TryFrom<(u64, [f64; 4])> for Coordinates {
             && north <= 40.0_f64
             && south < north)
             .ok_or("대한민국 등면적 좌표 범위 오류")?;
+        let south_area = cumulative_area_and_derivative(south).0;
+        let area_span = cumulative_area_and_derivative(north).0 - south_area;
+        Ok(Self {
+            area_span,
+            east,
+            north,
+            south,
+            south_area,
+            west,
+        })
+    }
+}
+impl TryFrom<(u64, BoundaryAreaBounds)> for Coordinates {
+    type Error = AppError;
+    fn try_from((value, bounds): (u64, BoundaryAreaBounds)) -> Result<Self> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
         let vertical =
             (f64::from(u32::from_be_bytes([b0, b1, b2, b3])) + 0.5_f64) / 4_294_967_296.0_f64;
         let horizontal =
             (f64::from(u32::from_be_bytes([b4, b5, b6, b7])) + 0.5_f64) / 4_294_967_296.0_f64;
-        let south_area = cumulative_area_and_derivative(south).0;
-        let area_span = cumulative_area_and_derivative(north).0 - south_area;
-        let area_offset = vertical * area_span;
-        let target = south_area + area_offset;
-        let latitude_offset = (north - south) * vertical;
-        let mut latitude = south + latitude_offset;
+        let area_offset = vertical * bounds.area_span;
+        let target = bounds.south_area + area_offset;
+        let latitude_offset = (bounds.north - bounds.south) * vertical;
+        let mut latitude = bounds.south + latitude_offset;
         for _ in 0_usize..3_usize {
             let (area, derivative) = cumulative_area_and_derivative(latitude);
             latitude -= (area - target) / derivative;
         }
-        let longitude_offset = horizontal * (east - west);
-        let longitude = west + longitude_offset;
-        (latitude > south && latitude < north && longitude > west && longitude < east)
+        let longitude_offset = horizontal * (bounds.east - bounds.west);
+        let longitude = bounds.west + longitude_offset;
+        (latitude > bounds.south
+            && latitude < bounds.north
+            && longitude > bounds.west
+            && longitude < bounds.east)
             .ok_or("대한민국 등면적 좌표 역산 오류")?;
         Ok(Self {
             latitude,
