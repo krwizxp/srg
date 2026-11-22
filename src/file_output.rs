@@ -85,9 +85,7 @@ impl TryFrom<&Path> for OutputFile {
             Err(source) => {
                 #[cfg(target_os = "windows")]
                 if source.raw_os_error() == Some(ERROR_SHARING_VIOLATION_CODE) {
-                    return Err(AppError::message(
-                        "다른 srg 인스턴스가 출력 파일을 사용 중입니다.",
-                    ));
+                    return Err("다른 srg 인스턴스가 출력 파일을 사용 중입니다.".into());
                 }
                 return Err(source.into());
             }
@@ -127,9 +125,7 @@ impl TryFrom<&Path> for OutputFile {
         match file.try_lock() {
             Ok(()) => {}
             Err(TryLockError::WouldBlock) => {
-                return Err(AppError::message(
-                    "다른 srg 인스턴스가 출력 파일을 사용 중입니다.",
-                ));
+                return Err("다른 srg 인스턴스가 출력 파일을 사용 중입니다.".into());
             }
             Err(TryLockError::Error(err)) => {
                 return Err(AppError::context("출력 파일 잠금 실패", err));
@@ -141,9 +137,7 @@ impl TryFrom<&Path> for OutputFile {
             permissions.set_mode(metadata.mode() & !0o077);
             file.set_permissions(permissions)?;
             if file.metadata()?.mode() & 0o077 != 0 {
-                return Err(AppError::message(
-                    "출력 파일의 group/other 접근 권한을 제거하지 못했습니다.",
-                ));
+                return Err("출력 파일의 group/other 접근 권한을 제거하지 못했습니다.".into());
             }
         }
         let len = file.seek(SeekFrom::End(0))?;
@@ -179,9 +173,9 @@ impl TryFrom<&Path> for OutputFile {
                         .get(record_start.strict_sub(1))
                         .is_none_or(|&byte| byte != b'\n')
                 {
-                    return Err(AppError::message(
-                        "기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.",
-                    ));
+                    return Err(
+                        "기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.".into(),
+                    );
                 }
                 let record = content
                     .get(record_start..)
@@ -210,9 +204,9 @@ impl TryFrom<&Path> for OutputFile {
                                 })
                         });
                 if record_line_count != FILE_RECORD_LINE_COUNT || !final_value_is_valid {
-                    return Err(AppError::message(
-                        "기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.",
-                    ));
+                    return Err(
+                        "기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.".into(),
+                    );
                 }
             }
         }

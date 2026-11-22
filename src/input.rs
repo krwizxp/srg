@@ -1,6 +1,8 @@
 use crate::diagnostic::Result;
 #[cfg(target_arch = "x86_64")]
 use crate::ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES};
+#[cfg(target_arch = "x86_64")]
+use alloc::borrow::Cow;
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
 use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, stdin};
 #[cfg(target_arch = "x86_64")]
@@ -146,47 +148,48 @@ pub(super) fn read_ladder_entries(
     mode: LadderEntryMode,
 ) -> Result<usize> {
     let (out, err) = io;
-    Ok('read: loop {
-        let line = read_line_reuse_limited(prompt, storage, out, MAX_LADDER_INPUT_BYTES)?;
-        let mut count = 0_usize;
-        for part in line.split(',') {
-            count = count.strict_add(1);
-            match mode {
-                LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
-                    writeln!(
-                        err,
-                        "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
-                    )?;
-                    continue 'read;
-                }
-                LadderEntryMode::Results { expected_count } if count > expected_count => break,
-                LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
-            }
-            if part.trim().is_empty() {
-                let message = match mode {
-                    LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
-                    LadderEntryMode::Results { expected_count: _ } => {
-                        "결과값은 비워둘 수 없습니다."
+    get_validated_input(
+        prompt,
+        storage,
+        out,
+        Some(err),
+        MAX_LADDER_INPUT_BYTES,
+        |line| -> CoreResult<usize, Cow<'static, str>> {
+            let mut count = 0_usize;
+            for part in line.split(',') {
+                count = count.strict_add(1);
+                match mode {
+                    LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
+                        return Err(Cow::Owned(format!(
+                            "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
+                        )));
                     }
-                };
-                writeln!(err, "{message}")?;
-                continue 'read;
+                    LadderEntryMode::Results { expected_count } if count > expected_count => break,
+                    LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
+                }
+                if part.trim().is_empty() {
+                    return Err(Cow::Borrowed(match mode {
+                        LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
+                        LadderEntryMode::Results { expected_count: _ } => {
+                            "결과값은 비워둘 수 없습니다."
+                        }
+                    }));
+                }
             }
-        }
-        match mode {
-            LadderEntryMode::Players if count < 2 => {
-                writeln!(err, "플레이어 수는 최소 2명이어야 합니다.")?;
-                continue;
+            match mode {
+                LadderEntryMode::Players if count < 2 => {
+                    Err(Cow::Borrowed("플레이어 수는 최소 2명이어야 합니다."))
+                }
+                LadderEntryMode::Results { expected_count } if count != expected_count => {
+                    Err(Cow::Owned(format!(
+                        "결과값의 개수({count})가 플레이어 수({expected_count})와 일치하지 않습니다.\n"
+                    )))
+                }
+                LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {
+                    Ok(count)
+                }
             }
-            LadderEntryMode::Results { expected_count } if count != expected_count => {
-                writeln!(
-                    err,
-                    "결과값의 개수({count})가 플레이어 수({expected_count})와 일치하지 않습니다.\n"
-                )?;
-                continue;
-            }
-            LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
-        }
-        break count;
-    })
+        },
+    )
+    .map_err(Into::into)
 }

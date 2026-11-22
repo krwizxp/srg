@@ -2,7 +2,7 @@ use super::{
     CivilDate, Result, TimeError,
     util::{
         DAYS_PER_WEEK_I64, SECS_PER_DAY_I64, SECS_PER_DAY_U64, SECS_PER_HOUR_I64,
-        SECS_PER_MINUTE_I64, parse_hms, parse_result_with_context, parse_u32_digits,
+        SECS_PER_MINUTE_I64, parse_hms, parse_u32_digits,
     },
 };
 use core::{
@@ -10,9 +10,6 @@ use core::{
     time::Duration,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
-const DAYS_PER_400_YEARS_I64: i64 = 146_097;
-const DAYS_PER_COMMON_YEAR_I64: i64 = 365;
-const DAYS_UNTIL_UNIX_EPOCH_I64: i64 = 719_468;
 const ERR_ASCTIME_FORMAT: &str = "HTTP Date 파싱 실패: asctime-date 형식이 아닙니다.";
 const ERR_ASCTIME_NUM: &str = "HTTP Date 파싱 실패: asctime-date 숫자 변환에 실패했습니다.";
 const ERR_HTTP_DATE_FORMAT: &str = concat!(
@@ -24,24 +21,12 @@ const ERR_IMF_NUM: &str = "HTTP Date 파싱 실패: IMF-fixdate 숫자 변환에
 const ERR_LOCAL_YEAR: &str = "HTTP Date 파싱 실패: 현재 연도 계산에 실패했습니다.";
 const ERR_RFC850_FORMAT: &str = "HTTP Date 파싱 실패: rfc850-date 형식이 아닙니다.";
 const ERR_RFC850_NUM: &str = "HTTP Date 파싱 실패: rfc850-date 숫자 변환에 실패했습니다.";
-const FEBRUARY_DAY_LEAP: u32 = 29;
+const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
+const FOUR_DIGIT_LEN: usize = 4;
 const IMF_FIXDATE_WEEKDAY_COMMA_INDEX: usize = 3;
 const LEAP_YEAR_CENTURY_DIVISOR_I32: i32 = 100;
-const LEAP_YEAR_DIVISOR_I32: i32 = 4;
-const LEAP_YEAR_ERA_DIVISOR_I32: i32 = 400;
-const MARCH_BASE_MONTH_OFFSET_I64: i64 = 3;
-const PRE_MARCH_MONTH_OFFSET_I64: i64 = 9;
 const RFC850_CENTURY_CUTOFF_OFFSET: i32 = 50;
 const TWO_DIGIT_LEN: usize = 2;
-const FOUR_DIGIT_LEN: usize = 4;
-const MAX_HTTP_HOUR: u32 = 23;
-const MAX_HTTP_MINUTE: u32 = 59;
-const MAX_HTTP_SECOND: u32 = 60;
-const MARCH_MONTH_THRESHOLD: u32 = 2;
-const MONTH_TERM_DIVISOR_I64: i64 = 5;
-const MONTH_TERM_MULTIPLIER_I64: i64 = 153;
-const MONTH_TERM_OFFSET_I64: i64 = 2;
-const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 pub(super) struct HttpDate(pub SystemTime);
 #[derive(Clone, Copy)]
 enum HttpDateFormat {
@@ -83,7 +68,8 @@ impl FromStr for HttpDate {
                     .div_euclid(SECS_PER_DAY_U64)
                     .strict_add(u64::from(remainder != 0 || fraction != 0));
                 (
-                    parse_result_with_context(i64::try_from(days_before), ERR_LOCAL_YEAR)?
+                    i64::try_from(days_before)
+                        .map_err(|source| TimeError::parse_with_source(ERR_LOCAL_YEAR, source))?
                         .strict_neg(),
                     SECS_PER_DAY_U64
                         .strict_sub(remainder.strict_add(fraction))
@@ -91,7 +77,8 @@ impl FromStr for HttpDate {
                 )
             }
         };
-        let day_index = parse_result_with_context(i32::try_from(day_index_i64), ERR_LOCAL_YEAR)?;
+        let day_index = i32::try_from(day_index_i64)
+            .map_err(|source| TimeError::parse_with_source(ERR_LOCAL_YEAR, source))?;
         let current_date = civil_from_days(day_index);
         let current_year = current_date.year;
         let mut parts = raw_date.split_ascii_whitespace();
@@ -133,11 +120,8 @@ impl FromStr for HttpDate {
             || year == cutoff_year && {
                 let date_order = (month.number, day).cmp(&(current_date.month, current_date.day));
                 if date_order.is_eq() {
-                    let (hour, minute, second) = parse_hms(time_token).ok_or_else(|| {
-                        TimeError::parse(
-                            "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)",
-                        )
-                    })?;
+                    let (hour, minute, second) =
+                        parse_hms(time_token).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?;
                     let second_of_day = u64::from(hour)
                         .strict_mul(3600)
                         .strict_add(u64::from(minute).strict_mul(60))
@@ -207,54 +191,49 @@ fn parse_http_date_time(
     time_token: &str,
 ) -> Result<SystemTime> {
     const ERR_DAY: &str = "HTTP Date 파싱 실패: 날짜 값이 유효하지 않습니다.";
-    const ERR_TIME_FMT: &str = "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)";
     const ERR_TIME_RANGE: &str = "HTTP Date 파싱 실패: 시간 값 범위가 올바르지 않습니다.";
     const ERR_UNIX_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     const ERR_WEEKDAY: &str = "HTTP Date 파싱 실패: 요일이 날짜와 일치하지 않습니다.";
     let (hour, minute, second) =
         parse_hms(time_token).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?;
-    (hour <= MAX_HTTP_HOUR && minute <= MAX_HTTP_MINUTE && second <= MAX_HTTP_SECOND)
+    (hour <= 23_u32 && minute <= 59_u32 && second <= 60_u32)
         .ok_or_else(|| TimeError::parse(ERR_TIME_RANGE))?;
-    let leap_year = year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32
+    let leap_year = year.rem_euclid(4_i32) == 0_i32
         && (year.rem_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32) != 0_i32
-            || year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32) == 0_i32);
+            || year.rem_euclid(400_i32) == 0_i32);
     let HttpMonth {
         mut max_day,
         number: month_number,
     } = month;
-    if month_number == 2 && leap_year {
-        max_day = FEBRUARY_DAY_LEAP;
+    if month_number == 2_u32 && leap_year {
+        max_day = 29_u32;
     }
     (day != 0 && day <= max_day).ok_or_else(|| TimeError::parse(ERR_DAY))?;
-    let adjusted_year =
-        i64::from(year).strict_sub(i64::from(month_number <= MARCH_MONTH_THRESHOLD));
+    let adjusted_year = i64::from(year).strict_sub(i64::from(month_number <= 2_u32));
     let (era, year_of_era) = (
-        adjusted_year.div_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
-        adjusted_year.rem_euclid(LEAP_YEAR_ERA_DIVISOR_I32.into()),
+        adjusted_year.div_euclid(400_i64),
+        adjusted_year.rem_euclid(400_i64),
     );
-    let shifted_month = if month_number > MARCH_MONTH_THRESHOLD {
-        i64::from(month_number).strict_sub(MARCH_BASE_MONTH_OFFSET_I64)
+    let shifted_month = if month_number > 2_u32 {
+        i64::from(month_number).strict_sub(3_i64)
     } else {
-        i64::from(month_number).strict_add(PRE_MARCH_MONTH_OFFSET_I64)
+        i64::from(month_number).strict_add(9_i64)
     };
-    let month_term = MONTH_TERM_MULTIPLIER_I64
+    let day_of_year = 153_i64
         .strict_mul(shifted_month)
-        .strict_add(MONTH_TERM_OFFSET_I64);
-    let day_of_year = month_term
-        .div_euclid(MONTH_TERM_DIVISOR_I64)
+        .strict_add(2_i64)
+        .div_euclid(5_i64)
         .strict_add(i64::from(day).strict_sub(1_i64));
-    let day_of_era = DAYS_PER_COMMON_YEAR_I64
+    let day_of_era = 365_i64
         .strict_mul(year_of_era)
-        .strict_add(year_of_era.div_euclid(LEAP_YEAR_DIVISOR_I32.into()))
-        .strict_sub(year_of_era.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32.into()))
+        .strict_add(year_of_era.div_euclid(4_i64))
+        .strict_sub(year_of_era.div_euclid(100_i64))
         .strict_add(day_of_year);
     let days = era
-        .strict_mul(DAYS_PER_400_YEARS_I64)
+        .strict_mul(146_097_i64)
         .strict_add(day_of_era)
-        .strict_sub(DAYS_UNTIL_UNIX_EPOCH_I64);
-    let actual_weekday = days
-        .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
-        .rem_euclid(DAYS_PER_WEEK_I64);
+        .strict_sub(719_468_i64);
+    let actual_weekday = days.strict_add(4_i64).rem_euclid(DAYS_PER_WEEK_I64);
     (actual_weekday == i64::from(weekday)).ok_or_else(|| TimeError::parse(ERR_WEEKDAY))?;
     let timestamp_secs = days
         .strict_mul(SECS_PER_DAY_I64)
@@ -319,11 +298,11 @@ pub(super) fn civil_from_days(z: i32) -> CivilDate {
         .strict_add(doe.div_euclid(36_524))
         .strict_sub(doe.div_euclid(DAYS_PER_400_YEARS.strict_sub(1)))
         .div_euclid(365);
-    let y = yoe.strict_add(era.strict_mul(LEAP_YEAR_ERA_DIVISOR_I32));
+    let y = yoe.strict_add(era.strict_mul(400_i32));
     let doy = doe.strict_sub(
         365_i32
             .strict_mul(yoe)
-            .strict_add(yoe.div_euclid(LEAP_YEAR_DIVISOR_I32))
+            .strict_add(yoe.div_euclid(4_i32))
             .strict_sub(yoe.div_euclid(LEAP_YEAR_CENTURY_DIVISOR_I32)),
     );
     let mp = 5_i32.strict_mul(doy).strict_add(2).div_euclid(153);
@@ -332,6 +311,6 @@ pub(super) fn civil_from_days(z: i32) -> CivilDate {
     let month = mp
         .strict_add(if mp < 10_i32 { 3 } else { -9 })
         .cast_unsigned();
-    let year = y.strict_add(i32::from(month <= MARCH_MONTH_THRESHOLD));
+    let year = y.strict_add(i32::from(month <= 2_u32));
     CivilDate { day, month, year }
 }

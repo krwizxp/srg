@@ -1,5 +1,4 @@
-use super::{Result, TimeError};
-use core::{error::Error, result::Result as CoreResult, time::Duration};
+use core::time::Duration;
 pub(super) const DAYS_PER_WEEK_I64: i64 = 7;
 pub(super) const SECS_PER_DAY_I64: i64 = 86_400;
 pub(super) const SECS_PER_DAY_U64: u64 = 86_400;
@@ -35,12 +34,6 @@ pub(super) fn parse_hms(raw: &str) -> Option<(u32, u32, u32)> {
         parse_two(minute_str)?,
         parse_two(second_str)?,
     ))
-}
-pub(super) fn parse_result_with_context<T>(
-    result: CoreResult<T, impl Error + Send + Sync + 'static>,
-    context: &'static str,
-) -> Result<T> {
-    result.map_err(|err| TimeError::parse_with_source(context, err))
 }
 pub(super) fn parse_u32_digits(raw: &str) -> Option<u32> {
     if raw.starts_with('+') {

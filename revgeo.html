@@ -2647,6 +2647,8 @@
 		const query = (selector, within = document) => within.querySelector(selector);
 		const queryAll = (selector, within = document) => within.querySelectorAll(selector);
 		const NO_SCROLL = {preventScroll: true};
+		const canFocus = el => Boolean(el?.isConnected && !el.disabled && el.getClientRects().length);
+		const totalPages = (count = state.visibleIndices.length) => Math.max(1, Math.ceil(count / pageSize));
 		const COORD_REGEX =
 			/(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])|(?:대한민국|세계)\s*위경도/g;
 		const csvEsc = (s) => {
@@ -2886,7 +2888,6 @@
 			(_lat, _lon, lat6, lon6) => `https://map.naver.com/?lng=${lon6}&lat=${lat6}&title=${lat6}%2C%20${lon6}`,
 			(lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
 		];
-		const buildMapLink = (index, lat, lon, lat6, lon6) => MAP_BUILDERS[index](lat, lon, lat6, lon6);
 		on(mapPopover, "beforetoggle", (e) => {
 			if (e.newState !== "open") return;
 			const btn = e.source;
@@ -2895,7 +2896,7 @@
 			const {latStr: lat, lonStr: lon} = r;
 			const lat6 = fmtCoord6(lat), lon6 = fmtCoord6(lon);
 			for (let i = 0; i < MAP_NAMES.length; i++)
-				mapAnchors[i].href = buildMapLink(i, lat, lon, lat6, lon6);
+				mapAnchors[i].href = MAP_BUILDERS[i](lat, lon, lat6, lon6);
 		});
 		const fmt =
 			new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format;
@@ -3075,7 +3076,7 @@
 			const numberFocus = pageNumbers.contains(active);
 			const focusedPage = numberFocus ? active.dataset.page : null;
 			const edgeFocus = active === pagePrev || active === pageNext;
-			const pageCount = Math.max(1, Math.ceil(visibleCount / pageSize));
+			const pageCount = totalPages(visibleCount);
 			if (state.page >= pageCount) state.page = pageCount - 1;
 			pageNav.hidden = visibleCount === 0;
 			pagePrev.disabled = state.page === 0;
@@ -3131,7 +3132,7 @@
 			announcePage();
 		}
 		function announcePage() {
-			pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(Math.max(1, Math.ceil(state.visibleIndices.length / pageSize)))} 페이지 · ${fmt(state.visibleIndices.length)}건`;
+			pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(totalPages())} 페이지 · ${fmt(state.visibleIndices.length)}건`;
 		}
 		function revealPage() {
 			renderPage(true);
@@ -4291,7 +4292,7 @@
 						const lat6 = fmtCoord6(lat);
 						const lon6 = fmtCoord6(lon);
 						for (let k = 0; k < MAP_NAMES.length; k++) {
-							const link = buildMapLink(k, lat, lon, lat6, lon6);
+							const link = MAP_BUILDERS[k](lat, lon, lat6, lon6);
 							line += k === 2 ? "," + link : ",\"" + link + "\"";
 						}
 						chunkLines.push(line);
@@ -4377,7 +4378,7 @@
 			const button = event.target.closest("button[data-page]");
 			if (!button) return;
 			const page = Number(button.dataset.page);
-			if (!Number.isInteger(page) || page < 0 || page >= Math.ceil(state.visibleIndices.length / pageSize) || page === state.page) return;
+			if (!Number.isInteger(page) || page < 0 || page >= totalPages() || page === state.page) return;
 			state.page = page;
 			revealPage();
 			if (!mobileMedia.matches) query('[aria-current="page"]', pageNumbers)?.focus(NO_SCROLL);
@@ -4433,7 +4434,7 @@
 		});
 		function shiftPage(step) {
 			const next = state.page + step;
-			if (next < 0 || next >= Math.ceil(state.visibleIndices.length / pageSize)) return;
+			if (next < 0 || next >= totalPages()) return;
 			state.page = next;
 			revealPage();
 		}
@@ -4453,8 +4454,7 @@
 						`${fmt(count)}개 좌표 조회`;
 					state.bulkConfirmed = await new Promise(resolve => {
 						bulkDialog.returnValue = "";
-						const onClose = () => resolve(bulkDialog.returnValue === "confirm");
-						on(bulkDialog, "close", onClose, {once: true});
+						on(bulkDialog, "close", () => resolve(bulkDialog.returnValue === "confirm"), {once: true});
 						bulkDialog.showModal();
 					});
 					if (!state.bulkConfirmed) {
@@ -4568,16 +4568,6 @@
 				type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
 			});
 		}
-		async function copyChunks(chunks) {
-			if (!window.isSecureContext)
-				throw new Error(
-					"클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.",
-				);
-			const blob = outputBlob(chunks, false);
-			await navigator.clipboard.write([new ClipboardItem({
-				"text/plain": blob,
-			})]);
-		}
 		function setInputError(input, message, error = `${input.id}-error`) {
 			byId(error).textContent = message;
 			if (message) {
@@ -4637,7 +4627,7 @@
 				});
 			on(generateDialog, "click", () => {
 				if (!suppRequest) return;
-				clearSupplementError();
+				setSupplementError("");
 				try {
 					finishSupplement(generateRandomValues(32));
 				} catch (err) {
@@ -4653,9 +4643,8 @@
 					if (input.ariaInvalid === "true") clearInputErrors();
 				});
 			const setSupplementError = message => setInputError(suppValues, message, "supp-error");
-			const clearSupplementError = () => setSupplementError("");
 			on(suppValues, "input", () => {
-				if (suppValues.ariaInvalid === "true") clearSupplementError();
+				if (suppValues.ariaInvalid === "true") setSupplementError("");
 			});
 			let suppRequest = null;
 			let returnFocus = null;
@@ -4678,7 +4667,7 @@
 				const {promise, resolve} = Promise.withResolvers();
 				suppRequest = resolve;
 				suppValues.value = "";
-				clearSupplementError();
+				setSupplementError("");
 				try {
 					suppDialog.showModal();
 				} catch (err) {
@@ -4705,7 +4694,7 @@
 					);
 					if (!values.length)
 						throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
-					clearSupplementError();
+					setSupplementError("");
 					finishSupplement(values);
 				} catch (err) {
 					setSupplementError(errorMessage(err));
@@ -4719,7 +4708,7 @@
 			});
 			let chunks = [];
 			let manualBusy = false;
-			let copyTask = null;
+			let copying = false;
 			const setBusy = (busy) => {
 				manualBusy = busy;
 				const hasOutput = chunks.length > 0;
@@ -4727,7 +4716,7 @@
 				outputReady = !busy && hasOutput;
 				useOutput.disabled = !outputReady || state.task !== null;
 				saveBtn.disabled = busy || !hasOutput;
-				copyBtn.disabled = saveBtn.disabled || copyTask !== null;
+				copyBtn.disabled = saveBtn.disabled || copying;
 			};
 			let outputEpoch = 0;
 			let activeWorkerController = null;
@@ -4921,28 +4910,29 @@
 				}
 			});
 			on(copyBtn, "click", async () => {
-				if (copyTask) return;
+				if (copying) return;
 				const epoch = outputEpoch;
 				const snapshot = chunks;
-				const isCurrent = () => epoch === outputEpoch && snapshot === chunks;
 				const ownedFocus = document.activeElement === copyBtn;
 				clearInputErrors();
-				copyTask = copyChunks(snapshot);
+				copying = true;
 				setBusy(manualBusy);
 				let message = "복사됨";
 				let type = "info";
 				try {
-					await copyTask;
+					if (!window.isSecureContext)
+						throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
+					await navigator.clipboard.write([new ClipboardItem({"text/plain": outputBlob(snapshot, false)})]);
 				} catch (err) {
 					message = err instanceof Error ? err.message : "클립보드 복사에 실패했습니다.";
 					type = "error";
 				} finally {
-					copyTask = null;
+					copying = false;
 					setBusy(manualBusy);
 				}
-				if (!isCurrent()) return;
-				if (ownedFocus && document.activeElement === document.body && document.hasFocus() &&
-					!copyBtn.disabled && copyBtn.getClientRects().length) copyBtn.focus(NO_SCROLL);
+				if (epoch !== outputEpoch || snapshot !== chunks) return;
+				if (ownedFocus && document.activeElement === document.body && document.hasFocus() && canFocus(copyBtn))
+					copyBtn.focus(NO_SCROLL);
 				showNotice(message, type);
 			});
 			const clearDialog = byId("clear-dialog");
@@ -4992,7 +4982,6 @@
 		on(document, "focusin", ({target}) => {
 			layoutFocus = jobPanel.contains(target) ? target : null;
 		});
-		on(document, "pointerdown", () => {layoutFocus = null;}, {passive: true});
 		on(window, "blur", () => {layoutFocus = null;});
 		function syncTabs(tabs, attr, value) {
 			for (const tab of tabs) {
@@ -5046,7 +5035,7 @@
 				? mobileSlot : inputSlot;
 			if (jobPanel.parentElement !== jobSlot) jobSlot.append(jobPanel);
 			if (!compactMedia.matches && detailSheet.open) detailSheet.close();
-			if (restoreFocus && active.getClientRects().length && !active.disabled) active.focus(NO_SCROLL);
+			if (restoreFocus && canFocus(active)) active.focus(NO_SCROLL);
 		}
 		const settings = byId("display-settings");
 		const settingsBtn = query(".settings-button");
@@ -5055,8 +5044,7 @@
 			const ownedFocus = settings.contains(document.activeElement) ||
 				document.activeElement === settingsBtn;
 			settings.close();
-			if (restoreFocus && ownedFocus && settingsBtn.getClientRects().length)
-				settingsBtn.focus(NO_SCROLL);
+			if (restoreFocus && ownedFocus && canFocus(settingsBtn)) settingsBtn.focus(NO_SCROLL);
 		}
 		on(settingsBtn, "click", () => {
 			if (settings.open) return closeSettings();
@@ -5070,10 +5058,11 @@
 			closeSettings();
 		});
 		on(document, "pointerdown", event => {
+			layoutFocus = null;
 			if (settings.open && !settings.matches(":modal") &&
 				!settings.contains(event.target) && !settingsBtn.contains(event.target))
 				closeSettings(false);
-		});
+		}, {passive: true});
 		on(settings, "keydown", event => {
 			if (event.key === "Escape" && !settings.matches(":modal")) {
 				event.preventDefault();
@@ -5094,7 +5083,7 @@
 					if (document.body.dataset.mobiletab === nextView) window.scrollTo(0, mobileScroll[nextView]);
 				});
 				if (focusInView) {
-					const next = active.getClientRects().length && !active.disabled ? active
+					const next = canFocus(active) ? active
 						: byId(view === "results" ? "results-title" : "input-title");
 					next.focus(NO_SCROLL);
 				}
@@ -5204,8 +5193,7 @@
 			noticeOwner = noticeFocus = null;
 			if (notice.parentElement !== noticeHome) noticeHome.append(notice);
 			const modal = query("dialog:modal");
-			if (restoreFocus && ownedFocus && target?.isConnected && !target.disabled &&
-				target.getClientRects().length && !target.closest("[inert]") &&
+			if (restoreFocus && ownedFocus && canFocus(target) && !target.closest("[inert]") &&
 				(!modal || modal.contains(target))) target.focus(NO_SCROLL);
 		}
 		on(noticeClose, "click", () => dismissNotice());
@@ -5231,12 +5219,9 @@
 		}
 		const [mapFeedback, mapRecovery, mapExternal] = ["map-feedback", "map-recovery", "map-external"].map(byId);
 		let mapLoadTimer = 0;
-		function clearMapTimer() {
+		function setMapUi({map = true, load = true, loading = false, feedback = true, recovery = true}) {
 			clearTimeout(mapLoadTimer);
 			mapLoadTimer = 0;
-		}
-		function setMapUi({map = true, load = true, loading = false, feedback = true, recovery = true}) {
-			clearMapTimer();
 			detailMap.hidden = map;
 			loadMap.hidden = load;
 			mapFeedback.dataset.loading = String(loading);
@@ -5393,8 +5378,7 @@
 			mapPopover.hidePopover();
 			unloadMap();
 			inspector.append(detailContent);
-			if (detailFocus?.isConnected && detailFocus.getClientRects().length)
-				detailFocus.focus(NO_SCROLL);
+			if (canFocus(detailFocus)) detailFocus.focus(NO_SCROLL);
 			detailFocus = null;
 		});
 		on(copyAddress, "click", () => {
@@ -5414,7 +5398,7 @@
 			if (!record) return;
 			const lat = Number(record.latStr), lon = Number(record.lonStr);
 			const polar = Math.abs(lat) > 85;
-			mapExternal.href = buildMapLink(1, record.latStr, record.lonStr);
+			mapExternal.href = MAP_BUILDERS[1](record.latStr, record.lonStr);
 			retryMap.disabled = polar;
 			if (polar) return showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
 			if (!navigator.onLine) {
@@ -5465,7 +5449,7 @@
 		const helpTrigger = byId("show-help");
 		on(helpTrigger, "click", () => closeSettings(false));
 		on(byId("help-dialog"), "close", () => {
-			if (helpTrigger.getClientRects().length) helpTrigger.focus(NO_SCROLL);
+			if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL);
 		});
 		on(window, "pagehide", () => {
 			revokeDownloadUrl();
