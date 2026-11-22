@@ -2806,12 +2806,6 @@
 				["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(key => boundedText(addr[key])) &&
 				["kind", "countryCode", "countryName"].every(k => parsed[k] === undefined || boundedText(parsed[k]));
 		}
-		const ADMIN_KEYS = ["level2", "level4", "level6", "level7", "level8", "level9", "level10"];
-		const GC_KEYS = [
-			"country", "name", "street", "type", "district", "suburb", "city", "county",
-			"state", "region", "province", "town", "locality", "village", "neighbourhood",
-			"municipality", "quarter", "hamlet", "township", "residential",
-		];
 		const countryNames = new Intl.DisplayNames("ko", {type: "region"});
 		function parseGeocode(data) {
 			const gc = Array.isArray(data?.features)
@@ -2824,9 +2818,36 @@
 			const country = text(gc.country_code).toLowerCase();
 			const countryCode = /^[a-z]{2}$/.test(country) ? country : "";
 			const admin = typeof gc.admin === "object" ? gc.admin : null;
-			const fields = {cityDistrict: text(gc.city_district)};
-			for (const key of ADMIN_KEYS) fields[key] = text(admin?.[key]);
-			for (const key of GC_KEYS) fields[key] = text(gc[key]);
+			const fields = {
+				cityDistrict: text(gc.city_district),
+				level2: text(admin?.level2),
+				level4: text(admin?.level4),
+				level6: text(admin?.level6),
+				level7: text(admin?.level7),
+				level8: text(admin?.level8),
+				level9: text(admin?.level9),
+				level10: text(admin?.level10),
+				country: text(gc.country),
+				name: text(gc.name),
+				street: text(gc.street),
+				type: text(gc.type),
+				district: text(gc.district),
+				suburb: text(gc.suburb),
+				city: text(gc.city),
+				county: text(gc.county),
+				state: text(gc.state),
+				region: text(gc.region),
+				province: text(gc.province),
+				town: text(gc.town),
+				locality: text(gc.locality),
+				village: text(gc.village),
+				neighbourhood: text(gc.neighbourhood),
+				municipality: text(gc.municipality),
+				quarter: text(gc.quarter),
+				hamlet: text(gc.hamlet),
+				township: text(gc.township),
+				residential: text(gc.residential),
+			};
 			const labelParts = label.split(",").map(part => part.trim());
 			const firstPart = labelParts[0];
 			const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
@@ -2839,7 +2860,10 @@
 			const kind = country === "kr" ? "KR" :
 				country === "kp" ? "KP" :
 					country ? "WORLD" : undefined;
-			[sigungu, eupmyeon, tag].forEach(text);
+			if (sigungu.length > CONFIG.TEXT_HARD_LIMIT ||
+				eupmyeon.length > CONFIG.TEXT_HARD_LIMIT ||
+				tag.length > CONFIG.TEXT_HARD_LIMIT)
+				throw new InputError(TEXT_LIMIT_MESSAGE);
 			return {
 				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
 				kind,
