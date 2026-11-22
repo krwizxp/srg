@@ -271,14 +271,12 @@
 		}
 		.button,
 		.copyright,
-		.credits a,
-		.kind-badge {
+		.credits a {
 			display: inline-flex;
 			align-items: center
 		}
 		.button,
 		.copyright,
-		.kind-badge,
 		.table-hint {
 			justify-content: center
 		}
@@ -448,7 +446,7 @@
 		.segmented :is([aria-selected=true], [aria-pressed=true]):active:not(:disabled) {
 			background: var(--surface)
 		}
-		.input-tabs :is([aria-selected=true], [aria-pressed=true]) {
+		.input-tabs [aria-selected=true] {
 			background: 0 0;
 			box-shadow: none
 		}
@@ -518,7 +516,6 @@
 		}
 		.button:active:not(:disabled) {
 			background: var(--tint-active);
-			border-color: transparent;
 			color: var(--accent-active)
 		}
 		.steps [aria-current=step] span,
@@ -527,9 +524,6 @@
 		.page-number[aria-current=page] {
 			background: var(--button-fill);
 			color: #fff
-		}
-		.primary {
-			border-color: transparent
 		}
 		:is(.primary, .page-number[aria-current=page]):active:not(:disabled) {
 			background: var(--button-active);
@@ -548,8 +542,7 @@
 		}
 		.danger:active:not(:disabled) {
 			color: var(--danger);
-			background: var(--danger-active);
-			border-color: var(--danger)
+			background: var(--danger-active)
 		}
 		#parse {
 			width: 100%;
@@ -786,8 +779,7 @@
 		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn {
 			color: var(--fg);
-			background: var(--press-bg);
-			border-color: transparent
+			background: var(--press-bg)
 		}
 		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):active:not(:disabled),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
@@ -811,13 +803,13 @@
 		.results-card {
 			border-radius: var(--radius-large)
 		}
-		.filterbar,
 		.results-heading {
 			flex-wrap: wrap;
 			gap: 16px;
 			padding: 26px 28px 18px
 		}
 		.filterbar {
+			flex-wrap: wrap;
 			gap: 12px;
 			padding: 0 28px 18px
 		}
@@ -1019,7 +1011,6 @@
 		}
 		@media screen {
 			.location-button :is(.address-main, .address-sub),
-			.row-error,
 			#detail-title {
 				display: -webkit-box;
 				-webkit-box-orient: vertical;
@@ -1120,8 +1111,7 @@
 			gap: 4px
 		}
 		.result-pages .button {
-			padding: 8px;
-			border-color: transparent
+			padding: 8px
 		}
 		.page-number[aria-current=page] {
 			font-weight: 600
@@ -1331,12 +1321,10 @@
 			z-index: 40
 		}
 		.settings {
-			--popover-width: 300px;
-			width: min(var(--popover-width), calc(100vw - 24px))
+			width: min(300px, calc(100vw - 24px))
 		}
 		.map-popover {
-			--popover-width: 340px;
-			width: min(var(--popover-width), calc(100vw - 24px))
+			width: min(340px, calc(100vw - 24px))
 		}
 		.settings-button {
 			anchor-name: --settings-trigger
@@ -1415,7 +1403,6 @@
 			min-width: 0;
 			padding: 12px 14px;
 			background: 0 0;
-			border-color: transparent;
 			text-align: start;
 			overflow-wrap: anywhere
 		}
@@ -1434,7 +1421,6 @@
 			display: grid;
 			gap: 16px
 		}
-		.supp-form h2,
 		.sheet-heading h2 {
 			font-size: 1.25rem;
 			font-weight: 600
@@ -1625,7 +1611,6 @@
 			}
 			#app,
 			table,
-			tbody,
 			.location-button::after {
 				display: block
 			}
@@ -1675,7 +1660,7 @@
 				gap: 12px;
 				padding: 0 0 18px
 			}
-			#desktop-export-slot {
+			#export {
 				margin-left: auto
 			}
 			.filterbar {
@@ -1772,8 +1757,10 @@
 			td:nth-child(4),
 			td:nth-child(5) {
 				grid-column: 2;
-				grid-row: 1;
 				text-align: right
+			}
+			td:nth-child(4) {
+				grid-row: 1
 			}
 			td:nth-child(5) {
 				grid-row: 2;
@@ -1914,8 +1901,7 @@
 				position: fixed;
 				width: 100%;
 				max-width: 100%;
-				overscroll-behavior: contain;
-				-webkit-overflow-scrolling: touch
+				overscroll-behavior: contain
 			}
 			#filter-dialog:modal[data-edit-viewport] {
 				top: auto;
@@ -2000,7 +1986,7 @@
 			.segmented :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
 				background: var(--surface)
 			}
-			.input-tabs :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
+			.input-tabs [aria-selected=true]:hover:not(:active):not(:disabled) {
 				background: 0 0
 			}
 			.drop-zone:hover:not(:active):not(:has(input:disabled)),
@@ -2012,7 +1998,6 @@
 			}
 			.button:hover:not(:active):not(:disabled) {
 				background: var(--tint-hover);
-				border-color: transparent;
 				color: var(--accent)
 			}
 			:is(.primary, .page-number[aria-current=page]):hover:not(:active):not(:disabled) {
@@ -2021,14 +2006,12 @@
 			}
 			.danger:hover:not(:active):not(:disabled) {
 				color: var(--danger);
-				background: var(--danger-hover);
-				border-color: var(--danger)
+				background: var(--danger-hover)
 			}
 			:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):hover:not(:active):not(:disabled),
 			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
 				color: var(--fg);
-				background: var(--secondary-hover);
-				border-color: transparent
+				background: var(--secondary-hover)
 			}
 			#clearBtn:hover:not(:active):not(:disabled) {
 				background: var(--danger-bg);
@@ -2396,22 +2379,20 @@
 		<section aria-labelledby="mobile-results-tab" class="results" id="results-view" role="tabpanel">
 			<div class="results-card">
 				<header class="results-heading">
-					<div>
-						<h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2>
-					</div>
-					<div id="desktop-export-slot"><button class="button" command="--export" commandfor="app" disabled
-							id="export" title="조회된 전체 결과를 CSV로 저장" type="button">
-							<svg aria-hidden="true" viewbox="0 0 24 24">
-								<path d="M12 4.5v10" />
-								<path d="m8 10.75 4 4 4-4" />
-								<path d="M5.5 18.5h13" />
-							</svg>
-							<span>전체 결과 CSV</span>
-						</button></div>
+					<h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2>
+					<button class="button" command="--export" commandfor="app" disabled id="export"
+						title="조회된 전체 결과를 CSV로 저장" type="button">
+						<svg aria-hidden="true" viewBox="0 0 24 24">
+							<path d="M12 4.5v10" />
+							<path d="m8 10.75 4 4 4-4" />
+							<path d="M5.5 18.5h13" />
+						</svg>
+						<span>전체 결과 CSV</span>
+					</button>
 				</header>
 				<div class="mobile-job-slot" id="mobile-job-slot"></div>
 				<div class="filterbar">
-					<div aria-label="처리 상태 필터" class="segmented" id="status-filters" role="group">
+					<div aria-label="처리 상태 필터" class="segmented" role="group">
 						<button aria-pressed="true" data-status="all" type="button">전체 <strong
 								id="summary-processed">0</strong></button>
 						<button aria-pressed="false" data-status="done" type="button">주소 확인 <strong
@@ -2446,20 +2427,19 @@
 						<dialog aria-labelledby="filter-title" closedby="any" id="filter-dialog">
 							<div class="sheet-heading">
 								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
-									command="close" commandfor="filter-dialog" id="filter-dismiss" type="button"><svg
-										aria-hidden="true" viewBox="0 0 24 24">
+									command="close" commandfor="filter-dialog" type="button"><svg aria-hidden="true"
+										viewBox="0 0 24 24">
 										<path d="m6 6 12 12M6 18 18 6" />
 									</svg></button>
 							</div>
-							<div class="filter-grid"><label>광역 지역<input aria-label="광역 지역" enterkeyhint="search"
-										autofocus id="filter-sido" inputmode="search" placeholder="시·도, 주 등"
-										type="search"></label><label>도시·행정구역<input aria-label="도시·행정구역"
-										enterkeyhint="search" id="filter-sigungu" inputmode="search"
-										placeholder="시·군·구 등" type="search"></label><label>세부 지역<input
-										aria-label="세부 지역" enterkeyhint="search" id="filter-emd" inputmode="search"
-										placeholder="읍·면·동·리 등" type="search"></label><label>지물 태그<input
-										aria-label="지물 태그" enterkeyhint="search" id="filter-tag" inputmode="search"
-										placeholder="지물 태그" type="search"></label><label>전체주소<input aria-label="전체주소"
+							<div class="filter-grid"><label>광역 지역<input enterkeyhint="search" autofocus id="filter-sido"
+										inputmode="search" placeholder="시·도, 주 등"
+										type="search"></label><label>도시·행정구역<input enterkeyhint="search"
+										id="filter-sigungu" inputmode="search" placeholder="시·군·구 등"
+										type="search"></label><label>세부 지역<input enterkeyhint="search" id="filter-emd"
+										inputmode="search" placeholder="읍·면·동·리 등" type="search"></label><label>지물
+									태그<input enterkeyhint="search" id="filter-tag" inputmode="search"
+										placeholder="지물 태그" type="search"></label><label>전체주소<input
 										enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소"
 										type="search"></label><button class="button" command="--filter-clear"
 									commandfor="app" id="filter-clear" type="button">
@@ -2467,7 +2447,7 @@
 										<path d="M20 7v5h-5M4 17v-5h5" />
 										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
 									</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close"
-									commandfor="filter-dialog" id="filter-close" type="button">완료</button>
+									commandfor="filter-dialog" type="button">완료</button>
 							</div>
 						</dialog>
 					</div>
@@ -2573,9 +2553,8 @@
 								popover="auto">
 								<div class="sheet-heading">
 									<h2 id="map-popover-title">지도에서 열기</h2><button aria-label="지도 선택 닫기"
-										class="icon-button" id="map-popover-close" popovertarget="map-popover"
-										popovertargetaction="hide" type="button"><svg aria-hidden="true"
-											viewBox="0 0 24 24">
+										class="icon-button" popovertarget="map-popover" popovertargetaction="hide"
+										type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 											<path d="m6 6 12 12M6 18 18 6" />
 										</svg></button>
 								</div>
@@ -2622,8 +2601,8 @@
 	<dialog aria-labelledby="settings-title" class="settings" id="display-settings">
 		<div class="sheet-heading">
 			<h2 id="settings-title">화면 설정</h2><button aria-label="화면 설정 닫기" autofocus class="icon-button"
-				command="request-close" commandfor="display-settings" id="settings-close" type="button"><svg
-					aria-hidden="true" viewBox="0 0 24 24">
+				command="request-close" commandfor="display-settings" type="button"><svg aria-hidden="true"
+					viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2645,8 +2624,8 @@
 		<form class="supp-form" id="supp-form" novalidate>
 			<div class="sheet-heading">
 				<h2 id="supp-title">보조 난수값 추가</h2><button aria-label="보조 난수 입력 중단" class="icon-button"
-					command="request-close" commandfor="supp-dialog" id="supp-dismiss" type="button"><svg
-						aria-hidden="true" viewBox="0 0 24 24">
+					command="request-close" commandfor="supp-dialog" type="button"><svg aria-hidden="true"
+						viewBox="0 0 24 24">
 						<path d="m6 6 12 12M6 18 18 6" />
 					</svg></button>
 			</div>
@@ -2658,19 +2637,15 @@
 			</div>
 			<div class="rng-actions">
 				<button class="button" id="generate-supp-dialog" type="button">난수 생성 후 계속</button>
-				<button class="button" command="request-close" commandfor="supp-dialog" type="button">
-					<span>중단</span>
-				</button>
-				<button class="button primary" type="submit">
-					<span>입력 후 계속</span>
-				</button>
+				<button class="button" command="request-close" commandfor="supp-dialog" type="button">중단</button>
+				<button class="button primary" type="submit">입력 후 계속</button>
 			</div>
 		</form>
 	</dialog>
 	<dialog aria-labelledby="sheet-title" id="detail-sheet">
 		<div class="sheet-heading">
 			<h2 id="sheet-title">위치 상세</h2><button aria-label="상세 닫기" class="icon-button" command="close"
-				commandfor="detail-sheet" id="close-detail" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+				commandfor="detail-sheet" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2678,7 +2653,7 @@
 	<dialog aria-labelledby="help-title" id="help-dialog">
 		<div class="sheet-heading">
 			<h2 id="help-title">사용 방법</h2><button aria-label="도움말 닫기" class="icon-button" command="close"
-				commandfor="help-dialog" id="close-help" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+				commandfor="help-dialog" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
 					<path d="m6 6 12 12M6 18 18 6" />
 				</svg></button>
 		</div>
@@ -2724,7 +2699,7 @@
 				target="_blank">Nominatim 사용 정책</a></p>
 		<div class="confirm-actions"><button autofocus class="button" command="close" commandfor="bulk-dialog"
 				id="bulk-cancel" type="button" value="cancel">취소</button><button class="button primary" command="close"
-				commandfor="bulk-dialog" id="bulk-confirm" type="button" value="confirm">일회성 조회 확인</button></div>
+				commandfor="bulk-dialog" type="button" value="confirm">일회성 조회 확인</button></div>
 	</dialog>
 	<div class="ui-notice" hidden id="ui-notice" role="status" aria-atomic="true"><span
 			id="ui-notice-text"></span><button aria-label="알림 닫기" class="icon-button" id="ui-notice-close"
@@ -3319,11 +3294,6 @@
 				applyFilters();
 			}, 80);
 		}
-		function clearFilters() {
-			for (const input of queryAll("input, select", filterControls)) input.value = "";
-			setStatusFilter("all", false);
-			scheduleFilter();
-		}
 		const CSV_HEADER =
 			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소" +
 			MAP_NAMES.map((key) => "," + `지도링크(${key})`).join("");
@@ -3334,7 +3304,6 @@
 			URL.revokeObjectURL(downloadUrl);
 			downloadUrl = null;
 		}
-		on(window, "pagehide", revokeDownloadUrl);
 		function downloadBlob(blob, filename) {
 			revokeDownloadUrl();
 			const url = URL.createObjectURL(blob);
@@ -3426,13 +3395,13 @@
 				scheduleRender();
 				return this.task;
 			},
-			setRecords(records, status = "idle") {
+			setRecords(records) {
 				resetElapsed();
 				this.records = records;
 				resetCountryFilter();
 				this.bulkConfirmed =
 					records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
-				return this.reset(status);
+				this.reset("idle");
 			},
 			setStatus(status) {
 				if (status === "idle")
@@ -3483,9 +3452,8 @@
 			statusAnnouncement.textContent = text || "";
 		}
 		function paintStatus(msg, type) {
-			const el = statusText;
-			if (el.textContent !== msg) el.textContent = msg;
-			el.className = `status ${type === "error" ? "err" : type}`;
+			if (statusText.textContent !== msg) statusText.textContent = msg;
+			statusText.className = `status ${type === "error" ? "err" : type}`;
 		}
 		function showStatus(msg, type = "info") {
 			const nextMsg = String(msg ?? "");
@@ -3616,13 +3584,12 @@
 			const parts = [];
 			let length = 0, trailingCr = false;
 			let skippedLines = 0;
+			const lineLimitMessage = `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`;
 			const append = part => {
 				if (!part) return;
 				length += part.length;
 				if (length > CONFIG.INPUT_LINE_HARD_LIMIT)
-					throw new InputError(
-						`입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
-					);
+					throw new InputError(lineLimitMessage);
 				parts.push(part);
 			};
 			const emit = () => {
@@ -3668,9 +3635,7 @@
 						}
 						if (parts.length === 0) {
 							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
-								throw new InputError(
-									`입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`,
-								);
+								throw new InputError(lineLimitMessage);
 							if (keywordIndex !== -1 && keywordIndex < end) {
 								yield chunk.slice(start, end);
 								keywordIndex = chunk.indexOf("위경도", nextStart);
@@ -3697,10 +3662,6 @@
 				if (trailingCr || length) {
 					const line = emit();
 					if (line.includes("위경도")) yield line;
-					else if (++skippedLines >= 1000) {
-						skippedLines = 0;
-						yield null;
-					}
 				}
 			} finally {
 				signal.removeEventListener("abort", abort);
@@ -3733,10 +3694,9 @@
 					}
 					linesSinceYield = 0;
 				}
-				let invalid = 0;
 				for (const m of line.matchAll(COORD_REGEX)) {
 					if (!m[1]) {
-						invalid++;
+						invalidCount++;
 						continue;
 					}
 					const lat = m[2];
@@ -3744,7 +3704,7 @@
 					const fLat = +lat, fLon = +lon;
 					if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
 						Math.abs(fLat) > 90 || Math.abs(fLon) > 180) {
-						invalid++;
+						invalidCount++;
 						continue;
 					}
 					if (out.length >= CONFIG.BULK_HARD_LIMIT)
@@ -3759,7 +3719,6 @@
 						result: null,
 					});
 				}
-				invalidCount += invalid;
 			}
 			return {records: out, invalidCount};
 		}
@@ -4096,7 +4055,7 @@
 				reader.releaseLock();
 			}
 		}
-		async function fetchWithRetry(url, userSignal, report = () => { }) {
+		async function fetchWithRetry(url, userSignal, report) {
 			const maxRetry = CONFIG.MAX_RETRY;
 			const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
 			let attempt = 0;
@@ -4286,9 +4245,8 @@
 							parsed = parseGeocode(
 								await fetchWithRetry(url, signal, (message, announce) => {
 									if (state.task !== task || state.status !== "running" || signal.aborted) return;
-									const status = message;
-									paintStatus(status, "info");
-									if (announce) announceStatus(status);
+									paintStatus(message, "info");
+									if (announce) announceStatus(message);
 								}),
 							);
 							signal.throwIfAborted();
@@ -4673,7 +4631,11 @@
 				showStatus("중지 중…", "stopped");
 			},
 			"--export": handleExport,
-			"--filter-clear": () => clearFilters(),
+			"--filter-clear": () => {
+				for (const input of queryAll("input, select", filterControls)) input.value = "";
+				setStatusFilter("all", false);
+				scheduleFilter();
+			},
 			"--page-prev": () => shiftPage(-1),
 			"--page-next": () => shiftPage(1),
 		};
@@ -4780,7 +4742,6 @@
 			const [rngCount, generateNum, generateSupp, autoSupp, rngError, generateDialog] =
 				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-error", "generate-supp-dialog"].map(byId);
 			let prepareTimer;
-			on(window, "pagehide", () => clearTimeout(prepareTimer));
 			on(num64Input, "input", () => {
 				clearTimeout(prepareTimer);
 				prepareTimer = setTimeout(() => {
@@ -4899,7 +4860,10 @@
 			};
 			let outputEpoch = 0;
 			let activeWorkerController = null;
-			on(window, "pagehide", () => activeWorkerController?.abort());
+			on(window, "pagehide", () => {
+				clearTimeout(prepareTimer);
+				activeWorkerController?.abort();
+			});
 			setBusy(false);
 			on(runBtn, "click", async () => {
 				const epoch = ++outputEpoch;
@@ -5336,7 +5300,7 @@
 			const editing = active instanceof HTMLInputElement && active.type === "search" &&
 				!active.disabled && !active.readOnly && active.closest("dialog") === filterDialog;
 			const retaining = filterViewportState && (filterDialog.contains(active) || active === document.body);
-			if (!filterViewport || filterViewportPaused || !filterDialog.open ||
+			if (filterViewportPaused || !filterDialog.open ||
 				!filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
 			const {width, height, offsetLeft, offsetTop, scale} = filterViewport;
 			const layoutWidth = innerWidth, layoutHeight = innerHeight;
@@ -5353,7 +5317,7 @@
 			filterViewportState = next;
 		}
 		function scheduleFilterViewport() {
-			if (!filterViewport || filterViewportPaused || (!filterDialog.open && !filterViewportState)) return;
+			if (filterViewportPaused || (!filterDialog.open && !filterViewportState)) return;
 			filterViewportFrame ??= requestAnimationFrame(syncFilterViewport);
 		}
 		if (filterViewport) {
@@ -5366,14 +5330,13 @@
 				scheduleFilterViewport();
 			});
 		}
-		function closeFilters() {if (filterDialog.open) filterDialog.close();}
 		on(filterDialog, "close", clearFilterViewport);
 		if (!("closedBy" in HTMLDialogElement.prototype))
 			on(filterDialog, "click", event => {
 				if (event.target !== filterDialog) return;
 				const r = filterDialog.getBoundingClientRect();
 				if (event.clientX < r.left || event.clientX > r.right ||
-					event.clientY < r.top || event.clientY > r.bottom) closeFilters();
+					event.clientY < r.top || event.clientY > r.bottom) filterDialog.close();
 			});
 		const noticeText = byId("ui-notice-text");
 		const noticeClose = byId("ui-notice-close");
@@ -5570,7 +5533,7 @@
 		enableSheetDrag(mapPopover, () => mapPopover.hidePopover());
 		enableSheetDrag(byId("help-dialog"));
 		enableSheetDrag(settings, closeSettings);
-		enableSheetDrag(filterDialog, closeFilters);
+		enableSheetDrag(filterDialog);
 		on(detailSheet, "close", () => {
 			mapPopover.hidePopover();
 			unloadMap();
@@ -5587,7 +5550,7 @@
 				if (!window.isSecureContext || !navigator.clipboard)
 					throw new Error("복사는 HTTPS 또는 localhost에서 사용할 수 있습니다.");
 				await navigator.clipboard.writeText(address);
-				if (selection === record) showNotice("주소 복사됨", "success");
+				if (selection === record) showNotice("주소 복사됨");
 			} catch (error) {
 				if (selection === record) showNotice(`복사 실패: ${errorMessage(error)}`, "error");
 			}
@@ -5660,6 +5623,7 @@
 			if (helpTrigger.getClientRects().length) helpTrigger.focus(NO_SCROLL);
 		});
 		on(window, "pagehide", () => {
+			revokeDownloadUrl();
 			filterViewportPaused = true;
 			clearFilterViewport();
 			dismissNotice(false);

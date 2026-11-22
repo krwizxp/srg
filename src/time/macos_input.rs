@@ -1,6 +1,5 @@
 use super::{NativeInputSendStatus, TriggerAction};
 use crate::{diagnostic::terminal_safe, write_line_best_effort};
-use alloc::borrow::Cow;
 use core::{
     ffi::c_void,
     mem::offset_of,
@@ -19,8 +18,7 @@ type CGEventTapLocation = u32;
 type CGEventType = u32;
 type CGKeyCode = u16;
 type CGMouseButton = u32;
-type InputError = Cow<'static, str>;
-type InputResult<T> = Result<T, InputError>;
+type InputResult<T> = Result<T, String>;
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct CGPoint {
@@ -57,7 +55,7 @@ impl Drop for Event {
 impl Event {
     fn from_raw(raw_ptr: CGEventRef, context: &str) -> InputResult<Self> {
         let Some(raw) = NonNull::new(raw_ptr) else {
-            return Err(Cow::Owned(format!("{context}: CGEvent 생성 실패")));
+            return Err(format!("{context}: CGEvent 생성 실패"));
         };
         Ok(Self { raw })
     }

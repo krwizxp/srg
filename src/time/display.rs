@@ -16,7 +16,6 @@ const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "�
 const HOUR_SECONDS_I64: i64 = 3_600;
 const MINUTE_SECONDS_I64: i64 = 60;
 const U32_FOUR_DIGIT_THRESHOLD: u32 = 10_000;
-const U32_NEGATIVE_YEAR_SHORT_THRESHOLD: u32 = 1_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
 impl ByteCursor<'_> {
@@ -29,26 +28,16 @@ impl ByteCursor<'_> {
         *self.take_array::<3>() = [digit_byte(hundreds), tens, ones];
     }
     fn write_year_padded4(&mut self, year: i32) {
-        if year >= 0_i32 {
-            let year_value = year.cast_unsigned();
-            if year_value < U32_FOUR_DIGIT_THRESHOLD {
-                let hi = low_u8_from_u32(year_value.div_euclid(U32_THREE_DIGIT_THRESHOLD));
-                let lo = low_u8_from_u32(year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
-                let [h0, h1] = two_digits(hi);
-                let [l0, l1] = two_digits(lo);
-                *self.take_array::<4>() = [h0, h1, l0, l1];
-                return;
-            }
-            self.write_u64_dec(u64::from(year_value));
+        let year_value = year.cast_unsigned();
+        if year_value < U32_FOUR_DIGIT_THRESHOLD {
+            let hi = low_u8_from_u32(year_value.div_euclid(U32_THREE_DIGIT_THRESHOLD));
+            let lo = low_u8_from_u32(year_value.rem_euclid(U32_THREE_DIGIT_THRESHOLD));
+            let [h0, h1] = two_digits(hi);
+            let [l0, l1] = two_digits(lo);
+            *self.take_array::<4>() = [h0, h1, l0, l1];
             return;
         }
-        self.write_byte(b'-');
-        let abs = year.unsigned_abs();
-        if abs < U32_NEGATIVE_YEAR_SHORT_THRESHOLD {
-            self.write_u32_3digits(abs);
-            return;
-        }
-        self.write_u64_dec(u64::from(abs));
+        self.write_u64_dec(u64::from(year_value));
     }
 }
 impl ServerTime {

@@ -34,14 +34,9 @@ pub(super) fn generate_random_float(
     let result = if min_value.to_bits() == max_value.to_bits() {
         min_value
     } else {
-        let value = scale.mul_add(max_value - min_value, min_value);
-        if value > max_value {
-            max_value
-        } else if value < min_value {
-            min_value
-        } else {
-            value
-        }
+        scale
+            .mul_add(max_value - min_value, min_value)
+            .clamp(min_value, max_value)
     };
     writeln!(out, "무작위 실수({min_value} ~ {max_value}): {result}").map_err(Into::into)
 }

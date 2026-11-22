@@ -2,11 +2,12 @@ use self::data::{INDEX as DATA, PARTS};
 use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
-    geo_uniform::{BoundaryAreaBounds, Orientation},
+    geo_uniform::{BoundaryAreaBounds, product_error},
     numeric::low_u16_from_u64,
     random_data::Coordinates,
 };
 use alloc::collections::VecDeque;
+use core::cmp::Ordering;
 use std::sync::{LazyLock, OnceLock};
 mod atlas;
 mod data;
@@ -102,7 +103,7 @@ impl BoundaryIndex {
         if tile.state != 2 {
             return Ok(tile.state == 1);
         }
-        match self.atlas.state(self, point, tile_number)? {
+        match self.atlas.state(self, point, column, row, tile_number)? {
             0 => return Ok(false),
             1 => return Ok(true),
             _ => {}
@@ -127,8 +128,8 @@ impl BoundaryIndex {
                             ^ !endpoints
                                 .partition_point(|edge| *edge <= point.latitude)
                                 .is_multiple_of(2);
-                        if let Some(last) = endpoints.last() {
-                            last_endpoint = Some(*last);
+                        if let Some(&last) = endpoints.last() {
+                            last_endpoint = Some(last);
                         }
                         Ok(())
                     })();
@@ -176,17 +177,59 @@ impl BoundaryIndex {
                                 parity ^= crosses;
                                 continue;
                             }
-                            let side = Orientation::try_from((
-                                start,
-                                end,
-                                [point.longitude, point.latitude],
-                            ))?;
-                            boundary |= side == Orientation::Zero;
+                            let dx = end[0] - start[0];
+                            let dy = end[1] - start[1];
+                            let px = point.longitude - start[0];
+                            let py = point.latitude - start[1];
+                            let left = dx * py;
+                            let right = dy * px;
+                            let approximate = left - right;
+                            let determinant: f64 = if approximate.abs()
+                                > 3.330_669_073_875_471_6e-16_f64 * (left.abs() + right.abs())
+                            {
+                                approximate
+                            } else {
+                                let mut expansion = [0.0_f64; 4];
+                                let mut length = 0_usize;
+                                for mut value in [
+                                    product_error(dx, py, left),
+                                    left,
+                                    -product_error(dy, px, right),
+                                    -right,
+                                ] {
+                                    let mut count = 0_usize;
+                                    let previous = expansion;
+                                    for entry in previous.into_iter().take(length) {
+                                        let total = value + entry;
+                                        let virtual_value = total - value;
+                                        let error = (value - (total - virtual_value))
+                                            + (entry - virtual_value);
+                                        if error != 0.0_f64 {
+                                            *expansion
+                                                .get_mut(count)
+                                                .ok_or("대한민국 경계 좌표 누산 범위 오류")? =
+                                                error;
+                                            count = count.strict_add(1);
+                                        }
+                                        value = total;
+                                    }
+                                    if value != 0.0_f64 || count == 0 {
+                                        *expansion
+                                            .get_mut(count)
+                                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = value;
+                                        count = count.strict_add(1);
+                                    }
+                                    length = count;
+                                }
+                                expansion.iter().take(length).sum()
+                            };
+                            let side = determinant.partial_cmp(&0.0_f64);
+                            boundary |= side == Some(Ordering::Equal);
                             parity ^= crosses
                                 && if end[1] > start[1] {
-                                    side == Orientation::Positive
+                                    side == Some(Ordering::Greater)
                                 } else {
-                                    side == Orientation::Negative
+                                    side == Some(Ordering::Less)
                                 };
                         }
                         Ok(())
@@ -258,6 +301,7 @@ impl BoundaryIndex {
             }
             1 => {
                 let first = read_count(raw, 32)?;
+                let hole = read_u32(raw, 36)?;
                 (count > 0
                     && count <= 1024
                     && field_a < self.ring_count
@@ -265,7 +309,7 @@ impl BoundaryIndex {
                     && first
                         .checked_add(count)
                         .is_some_and(|end| end < self.vertex_count)
-                    && read_u32(raw, 36)? <= 1
+                    && hole <= 1
                     && length == 40_usize.strict_add(count.strict_add(1).strict_mul(16)))
                 .ok_or("대한민국 경계 링 인덱스 오류")?;
                 let words = count.strict_add(1).strict_mul(2);
@@ -316,7 +360,7 @@ impl BoundaryIndex {
                     decoded: DecodedPage::Chain {
                         ring: field_a,
                         owner: field_b,
-                        hole: read_u32(raw, 36)?,
+                        hole,
                         first,
                         vertices: vertices.into_boxed_slice(),
                     },
@@ -619,8 +663,6 @@ impl SampleState<'_> {
         if self.is_complete() {
             return Ok(());
         }
-        (self.supplemental_reads != KOREA_SUPP_RETRY_LIMIT)
-            .ok_or("대한민국 좌표 보완 난수 시도 횟수 초과")?;
         self.supplemental_reads = self.supplemental_reads.strict_add(1);
         self.try_word(value)?;
         (self.supplemental_reads != KOREA_SUPP_RETRY_LIMIT || self.is_complete())

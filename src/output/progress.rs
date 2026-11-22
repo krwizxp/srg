@@ -37,7 +37,7 @@ impl ProgressBuffers {
     ) -> Result<()> {
         let elapsed_millis = elapsed.as_millis();
         let elapsed_deci = elapsed_millis.div_euclid(ELAPSED_MILLIS_PER_DECI);
-        let eta_deci = if total == 0 || completed == total {
+        let eta_deci = if completed == total {
             Some(0)
         } else if completed == 0 {
             None
@@ -49,14 +49,10 @@ impl ProgressBuffers {
         };
         format_time_into(Some(elapsed_deci), &mut self.elapsed);
         format_time_into(eta_deci, &mut self.eta);
-        let percent_value = if total == 0 {
-            PERCENT_SCALE
-        } else {
-            completed
-                .strict_mul(PERCENT_SCALE)
-                .div_euclid(total)
-                .min(PERCENT_SCALE)
-        };
+        let percent_value = completed
+            .strict_mul(PERCENT_SCALE)
+            .div_euclid(total)
+            .min(PERCENT_SCALE);
         let filled = percent_value.div_euclid(PERCENT_SCALE.div_euclid(BAR_WIDTH));
         let [percent, ..] = percent_value.to_le_bytes();
         let mut cur = ByteCursor::new(&mut self.line);

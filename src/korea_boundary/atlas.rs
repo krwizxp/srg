@@ -24,11 +24,10 @@ impl Atlas<'_> {
         &self,
         boundary: &BoundaryIndex,
         point: &Coordinates,
+        column: usize,
+        row: usize,
         tile_number: usize,
     ) -> Result<u8> {
-        let width = boundary.columns.len().strict_sub(1);
-        let column = tile_number.rem_euclid(width);
-        let row = tile_number.div_euclid(width);
         let west = *boundary
             .columns
             .get(column)

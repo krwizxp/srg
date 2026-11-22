@@ -193,11 +193,11 @@ impl TryFrom<&Path> for OutputFile {
                 let body = record.strip_suffix(b"\n").ok_or_else(|| {
                     AppError::message("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")
                 })?;
-                let mut lines = body.split(|&byte| byte == b'\n');
-                let first = lines.next().unwrap_or_else(|| process::abort());
-                let (record_line_count, last) = lines.fold((1_usize, first), |(count, _), line| {
-                    (count.strict_add(1), line)
-                });
+                let (record_line_count, last) = body
+                    .split(|&byte| byte == b'\n')
+                    .fold((0_usize, [].as_slice()), |(count, _), line| {
+                        (count.strict_add(1), line)
+                    });
                 let final_value_is_valid =
                     last.strip_prefix(FILE_RECORD_FINAL_LABEL)
                         .is_some_and(|value| {

@@ -58,8 +58,7 @@ impl HardwareRng {
         if self.rdrand_supported
             && let Ok(fallback) = Self::rdrand_random()
         {
-            self.fallback_notice_pending
-                .fetch_or(true, Ordering::Release);
+            self.fallback_notice_pending.store(true, Ordering::Release);
             return Ok(fallback);
         }
         if Self::try_rdseed(&mut value) {
@@ -84,8 +83,7 @@ impl HardwareRng {
             if self.rdrand_supported
                 && let Ok(fallback) = Self::rdrand_random()
             {
-                self.fallback_notice_pending
-                    .fetch_or(true, Ordering::Release);
+                self.fallback_notice_pending.store(true, Ordering::Release);
                 return Ok(fallback);
             }
             match self.source() {
@@ -98,8 +96,7 @@ impl HardwareRng {
         }
         self.rdseed_active.store(false, Ordering::Relaxed);
         if self.rdrand_supported {
-            self.fallback_notice_pending
-                .fetch_or(true, Ordering::Release);
+            self.fallback_notice_pending.store(true, Ordering::Release);
             return Self::rdrand_random();
         }
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())

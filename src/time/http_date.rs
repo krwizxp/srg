@@ -95,7 +95,8 @@ impl FromStr for HttpDate {
             }
         };
         let day_index = parse_result_with_context(i32::try_from(day_index_i64), ERR_LOCAL_YEAR)?;
-        let current_year = civil_from_days(day_index).year;
+        let current_date = civil_from_days(day_index);
+        let current_year = current_date.year;
         let mut parts = raw_date.split_ascii_whitespace();
         let (weekday_token, date_token, time_token, tz_token) = (
             next_date_part(&mut parts, ERR_RFC850_FORMAT)?,
@@ -133,7 +134,6 @@ impl FromStr for HttpDate {
         let cutoff_year = current_year.strict_add(RFC850_CENTURY_CUTOFF_OFFSET);
         let past_cutoff = year > cutoff_year
             || year == cutoff_year && {
-                let current_date = civil_from_days(day_index);
                 let date_order = (month.number, day).cmp(&(current_date.month, current_date.day));
                 if date_order.is_eq() {
                     let clock = [
@@ -282,7 +282,6 @@ fn parse_http_date_time(
         .strict_add(day_of_era)
         .strict_sub(DAYS_UNTIL_UNIX_EPOCH_I64);
     let actual_weekday = days
-        .rem_euclid(DAYS_PER_WEEK_I64)
         .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
         .rem_euclid(DAYS_PER_WEEK_I64);
     (actual_weekday == i64::from(weekday)).ok_or_else(|| TimeError::parse(ERR_WEEKDAY))?;

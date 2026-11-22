@@ -39,7 +39,7 @@ struct Bits<'data> {
     cursor: usize,
 }
 struct Huffman {
-    counts: [u32; 16],
+    counts: [u16; 16],
     quick: [u16; 512],
     symbols: [u16; 288],
 }
@@ -120,11 +120,12 @@ impl Huffman {
             *count = count.strict_add(1);
         }
         let mut remaining = 1_u32;
-        let mut offsets = [0_u32; 16];
+        let mut offsets = [0_u16; 16];
         for length in 1_usize..16 {
+            let length_count = *result.counts.get(length).ok_or("경계 압축 코드 오류")?;
             remaining = remaining
                 .strict_mul(2)
-                .checked_sub(*result.counts.get(length).ok_or("경계 압축 코드 오류")?)
+                .checked_sub(u32::from(length_count))
                 .ok_or("경계 압축 코드가 중복됩니다.")?;
             if length > 1 {
                 *offsets.get_mut(length).ok_or("경계 압축 코드 오류")? = offsets
@@ -147,42 +148,36 @@ impl Huffman {
             let offset = offsets
                 .get_mut(usize::from(length))
                 .ok_or("경계 압축 코드 오류")?;
-            let index = usize::try_from(*offset)
-                .map_err(|source| format!("경계 압축 코드 위치 오류: {source}"))?;
             *result
                 .symbols
-                .get_mut(index)
+                .get_mut(usize::from(*offset))
                 .ok_or("경계 압축 코드 위치 오류")? =
                 u16::try_from(symbol).map_err(|source| format!("경계 압축 심볼 오류: {source}"))?;
             *offset = offset.strict_add(1);
         }
-        let mut first = 0_u32;
+        let mut first = 0_u16;
         let mut index = 0_usize;
-        for length in 1_u32..=9 {
+        for length in 1_u16..=9 {
             let count = *result
                 .counts
-                .get(usize::try_from(length).map_err(|source| format!("{source}"))?)
+                .get(usize::from(length))
                 .ok_or("경계 압축 코드 길이 오류")?;
             for offset in 0..count {
-                let symbol_index = index
-                    .strict_add(usize::try_from(offset).map_err(|source| format!("{source}"))?);
                 let symbol = *result
                     .symbols
-                    .get(symbol_index)
+                    .get(index.strict_add(usize::from(offset)))
                     .ok_or("경계 압축 심볼 위치 오류")?;
-                let packed = u16::try_from((length << 9_u32) | u32::from(symbol))
-                    .map_err(|source| format!("{source}"))?;
-                let reversed =
-                    first.strict_add(offset).reverse_bits() >> u32::BITS.strict_sub(length);
-                let begin = usize::try_from(reversed).map_err(|source| format!("{source}"))?;
-                for slot in (begin..512).step_by(1_usize << length) {
+                let packed = (length << 9_u16) | symbol;
+                let reversed = first.strict_add(offset).reverse_bits()
+                    >> u16::BITS.strict_sub(u32::from(length));
+                for slot in (usize::from(reversed)..512).step_by(1_usize << length) {
                     *result
                         .quick
                         .get_mut(slot)
                         .ok_or("경계 압축 조회 위치 오류")? = packed;
                 }
             }
-            index = index.strict_add(usize::try_from(count).map_err(|source| format!("{source}"))?);
+            index = index.strict_add(usize::from(count));
             first = first.strict_add(count).strict_mul(2);
         }
         Ok(result)
@@ -201,9 +196,10 @@ impl Huffman {
         let mut code = 0_u32;
         let mut first = 0_u32;
         let mut index = 0_u32;
-        for count in self.counts.iter().skip(1) {
+        for &entry_count in self.counts.iter().skip(1) {
             code |= bits.read(1)?;
-            if code < first.strict_add(*count) {
+            let count = u32::from(entry_count);
+            if code < first.strict_add(count) {
                 let position = usize::try_from(index.strict_add(code.strict_sub(first)))
                     .map_err(|source| format!("경계 압축 코드 위치 오류: {source}"))?;
                 return self
@@ -212,8 +208,8 @@ impl Huffman {
                     .copied()
                     .ok_or_else(|| "경계 압축 코드 위치 오류".into());
             }
-            index = index.strict_add(*count);
-            first = first.strict_add(*count).strict_mul(2);
+            index = index.strict_add(count);
+            first = first.strict_add(count).strict_mul(2);
             code <<= 1_u32;
         }
         Err("경계 압축 허프먼 코드 오류".into())
@@ -337,8 +333,7 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             written = written.strict_add(1);
                             continue;
                         }
-                        let index =
-                            usize::from(symbol.checked_sub(257).ok_or("경계 압축 길이 코드 오류")?);
+                        let index = usize::from(symbol.strict_sub(257));
                         let length = LENGTH_BASE
                             .get(index)
                             .ok_or("경계 압축 길이 코드 오류")?
@@ -367,23 +362,13 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             .ok_or("경계 압축 참조 위치 오류")?;
                         (written.strict_add(length) <= output.len())
                             .ok_or("경계 압축 출력 한도 오류")?;
-                        if backward >= length {
-                            output.copy_within(
-                                source_start..source_start.strict_add(length),
-                                written,
-                            );
-                            written = written.strict_add(length);
-                        } else {
-                            let mut copied = 0_usize;
-                            while copied < length {
-                                let step = backward.max(copied).min(length.strict_sub(copied));
-                                output.copy_within(
-                                    source_start..source_start.strict_add(step),
-                                    written,
-                                );
-                                written = written.strict_add(step);
-                                copied = copied.strict_add(step);
-                            }
+                        let mut copied = 0_usize;
+                        while copied < length {
+                            let step = backward.max(copied).min(length.strict_sub(copied));
+                            output
+                                .copy_within(source_start..source_start.strict_add(step), written);
+                            written = written.strict_add(step);
+                            copied = copied.strict_add(step);
                         }
                     }
                 }

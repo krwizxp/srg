@@ -59,10 +59,16 @@ const HTTP_HEAD_MAX_HEADER_BYTES_DWORD: u32 = 64 * 1024;
 const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
 const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
 const WINHTTP_TIMEOUT_MILLIS: i32 = 5_000;
-const USER_AGENT_CAPACITY: usize = "Rust-Time-Sync"
-    .len()
-    .strict_add(concat!("srg/", env!("CARGO_PKG_VERSION")).len())
-    .strict_add(1);
+const USER_AGENT_CAPACITY: usize = {
+    let primary = "Rust-Time-Sync".len();
+    let fallback = concat!("srg/", env!("CARGO_PKG_VERSION")).len();
+    (if primary > fallback {
+        primary
+    } else {
+        fallback
+    })
+    .strict_add(1)
+};
 enum WinHttpHandle {}
 type HInternet = *mut WinHttpHandle;
 #[derive(Default)]
@@ -171,9 +177,7 @@ impl Client {
                 0,
             )
         };
-        let handle = NonNull::new(raw_connect)
-            .map(Handle)
-            .ok_or_else(|| Self::last_error("WinHttpConnect", context))?;
+        let handle = Self::non_null_handle(raw_connect, "WinHttpConnect", context)?;
         let connect = handle.0;
         cache.connect = Some(handle);
         Ok(connect)

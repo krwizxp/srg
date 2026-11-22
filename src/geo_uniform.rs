@@ -13,13 +13,6 @@ pub(super) struct BoundaryAreaBounds {
     south_area: f64,
     west: f64,
 }
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub(super) enum Orientation {
-    Negative,
-    Positive,
-    Unordered,
-    Zero,
-}
 impl TryFrom<[f64; 4]> for BoundaryAreaBounds {
     type Error = AppError;
     fn try_from(bounds: [f64; 4]) -> Result<Self> {
@@ -70,63 +63,6 @@ impl TryFrom<(u64, BoundaryAreaBounds)> for Coordinates {
         Ok(Self {
             latitude,
             longitude,
-        })
-    }
-}
-impl TryFrom<([f64; 2], [f64; 2], [f64; 2])> for Orientation {
-    type Error = AppError;
-    fn try_from((start, end, point): ([f64; 2], [f64; 2], [f64; 2])) -> Result<Self> {
-        let dx = end[0] - start[0];
-        let dy = end[1] - start[1];
-        let px = point[0] - start[0];
-        let py = point[1] - start[1];
-        let left = dx * py;
-        let right = dy * px;
-        let approximate = left - right;
-        let determinant: f64 =
-            if approximate.abs() > 3.330_669_073_875_471_6e-16_f64 * (left.abs() + right.abs()) {
-                approximate
-            } else {
-                let mut expansion = [0.0_f64; 4];
-                let mut length = 0_usize;
-                for mut value in [
-                    product_error(dx, py, left),
-                    left,
-                    -product_error(dy, px, right),
-                    -right,
-                ] {
-                    let mut count = 0_usize;
-                    let previous = expansion;
-                    for entry in previous.into_iter().take(length) {
-                        let total = value + entry;
-                        let virtual_value = total - value;
-                        let error = (value - (total - virtual_value)) + (entry - virtual_value);
-                        if error != 0.0_f64 {
-                            *expansion
-                                .get_mut(count)
-                                .ok_or("대한민국 경계 좌표 누산 범위 오류")? = error;
-                            count = count.strict_add(1);
-                        }
-                        value = total;
-                    }
-                    if value != 0.0_f64 || count == 0 {
-                        *expansion
-                            .get_mut(count)
-                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = value;
-                        count = count.strict_add(1);
-                    }
-                    length = count;
-                }
-                expansion.iter().take(length).sum()
-            };
-        Ok(if determinant < 0.0_f64 {
-            Self::Negative
-        } else if determinant > 0.0_f64 {
-            Self::Positive
-        } else if determinant == 0.0_f64 {
-            Self::Zero
-        } else {
-            Self::Unordered
         })
     }
 }
@@ -184,7 +120,7 @@ fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
     let denominator_squared = denominator * denominator;
     (sine * polynomial, numerator / denominator_squared)
 }
-fn product_error(left: f64, right: f64, product: f64) -> f64 {
+pub(super) fn product_error(left: f64, right: f64, product: f64) -> f64 {
     let split_left = 134_217_729.0_f64 * left;
     let ah = split_left - (split_left - left);
     let al = left - ah;

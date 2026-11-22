@@ -513,14 +513,8 @@ impl PortalSession {
     fn error_message(&self) -> InputError {
         // SAFETY: context is live and owns the returned NUL-terminated error string.
         let raw_error = unsafe { (self.api.get_error_message)(self.context.as_ptr()) };
-        if raw_error.is_null() {
-            return Cow::Borrowed("liboeffis 연결이 종료되었습니다.");
-        }
-        // SAFETY: liboeffis returned a non-null NUL-terminated string owned by the context.
-        unsafe { CStr::from_ptr(raw_error) }
-            .to_string_lossy()
-            .into_owned()
-            .into()
+        // SAFETY: raw_error is either null or a valid NUL-terminated C string owned by context.
+        unsafe { cstr_or_default(raw_error, "liboeffis 연결이 종료되었습니다.") }
     }
     fn poll_fd(&self) -> InputResult<c_int> {
         // SAFETY: context is a live liboeffis context.
@@ -747,17 +741,21 @@ impl WaylandInput {
         ))
     }
 }
-fn dl_error_message() -> InputError {
-    // SAFETY: dlerror has no preconditions and returns a thread-local C string or null.
-    let raw_error = unsafe { sys::dlerror() };
+unsafe fn cstr_or_default(raw_error: *const c_char, fallback: &'static str) -> InputError {
     if raw_error.is_null() {
-        return Cow::Borrowed("알 수 없는 dynamic loader 오류");
+        return Cow::Borrowed(fallback);
     }
-    // SAFETY: dlerror returned a non-null NUL-terminated C string.
+    // SAFETY: caller guarantees raw_error is a valid NUL-terminated C string.
     unsafe { CStr::from_ptr(raw_error) }
         .to_string_lossy()
         .into_owned()
         .into()
+}
+fn dl_error_message() -> InputError {
+    // SAFETY: dlerror has no preconditions and returns a thread-local C string or null.
+    let raw_error = unsafe { sys::dlerror() };
+    // SAFETY: raw_error is either null or a valid NUL-terminated thread-local C string.
+    unsafe { cstr_or_default(raw_error, "알 수 없는 dynamic loader 오류") }
 }
 fn poll_timeout_until(deadline: Instant, now: Instant) -> c_int {
     let remaining = deadline.saturating_duration_since(now).min(POLL_INTERVAL);

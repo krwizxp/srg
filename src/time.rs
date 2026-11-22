@@ -259,7 +259,7 @@ impl Activity {
             next_sample_at: now,
             pending_generation: None,
             previous_sample: None,
-            rtt_nanos: [u128::MAX; NUM_SAMPLES],
+            rtt_nanos: [0; NUM_SAMPLES],
             started: false,
         }))
     }
@@ -334,12 +334,12 @@ impl TriggerTimingPolicy {
         effective_rtt: Duration,
         server_time: ServerTime,
     ) -> Result<()> {
-        (sample.rtt != Duration::ZERO && sample.rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(
-            TimeError::parse("최종 샘플 RTT가 허용 범위를 벗어났습니다."),
-        )?;
-        (effective_rtt != Duration::ZERO && effective_rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(
-            TimeError::parse("액션에 사용하는 RTT가 허용 범위를 벗어났습니다."),
-        )?;
+        (sample.rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(TimeError::parse(
+            "최종 샘플 RTT가 허용 범위를 벗어났습니다.",
+        ))?;
+        (effective_rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(TimeError::parse(
+            "액션에 사용하는 RTT가 허용 범위를 벗어났습니다.",
+        ))?;
         let &mut Self::UnauthenticatedHttp(ref mut guard) = self else {
             return Ok(());
         };
@@ -655,10 +655,7 @@ impl AppState<'_> {
         if current_dur.as_secs().checked_sub(prev_dur.as_secs()) != Some(1) {
             return Ok(None);
         }
-        let anchor_time = current_sample
-            .server_time
-            .checked_sub(Duration::from_nanos(u64::from(current_dur.subsec_nanos())))
-            .ok_or_else(|| TimeError::parse("정밀 보정 기준 서버 시각 계산 실패"))?;
+        let anchor_time = current_sample.server_time;
         let one_way_delay =
             TriggerTimingPolicy::AuthenticatedHttps.one_way_delay(current_sample.rtt);
         let anchor_instant = current_sample
@@ -975,14 +972,12 @@ impl AppState<'_> {
         let attempt_index = baseline.attempts;
         let next_sample_base = match result {
             Ok(sample) => {
-                if sample.rtt > Duration::ZERO {
-                    let Some(slot) = baseline.rtt_nanos.get_mut(attempt_index) else {
-                        process::abort();
-                    };
-                    *slot = sample.rtt.as_nanos();
-                    baseline.previous_sample = Some(sample);
-                    baseline.had_previous_sample = true;
-                }
+                let Some(slot) = baseline.rtt_nanos.get_mut(attempt_index) else {
+                    process::abort();
+                };
+                *slot = sample.rtt.as_nanos();
+                baseline.previous_sample = Some(sample);
+                baseline.had_previous_sample = true;
                 sample.response_received_inst
             }
             Err(err) => {
@@ -1001,16 +996,10 @@ impl AppState<'_> {
         if baseline.attempts < NUM_SAMPLES {
             return ActivityTransition::stay(Activity::MeasureBaselineRtt(baseline));
         }
-        let Some(previous_sample) = baseline.previous_sample else {
-            return transition_to_retry(
-                "유효한 RTT 샘플을 얻지 못했습니다.",
-                baseline.had_previous_sample,
-            );
-        };
+        let previous_sample = baseline.previous_sample.unwrap_or_else(|| process::abort());
         baseline.rtt_nanos.sort_unstable();
-        let sample_count = baseline.rtt_nanos.partition_point(|&rtt| rtt != u128::MAX);
-        let trim = sample_count.div_euclid(RTT_TRIM_DIVISOR);
-        let trimmed_sample_count = sample_count.strict_sub(trim.strict_mul(2));
+        let trim = NUM_SAMPLES.div_euclid(RTT_TRIM_DIVISOR);
+        let trimmed_sample_count = NUM_SAMPLES.strict_sub(trim.strict_mul(2));
         let sum_nanos = baseline
             .rtt_nanos
             .iter()
@@ -1512,14 +1501,11 @@ fn append_error_detail(target: &mut String, prefix: &str, err: impl fmt::Display
 }
 fn final_countdown_sample_interval(remaining: Option<Duration>) -> Duration {
     match remaining {
-        Some(duration) if duration <= Duration::from_secs(1) => {
-            FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL
+        Some(duration) if duration > Duration::from_secs(3) => {
+            FINAL_COUNTDOWN_SAMPLE_NORMAL_INTERVAL
         }
-        Some(duration) if duration <= Duration::from_secs(3) => {
-            FINAL_COUNTDOWN_SAMPLE_FAST_INTERVAL
-        }
-        Some(_) => FINAL_COUNTDOWN_SAMPLE_NORMAL_INTERVAL,
-        None => FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL,
+        Some(duration) if duration > Duration::from_secs(1) => FINAL_COUNTDOWN_SAMPLE_FAST_INTERVAL,
+        _ => FINAL_COUNTDOWN_SAMPLE_FINAL_INTERVAL,
     }
 }
 fn strict_server_deadline(server_time: ServerTime, target_time: SystemTime) -> Result<Instant> {

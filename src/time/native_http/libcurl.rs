@@ -235,17 +235,16 @@ impl Client {
             return Err(error(context, callback_error));
         }
         if perform_code != CURLE_OK {
-            let perform_error: Cow<'static, str> = if let Ok(message_cstr) =
-                CStr::from_bytes_until_nul(&error_buffer)
+            let perform_error = if let Ok(message_cstr) = CStr::from_bytes_until_nul(&error_buffer)
                 && !message_cstr.is_empty()
             {
-                Cow::Owned(format!(
+                format!(
                     "curl_easy_perform 실패: {} ({})",
                     message_cstr.to_string_lossy(),
                     perform_code
-                ))
+                )
             } else {
-                Cow::Owned(curl_error("curl_easy_perform", perform_code))
+                curl_error("curl_easy_perform", perform_code)
             };
             self.easy_handle = None;
             return Err(error(context, perform_error));

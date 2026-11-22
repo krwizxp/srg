@@ -9,11 +9,11 @@ use self::{
 };
 use core::fmt;
 #[cfg(target_arch = "x86_64")]
-use std::io::stderr;
+use std::io::{Write as _, stderr};
 use std::{
     env,
     ffi::OsStr,
-    io::{self, IsTerminal as TerminalDetect, Write as _},
+    io::{self, IsTerminal as TerminalDetect},
     path::Path,
     sync::LazyLock,
 };
@@ -46,8 +46,6 @@ const FILE_RECORD_LINE_COUNT: usize = 17;
 const FILE_RECORD_START: &[u8] = "64비트 난수: ".as_bytes();
 static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| TerminalDetect::is_terminal(&io::stdout()));
 const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
-const APP_NAME: &str = env!("CARGO_PKG_NAME");
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " ",
@@ -94,8 +92,9 @@ fn main() -> Result<()> {
             if let Some(extra) = args.next() {
                 return Err(unknown_option("알 수 없는 --version 옵션", &extra));
             }
-            let mut out = io::stdout().lock();
-            writeln!(out, "{APP_NAME} {APP_VERSION}")?;
+            output::write_slice_to_console(
+                concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n").as_bytes(),
+            )?;
             return Ok(());
         }
         return CliCommand::try_from((first, args))?.execute();

@@ -49,10 +49,10 @@ fn main() -> io::Result<()> {
     let artifacts = Path::new("artifacts");
     let random_data = artifacts.join("random_data.txt");
     fs::create_dir_all(artifacts)?;
-    match fs::remove_file(&random_data) {
-        Ok(()) => {}
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-        Err(source) => return Err(source),
+    if let Err(source) = fs::remove_file(&random_data)
+        && source.kind() != io::ErrorKind::NotFound
+    {
+        return Err(source);
     }
     let mut binary = env::var_os("CARGO_TARGET_DIR")
         .map_or_else(|| PathBuf::from("target"), PathBuf::from)
@@ -73,15 +73,13 @@ fn main() -> io::Result<()> {
         .status
         .success()
         .ok_or_else(|| io::Error::other("selected SRG action failed"))?;
-    output_check
-        .is_none_or(|expected| {
-            output
-                .stdout
-                .windows(expected.len())
-                .any(|window| window == expected.as_bytes())
-        })
-        .ok_or_else(|| io::Error::other("selected SRG action produced no expected output"))?;
-    if output_check.is_none() {
+    if let Some(expected) = output_check {
+        output
+            .stdout
+            .windows(expected.len())
+            .any(|window| window == expected.as_bytes())
+            .ok_or_else(|| io::Error::other("selected SRG action produced no expected output"))?;
+    } else {
         (fs::metadata(&random_data)?.len() > 3)
             .ok_or_else(|| io::Error::other("SRG generated no random data"))?;
     }

@@ -85,18 +85,6 @@ fn write_worker_chunk(
     chunk.written_len = 0;
     Ok(())
 }
-fn print_final_progress(
-    out: &mut dyn Write,
-    completed: usize,
-    requested: usize,
-    elapsed: Duration,
-) -> Result<()> {
-    if !*IS_TERMINAL {
-        return Ok(());
-    }
-    let mut buffers = output::progress::ProgressBuffers::new();
-    buffers.print(out, completed, requested, elapsed)
-}
 pub(super) fn regenerate_with_count(
     output_file: &mut OutputFile,
     rng: &HardwareRng,
@@ -232,7 +220,7 @@ pub(super) fn regenerate_with_count(
                     last_progress = Instant::now();
                 }
             }
-            let rng_guard = DropGuard::new(&*rng, |active_rng| {
+            let rng_guard = DropGuard::new(rng, |active_rng| {
                 active_rng.set_pending_read_interruption(false);
             });
             rng_guard.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
@@ -275,15 +263,21 @@ pub(super) fn regenerate_with_count(
             failure.first_error,
         ));
     }
+    let completed_count = if user_cancelled {
+        processed.load(Ordering::Relaxed)
+    } else {
+        requested_count
+    };
+    if *IS_TERMINAL {
+        let mut buffers = output::progress::ProgressBuffers::new();
+        buffers.print(out, completed_count, requested_count, start_time.elapsed())?;
+    }
     if user_cancelled {
-        let completed_count = processed.load(Ordering::Relaxed);
-        print_final_progress(out, completed_count, requested_count, start_time.elapsed())?;
         writeln!(
             out,
             "\nEnter 입력으로 작업을 중단했습니다. 총 {completed_count}건이 {FILE_NAME}에 기록되었습니다.\n"
         )?;
     } else {
-        print_final_progress(out, requested_count, requested_count, start_time.elapsed())?;
         writeln!(
             out,
             "\n총 {requested_count}건 생성 완료 ({FILE_NAME} 에 추가).\n"

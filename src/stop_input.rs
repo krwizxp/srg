@@ -55,7 +55,7 @@ cfg_select! {
     }
     any(target_os = "linux", target_os = "macos") => {
         const POLL_DESCRIPTOR_COUNT: PollDescriptorCount = 1;
-        const POLL_ERROR_EVENTS: c_short = 0x0038;
+        const POLL_ERROR_EVENTS: c_short = 0x0028;
         const POLLHUP: c_short = 0x0010;
         const POLLIN: c_short = 0x0001;
     }

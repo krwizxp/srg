@@ -25,17 +25,14 @@ impl FreshTimeHeaders {
     fn capture_age(&mut self, raw: &str) {
         self.age_result = Some(if self.age_result.is_some() {
             Err("Age 헤더가 여러 개입니다.")
+        } else if raw.is_empty() {
+            Err("Age 헤더 값이 비어 있습니다.")
+        } else if let Some(nonzero) = raw.bytes().try_fold(false, |nonzero, byte| {
+            byte.is_ascii_digit().then_some(nonzero || byte != b'0')
+        }) {
+            (!nonzero).ok_or("Age 헤더가 0보다 커 캐시된 응답입니다.")
         } else {
-            let trimmed = raw.trim_ascii();
-            if trimmed.is_empty() {
-                Err("Age 헤더 값이 비어 있습니다.")
-            } else if let Some(nonzero) = trimmed.bytes().try_fold(false, |nonzero, byte| {
-                byte.is_ascii_digit().then_some(nonzero || byte != b'0')
-            }) {
-                (!nonzero).ok_or("Age 헤더가 0보다 커 캐시된 응답입니다.")
-            } else {
-                Err("Age 헤더 값이 숫자가 아닙니다.")
-            }
+            Err("Age 헤더 값이 숫자가 아닙니다.")
         });
     }
     fn capture_date(&mut self, raw: &str, received_at: Instant) {

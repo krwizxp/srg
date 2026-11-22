@@ -93,7 +93,7 @@ impl OutputFormatter<'_, '_, '_> {
                 buffer_cur.write_bytes(glyph.as_bytes());
                 glyph_bits <<= 4_u32;
             }
-            buffer_cur.write_bytes(b")");
+            buffer_cur.write_byte(b')');
         });
         self.write_labeled_line(FILE_RECORD_FINAL_LABEL, |buffer_cur| {
             buffer_cur.write_bytes(&hex_u16(data.galaxy_x));

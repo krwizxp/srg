@@ -155,8 +155,8 @@ impl MenuApp {
             LadderEntryMode::Results { expected_count: n },
         )?;
         write_ladder_results(
-            players_storage.trim().split(',').map(str::trim),
-            results_storage.trim().split(',').map(str::trim),
+            players_storage.split(',').map(str::trim),
+            results_storage.split(',').map(str::trim),
             &self.rng,
             out,
         )
@@ -167,7 +167,6 @@ impl MenuApp {
         err: &mut dyn Write,
     ) -> Result<()> {
         writeln!(out, "\nnum_64/supp 수동 입력 변환 모드")?;
-        self.input_buffer.clear();
         let manual_num_64 = read_u64_hex_input(
             format_args!(
                 "num_64를 입력해 주세요 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}): ",

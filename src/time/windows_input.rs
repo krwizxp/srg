@@ -67,26 +67,51 @@ assert_ffi_layout!(
 assert_ffi_layout!(Input, 40, 8, r#type: 0, union: 8);
 impl TriggerAction {
     pub(super) fn send(self, err: &mut dyn Write) -> NativeInputSendStatus {
-        match self {
-            Self::LeftClick => {
-                let release = mouse_input(MOUSEEVENTF_LEFTUP);
-                let inputs = [mouse_input(MOUSEEVENTF_LEFTDOWN), release];
-                send_input_events(inputs, err)
+        let inputs = match self {
+            Self::LeftClick => [
+                mouse_input(MOUSEEVENTF_LEFTDOWN),
+                mouse_input(MOUSEEVENTF_LEFTUP),
+            ],
+            Self::F5Press => [
+                keyboard_input(KEYEVENTF_KEYDOWN),
+                keyboard_input(KEYEVENTF_KEYUP),
+            ],
+        };
+        // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
+        let sent = unsafe { SendInput(INPUT_EVENT_COUNT, inputs.as_ptr(), INPUT_SIZE) };
+        if sent == INPUT_EVENT_COUNT {
+            return NativeInputSendStatus::Sent;
+        }
+        write_line_best_effort(
+            err,
+            format_args!(
+                "[경고] Windows 입력 이벤트 전송 실패: 요청 {INPUT_EVENT_COUNT}, 전송 {sent}"
+            ),
+        );
+        if sent == 1 {
+            let [_press, release_input] = inputs;
+            // SAFETY: `release_input` is a valid one-element INPUT pointer and `INPUT_SIZE` matches the Rust representation.
+            let release_sent = unsafe { SendInput(1, &raw const release_input, INPUT_SIZE) };
+            if release_sent != 1 {
+                write_line_best_effort(
+                    err,
+                    format_args!("[경고] Windows 입력 release 이벤트 전송 실패"),
+                );
             }
-            Self::F5Press => {
-                let release = keyboard_input(VK_F5, KEYEVENTF_KEYUP);
-                let inputs = [keyboard_input(VK_F5, KEYEVENTF_KEYDOWN), release];
-                send_input_events(inputs, err)
-            }
+        }
+        if sent == 0 {
+            NativeInputSendStatus::FailedBeforeSend
+        } else {
+            NativeInputSendStatus::PartialOrUnknown
         }
     }
 }
-fn keyboard_input(w_vk: u16, dw_flags: u32) -> Input {
+fn keyboard_input(dw_flags: u32) -> Input {
     Input {
         r#type: INPUT_KEYBOARD,
         union: InputUnion {
             ki: KeybdInput {
-                w_vk,
+                w_vk: VK_F5,
                 dw_flags,
                 ..Default::default()
             },
@@ -102,32 +127,5 @@ fn mouse_input(dw_flags: u32) -> Input {
                 ..Default::default()
             },
         },
-    }
-}
-fn send_input_events(inputs: [Input; 2], err: &mut dyn Write) -> NativeInputSendStatus {
-    // SAFETY: `inputs.as_ptr()` stays valid for the call and `cb_size` matches the Rust `Input` representation.
-    let sent = unsafe { SendInput(INPUT_EVENT_COUNT, inputs.as_ptr(), INPUT_SIZE) };
-    if sent == INPUT_EVENT_COUNT {
-        return NativeInputSendStatus::Sent;
-    }
-    write_line_best_effort(
-        err,
-        format_args!("[경고] Windows 입력 이벤트 전송 실패: 요청 {INPUT_EVENT_COUNT}, 전송 {sent}"),
-    );
-    if sent == 1 {
-        let [_press, release_input] = inputs;
-        // SAFETY: `release` is a valid one-element INPUT pointer and `INPUT_SIZE` matches the Rust representation.
-        let release_sent = unsafe { SendInput(1, &raw const release_input, INPUT_SIZE) };
-        if release_sent != 1 {
-            write_line_best_effort(
-                err,
-                format_args!("[경고] Windows 입력 release 이벤트 전송 실패"),
-            );
-        }
-    }
-    if sent == 0 {
-        NativeInputSendStatus::FailedBeforeSend
-    } else {
-        NativeInputSendStatus::PartialOrUnknown
     }
 }
