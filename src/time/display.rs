@@ -12,7 +12,7 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 pub(super) const DISPLAY_LINE_BUF_LEN: usize = 80;
-const DAY_OF_WEEK_KO: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
+const DAY_OF_WEEK_KO: &[[u8; 3]] = "일월화수목금토".as_bytes().as_chunks::<3>().0;
 const U32_FOUR_DIGIT_THRESHOLD: u32 = 10_000;
 const U32_THREE_DIGIT_THRESHOLD: u32 = 100;
 const UNIX_EPOCH_WEEKDAY_OFFSET_I64: i64 = 4;
@@ -63,7 +63,7 @@ impl ServerTime {
             .strict_add(UNIX_EPOCH_WEEKDAY_OFFSET_I64)
             .rem_euclid(DAYS_PER_WEEK_I64);
         let day_of_week_idx = usize::try_from(day_of_week_num).unwrap_or_else(|_| process::abort());
-        let day_of_week_str = DAY_OF_WEEK_KO
+        let day_of_week_bytes = DAY_OF_WEEK_KO
             .get(day_of_week_idx)
             .copied()
             .unwrap_or_else(|| process::abort());
@@ -85,7 +85,7 @@ impl ServerTime {
         cur.write_byte(b'-');
         cur.write_u32_2digits(day_of_month);
         cur.write_byte(b'(');
-        cur.write_bytes(day_of_week_str.as_bytes());
+        *cur.take_array::<3>() = day_of_week_bytes;
         cur.write_bytes(b") ");
         cur.write_u32_2digits(hour);
         cur.write_byte(b':');

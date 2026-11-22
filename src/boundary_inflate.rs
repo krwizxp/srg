@@ -172,11 +172,14 @@ impl Huffman {
                 return Ok(packed & 0x01FF);
             }
         }
+        bits.refill(15);
         let mut code = 0_u32;
         let mut first = 0_u32;
         let mut index = 0_u32;
         for &entry_count in self.counts.iter().skip(1) {
-            code |= bits.read(1)?;
+            (bits.bit_count >= 1).ok_or("경계 압축 데이터가 잘렸습니다.")?;
+            code |= low_u32_from_u64(bits.bit_buffer & 1_u64);
+            bits.consume(1);
             let count = u32::from(entry_count);
             if code < first.strict_add(count) {
                 let position = usize::try_from(index.strict_add(code.strict_sub(first)))
@@ -360,8 +363,21 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
             .ok_or("경계 압축 출력 오류")?
             .chunks(5552)
         {
-            for byte in chunk {
-                first = first.wrapping_add(u32::from(*byte));
+            let (blocks, remainder) = chunk.as_chunks::<16>();
+            for block in blocks {
+                second = second.wrapping_add(first.wrapping_mul(16));
+                let mut sum = 0_u32;
+                let mut weighted = 0_u32;
+                for (weight, &byte) in (1_u32..=16_u32).rev().zip(block) {
+                    let value = u32::from(byte);
+                    sum = sum.wrapping_add(value);
+                    weighted = weighted.wrapping_add(value.wrapping_mul(weight));
+                }
+                first = first.wrapping_add(sum);
+                second = second.wrapping_add(weighted);
+            }
+            for &byte in remainder {
+                first = first.wrapping_add(u32::from(byte));
                 second = second.wrapping_add(first);
             }
             first = first.rem_euclid(0xFFF1);

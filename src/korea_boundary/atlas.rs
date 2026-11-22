@@ -1,7 +1,6 @@
-use super::{BoundaryIndex, IEEE_F64_MANTISSA_ALIGN, Tile, read_count};
+use super::{BoundaryIndex, Tile, grid_axis_index, read_count};
 use crate::{
     diagnostic::{AppError, Result},
-    numeric::low_u16_from_u64,
     random_data::Coordinates,
 };
 pub(super) const DATA: &[u8] = include_bytes!("../../data/korea-boundary-v4/atlas-16.bin");
@@ -26,17 +25,30 @@ impl Atlas<'_> {
         row: usize,
         tile_number: usize,
     ) -> Result<u8> {
-        let west = *boundary
-            .columns
-            .get(column)
+        let col_u16 = u16::try_from(column)
+            .ok()
             .ok_or("대한민국 세부 격자 열 범위 오류")?;
-        let south = *boundary
-            .rows
-            .get(row)
+        let row_u16 = u16::try_from(row)
+            .ok()
             .ok_or("대한민국 세부 격자 행 범위 오류")?;
+        let west = f64::from(col_u16).mul_add(boundary.inv_divisor, boundary.grid_west);
+        let south = f64::from(row_u16).mul_add(boundary.inv_divisor, boundary.grid_south);
         let divisor = boundary.divisor * SUBDIVISION_F64;
-        let fine_column = fine_axis_index(west, divisor, point.longitude);
-        let fine_row = fine_axis_index(south, divisor, point.latitude);
+        let inv_divisor = boundary.inv_divisor * (1.0_f64 / SUBDIVISION_F64);
+        let fine_column = grid_axis_index(
+            west,
+            divisor,
+            inv_divisor,
+            SUBDIVISION_MAX_CELL,
+            point.longitude,
+        );
+        let fine_row = grid_axis_index(
+            south,
+            divisor,
+            inv_divisor,
+            SUBDIVISION_MAX_CELL,
+            point.latitude,
+        );
         let ordinal = *self
             .ordinals
             .get(tile_number)
@@ -93,20 +105,5 @@ impl<'data> TryFrom<(&'data [u8], &[Tile], [u8; 32])> for Atlas<'data> {
             ordinals: ordinals.into_boxed_slice(),
             states,
         })
-    }
-}
-fn fine_axis_index(origin: f64, divisor: f64, coordinate: f64) -> usize {
-    let scaled = ((coordinate - origin) * divisor)
-        .floor()
-        .clamp(0.0_f64, SUBDIVISION_F64);
-    let aligned_bits = (scaled + IEEE_F64_MANTISSA_ALIGN).to_bits() & 0x1FFF_u64;
-    let approx = low_u16_from_u64(aligned_bits).min(SUBDIVISION_MAX_CELL);
-    let next_edge = origin + f64::from(approx.strict_add(1)) / divisor;
-    if next_edge <= coordinate {
-        usize::from(approx.strict_add(1).min(SUBDIVISION_MAX_CELL))
-    } else if approx > 0 && origin + f64::from(approx) / divisor > coordinate {
-        usize::from(approx.strict_sub(1))
-    } else {
-        usize::from(approx)
     }
 }

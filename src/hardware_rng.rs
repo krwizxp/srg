@@ -33,7 +33,14 @@ impl HardwareRng {
     }
     pub(super) fn next_u64(&self) -> Result<u64> {
         match self.source() {
-            HardwareRandomSource::RdSeed => self.rdseed_random(),
+            HardwareRandomSource::RdSeed => {
+                let mut value = 0_u64;
+                // SAFETY: callers only use this after confirming `rdseed` support.
+                if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
+                    return Ok(value);
+                }
+                self.rdseed_random_slow()
+            }
             HardwareRandomSource::RdRand => Self::rdrand_random(),
             HardwareRandomSource::None => Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
         }
@@ -49,12 +56,10 @@ impl HardwareRng {
         }
         Err("RDRAND 실패".into())
     }
-    fn rdseed_random(&self) -> Result<u64> {
+    #[cold]
+    #[inline(never)]
+    fn rdseed_random_slow(&self) -> Result<u64> {
         let mut value = 0_u64;
-        // SAFETY: callers only use this after confirming `rdseed` support.
-        if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
-            return Ok(value);
-        }
         if let Some(fallback) = self.try_rdrand_fallback() {
             return Ok(fallback);
         }

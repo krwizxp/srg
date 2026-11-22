@@ -37,14 +37,15 @@ struct BoundaryIndex {
     area_bounds: BoundaryAreaBounds,
     atlas: atlas::Atlas<'static>,
     bounds: [f64; 4],
-    columns: Box<[f64]>,
+    column_count: u16,
     divisor: f64,
     grid_south: f64,
     grid_west: f64,
+    inv_divisor: f64,
     parts: Box<[Part]>,
     polygon_count: usize,
     ring_count: usize,
-    rows: Box<[f64]>,
+    row_count: u16,
     sampler_tiles: Box<[u32]>,
     source_hash: [u8; 32],
     tiles: Box<[Tile]>,
@@ -92,9 +93,21 @@ impl BoundaryIndex {
                 .ok_or("대한민국 포함 판정 좌표 오류")?;
             return Ok(false);
         }
-        let width = self.columns.len().strict_sub(1);
-        let column = grid_axis_index(&self.columns, self.grid_west, self.divisor, point.longitude);
-        let row = grid_axis_index(&self.rows, self.grid_south, self.divisor, point.latitude);
+        let width = usize::from(self.column_count);
+        let column = grid_axis_index(
+            self.grid_west,
+            self.divisor,
+            self.inv_divisor,
+            self.column_count.strict_sub(1),
+            point.longitude,
+        );
+        let row = grid_axis_index(
+            self.grid_south,
+            self.divisor,
+            self.inv_divisor,
+            self.row_count.strict_sub(1),
+            point.latitude,
+        );
         let tile_number = row.strict_mul(width).strict_add(column);
         let tile = self
             .tiles
@@ -270,13 +283,15 @@ impl BoundaryIndex {
                     && field_a <= 1
                     && field_b == 0)
                     .ok_or("대한민국 경계 교차 인덱스 오류")?;
-                let width = self.columns.len().strict_sub(1);
+                let width = usize::from(self.column_count);
                 let row = tile_number.div_euclid(width);
-                let south = *self.rows.get(row).ok_or("대한민국 타일 행 오류")?;
-                let north = *self
-                    .rows
-                    .get(row.strict_add(1))
+                let row_u16 = u16::try_from(row)
+                    .ok()
+                    .filter(|&value| value < self.row_count)
                     .ok_or("대한민국 타일 행 오류")?;
+                let south = f64::from(row_u16).mul_add(self.inv_divisor, self.grid_south);
+                let north =
+                    f64::from(row_u16.strict_add(1)).mul_add(self.inv_divisor, self.grid_south);
                 let mut previous = south;
                 let mut endpoints = Vec::with_capacity(count);
                 for chunk in raw
@@ -395,6 +410,8 @@ impl BoundaryIndex {
             .ok_or("대한민국 경계 블록 위치 오류")?;
         self.decode_page(page_number, tile_number, compressed, raw_size, scratch)
     }
+    #[cold]
+    #[inline(never)]
     fn validate_part(&self, part: &Part, bytes: &[u8]) -> Result<()> {
         (bytes.len() == part.bytes
             && bytes.starts_with(b"SRGKP004")
@@ -494,12 +511,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             && north <= grid_north
             && north > grid_north - 1.0_f64 / divisor)
             .ok_or("대한민국 경계 타일 범위 오류")?;
-        let columns = (0..=column_count)
-            .map(|position| grid_west + f64::from(position) / divisor)
-            .collect();
-        let rows = (0..=row_count)
-            .map(|position| grid_south + f64::from(position) / divisor)
-            .collect();
+        let inv_divisor = 1.0_f64 / divisor;
         let mut source_hash = [0_u8; 32];
         source_hash.copy_from_slice(bytes.get(96..128).ok_or("대한민국 경계 원본 식별자 오류")?);
         let mut tiles = Vec::with_capacity(tile_count);
@@ -568,11 +580,16 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             area_bounds: BoundaryAreaBounds::try_from(bounds)?,
             atlas: atlas::Atlas::try_from((atlas::DATA, tiles.as_slice(), source_hash))?,
             bounds,
-            columns,
+            column_count: u16::try_from(column_count)
+                .ok()
+                .ok_or("대한민국 경계 격자 열 범위 오류")?,
             divisor,
             grid_south,
             grid_west,
-            rows,
+            inv_divisor,
+            row_count: u16::try_from(row_count)
+                .ok()
+                .ok_or("대한민국 경계 격자 행 범위 오류")?,
             polygon_count,
             ring_count,
             vertex_count,
@@ -681,26 +698,24 @@ impl<'cache> TryFrom<(u64, &'cache mut BoundaryCache)> for SampleState<'cache> {
         Ok(state)
     }
 }
-fn grid_axis_index(edges: &[f64], origin: f64, divisor: f64, coordinate: f64) -> usize {
-    let max_cell = edges.len().strict_sub(2);
+fn grid_axis_index(
+    origin: f64,
+    divisor: f64,
+    inv_divisor: f64,
+    max_cell: u16,
+    coordinate: f64,
+) -> usize {
     let scaled = ((coordinate - origin) * divisor)
         .floor()
         .clamp(0.0_f64, MAX_GRID_DIMENSION_F64);
     let aligned_bits = (scaled + IEEE_F64_MANTISSA_ALIGN).to_bits() & 0x1FFF_u64;
-    let approx = usize::from(low_u16_from_u64(aligned_bits)).min(max_cell);
-    if edges
-        .get(approx.strict_add(1))
-        .is_some_and(|&next_edge| next_edge <= coordinate)
-    {
-        approx.strict_add(1).min(max_cell)
-    } else if approx > 0
-        && edges
-            .get(approx)
-            .is_some_and(|&curr_edge| curr_edge > coordinate)
-    {
-        approx.strict_sub(1)
+    let approx = low_u16_from_u64(aligned_bits).min(max_cell);
+    if f64::from(approx.strict_add(1)).mul_add(inv_divisor, origin) <= coordinate {
+        usize::from(approx.strict_add(1).min(max_cell))
+    } else if approx > 0 && f64::from(approx).mul_add(inv_divisor, origin) > coordinate {
+        usize::from(approx.strict_sub(1))
     } else {
-        approx
+        usize::from(approx)
     }
 }
 fn read_chunk<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {

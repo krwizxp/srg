@@ -10,10 +10,10 @@ use crate::{
 use std::process;
 const ASCII_PRINTABLE_LEN: u64 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
-const BINOMIAL_VALUES: [[u32; 51]; 8] = {
-    let mut values = [[0; 51]; 8];
-    let mut rows: &mut [[u32; 51]] = &mut values;
-    let mut choose = 0_u32;
+const BINOMIAL_VALUES: [[u32; 50]; 6] = {
+    let mut values = [[0; 50]; 6];
+    let mut rows: &mut [[u32; 50]] = &mut values;
+    let mut choose = 2_u32;
     while let Some((row, remaining_rows)) = rows.split_first_mut() {
         let mut cells: &mut [u32] = row;
         let mut total = 0_u32;
@@ -127,7 +127,7 @@ impl RandomDataBuildState<'_> {
     fn check_complete(&self) -> Result<()> {
         self.is_basic_complete()
             .ok_or("기본 필드 보완 난수 시도 횟수를 초과했습니다.")?;
-        (!self.data.hangul_syllables.contains(&'\0'))
+        (!matches!(self.data.hangul_syllables, ['\0', ..]))
             .ok_or("한글 음절 보완 난수 시도 횟수를 초과했습니다.")
             .map_err(Into::into)
     }
@@ -166,15 +166,23 @@ impl RandomDataBuildState<'_> {
         );
     }
     fn fill_hangul_from_u64(&mut self, value: u64) {
-        if !self.data.hangul_syllables.contains(&'\0') {
+        if !matches!(self.data.hangul_syllables, ['\0', ..]) {
             return;
         }
-        let Some(mut rem) = mix_bounded::<HANGUL_QUAD_MODULUS>(value, MIX_SALT_HANGUL) else {
+        let Some(rem) = mix_bounded::<HANGUL_QUAD_MODULUS>(value, MIX_SALT_HANGUL) else {
             return;
         };
-        for slot in &mut self.data.hangul_syllables {
-            let offset = low_u32_from_u64(rem.rem_euclid(HANGUL_SYLLABLE_MODULUS));
-            rem = rem.div_euclid(HANGUL_SYLLABLE_MODULUS);
+        let pair_mod = HANGUL_SYLLABLE_MODULUS.strict_mul(HANGUL_SYLLABLE_MODULUS);
+        let lo = low_u32_from_u64(rem.rem_euclid(pair_mod));
+        let hi = low_u32_from_u64(rem.div_euclid(pair_mod));
+        let base_mod = low_u32_from_u64(HANGUL_SYLLABLE_MODULUS);
+        let offsets = [
+            lo.rem_euclid(base_mod),
+            lo.div_euclid(base_mod),
+            hi.rem_euclid(base_mod),
+            hi.div_euclid(base_mod),
+        ];
+        for (slot, offset) in self.data.hangul_syllables.iter_mut().zip(offsets) {
             let point = HANGUL_BASE_CODE_POINT.strict_add(offset);
             *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
         }
@@ -202,16 +210,22 @@ impl RandomDataBuildState<'_> {
         unrank_combination_into(japan_lotto_rank, LOTTO7_MAX, &mut self.data.lotto7_numbers);
     }
     fn fill_password_from_u64(&mut self, value: u64) {
-        if !self.data.password.contains(&0) {
+        if !matches!(self.data.password, [0, ..]) {
             return;
         }
-        let Some(mut rem) = mix_bounded::<PASSWORD_OCTET_MODULUS>(value, MIX_SALT_PASSWORD) else {
+        let Some(rem) = mix_bounded::<PASSWORD_OCTET_MODULUS>(value, MIX_SALT_PASSWORD) else {
             return;
         };
-        for slot in &mut self.data.password {
-            let offset = low_u8_from_u64(rem.rem_euclid(ASCII_PRINTABLE_LEN));
-            rem = rem.div_euclid(ASCII_PRINTABLE_LEN);
-            *slot = ASCII_PRINTABLE_START.strict_add(offset);
+        let quad_mod = const { ASCII_PRINTABLE_LEN.strict_pow(4) };
+        let mut lo = low_u32_from_u64(rem.rem_euclid(quad_mod));
+        let mut hi = low_u32_from_u64(rem.div_euclid(quad_mod));
+        let base_mod = low_u32_from_u64(ASCII_PRINTABLE_LEN);
+        let (lo_slots, hi_slots) = self.data.password.split_at_mut(4);
+        for (lo_slot, hi_slot) in lo_slots.iter_mut().zip(hi_slots) {
+            *lo_slot = ASCII_PRINTABLE_START.strict_add(low_u8_from_u32(lo.rem_euclid(base_mod)));
+            *hi_slot = ASCII_PRINTABLE_START.strict_add(low_u8_from_u32(hi.rem_euclid(base_mod)));
+            lo = lo.div_euclid(base_mod);
+            hi = hi.div_euclid(base_mod);
         }
     }
     fn finish(self) -> Result<RandomDataSet> {
@@ -220,14 +234,14 @@ impl RandomDataBuildState<'_> {
         data.kor_coords = self.korea.finish()?;
         Ok(data)
     }
-    fn is_basic_complete(&self) -> bool {
-        !self.data.password.contains(&0)
+    const fn is_basic_complete(&self) -> bool {
+        !matches!(self.data.password, [0, ..])
             && self.data.planet_number != 0
             && self.data.solar_system_index != 0
     }
-    fn is_complete(&self) -> bool {
+    const fn is_complete(&self) -> bool {
         self.is_basic_complete()
-            && !self.data.hangul_syllables.contains(&'\0')
+            && !matches!(self.data.hangul_syllables, ['\0', ..])
             && self.korea.is_complete()
     }
     fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
@@ -287,22 +301,23 @@ const fn mix_bounded<const MODULUS: u64>(value: u64, salt: u64) -> Option<u64> {
     }
 }
 fn unrank_combination_into(mut rank: u32, max_n: u32, out: &mut [u8]) {
+    let Some((first_slot, tail)) = out.split_first_mut() else {
+        return;
+    };
     let mut upper = usize::try_from(max_n).unwrap_or_else(|_| process::abort());
-    for (idx, slot) in out.iter_mut().enumerate().rev() {
-        if idx == 0 {
-            *slot = low_u8_from_u32(rank.strict_add(1));
-            return;
-        }
-        let slot_num = idx.strict_add(1);
+    for (tail_idx, slot) in tail.iter_mut().enumerate().rev() {
+        let lower = tail_idx.strict_add(1);
         let row = BINOMIAL_VALUES
-            .get(slot_num)
-            .and_then(|values| values.get(..upper))
+            .get(tail_idx)
+            .and_then(|values| values.get(lower..upper))
             .unwrap_or_else(|| process::abort());
-        let value = row.partition_point(|&comb| comb <= rank).strict_sub(1);
-        let combinations = *row.get(value).unwrap_or_else(|| process::abort());
+        let offset = row.partition_point(|&comb| comb <= rank).strict_sub(1);
+        let combinations = *row.get(offset).unwrap_or_else(|| process::abort());
         rank = rank.strict_sub(combinations);
+        let value = lower.strict_add(offset);
         let value_u32 = u32::try_from(value).unwrap_or_else(|_| process::abort());
         *slot = low_u8_from_u32(value_u32.strict_add(1));
         upper = value;
     }
+    *first_slot = low_u8_from_u32(rank.strict_add(1));
 }

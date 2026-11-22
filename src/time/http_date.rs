@@ -138,24 +138,29 @@ impl FromStr for HttpDate {
     }
 }
 fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
-    const MONTHS: [(&str, u32, u32); 12] = [
-        ("Jan", 1, 31),
-        ("Feb", 2, 28),
-        ("Mar", 3, 31),
-        ("Apr", 4, 30),
-        ("May", 5, 31),
-        ("Jun", 6, 30),
-        ("Jul", 7, 31),
-        ("Aug", 8, 31),
-        ("Sep", 9, 30),
-        ("Oct", 10, 31),
-        ("Nov", 11, 30),
-        ("Dec", 12, 31),
+    const MONTHS: [([u8; 3], u8); 12] = [
+        (*b"Jan", 31),
+        (*b"Feb", 28),
+        (*b"Mar", 31),
+        (*b"Apr", 30),
+        (*b"May", 31),
+        (*b"Jun", 30),
+        (*b"Jul", 31),
+        (*b"Aug", 31),
+        (*b"Sep", 30),
+        (*b"Oct", 31),
+        (*b"Nov", 30),
+        (*b"Dec", 31),
     ];
+    let month_bytes = month_str.as_bytes();
     MONTHS
         .iter()
-        .find_map(|&(name, number, max_day)| {
-            (name == month_str).then_some(HttpMonth { max_day, number })
+        .enumerate()
+        .find_map(|(idx, &(name, max_day))| {
+            (name.as_slice() == month_bytes).then_some(HttpMonth {
+                max_day: u32::from(max_day),
+                number: u32::try_from(idx).unwrap_or(0).strict_add(1),
+            })
         })
         .ok_or_else(|| TimeError::parse("HTTP Date 파싱 실패: 알 수 없는 월 형식"))
 }

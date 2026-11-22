@@ -23,7 +23,10 @@ impl<'buffer> ByteCursor<'buffer> {
             .unwrap_or_else(|| process::abort())
     }
     pub(super) fn write_byte(&mut self, byte: u8) {
-        self.write_bytes(&[byte]);
+        *self
+            .remaining
+            .split_off_first_mut()
+            .unwrap_or_else(|| process::abort()) = byte;
     }
     pub(super) fn write_bytes(&mut self, bytes: &[u8]) {
         self.take(bytes.len()).copy_from_slice(bytes);
