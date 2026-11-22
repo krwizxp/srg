@@ -231,6 +231,8 @@ impl Client {
         .inspect_err(|_| self.session_cache = None)?;
         self.query_server_time(&request, request_start, response_received, context)
     }
+    #[cold]
+    #[inline(never)]
     fn last_error(operation: &str, context: &str) -> TimeError {
         let code = Self::last_error_code();
         Self::windows_error(operation, code, context)
@@ -258,7 +260,7 @@ impl Client {
             "Date",
             context,
             (&mut self.header_buffer, &mut self.header_line_buffer),
-            |value| time_headers.capture_date(value, response_received),
+            &mut |value| time_headers.capture_date(value, response_received),
         )?;
         Self::read_header_values(
             request,
@@ -266,7 +268,7 @@ impl Client {
             "Age",
             context,
             (&mut self.header_buffer, &mut self.header_line_buffer),
-            |value| time_headers.capture_age(value),
+            &mut |value| time_headers.capture_age(value),
         )?;
         time_headers.finish(request_start, context)
     }
@@ -276,7 +278,7 @@ impl Client {
         name: &str,
         context: &str,
         buffers: (&mut Vec<u16>, &mut Vec<u8>),
-        mut capture: impl FnMut(&str),
+        capture: &mut dyn FnMut(&str),
     ) -> Result<()> {
         let (wide_buffer, ascii_buffer) = buffers;
         let mut index = 0_u32;
@@ -312,7 +314,7 @@ impl Client {
             (header_bytes <= HTTP_HEAD_MAX_HEADER_BYTES).ok_or_else(|| {
                 error(
                     context,
-                    format!(
+                    &format!(
                         "{name} 헤더가 허용 한도({HTTP_HEAD_MAX_HEADER_BYTES} bytes)를 초과했습니다."
                     ),
                 )
@@ -320,7 +322,7 @@ impl Client {
             header_bytes.is_multiple_of(2).ok_or_else(|| {
                 error(
                     context,
-                    format!("{name} 헤더 UTF-16 길이가 올바르지 않습니다."),
+                    &format!("{name} 헤더 UTF-16 길이가 올바르지 않습니다."),
                 )
             })?;
             let units = header_bytes.div_euclid(2);
@@ -347,7 +349,10 @@ impl Client {
                 wide_buffer.as_slice()
             };
             (index > current_index).ok_or_else(|| {
-                error(context, format!("{name} 헤더 index가 진행되지 않았습니다."))
+                error(
+                    context,
+                    &format!("{name} 헤더 index가 진행되지 않았습니다."),
+                )
             })?;
             while let Some((&0, rest)) = header.split_last() {
                 header = rest;
@@ -365,14 +370,14 @@ impl Client {
             };
             for (slot, &unit) in dest.iter_mut().zip(header) {
                 *slot = u8::try_from(unit).map_err(|source| {
-                    error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
+                    error_with_source(context, &format!("{name} 헤더 ASCII 변환 실패"), source)
                 })?;
             }
             let ascii_slice: &[u8] = dest;
             let value = str::from_utf8(ascii_slice)
                 .map(str::trim_ascii)
                 .map_err(|source| {
-                    error_with_source(context, format!("{name} 헤더 UTF-8 변환 실패"), source)
+                    error_with_source(context, &format!("{name} 헤더 UTF-8 변환 실패"), source)
                 })?;
             capture(value);
         }
@@ -399,8 +404,10 @@ impl Client {
         };
         (ok != 0_i32).ok_or_else(Self::last_error_code)
     }
+    #[cold]
+    #[inline(never)]
     fn windows_error(operation: &str, code: u32, context: &str) -> TimeError {
-        error(context, format!("{operation} 실패: Windows error {code}"))
+        error(context, &format!("{operation} 실패: Windows error {code}"))
     }
 }
 fn prepare_buffer<'buf, T>(

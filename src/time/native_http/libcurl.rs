@@ -1,3 +1,4 @@
+use super::super::TimeError;
 use super::super::{ParsedServer, UrlScheme};
 use super::{FreshTimeHeaders, Result, TimeSample, error};
 use alloc::{borrow::Cow, string::String};
@@ -14,7 +15,7 @@ macro_rules! curl_setopt {
     ($handle:expr, $option:expr, $value:expr, $context:expr) => {{
         // SAFETY: call sites pair each option with a wrapper using its documented libcurl ABI type.
         let code = unsafe { sys::curl_easy_setopt($handle.as_ptr(), $option, $value) };
-        (code == CURLE_OK).ok_or_else(|| error($context, curl_error("curl_easy_setopt", code)))
+        (code == CURLE_OK).ok_or_else(|| setopt_error($context, code))
     }};
 }
 const AGE_HEADER_NAME: &[u8; 3] = b"age";
@@ -104,7 +105,7 @@ impl EasyHandle {
         let code =
             unsafe { sys::curl_easy_getinfo(self.as_ptr(), CURLINFO_SCHEME, &raw mut scheme) };
         (code == CURLE_OK)
-            .ok_or_else(|| error(context, curl_error("curl_easy_getinfo scheme", code)))?;
+            .ok_or_else(|| error(context, &curl_error("curl_easy_getinfo scheme", code)))?;
         let Some(scheme_ptr) = NonNull::new(scheme) else {
             return Err(error(context, "curl 최종 scheme이 비어 있습니다."));
         };
@@ -115,7 +116,7 @@ impl EasyHandle {
             .ok_or_else(|| {
                 error(
                     context,
-                    format!(
+                    &format!(
                         "curl 최종 scheme이 {}가 아닙니다: {}",
                         expected_scheme.to_string_lossy(),
                         String::from_utf8_lossy(scheme_bytes)
@@ -138,7 +139,7 @@ impl EasyHandle {
     fn setopt_long(&self, option: CurlOption, value: c_long, context: &str) -> Result<()> {
         curl_setopt!(self, option, value, context)
     }
-    fn setopt_ptr<T>(&self, option: CurlOption, value: *mut T, context: &str) -> Result<()> {
+    fn setopt_ptr(&self, option: CurlOption, value: *mut c_void, context: &str) -> Result<()> {
         curl_setopt!(self, option, value, context)
     }
     fn setopt_str(&self, option: CurlOption, value: *const c_char, context: &str) -> Result<()> {
@@ -165,7 +166,7 @@ impl Client {
         };
         let init_code = *CURL_INIT;
         (init_code == CURLE_OK)
-            .ok_or_else(|| error(context, curl_error("curl_global_init", init_code)))?;
+            .ok_or_else(|| error(context, &curl_error("curl_global_init", init_code)))?;
         let handle = match &mut self.easy_handle {
             &mut Some(ref mut handle) => handle,
             empty @ &mut None => {
@@ -198,7 +199,7 @@ impl Client {
             )?;
             handle.setopt_ptr(
                 CURLOPT_ERRORBUFFER,
-                error_buffer.as_mut_ptr().cast::<c_char>(),
+                error_buffer.as_mut_ptr().cast::<c_void>(),
                 context,
             )?;
             handle.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
@@ -232,7 +233,7 @@ impl Client {
         };
         if let Some(callback_error) = body_sink.error.or(header_capture.error) {
             self.easy_handle = None;
-            return Err(error(context, callback_error));
+            return Err(error(context, &callback_error));
         }
         if perform_code != CURLE_OK {
             let perform_error = if let Ok(message_cstr) = CStr::from_bytes_until_nul(&error_buffer)
@@ -247,7 +248,7 @@ impl Client {
                 curl_error("curl_easy_perform", perform_code)
             };
             self.easy_handle = None;
-            return Err(error(context, perform_error));
+            return Err(error(context, &perform_error));
         }
         if let Err(scheme_error) = scheme_result.unwrap_or_else(|| process::abort()) {
             self.easy_handle = None;
@@ -331,6 +332,8 @@ fn account_bytes(
     *bytes_seen = next_len;
     true
 }
+#[cold]
+#[inline(never)]
 fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.
     let raw_ptr = unsafe { sys::curl_easy_strerror(code) };
@@ -341,6 +344,11 @@ fn curl_error(context: &str, code: CurlCode) -> String {
         unsafe { CStr::from_ptr(raw_ptr) }.to_string_lossy()
     };
     format!("{context} 실패: {message} ({code})")
+}
+#[cold]
+#[inline(never)]
+fn setopt_error(context: &str, code: CurlCode) -> TimeError {
+    error(context, &curl_error("curl_easy_setopt", code))
 }
 unsafe extern "C" fn write_callback(
     ptr: *mut c_char,

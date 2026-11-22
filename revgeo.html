@@ -710,7 +710,6 @@
 			user-select: none
 		}
 		#auto-supp {
-			-webkit-appearance: none;
 			appearance: none;
 			position: relative;
 			width: 51px;
@@ -842,7 +841,6 @@
 			padding: 8px 12px
 		}
 		:is(.filters, .settings) select {
-			-webkit-appearance: none;
 			appearance: none;
 			padding-right: 34px;
 			background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E") right 10px center / 16px 16px no-repeat
@@ -2633,7 +2631,7 @@
 			<td></td>
 			<td><button class="location-button" type="button"><span class="address-main" dir="auto">위치 상세 보기</span>
 					<span class="address-sub" dir="auto"></span></button></td>
-			<td class="coords-cell"><span></span><span></span></td>
+			<td class="coords-cell" dir="ltr"><span></span><span></span></td>
 			<td><span class="kind-badge"></span></td>
 			<td><span class="result-state" data-status="done"></span></td>
 		</tr>
@@ -2651,12 +2649,12 @@
 		const totalPages = (count = state.visibleIndices.length) => Math.max(1, Math.ceil(count / pageSize));
 		const COORD_REGEX =
 			/(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])|(?:대한민국|세계)\s*위경도/g;
-		const csvEsc = (s) => {
-			if (s && /^[\t\n\r=+\-@]/.test(s)) s = "'" + s;
-			return /[",\r\n]/.test(s)
-				? "\"" + s.replaceAll("\"", "\"\"") + "\""
-				: s;
-		}
+		const RX_CSV_FORMULA = /^[\t\n\r=+\-@]/, RX_CSV_QUOTE = /[",\r\n]/;
+		const csvEsc = s => {
+			if (!s) return "";
+			if (RX_CSV_FORMULA.test(s)) s = "'" + s;
+			return RX_CSV_QUOTE.test(s) ? "\"" + s.replaceAll("\"", "\"\"") + "\"" : s;
+		};
 		const CONFIG = {
 			MAX_RETRY: 3,
 			REQUEST_TIMEOUT_MS: 10_000,
@@ -2805,10 +2803,13 @@
 		function isValidGeocode(parsed) {
 			const addr = parsed?.addr;
 			return !!addr && typeof parsed === "object" && typeof addr === "object" &&
-				["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(key => boundedText(addr[key])) &&
-				["kind", "countryCode", "countryName"].every(k => parsed[k] === undefined || boundedText(parsed[k]));
+				boundedText(addr.sido) && boundedText(addr.sigungu) && boundedText(addr.eupmyeon) &&
+				boundedText(addr.tag) && boundedText(addr.fullAddr) &&
+				(parsed.kind === undefined || boundedText(parsed.kind)) &&
+				(parsed.countryCode === undefined || boundedText(parsed.countryCode)) &&
+				(parsed.countryName === undefined || boundedText(parsed.countryName));
 		}
-		const countryNames = new Intl.DisplayNames("ko", {type: "region"});
+		let countryNames = null;
 		function parseGeocode(data) {
 			const gc = Array.isArray(data?.features)
 				? data.features[0]?.properties?.geocoding : null;
@@ -2871,7 +2872,7 @@
 				kind,
 				countryCode: kind === "WORLD" ? countryCode : "",
 				countryName: kind === "WORLD"
-					? fields.country || (countryCode ? countryNames.of(countryCode.toUpperCase()) : "")
+					? fields.country || (countryCode ? (countryNames ??= new Intl.DisplayNames("ko", {type: "region"})).of(countryCode.toUpperCase()) : "")
 					: "",
 			};
 		}
@@ -2908,7 +2909,7 @@
 			const rounded = v.length - dot - 1 > COORD_DECIMALS
 				? (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(COORD_DECIMALS)
 				: v;
-			const normalized = rounded.replace(/\.?0+$/, "");
+			const normalized = rounded.charCodeAt(rounded.length - 1) === 48 ? rounded.replace(/\.?0+$/, "") : rounded;
 			return normalized === "-0" ? "0" : normalized;
 		}
 		const [fileInput, themeToggle, exportBtn, statusText] = ["file", "theme-toggle", "export", "status"].map(byId);
@@ -2953,7 +2954,7 @@
 		const updateTheme = () => {
 			pageScheme.content = root.dataset.theme || "light dark";
 			const dark = currentTheme() === "dark";
-			const background = getComputedStyle(root).backgroundColor;
+			const background = dark ? "#000000" : "#f5f5f7";
 			for (const meta of themeColors) meta.content = background;
 			const next = dark ? "라이트" : "다크";
 			themeToggle.dataset.nextTheme = dark ? "light" : "dark";
@@ -2973,7 +2974,7 @@
 		on(themeToggle, "click", () => {
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
-		const seenCountryFilters = new Set(Iterator.from(filterKind.options).map(option => option.value));
+		const seenCountryFilters = new Set(["", "에러"]);
 		function addCountryFilter(record) {
 			const {result} = record;
 			const kind = result.kind || record.set;
@@ -2990,7 +2991,7 @@
 		let filterStatus = "all";
 		const rowTemplate = query("tr", byId("tmpl-row").content);
 		const RX_COMMA_WS = /\s*,\s*/g;
-		const norm = s => s == null ? "" : s.trim().toLowerCase().replace(RX_COMMA_WS, ",");
+		const norm = s => {const t = s ? s.trim().toLowerCase() : ""; return t.includes(",") ? t.replace(RX_COMMA_WS, ",") : t;};
 		const countryFilterValue = ({result, set}) =>
 			result.kind === "WORLD" && (result.countryCode || result.countryName)
 				? "country:" + (result.countryCode || norm(result.countryName))
@@ -2998,14 +2999,15 @@
 		function readFilters() {
 			const q = norm(filterQuery.value);
 			let query = null;
+			let queryIsOr = false;
 			if (q) {
-				const isOr = q.includes("|");
+				queryIsOr = q.includes("|");
 				const tokens = [...new Set(
-					q.split(isOr ? "|" : /\s+/u).map(token => token.trim()).filter(Boolean),
+					q.split(queryIsOr ? "|" : /\s+/u).map(token => token.trim()).filter(Boolean),
 				)];
 				if (tokens.length === 1) query = tokens[0];
 				else if (tokens.length > 1)
-					query = isOr ? new Set(tokens) : tokens.sort((a, b) => b.length - a.length);
+					query = queryIsOr ? tokens : tokens.sort((a, b) => b.length - a.length);
 			}
 			const fields = {
 				kind: filterKind.value,
@@ -3017,7 +3019,7 @@
 			};
 			const hasFields = Object.values(fields).some(Boolean);
 			return filterStatus === "all" && !query && !hasFields
-				? null : {status: filterStatus, ...fields, query, hasFields};
+				? null : {status: filterStatus, ...fields, query, queryIsOr, hasFields};
 		}
 		let filterState = readFilters();
 		function resetCountryFilter() {
@@ -3056,9 +3058,9 @@
 			if (!query) return true;
 			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${norm(r.result.countryName)}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
 			if (typeof query === "string") return hay.includes(query);
-			const isOr = query instanceof Set;
-			for (const token of query)
-				if (hay.includes(token) === isOr) return isOr;
+			const isOr = f.queryIsOr;
+			for (let i = 0; i < query.length; i++)
+				if (hay.includes(query[i]) === isOr) return isOr;
 			return !isOr;
 		}
 		let pageSize = [10, 25, 50, 100].includes(preferences.pageSize) ? preferences.pageSize : 10;
@@ -3468,19 +3470,22 @@
 				};
 			})();
 		const cancelReader = (readable) => readable?.cancel().catch(() => { });
-		async function* lineIterator(stream, signal) {
-			const reader = stream.getReader();
+		async function parseFile(file, signal) {
+			if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT)
+				throw new InputError(
+					"입력 파일은 최대 64 MiB입니다. 파일을 나누어 다시 불러와 주세요.",
+				);
+			const out = [];
+			let invalidCount = 0;
+			let lastYield = performance.now();
+			let linesSinceYield = 0;
+			let skippedLines = 0;
+			const reader = file.stream().getReader();
 			const decoder = new TextDecoder("utf-8", {fatal: true});
 			const abort = () => {void cancelReader(reader);};
 			on(signal, "abort", abort, {once: true});
 			const parts = [];
 			let length = 0, trailingCr = false;
-			let skippedLines = 0;
-			const shouldYieldSkip = () => {
-				if (++skippedLines < 1000) return false;
-				skippedLines = 0;
-				return true;
-			};
 			const lineLimitMessage = `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`;
 			const append = part => {
 				if (!part) return;
@@ -3495,94 +3500,31 @@
 				length = 0;
 				return line;
 			};
-			const newlines = /\r\n|[\r\n]/g;
-			try {
-				for (; ;) {
-					signal.throwIfAborted();
-					const {value, done} = await reader.read();
-					signal.throwIfAborted();
-					let chunk;
-					try {
-						chunk = decoder.decode(value, {stream: !done});
-					} catch (err) {
-						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", {cause: err});
-					}
-					if (!chunk && !done) continue;
-					let start = 0;
-					if (trailingCr) {
-						const line = emit();
-						trailingCr = false;
-						if (chunk.charCodeAt(0) === 10) start = 1;
-						if (line.includes("위경도")) yield line;
-						else if (shouldYieldSkip()) yield null;
-					}
-					let keywordIndex = chunk.indexOf("위경도", start);
-					newlines.lastIndex = start;
-					for (const match of chunk.matchAll(newlines)) {
-						const end = match.index;
-						const nextStart = end + match[0].length;
-						if (match[0] === "\r" && nextStart === chunk.length) {
-							append(chunk.slice(start, end));
-							start = nextStart;
-							trailingCr = true;
-							break;
-						}
-						if (parts.length === 0) {
-							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
-								throw new InputError(lineLimitMessage);
-							if (keywordIndex !== -1 && keywordIndex < end) {
-								yield chunk.slice(start, end);
-								keywordIndex = chunk.indexOf("위경도", nextStart);
-							} else if (shouldYieldSkip()) yield null;
-						} else {
-							append(chunk.slice(start, end));
-							const line = emit();
-							if (line.includes("위경도")) yield line;
-							else if (shouldYieldSkip()) yield null;
-							if (keywordIndex !== -1 && keywordIndex < nextStart)
-								keywordIndex = chunk.indexOf("위경도", nextStart);
-						}
-						start = nextStart;
-					}
-					append(chunk.slice(start));
-					if (done) break;
+			const maybeYield = async () => {
+				if (performance.now() - lastYield >= 8) {
+					await yieldToMain();
+					lastYield = performance.now();
 				}
-				if (trailingCr || length) {
-					const line = emit();
-					if (line.includes("위경도")) yield line;
-				}
-			} finally {
-				signal.removeEventListener("abort", abort);
-				await cancelReader(reader);
-				reader.releaseLock();
-			}
-		}
-		async function parseFile(file, signal) {
-			if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT)
-				throw new InputError(
-					"입력 파일은 최대 64 MiB입니다. 파일을 나누어 다시 불러와 주세요.",
-				);
-			const out = [];
-			let invalidCount = 0;
-			let lastYield = performance.now();
-			let linesSinceYield = 0;
-			for await (const line of lineIterator(file.stream(), signal)) {
+			};
+			const onSkip = () => {
+				if (++skippedLines < 1000) return;
+				skippedLines = 0;
+				return maybeYield();
+			};
+			const consumeLine = async (line) => {
 				signal.throwIfAborted();
-				if (line === null || ++linesSinceYield >= 128) {
-					if (line !== null) linesSinceYield = 0;
-					if (performance.now() - lastYield >= 8) {
-						await yieldToMain();
-						lastYield = performance.now();
-					}
-					if (line === null) continue;
+				if (++linesSinceYield >= 128) {
+					linesSinceYield = 0;
+					await maybeYield();
 				}
-				for (const m of line.matchAll(COORD_REGEX)) {
+				COORD_REGEX.lastIndex = 0;
+				let m;
+				while ((m = COORD_REGEX.exec(line)) !== null) {
 					if (!m[1]) {
 						invalidCount++;
 						continue;
 					}
-					const lat = m[2];
-					const lon = m[3];
+					const lat = m[2], lon = m[3];
 					const fLat = +lat, fLon = +lon;
 					if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
 						Math.abs(fLat) > 90 || Math.abs(fLon) > 180) {
@@ -3601,6 +3543,72 @@
 						result: null,
 					});
 				}
+			};
+			try {
+				for (; ;) {
+					signal.throwIfAborted();
+					const {value, done} = await reader.read();
+					signal.throwIfAborted();
+					let chunk;
+					try {
+						chunk = decoder.decode(value, {stream: !done});
+					} catch (err) {
+						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", {cause: err});
+					}
+					if (!chunk && !done) continue;
+					let start = 0;
+					if (trailingCr) {
+						const line = emit();
+						trailingCr = false;
+						if (chunk.charCodeAt(0) === 10) start = 1;
+						if (line.includes("위경도")) await consumeLine(line);
+						else await onSkip();
+					}
+					let keywordIndex = chunk.indexOf("위경도", start);
+					let nextLf = chunk.indexOf("\n", start);
+					let nextCr = chunk.indexOf("\r", start);
+					while (nextLf !== -1 || nextCr !== -1) {
+						const useCr = nextCr !== -1 && (nextLf === -1 || nextCr < nextLf);
+						const end = useCr ? nextCr : nextLf;
+						const nextStart = useCr
+							? (end + 1 < chunk.length && chunk.charCodeAt(end + 1) === 10 ? end + 2 : end + 1)
+							: end + 1;
+						if (useCr && nextStart === chunk.length) {
+							append(chunk.slice(start, end));
+							start = nextStart;
+							trailingCr = true;
+							break;
+						}
+						if (parts.length === 0) {
+							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
+								throw new InputError(lineLimitMessage);
+							if (keywordIndex !== -1 && keywordIndex < end) {
+								await consumeLine(chunk.slice(start, end));
+								keywordIndex = chunk.indexOf("위경도", nextStart);
+							} else await onSkip();
+						} else {
+							append(chunk.slice(start, end));
+							const line = emit();
+							if (line.includes("위경도")) await consumeLine(line);
+							else await onSkip();
+							if (keywordIndex !== -1 && keywordIndex < nextStart)
+								keywordIndex = chunk.indexOf("위경도", nextStart);
+						}
+						start = nextStart;
+						if (nextLf !== -1 && nextLf < start) nextLf = chunk.indexOf("\n", start);
+						if (nextCr !== -1 && nextCr < start) nextCr = chunk.indexOf("\r", start);
+					}
+					append(chunk.slice(start));
+					if (done) break;
+				}
+				if (trailingCr || length) {
+					const line = emit();
+					if (line.includes("위경도")) await consumeLine(line);
+				}
+			} finally {
+				signal.removeEventListener("abort", abort);
+				await cancelReader(reader);
+				reader.releaseLock();
 			}
 			return {records: out, invalidCount};
 		}
@@ -4220,7 +4228,6 @@
 			button.ariaDescription = `좌표 ${record.latStr}, ${record.lonStr}; 구분 ${kind}; ${statusLabel}`;
 			cells[2].firstElementChild.textContent = fmtCoord6(record.latStr);
 			cells[2].lastElementChild.textContent = fmtCoord6(record.lonStr);
-			cells[2].dir = "ltr";
 			cells[2].title = record.latStr + ", " + record.lonStr;
 			cells[3].firstElementChild.textContent = kind;
 			const statusBadge = cells[4].firstElementChild;
@@ -4284,10 +4291,11 @@
 						const lon = r.lonStr;
 						const exportKind = (result.kind || r.set) === "WORLD"
 							? kindLabel("WORLD", result.countryName) : result.kind || r.set;
-						let line = `${csvEsc(exportKind)},${rowIndex + 1},"${/^[+-]/.test(lat) ? "'" : ""}${lat}, ${lon}",`;
+						const latPrefix = lat[0] === "+" || lat[0] === "-" ? "'" : "";
+						let line = `${csvEsc(exportKind)},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",`;
 						const addr = result.addr;
 						line += (addr
-							? [addr.sido, addr.sigungu, addr.eupmyeon, addr.tag].map(csvEsc).join(",")
+							? `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)}`
 							: ",,,") + "," + csvEsc(result.error || addr.fullAddr);
 						const lat6 = fmtCoord6(lat);
 						const lon6 = fmtCoord6(lon);
@@ -4756,9 +4764,10 @@
 					const limitMessage = `기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`;
 					const appendBlock = block => nextChunks.push(nextChunks.length ? `\n${block}` : block);
 					let convertedInWorkers = false;
+					let parsedWords = null;
 					if (autoSupp.checked && !suppInput.value.trim() && typeof Worker === "function") {
 						invalidInput = num64Input;
-						const words = parseU64List(num64Input.value, limitMessage);
+						const words = parsedWords = parseU64List(num64Input.value, limitMessage);
 						invalidInput = null;
 						if (words.length >= 512) {
 							const controller = new AbortController();
@@ -4794,13 +4803,15 @@
 						}
 					}
 					if (!convertedInWorkers) {
-						for (const token of u64Tokens(num64Input.value)) {
-							if (epoch !== outputEpoch)
-								return;
-							invalidInput = num64Input;
-							if (processed >= GENERATION_LIMIT) throw new InputError(limitMessage);
-							const num = parseU64(token);
-							invalidInput = null;
+						for (const item of parsedWords ?? u64Tokens(num64Input.value)) {
+							if (epoch !== outputEpoch) return;
+							let num = item;
+							if (!parsedWords) {
+								invalidInput = num64Input;
+								if (processed >= GENERATION_LIMIT) throw new InputError(limitMessage);
+								num = parseU64(item);
+								invalidInput = null;
+							}
 							sampleKorea ??= (await loadKoreaModule()).sampleKorea;
 							if (epoch !== outputEpoch) return;
 							const conversion = convertNumber(num, sampleKorea);
@@ -5091,12 +5102,16 @@
 		}
 		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, {focusOpt: NO_SCROLL});
 		for (const media of [mobileMedia, compactMedia]) on(media, "change", adaptLayout);
+		const stepLabel = byId("step-label");
+		let lastWorkflowStep = "";
 		function updateWorkflowStep() {
 			const step = state.isRunning || state.isStopping ? "lookup" :
 				state.processed ? "results" : "input";
+			if (step === lastWorkflowStep) return;
+			lastWorkflowStep = step;
 			for (const item of steps)
 				item.ariaCurrent = item.dataset.step === step ? "step" : null;
-			byId("step-label").textContent =
+			stepLabel.textContent =
 				step === "lookup" ? "2/3 · 주소 조회" :
 					step === "results" ? "3/3 · 결과 확인" : "1/3 · 데이터 입력";
 		}
@@ -5311,30 +5326,45 @@
 			buttons[next].focus();
 			selectRecord(Number(buttons[next].dataset.record), false);
 		});
+		const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
+		let activeDrag = null;
+		on(window, "pointermove", event => {
+			const d = activeDrag;
+			if (!d || event.pointerId !== d.id) return;
+			if (!(event.buttons & 1)) return d.finish(event);
+			d.offset = Math.max(0, d.startOffset + event.clientY - d.y);
+			d.sheet.style.translate = `0 ${d.offset}px`;
+		});
+		on(window, "pointerup", event => {
+			const d = activeDrag;
+			if (!d || event.pointerId !== d.id) return;
+			const dx = event.clientX - d.x, dy = event.clientY - d.y;
+			d.finish(event, dy > 80 && dy > Math.abs(dx) * 1.4);
+		});
+		on(window, "pointercancel", event => activeDrag?.finish(event));
+		for (const ev of ["blur", "resize"]) on(window, ev, () => activeDrag?.reset());
 		function enableSheetDrag(sheet, dismiss = () => sheet.close()) {
 			const heading = query(".sheet-heading", sheet);
 			const popover = sheet.hasAttribute("popover");
 			const isOpen = () => popover ? sheet.matches(":popover-open") : sheet.open;
-			let drag = null;
 			let motion = null;
 			function reset() {
-				const pointerId = drag?.id;
-				drag = null;
+				const d = activeDrag?.sheet === sheet ? activeDrag : null;
+				if (d) activeDrag = null;
 				motion?.cancel();
 				motion = null;
 				sheet.style.removeProperty("translate");
-				if (pointerId !== undefined && heading.hasPointerCapture(pointerId))
-					heading.releasePointerCapture(pointerId);
+				if (d && heading.hasPointerCapture(d.id)) heading.releasePointerCapture(d.id);
 			}
 			function finish(event, shouldDismiss = false) {
-				if (!drag || event.pointerId !== drag.id) return;
-				const offset = drag.offset;
+				if (activeDrag?.sheet !== sheet || event.pointerId !== activeDrag.id) return;
+				const offset = activeDrag.offset;
 				reset();
 				if (!isOpen() || !mobileMedia.matches) return;
 				const animation = sheet.animate([
 					{translate: `0 ${offset}px`},
 					{translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`},
-				], {duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
+				], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
 				motion = animation;
 				animation.finished.then(() => {
 					if (motion !== animation) return;
@@ -5346,25 +5376,13 @@
 				if (!mobileMedia.matches || !isOpen() || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
 				event.preventDefault();
 				const offset = parseFloat(getComputedStyle(sheet).translate.split(" ")[1]) || 0;
+				activeDrag?.reset();
 				reset();
-				drag = {id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset};
+				activeDrag = {sheet, id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset, reset, finish};
 				sheet.style.translate = `0 ${offset}px`;
 				heading.setPointerCapture(event.pointerId);
 			});
-			on(window, "pointermove", event => {
-				if (!drag || event.pointerId !== drag.id) return;
-				if (!(event.buttons & 1)) return finish(event);
-				drag.offset = Math.max(0, drag.startOffset + event.clientY - drag.y);
-				sheet.style.translate = `0 ${drag.offset}px`;
-			});
-			on(window, "pointerup", event => {
-				if (!drag || event.pointerId !== drag.id) return;
-				const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-				finish(event, dy > 80 && dy > Math.abs(dx) * 1.4);
-			});
-			on(window, "pointercancel", finish);
 			on(heading, "lostpointercapture", finish);
-			for (const ev of ["blur", "resize"]) on(window, ev, reset);
 			for (const ev of ["beforetoggle", "close"]) on(sheet, ev, reset);
 		}
 		for (const [sheet, dismiss] of [

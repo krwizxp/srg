@@ -1,7 +1,7 @@
 use super::{MIN_TRANSFER_TIME, Result, TimeError, TimeErrorKind, TimeSample, http_date::HttpDate};
 #[cfg(target_os = "windows")]
 use core::error::Error;
-use core::{fmt::Display, result::Result as CoreResult};
+use core::result::Result as CoreResult;
 use std::time::{Instant, SystemTime};
 cfg_select! {
     any(target_os = "linux", target_os = "macos") => {
@@ -64,17 +64,25 @@ impl FreshTimeHeaders {
         })
     }
 }
-fn error(context: &str, detail: impl Display) -> TimeError {
-    TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
+#[cold]
+#[inline(never)]
+fn error(context: &str, detail: &str) -> TimeError {
+    let mut message = String::with_capacity(context.len().strict_add(detail.len()).strict_add(2));
+    message.push_str(context);
+    message.push_str(": ");
+    message.push_str(detail);
+    TimeError::new(TimeErrorKind::NativeHttp, message)
 }
 #[cfg(target_os = "windows")]
-fn error_with_source<E>(context: &str, detail: impl Display, source: E) -> TimeError
+#[cold]
+#[inline(never)]
+fn error_with_source<E>(context: &str, detail: &str, source: E) -> TimeError
 where
     E: Error + Send + Sync + 'static,
 {
-    TimeError::new_with_source(
-        TimeErrorKind::NativeHttp,
-        format!("{context}: {detail}"),
-        source,
-    )
+    let mut message = String::with_capacity(context.len().strict_add(detail.len()).strict_add(2));
+    message.push_str(context);
+    message.push_str(": ");
+    message.push_str(detail);
+    TimeError::new_with_source(TimeErrorKind::NativeHttp, message, source)
 }

@@ -44,7 +44,7 @@ impl Bits<'_> {
     }
     const fn consume(&mut self, count: u32) {
         self.bit_buffer >>= count;
-        self.bit_count = self.bit_count.strict_sub(count);
+        self.bit_count = self.bit_count.wrapping_sub(count);
     }
     const fn is_exhausted(&self) -> bool {
         self.cursor == self.bytes.len() && self.bit_count < 8
@@ -80,8 +80,8 @@ impl Bits<'_> {
             .and_then(|tail| tail.first_chunk::<4>())
         {
             self.bit_buffer |= u64::from(u32::from_le_bytes(chunk)) << self.bit_count;
-            self.cursor = self.cursor.strict_add(4);
-            self.bit_count = self.bit_count.strict_add(32);
+            self.cursor = self.cursor.wrapping_add(4);
+            self.bit_count = self.bit_count.wrapping_add(32);
             return;
         }
         while self.bit_count < needed {
@@ -303,7 +303,7 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                         if symbol < 256 {
                             *output.get_mut(written).ok_or("경계 압축 출력 한도 오류")? =
                                 symbol.to_le_bytes()[0];
-                            written = written.strict_add(1);
+                            written = written.wrapping_add(1);
                             continue;
                         }
                         let length = decode_extra(
@@ -328,10 +328,10 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             .ok_or("경계 압축 출력 한도 오류")?;
                         if backward >= length {
                             output.copy_within(
-                                source_start..source_start.strict_add(length),
+                                source_start..source_start.wrapping_add(length),
                                 written,
                             );
-                            written = written.strict_add(length);
+                            written = written.wrapping_add(length);
                         } else {
                             let mut copied = 0_usize;
                             while copied < length {
@@ -358,11 +358,11 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
         for chunk in output
             .get(..written)
             .ok_or("경계 압축 출력 오류")?
-            .chunks(1024)
+            .chunks(5552)
         {
             for byte in chunk {
-                first = first.strict_add(u32::from(*byte));
-                second = second.strict_add(first);
+                first = first.wrapping_add(u32::from(*byte));
+                second = second.wrapping_add(first);
             }
             first = first.rem_euclid(0xFFF1);
             second = second.rem_euclid(0xFFF1);

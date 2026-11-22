@@ -14,6 +14,8 @@ pub(super) struct AppError {
 }
 struct ControlEscapingWriter<'formatter, 'output>(&'formatter mut fmt::Formatter<'output>);
 impl AppError {
+    #[cold]
+    #[inline(never)]
     pub(super) fn context(
         context: impl Into<Cow<'static, str>>,
         source: impl Error + Send + Sync + 'static,
@@ -23,6 +25,8 @@ impl AppError {
             source: Some(Box::new(source)),
         }
     }
+    #[cold]
+    #[inline(never)]
     pub(super) fn message(message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             message: message.into(),

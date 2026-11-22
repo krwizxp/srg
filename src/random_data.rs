@@ -10,19 +10,19 @@ use crate::{
 use std::process;
 const ASCII_PRINTABLE_LEN: u64 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
-const BINOMIAL_VALUES: [[u32; 8]; 51] = {
-    let mut values = [[0; 8]; 51];
-    let mut rows: &mut [[u32; 8]] = &mut values;
-    let mut total = 0_u32;
+const BINOMIAL_VALUES: [[u32; 51]; 8] = {
+    let mut values = [[0; 51]; 8];
+    let mut rows: &mut [[u32; 51]] = &mut values;
+    let mut choose = 0_u32;
     while let Some((row, remaining_rows)) = rows.split_first_mut() {
         let mut cells: &mut [u32] = row;
-        let mut choose = 0_u32;
+        let mut total = 0_u32;
         while let Some((cell, remaining_cells)) = cells.split_first_mut() {
             *cell = binomial(total, choose);
-            choose = choose.strict_add(1);
+            total = total.strict_add(1);
             cells = remaining_cells;
         }
-        total = total.strict_add(1);
+        choose = choose.strict_add(1);
         rows = remaining_rows;
     }
     values
@@ -159,8 +159,11 @@ impl RandomDataBuildState<'_> {
         let euro_rank = low_u32_from_u64(rem_pin_euro.div_euclid(NUMERIC_PASSWORD_MODULUS));
         self.data.solar_system_index = low_u16_from_u64(solar_rem.strict_add(1));
         self.data.numeric_password = low_u32_from_u64(pin_rem);
-        self.data.euro_millions_main_numbers =
-            unrank_combination::<EURO_MILLIONS_MAIN_COUNT>(euro_rank, EURO_MAIN_MAX);
+        unrank_combination_into(
+            euro_rank,
+            EURO_MAIN_MAX,
+            &mut self.data.euro_millions_main_numbers,
+        );
     }
     fn fill_hangul_from_u64(&mut self, value: u64) {
         if !self.data.hangul_syllables.contains(&'\0') {
@@ -190,10 +193,13 @@ impl RandomDataBuildState<'_> {
         let korea_lotto_rank = low_u32_from_u64(rem_lottos.rem_euclid(LOTTO_COMB));
         let japan_lotto_rank = low_u32_from_u64(rem_lottos.div_euclid(LOTTO_COMB));
         self.data.planet_number = low_u8_from_u64(planet_rem.strict_add(1));
-        self.data.euro_millions_lucky_stars =
-            unrank_combination::<EURO_MILLIONS_LUCKY_COUNT>(lucky_rank, EURO_LUCKY_MAX);
-        self.data.lotto_numbers = unrank_combination::<LOTTO_COUNT>(korea_lotto_rank, LOTTO_MAX);
-        self.data.lotto7_numbers = unrank_combination::<LOTTO7_COUNT>(japan_lotto_rank, LOTTO7_MAX);
+        unrank_combination_into(
+            lucky_rank,
+            EURO_LUCKY_MAX,
+            &mut self.data.euro_millions_lucky_stars,
+        );
+        unrank_combination_into(korea_lotto_rank, LOTTO_MAX, &mut self.data.lotto_numbers);
+        unrank_combination_into(japan_lotto_rank, LOTTO7_MAX, &mut self.data.lotto7_numbers);
     }
     fn fill_password_from_u64(&mut self, value: u64) {
         if !self.data.password.contains(&0) {
@@ -248,13 +254,7 @@ const fn binomial(total: u32, choose: u32) -> u32 {
     }
     result
 }
-fn combination_count(total: u32, choose: usize) -> u32 {
-    BINOMIAL_VALUES
-        .get(usize::try_from(total).unwrap_or_else(|_| process::abort()))
-        .and_then(|row| row.get(choose))
-        .copied()
-        .unwrap_or_else(|| process::abort())
-}
+
 const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
     // Callers supply 8-bit or 12-bit fields; shift the origin within that field.
     value.strict_add(OFFSET) & MASK
@@ -286,22 +286,23 @@ const fn mix_bounded<const MODULUS: u64>(value: u64, salt: u64) -> Option<u64> {
         Some(mixed.rem_euclid(MODULUS))
     }
 }
-fn unrank_combination<const K: usize>(mut rank: u32, max_n: u32) -> [u8; K] {
-    let mut out = [0_u8; K];
-    let mut upper = max_n;
-    for slot_num in (1..=K).rev() {
-        let mut value = upper.strict_sub(1);
-        let mut combinations = combination_count(value, slot_num);
-        while combinations > rank {
-            value = value.strict_sub(1);
-            combinations = combination_count(value, slot_num);
+fn unrank_combination_into(mut rank: u32, max_n: u32, out: &mut [u8]) {
+    let mut upper = usize::try_from(max_n).unwrap_or_else(|_| process::abort());
+    for (idx, slot) in out.iter_mut().enumerate().rev() {
+        if idx == 0 {
+            *slot = low_u8_from_u32(rank.strict_add(1));
+            return;
         }
-        rank = rank.strict_sub(combinations);
-        let slot = out
-            .get_mut(slot_num.strict_sub(1))
+        let slot_num = idx.strict_add(1);
+        let row = BINOMIAL_VALUES
+            .get(slot_num)
+            .and_then(|values| values.get(..upper))
             .unwrap_or_else(|| process::abort());
-        *slot = low_u8_from_u32(value.strict_add(1));
+        let value = row.partition_point(|&comb| comb <= rank).strict_sub(1);
+        let combinations = *row.get(value).unwrap_or_else(|| process::abort());
+        rank = rank.strict_sub(combinations);
+        let value_u32 = u32::try_from(value).unwrap_or_else(|_| process::abort());
+        *slot = low_u8_from_u32(value_u32.strict_add(1));
         upper = value;
     }
-    out
 }

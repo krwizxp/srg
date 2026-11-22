@@ -419,6 +419,16 @@ impl Library {
         };
         Ok(Self { handle })
     }
+    #[inline(never)]
+    fn raw_symbol(&self, name: &CStr) -> InputResult<NonNull<c_void>> {
+        // SAFETY: dlerror has no preconditions and clears any previous loader error.
+        unsafe {
+            sys::dlerror();
+        }
+        // SAFETY: self.handle is live and name is NUL-terminated.
+        NonNull::new(unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) })
+            .ok_or_else(dl_error_message)
+    }
     fn typed_symbol<F>(&self, name: &CStr) -> InputResult<F>
     where
         F: Copy,
@@ -430,13 +440,7 @@ impl Library {
                 "dynamic loader symbol ABI가 함수 포인터와 다릅니다."
             );
         }
-        // SAFETY: dlerror has no preconditions and clears any previous loader error.
-        unsafe {
-            sys::dlerror();
-        }
-        // SAFETY: self.handle is live and name is NUL-terminated.
-        let symbol = NonNull::new(unsafe { sys::dlsym(self.handle.as_ptr(), name.as_ptr()) })
-            .ok_or_else(dl_error_message)?;
+        let symbol = self.raw_symbol(name)?;
         // SAFETY: each symbol name is paired with its exact C function pointer type, ABI size and
         // alignment are checked at compile time, and the owning API keeps this library loaded.
         Ok(unsafe {

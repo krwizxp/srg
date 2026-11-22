@@ -162,18 +162,14 @@ impl BoundaryIndex {
                         (offset > 0).ok_or("대한민국 경계 교차 블록 누락")?;
                         chains_started = true;
                         for &[start, end] in vertices.array_windows::<2>() {
-                            let min_lat = start[1].min(end[1]);
-                            let max_lat = start[1].max(end[1]);
-                            if point.latitude < min_lat || point.latitude > max_lat {
-                                continue;
-                            }
-                            let min_lon = start[0].min(end[0]);
-                            let max_lon = start[0].max(end[0]);
-                            if point.longitude > max_lon {
+                            if (point.latitude < start[1] && point.latitude < end[1])
+                                || (point.latitude > start[1] && point.latitude > end[1])
+                                || (point.longitude > start[0] && point.longitude > end[0])
+                            {
                                 continue;
                             }
                             let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
-                            if point.longitude < min_lon {
+                            if point.longitude < start[0] && point.longitude < end[0] {
                                 parity ^= crosses;
                                 continue;
                             }
@@ -283,8 +279,13 @@ impl BoundaryIndex {
                     .ok_or("대한민국 타일 행 오류")?;
                 let mut previous = south;
                 let mut endpoints = Vec::with_capacity(count);
-                for offset in 0..count {
-                    let value = read_f64(raw, 32_usize.strict_add(offset.strict_mul(8)))?;
+                for chunk in raw
+                    .get(32..)
+                    .ok_or("대한민국 경계 교차 길이 오류")?
+                    .as_chunks::<8>()
+                    .0
+                {
+                    let value = f64::from_le_bytes(*chunk);
                     (value.is_finite() && value > previous && value <= north)
                         .ok_or("대한민국 경계 교차 범위 오류")?;
                     endpoints.push(value);
@@ -322,25 +323,24 @@ impl BoundaryIndex {
                 for slot in &mut planes {
                     *slot = plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?;
                 }
+                let [p0, p1, p2, p3, p4, p5, p6, p7] = planes.map(|plane| plane.as_chunks::<2>().0);
                 let mut vertices = Vec::with_capacity(count.strict_add(1));
                 let [west, south, east, north] = self.bounds;
-                for position in 0..=count {
-                    let base_word = position.strict_mul(2);
-                    let mut point = [0.0_f64; 2];
-                    for (axis, coordinate) in point.iter_mut().enumerate() {
-                        let word = base_word.strict_add(axis);
-                        let mut number = [0_u8; 8];
-                        for (dst, plane) in number.iter_mut().zip(planes) {
-                            *dst = *plane.get(word).ok_or("대한민국 경계 정점 길이 오류")?;
-                        }
-                        *coordinate = f64::from_le_bytes(number);
-                    }
-                    (point[0] >= west
-                        && point[0] <= east
-                        && point[1] >= south
-                        && point[1] <= north)
+                for (((b0, b1), (b2, b3)), ((b4, b5), (b6, b7))) in p0
+                    .iter()
+                    .zip(p1)
+                    .zip(p2.iter().zip(p3))
+                    .zip(p4.iter().zip(p5).zip(p6.iter().zip(p7)))
+                {
+                    let lon = f64::from_le_bytes([
+                        b0[0], b1[0], b2[0], b3[0], b4[0], b5[0], b6[0], b7[0],
+                    ]);
+                    let lat = f64::from_le_bytes([
+                        b0[1], b1[1], b2[1], b3[1], b4[1], b5[1], b6[1], b7[1],
+                    ]);
+                    (lon >= west && lon <= east && lat >= south && lat <= north)
                         .ok_or("대한민국 경계 정점 범위 오류")?;
-                    vertices.push(point);
+                    vertices.push([lon, lat]);
                 }
                 let retained_bytes = vertices
                     .len()
@@ -552,15 +552,14 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         (next_page == page_count).ok_or("대한민국 경계 전체 블록 개수 오류")?;
         (KOREA_TILE_BYTES.len() == 0x8000).ok_or("대한민국 좌표 타일 인덱스 길이 오류")?;
         let mut selected = Vec::with_capacity(KOREA_TILE_COUNT);
-        for tile in 0_usize..0x0004_0000_usize {
-            let byte = *KOREA_TILE_BYTES
-                .get(tile >> 3_i32)
-                .ok_or("대한민국 타일 비트맵 위치 오류")?;
-            if byte & (1_u8 << (tile & 7_usize)) != 0 {
-                selected.push(
-                    u32::try_from(tile)
-                        .map_err(|source| format!("대한민국 타일 번호 오류: {source}"))?,
-                );
+        for (word_index, chunk) in KOREA_TILE_BYTES.as_chunks::<8>().0.iter().enumerate() {
+            let mut bits = u64::from_le_bytes(*chunk);
+            let base = u32::try_from(word_index)
+                .map_err(|source| format!("대한민국 타일 번호 오류: {source}"))?
+                .strict_mul(64);
+            while bits != 0 {
+                selected.push(base | bits.trailing_zeros());
+                bits &= bits.wrapping_sub(1);
             }
         }
         (selected.len() == KOREA_TILE_COUNT).ok_or("대한민국 좌표 타일 개수 오류")?;
