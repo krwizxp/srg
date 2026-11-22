@@ -26,20 +26,11 @@ struct CGPoint {
     y: f64,
 }
 const _: () = assert!(
-    size_of::<CGPoint>() == 16,
-    "CoreGraphics CGPoint size mismatch"
-);
-const _: () = assert!(
-    align_of::<CGPoint>() == 8,
-    "CoreGraphics CGPoint align mismatch"
-);
-const _: () = assert!(
-    offset_of!(CGPoint, x) == 0,
-    "CoreGraphics CGPoint x offset mismatch"
-);
-const _: () = assert!(
-    offset_of!(CGPoint, y) == 8,
-    "CoreGraphics CGPoint y offset mismatch"
+    size_of::<CGPoint>() == 16
+        && align_of::<CGPoint>() == 8
+        && offset_of!(CGPoint, x) == 0
+        && offset_of!(CGPoint, y) == 8,
+    "CoreGraphics CGPoint layout mismatch"
 );
 struct Event {
     raw: NonNull<c_void>,

@@ -3,20 +3,68 @@ use std::sync::LazyLock;
 const CODE_ORDER: [usize; 19] = [
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
 ];
-const DISTANCE_BASE: [usize; 30] = [
-    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
-    2049, 3073, 4097, 6145, 8193, 12289, 0x4001, 24577,
+const DISTANCE_TABLE: [(usize, u32); 30] = [
+    (1, 0),
+    (2, 0),
+    (3, 0),
+    (4, 0),
+    (5, 1),
+    (7, 1),
+    (9, 2),
+    (13, 2),
+    (17, 3),
+    (25, 3),
+    (33, 4),
+    (49, 4),
+    (65, 5),
+    (97, 5),
+    (129, 6),
+    (193, 6),
+    (257, 7),
+    (385, 7),
+    (513, 8),
+    (769, 8),
+    (1025, 9),
+    (1537, 9),
+    (2049, 10),
+    (3073, 10),
+    (4097, 11),
+    (6145, 11),
+    (8193, 12),
+    (12289, 12),
+    (0x4001, 13),
+    (24577, 13),
 ];
-const DISTANCE_EXTRA: [u32; 30] = [
-    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13,
-    13,
-];
-const LENGTH_BASE: [usize; 29] = [
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,
-    163, 195, 227, 258,
-];
-const LENGTH_EXTRA: [u32; 29] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
+const LENGTH_TABLE: [(usize, u32); 29] = [
+    (3, 0),
+    (4, 0),
+    (5, 0),
+    (6, 0),
+    (7, 0),
+    (8, 0),
+    (9, 0),
+    (10, 0),
+    (11, 1),
+    (13, 1),
+    (15, 1),
+    (17, 1),
+    (19, 2),
+    (23, 2),
+    (27, 2),
+    (31, 2),
+    (35, 3),
+    (43, 3),
+    (51, 3),
+    (59, 3),
+    (67, 4),
+    (83, 4),
+    (99, 4),
+    (115, 4),
+    (131, 5),
+    (163, 5),
+    (195, 5),
+    (227, 5),
+    (258, 0),
 ];
 static FIXED_TREES: LazyLock<Result<HuffmanTrees>> = LazyLock::new(|| {
     let mut lengths = [8_u8; 288];
@@ -80,6 +128,9 @@ impl Bits<'_> {
         self.consume(count);
         Ok(u32::from_le_bytes([b0, b1, b2, b3]))
     }
+    fn read_usize(&mut self, count: u32, context: &'static str) -> Result<usize> {
+        usize::try_from(self.read(count)?).map_err(|source| format!("{context}: {source}").into())
+    }
     fn refill(&mut self, needed: u32) {
         if self.bit_count >= needed {
             return;
@@ -121,23 +172,16 @@ impl Huffman {
         }
         let mut remaining = 1_u32;
         let mut offsets = [0_u16; 16];
-        for length in 1_usize..16 {
-            let length_count = *result.counts.get(length).ok_or("경계 압축 코드 오류")?;
+        let mut next_offset = 0_u16;
+        for (&length_count, offset_slot) in
+            result.counts.iter().skip(1).zip(offsets.iter_mut().skip(1))
+        {
             remaining = remaining
                 .strict_mul(2)
                 .checked_sub(u32::from(length_count))
                 .ok_or("경계 압축 코드가 중복됩니다.")?;
-            if length > 1 {
-                *offsets.get_mut(length).ok_or("경계 압축 코드 오류")? = offsets
-                    .get(length.strict_sub(1))
-                    .ok_or("경계 압축 코드 오류")?
-                    .strict_add(
-                        *result
-                            .counts
-                            .get(length.strict_sub(1))
-                            .ok_or("경계 압축 코드 오류")?,
-                    );
-            }
+            *offset_slot = next_offset;
+            next_offset = next_offset.strict_add(length_count);
         }
         (remaining == 0 || (!require_complete && lengths.iter().all(|&length| length <= 1)))
             .ok_or("경계 압축 코드가 불완전합니다.")?;
@@ -157,11 +201,7 @@ impl Huffman {
         }
         let mut first = 0_u16;
         let mut index = 0_usize;
-        for length in 1_u16..=9 {
-            let count = *result
-                .counts
-                .get(usize::from(length))
-                .ok_or("경계 압축 코드 길이 오류")?;
+        for (length, &count) in (1_u16..=9).zip(result.counts.iter().skip(1)) {
             for offset in 0..count {
                 let symbol = *result
                     .symbols
@@ -223,12 +263,15 @@ impl AsRef<[u8]> for InflatedPage<'_> {
 impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
     type Error = AppError;
     fn try_from(bits: &mut Bits<'_>) -> Result<Self> {
-        let literal_count = usize::try_from(bits.read(5)?.strict_add(257))
-            .map_err(|source| format!("경계 압축 코드 개수 오류: {source}"))?;
-        let distance_count = usize::try_from(bits.read(5)?.strict_add(1))
-            .map_err(|source| format!("경계 압축 코드 개수 오류: {source}"))?;
-        let code_count = usize::try_from(bits.read(4)?.strict_add(4))
-            .map_err(|source| format!("경계 압축 코드 개수 오류: {source}"))?;
+        let literal_count = bits
+            .read_usize(5, "경계 압축 코드 개수 오류")?
+            .strict_add(257);
+        let distance_count = bits
+            .read_usize(5, "경계 압축 코드 개수 오류")?
+            .strict_add(1);
+        let code_count = bits
+            .read_usize(4, "경계 압축 코드 개수 오류")?
+            .strict_add(4);
         (literal_count <= 286).ok_or("경계 압축 코드 개수 오류")?;
         let mut code_lengths = [0_u8; 19];
         for &position in CODE_ORDER.iter().take(code_count) {
@@ -248,19 +291,10 @@ impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
                     *lengths
                         .get(filled.checked_sub(1).ok_or("경계 압축 코드 반복 오류")?)
                         .ok_or("경계 압축 코드 반복 오류")?,
-                    usize::try_from(bits.read(2)?.strict_add(3))
-                        .map_err(|source| format!("경계 압축 반복 오류: {source}"))?,
+                    bits.read_usize(2, "경계 압축 반복 오류")?.strict_add(3),
                 ),
-                17 => (
-                    0,
-                    usize::try_from(bits.read(3)?.strict_add(3))
-                        .map_err(|source| format!("경계 압축 반복 오류: {source}"))?,
-                ),
-                18 => (
-                    0,
-                    usize::try_from(bits.read(7)?.strict_add(11))
-                        .map_err(|source| format!("경계 압축 반복 오류: {source}"))?,
-                ),
+                17 => (0, bits.read_usize(3, "경계 압축 반복 오류")?.strict_add(3)),
+                18 => (0, bits.read_usize(7, "경계 압축 반복 오류")?.strict_add(11)),
                 _ => return Err("경계 압축 코드 길이 오류".into()),
             };
             let next = filled.strict_add(count);
@@ -333,30 +367,21 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             written = written.strict_add(1);
                             continue;
                         }
-                        let index = usize::from(symbol.strict_sub(257));
-                        let length = LENGTH_BASE
-                            .get(index)
-                            .ok_or("경계 압축 길이 코드 오류")?
-                            .strict_add(
-                                usize::try_from(bits.read(
-                                    *LENGTH_EXTRA.get(index).ok_or("경계 압축 길이 코드 오류")?,
-                                )?)
-                                .map_err(|source| format!("경계 압축 길이 오류: {source}"))?,
-                            );
+                        let length = decode_extra(
+                            &LENGTH_TABLE,
+                            usize::from(symbol.strict_sub(257)),
+                            &mut bits,
+                            "경계 압축 길이 코드 오류",
+                            "경계 압축 길이 오류",
+                        )?;
                         let distance_index = usize::from(trees.distance.symbol(&mut bits)?);
-                        let backward = DISTANCE_BASE
-                            .get(distance_index)
-                            .ok_or("경계 압축 거리 코드 오류")?
-                            .strict_add(
-                                usize::try_from(
-                                    bits.read(
-                                        *DISTANCE_EXTRA
-                                            .get(distance_index)
-                                            .ok_or("경계 압축 거리 코드 오류")?,
-                                    )?,
-                                )
-                                .map_err(|source| format!("경계 압축 거리 오류: {source}"))?,
-                            );
+                        let backward = decode_extra(
+                            &DISTANCE_TABLE,
+                            distance_index,
+                            &mut bits,
+                            "경계 압축 거리 코드 오류",
+                            "경계 압축 거리 오류",
+                        )?;
                         let source_start = written
                             .checked_sub(backward)
                             .ok_or("경계 압축 참조 위치 오류")?;
@@ -401,4 +426,14 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
             .ok_or("경계 압축 체크섬 오류")?;
         Ok(Self(output.get(..written).ok_or("경계 압축 출력 오류")?))
     }
+}
+fn decode_extra(
+    table: &[(usize, u32)],
+    index: usize,
+    bits: &mut Bits<'_>,
+    code_err: &'static str,
+    range_err: &'static str,
+) -> Result<usize> {
+    let &(base, extra_bits) = table.get(index).ok_or(code_err)?;
+    Ok(base.strict_add(bits.read_usize(extra_bits, range_err)?))
 }

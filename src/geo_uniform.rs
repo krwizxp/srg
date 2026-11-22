@@ -69,49 +69,48 @@ impl TryFrom<(u64, BoundaryAreaBounds)> for Coordinates {
 fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
     let delta = (latitude - 36.0_f64) * DEGREES;
     let square = delta * delta;
-    let mut sine_polynomial = -2.505_210_838_544_172e-8_f64;
-    for coefficient in [
-        2.755_731_922_398_589_3e-6_f64,
-        -0.000_198_412_698_412_698_4_f64,
-        0.008_333_333_333_333_333_f64,
-        -0.166_666_666_666_666_66_f64,
-        1.0_f64,
-    ] {
-        let term = square * sine_polynomial;
-        sine_polynomial = coefficient + term;
-    }
-    let sine_delta = delta * sine_polynomial;
-    let mut cosine_polynomial = 2.087_675_698_786_81e-9_f64;
-    for coefficient in [
-        -2.755_731_922_398_589e-7_f64,
-        2.480_158_730_158_73e-5_f64,
-        -0.001_388_888_888_888_889_f64,
-        0.041_666_666_666_666_664_f64,
-        -0.5_f64,
-        1.0_f64,
-    ] {
-        let term = square * cosine_polynomial;
-        cosine_polynomial = coefficient + term;
-    }
-    let cosine_delta = cosine_polynomial;
+    let sine_delta = delta
+        * eval_poly(
+            square,
+            -2.505_210_838_544_172e-8_f64,
+            &[
+                2.755_731_922_398_589_3e-6_f64,
+                -0.000_198_412_698_412_698_4_f64,
+                0.008_333_333_333_333_333_f64,
+                -0.166_666_666_666_666_66_f64,
+                1.0_f64,
+            ],
+        );
+    let cosine_delta = eval_poly(
+        square,
+        2.087_675_698_786_81e-9_f64,
+        &[
+            -2.755_731_922_398_589e-7_f64,
+            2.480_158_730_158_73e-5_f64,
+            -0.001_388_888_888_888_889_f64,
+            0.041_666_666_666_666_664_f64,
+            -0.5_f64,
+            1.0_f64,
+        ],
+    );
     let cosine_part = 0.587_785_252_292_473_1_f64 * cosine_delta;
     let sine_part = 0.809_016_994_374_947_5_f64 * sine_delta;
     let sine = cosine_part + sine_part;
     let square_eccentric_sine = ECCENTRICITY_SQUARED * sine * sine;
-    let mut polynomial = 9.0_f64 / 17.0_f64;
-    for coefficient in [
-        8.0_f64 / 15.0_f64,
-        7.0_f64 / 13.0_f64,
-        6.0_f64 / 11.0_f64,
-        5.0_f64 / 9.0_f64,
-        4.0_f64 / 7.0_f64,
-        3.0_f64 / 5.0_f64,
-        2.0_f64 / 3.0_f64,
-        1.0_f64,
-    ] {
-        let contribution = square_eccentric_sine * polynomial;
-        polynomial = coefficient + contribution;
-    }
+    let polynomial = eval_poly(
+        square_eccentric_sine,
+        9.0_f64 / 17.0_f64,
+        &[
+            8.0_f64 / 15.0_f64,
+            7.0_f64 / 13.0_f64,
+            6.0_f64 / 11.0_f64,
+            5.0_f64 / 9.0_f64,
+            4.0_f64 / 7.0_f64,
+            3.0_f64 / 5.0_f64,
+            2.0_f64 / 3.0_f64,
+            1.0_f64,
+        ],
+    );
     let longitude_cosine_term = 0.809_016_994_374_947_5_f64 * cosine_delta;
     let longitude_sine_term = 0.587_785_252_292_473_1_f64 * sine_delta;
     let cosine = longitude_cosine_term - longitude_sine_term;
@@ -119,6 +118,12 @@ fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
     let numerator = DEGREES * cosine;
     let denominator_squared = denominator * denominator;
     (sine * polynomial, numerator / denominator_squared)
+}
+fn eval_poly(point: f64, initial: f64, coefficients: &[f64]) -> f64 {
+    coefficients.iter().fold(initial, |acc, &coeff| {
+        let term = point * acc;
+        coeff + term
+    })
 }
 pub(super) fn product_error(left: f64, right: f64, product: f64) -> f64 {
     let split_left = 134_217_729.0_f64 * left;

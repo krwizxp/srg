@@ -55,10 +55,7 @@ impl HardwareRng {
         if unsafe { _rdseed64_step(&mut value) } == 1_i32 {
             return Ok(value);
         }
-        if self.rdrand_supported
-            && let Ok(fallback) = Self::rdrand_random()
-        {
-            self.fallback_notice_pending.store(true, Ordering::Release);
+        if let Some(fallback) = self.try_rdrand_fallback() {
             return Ok(fallback);
         }
         if Self::try_rdseed(&mut value) {
@@ -80,10 +77,7 @@ impl HardwareRng {
             if Self::try_rdseed(&mut value) {
                 return Ok(value);
             }
-            if self.rdrand_supported
-                && let Ok(fallback) = Self::rdrand_random()
-            {
-                self.fallback_notice_pending.store(true, Ordering::Release);
+            if let Some(fallback) = self.try_rdrand_fallback() {
                 return Ok(fallback);
             }
             match self.source() {
@@ -112,6 +106,11 @@ impl HardwareRng {
         } else {
             HardwareRandomSource::None
         }
+    }
+    fn try_rdrand_fallback(&self) -> Option<u64> {
+        let fallback = self.rdrand_supported.then(Self::rdrand_random)?.ok()?;
+        self.fallback_notice_pending.store(true, Ordering::Release);
+        Some(fallback)
     }
     fn try_rdseed(value: &mut u64) -> bool {
         for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {

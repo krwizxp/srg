@@ -31,22 +31,13 @@ const EURO_MAIN_COMB: u64 = binomial(EURO_MAIN_MAX, 5) as u64;
 const EURO_MAIN_MAX: u32 = 50;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
-const EURO_PIN_NMS_LIMIT: u64 = u64::MAX
-    .div_euclid(EURO_PIN_NMS_MODULUS)
-    .strict_mul(EURO_PIN_NMS_MODULUS);
 const EURO_PIN_NMS_MODULUS: u64 = EURO_MAIN_COMB
     .strict_mul(NUMERIC_PASSWORD_MODULUS)
     .strict_mul(NMS_SOLAR_SYSTEM_MODULUS);
 const HANGUL_BASE_CODE_POINT: u32 = 0xAC00;
-const HANGUL_QUAD_LIMIT: u64 = u64::MAX
-    .div_euclid(HANGUL_QUAD_MODULUS)
-    .strict_mul(HANGUL_QUAD_MODULUS);
 const HANGUL_QUAD_MODULUS: u64 = HANGUL_SYLLABLE_MODULUS.strict_pow(4);
 const HANGUL_SYLLABLE_COUNT: usize = 4;
 const HANGUL_SYLLABLE_MODULUS: u64 = 11_172;
-const LOTTO_BUNDLE_LIMIT: u64 = u64::MAX
-    .div_euclid(LOTTO_BUNDLE_MODULUS)
-    .strict_mul(LOTTO_BUNDLE_MODULUS);
 const LOTTO_BUNDLE_MODULUS: u64 = LOTTO_COMB
     .strict_mul(LOTTO7_COMB)
     .strict_mul(EURO_LUCKY_COMB)
@@ -68,9 +59,6 @@ const NMS_PLANET_MODULUS: u64 = 6;
 const NMS_SOLAR_SYSTEM_MODULUS: u64 = 767;
 const NUMERIC_PASSWORD_MODULUS: u64 = 1_000_000;
 const PASSWORD_BYTE_LEN: usize = 8;
-const PASSWORD_OCTET_LIMIT: u64 = u64::MAX
-    .div_euclid(PASSWORD_OCTET_MODULUS)
-    .strict_mul(PASSWORD_OCTET_MODULUS);
 const PASSWORD_OCTET_MODULUS: u64 = ASCII_PRINTABLE_LEN.strict_pow(8);
 const SUPPLEMENTAL_RETRY_LIMIT: usize = 1024;
 const U32_MAX_INV: f64 = 1.0 / 4_294_967_295.0;
@@ -162,11 +150,9 @@ impl RandomDataBuildState<'_> {
         if self.data.solar_system_index != 0 {
             return;
         }
-        let mixed = mix_word(value, MIX_SALT_EURO);
-        if mixed >= EURO_PIN_NMS_LIMIT {
+        let Some(rem) = mix_bounded::<EURO_PIN_NMS_MODULUS>(value, MIX_SALT_EURO) else {
             return;
-        }
-        let rem = mixed.rem_euclid(EURO_PIN_NMS_MODULUS);
+        };
         let solar_rem = rem.rem_euclid(NMS_SOLAR_SYSTEM_MODULUS);
         let rem_pin_euro = rem.div_euclid(NMS_SOLAR_SYSTEM_MODULUS);
         let pin_rem = rem_pin_euro.rem_euclid(NUMERIC_PASSWORD_MODULUS);
@@ -180,11 +166,9 @@ impl RandomDataBuildState<'_> {
         if !self.data.hangul_syllables.contains(&'\0') {
             return;
         }
-        let mixed = mix_word(value, MIX_SALT_HANGUL);
-        if mixed >= HANGUL_QUAD_LIMIT {
+        let Some(mut rem) = mix_bounded::<HANGUL_QUAD_MODULUS>(value, MIX_SALT_HANGUL) else {
             return;
-        }
-        let mut rem = mixed.rem_euclid(HANGUL_QUAD_MODULUS);
+        };
         for slot in &mut self.data.hangul_syllables {
             let offset = low_u32_from_u64(rem.rem_euclid(HANGUL_SYLLABLE_MODULUS));
             rem = rem.div_euclid(HANGUL_SYLLABLE_MODULUS);
@@ -196,11 +180,9 @@ impl RandomDataBuildState<'_> {
         if self.data.planet_number != 0 {
             return;
         }
-        let mixed = mix_word(value, MIX_SALT_LOTTO);
-        if mixed >= LOTTO_BUNDLE_LIMIT {
+        let Some(rem) = mix_bounded::<LOTTO_BUNDLE_MODULUS>(value, MIX_SALT_LOTTO) else {
             return;
-        }
-        let rem = mixed.rem_euclid(LOTTO_BUNDLE_MODULUS);
+        };
         let planet_rem = rem.rem_euclid(NMS_PLANET_MODULUS);
         let rem_after_planet = rem.div_euclid(NMS_PLANET_MODULUS);
         let lucky_rank = low_u32_from_u64(rem_after_planet.rem_euclid(EURO_LUCKY_COMB));
@@ -217,11 +199,9 @@ impl RandomDataBuildState<'_> {
         if !self.data.password.contains(&0) {
             return;
         }
-        let mixed = mix_word(value, MIX_SALT_PASSWORD);
-        if mixed >= PASSWORD_OCTET_LIMIT {
+        let Some(mut rem) = mix_bounded::<PASSWORD_OCTET_MODULUS>(value, MIX_SALT_PASSWORD) else {
             return;
-        }
-        let mut rem = mixed.rem_euclid(PASSWORD_OCTET_MODULUS);
+        };
         for slot in &mut self.data.password {
             let offset = low_u8_from_u64(rem.rem_euclid(ASCII_PRINTABLE_LEN));
             rem = rem.div_euclid(ASCII_PRINTABLE_LEN);
@@ -294,11 +274,17 @@ pub(super) fn generate_random_data_with_rng(
     }
     .populate(&mut next_supp, boundary_cache)
 }
-const fn mix_word(value: u64, salt: u64) -> u64 {
+const fn mix_bounded<const MODULUS: u64>(value: u64, salt: u64) -> Option<u64> {
+    let limit = const { u64::MAX.div_euclid(MODULUS).strict_mul(MODULUS) };
     let mut state = value.wrapping_add(salt);
     state = (state ^ (state >> 30_u32)).wrapping_mul(MIX_MUL_A);
     state = (state ^ (state >> 27_u32)).wrapping_mul(MIX_MUL_B);
-    state ^ (state >> 31_u32)
+    let mixed = state ^ (state >> 31_u32);
+    if mixed >= limit {
+        None
+    } else {
+        Some(mixed.rem_euclid(MODULUS))
+    }
 }
 fn unrank_combination<const K: usize>(mut rank: u32, max_n: u32) -> [u8; K] {
     let mut out = [0_u8; K];

@@ -1,5 +1,5 @@
-use super::super::{ParsedServer, TimeError, UrlScheme};
-use super::{FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeSample, error};
+use super::super::{ParsedServer, UrlScheme};
+use super::{FreshTimeHeaders, Result, TimeSample, error};
 use alloc::{borrow::Cow, string::String};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
@@ -256,48 +256,31 @@ impl Client {
         let header_block = header_capture
             .completed_block
             .ok_or_else(|| error(context, "완료된 HTTP 응답 header block을 찾지 못했습니다."))?;
-        let (server_time, response_received_inst) = header_block.finish(context)?;
-        let http_elapsed = response_received_inst
-            .checked_duration_since(request_start)
-            .ok_or_else(|| TimeError::parse("HTTP 응답 시각이 요청 시작 시각보다 앞섭니다."))?
-            .max(MIN_TRANSFER_TIME);
-        Ok(TimeSample {
-            response_received_inst,
-            rtt: http_elapsed,
-            server_time,
-        })
+        header_block.finish(request_start, context)
     }
 }
 impl CurlBodySink {
     fn append(&mut self, bytes: &[u8]) -> bool {
-        let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
-            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 본문 크기 계산 실패"));
-            return false;
-        };
-        if next_len > HTTP_HEAD_MAX_BODY_BYTES {
-            self.error = Some(Cow::Owned(format!(
-                "HTTP HEAD 응답 본문 크기가 허용 한도({HTTP_HEAD_MAX_BODY_BYTES} bytes)를 초과했습니다."
-            )));
-            return false;
-        }
-        self.bytes_seen = next_len;
-        true
+        account_bytes(
+            &mut self.bytes_seen,
+            &mut self.error,
+            bytes.len(),
+            HTTP_HEAD_MAX_BODY_BYTES,
+            "본문",
+        )
     }
 }
 impl CurlHeaderCapture {
     fn append(&mut self, bytes: &[u8]) -> bool {
-        let Some(next_len) = self.bytes_seen.checked_add(bytes.len()) else {
-            self.error = Some(Cow::Borrowed("HTTP HEAD 응답 헤더 크기 계산 실패"));
-            return false;
-        };
-        if next_len > self.limit {
-            self.error = Some(Cow::Owned(format!(
-                "HTTP HEAD 응답 헤더 크기가 허용 한도({} bytes)를 초과했습니다.",
-                self.limit
-            )));
+        if !account_bytes(
+            &mut self.bytes_seen,
+            &mut self.error,
+            bytes.len(),
+            self.limit,
+            "헤더",
+        ) {
             return false;
         }
-        self.bytes_seen = next_len;
         let line = bytes.trim_suffix(b"\n").trim_suffix(b"\r");
         if line.starts_with(b"HTTP/") {
             self.current_block = Some(FreshTimeHeaders::default());
@@ -338,6 +321,26 @@ impl CurlHeaderCapture {
         }
         true
     }
+}
+fn account_bytes(
+    bytes_seen: &mut usize,
+    error_slot: &mut Option<Cow<'static, str>>,
+    len: usize,
+    limit: usize,
+    label: &str,
+) -> bool {
+    let Some(next_len) = bytes_seen.checked_add(len) else {
+        *error_slot = Some(Cow::Owned(format!("HTTP HEAD 응답 {label} 크기 계산 실패")));
+        return false;
+    };
+    if next_len > limit {
+        *error_slot = Some(Cow::Owned(format!(
+            "HTTP HEAD 응답 {label} 크기가 허용 한도({limit} bytes)를 초과했습니다."
+        )));
+        return false;
+    }
+    *bytes_seen = next_len;
+    true
 }
 fn curl_error(context: &str, code: CurlCode) -> String {
     // SAFETY: curl_easy_strerror returns either null or a static NUL-terminated message for code.

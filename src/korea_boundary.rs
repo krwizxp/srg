@@ -315,16 +315,10 @@ impl BoundaryIndex {
                 let words = count.strict_add(1).strict_mul(2);
                 let payload = raw.get(40..).ok_or("대한민국 경계 정점 길이 오류")?;
                 let mut plane_iter = payload.chunks_exact(words);
-                let planes = [
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                    plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?,
-                ];
+                let mut planes = [[].as_slice(); 8];
+                for slot in &mut planes {
+                    *slot = plane_iter.next().ok_or("대한민국 경계 정점 길이 오류")?;
+                }
                 let mut vertices = Vec::with_capacity(count.strict_add(1));
                 let [west, south, east, north] = self.bounds;
                 for position in 0..=count {
@@ -332,16 +326,10 @@ impl BoundaryIndex {
                     let mut point = [0.0_f64; 2];
                     for (axis, coordinate) in point.iter_mut().enumerate() {
                         let word = base_word.strict_add(axis);
-                        let number = [
-                            *planes[0].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[1].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[2].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[3].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[4].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[5].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[6].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                            *planes[7].get(word).ok_or("대한민국 경계 정점 길이 오류")?,
-                        ];
+                        let mut number = [0_u8; 8];
+                        for (dst, plane) in number.iter_mut().zip(planes) {
+                            *dst = *plane.get(word).ok_or("대한민국 경계 정점 길이 오류")?;
+                        }
                         *coordinate = f64::from_le_bytes(number);
                     }
                     (point[0] >= west
@@ -730,23 +718,22 @@ fn grid_axis_index(edges: &[f64], origin: f64, divisor: f64, coordinate: f64) ->
         approx
     }
 }
-fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
-    let value = bytes
+fn read_chunk<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {
+    bytes
         .get(offset..)
-        .and_then(|tail| tail.first_chunk::<4>())
-        .ok_or("대한민국 경계 데이터 구조 오류")?;
-    Ok(u32::from_le_bytes(*value))
+        .and_then(<[u8]>::first_chunk::<N>)
+        .copied()
+        .ok_or_else(|| "대한민국 경계 데이터 구조 오류".into())
 }
 fn read_count(bytes: &[u8], offset: usize) -> Result<usize> {
     usize::try_from(read_u32(bytes, offset)?)
         .map_err(|source| format!("대한민국 경계 길이 오류: {source}").into())
 }
+fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
+    read_chunk::<4>(bytes, offset).map(u32::from_le_bytes)
+}
 fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
-    let value = bytes
-        .get(offset..)
-        .and_then(|tail| tail.first_chunk::<8>())
-        .ok_or("대한민국 경계 데이터 구조 오류")?;
-    Ok(u64::from_le_bytes(*value))
+    read_chunk::<8>(bytes, offset).map(u64::from_le_bytes)
 }
 fn read_f64(bytes: &[u8], offset: usize) -> Result<f64> {
     Ok(f64::from_bits(read_u64(bytes, offset)?))

@@ -1,7 +1,5 @@
 use super::super::{ParsedServer, UrlScheme};
-use super::{
-    FreshTimeHeaders, MIN_TRANSFER_TIME, Result, TimeError, TimeSample, error, error_with_source,
-};
+use super::{FreshTimeHeaders, Result, TimeError, TimeSample, error, error_with_source};
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
@@ -9,10 +7,7 @@ use core::{
     result::Result as CoreResult,
     str,
 };
-use std::{
-    process,
-    time::{Instant, SystemTime},
-};
+use std::{process, time::Instant};
 mod sys;
 const DWORD_BYTE_SIZE: u32 = 4;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
@@ -205,22 +200,22 @@ impl Client {
                 )
             };
             let request = Self::non_null_handle(raw_request, "WinHttpOpenRequest", context)?;
-            Self::set_dword_option(
-                &request,
-                WINHTTP_OPTION_DISABLE_FEATURE,
-                WINHTTP_DISABLE_COOKIES
-                    | WINHTTP_DISABLE_REDIRECTS
-                    | WINHTTP_DISABLE_AUTHENTICATION,
-                "WinHttpSetOption DISABLE_FEATURE",
-                context,
-            )?;
-            Self::set_dword_option(
-                &request,
-                WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,
-                HTTP_HEAD_MAX_HEADER_BYTES_DWORD,
-                "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE",
-                context,
-            )?;
+            for (option, value, operation) in [
+                (
+                    WINHTTP_OPTION_DISABLE_FEATURE,
+                    WINHTTP_DISABLE_COOKIES
+                        | WINHTTP_DISABLE_REDIRECTS
+                        | WINHTTP_DISABLE_AUTHENTICATION,
+                    "WinHttpSetOption DISABLE_FEATURE",
+                ),
+                (
+                    WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,
+                    HTTP_HEAD_MAX_HEADER_BYTES_DWORD,
+                    "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE",
+                ),
+            ] {
+                Self::set_dword_option(&request, option, value, operation, context)?;
+            }
             let request_start = Instant::now();
             // SAFETY: request is valid and no additional request body or headers are needed for HEAD.
             let sent =
@@ -234,16 +229,7 @@ impl Client {
             Ok((request, request_start, response_received))
         })()
         .inspect_err(|_| self.session_cache = None)?;
-        let server_time = self.query_server_time(&request, response_received, context)?;
-        let rtt = response_received
-            .checked_duration_since(request_start)
-            .ok_or_else(|| TimeError::parse("HTTP 응답 시각이 요청 시작 시각보다 앞섭니다."))?
-            .max(MIN_TRANSFER_TIME);
-        Ok(TimeSample {
-            response_received_inst: response_received,
-            rtt,
-            server_time,
-        })
+        self.query_server_time(&request, request_start, response_received, context)
     }
     fn last_error(operation: &str, context: &str) -> TimeError {
         let code = Self::last_error_code();
@@ -261,9 +247,10 @@ impl Client {
     fn query_server_time(
         &mut self,
         request: &Handle,
+        request_start: Instant,
         response_received: Instant,
         context: &str,
-    ) -> Result<SystemTime> {
+    ) -> Result<TimeSample> {
         let mut time_headers = FreshTimeHeaders::default();
         Self::read_header_values(
             request,
@@ -281,9 +268,7 @@ impl Client {
             (&mut self.header_buffer, &mut self.header_line_buffer),
             |value| time_headers.capture_age(value),
         )?;
-        time_headers
-            .finish(context)
-            .map(|(server_time, _received_at)| server_time)
+        time_headers.finish(request_start, context)
     }
     fn read_header_values(
         request: &Handle,
@@ -372,13 +357,8 @@ impl Client {
                 header = rest;
             }
             let mut short_ascii = [0_u8; 64];
-            let ascii_slice = if let Some(dest) = short_ascii.get_mut(..header.len()) {
-                for (slot, &unit) in dest.iter_mut().zip(header) {
-                    *slot = u8::try_from(unit).map_err(|source| {
-                        error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
-                    })?;
-                }
-                &*dest
+            let dest = if let Some(inline) = short_ascii.get_mut(..header.len()) {
+                inline
             } else {
                 ascii_buffer.clear();
                 ascii_buffer
@@ -386,13 +366,15 @@ impl Client {
                     .map_err(|source| {
                         error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
                     })?;
-                for &unit in header {
-                    ascii_buffer.push(u8::try_from(unit).map_err(|source| {
-                        error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
-                    })?);
-                }
-                ascii_buffer.as_slice()
+                ascii_buffer.resize(header.len(), 0);
+                ascii_buffer.as_mut_slice()
             };
+            for (slot, &unit) in dest.iter_mut().zip(header) {
+                *slot = u8::try_from(unit).map_err(|source| {
+                    error_with_source(context, format!("{name} 헤더 ASCII 변환 실패"), source)
+                })?;
+            }
+            let ascii_slice: &[u8] = dest;
             let value = str::from_utf8(ascii_slice)
                 .map(str::trim_ascii)
                 .map_err(|source| {

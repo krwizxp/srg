@@ -319,12 +319,11 @@
 		}
 		.input-card,
 		.results,
-		.site-brand>div,
+		.site-brand h1,
 		.table-zone {
 			min-width: 0
 		}
 		.site-brand h1 {
-			display: inline;
 			font-size: 1.2rem;
 			letter-spacing: 0
 		}
@@ -725,8 +724,7 @@
 		#auto-supp::before {
 			content: "";
 			position: absolute;
-			top: 1px;
-			left: 1px;
+			inset: 1px auto auto 1px;
 			width: 27px;
 			height: 27px;
 			border-radius: 50%;
@@ -847,10 +845,7 @@
 			-webkit-appearance: none;
 			appearance: none;
 			padding-right: 34px;
-			background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E");
-			background-repeat: no-repeat;
-			background-position: right 10px center;
-			background-size: 16px 16px
+			background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E") right 10px center / 16px 16px no-repeat
 		}
 		.search-field {
 			position: relative;
@@ -858,8 +853,7 @@
 		}
 		.search-field>svg {
 			position: absolute;
-			top: 12px;
-			left: 12px;
+			inset: 12px auto auto 12px;
 			color: var(--muted)
 		}
 		.search-field>input {
@@ -892,8 +886,7 @@
 		}
 		#filter-dialog:modal[data-edit-viewport] {
 			position: fixed;
-			top: var(--filter-viewport-top);
-			bottom: calc(100% - var(--filter-viewport-top) - var(--filter-viewport-height));
+			inset-block: var(--filter-viewport-top) calc(100% - var(--filter-viewport-top) - var(--filter-viewport-height));
 			max-height: calc(var(--filter-viewport-height) - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)))
 		}
 		#filter-dialog .sheet-heading,
@@ -1015,8 +1008,7 @@
 				display: -webkit-box;
 				-webkit-box-orient: vertical;
 				-webkit-line-clamp: 2;
-				overflow: hidden;
-				white-space: normal
+				overflow: hidden
 			}
 			#detail-title {
 				-webkit-line-clamp: 3;
@@ -1208,14 +1200,9 @@
 			flex: 1;
 			min-width: 0
 		}
-		#copy-address {
-			flex: none;
-			background: var(--press-bg)
-		}
 		.detail-fields {
 			padding: 12px 0;
-			border-top: 1px solid var(--line);
-			border-bottom: 1px solid var(--line)
+			border-block: 1px solid var(--line)
 		}
 		.detail-fields>div {
 			display: grid;
@@ -1286,8 +1273,7 @@
 		}
 		.credits {
 			display: flex;
-			column-gap: .65rem;
-			row-gap: 0;
+			gap: 0 .65rem;
 			min-width: 0
 		}
 		.usage-policy {
@@ -1343,7 +1329,6 @@
 		@media (min-width:801px) {
 			.map-popover,
 			.settings {
-				inset: auto;
 				margin: 8px 0 12px 12px;
 				max-width: min(calc(100vw - 24px), calc(100% - 12px));
 				min-height: min(12rem, calc(100dvh - 24px));
@@ -1359,9 +1344,6 @@
 				position-anchor: --map-trigger;
 				position-area: top span-left;
 				margin-block: 12px 8px
-			}
-			body:has(#display-settings:open) .site-header {
-				z-index: 30
 			}
 			#detail-map-links:has(+ #map-popover:popover-open) {
 				position: sticky;
@@ -1421,10 +1403,6 @@
 			display: grid;
 			gap: 16px
 		}
-		.sheet-heading h2 {
-			font-size: 1.25rem;
-			font-weight: 600
-		}
 		.supp-form .rng-actions button[type=submit] {
 			grid-column: 1/-1
 		}
@@ -1438,6 +1416,8 @@
 			margin-bottom: 8px
 		}
 		.sheet-heading h2 {
+			font-size: 1.25rem;
+			font-weight: 600;
 			min-width: 0;
 			overflow-wrap: anywhere;
 			unicode-bidi: plaintext
@@ -1454,6 +1434,7 @@
 			background: var(--surface);
 			border-bottom: 1px solid var(--line)
 		}
+		#copy-address,
 		.sheet-heading .icon-button {
 			flex: none;
 			background: var(--press-bg)
@@ -1477,8 +1458,7 @@
 		}
 		.ui-notice {
 			position: fixed;
-			bottom: 24px;
-			left: 50%;
+			inset: auto auto 24px 50%;
 			transform: translateX(-50%);
 			z-index: 60;
 			max-width: calc(100vw - 32px);
@@ -1674,8 +1654,6 @@
 				width: 100%;
 				border-radius: var(--radius-card)
 			}
-			.input-tabs,
-			.input-tabs button,
 			.search-field>input {
 				border-radius: var(--radius-pill)
 			}
@@ -1694,8 +1672,7 @@
 			}
 			#filter-count {
 				position: absolute;
-				top: -6px;
-				right: -6px;
+				inset: -6px -6px auto auto;
 				border: 2px solid var(--page);
 				min-width: 22px;
 				height: 22px
@@ -1805,9 +1782,7 @@
 			.mobile-bottom {
 				position: fixed;
 				z-index: 25;
-				bottom: 8px;
-				left: 0;
-				right: 0;
+				inset: auto 0 8px;
 				display: flex;
 				justify-content: center;
 				align-items: center;
@@ -1918,8 +1893,7 @@
 			:is(#detail-sheet, #map-popover, #help-dialog, #display-settings, #filter-dialog)>.sheet-heading::before {
 				content: "";
 				position: absolute;
-				top: 8px;
-				left: 50%;
+				inset: 8px auto auto 50%;
 				width: 36px;
 				height: 4px;
 				border-radius: var(--radius-pill);
@@ -1966,8 +1940,7 @@
 		.header-inner,
 		.mobile-bottom,
 		.page-footer {
-			padding-left: max(var(--page-gutter), env(safe-area-inset-left));
-			padding-right: max(var(--page-gutter), env(safe-area-inset-right))
+			padding-inline: max(var(--page-gutter), env(safe-area-inset-left)) max(var(--page-gutter), env(safe-area-inset-right))
 		}
 		@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
 			.site-header,
@@ -1997,25 +1970,20 @@
 				border-color: var(--accent)
 			}
 			.button:hover:not(:active):not(:disabled) {
-				background: var(--tint-hover);
-				color: var(--accent)
+				background: var(--tint-hover)
 			}
 			:is(.primary, .page-number[aria-current=page]):hover:not(:active):not(:disabled) {
-				background: var(--button-hover);
-				color: #fff
+				background: var(--button-hover)
 			}
 			.danger:hover:not(:active):not(:disabled) {
-				color: var(--danger);
 				background: var(--danger-hover)
 			}
 			:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):hover:not(:active):not(:disabled),
 			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
-				color: var(--fg);
 				background: var(--secondary-hover)
 			}
 			#clearBtn:hover:not(:active):not(:disabled) {
-				background: var(--danger-bg);
-				border-color: transparent
+				background: var(--danger-bg)
 			}
 			tr[data-record]:hover:not(:active):not([data-selected=true]) {
 				background: var(--panel)
@@ -2069,9 +2037,7 @@
 				--muted: var(--fg)
 			}
 			.mobile-nav,
-			.tool-capsule {
-				border-color: var(--fg)
-			}
+			.tool-capsule,
 			.coords-panel,
 			.job-panel,
 			.kind-badge,
@@ -2192,9 +2158,7 @@
 			<a aria-label="SRG 역지오코딩 상단으로 이동" class="site-brand" href="#app">
 				<img alt="" aria-hidden="true" class="brand-mark" decoding="async" height="38" src="./icon.svg?v=7"
 					width="38">
-				<div>
-					<h1>SRG 역지오코딩</h1>
-				</div>
+				<h1>SRG 역지오코딩</h1>
 			</a>
 			<ol aria-label="작업 단계" class="steps">
 				<li aria-current="step" data-step="input"><span>1</span>데이터 입력</li>
@@ -2898,10 +2862,14 @@
 			const addr = parsed?.addr;
 			return !!addr && typeof parsed === "object" && typeof addr === "object" &&
 				["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(key => boundedText(addr[key])) &&
-				(parsed.kind === undefined || boundedText(parsed.kind)) &&
-				(parsed.countryCode === undefined || boundedText(parsed.countryCode)) &&
-				(parsed.countryName === undefined || boundedText(parsed.countryName));
+				["kind", "countryCode", "countryName"].every(k => parsed[k] === undefined || boundedText(parsed[k]));
 		}
+		const ADMIN_KEYS = ["level2", "level4", "level6", "level7", "level8", "level9", "level10"];
+		const GC_KEYS = [
+			"country", "name", "street", "type", "district", "suburb", "city", "county",
+			"state", "region", "province", "town", "locality", "village", "neighbourhood",
+			"municipality", "quarter", "hamlet", "township", "residential",
+		];
 		const countryNames = new Intl.DisplayNames("ko", {type: "region"});
 		function parseGeocode(data) {
 			const gc = Array.isArray(data?.features)
@@ -2914,36 +2882,9 @@
 			const country = text(gc.country_code).toLowerCase();
 			const countryCode = /^[a-z]{2}$/.test(country) ? country : "";
 			const admin = typeof gc.admin === "object" ? gc.admin : null;
-			const fields = {
-				level2: text(admin?.level2),
-				level4: text(admin?.level4),
-				level6: text(admin?.level6),
-				level7: text(admin?.level7),
-				level8: text(admin?.level8),
-				level9: text(admin?.level9),
-				level10: text(admin?.level10),
-				country: text(gc.country),
-				name: text(gc.name),
-				street: text(gc.street),
-				type: text(gc.type),
-				cityDistrict: text(gc.city_district),
-				district: text(gc.district),
-				suburb: text(gc.suburb),
-				city: text(gc.city),
-				county: text(gc.county),
-				state: text(gc.state),
-				region: text(gc.region),
-				province: text(gc.province),
-				town: text(gc.town),
-				locality: text(gc.locality),
-				village: text(gc.village),
-				neighbourhood: text(gc.neighbourhood),
-				municipality: text(gc.municipality),
-				quarter: text(gc.quarter),
-				hamlet: text(gc.hamlet),
-				township: text(gc.township),
-				residential: text(gc.residential),
-			};
+			const fields = {cityDistrict: text(gc.city_district)};
+			for (const key of ADMIN_KEYS) fields[key] = text(admin?.[key]);
+			for (const key of GC_KEYS) fields[key] = text(gc[key]);
 			const labelParts = label.split(",").map(part => part.trim());
 			const firstPart = labelParts[0];
 			const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
@@ -2976,17 +2917,14 @@
 		const mapPopover = byId("map-popover");
 		const mapAnchors = queryAll("#map-popover-links a");
 		const MAP_NAMES = ["Google", "OSM", "Naver", "Kakao"];
-		function buildMapLink(index, lat, lon, lat6, lon6) {
-			switch (index) {
-				case 0: return "https://www.google.com/maps?q=" + lat + "," + lon;
-				case 1: return "https://www.openstreetmap.org/search?query=" + lat +
-					"," + lon + "&zoom=16#map=16/" + lat + "/" + lon;
-				case 2: return "https://map.naver.com/?lng=" + lon6 + "&lat=" + lat6 +
-					"&title=" + lat6 + "%2C%20" + lon6;
-				default: return "https://map.kakao.com/link/map/" + lat + "%20" +
-					lon + "," + lat + "," + lon;
-			}
-		}
+		const MAP_BUILDERS = [
+			(lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`,
+			(lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}`,
+			(_lat, _lon, lat6, lon6) => `https://map.naver.com/?lng=${lon6}&lat=${lat6}&title=${lat6}%2C%20${lon6}`,
+			(lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
+		];
+		const buildMapLink = (index, lat, lon, lat6, lon6) =>
+			(MAP_BUILDERS[index] ?? MAP_BUILDERS[3])(lat, lon, lat6, lon6);
 		on(mapPopover, "beforetoggle", (e) => {
 			if (e.newState !== "open") return;
 			const btn = e.source;
@@ -3483,20 +3421,15 @@
 		};
 		function renderFrame() {
 			state.renderReq = null;
+			const {processed, cntFail: fail, cntNoAddress: noAddress} = state;
 			const total = state.records.length;
-			const processed = state.processed;
-			const fail = state.cntFail;
-			const noAddress = state.cntNoAddress;
 			const totalChanged = renderCache.total !== total;
 			const doneChanged = renderCache.processed !== processed;
 			const failChanged = renderCache.fail !== fail;
 			const noAddressChanged = renderCache.noAddress !== noAddress;
 			if (!(totalChanged || doneChanged || failChanged || noAddressChanged)) return;
 			updateWorkflowStep();
-			renderCache.total = total;
-			renderCache.processed = processed;
-			renderCache.fail = fail;
-			renderCache.noAddress = noAddress;
+			Object.assign(renderCache, {total, processed, fail, noAddress});
 			const remaining = total - processed;
 			if (totalChanged) {
 				countTotal.textContent = summaryTotal.textContent =
@@ -3584,6 +3517,11 @@
 			const parts = [];
 			let length = 0, trailingCr = false;
 			let skippedLines = 0;
+			const shouldYieldSkip = () => {
+				if (++skippedLines < 1000) return false;
+				skippedLines = 0;
+				return true;
+			};
 			const lineLimitMessage = `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`;
 			const append = part => {
 				if (!part) return;
@@ -3616,10 +3554,7 @@
 						trailingCr = false;
 						if (chunk.charCodeAt(0) === 10) start = 1;
 						if (line.includes("위경도")) yield line;
-						else if (++skippedLines >= 1000) {
-							skippedLines = 0;
-							yield null;
-						}
+						else if (shouldYieldSkip()) yield null;
 					}
 					let keywordIndex = chunk.indexOf("위경도", start);
 					const newlines = /\r\n|[\r\n]/g;
@@ -3639,18 +3574,12 @@
 							if (keywordIndex !== -1 && keywordIndex < end) {
 								yield chunk.slice(start, end);
 								keywordIndex = chunk.indexOf("위경도", nextStart);
-							} else if (++skippedLines >= 1000) {
-								skippedLines = 0;
-								yield null;
-							}
+							} else if (shouldYieldSkip()) yield null;
 						} else {
 							append(chunk.slice(start, end));
 							const line = emit();
 							if (line.includes("위경도")) yield line;
-							else if (++skippedLines >= 1000) {
-								skippedLines = 0;
-								yield null;
-							}
+							else if (shouldYieldSkip()) yield null;
 							if (keywordIndex !== -1 && keywordIndex < nextStart)
 								keywordIndex = chunk.indexOf("위경도", nextStart);
 						}
@@ -3680,19 +3609,13 @@
 			let linesSinceYield = 0;
 			for await (const line of lineIterator(file.stream(), signal)) {
 				signal.throwIfAborted();
-				if (line === null) {
+				if (line === null || ++linesSinceYield >= 128) {
+					if (line !== null) linesSinceYield = 0;
 					if (performance.now() - lastYield >= 8) {
 						await yieldToMain();
 						lastYield = performance.now();
 					}
-					continue;
-				}
-				if (++linesSinceYield >= 128) {
-					if (performance.now() - lastYield >= 8) {
-						await yieldToMain();
-						lastYield = performance.now();
-					}
-					linesSinceYield = 0;
+					if (line === null) continue;
 				}
 				for (const m of line.matchAll(COORD_REGEX)) {
 					if (!m[1]) {
@@ -4168,6 +4091,10 @@
 				await writeDiskCache(cacheBatch, signal);
 				cacheBatch.length = 0;
 			};
+			const yieldAndReset = async () => {
+				await yieldToMain();
+				lastYield = performance.now();
+			};
 			const persistentCache = new Map();
 			const unresolved = [];
 			for (let i = 0; i < total && !signal.aborted; i++) {
@@ -4185,10 +4112,7 @@
 					continue;
 				}
 				commitResult(i, parsed, false);
-				if (reportProgress() - lastYield >= 8) {
-					await yieldToMain();
-					lastYield = performance.now();
-				}
+				if (reportProgress() - lastYield >= 8) await yieldAndReset();
 			}
 			if (persistentCache.size && !signal.aborted) {
 				try {
@@ -4207,10 +4131,7 @@
 					if (!row) continue;
 					putMemoryCache(cacheKey, row.parsed, row.savedAt);
 					commitResult(i, row.parsed, false);
-					if (reportProgress() - lastYield >= 8) {
-						await yieldToMain();
-						lastYield = performance.now();
-					}
+					if (reportProgress() - lastYield >= 8) await yieldAndReset();
 				}
 			}
 			queuePage();
@@ -4281,10 +4202,7 @@
 							`조회 실패: (${fmt(i1)}/${totalDisp}) ${parsed.error}`,
 							"error",
 						);
-					if (cacheHit && now - lastYield >= 8) {
-						await yieldToMain();
-						lastYield = performance.now();
-					}
+					if (cacheHit && now - lastYield >= 8) await yieldAndReset();
 				} catch (err) {
 					if (signal.aborted && err?.name === "AbortError") break;
 					console.error(err);
@@ -4527,17 +4445,24 @@
 			coordsExpand.ariaExpanded = expanded;
 			coordsExpand.textContent = expanded ? "미리보기 접기" : "미리보기 펼치기";
 		});
-		on(byId("coords-copy"), "click", async () => {
-			const generation = state.generation;
+		async function copyTextWithNotice(getText, isCurrent, okMsg, errPrefix, insecureMsg) {
 			try {
-				if (!navigator.clipboard || !isSecureContext) throw new Error("HTTPS 연결에서 사용할 수 있습니다.");
-				await navigator.clipboard.writeText(
-					state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"),
-				);
-				if (generation === state.generation) showNotice("좌표 복사됨");
+				if (!isSecureContext || !navigator.clipboard) throw new Error(insecureMsg);
+				await navigator.clipboard.writeText(getText());
+				if (isCurrent()) showNotice(okMsg);
 			} catch (error) {
-				if (generation === state.generation) showNotice(`좌표 복사 실패: ${errorMessage(error)}`, "error");
+				if (isCurrent()) showNotice(`${errPrefix}: ${errorMessage(error)}`, "error");
 			}
+		}
+		on(byId("coords-copy"), "click", () => {
+			const generation = state.generation;
+			void copyTextWithNotice(
+				() => state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"),
+				() => generation === state.generation,
+				"좌표 복사됨",
+				"좌표 복사 실패",
+				"HTTPS 연결에서 사용할 수 있습니다.",
+			);
 		});
 		on(byId("page-size"), "change", (event) => {
 			const size = Number(event.target.value);
@@ -4820,18 +4745,22 @@
 				}
 				return promise;
 			}
+			const parseU64List = (raw, limitMessage) => {
+				const values = [];
+				for (const token of u64Tokens(raw)) {
+					if (values.length >= GENERATION_LIMIT) throw new InputError(limitMessage);
+					values.push(parseU64(token));
+				}
+				return values;
+			};
 			on(suppForm, "submit", (event) => {
 				event.preventDefault();
 				if (!suppRequest) return;
 				try {
-					const values = [];
-					for (const token of u64Tokens(suppValues.value)) {
-						if (values.length >= GENERATION_LIMIT)
-							throw new InputError(
-								`보조 난수값은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 입력할 수 있습니다.`,
-							);
-						values.push(parseU64(token));
-					}
+					const values = parseU64List(
+						suppValues.value,
+						`보조 난수값은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 입력할 수 있습니다.`,
+					);
 					if (!values.length)
 						throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
 					clearSupplementError();
@@ -4895,13 +4824,11 @@
 					let cancelled = false;
 					let convertedInWorkers = false;
 					if (autoSupp.checked && !suppInput.value.trim() && typeof Worker === "function") {
-						const words = [];
 						invalidInput = num64Input;
-						for (const token of u64Tokens(num64Input.value)) {
-							if (words.length >= GENERATION_LIMIT)
-								throw new InputError(`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`);
-							words.push(parseU64(token));
-						}
+						const words = parseU64List(
+							num64Input.value,
+							`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`,
+						);
 						invalidInput = null;
 						if (words.length >= 512) {
 							const controller = new AbortController();
@@ -5133,34 +5060,43 @@
 		});
 		on(document, "pointerdown", () => {layoutFocus = null;}, {passive: true});
 		on(window, "blur", () => {layoutFocus = null;});
+		function syncTabs(tabs, attr, value) {
+			for (const tab of tabs) {
+				const selected = tab.dataset[attr] === value;
+				tab.ariaSelected = selected;
+				tab.tabIndex = selected ? 0 : -1;
+			}
+		}
+		function bindTablist(container, attr, [first, second], onSelect, {wrap = false, focusOpt} = {}) {
+			on(container, "click", event => {
+				const tab = event.target.closest("[role=tab]");
+				if (tab) onSelect(tab.dataset[attr]);
+			});
+			on(container, "keydown", event => {
+				if (!TAB_KEYS.includes(event.key)) return;
+				const tab = event.target.closest("[role=tab]");
+				if (!tab) return;
+				event.preventDefault();
+				const next = event.key === "Home" ? first
+					: event.key === "End" ? second
+						: wrap ? (tab.dataset[attr] === first ? second : first)
+							: event.key === "ArrowRight" ? second : first;
+				onSelect(next);
+				query(`[data-${attr}="${next}"]`, container)?.focus(focusOpt);
+			});
+		}
 		function setInputMode(mode) {
 			const manual = mode === "manual";
 			filePane.hidden = manual;
 			manualPanel.hidden = !manual;
-			for (const tab of queryAll("[role=tab]", inputTabs)) {
-				const selected = tab.dataset.mode === mode;
-				tab.ariaSelected = selected;
-				tab.tabIndex = selected ? 0 : -1;
-			}
+			syncTabs(queryAll("[role=tab]", inputTabs), "mode", mode);
 			if (manual && !manualLoaded) {
 				loadManualRng();
 				manualLoaded = true;
 				prepareKorea();
 			}
 		}
-		on(inputTabs, "click", (event) => {
-			const tab = event.target.closest("[role=tab]");
-			if (tab) setInputMode(tab.dataset.mode);
-		});
-		on(inputTabs, "keydown", (event) => {
-			if (!TAB_KEYS.includes(event.key)) return;
-			const tab = event.target.closest("[role=tab]");
-			if (!tab) return;
-			event.preventDefault();
-			const mode = event.key === "Home" ? "file" : event.key === "End" || tab.dataset.mode === "file" ? "manual" : "file";
-			setInputMode(mode);
-			byId(`${mode}-tab`).focus();
-		});
+		bindTablist(inputTabs, "mode", ["file", "manual"], setInputMode, {wrap: true});
 		function adaptLayout() {
 			if (settings.open && settings.matches(":modal") !== mobileMedia.matches) closeSettings();
 			for (const [panel, tab, heading] of [
@@ -5217,11 +5153,7 @@
 			const active = document.activeElement;
 			const focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .job-panel");
 			document.body.dataset.mobiletab = nextView;
-			for (const button of mobileButtons) {
-				const selected = button.dataset.mobile === nextView;
-				button.ariaSelected = selected;
-				button.tabIndex = selected ? 0 : -1;
-			}
+			syncTabs(mobileButtons, "mobile", nextView);
 			adaptLayout();
 			if (mobileMedia.matches) {
 				requestAnimationFrame(() => {
@@ -5234,17 +5166,7 @@
 				}
 			}
 		}
-		for (const button of mobileButtons)
-			on(button, "click", () => setMobileView(button.dataset.mobile));
-		on(query(".mobile-nav"), "keydown", event => {
-			if (!TAB_KEYS.includes(event.key)) return;
-			if (!event.target.closest('[role="tab"]')) return;
-			event.preventDefault();
-			const view = event.key === "Home" ? "input" : event.key === "End" ? "results" :
-				event.key === "ArrowRight" ? "results" : "input";
-			setMobileView(view);
-			byId(`mobile-${view}-tab`).focus(NO_SCROLL);
-		});
+		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, {focusOpt: NO_SCROLL});
 		for (const media of [mobileMedia, compactMedia]) on(media, "change", adaptLayout);
 		function updateWorkflowStep() {
 			const step = state.isRunning || state.isStopping ? "lookup" :
@@ -5379,25 +5301,24 @@
 			clearTimeout(mapLoadTimer);
 			mapLoadTimer = 0;
 		}
-		function showMapFailure(message) {
-			const active = document.activeElement;
-			const ownedFocus = [loadMap, retryMap, mapFeedback, detailMap].includes(active);
+		function setMapUi({map = true, load = true, loading = false, feedback = true, recovery = true}) {
 			clearMapTimer();
-			detailMap.hidden = true;
-			loadMap.hidden = true;
+			detailMap.hidden = map;
+			loadMap.hidden = load;
+			mapFeedback.dataset.loading = String(loading);
+			mapFeedback.hidden = feedback;
+			mapRecovery.hidden = recovery;
+		}
+		function showMapFailure(message) {
+			const ownedFocus = [loadMap, retryMap, mapFeedback, detailMap].includes(document.activeElement);
 			mapFeedback.textContent = message;
-			mapFeedback.dataset.loading = "false";
-			mapFeedback.hidden = mapRecovery.hidden = false;
+			setMapUi({feedback: false, recovery: false});
 			if (ownedFocus) (retryMap.disabled ? mapExternal : retryMap).focus(NO_SCROLL);
 		}
 		function unloadMap() {
-			clearMapTimer();
 			detailMap.removeAttribute("src");
-			detailMap.hidden = true;
-			loadMap.hidden = false;
 			retryMap.disabled = false;
-			mapFeedback.dataset.loading = "false";
-			mapFeedback.hidden = mapRecovery.hidden = true;
+			setMapUi({load: false});
 			mapExternal.href = "about:blank";
 		}
 		function resetInspector() {
@@ -5524,16 +5445,16 @@
 			});
 			on(window, "pointercancel", finish);
 			on(heading, "lostpointercapture", finish);
-			on(window, "blur", reset);
-			on(window, "resize", reset);
-			on(sheet, "beforetoggle", reset);
-			on(sheet, "close", reset);
+			for (const ev of ["blur", "resize"]) on(window, ev, reset);
+			for (const ev of ["beforetoggle", "close"]) on(sheet, ev, reset);
 		}
-		enableSheetDrag(detailSheet);
-		enableSheetDrag(mapPopover, () => mapPopover.hidePopover());
-		enableSheetDrag(byId("help-dialog"));
-		enableSheetDrag(settings, closeSettings);
-		enableSheetDrag(filterDialog);
+		for (const [sheet, dismiss] of [
+			[detailSheet],
+			[mapPopover, () => mapPopover.hidePopover()],
+			[byId("help-dialog")],
+			[settings, closeSettings],
+			[filterDialog],
+		]) enableSheetDrag(sheet, dismiss);
 		on(detailSheet, "close", () => {
 			mapPopover.hidePopover();
 			unloadMap();
@@ -5542,18 +5463,17 @@
 				detailFocus.focus(NO_SCROLL);
 			detailFocus = null;
 		});
-		on(copyAddress, "click", async () => {
+		on(copyAddress, "click", () => {
 			const record = selection;
 			const address = record?.result.addr?.fullAddr;
 			if (!address) return;
-			try {
-				if (!window.isSecureContext || !navigator.clipboard)
-					throw new Error("복사는 HTTPS 또는 localhost에서 사용할 수 있습니다.");
-				await navigator.clipboard.writeText(address);
-				if (selection === record) showNotice("주소 복사됨");
-			} catch (error) {
-				if (selection === record) showNotice(`복사 실패: ${errorMessage(error)}`, "error");
-			}
+			void copyTextWithNotice(
+				() => address,
+				() => selection === record,
+				"주소 복사됨",
+				"복사 실패",
+				"복사는 HTTPS 또는 localhost에서 사용할 수 있습니다.",
+			);
 		});
 		function startMapLoad() {
 			const record = selection;
@@ -5570,30 +5490,23 @@
 			}
 			const ownedFocus = [loadMap, retryMap, mapFeedback].includes(document.activeElement);
 			mapFeedback.textContent = "OpenStreetMap 지도를 불러오는 중…";
-			mapFeedback.dataset.loading = "true";
-			mapFeedback.hidden = false;
-			mapRecovery.hidden = true;
 			const box = [Math.max(-180, lon - .01), Math.max(-85, lat - .006), Math.min(180, lon + .01), Math.min(85, lat + .006)];
 			const url = new URL("https://www.openstreetmap.org/export/embed.html");
 			url.search = new URLSearchParams({
 				bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon,
 			});
 			detailMap.src = url.href;
-			detailMap.hidden = false;
-			loadMap.hidden = true;
+			setMapUi({map: false, loading: true, feedback: false});
 			if (ownedFocus) mapFeedback.focus(NO_SCROLL);
 			mapLoadTimer = setTimeout(() => showMapFailure(
 				"지도 표시가 지연되고 있습니다. 다시 시도하거나 외부 지도에서 확인하세요.",
 			), 12000);
 		}
-		on(loadMap, "click", startMapLoad);
-		on(retryMap, "click", startMapLoad);
+		for (const btn of [loadMap, retryMap]) on(btn, "click", startMapLoad);
 		on(detailMap, "load", () => {
 			if (detailMap.hidden || !detailMap.getAttribute("src")) return;
 			const ownedFocus = document.activeElement === mapFeedback;
-			clearMapTimer();
-			mapFeedback.dataset.loading = "false";
-			mapFeedback.hidden = mapRecovery.hidden = true;
+			setMapUi({map: false});
 			if (ownedFocus) detailMap.focus(NO_SCROLL);
 		});
 		on(detailMap, "error", () => {

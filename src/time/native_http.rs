@@ -43,16 +43,25 @@ impl FreshTimeHeaders {
                 .map(|HttpDate(server_time)| (server_time, received_at))
         });
     }
-    fn finish(self, context: &str) -> Result<(SystemTime, Instant)> {
+    fn finish(self, request_start: Instant, context: &str) -> Result<TimeSample> {
         self.age_result
             .transpose()
             .map_err(|message| error(context, message))?;
-        self.date_result.ok_or_else(|| {
+        let (server_time, response_received_inst) = self.date_result.ok_or_else(|| {
             TimeError::new(
                 TimeErrorKind::HeaderNotFound,
                 format!("{context} 응답에서 Date"),
             )
-        })?
+        })??;
+        let rtt = response_received_inst
+            .checked_duration_since(request_start)
+            .ok_or_else(|| TimeError::parse("HTTP 응답 시각이 요청 시작 시각보다 앞섭니다."))?
+            .max(MIN_TRANSFER_TIME);
+        Ok(TimeSample {
+            response_received_inst,
+            rtt,
+            server_time,
+        })
     }
 }
 fn error(context: &str, detail: impl Display) -> TimeError {
