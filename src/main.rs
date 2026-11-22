@@ -1,6 +1,6 @@
 extern crate alloc;
 use self::command::CliCommand;
-use self::diagnostic::{AppError, Result};
+use self::diagnostic::Result;
 use self::{file_output::OutputFile, menu_app::MenuApp};
 #[cfg(target_arch = "x86_64")]
 use self::{
@@ -12,7 +12,6 @@ use core::fmt;
 use std::io::{Write as _, stderr};
 use std::{
     env,
-    ffi::OsStr,
     io::{self, IsTerminal as TerminalDetect},
     path::Path,
     sync::LazyLock,
@@ -70,9 +69,6 @@ const HELP_TEXT: &str = concat!(
     "  -h, --help               도움말\n",
     "  --version                버전\n"
 );
-fn unknown_option(label: &str, option: &OsStr) -> AppError {
-    format!("{label}: {}", option.display()).into()
-}
 fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
     match writeln!(output, "{args}") {
         Ok(()) | Err(_) => {}
@@ -81,21 +77,21 @@ fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) 
 fn main() -> Result<()> {
     let mut args = env::args_os().skip(1);
     if let Some(first) = args.next() {
-        if first == "-h" || first == "--help" {
+        let info_cmd = if first == "-h" || first == "--help" {
+            Some(("알 수 없는 도움말 옵션", HELP_TEXT))
+        } else if first == "--version" {
+            Some((
+                "알 수 없는 --version 옵션",
+                concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n"),
+            ))
+        } else {
+            None
+        };
+        if let Some((err_label, text)) = info_cmd {
             if let Some(extra) = args.next() {
-                return Err(unknown_option("알 수 없는 도움말 옵션", &extra));
+                return Err(format!("{err_label}: {}", extra.display()).into());
             }
-            output::write_slice_to_console(HELP_TEXT.as_bytes())?;
-            return Ok(());
-        }
-        if first == "--version" {
-            if let Some(extra) = args.next() {
-                return Err(unknown_option("알 수 없는 --version 옵션", &extra));
-            }
-            output::write_slice_to_console(
-                concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n").as_bytes(),
-            )?;
-            return Ok(());
+            return output::write_slice_to_console(text.as_bytes()).map_err(Into::into);
         }
         return CliCommand::try_from((first, args))?.execute();
     }

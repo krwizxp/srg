@@ -55,9 +55,11 @@ cfg_select! {
     }
     any(target_os = "linux", target_os = "macos") => {
         const POLL_DESCRIPTOR_COUNT: PollDescriptorCount = 1;
-        const POLL_ERROR_EVENTS: c_short = 0x0028;
-        const POLLHUP: c_short = 0x0010;
-        const POLLIN: c_short = 0x0001;
+        const POLL_ERROR_EVENTS: c_short = POLLERR | POLLNVAL;
+        pub(crate) const POLLERR: c_short = 0x0008;
+        pub(crate) const POLLHUP: c_short = 0x0010;
+        pub(crate) const POLLIN: c_short = 0x0001;
+        pub(crate) const POLLNVAL: c_short = 0x0020;
     }
     _ => {
         compile_error!("Stop input supports only Windows, Linux, and macOS.");
@@ -65,29 +67,30 @@ cfg_select! {
 }
 cfg_select! {
     target_os = "linux" => {
-        type PollDescriptorCount = c_ulong;
+        pub(crate) type PollDescriptorCount = c_ulong;
     }
     target_os = "macos" => {
-        type PollDescriptorCount = c_uint;
+        pub(crate) type PollDescriptorCount = c_uint;
     }
     _ => {}
 }
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[repr(C)]
-struct PollFd {
-    fd: c_int,
-    events: c_short,
-    revents: c_short,
+#[derive(Clone, Copy)]
+pub(crate) struct PollFd {
+    pub fd: c_int,
+    pub events: c_short,
+    pub revents: c_short,
 }
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 const _: () = assert!(
-    size_of::<PollFd>() == 8,
+    size_of::<PollFd>() == 8 && align_of::<PollFd>() == 4,
     "pollfd layout must match the platform ABI"
 );
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 unsafe extern "C" {
     #[link_name = "poll"]
-    fn poll_stdin(
+    pub(crate) fn poll_stdin(
         descriptors: *mut PollFd,
         descriptor_count: PollDescriptorCount,
         timeout: c_int,

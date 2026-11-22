@@ -19,3 +19,10 @@ pub(super) const fn low_u32_from_u64(value: u64) -> u32 {
     let [b0, b1, b2, b3, ..] = value.to_le_bytes();
     u32::from_le_bytes([b0, b1, b2, b3])
 }
+pub(super) const fn split_u64_be_u32(value: u64) -> (u32, u32) {
+    let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
+    (
+        u32::from_be_bytes([b0, b1, b2, b3]),
+        u32::from_be_bytes([b4, b5, b6, b7]),
+    )
+}

@@ -2,7 +2,10 @@
 use self::timer_resolution::{
     CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, SYNCHRONIZE_ACCESS, TIMER_MODIFY_STATE_ACCESS, sys,
 };
-use self::util::{blend_rtt, parse_u32_digits};
+use self::util::{
+    SECS_PER_DAY_U64 as KST_SECONDS_PER_DAY_U64, SECS_PER_HOUR_U32, SECS_PER_MINUTE_U32, blend_rtt,
+    hms_from_second_of_day, parse_hms,
+};
 use crate::{IS_TERMINAL, buffmt::ByteCursor, stop_input::StopInput};
 use alloc::borrow::Cow;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -64,10 +67,7 @@ const HTTPS_SCHEME_PREFIX_LEN: usize = HTTPS_SCHEME_PREFIX.len();
 const KST_OFFSET: Duration = Duration::from_hours(9);
 const KST_OFFSET_SECS_U64: u64 = KST_OFFSET.as_secs();
 const KST_OFFSET_SECS: i64 = KST_OFFSET_SECS_U64.cast_signed();
-const KST_SECONDS_PER_MINUTE_U32: u32 = 60;
-const KST_SECONDS_PER_HOUR_U32: u32 = 60 * KST_SECONDS_PER_MINUTE_U32;
-const KST_SECONDS_PER_DAY_U64: u64 = 86_400;
-const CLOCK_COMPONENT_LEN: usize = 2;
+
 const INTERACTIVE_DISPLAY_INTERVAL: Duration = Duration::from_millis(16);
 const REDIRECTED_DISPLAY_INTERVAL: Duration = Duration::from_secs(1);
 const DISPLAY_STATUS_PREFIX: &str = "\r서버 시간: ";
@@ -313,11 +313,7 @@ impl TargetTimeOfDay {
         let day_index = i32::try_from(target_day)
             .map_err(|source| TimeError::parse_with_source("목표 날짜 변환 실패", source))?;
         let CivilDate { day, month, year } = http_date::civil_from_days(day_index);
-        let hour = target_second.div_euclid(KST_SECONDS_PER_HOUR_U32);
-        let minute = target_second
-            .rem_euclid(KST_SECONDS_PER_HOUR_U32)
-            .div_euclid(KST_SECONDS_PER_MINUTE_U32);
-        let second = target_second.rem_euclid(KST_SECONDS_PER_MINUTE_U32);
+        let (hour, minute, second) = hms_from_second_of_day(target_second);
         append_fmt(
             msg_buf,
             format_args!(
@@ -401,23 +397,11 @@ impl FromStr for TargetTimeOfDay {
     fn from_str(raw_input: &str) -> CoreResult<Self, Self::Err> {
         const INVALID_TIME_INPUT_ERR: &str =
             "잘못된 형식, 숫자 또는 시간 범위입니다 (HH:MM:SS, 0-23:0-59:0-59).";
-        let (hour_str, minute_second) = raw_input.split_once(':').ok_or(INVALID_TIME_INPUT_ERR)?;
-        let (minute_str, second_str) = minute_second
-            .split_once(':')
-            .ok_or(INVALID_TIME_INPUT_ERR)?;
-        let parse_component = |component: &str| -> CoreResult<u32, &'static str> {
-            (component.len() == CLOCK_COMPONENT_LEN).ok_or(INVALID_TIME_INPUT_ERR)?;
-            parse_u32_digits(component).ok_or(INVALID_TIME_INPUT_ERR)
-        };
-        let (hour, minute, second) = (
-            parse_component(hour_str)?,
-            parse_component(minute_str)?,
-            parse_component(second_str)?,
-        );
+        let (hour, minute, second) = parse_hms(raw_input).ok_or(INVALID_TIME_INPUT_ERR)?;
         (hour <= 23 && minute <= 59 && second <= 59).ok_or(INVALID_TIME_INPUT_ERR)?;
         let seconds_after_midnight = hour
-            .strict_mul(KST_SECONDS_PER_HOUR_U32)
-            .strict_add(minute.strict_mul(KST_SECONDS_PER_MINUTE_U32))
+            .strict_mul(SECS_PER_HOUR_U32)
+            .strict_add(minute.strict_mul(SECS_PER_MINUTE_U32))
             .strict_add(second);
         Ok(Self {
             seconds_after_midnight,
@@ -739,6 +723,7 @@ impl AppState<'_> {
                     }
                 };
             if let Some(server_time) = accepted_server_time {
+                let mut use_msg_buf = false;
                 if let Some(scheduled_target) = self
                     .scheduled_trigger
                     .as_ref()
@@ -790,31 +775,27 @@ impl AppState<'_> {
                                 timing_policy,
                             }),
                     };
-                    let message = match updated {
+                    match updated {
                         Ok(updated_target) => {
                             if let Some(schedule) = self.scheduled_trigger.as_mut() {
                                 schedule.target = updated_target;
                             }
-                            if pending {
-                                msg_buf.as_str()
-                            } else {
-                                "[성공] 정밀 보정 완료!"
-                            }
+                            use_msg_buf = pending;
                         }
                         Err(reason) => {
                             self.scheduled_trigger = None;
                             append_error_detail(msg_buf, "\n[경고] HTTP 예약 액션 취소: ", reason);
-                            msg_buf.as_str()
+                            use_msg_buf = true;
                         }
-                    };
-                    return ActivityTransition::message(
-                        Activity::Predicting { server_time },
-                        message,
-                    );
+                    }
                 }
                 return ActivityTransition::message(
                     Activity::Predicting { server_time },
-                    "[성공] 정밀 보정 완료!",
+                    if use_msg_buf {
+                        msg_buf.as_str()
+                    } else {
+                        "[성공] 정밀 보정 완료!"
+                    },
                 );
             }
             calibration.previous_sample = current_sample;

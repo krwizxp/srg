@@ -1,8 +1,11 @@
 use super::{NativeInputSendStatus, TriggerAction};
+use crate::stop_input::{
+    POLLERR, POLLHUP, POLLIN, POLLNVAL, PollDescriptorCount, PollFd, poll_stdin as poll,
+};
 use crate::{diagnostic::terminal_safe, write_line_best_effort};
 use alloc::borrow::Cow;
 use core::{
-    ffi::{CStr, c_char, c_int, c_short, c_uint, c_ulong, c_void},
+    ffi::{CStr, c_char, c_int, c_short, c_uint, c_void},
     marker::{PhantomData, PhantomPinned},
     mem::DropGuard,
     ptr::{NonNull, null_mut},
@@ -70,22 +73,8 @@ const OEFFIS_EVENT_NONE: c_int = 0;
 const POLL_ERROR_EVENTS: c_short = POLLERR | POLLHUP | POLLNVAL;
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const POLL_READ_EVENTS: c_short = POLLIN | POLL_ERROR_EVENTS;
-const POLLERR: c_short = 0x0008;
-const POLLHUP: c_short = 0x0010;
-const POLLIN: c_short = 0x0001;
-const POLLNVAL: c_short = 0x0020;
 const PREPARE_TIMEOUT: Duration = Duration::from_mins(2);
 opaque_ffi_types!(Ei, EiDevice, EiEvent, EiPing, EiSeat, Oeffis);
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct PollFd {
-    fd: c_int,
-    events: c_short,
-    revents: c_short,
-}
-const _: () = assert!(size_of::<PollFd>() == 8, "pollfd size mismatch");
-const _: () = assert!(align_of::<PollFd>() == 4, "pollfd align mismatch");
-type PollDescriptorCount = c_ulong;
 type InputError = Cow<'static, str>;
 type InputResult<T> = Result<T, InputError>;
 #[derive(Clone, Copy)]
@@ -769,7 +758,7 @@ fn poll_fds(fds: &mut [PollFd], timeout: c_int) -> InputResult<()> {
     let descriptor_count = PollDescriptorCount::try_from(fds.len())
         .map_err(|source| format!("poll descriptor 개수 변환 실패: {source}"))?;
     // SAFETY: fds is a writable pollfd array with the exact element count supplied.
-    let result = unsafe { sys::poll(fds.as_mut_ptr(), descriptor_count, timeout) };
+    let result = unsafe { poll(fds.as_mut_ptr(), descriptor_count, timeout) };
     if result >= 0_i32 {
         return Ok(());
     }

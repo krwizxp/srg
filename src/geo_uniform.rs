@@ -1,5 +1,6 @@
 use crate::{
     diagnostic::{AppError, Result},
+    numeric::split_u64_be_u32,
     random_data::Coordinates,
 };
 const DEGREES: f64 = 0.017_453_292_519_943_295_f64;
@@ -40,11 +41,9 @@ impl TryFrom<[f64; 4]> for BoundaryAreaBounds {
 impl TryFrom<(u64, BoundaryAreaBounds)> for Coordinates {
     type Error = AppError;
     fn try_from((value, bounds): (u64, BoundaryAreaBounds)) -> Result<Self> {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
-        let vertical =
-            (f64::from(u32::from_be_bytes([b0, b1, b2, b3])) + 0.5_f64) / 4_294_967_296.0_f64;
-        let horizontal =
-            (f64::from(u32::from_be_bytes([b4, b5, b6, b7])) + 0.5_f64) / 4_294_967_296.0_f64;
+        let (hi, lo) = split_u64_be_u32(value);
+        let vertical = (f64::from(hi) + 0.5_f64) / 4_294_967_296.0_f64;
+        let horizontal = (f64::from(lo) + 0.5_f64) / 4_294_967_296.0_f64;
         let area_offset = vertical * bounds.area_span;
         let target = bounds.south_area + area_offset;
         let latitude_offset = (bounds.north - bounds.south) * vertical;
@@ -124,18 +123,4 @@ fn eval_poly(point: f64, initial: f64, coefficients: &[f64]) -> f64 {
         let term = point * acc;
         coeff + term
     })
-}
-pub(super) fn product_error(left: f64, right: f64, product: f64) -> f64 {
-    let split_left = 134_217_729.0_f64 * left;
-    let ah = split_left - (split_left - left);
-    let al = left - ah;
-    let split_right = 134_217_729.0_f64 * right;
-    let bh = split_right - (split_right - right);
-    let bl = right - bh;
-    let high_product = ah * bh;
-    let high_error = high_product - product;
-    let cross_left = ah * bl;
-    let cross_right = al * bh;
-    let low_product = al * bl;
-    ((high_error + cross_left) + cross_right) + low_product
 }

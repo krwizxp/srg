@@ -99,7 +99,7 @@ impl TryFrom<&Path> for OutputFile {
         })?;
         metadata
             .is_file()
-            .ok_or_else(|| AppError::message("출력 경로는 일반 파일이어야 합니다."))?;
+            .ok_or("출력 경로는 일반 파일이어야 합니다.")?;
         let link_count = cfg_select! {
             target_os = "windows" => {{
                 let mut standard_info = FileStandardInfo::default();
@@ -122,8 +122,7 @@ impl TryFrom<&Path> for OutputFile {
                 compile_error!("Output file validation supports only Windows, Linux, and macOS.")
             }
         };
-        (link_count == 1)
-            .ok_or_else(|| AppError::message("출력 파일의 하드 링크 수는 1이어야 합니다."))?;
+        (link_count == 1).ok_or("출력 파일의 하드 링크 수는 1이어야 합니다.")?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         match file.try_lock() {
             Ok(()) => {}

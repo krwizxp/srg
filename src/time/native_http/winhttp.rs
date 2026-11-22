@@ -329,11 +329,7 @@ impl Client {
                     .get(..units)
                     .unwrap_or_else(|| process::abort())
             } else {
-                wide_buffer.clear();
-                wide_buffer.try_reserve_exact(units).map_err(|source| {
-                    error_with_source(context, "응답 헤더 메모리 확보 실패", source)
-                })?;
-                wide_buffer.resize(units, 0_u16);
+                prepare_buffer(wide_buffer, units, context, "응답 헤더 메모리 확보 실패")?;
                 index = current_index;
                 // SAFETY: wide_buffer has the probed size and request is valid.
                 let long_fetched = unsafe {
@@ -360,14 +356,12 @@ impl Client {
             let dest = if let Some(inline) = short_ascii.get_mut(..header.len()) {
                 inline
             } else {
-                ascii_buffer.clear();
-                ascii_buffer
-                    .try_reserve_exact(header.len())
-                    .map_err(|source| {
-                        error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
-                    })?;
-                ascii_buffer.resize(header.len(), 0);
-                ascii_buffer.as_mut_slice()
+                prepare_buffer(
+                    ascii_buffer,
+                    header.len(),
+                    context,
+                    "응답 헤더 ASCII 메모리 확보 실패",
+                )?
             };
             for (slot, &unit) in dest.iter_mut().zip(header) {
                 *slot = u8::try_from(unit).map_err(|source| {
@@ -408,4 +402,20 @@ impl Client {
     fn windows_error(operation: &str, code: u32, context: &str) -> TimeError {
         error(context, format!("{operation} 실패: Windows error {code}"))
     }
+}
+fn prepare_buffer<'buf, T>(
+    buffer: &'buf mut Vec<T>,
+    len: usize,
+    context: &str,
+    err_msg: &'static str,
+) -> Result<&'buf mut [T]>
+where
+    T: Copy + Default,
+{
+    buffer.clear();
+    buffer
+        .try_reserve_exact(len)
+        .map_err(|source| error_with_source(context, err_msg, source))?;
+    buffer.resize(len, T::default());
+    Ok(buffer.as_mut_slice())
 }

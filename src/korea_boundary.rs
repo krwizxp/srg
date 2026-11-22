@@ -2,7 +2,7 @@ use self::data::{INDEX as DATA, PARTS};
 use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
-    geo_uniform::{BoundaryAreaBounds, product_error},
+    geo_uniform::BoundaryAreaBounds,
     numeric::low_u16_from_u64,
     random_data::Coordinates,
 };
@@ -191,12 +191,9 @@ impl BoundaryIndex {
                             } else {
                                 let mut expansion = [0.0_f64; 4];
                                 let mut length = 0_usize;
-                                for mut value in [
-                                    product_error(dx, py, left),
-                                    left,
-                                    -product_error(dy, px, right),
-                                    -right,
-                                ] {
+                                for mut value in
+                                    [dx.mul_add(py, -left), left, -dy.mul_add(px, -right), -right]
+                                {
                                     let mut count = 0_usize;
                                     let previous = expansion;
                                     for entry in previous.into_iter().take(length) {
@@ -277,7 +274,13 @@ impl BoundaryIndex {
                     && field_a <= 1
                     && field_b == 0)
                     .ok_or("대한민국 경계 교차 인덱스 오류")?;
-                let [_, south, _, north] = self.tile_bounds(tile_number)?;
+                let width = self.columns.len().strict_sub(1);
+                let row = tile_number.div_euclid(width);
+                let south = *self.rows.get(row).ok_or("대한민국 타일 행 오류")?;
+                let north = *self
+                    .rows
+                    .get(row.strict_add(1))
+                    .ok_or("대한민국 타일 행 오류")?;
                 let mut previous = south;
                 let mut endpoints = Vec::with_capacity(count);
                 for offset in 0..count {
@@ -391,23 +394,6 @@ impl BoundaryIndex {
             .get(start..start.strict_add(size))
             .ok_or("대한민국 경계 블록 위치 오류")?;
         self.decode_page(page_number, tile_number, compressed, raw_size, scratch)
-    }
-    fn tile_bounds(&self, tile_number: usize) -> Result<[f64; 4]> {
-        let width = self.columns.len().strict_sub(1);
-        let column = tile_number.rem_euclid(width);
-        let row = tile_number.div_euclid(width);
-        Ok([
-            *self.columns.get(column).ok_or("대한민국 타일 열 오류")?,
-            *self.rows.get(row).ok_or("대한민국 타일 행 오류")?,
-            *self
-                .columns
-                .get(column.strict_add(1))
-                .ok_or("대한민국 타일 열 오류")?,
-            *self
-                .rows
-                .get(row.strict_add(1))
-                .ok_or("대한민국 타일 행 오류")?,
-        ])
     }
     fn validate_part(&self, part: &Part, bytes: &[u8]) -> Result<()> {
         (bytes.len() == part.bytes

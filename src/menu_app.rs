@@ -2,7 +2,10 @@ use crate::{
     FILE_NAME,
     diagnostic::Result,
     file_output::OutputFile,
-    input::{get_validated_input, read_line_reuse_limited, read_u64_hex_input},
+    input::{
+        DEFAULT_INPUT_LINE_MAX_BYTES, get_validated_input, read_line_reuse_limited,
+        read_u64_hex_input,
+    },
     random_data::RandomDataSet,
     time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TriggerAction},
 };
@@ -10,10 +13,7 @@ use crate::{
 use crate::{
     batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
     hardware_rng::{HardwareRandomSource, HardwareRng},
-    input::{
-        BATCH_COUNT_INPUT_MAX_BYTES, LadderEntryMode, parse_regular_f64, read_ladder_entries,
-        read_parsed_value,
-    },
+    input::{BATCH_COUNT_INPUT_MAX_BYTES, LadderEntryMode, parse_regular_f64, read_ladder_entries},
     ladder::write_ladder_results,
     random_number::{
         FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float,
@@ -89,28 +89,23 @@ impl MenuApp {
                         let requested_count = if command == b'3' {
                             1
                         } else {
-                            let input_buffer = &mut self.input_buffer;
-                            let count_prompt =
-                                format_args!("\n생성할 데이터 개수를 입력해 주세요: ");
-                            loop {
-                                match read_line_reuse_limited(
-                                    count_prompt,
-                                    input_buffer,
-                                    out,
-                                    BATCH_COUNT_INPUT_MAX_BYTES,
-                                )?
-                                .parse::<usize>()
-                                .ok()
-                                {
-                                    Some(0) => writeln!(err, "1 이상의 값을 입력해 주세요.")?,
-                                    Some(count) if count > MAX_BATCH_GENERATE_COUNT => writeln!(
-                                        err,
-                                        "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
-                                    )?,
-                                    Some(count) => break count,
-                                    None => writeln!(err, "유효한 숫자를 입력해 주세요.")?,
-                                }
-                            }
+                            get_validated_input(
+                                format_args!("\n생성할 데이터 개수를 입력해 주세요: "),
+                                &mut self.input_buffer,
+                                out,
+                                Some(err),
+                                BATCH_COUNT_INPUT_MAX_BYTES,
+                                |raw| match raw.parse::<usize>().ok() {
+                                    Some(0) => Err(Cow::Borrowed("1 이상의 값을 입력해 주세요.")),
+                                    Some(count) if count > MAX_BATCH_GENERATE_COUNT => Err(Cow::Owned(
+                                        format!(
+                                            "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
+                                        ),
+                                    )),
+                                    Some(count) => Ok(count),
+                                    None => Err(Cow::Borrowed("유효한 숫자를 입력해 주세요.")),
+                                },
+                            )?
                         };
                         regenerate_with_count(
                             &mut self.output_file,
@@ -222,63 +217,56 @@ impl MenuApp {
                     out,
                     "\n무작위 정수 생성기(지원 범위: -9223372036854775807 ~ 9223372036854775807)"
                 )?;
-                let min_value = loop {
-                    let value = read_parsed_value(
-                        format_args!("최솟값을 입력해 주세요 ({MIN_ALLOWED_INTEGER_VALUE} 이상): "),
-                        input_buffer,
-                        out,
-                        err,
-                        "유효한 정수 형식이 아닙니다.",
-                        |line| line.parse::<i64>().ok(),
-                    )?;
-                    if value >= MIN_ALLOWED_INTEGER_VALUE {
-                        break value;
-                    }
-                    writeln!(
-                        err,
-                        "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요."
-                    )?;
-                };
-                let max_value = loop {
-                    let value = read_parsed_value(
-                        format_args!("최댓값을 입력해 주세요: "),
-                        input_buffer,
-                        out,
-                        err,
-                        "유효한 정수 형식이 아닙니다.",
-                        |line| line.parse::<i64>().ok(),
-                    )?;
-                    if value >= min_value {
-                        break value;
-                    }
-                    writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
-                };
+                let min_value = get_validated_input(
+                    format_args!("최솟값을 입력해 주세요 ({MIN_ALLOWED_INTEGER_VALUE} 이상): "),
+                    input_buffer,
+                    out,
+                    Some(err),
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                    |line| match line.parse::<i64>().ok() {
+                        Some(value) if value >= MIN_ALLOWED_INTEGER_VALUE => Ok(value),
+                        Some(_) => Err(Cow::Owned(format!(
+                            "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요."
+                        ))),
+                        None => Err(Cow::Borrowed("유효한 정수 형식이 아닙니다.")),
+                    },
+                )?;
+                let max_value = get_validated_input(
+                    format_args!("최댓값을 입력해 주세요: "),
+                    input_buffer,
+                    out,
+                    Some(err),
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                    |line| match line.parse::<i64>().ok() {
+                        Some(value) if value >= min_value => Ok(value),
+                        Some(_) => Err("최댓값은 최솟값보다 크거나 같아야 합니다."),
+                        None => Err("유효한 정수 형식이 아닙니다."),
+                    },
+                )?;
                 generate_random_integer(min_value, max_value, out, &self.rng)?;
             }
             b"2" => {
                 writeln!(out, "\n무작위 실수 생성기")?;
-                let min_value = read_parsed_value(
+                let min_value = get_validated_input(
                     format_args!("최솟값을 입력해 주세요: "),
                     input_buffer,
                     out,
-                    err,
-                    FLOAT_INPUT_ERROR,
-                    parse_regular_f64,
+                    Some(err),
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                    |line| parse_regular_f64(line).ok_or(FLOAT_INPUT_ERROR),
                 )?;
-                let max_value = loop {
-                    let value = read_parsed_value(
-                        format_args!("최댓값을 입력해 주세요: "),
-                        input_buffer,
-                        out,
-                        err,
-                        FLOAT_INPUT_ERROR,
-                        parse_regular_f64,
-                    )?;
-                    if value >= min_value {
-                        break value;
-                    }
-                    writeln!(err, "최댓값은 최솟값보다 크거나 같아야 합니다.")?;
-                };
+                let max_value = get_validated_input(
+                    format_args!("최댓값을 입력해 주세요: "),
+                    input_buffer,
+                    out,
+                    Some(err),
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
+                    |line| match parse_regular_f64(line) {
+                        Some(value) if value >= min_value => Ok(value),
+                        Some(_) => Err("최댓값은 최솟값보다 크거나 같아야 합니다."),
+                        None => Err(FLOAT_INPUT_ERROR),
+                    },
+                )?;
                 (max_value - min_value)
                     .is_finite()
                     .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
@@ -296,9 +284,13 @@ impl MenuApp {
         err: &mut dyn Write,
     ) -> Result<()> {
         let host = get_validated_input(
-            "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): ",
+            format_args!(
+                "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): "
+            ),
             &mut self.input_buffer,
             &mut *out,
+            None,
+            DEFAULT_INPUT_LINE_MAX_BYTES,
             |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
                 (!raw_input.is_empty()).ok_or(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."))?;
                 raw_input.parse::<ParsedServer>().map_err(|source| {
@@ -307,9 +299,11 @@ impl MenuApp {
             },
         )?;
         let requested_target_time = get_validated_input(
-            "액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): ",
+            format_args!("액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): "),
             &mut self.input_buffer,
             &mut *out,
+            None,
+            DEFAULT_INPUT_LINE_MAX_BYTES,
             |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
                 if raw_input.is_empty() {
                     return Ok(None);
@@ -321,9 +315,11 @@ impl MenuApp {
             Some(target_time) => Some((
                 target_time,
                 get_validated_input(
-                    "수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): ",
+                    format_args!("수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): "),
                     &mut self.input_buffer,
                     &mut *out,
+                    None,
+                    DEFAULT_INPUT_LINE_MAX_BYTES,
                     |selection| -> CoreResult<TriggerAction, &'static str> {
                         match selection.as_bytes() {
                             b"1" => Ok(TriggerAction::LeftClick),

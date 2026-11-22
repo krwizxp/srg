@@ -205,16 +205,14 @@ impl OutputFormatter<'_, '_, '_> {
                 ];
             }
         });
-        self.cursor.write_bytes("대한민국 위경도: ".as_bytes());
-        let kor_latitude = data.kor_coords.latitude;
-        let kor_longitude = data.kor_coords.longitude;
-        self.cursor
-            .write_format(format_args!("{kor_latitude}, {kor_longitude}\n"));
-        self.cursor.write_bytes("세계 위경도: ".as_bytes());
-        let world_latitude = data.world_coords.latitude;
-        let world_longitude = data.world_coords.longitude;
-        self.cursor
-            .write_format(format_args!("{world_latitude}, {world_longitude}\n"));
+        for (label, coords) in [
+            ("대한민국 위경도: ", &data.kor_coords),
+            ("세계 위경도: ", &data.world_coords),
+        ] {
+            self.cursor.write_bytes(label.as_bytes());
+            self.cursor
+                .write_format(format_args!("{}, {}\n", coords.latitude, coords.longitude));
+        }
     }
 }
 pub(super) fn format_data_into_buffer(
@@ -227,21 +225,19 @@ pub(super) fn format_data_into_buffer(
         let [b0, b1, b2, b3, b4, b5, _, _] = bytes;
         let mut colored = [0_u8; COLORED_HEX_BUF_LEN];
         let mut color_cur = ByteCursor::new(colored.as_mut_slice());
-        color_cur.write_bytes(b"\x1B[38;2;");
-        buf_write_u8_dec(&mut color_cur, b0);
-        color_cur.write_byte(b';');
-        buf_write_u8_dec(&mut color_cur, b1);
-        color_cur.write_byte(b';');
-        buf_write_u8_dec(&mut color_cur, b2);
-        buf_write_prefixed_hex24(&mut color_cur, b"m#", b0, b1, b2);
-        color_cur.write_bytes(b"\x1B[0m \x1B[38;2;");
-        buf_write_u8_dec(&mut color_cur, b3);
-        color_cur.write_byte(b';');
-        buf_write_u8_dec(&mut color_cur, b4);
-        color_cur.write_byte(b';');
-        buf_write_u8_dec(&mut color_cur, b5);
-        buf_write_prefixed_hex24(&mut color_cur, b"m#", b3, b4, b5);
-        color_cur.write_bytes(b"\x1B[0m");
+        for (prefix, [red, green, blue]) in [
+            (b"\x1B[38;2;".as_slice(), [b0, b1, b2]),
+            (b" \x1B[38;2;".as_slice(), [b3, b4, b5]),
+        ] {
+            color_cur.write_bytes(prefix);
+            buf_write_u8_dec(&mut color_cur, red);
+            color_cur.write_byte(b';');
+            buf_write_u8_dec(&mut color_cur, green);
+            color_cur.write_byte(b';');
+            buf_write_u8_dec(&mut color_cur, blue);
+            buf_write_prefixed_hex24(&mut color_cur, b"m#", red, green, blue);
+            color_cur.write_bytes(b"\x1B[0m");
+        }
         let colored_len = color_cur.written_len();
         let value_start = buffer
             .get(HEX_CODE_MIN_OFFSET..file_len)
@@ -284,11 +280,12 @@ fn hex_u16(value: u16) -> [u8; HEX_U16_FULL_WIDTH] {
 }
 fn buf_write_u8_dec(cur: &mut ByteCursor<'_>, n: u8) {
     if n >= U8_THREE_DIGIT_THRESHOLD {
-        let &mut [ref mut hundreds, ref mut tens, ref mut ones] = cur.take_array::<3>();
-        *hundreds = digit_byte(n.div_euclid(U8_THREE_DIGIT_THRESHOLD));
-        let [tens_value, ones_value] = two_digits(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
-        *tens = tens_value;
-        *ones = ones_value;
+        let [tens, ones] = two_digits(n.rem_euclid(U8_THREE_DIGIT_THRESHOLD));
+        *cur.take_array::<3>() = [
+            digit_byte(n.div_euclid(U8_THREE_DIGIT_THRESHOLD)),
+            tens,
+            ones,
+        ];
         return;
     }
     if n >= U8_TWO_DIGIT_THRESHOLD {

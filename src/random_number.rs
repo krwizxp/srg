@@ -1,5 +1,5 @@
 use super::hardware_rng::HardwareRng;
-use crate::diagnostic::Result;
+use crate::{diagnostic::Result, numeric::split_u64_be_u32};
 use std::io::Write;
 pub(super) const FLOAT_INPUT_ERROR: &str =
     "유효한 정규 실수 값을 입력해야 합니다 (NaN, 무한대, 비정규 값 제외).";
@@ -27,9 +27,7 @@ pub(super) fn generate_random_float(
     out: &mut dyn Write,
     rng: &HardwareRng,
 ) -> Result<()> {
-    let [b0, b1, b2, b3, b4, b5, b6, b7] = rng.next_u64()?.to_be_bytes();
-    let upper_32 = u32::from_be_bytes([b0, b1, b2, b3]);
-    let lower_32 = u32::from_be_bytes([b4, b5, b6, b7]);
+    let (upper_32, lower_32) = split_u64_be_u32(rng.next_u64()?);
     let scale = f64::from(upper_32).mul_add(TWO_POW_32_F64, f64::from(lower_32)) * U64_UNIT_SCALE;
     let result = if min_value.to_bits() == max_value.to_bits() {
         min_value

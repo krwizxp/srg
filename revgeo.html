@@ -164,6 +164,7 @@
 		.drop-zone,
 		.elapsed-time,
 		.filterbar,
+		.full-address,
 		.header-inner,
 		.header-tools,
 		.map-feedback,
@@ -277,7 +278,8 @@
 		}
 		.button,
 		.copyright,
-		.table-hint {
+		.table-hint,
+		[role=alertdialog] .sheet-heading {
 			justify-content: center
 		}
 		.coords-empty,
@@ -286,14 +288,17 @@
 			justify-content: center;
 			gap: 12px
 		}
+		.site-header,
+		.mobile-nav {
+			background: var(--glass);
+			-webkit-backdrop-filter: blur(20px) saturate(1.8);
+			backdrop-filter: blur(20px) saturate(1.8)
+		}
 		.site-header {
 			position: sticky;
 			top: 0;
 			z-index: 30;
-			background: var(--glass);
-			border-bottom: 1px solid var(--line);
-			-webkit-backdrop-filter: blur(20px) saturate(1.8);
-			backdrop-filter: blur(20px) saturate(1.8)
+			border-bottom: 1px solid var(--line)
 		}
 		.header-inner {
 			gap: 24px;
@@ -363,10 +368,7 @@
 		.mobile-nav {
 			isolation: isolate;
 			border: 1px solid var(--line);
-			background: var(--glass);
-			box-shadow: var(--glass-shadow);
-			-webkit-backdrop-filter: blur(20px) saturate(1.8);
-			backdrop-filter: blur(20px) saturate(1.8)
+			box-shadow: var(--glass-shadow)
 		}
 		.icon-button {
 			border: 0;
@@ -771,22 +773,23 @@
 			gap: 8px
 		}
 		#runBtn,
-		#useOutput {
+		#useOutput,
+		.supp-form .rng-actions button[type=submit] {
 			grid-column: 1/-1
 		}
-		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel),
+		.secondary,
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn {
 			color: var(--fg);
 			background: var(--press-bg)
 		}
-		:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):active:not(:disabled),
+		.secondary:active:not(:disabled),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
+			color: var(--fg);
 			background: var(--secondary-active)
 		}
 		#clearBtn {
 			justify-self: start;
 			padding-inline: 12px;
-			color: var(--danger);
 			background: transparent;
 			border-color: transparent
 		}
@@ -821,15 +824,12 @@
 		.remaining-note {
 			margin-left: auto
 		}
-		search {
-			display: block;
-			padding: 0 28px 20px
-		}
 		.filters {
 			display: grid;
 			grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
 			gap: 12px;
-			align-items: start
+			align-items: start;
+			padding: 0 28px 20px
 		}
 		.filters :is(input, select),
 		.rng-generator input[type=number],
@@ -858,7 +858,6 @@
 		}
 		.search-field>input {
 			padding-left: 40px;
-			border-radius: var(--radius-pill);
 			background: var(--panel);
 			border-color: transparent
 		}
@@ -867,9 +866,6 @@
 		}
 		.filter-trigger {
 			position: relative
-		}
-		.filter-trigger:is([data-active=true], :has(+ #filter-dialog:open)) {
-			background: var(--tint)
 		}
 		#filter-count {
 			display: grid;
@@ -949,9 +945,6 @@
 		col:nth-child(1) {
 			width: 44px
 		}
-		col:nth-child(2) {
-			width: auto
-		}
 		col:nth-child(3) {
 			width: 26%
 		}
@@ -1015,11 +1008,7 @@
 				unicode-bidi: plaintext
 			}
 		}
-		#rng-error,
-		#error,
-		#supp-error,
-		#num64-error,
-		#suppValues-error,
+		.note[role=alert],
 		.result-state[data-error=true],
 		.status.err,
 		.row-error {
@@ -1192,8 +1181,6 @@
 		}
 		.full-address {
 			margin-top: 6px;
-			display: flex;
-			align-items: center;
 			gap: 8px
 		}
 		#detail-full {
@@ -1286,14 +1273,12 @@
 		}
 		.map-popover,
 		dialog {
-			--overlay-top: 22px;
 			--overlay-start: 22px;
 			--overlay-end: 22px;
-			--overlay-bottom: 22px;
 			max-width: calc(100vw - 2*max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
 			max-height: calc(100dvh - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)));
 			overflow: auto;
-			padding: var(--overlay-top) var(--overlay-end) var(--overlay-bottom) var(--overlay-start);
+			padding: 22px var(--overlay-end) 22px var(--overlay-start);
 			scroll-padding-block-start: 88px;
 			color: var(--fg);
 			border-radius: var(--radius-large);
@@ -1403,9 +1388,6 @@
 			display: grid;
 			gap: 16px
 		}
-		.supp-form .rng-actions button[type=submit] {
-			grid-column: 1/-1
-		}
 		dialog::backdrop {
 			background: #0006
 		}
@@ -1425,12 +1407,12 @@
 		:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading,
 		.supp-form>.sheet-heading {
 			position: sticky;
-			top: calc(-1*var(--overlay-top));
+			top: -22px;
 			z-index: 2;
 			gap: 12px;
-			margin-block-start: calc(-1*var(--overlay-top));
+			margin-block-start: -22px;
 			margin-inline: calc(-1*var(--overlay-start)) calc(-1*var(--overlay-end));
-			padding: var(--overlay-top) var(--overlay-end) 12px var(--overlay-start);
+			padding: 22px var(--overlay-end) 12px var(--overlay-start);
 			background: var(--surface);
 			border-bottom: 1px solid var(--line)
 		}
@@ -1502,9 +1484,6 @@
 			margin: auto;
 			width: min(320px, calc(100vw - 32px));
 			text-align: center
-		}
-		[role=alertdialog] .sheet-heading {
-			justify-content: center
 		}
 		#detail-full[dir=auto],
 		.address-main[dir=auto],
@@ -1590,6 +1569,7 @@
 				height: 32px
 			}
 			#app,
+			.results-grid,
 			table,
 			.location-button::after {
 				display: block
@@ -1605,7 +1585,10 @@
 			body[data-mobiletab=input] .results,
 			body[data-mobiletab=results] .input-card,
 			colgroup,
-			td:nth-child(1) {
+			td:nth-child(1),
+			.table-wrap:not(:has(tbody>tr))+.results-footer,
+			:is(#page-prev, #page-next)>span,
+			.mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
 				display: none
 			}
 			.header-tools {
@@ -1660,12 +1643,10 @@
 			.filterbar .segmented button {
 				border-radius: calc(var(--radius-card) - 4px)
 			}
-			search {
-				padding: 0 0 18px
-			}
 			.filters {
 				grid-template-columns: minmax(0, 1fr) 44px;
-				gap: 8px
+				gap: 8px;
+				padding: 0 0 18px
 			}
 			.filter-trigger {
 				padding: 10px
@@ -1678,8 +1659,7 @@
 				height: 22px
 			}
 			.results-grid {
-				border: 0;
-				display: block
+				border: 0
 			}
 			.table-wrap {
 				overflow: visible;
@@ -1688,9 +1668,6 @@
 			}
 			.table-wrap:not(:has(tbody>tr)) {
 				min-height: 96px
-			}
-			.table-wrap:not(:has(tbody>tr))+.results-footer {
-				display: none
 			}
 			thead {
 				position: absolute;
@@ -1723,24 +1700,21 @@
 				border: 0
 			}
 			td:nth-child(2) {
-				grid-column: 1;
-				grid-row: 1;
+				grid-area: 1/1;
 				min-width: 0
 			}
 			td:nth-child(3) {
-				grid-column: 1;
-				grid-row: 2
+				grid-area: 2/1
 			}
 			td:nth-child(4),
 			td:nth-child(5) {
-				grid-column: 2;
 				text-align: right
 			}
 			td:nth-child(4) {
-				grid-row: 1
+				grid-area: 1/2
 			}
 			td:nth-child(5) {
-				grid-row: 2;
+				grid-area: 2/2;
 				align-self: end
 			}
 			.site-brand h1,
@@ -1775,9 +1749,6 @@
 			#results-count {
 				text-align: center;
 				width: 100%
-			}
-			:is(#page-prev, #page-next)>span {
-				display: none
 			}
 			.mobile-bottom {
 				position: fixed;
@@ -1855,9 +1826,6 @@
 			.mobile-job-slot .job-panel {
 				margin: 0 0 18px
 			}
-			.mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
-				display: none
-			}
 			:is(dialog, #detail-sheet):not([role=alertdialog]),
 			.map-popover {
 				inset: auto 0 0;
@@ -1865,7 +1833,7 @@
 				margin: 0;
 				--overlay-start: max(20px, env(safe-area-inset-left));
 				--overlay-end: max(20px, env(safe-area-inset-right));
-				--overlay-bottom: max(22px, env(safe-area-inset-bottom));
+				padding-bottom: max(22px, env(safe-area-inset-bottom));
 				border-radius: var(--radius-large) var(--radius-large) 0 0
 			}
 			.map-popover {
@@ -1885,12 +1853,12 @@
 			#detail-sheet {
 				max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
 			}
-			:is(#detail-sheet, #map-popover, #help-dialog, #display-settings, #filter-dialog)>.sheet-heading {
+			:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading {
 				touch-action: none;
 				user-select: none;
 				cursor: grab
 			}
-			:is(#detail-sheet, #map-popover, #help-dialog, #display-settings, #filter-dialog)>.sheet-heading::before {
+			:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading::before {
 				content: "";
 				position: absolute;
 				inset: 8px auto auto 50%;
@@ -1978,7 +1946,7 @@
 			.danger:hover:not(:active):not(:disabled) {
 				background: var(--danger-hover)
 			}
-			:is(#saveOutput, #copyOutput, #coords-copy, #export, #filter-clear, #clear-cancel, #bulk-cancel):hover:not(:active):not(:disabled),
+			.secondary:hover:not(:active):not(:disabled),
 			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
 				background: var(--secondary-hover)
 			}
@@ -2215,67 +2183,64 @@
 						<path d="M14 3v5h4m-9 4h6m-6 4h6" />
 					</svg> 좌표 추출 </button>
 			</div>
-			<div aria-labelledby="manual-tab" class="manual-rng" hidden id="manual-pane" role="tabpanel">
-				<div class="rng-fields">
-					<section aria-label="난수 생성" class="rng-generator">
-						<div class="field">
-							<label class="label" for="rng-count">생성 개수</label>
-							<input id="rng-count" type="number" min="1" max="10000" step="1" value="1"
-								inputmode="numeric">
-						</div>
-						<div class="rng-actions">
-							<button class="button" id="generate-num64" type="button">기본 난수 생성</button>
-							<button class="button" id="generate-supp" type="button">보조 난수 생성</button>
-						</div>
-						<label class="check-label"><span>보조 난수 자동 생성</span><input id="auto-supp" role="switch"
-								type="checkbox"></label>
-						<p class="note" id="rng-error" role="alert" aria-atomic="true"></p>
-					</section>
+			<div aria-labelledby="manual-tab" class="manual-rng rng-fields" hidden id="manual-pane" role="tabpanel">
+				<section aria-label="난수 생성" class="rng-generator">
 					<div class="field">
-						<label class="label" for="num64">기본 난수값 목록</label>
-						<textarea id="num64" spellcheck="false" autocorrect="off" autocapitalize="off"
-							autocomplete="off" inputmode="text" placeholder="예)
-123456789
-0x1122334455667788"></textarea>
-						<p aria-atomic="true" class="note" id="num64-error" role="alert"></p>
-					</div>
-					<div class="field">
-						<label class="label" for="suppValues">보조 난수값 목록 (선택)</label>
-						<textarea id="suppValues" spellcheck="false" autocorrect="off" autocapitalize="off"
-							autocomplete="off" inputmode="text" placeholder="예)
-123456789
-0x1122334455667788"></textarea>
-						<p aria-atomic="true" class="note" id="suppValues-error" role="alert"></p>
+						<label class="label" for="rng-count">생성 개수</label>
+						<input id="rng-count" type="number" min="1" max="10000" step="1" value="1" inputmode="numeric">
 					</div>
 					<div class="rng-actions">
-						<button class="button primary" id="runBtn" type="button">
-							<svg aria-hidden="true" viewBox="0 0 24 24">
-								<path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" />
-							</svg> 좌표로 변환 </button>
-						<button class="button" disabled id="saveOutput" type="button">
-							<svg aria-hidden="true" viewbox="0 0 24 24">
-								<path d="M12 4.5v10" />
-								<path d="m8 10.75 4 4 4-4" />
-								<path d="M5.5 18.5h13" />
-							</svg> TXT 저장 </button>
-						<button class="button" disabled id="copyOutput" title="결과 복사" type="button">
-							<svg aria-hidden="true" viewBox="0 0 24 24">
-								<rect width="11" height="11" x="9" y="9" rx="2" />
-								<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-							</svg> 결과 복사 </button>
-						<button class="button primary" disabled id="useOutput" type="button">이 좌표로 조회 준비</button>
-						<button class="button danger" id="clearBtn" type="button">
-							<svg aria-hidden="true" viewBox="0 0 24 24">
-								<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15m-8 4v7m4-7v7" />
-							</svg> 출력 지우기 </button>
+						<button class="button" id="generate-num64" type="button">기본 난수 생성</button>
+						<button class="button" id="generate-supp" type="button">보조 난수 생성</button>
 					</div>
-					<div aria-atomic="true" class="note" id="meta" role="status"></div>
-					<div aria-atomic="true" class="note" id="error" role="alert"></div>
-					<section aria-label="변환 결과">
-						<h2 class="label">변환 결과</h2>
-						<pre class="code-view" id="output" tabindex="0"><code class="code-content"></code></pre>
-					</section>
+					<label class="check-label"><span>보조 난수 자동 생성</span><input id="auto-supp" role="switch"
+							type="checkbox"></label>
+					<p class="note" id="rng-error" role="alert" aria-atomic="true"></p>
+				</section>
+				<div class="field">
+					<label class="label" for="num64">기본 난수값 목록</label>
+					<textarea id="num64" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"
+						inputmode="text" placeholder="예)
+123456789
+0x1122334455667788"></textarea>
+					<p aria-atomic="true" class="note" id="num64-error" role="alert"></p>
 				</div>
+				<div class="field">
+					<label class="label" for="suppValues">보조 난수값 목록 (선택)</label>
+					<textarea id="suppValues" spellcheck="false" autocorrect="off" autocapitalize="off"
+						autocomplete="off" inputmode="text" placeholder="예)
+123456789
+0x1122334455667788"></textarea>
+					<p aria-atomic="true" class="note" id="suppValues-error" role="alert"></p>
+				</div>
+				<div class="rng-actions">
+					<button class="button primary" id="runBtn" type="button">
+						<svg aria-hidden="true" viewBox="0 0 24 24">
+							<path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" />
+						</svg> 좌표로 변환 </button>
+					<button class="button secondary" disabled id="saveOutput" type="button">
+						<svg aria-hidden="true" viewbox="0 0 24 24">
+							<path d="M12 4.5v10" />
+							<path d="m8 10.75 4 4 4-4" />
+							<path d="M5.5 18.5h13" />
+						</svg> TXT 저장 </button>
+					<button class="button secondary" disabled id="copyOutput" title="결과 복사" type="button">
+						<svg aria-hidden="true" viewBox="0 0 24 24">
+							<rect width="11" height="11" x="9" y="9" rx="2" />
+							<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+						</svg> 결과 복사 </button>
+					<button class="button primary" disabled id="useOutput" type="button">이 좌표로 조회 준비</button>
+					<button class="button danger" id="clearBtn" type="button">
+						<svg aria-hidden="true" viewBox="0 0 24 24">
+							<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15m-8 4v7m4-7v7" />
+						</svg> 출력 지우기 </button>
+				</div>
+				<div aria-atomic="true" class="note" id="meta" role="status"></div>
+				<div aria-atomic="true" class="note" id="error" role="alert"></div>
+				<section aria-label="변환 결과">
+					<h2 class="label">변환 결과</h2>
+					<pre class="code-view" id="output" tabindex="0"><code class="code-content"></code></pre>
+				</section>
 			</div>
 			<section aria-labelledby="coords-label" class="coords-panel" data-empty="true" data-expanded="false">
 				<div class="coords-head">
@@ -2291,8 +2256,8 @@
 				<pre class="code-view" id="coords" tabindex="0"><span aria-hidden="true"
 						id="coord-line-numbers"></span><code class="code-content"></code></pre>
 				<div class="coords-tools"><button aria-controls="coords" aria-expanded="false" class="button"
-						id="coords-expand" type="button">미리보기 펼치기</button><button class="button" id="coords-copy"
-						type="button">전체 좌표 복사</button></div>
+						id="coords-expand" type="button">미리보기 펼치기</button><button class="button secondary"
+						id="coords-copy" type="button">전체 좌표 복사</button></div>
 			</section>
 			<div id="input-job-slot">
 				<section aria-label="조회 진행 상황" class="job-panel">
@@ -2340,198 +2305,191 @@
 				</section>
 			</div>
 		</section>
-		<section aria-labelledby="mobile-results-tab" class="results" id="results-view" role="tabpanel">
-			<div class="results-card">
-				<header class="results-heading">
-					<h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2>
-					<button class="button" command="--export" commandfor="app" disabled id="export"
-						title="조회된 전체 결과를 CSV로 저장" type="button">
-						<svg aria-hidden="true" viewBox="0 0 24 24">
-							<path d="M12 4.5v10" />
-							<path d="m8 10.75 4 4 4-4" />
-							<path d="M5.5 18.5h13" />
-						</svg>
-						<span>전체 결과 CSV</span>
-					</button>
-				</header>
-				<div class="mobile-job-slot" id="mobile-job-slot"></div>
-				<div class="filterbar">
-					<div aria-label="처리 상태 필터" class="segmented" role="group">
-						<button aria-pressed="true" data-status="all" type="button">전체 <strong
-								id="summary-processed">0</strong></button>
-						<button aria-pressed="false" data-status="done" type="button">주소 확인 <strong
-								id="summary-success">0</strong></button>
-						<button aria-pressed="false" data-status="missing" type="button">주소 없음 <strong
-								id="summary-no-address">0</strong></button>
-						<button aria-pressed="false" data-status="failed" type="button">실패 <strong
-								id="summary-fail">0</strong></button>
-					</div>
-					<p class="remaining-note">총 <strong id="summary-total">0</strong>개 좌표 · 미처리 <strong
-							id="summary-remain">0</strong></p>
+		<section aria-labelledby="mobile-results-tab" class="results results-card" id="results-view" role="tabpanel">
+			<header class="results-heading">
+				<h2 class="card-label" id="results-title" tabindex="-1">주소 조회 결과</h2>
+				<button class="button secondary" command="--export" commandfor="app" disabled id="export"
+					title="조회된 전체 결과를 CSV로 저장" type="button">
+					<svg aria-hidden="true" viewBox="0 0 24 24">
+						<path d="M12 4.5v10" />
+						<path d="m8 10.75 4 4 4-4" />
+						<path d="M5.5 18.5h13" />
+					</svg>
+					<span>전체 결과 CSV</span>
+				</button>
+			</header>
+			<div class="mobile-job-slot" id="mobile-job-slot"></div>
+			<div class="filterbar">
+				<div aria-label="처리 상태 필터" class="segmented" role="group">
+					<button aria-pressed="true" data-status="all" type="button">전체 <strong
+							id="summary-processed">0</strong></button>
+					<button aria-pressed="false" data-status="done" type="button">주소 확인 <strong
+							id="summary-success">0</strong></button>
+					<button aria-pressed="false" data-status="missing" type="button">주소 없음 <strong
+							id="summary-no-address">0</strong></button>
+					<button aria-pressed="false" data-status="failed" type="button">실패 <strong
+							id="summary-fail">0</strong></button>
 				</div>
-				<search aria-label="주소 조회 결과 필터">
-					<div class="filters" id="filters">
-						<div class="search-field">
+				<p class="remaining-note">총 <strong id="summary-total">0</strong>개 좌표 · 미처리 <strong
+						id="summary-remain">0</strong></p>
+			</div>
+			<search aria-label="주소 조회 결과 필터" class="filters" id="filters">
+				<div class="search-field">
+					<svg aria-hidden="true" viewBox="0 0 24 24">
+						<circle cx="10.5" cy="10.5" r="6.5" />
+						<path d="m16 16 4.5 4.5" />
+					</svg>
+					<input aria-keyshortcuts="/" aria-label="주소, 좌표, 지물 검색" enterkeyhint="search" id="filter-q"
+						inputmode="search" placeholder="주소, 좌표, 지물 검색" type="search">
+				</div><select aria-label="구분" id="filter-kind">
+					<option value="">전체</option>
+					<option value="에러"> 조회 실패 </option>
+				</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
+					class="button filter-trigger" command="show-modal" commandfor="filter-dialog" id="advanced-filters"
+					type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+						<path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
+						<circle cx="14" cy="7" r="3" />
+						<circle cx="10" cy="17" r="3" />
+					</svg><span>상세 필터</span> <span hidden id="filter-count"></span></button>
+				<dialog aria-labelledby="filter-title" closedby="any" id="filter-dialog">
+					<div class="sheet-heading">
+						<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
+							command="close" commandfor="filter-dialog" type="button"><svg aria-hidden="true"
+								viewBox="0 0 24 24">
+								<path d="m6 6 12 12M6 18 18 6" />
+							</svg></button>
+					</div>
+					<div class="filter-grid"><label>광역 지역<input enterkeyhint="search" autofocus id="filter-sido"
+								inputmode="search" placeholder="시·도, 주 등" type="search"></label><label>도시·행정구역<input
+								enterkeyhint="search" id="filter-sigungu" inputmode="search" placeholder="시·군·구 등"
+								type="search"></label><label>세부 지역<input enterkeyhint="search" id="filter-emd"
+								inputmode="search" placeholder="읍·면·동·리 등" type="search"></label><label>지물
+							태그<input enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그"
+								type="search"></label><label>전체주소<input enterkeyhint="search" id="filter-fulladdr"
+								inputmode="search" placeholder="전체주소" type="search"></label><button
+							class="button secondary" command="--filter-clear" commandfor="app" id="filter-clear"
+							type="button">
 							<svg aria-hidden="true" viewBox="0 0 24 24">
-								<circle cx="10.5" cy="10.5" r="6.5" />
-								<path d="m16 16 4.5 4.5" />
-							</svg>
-							<input aria-keyshortcuts="/" aria-label="주소, 좌표, 지물 검색" enterkeyhint="search" id="filter-q"
-								inputmode="search" placeholder="주소, 좌표, 지물 검색" type="search">
-						</div><select aria-label="구분" id="filter-kind">
-							<option value="">전체</option>
-							<option value="에러"> 조회 실패 </option>
-						</select><button aria-label="상세 필터" aria-haspopup="dialog" aria-controls="filter-dialog"
-							class="button filter-trigger" command="show-modal" commandfor="filter-dialog"
-							id="advanced-filters" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
-								<path d="M4 7h7m6 0h3M4 17h3m6 0h7" />
-								<circle cx="14" cy="7" r="3" />
-								<circle cx="10" cy="17" r="3" />
-							</svg><span>상세 필터</span> <span hidden id="filter-count"></span></button>
-						<dialog aria-labelledby="filter-title" closedby="any" id="filter-dialog">
+								<path d="M20 7v5h-5M4 17v-5h5" />
+								<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
+							</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close"
+							commandfor="filter-dialog" type="button">완료</button>
+					</div>
+				</dialog>
+			</search>
+			<div class="results-grid">
+				<div class="table-zone">
+					<section aria-label="주소 조회 결과 표" class="table-wrap" tabindex="0">
+						<p aria-atomic="true" aria-live="polite" class="table-hint empty-hint">조회 결과 없음</p>
+						<div class="table-hint filter-empty-hint">
+							<p>검색 결과가 없습니다.</p>
+							<p class="note" id="active-filter-summary"></p><button class="button"
+								command="--filter-clear" commandfor="app" type="button">검색·필터 모두 초기화</button>
+						</div>
+						<table id="tbl">
+							<caption class="sr-only">역지오코딩 결과</caption>
+							<colgroup>
+								<col>
+								<col>
+								<col>
+								<col>
+								<col>
+							</colgroup>
+							<thead>
+								<tr>
+									<th scope="col">#</th>
+									<th scope="col">주소</th>
+									<th scope="col">좌표</th>
+									<th scope="col">구분</th>
+									<th scope="col">상태</th>
+								</tr>
+							</thead>
+							<tbody></tbody>
+						</table>
+					</section>
+					<div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
+						<nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
+							<button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app"
+								id="page-prev" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
+									<path d="m14 6-6 6 6 6" />
+								</svg><span>이전</span></button>
+							<output aria-live="polite" class="sr-only" id="page-status"></output><span
+								class="page-numbers" id="page-numbers"></span>
+							<button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app"
+								id="page-next" type="button"><span>다음</span><svg aria-hidden="true" viewBox="0 0 24 24">
+									<path d="m10 6 6 6-6 6" />
+								</svg></button>
+						</nav>
+					</div>
+				</div>
+				<aside aria-label="선택한 위치" class="inspector" id="inspector">
+					<p class="inspector-empty" id="inspector-empty">선택한 위치 없음</p>
+					<div hidden id="inspector-content">
+						<p class="inspector-eyebrow">선택한 위치</p>
+						<h2 dir="auto" id="detail-title">주소 정보 없음</h2>
+						<p dir="auto" id="detail-town"></p>
+						<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg
+									aria-hidden="true" viewBox="0 0 24 24">
+									<path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
+									<circle cx="12" cy="10" r="2.5" />
+								</svg>OpenStreetMap 지도 불러오기</button>
+							<div aria-live="polite" class="map-feedback" hidden id="map-feedback" tabindex="-1">
+							</div><iframe hidden id="detail-map" loading="lazy"
+								referrerpolicy="strict-origin-when-cross-origin"
+								title="선택한 좌표의 OpenStreetMap 지도"></iframe>
+						</div>
+						<div class="map-recovery" hidden id="map-recovery"><button class="button" id="retry-map"
+								type="button">다시
+								시도</button><a class="button" href="about:blank" id="map-external"
+								rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
+						<p class="detail-label">전체 주소</p>
+						<div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
+								class="icon-button" id="copy-address" type="button"><svg aria-hidden="true"
+									viewBox="0 0 24 24">
+									<rect width="11" height="11" x="9" y="9" rx="2" />
+									<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+								</svg></button></div>
+						<dl class="detail-fields">
+							<div>
+								<dt>광역 지역</dt>
+								<dd dir="auto" id="detail-province"></dd>
+							</div>
+							<div>
+								<dt>도시·행정구역</dt>
+								<dd dir="auto" id="detail-district"></dd>
+							</div>
+							<div>
+								<dt>세부 지역</dt>
+								<dd dir="auto" id="detail-town2"></dd>
+							</div>
+						</dl>
+						<div class="detail-tags">
+							<p class="detail-label">지물 태그</p>
+							<p dir="auto" id="detail-tag"></p>
+						</div>
+						<p dir="ltr" id="detail-coordinates"></p>
+						<button class="map-btn button open-map" id="detail-map-links" popovertarget="map-popover"
+							popovertargetaction="show" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
+								<path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z" />
+								<path d="M9 2v17m6-14v17" />
+							</svg>지도에서 열기</button>
+						<nav aria-labelledby="map-popover-title" class="map-popover" id="map-popover" popover="auto">
 							<div class="sheet-heading">
-								<h2 id="filter-title">상세 필터</h2><button aria-label="상세 필터 닫기" class="icon-button"
-									command="close" commandfor="filter-dialog" type="button"><svg aria-hidden="true"
-										viewBox="0 0 24 24">
+								<h2 id="map-popover-title">지도에서 열기</h2><button aria-label="지도 선택 닫기" class="icon-button"
+									popovertarget="map-popover" popovertargetaction="hide" type="button"><svg
+										aria-hidden="true" viewBox="0 0 24 24">
 										<path d="m6 6 12 12M6 18 18 6" />
 									</svg></button>
 							</div>
-							<div class="filter-grid"><label>광역 지역<input enterkeyhint="search" autofocus id="filter-sido"
-										inputmode="search" placeholder="시·도, 주 등"
-										type="search"></label><label>도시·행정구역<input enterkeyhint="search"
-										id="filter-sigungu" inputmode="search" placeholder="시·군·구 등"
-										type="search"></label><label>세부 지역<input enterkeyhint="search" id="filter-emd"
-										inputmode="search" placeholder="읍·면·동·리 등" type="search"></label><label>지물
-									태그<input enterkeyhint="search" id="filter-tag" inputmode="search"
-										placeholder="지물 태그" type="search"></label><label>전체주소<input
-										enterkeyhint="search" id="filter-fulladdr" inputmode="search" placeholder="전체주소"
-										type="search"></label><button class="button" command="--filter-clear"
-									commandfor="app" id="filter-clear" type="button">
-									<svg aria-hidden="true" viewBox="0 0 24 24">
-										<path d="M20 7v5h-5M4 17v-5h5" />
-										<path d="M6 6a8 8 0 0 1 13.3 4M4.7 14A8 8 0 0 0 18 18" />
-									</svg> 검색·필터 모두 초기화 </button><button class="button primary" command="close"
-									commandfor="filter-dialog" type="button">완료</button>
+							<div class="map-links" id="map-popover-links">
+								<a href="about:blank" rel="noopener noreferrer" target="_blank">Google 지도</a>
+								<a href="about:blank" rel="noopener noreferrer" target="_blank">OpenStreetMap</a>
+								<a href="about:blank" rel="noopener noreferrer" target="_blank">네이버 지도</a>
+								<a href="about:blank" rel="noopener noreferrer" target="_blank">카카오맵</a>
 							</div>
-						</dialog>
+						</nav>
 					</div>
-				</search>
-				<div class="results-grid">
-					<div class="table-zone">
-						<section aria-label="주소 조회 결과 표" class="table-wrap" tabindex="0">
-							<p aria-atomic="true" aria-live="polite" class="table-hint empty-hint">조회 결과 없음</p>
-							<div class="table-hint filter-empty-hint">
-								<p>검색 결과가 없습니다.</p>
-								<p class="note" id="active-filter-summary"></p><button class="button"
-									command="--filter-clear" commandfor="app" type="button">검색·필터 모두 초기화</button>
-							</div>
-							<table id="tbl">
-								<caption class="sr-only">역지오코딩 결과</caption>
-								<colgroup>
-									<col>
-									<col>
-									<col>
-									<col>
-									<col>
-								</colgroup>
-								<thead>
-									<tr>
-										<th scope="col">#</th>
-										<th scope="col">주소</th>
-										<th scope="col">좌표</th>
-										<th scope="col">구분</th>
-										<th scope="col">상태</th>
-									</tr>
-								</thead>
-								<tbody></tbody>
-							</table>
-						</section>
-						<div class="results-footer"><span id="results-count">표시할 결과가 없습니다.</span>
-							<nav aria-label="결과 페이지" class="result-pages" hidden id="result-pages">
-								<button aria-label="이전 페이지" class="button" command="--page-prev" commandfor="app"
-									id="page-prev" type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
-										<path d="m14 6-6 6 6 6" />
-									</svg><span>이전</span></button>
-								<output aria-live="polite" class="sr-only" id="page-status"></output><span
-									class="page-numbers" id="page-numbers"></span>
-								<button aria-label="다음 페이지" class="button" command="--page-next" commandfor="app"
-									id="page-next" type="button"><span>다음</span><svg aria-hidden="true"
-										viewBox="0 0 24 24">
-										<path d="m10 6 6 6-6 6" />
-									</svg></button>
-							</nav>
-						</div>
-					</div>
-					<aside aria-label="선택한 위치" class="inspector" id="inspector">
-						<p class="inspector-empty" id="inspector-empty">선택한 위치 없음</p>
-						<div hidden id="inspector-content">
-							<p class="inspector-eyebrow">선택한 위치</p>
-							<h2 dir="auto" id="detail-title">주소 정보 없음</h2>
-							<p dir="auto" id="detail-town"></p>
-							<div class="map-preview"><button class="map-load" id="load-map" type="button"><svg
-										aria-hidden="true" viewBox="0 0 24 24">
-										<path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0Z" />
-										<circle cx="12" cy="10" r="2.5" />
-									</svg>OpenStreetMap 지도 불러오기</button>
-								<div aria-live="polite" class="map-feedback" hidden id="map-feedback" tabindex="-1">
-								</div><iframe hidden id="detail-map" loading="lazy"
-									referrerpolicy="strict-origin-when-cross-origin"
-									title="선택한 좌표의 OpenStreetMap 지도"></iframe>
-							</div>
-							<div class="map-recovery" hidden id="map-recovery"><button class="button" id="retry-map"
-									type="button">다시
-									시도</button><a class="button" href="about:blank" id="map-external"
-									rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
-							<p class="detail-label">전체 주소</p>
-							<div class="full-address"><span dir="auto" id="detail-full"></span><button
-									aria-label="주소 복사" class="icon-button" id="copy-address" type="button"><svg
-										aria-hidden="true" viewBox="0 0 24 24">
-										<rect width="11" height="11" x="9" y="9" rx="2" />
-										<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-									</svg></button></div>
-							<dl class="detail-fields">
-								<div>
-									<dt>광역 지역</dt>
-									<dd dir="auto" id="detail-province"></dd>
-								</div>
-								<div>
-									<dt>도시·행정구역</dt>
-									<dd dir="auto" id="detail-district"></dd>
-								</div>
-								<div>
-									<dt>세부 지역</dt>
-									<dd dir="auto" id="detail-town2"></dd>
-								</div>
-							</dl>
-							<div class="detail-tags">
-								<p class="detail-label">지물 태그</p>
-								<p dir="auto" id="detail-tag"></p>
-							</div>
-							<p dir="ltr" id="detail-coordinates"></p>
-							<button class="map-btn button open-map" id="detail-map-links" popovertarget="map-popover"
-								popovertargetaction="show" type="button"><svg aria-hidden="true" viewbox="0 0 24 24">
-									<path d="m3 5 6-3 6 3 6-3v17l-6 3-6-3-6 3Z" />
-									<path d="M9 2v17m6-14v17" />
-								</svg>지도에서 열기</button>
-							<nav aria-labelledby="map-popover-title" class="map-popover" id="map-popover"
-								popover="auto">
-								<div class="sheet-heading">
-									<h2 id="map-popover-title">지도에서 열기</h2><button aria-label="지도 선택 닫기"
-										class="icon-button" popovertarget="map-popover" popovertargetaction="hide"
-										type="button"><svg aria-hidden="true" viewBox="0 0 24 24">
-											<path d="m6 6 12 12M6 18 18 6" />
-										</svg></button>
-								</div>
-								<div class="map-links" id="map-popover-links">
-									<a href="about:blank" rel="noopener noreferrer" target="_blank">Google 지도</a>
-									<a href="about:blank" rel="noopener noreferrer" target="_blank">OpenStreetMap</a>
-									<a href="about:blank" rel="noopener noreferrer" target="_blank">네이버 지도</a>
-									<a href="about:blank" rel="noopener noreferrer" target="_blank">카카오맵</a>
-								</div>
-							</nav>
-						</div>
-					</aside>
-				</div>
+				</aside>
 			</div>
 		</section>
 	</main>
@@ -2649,9 +2607,9 @@
 			<h2 id="clear-title">변환 결과 지우기</h2>
 		</div>
 		<p id="clear-description">현재 변환 결과를 지우면 복구할 수 없습니다.</p>
-		<div class="confirm-actions"><button autofocus class="button" command="close" commandfor="clear-dialog"
-				id="clear-cancel" type="button">취소</button><button class="button danger" id="clear-confirm"
-				type="button">결과 지우기</button></div>
+		<div class="confirm-actions"><button autofocus class="button secondary" command="close"
+				commandfor="clear-dialog" id="clear-cancel" type="button">취소</button><button class="button danger"
+				id="clear-confirm" type="button">결과 지우기</button></div>
 	</dialog>
 	<dialog aria-describedby="bulk-description" aria-labelledby="bulk-title" id="bulk-dialog" role="alertdialog">
 		<div class="sheet-heading">
@@ -2661,7 +2619,7 @@
 		<p class="note">초당 1회 이하 · 반복·격자형 수집 금지</p>
 		<p><a href="https://operations.osmfoundation.org/policies/nominatim/" rel="noopener noreferrer"
 				target="_blank">Nominatim 사용 정책</a></p>
-		<div class="confirm-actions"><button autofocus class="button" command="close" commandfor="bulk-dialog"
+		<div class="confirm-actions"><button autofocus class="button secondary" command="close" commandfor="bulk-dialog"
 				id="bulk-cancel" type="button" value="cancel">취소</button><button class="button primary" command="close"
 				commandfor="bulk-dialog" type="button" value="confirm">일회성 조회 확인</button></div>
 	</dialog>
@@ -2733,10 +2691,7 @@
 			return candidates.find(name => name && !excluded.includes(name) &&
 				(!suffixes || suffixes.includes(name.at(-1)))) || "";
 		}
-		function parseKoreanAdmin(fields, p0, p1) {
-			const primary = fields.name || p0;
-			const cityDistrict = fields.cityDistrict || fields.district ||
-				fields.suburb;
+		function parseKoreanAdmin(fields, p0, p1, primary, cityDistrict) {
 			const level6 = fields.level6 || fields.level7;
 			const {city, county} = fields;
 			let sido = fields.level4 || fields.state;
@@ -2744,18 +2699,8 @@
 			if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) sido = city;
 			if (sido && CONFIG.SPECIAL_CITIES.test(sido)) {
 				const candidates = [cityDistrict, level6, county, primary, p0, p1];
-				let fallback = "";
-				for (const name of candidates) {
-					if (!name || name === sido) continue;
-					const suffix = name.at(-1);
-					if ("구군".includes(suffix)) {
-						sigungu = name;
-						break;
-					}
-					if (!fallback && suffix === "시" &&
-						!CONFIG.SPECIAL_CITIES.test(name)) fallback = name;
-				}
-				sigungu ||= fallback;
+				sigungu = pickAdmin(candidates, "구군", sido) ||
+					candidates.find(name => name && name !== sido && name.at(-1) === "시" && !CONFIG.SPECIAL_CITIES.test(name)) || "";
 			} else {
 				const cityLike = pickAdmin(
 					[city, county, level6, primary, p1, p0], "시군", sido,
@@ -2795,10 +2740,7 @@
 			return (` ${sigungu.replace(/\s+/gu, " ").trim()} `)
 				.replaceAll(` ${district.replace(/\s+/gu, " ").trim()} `, " ").trim();
 		}
-		function parseGlobalAdmin(fields, p0, p1) {
-			const primary = fields.name || p0;
-			const cityDistrict = fields.cityDistrict || fields.district ||
-				fields.suburb;
+		function parseGlobalAdmin(fields, p0, p1, primary, cityDistrict) {
 			const {city, county} = fields;
 			const sido = fields.level4 || fields.state || fields.region ||
 				fields.province || county || city;
@@ -2844,9 +2786,9 @@
 				countryLabel === "대한민국" ||
 				countryLabel === "조선민주주의인민공화국" ||
 				lowerCountry.includes("korea") || lowerAdmin.includes("korea");
-			const result = korean
-				? parseKoreanAdmin(fields, p0, p1)
-				: parseGlobalAdmin(fields, p0, p1);
+			const primary = fields.name || p0;
+			const cityDistrict = fields.cityDistrict || fields.district || fields.suburb;
+			const result = (korean ? parseKoreanAdmin : parseGlobalAdmin)(fields, p0, p1, primary, cityDistrict);
 			if (!korean) {
 				for (const key of ["sido", "sigungu", "eupmyeon"]) {
 					const value = result[key].toLowerCase();
@@ -2897,10 +2839,7 @@
 			const kind = country === "kr" ? "KR" :
 				country === "kp" ? "KP" :
 					country ? "WORLD" : undefined;
-			if (sigungu.length > CONFIG.TEXT_HARD_LIMIT ||
-				eupmyeon.length > CONFIG.TEXT_HARD_LIMIT ||
-				tag.length > CONFIG.TEXT_HARD_LIMIT)
-				throw new InputError(TEXT_LIMIT_MESSAGE);
+			[sigungu, eupmyeon, tag].forEach(text);
 			return {
 				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
 				kind,
@@ -2923,8 +2862,7 @@
 			(_lat, _lon, lat6, lon6) => `https://map.naver.com/?lng=${lon6}&lat=${lat6}&title=${lat6}%2C%20${lon6}`,
 			(lat, lon) => `https://map.kakao.com/link/map/${lat}%20${lon},${lat},${lon}`,
 		];
-		const buildMapLink = (index, lat, lon, lat6, lon6) =>
-			(MAP_BUILDERS[index] ?? MAP_BUILDERS[3])(lat, lon, lat6, lon6);
+		const buildMapLink = (index, lat, lon, lat6, lon6) => MAP_BUILDERS[index](lat, lon, lat6, lon6);
 		on(mapPopover, "beforetoggle", (e) => {
 			if (e.newState !== "open") return;
 			const btn = e.source;
@@ -3059,7 +2997,7 @@
 		let filterState = readFilters();
 		function resetCountryFilter() {
 			const selected = filterKind.selectedOptions[0]?.dataset.country === "true";
-			for (const option of filterKind.querySelectorAll("option[data-country]")) {
+			for (const option of queryAll("option[data-country]", filterKind)) {
 				seenCountryFilters.delete(option.value);
 				option.remove();
 			}
@@ -3081,7 +3019,6 @@
 				norm(r.result.addr?.eupmyeon),
 				norm(r.result.addr?.tag),
 				norm(r.result.error || r.result.addr?.fullAddr),
-				undefined,
 			];
 			if (f.hasFields && !((!f.kind || fields[0] === f.kind) &&
 				(!f.sido || fields[1].includes(f.sido)) &&
@@ -3201,10 +3138,7 @@
 		}
 		function appendResult(index, visibleIndex) {
 			if (pageFrame !== null || filterTimer !== null) return;
-			tableWrap.classList.toggle(
-				"has-results",
-				state.processed > 0,
-			);
+			tableWrap.classList.add("has-results");
 			if (visibleIndex < 0) return;
 			const visibleCount = state.visibleIndices.length;
 			updatePages(visibleCount);
@@ -3536,6 +3470,7 @@
 				length = 0;
 				return line;
 			};
+			const newlines = /\r\n|[\r\n]/g;
 			try {
 				for (; ;) {
 					signal.throwIfAborted();
@@ -3557,7 +3492,6 @@
 						else if (shouldYieldSkip()) yield null;
 					}
 					let keywordIndex = chunk.indexOf("위경도", start);
-					const newlines = /\r\n|[\r\n]/g;
 					newlines.lastIndex = start;
 					for (const match of chunk.matchAll(newlines)) {
 						const end = match.index;
@@ -3764,14 +3698,14 @@
 			return shared;
 		}
 		function cacheTransaction(db, mode, signal, operation) {
-			signal.throwIfAborted();
+			signal?.throwIfAborted();
 			return new Promise((resolve, reject) => {
 				let settled = false;
 				let tx;
 				const finish = (callback, value) => {
 					if (settled) return;
 					settled = true;
-					signal.removeEventListener("abort", onAbort);
+					signal?.removeEventListener("abort", onAbort);
 					callback(value);
 				};
 				const abortTransaction = () => {
@@ -3794,13 +3728,13 @@
 					);
 					tx.onabort = () => finish(
 						reject,
-						signal.aborted
+						signal?.aborted
 							? signal.reason
 							: tx.error ??
 							new Error("Reverse geocoding cache transaction aborted."),
 					);
-					on(signal, "abort", onAbort, {once: true});
-					if (signal.aborted) onAbort();
+					if (signal) on(signal, "abort", onAbort, {once: true});
+					if (signal?.aborted) onAbort();
 					else operation(tx.objectStore(CONFIG.CACHE_STORE));
 				} catch (err) {
 					abortTransaction();
@@ -3898,24 +3832,11 @@
 			}
 		}
 		function startCachePrune(db) {
-			const errorText = "Reverse geocoding cache maintenance failed.";
-			try {
-				const tx = db.transaction(CONFIG.CACHE_STORE, "readwrite");
-				let prunedRows = null;
-				tx.oncomplete = () => {
-					if (
-						prunedRows !== null &&
-						cacheWriters?.size === 0
-					)
-						cacheRowCeiling = prunedRows;
-				};
-				tx.onabort = () => {
-					console.warn(errorText, tx.error ?? new Error(errorText));
-				};
-				pruneCache(tx.objectStore(CONFIG.CACHE_STORE), rows => prunedRows = rows);
-			} catch (err) {
-				console.warn(errorText, err);
-			}
+			let prunedRows = null;
+			cacheTransaction(db, "readwrite", null, store => pruneCache(store, rows => prunedRows = rows))
+				.then(() => {
+					if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;
+				}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
 		}
 		function pruneCache(store, onRows) {
 			const index = store.index("savedAt");
@@ -3949,10 +3870,11 @@
 		}
 		async function readResponse(response, signal) {
 			const limit = CONFIG.RESPONSE_MAX_BYTES;
+			const limitError = () => new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
 			const contentLength = Number(response.headers.get("content-length"));
 			if (Number.isFinite(contentLength) && contentLength > limit) {
 				await cancelReader(response.body);
-				throw new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
+				throw limitError();
 			}
 			if (!response.body) return "";
 			const decoder = new TextDecoder("utf-8", {fatal: true});
@@ -3965,10 +3887,7 @@
 					if (read.done) break;
 					signal.throwIfAborted();
 					bytesRead += read.value.byteLength;
-					if (bytesRead > limit)
-						throw new RangeError(
-							`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`,
-						);
+					if (bytesRead > limit) throw limitError();
 					parts.push(decodeResponse(decoder, read.value, true));
 				}
 				parts.push(decodeResponse(decoder, undefined, false));
@@ -4675,8 +4594,7 @@
 			});
 			const inputCount = ({value}) => {
 				let count = 0;
-				const pattern = new RegExp(RX_U64_TOKEN);
-				while (count <= GENERATION_LIMIT && pattern.test(value)) count++;
+				for (const _ of u64Tokens(value)) if (++count > GENERATION_LIMIT) break;
 				return count;
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
@@ -4822,13 +4740,12 @@
 					let lastYieldAt = performance.now();
 					let lastMetaAt = lastYieldAt;
 					let cancelled = false;
+					const limitMessage = `기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`;
+					const appendBlock = block => nextChunks.push(nextChunks.length ? `\n${block}` : block);
 					let convertedInWorkers = false;
 					if (autoSupp.checked && !suppInput.value.trim() && typeof Worker === "function") {
 						invalidInput = num64Input;
-						const words = parseU64List(
-							num64Input.value,
-							`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`,
-						);
+						const words = parseU64List(num64Input.value, limitMessage);
 						invalidInput = null;
 						if (words.length >= 512) {
 							const controller = new AbortController();
@@ -4849,8 +4766,7 @@
 									},
 								});
 								if (epoch !== outputEpoch) return;
-								for (const block of result.blocks)
-									nextChunks.push(nextChunks.length ? `\n${block}` : block);
+								result.blocks.forEach(appendBlock);
 								processed = result.blocks.length;
 								suppCount = result.supplements;
 								convertedInWorkers = true;
@@ -4869,10 +4785,7 @@
 							if (epoch !== outputEpoch)
 								return;
 							invalidInput = num64Input;
-							if (processed >= GENERATION_LIMIT)
-								throw new InputError(
-									`기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`,
-								);
+							if (processed >= GENERATION_LIMIT) throw new InputError(limitMessage);
 							const num = parseU64(token);
 							invalidInput = null;
 							sampleKorea ??= (await loadKoreaModule()).sampleKorea;
@@ -4915,10 +4828,7 @@
 								break;
 							}
 							suppCount += used;
-							const outputBlock = formatOutput(step.value);
-							nextChunks.push((processed === 0
-								? outputBlock
-								: `\n${outputBlock}`));
+							appendBlock(formatOutput(step.value));
 							processed++;
 							const now = performance.now();
 							if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
@@ -5478,13 +5388,11 @@
 		function startMapLoad() {
 			const record = selection;
 			if (!record) return;
-			clearMapTimer();
 			const lat = Number(record.latStr), lon = Number(record.lonStr);
+			const polar = Math.abs(lat) > 85;
 			mapExternal.href = buildMapLink(1, record.latStr, record.lonStr);
-			retryMap.disabled = Math.abs(lat) > 85;
-			if (Math.abs(lat) > 85) {
-				return showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
-			}
+			retryMap.disabled = polar;
+			if (polar) return showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
 			if (!navigator.onLine) {
 				return showMapFailure("네트워크 연결이 없습니다. 연결 후 다시 시도해 주세요.");
 			}

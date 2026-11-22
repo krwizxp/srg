@@ -259,17 +259,6 @@ impl Client {
         header_block.finish(request_start, context)
     }
 }
-impl CurlBodySink {
-    fn append(&mut self, bytes: &[u8]) -> bool {
-        account_bytes(
-            &mut self.bytes_seen,
-            &mut self.error,
-            bytes.len(),
-            HTTP_HEAD_MAX_BODY_BYTES,
-            "본문",
-        )
-    }
-}
 impl CurlHeaderCapture {
     fn append(&mut self, bytes: &[u8]) -> bool {
         if !account_bytes(
@@ -377,7 +366,13 @@ unsafe extern "C" fn write_callback(
     // SAFETY: userdata is the CurlWriteTarget pointer configured before curl_easy_perform.
     let target = unsafe { target_ptr.as_mut() };
     if !match *target {
-        CurlWriteTarget::Body(ref mut buffer) => (*buffer).append(bytes),
+        CurlWriteTarget::Body(ref mut buffer) => account_bytes(
+            &mut buffer.bytes_seen,
+            &mut buffer.error,
+            bytes.len(),
+            HTTP_HEAD_MAX_BODY_BYTES,
+            "본문",
+        ),
         CurlWriteTarget::Header(ref mut capture) => (*capture).append(bytes),
     } {
         return 0;

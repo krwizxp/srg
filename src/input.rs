@@ -82,48 +82,51 @@ pub(super) fn read_u64_hex_input(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<u64> {
-    loop {
-        let raw = read_line_reuse_limited(prompt, input_buffer, out, HEX_INPUT_LINE_MAX_BYTES)?;
-        let parsed_value = match raw
-            .strip_prefix('0')
-            .and_then(|body| body.strip_prefix(['x', 'X']))
-        {
-            Some(hex) if !hex.starts_with('+') => u64::from_str_radix(hex, 16).ok(),
-            Some(_) => None,
-            None => raw.parse::<u64>().ok(),
-        };
-        if let Some(value) = parsed_value {
-            return Ok(value);
-        }
-        writeln!(
-            err,
-            "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
-            max_u64 = u64::MAX
-        )?;
-    }
+    get_validated_input(
+        prompt,
+        input_buffer,
+        out,
+        Some(err),
+        HEX_INPUT_LINE_MAX_BYTES,
+        |raw| {
+            let parsed_value = match raw
+                .strip_prefix('0')
+                .and_then(|body| body.strip_prefix(['x', 'X']))
+            {
+                Some(hex) if !hex.starts_with('+') => u64::from_str_radix(hex, 16).ok(),
+                Some(_) => None,
+                None => raw.parse::<u64>().ok(),
+            };
+            parsed_value.ok_or_else(|| {
+                format!(
+                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
+                    max_u64 = u64::MAX
+                )
+            })
+        },
+    )
+    .map_err(Into::into)
 }
-pub(super) fn get_validated_input<T, E>(
-    prompt: &str,
+pub(super) fn get_validated_input<'writer, T, E>(
+    prompt: Arguments<'_>,
     input_buf: &mut String,
-    out: &mut dyn Write,
+    out: &'writer mut dyn Write,
+    mut err_out: Option<&'writer mut dyn Write>,
+    max_bytes: usize,
     mut validator: impl FnMut(&str) -> CoreResult<T, E>,
 ) -> IoResult<T>
 where
     E: AsRef<str>,
 {
     loop {
-        let input = read_line_reuse_limited(
-            format_args!("{prompt}"),
-            input_buf,
-            out,
-            DEFAULT_INPUT_LINE_MAX_BYTES,
-        )?;
+        let input = read_line_reuse_limited(prompt, input_buf, out, max_bytes)?;
         match validator(input) {
             Ok(value) => return Ok(value),
             Err(err) => {
                 let err_text = err.as_ref();
                 if !err_text.is_empty() {
-                    writeln!(out, "{err_text}")?;
+                    let target = err_out.as_mut().map_or(&mut *out, |writer| &mut **writer);
+                    writeln!(target, "{err_text}")?;
                 }
             }
         }
@@ -186,21 +189,4 @@ pub(super) fn read_ladder_entries(
         }
         break count;
     })
-}
-#[cfg(target_arch = "x86_64")]
-pub(super) fn read_parsed_value<T>(
-    prompt: Arguments<'_>,
-    buffer: &mut String,
-    out: &mut dyn Write,
-    err: &mut dyn Write,
-    invalid_message: &str,
-    mut parse: impl FnMut(&str) -> Option<T>,
-) -> Result<T> {
-    loop {
-        let line = read_line_reuse_limited(prompt, buffer, out, DEFAULT_INPUT_LINE_MAX_BYTES)?;
-        if let Some(value) = parse(line) {
-            return Ok(value);
-        }
-        writeln!(err, "{invalid_message}")?;
-    }
 }

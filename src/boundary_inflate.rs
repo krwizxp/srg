@@ -1,70 +1,10 @@
-use crate::diagnostic::{AppError, Result};
+use crate::{
+    diagnostic::{AppError, Result},
+    numeric::{low_u16_from_u64, low_u32_from_u64},
+};
 use std::sync::LazyLock;
 const CODE_ORDER: [usize; 19] = [
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
-];
-const DISTANCE_TABLE: [(usize, u32); 30] = [
-    (1, 0),
-    (2, 0),
-    (3, 0),
-    (4, 0),
-    (5, 1),
-    (7, 1),
-    (9, 2),
-    (13, 2),
-    (17, 3),
-    (25, 3),
-    (33, 4),
-    (49, 4),
-    (65, 5),
-    (97, 5),
-    (129, 6),
-    (193, 6),
-    (257, 7),
-    (385, 7),
-    (513, 8),
-    (769, 8),
-    (1025, 9),
-    (1537, 9),
-    (2049, 10),
-    (3073, 10),
-    (4097, 11),
-    (6145, 11),
-    (8193, 12),
-    (12289, 12),
-    (0x4001, 13),
-    (24577, 13),
-];
-const LENGTH_TABLE: [(usize, u32); 29] = [
-    (3, 0),
-    (4, 0),
-    (5, 0),
-    (6, 0),
-    (7, 0),
-    (8, 0),
-    (9, 0),
-    (10, 0),
-    (11, 1),
-    (13, 1),
-    (15, 1),
-    (17, 1),
-    (19, 2),
-    (23, 2),
-    (27, 2),
-    (31, 2),
-    (35, 3),
-    (43, 3),
-    (51, 3),
-    (59, 3),
-    (67, 4),
-    (83, 4),
-    (99, 4),
-    (115, 4),
-    (131, 5),
-    (163, 5),
-    (195, 5),
-    (227, 5),
-    (258, 0),
 ];
 static FIXED_TREES: LazyLock<Result<HuffmanTrees>> = LazyLock::new(|| {
     let mut lengths = [8_u8; 288];
@@ -114,8 +54,7 @@ impl Bits<'_> {
         if self.bit_count < 9 {
             return None;
         }
-        let [low, high, ..] = self.bit_buffer.to_le_bytes();
-        Some(u16::from_le_bytes([low, high]) & 0x01FF)
+        Some(low_u16_from_u64(self.bit_buffer) & 0x01FF)
     }
     fn read(&mut self, count: u32) -> Result<u32> {
         if count == 0 {
@@ -124,9 +63,9 @@ impl Bits<'_> {
         self.refill(count);
         (self.bit_count >= count).ok_or("경계 압축 데이터가 잘렸습니다.")?;
         let mask = (1_u64 << count).strict_sub(1);
-        let [b0, b1, b2, b3, ..] = (self.bit_buffer & mask).to_le_bytes();
+        let value = low_u32_from_u64(self.bit_buffer & mask);
         self.consume(count);
-        Ok(u32::from_le_bytes([b0, b1, b2, b3]))
+        Ok(value)
     }
     fn read_usize(&mut self, count: u32, context: &'static str) -> Result<usize> {
         usize::try_from(self.read(count)?).map_err(|source| format!("{context}: {source}").into())
@@ -368,15 +307,15 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             continue;
                         }
                         let length = decode_extra(
-                            &LENGTH_TABLE,
-                            usize::from(symbol.strict_sub(257)),
+                            false,
+                            u32::from(symbol.strict_sub(257)),
                             &mut bits,
                             "경계 압축 길이 코드 오류",
                             "경계 압축 길이 오류",
                         )?;
-                        let distance_index = usize::from(trees.distance.symbol(&mut bits)?);
+                        let distance_index = u32::from(trees.distance.symbol(&mut bits)?);
                         let backward = decode_extra(
-                            &DISTANCE_TABLE,
+                            true,
                             distance_index,
                             &mut bits,
                             "경계 압축 거리 코드 오류",
@@ -428,12 +367,37 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
     }
 }
 fn decode_extra(
-    table: &[(usize, u32)],
-    index: usize,
+    is_distance: bool,
+    index: u32,
     bits: &mut Bits<'_>,
     code_err: &'static str,
     range_err: &'static str,
 ) -> Result<usize> {
-    let &(base, extra_bits) = table.get(index).ok_or(code_err)?;
-    Ok(base.strict_add(bits.read_usize(extra_bits, range_err)?))
+    let (base, extra_bits) = if is_distance {
+        (index < 30).ok_or(code_err)?;
+        if index < 4 {
+            (index.strict_add(1), 0)
+        } else {
+            let extra = index.strict_sub(2) >> 1_u32;
+            (
+                ((2_u32.strict_add(index & 1_u32)) << extra).strict_add(1),
+                extra,
+            )
+        }
+    } else {
+        (index < 29).ok_or(code_err)?;
+        if index < 8 {
+            (index.strict_add(3), 0)
+        } else if index == 28 {
+            (258, 0)
+        } else {
+            let extra = index.strict_sub(4) >> 2_u32;
+            (
+                ((4_u32.strict_add(index & 3_u32)) << extra).strict_add(3),
+                extra,
+            )
+        }
+    };
+    let base_usize = usize::try_from(base).map_err(|source| format!("{range_err}: {source}"))?;
+    Ok(base_usize.strict_add(bits.read_usize(extra_bits, range_err)?))
 }

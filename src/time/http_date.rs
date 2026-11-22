@@ -1,21 +1,18 @@
 use super::{
     CivilDate, Result, TimeError,
-    util::{parse_result_with_context, parse_u32_digits},
+    util::{
+        DAYS_PER_WEEK_I64, SECS_PER_DAY_I64, SECS_PER_DAY_U64, SECS_PER_HOUR_I64,
+        SECS_PER_MINUTE_I64, parse_hms, parse_result_with_context, parse_u32_digits,
+    },
 };
 use core::{
     str::{FromStr, SplitAsciiWhitespace},
     time::Duration,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
-const SECS_PER_DAY_I64: i64 = 86_400;
-const SECS_PER_DAY_U64: u64 = 86_400;
-const SECS_PER_HOUR_I64: i64 = 3_600;
-const SECS_PER_MINUTE_I64: i64 = 60;
-const DAYS_PER_WEEK_I64: i64 = 7;
 const DAYS_PER_400_YEARS_I64: i64 = 146_097;
 const DAYS_PER_COMMON_YEAR_I64: i64 = 365;
 const DAYS_UNTIL_UNIX_EPOCH_I64: i64 = 719_468;
-const DECIMAL_BASE_U32: u32 = 10;
 const ERR_ASCTIME_FORMAT: &str = "HTTP Date 파싱 실패: asctime-date 형식이 아닙니다.";
 const ERR_ASCTIME_NUM: &str = "HTTP Date 파싱 실패: asctime-date 숫자 변환에 실패했습니다.";
 const ERR_HTTP_DATE_FORMAT: &str = concat!(
@@ -136,17 +133,11 @@ impl FromStr for HttpDate {
             || year == cutoff_year && {
                 let date_order = (month.number, day).cmp(&(current_date.month, current_date.day));
                 if date_order.is_eq() {
-                    let clock = [
-                        time_token.get(..2),
-                        time_token.get(3..5),
-                        time_token.get(6..8),
-                    ]
-                    .map(|part| part.and_then(parse_u32_digits));
-                    let [Some(hour), Some(minute), Some(second)] = clock else {
-                        return Err(TimeError::parse(
+                    let (hour, minute, second) = parse_hms(time_token).ok_or_else(|| {
+                        TimeError::parse(
                             "HTTP Date 파싱 실패: 시간 형식이 올바르지 않습니다 (HH:MM:SS)",
-                        ));
-                    };
+                        )
+                    })?;
                     let second_of_day = u64::from(hour)
                         .strict_mul(3600)
                         .strict_add(u64::from(minute).strict_mul(60))
@@ -162,31 +153,27 @@ impl FromStr for HttpDate {
         parse_http_date_time(day, month, year, weekday, time_token).map(Self)
     }
 }
-fn parse_two_digits(d0: u8, d1: u8) -> Option<u32> {
-    (d0.is_ascii_digit() && d1.is_ascii_digit()).then(|| {
-        u32::from(d0.strict_sub(b'0'))
-            .strict_mul(DECIMAL_BASE_U32)
-            .strict_add(u32::from(d1.strict_sub(b'0')))
-    })
-}
 fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
-    const ERR_MONTH: &str = "HTTP Date 파싱 실패: 알 수 없는 월 형식";
-    let (number, max_day) = match month_str {
-        "Jan" => (1, 31),
-        "Feb" => (2, 28),
-        "Mar" => (3, 31),
-        "Apr" => (4, 30),
-        "May" => (5, 31),
-        "Jun" => (6, 30),
-        "Jul" => (7, 31),
-        "Aug" => (8, 31),
-        "Sep" => (9, 30),
-        "Oct" => (10, 31),
-        "Nov" => (11, 30),
-        "Dec" => (12, 31),
-        _ => return Err(TimeError::parse(ERR_MONTH)),
-    };
-    Ok(HttpMonth { max_day, number })
+    const MONTHS: [(&str, u32, u32); 12] = [
+        ("Jan", 1, 31),
+        ("Feb", 2, 28),
+        ("Mar", 3, 31),
+        ("Apr", 4, 30),
+        ("May", 5, 31),
+        ("Jun", 6, 30),
+        ("Jul", 7, 31),
+        ("Aug", 8, 31),
+        ("Sep", 9, 30),
+        ("Oct", 10, 31),
+        ("Nov", 11, 30),
+        ("Dec", 12, 31),
+    ];
+    MONTHS
+        .iter()
+        .find_map(|&(name, number, max_day)| {
+            (name == month_str).then_some(HttpMonth { max_day, number })
+        })
+        .ok_or_else(|| TimeError::parse("HTTP Date 파싱 실패: 알 수 없는 월 형식"))
 }
 fn parse_http_weekday(weekday_str: &str) -> Option<u32> {
     match weekday_str {
@@ -224,24 +211,8 @@ fn parse_http_date_time(
     const ERR_TIME_RANGE: &str = "HTTP Date 파싱 실패: 시간 값 범위가 올바르지 않습니다.";
     const ERR_UNIX_TIMESTAMP: &str = "HTTP Date 변환 실패: 유효하지 않은 타임스탬프입니다.";
     const ERR_WEEKDAY: &str = "HTTP Date 파싱 실패: 요일이 날짜와 일치하지 않습니다.";
-    let &[
-        hour_tens,
-        hour_ones,
-        b':',
-        minute_tens,
-        minute_ones,
-        b':',
-        second_tens,
-        second_ones,
-    ] = time_token.as_bytes()
-    else {
-        return Err(TimeError::parse(ERR_TIME_FMT));
-    };
-    let (hour, minute, second) = (
-        parse_two_digits(hour_tens, hour_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
-        parse_two_digits(minute_tens, minute_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
-        parse_two_digits(second_tens, second_ones).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?,
-    );
+    let (hour, minute, second) =
+        parse_hms(time_token).ok_or_else(|| TimeError::parse(ERR_TIME_FMT))?;
     (hour <= MAX_HTTP_HOUR && minute <= MAX_HTTP_MINUTE && second <= MAX_HTTP_SECOND)
         .ok_or_else(|| TimeError::parse(ERR_TIME_RANGE))?;
     let leap_year = year.rem_euclid(LEAP_YEAR_DIVISOR_I32) == 0_i32

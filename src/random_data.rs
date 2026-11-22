@@ -3,7 +3,9 @@ use super::{diagnostic::AppError, hardware_rng::HardwareRng};
 use crate::{
     diagnostic::Result,
     korea_boundary,
-    numeric::{low_u8_from_u32, low_u8_from_u64, low_u16_from_u64, low_u32_from_u64},
+    numeric::{
+        low_u8_from_u32, low_u8_from_u64, low_u16_from_u64, low_u32_from_u64, split_u64_be_u32,
+    },
 };
 use std::process;
 const ASCII_PRINTABLE_LEN: u64 = 94;
@@ -130,9 +132,7 @@ impl RandomDataBuildState<'_> {
             .map_err(Into::into)
     }
     fn fill_coords(&mut self) {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = self.data.num_64.to_be_bytes();
-        let upper_32_bits = u32::from_be_bytes([b0, b1, b2, b3]);
-        let lower_32_bits = u32::from_be_bytes([b4, b5, b6, b7]);
+        let (upper_32_bits, lower_32_bits) = split_u64_be_u32(self.data.num_64);
         let upper_ratio = f64::from(upper_32_bits).algebraic_mul(U32_MAX_INV);
         let lower_ratio = f64::from(lower_32_bits).algebraic_mul(U32_MAX_INV);
         self.data.world_coords = Coordinates {
