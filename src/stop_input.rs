@@ -1,7 +1,3 @@
-#[cfg(target_os = "macos")]
-use core::ffi::c_uint;
-#[cfg(target_os = "linux")]
-use core::ffi::c_ulong;
 use std::io;
 cfg_select! {
     target_os = "windows" => {
@@ -11,21 +7,8 @@ cfg_select! {
         unsafe extern "system" {
             fn GetFileType(file: *mut c_void) -> u32;
             fn GetStdHandle(std_handle: i32) -> *mut c_void;
-            fn PeekNamedPipe(
-                pipe: *mut c_void,
-                buffer: *mut c_void,
-                buffer_size: u32,
-                bytes_read: *mut u32,
-                bytes_available: *mut u32,
-                bytes_left: *mut u32,
-            ) -> i32;
-            fn ReadFile(
-                file: *mut c_void,
-                buffer: *mut c_void,
-                bytes_to_read: u32,
-                bytes_read: *mut u32,
-                overlapped: *mut c_void,
-            ) -> i32;
+            fn PeekNamedPipe(p: *mut c_void, b: *mut c_void, s: u32, r: *mut u32, a: *mut u32, l: *mut u32) -> i32;
+            fn ReadFile(f: *mut c_void, b: *mut c_void, n: u32, r: *mut u32, o: *mut c_void) -> i32;
         }
         #[link(name = "msvcrt")]
         unsafe extern "C" {
@@ -37,23 +20,19 @@ cfg_select! {
     }
     any(target_os = "linux", target_os = "macos") => {
         use core::ffi::{c_int, c_short, c_void};
+        #[cfg(target_os = "macos")]
+        use core::ffi::c_uint as PollDescriptorCountRaw;
+        #[cfg(target_os = "linux")]
+        use core::ffi::c_ulong as PollDescriptorCountRaw;
         pub(crate) const POLLERR: c_short = 0x0008;
         pub(crate) const POLLHUP: c_short = 0x0010;
         pub(crate) const POLLIN: c_short = 0x0001;
         pub(crate) const POLLNVAL: c_short = 0x0020;
+        pub(crate) type PollDescriptorCount = PollDescriptorCountRaw;
     }
     _ => {
         compile_error!("Stop input supports only Windows, Linux, and macOS.");
     }
-}
-cfg_select! {
-    target_os = "linux" => {
-        pub(crate) type PollDescriptorCount = c_ulong;
-    }
-    target_os = "macos" => {
-        pub(crate) type PollDescriptorCount = c_uint;
-    }
-    _ => {}
 }
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[repr(C)]
@@ -135,9 +114,7 @@ impl StopInput {
                                 // SAFETY: this checks whether an extended-key byte is available.
                                 if unsafe { console_key_available() } != 0_i32 {
                                     // SAFETY: _kbhit reported the second byte of an extended key.
-                                    unsafe {
-                                        read_console_key();
-                                    }
+                                    unsafe { read_console_key(); }
                                 }
                                 continue;
                             }
@@ -147,25 +124,18 @@ impl StopInput {
                     }
                     StopInputBackend::Stream { file, pipe } => loop {
                         if pipe {
-                            let mut available = 0_u32;
-                            // SAFETY: file is a pipe handle and available is a writable DWORD.
-                            if unsafe {
-                                PeekNamedPipe(file, null_mut(), 0, null_mut(), &raw mut available, null_mut())
-                            } == 0_i32
-                            {
+                            let mut avail = 0_u32;
+                            // SAFETY: file is a pipe handle and avail is a writable DWORD.
+                            if unsafe { PeekNamedPipe(file, null_mut(), 0, null_mut(), &raw mut avail, null_mut()) } == 0_i32 {
                                 return pipe_failure(io::Error::last_os_error());
                             }
-                            if available == 0 {
+                            if avail == 0 {
                                 return Ok(false);
                             }
                         }
-                        let mut byte = 0_u8;
-                        let mut read = 0_u32;
+                        let (mut byte, mut read) = (0_u8, 0_u32);
                         // SAFETY: file is a readable standard input handle and byte is writable.
-                        if unsafe {
-                            ReadFile(file, (&raw mut byte).cast::<c_void>(), 1, &raw mut read, null_mut())
-                        } == 0_i32
-                        {
+                        if unsafe { ReadFile(file, (&raw mut byte).cast::<c_void>(), 1, &raw mut read, null_mut()) } == 0_i32 {
                             let source = io::Error::last_os_error();
                             return if pipe { pipe_failure(source) } else { Err(source) };
                         }
@@ -178,28 +148,24 @@ impl StopInput {
             }
             any(target_os = "linux", target_os = "macos") => {
                 loop {
-                    let mut descriptor = PollFd { fd: 0_i32, events: POLLIN, revents: 0 };
-                    // SAFETY: descriptor is one writable pollfd and the count is exactly one.
-                    let status = unsafe { poll_stdin(&raw mut descriptor, 1, 0_i32) };
+                    let mut pfd = PollFd { fd: 0_i32, events: POLLIN, revents: 0 };
+                    // SAFETY: pfd is one writable pollfd and the count is exactly one.
+                    let status = unsafe { poll_stdin(&raw mut pfd, 1, 0_i32) };
                     if status < 0_i32 {
                         let source = io::Error::last_os_error();
-                        if source.kind() == io::ErrorKind::Interrupted {
-                            continue;
-                        }
+                        if source.kind() == io::ErrorKind::Interrupted { continue; }
                         return Err(source);
                     }
                     if status == 0_i32 {
                         return Ok(false);
                     }
-                    if descriptor.revents & POLLIN != 0 {
+                    if pfd.revents & POLLIN != 0 {
                         let mut byte = 0_u8;
                         // SAFETY: byte is a writable one-byte buffer and fd 0 is standard input.
                         let read = unsafe { read_stdin(0_i32, (&raw mut byte).cast::<c_void>(), 1) };
                         if read < 0 {
                             let source = io::Error::last_os_error();
-                            if source.kind() == io::ErrorKind::Interrupted {
-                                continue;
-                            }
+                            if source.kind() == io::ErrorKind::Interrupted { continue; }
                             return Err(source);
                         }
                         if read == 0 || byte == b'\n' {
@@ -208,14 +174,11 @@ impl StopInput {
                         self.record_non_newline()?;
                         continue;
                     }
-                    if descriptor.revents & POLLHUP != 0 {
+                    if pfd.revents & POLLHUP != 0 {
                         return Ok(true);
                     }
-                    if descriptor.revents & (POLLERR | POLLNVAL) != 0 {
-                        return Err(io::Error::other(format!(
-                            "표준 입력 poll 오류: revents={:#06x}",
-                            descriptor.revents
-                        )));
+                    if pfd.revents & (POLLERR | POLLNVAL) != 0 {
+                        return Err(io::Error::other(format!("표준 입력 poll 오류: revents={:#06x}", pfd.revents)));
                     }
                     return Ok(false);
                 }

@@ -24,9 +24,8 @@ use crate::{
     },
 };
 use alloc::borrow::Cow;
-use core::{error::Error, iter::successors, result::Result as CoreResult};
+use core::{error::Error, fmt::Arguments, iter::successors, result::Result as CoreResult};
 use std::io::{self, Write, stderr, stdout};
-const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 cfg_select! {
     target_arch = "x86_64" => {
         const MENU: &str = concat!(
@@ -43,6 +42,7 @@ cfg_select! {
         );
     }
 }
+const MENU_SELECTION_INPUT_MAX_BYTES: usize = 256;
 pub(super) struct MenuApp {
     pub input_buffer: String,
     #[cfg(target_arch = "x86_64")]
@@ -74,16 +74,13 @@ impl MenuApp {
             }
             _ => {}
         }
+        if !matches!(command, b'1'..=b'4') {
+            return Ok(false);
+        }
         cfg_select! {
             target_arch = "x86_64" => {
-                if !matches!(command, b'1'..=b'4') {
-                    return Ok(false);
-                }
                 if self.rng.source() == HardwareRandomSource::None {
-                    writeln!(
-                        out,
-                        "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
-                    )?;
+                    writeln!(out, "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다.")?;
                     return Ok(true);
                 }
                 match command {
@@ -109,7 +106,7 @@ impl MenuApp {
                     }
                     b'2' => self.handle_random_number_command(out, err)?,
                     b'3' | b'4' => {
-                        let requested_count = if command == b'3' {
+                        let count = if command == b'3' {
                             1
                         } else {
                             get_validated_input(
@@ -125,13 +122,7 @@ impl MenuApp {
                                 },
                             )?
                         };
-                        regenerate_with_count(
-                            &mut self.output_file,
-                            &self.rng,
-                            requested_count,
-                            command == b'4',
-                            out,
-                        )?;
+                        regenerate_with_count(&mut self.output_file, &self.rng, count, command == b'4', out)?;
                     }
                     _ => return Ok(false),
                 }
@@ -139,9 +130,6 @@ impl MenuApp {
                 Ok(true)
             }
             _ => {
-                if !matches!(command, b'1'..=b'4') {
-                    return Ok(false);
-                }
                 writeln!(
                     out,
                     "{}번 메뉴: 이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.",
@@ -193,74 +181,65 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let input_buffer = &mut self.input_buffer;
         writeln!(out, "\n무작위 숫자 생성 타입 선택:")?;
-        let selection = read_line_reuse_limited(
+        let sel = read_line_reuse_limited(
             format_args!("1: 정수 생성, 2: 실수 생성, 기타: 취소\n선택해 주세요: "),
-            input_buffer,
+            &mut self.input_buffer,
             out,
             MENU_SELECTION_INPUT_MAX_BYTES,
         )?;
-        match selection.as_bytes() {
+        match sel.as_bytes() {
             b"1" => {
                 writeln!(
                     out,
                     "\n무작위 정수 생성기(지원 범위: -9223372036854775807 ~ 9223372036854775807)"
                 )?;
-                let min_value = get_validated_input(
+                let min = self.prompt_line(
                     format_args!("최솟값을 입력해 주세요 ({MIN_ALLOWED_INTEGER_VALUE} 이상): "),
-                    input_buffer,
                     out,
                     Some(err),
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
                     |line| match line.parse::<i64>().ok() {
-                        Some(value) if value >= MIN_ALLOWED_INTEGER_VALUE => Ok(value),
+                        Some(val) if val >= MIN_ALLOWED_INTEGER_VALUE => Ok(val),
                         Some(_) => Err(Cow::Owned(format!(
                             "{MIN_ALLOWED_INTEGER_VALUE} 이상의 값을 입력해 주세요."
                         ))),
                         None => Err(Cow::Borrowed("유효한 정수 형식이 아닙니다.")),
                     },
                 )?;
-                let max_value = get_validated_input(
+                let max = self.prompt_line(
                     format_args!("최댓값을 입력해 주세요: "),
-                    input_buffer,
                     out,
                     Some(err),
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
                     |line| match line.parse::<i64>().ok() {
-                        Some(value) if value >= min_value => Ok(value),
+                        Some(val) if val >= min => Ok(val),
                         Some(_) => Err("최댓값은 최솟값보다 크거나 같아야 합니다."),
                         None => Err("유효한 정수 형식이 아닙니다."),
                     },
                 )?;
-                generate_random_integer(min_value, max_value, out, &self.rng)?;
+                generate_random_integer(min, max, out, &self.rng)?;
             }
             b"2" => {
                 writeln!(out, "\n무작위 실수 생성기")?;
-                let min_value = get_validated_input(
+                let min = self.prompt_line(
                     format_args!("최솟값을 입력해 주세요: "),
-                    input_buffer,
                     out,
                     Some(err),
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
                     |line| parse_regular_f64(line).ok_or(FLOAT_INPUT_ERROR),
                 )?;
-                let max_value = get_validated_input(
+                let max = self.prompt_line(
                     format_args!("최댓값을 입력해 주세요: "),
-                    input_buffer,
                     out,
                     Some(err),
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
                     |line| match parse_regular_f64(line) {
-                        Some(value) if value >= min_value => Ok(value),
+                        Some(val) if val >= min => Ok(val),
                         Some(_) => Err("최댓값은 최솟값보다 크거나 같아야 합니다."),
                         None => Err(FLOAT_INPUT_ERROR),
                     },
                 )?;
-                (max_value - min_value)
+                (max - min)
                     .is_finite()
                     .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
-                generate_random_float(min_value, max_value, out, &self.rng)?;
+                generate_random_float(min, max, out, &self.rng)?;
             }
             _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
         }
@@ -271,26 +250,22 @@ impl MenuApp {
         out: &mut dyn Write,
         err: &mut dyn Write,
     ) -> Result<()> {
-        let host = get_validated_input(
+        let host = self.prompt_line(
             format_args!(
                 "확인할 서버 주소를 입력하세요 (스킴 생략 시 HTTPS, 평문 HTTP는 http:// 명시 / 예: www.example.com): "
             ),
-            &mut self.input_buffer,
-            &mut *out,
+            out,
             None,
-            DEFAULT_INPUT_LINE_MAX_BYTES,
             |raw| -> CoreResult<ParsedServer, Cow<'static, str>> {
                 (!raw.is_empty()).ok_or("서버 주소를 비워둘 수 없습니다.")?;
                 raw.parse::<ParsedServer>()
-                    .map_err(|source| format!("서버 주소가 올바르지 않습니다: {source}").into())
+                    .map_err(|src| format!("서버 주소가 올바르지 않습니다: {src}").into())
             },
         )?;
-        let requested_target_time = get_validated_input(
+        let target_time = self.prompt_line(
             format_args!("액션 실행 목표 시간을 입력하세요 (예: 20:00:00 / 건너뛰려면 Enter): "),
-            &mut self.input_buffer,
-            &mut *out,
+            out,
             None,
-            DEFAULT_INPUT_LINE_MAX_BYTES,
             |raw| {
                 if raw.is_empty() {
                     Ok(None)
@@ -299,16 +274,14 @@ impl MenuApp {
                 }
             },
         )?;
-        let scheduled_trigger = match requested_target_time {
-            Some(target_time) => Some((
-                target_time,
-                get_validated_input(
+        let scheduled_trigger = match target_time {
+            Some(target) => Some((
+                target,
+                self.prompt_line(
                     format_args!("수행할 동작을 선택하세요 (1: 마우스 왼쪽 클릭, 2: F5 입력): "),
-                    &mut self.input_buffer,
-                    &mut *out,
+                    out,
                     None,
-                    DEFAULT_INPUT_LINE_MAX_BYTES,
-                    |selection| match selection.as_bytes() {
+                    |sel| match sel.as_bytes() {
                         b"1" => Ok(TriggerAction::LeftClick),
                         b"2" => Ok(TriggerAction::F5Press),
                         _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
@@ -324,6 +297,25 @@ impl MenuApp {
         }
         .run_loop(out, err)
         .map_err(Into::into)
+    }
+    fn prompt_line<'writer, T, E>(
+        &mut self,
+        prompt: Arguments<'_>,
+        out: &'writer mut dyn Write,
+        err: Option<&'writer mut dyn Write>,
+        validator: impl FnMut(&str) -> CoreResult<T, E>,
+    ) -> io::Result<T>
+    where
+        E: AsRef<str>,
+    {
+        get_validated_input(
+            prompt,
+            &mut self.input_buffer,
+            out,
+            err,
+            DEFAULT_INPUT_LINE_MAX_BYTES,
+            validator,
+        )
     }
     pub(super) fn run(&mut self) -> Result<()> {
         let mut out = stdout().lock();

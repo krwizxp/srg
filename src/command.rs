@@ -10,7 +10,7 @@ cfg_select! {
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
-            input::BATCH_COUNT_INPUT_MAX_BYTES,
+            input::{BATCH_COUNT_INPUT_MAX_BYTES, validate_batch_count},
             ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
             random_number::{FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float, generate_random_integer},
         };
@@ -138,13 +138,11 @@ where
                 let (Some(count_arg), None) = (args.next(), args.next()) else {
                     return Err("사용법: srg generate <count>".into());
                 };
-                let count =
+                let requested_count =
                     Self::parse_arg::<usize>(&count_arg, "count", BATCH_COUNT_INPUT_MAX_BYTES)?;
-                (1..=MAX_BATCH_GENERATE_COUNT)
-                    .contains(&count)
-                    .ok_or_else(|| {
-                        format!("count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다.")
-                    })?;
+                let count = validate_batch_count(requested_count).map_err(|_menu_error| {
+                    format!("count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다.")
+                })?;
                 Ok(Self::Generate { count })
             }
             #[cfg(target_arch = "x86_64")]

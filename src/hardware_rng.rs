@@ -6,17 +6,17 @@ use core::{
     time::Duration,
 };
 use std::{io::Write, is_x86_feature_detected, thread::yield_now, time::Instant};
-pub(super) struct HardwareRng {
-    fallback_notice_pending: AtomicBool,
-    rdrand_supported: bool,
-    rdseed_active: AtomicBool,
-    stop_pending: AtomicBool,
-}
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum HardwareRandomSource {
     None,
     RdRand,
     RdSeed,
+}
+pub(super) struct HardwareRng {
+    fallback_notice_pending: AtomicBool,
+    rdrand_supported: bool,
+    rdseed_active: AtomicBool,
+    stop_pending: AtomicBool,
 }
 impl HardwareRng {
     pub(super) fn new() -> Self {
@@ -125,16 +125,12 @@ impl HardwareRng {
         false
     }
     pub(super) fn write_initial_source_notice(&self, err: &mut dyn Write) -> Result<()> {
-        match self.source() {
-            HardwareRandomSource::RdSeed => {
-                writeln!(err, "CPU가 RDSEED를 지원하여 RDSEED를 사용합니다.")?;
-            }
-            HardwareRandomSource::RdRand => {
-                writeln!(err, "RDSEED를 미지원하여 RDRAND를 사용합니다.")?;
-            }
-            HardwareRandomSource::None => {}
-        }
-        Ok(())
+        let msg = match self.source() {
+            HardwareRandomSource::RdSeed => "CPU가 RDSEED를 지원하여 RDSEED를 사용합니다.",
+            HardwareRandomSource::RdRand => "RDSEED를 미지원하여 RDRAND를 사용합니다.",
+            HardwareRandomSource::None => return Ok(()),
+        };
+        writeln!(err, "{msg}").map_err(Into::into)
     }
     pub(super) fn write_rdseed_fallback_notice(&self, err: &mut dyn Write) -> Result<()> {
         if self.fallback_notice_pending.swap(false, Ordering::Acquire) {

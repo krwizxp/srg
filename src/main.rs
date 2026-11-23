@@ -42,8 +42,6 @@ const FILE_NAME: &str = "random_data.txt";
 const FILE_RECORD_FINAL_LABEL: &[u8] = "NMS 은하 좌표: ".as_bytes();
 const FILE_RECORD_LINE_COUNT: usize = 17;
 const FILE_RECORD_START: &[u8] = "64비트 난수: ".as_bytes();
-static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| TerminalDetect::is_terminal(&io::stdout()));
-const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
 const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " ",
@@ -65,15 +63,12 @@ const HELP_TEXT: &str = concat!(
     " time-observe <host> <seconds>\n\n옵션:\n",
     "  -h, --help               도움말\n  --version                버전\n"
 );
-fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
-    match writeln!(output, "{args}") {
-        Ok(()) | Err(_) => {}
-    }
-}
+static IS_TERMINAL: LazyLock<bool> = LazyLock::new(|| TerminalDetect::is_terminal(&io::stdout()));
+const UTF8_BOM: &[u8; 3] = b"\xEF\xBB\xBF";
 fn main() -> Result<()> {
     let mut args = env::args_os().skip(1);
     if let Some(first) = args.next() {
-        let info_cmd = if first == "-h" || first == "--help" {
+        let info = if first == "-h" || first == "--help" {
             Some(("알 수 없는 도움말 옵션", HELP_TEXT))
         } else if first == "--version" {
             Some((
@@ -83,7 +78,7 @@ fn main() -> Result<()> {
         } else {
             None
         };
-        if let Some((err_label, text)) = info_cmd {
+        if let Some((err_label, text)) = info {
             if let Some(extra) = args.next() {
                 return Err(format!("{err_label}: {}", extra.display()).into());
             }
@@ -91,36 +86,44 @@ fn main() -> Result<()> {
         }
         return CliCommand::try_from((first, args))?.execute();
     }
-    let input_buffer = String::new();
     let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
     let mut app = cfg_select! {
-        target_arch = "x86_64" => {{
-            let mut output_file = output_file;
-            let rng = HardwareRng::new();
-            let mut err = stderr().lock();
-            match rng.source() {
-                HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
-                    rng.write_initial_source_notice(&mut err)?;
-                    let mut boundary_cache = BoundaryCache::default();
-                    let data = generate_random_data_with_rng(&rng, &mut boundary_cache)?;
-                    rng.write_rdseed_fallback_notice(&mut err)?;
-                    output_file.persist_and_print(&data)?;
-                }
-                HardwareRandomSource::None => err.write_all(
-                    "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
-                        .as_bytes(),
-                )?,
-            }
+        target_arch = "x86_64" => {
             MenuApp {
-                input_buffer,
+                input_buffer: String::new(),
                 ladder_results_storage: String::new(),
                 output_file,
-                rng,
+                rng: HardwareRng::new(),
             }
-        }}
+        }
         _ => {
-            MenuApp { input_buffer, output_file }
+            MenuApp {
+                input_buffer: String::new(),
+                output_file,
+            }
         }
     };
+    #[cfg(target_arch = "x86_64")]
+    {
+        let mut err = stderr().lock();
+        match app.rng.source() {
+            HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
+                app.rng.write_initial_source_notice(&mut err)?;
+                let mut boundary_cache = BoundaryCache::default();
+                let data = generate_random_data_with_rng(&app.rng, &mut boundary_cache)?;
+                app.rng.write_rdseed_fallback_notice(&mut err)?;
+                app.output_file.persist_and_print(&data)?;
+            }
+            HardwareRandomSource::None => err.write_all(
+                "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
+                    .as_bytes(),
+            )?,
+        }
+    }
     app.run()
+}
+fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
+    match writeln!(output, "{args}") {
+        Ok(()) | Err(_) => {}
+    }
 }

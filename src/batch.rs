@@ -25,16 +25,16 @@ use std::{
 pub(super) const MAX_BATCH_GENERATE_COUNT: usize = 10_000_000;
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 const WORKER_CHUNK_CAPACITY: usize = 0x0002_0000_usize.strict_add(BUFFER_SIZE);
-struct WorkerFailure {
-    count: usize,
-    first_error: AppError,
-}
 #[derive(Default)]
 struct WorkerChunk {
     bytes: Vec<u8>,
     last_len: usize,
     record_count: usize,
     written_len: usize,
+}
+struct WorkerFailure {
+    count: usize,
+    first_error: AppError,
 }
 struct WorkerOutput<'writer> {
     last_len: Option<usize>,
@@ -48,41 +48,6 @@ fn record_failure(outcome: &mut Option<WorkerFailure>, count: usize, first_error
         *outcome = Some(WorkerFailure { count, first_error });
     }
 }
-fn write_worker_chunk(
-    writer_lock: &Mutex<WorkerOutput<'_>>,
-    cancelled: &AtomicBool,
-    processed: &AtomicUsize,
-    chunk: &mut WorkerChunk,
-) -> Result<()> {
-    if chunk.written_len == 0 || cancelled.load(Ordering::Relaxed) {
-        return Ok(());
-    }
-    let mut output = writer_lock
-        .lock()
-        .map_err(|_poison| AppError::message("output writer lock 손상"))?;
-    if cancelled.load(Ordering::Relaxed) {
-        return Ok(());
-    }
-    let written = chunk.bytes.split_at(chunk.written_len).0;
-    output
-        .writer
-        .write_all(written)
-        .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
-    let last_len = chunk.last_len;
-    output
-        .last_record
-        .get_mut(..last_len)
-        .unwrap_or_else(|| process::abort())
-        .copy_from_slice(or_abort(
-            written.get(chunk.written_len.strict_sub(last_len)..),
-        ));
-    output.last_len = Some(last_len);
-    drop(output);
-    processed.fetch_add(chunk.record_count, Ordering::Relaxed);
-    chunk.record_count = 0;
-    chunk.written_len = 0;
-    Ok(())
-}
 pub(super) fn regenerate_with_count(
     output_file: &mut OutputFile,
     rng: &HardwareRng,
@@ -91,9 +56,8 @@ pub(super) fn regenerate_with_count(
     out: &mut dyn Write,
 ) -> Result<()> {
     if requested_count == 1 {
-        let mut boundary_cache = BoundaryCache::default();
-        let final_data = generate_random_data_with_rng(rng, &mut boundary_cache)?;
-        return output_file.persist_and_print(&final_data);
+        let mut cache = BoundaryCache::default();
+        return output_file.persist_and_print(&generate_random_data_with_rng(rng, &mut cache)?);
     }
     let start_time = Instant::now();
     let mut stop_input = if cancel_on_enter && stdin().is_terminal() {
@@ -103,69 +67,65 @@ pub(super) fn regenerate_with_count(
     } else {
         None
     };
-    let thread_count = requested_count.min(available_parallelism()?.get());
+    let threads = requested_count.min(available_parallelism()?.get());
     let (cancelled, processed) = (AtomicBool::new(false), AtomicUsize::new(0));
-    let (base_count, remainder) = (
-        requested_count.div_euclid(thread_count),
-        requested_count.rem_euclid(thread_count),
+    let (base_cnt, rem) = (
+        requested_count.div_euclid(threads),
+        requested_count.rem_euclid(threads),
     );
-    let mut last_record_buffer = [0_u8; BUFFER_SIZE];
-    let mut progress_buffers = ProgressBuffers::EMPTY;
+    let (mut last_buf, mut progress) = ([0_u8; BUFFER_SIZE], ProgressBuffers::EMPTY);
     let writer_lock = Mutex::new(WorkerOutput {
         last_len: None,
-        last_record: &mut last_record_buffer,
+        last_record: &mut last_buf,
         writer: output_file.writer(),
     });
     let coordinator = thread::current();
     let (worker_outcome, user_cancelled) =
         scope(|scope_ctx| -> Result<(Option<WorkerFailure>, bool)> {
-            let mut worker_handles = Vec::new();
-            worker_handles
-                .try_reserve_exact(thread_count)
-                .map_err(|source| AppError::context("작업 스레드 목록 확보 실패", source))?;
+            let mut handles = Vec::new();
+            handles
+                .try_reserve_exact(threads)
+                .map_err(|src| AppError::context("작업 스레드 목록 확보 실패", src))?;
             let mut progress_error = None;
-            for worker_idx in 0..thread_count {
-                let loop_count = base_count.strict_add(usize::from(worker_idx < remainder));
+            for worker_idx in 0..threads {
+                let loop_cnt = base_cnt.strict_add(usize::from(worker_idx < rem));
                 let (writer, stop, done, wake) =
                     (&writer_lock, &cancelled, &processed, &coordinator);
-                let worker = thread::Builder::new().spawn_scoped(scope_ctx, move || {
-                    let result = (|| {
+                match thread::Builder::new().spawn_scoped(scope_ctx, move || {
+                    let res = (|| {
                         let mut chunk = WorkerChunk::default();
-                        let capacity =
-                            WORKER_CHUNK_CAPACITY.min(loop_count.strict_mul(BUFFER_SIZE));
-                        chunk.bytes.try_reserve_exact(capacity).map_err(|source| {
-                            AppError::context("작업자 출력 버퍼 메모리 확보 실패", source)
+                        let cap = WORKER_CHUNK_CAPACITY.min(loop_cnt.strict_mul(BUFFER_SIZE));
+                        chunk.bytes.try_reserve_exact(cap).map_err(|src| {
+                            AppError::context("작업자 출력 버퍼 메모리 확보 실패", src)
                         })?;
-                        chunk.bytes.resize(capacity, 0);
-                        let mut outcome = None;
-                        let mut boundary_cache = BoundaryCache::default();
-                        for _ in 0..loop_count {
+                        chunk.bytes.resize(cap, 0);
+                        let (mut outcome, mut cache) = (None, BoundaryCache::default());
+                        for _ in 0..loop_cnt {
                             if chunk.written_len > chunk.bytes.len().strict_sub(BUFFER_SIZE) {
                                 write_worker_chunk(writer, stop, done, &mut chunk)?;
                             }
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            let data = match generate_random_data_with_rng(rng, &mut boundary_cache)
-                            {
+                            let data = match generate_random_data_with_rng(rng, &mut cache) {
                                 Ok(data) => data,
-                                Err(source) => {
+                                Err(src) => {
                                     record_failure(
                                         &mut outcome,
                                         1,
-                                        AppError::context("난수 생성 실패", source),
+                                        AppError::context("난수 생성 실패", src),
                                     );
                                     done.fetch_add(1, Ordering::Relaxed);
                                     continue;
                                 }
                             };
-                            let buffer = or_abort(
+                            let buf = or_abort(
                                 chunk
                                     .bytes
                                     .get_mut(chunk.written_len..)
                                     .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>()),
                             );
-                            let len = format_data_into_buffer(&data, buffer, OutputTarget::File);
+                            let len = format_data_into_buffer(&data, buf, OutputTarget::File);
                             chunk.written_len = chunk.written_len.strict_add(len);
                             chunk.record_count = chunk.record_count.strict_add(1);
                             chunk.last_len = len;
@@ -175,21 +135,19 @@ pub(super) fn regenerate_with_count(
                     })()
                     .inspect_err(|_| stop.store(true, Ordering::Relaxed));
                     wake.unpark();
-                    result
-                });
-                match worker {
-                    Ok(handle) => worker_handles.push(handle),
-                    Err(source) => {
+                    res
+                }) {
+                    Ok(handle) => handles.push(handle),
+                    Err(src) => {
                         cancelled.store(true, Ordering::Relaxed);
-                        progress_error = Some(AppError::context("작업 스레드 생성 실패", source));
+                        progress_error = Some(AppError::context("작업 스레드 생성 실패", src));
                         break;
                     }
                 }
             }
-            let mut last_progress = start_time;
-            let mut user_cancelled = false;
+            let (mut last_progress, mut user_cancelled) = (start_time, false);
             while !cancelled.load(Ordering::Relaxed)
-                && worker_handles.iter().any(|handle| !handle.is_finished())
+                && handles.iter().any(|handle| !handle.is_finished())
             {
                 if let Some(input) = stop_input.as_mut() {
                     match input.poll() {
@@ -199,51 +157,48 @@ pub(super) fn regenerate_with_count(
                             user_cancelled = true;
                             break;
                         }
-                        Err(error) => {
+                        Err(err) => {
                             cancelled.store(true, Ordering::Relaxed);
-                            progress_error = Some(error.into());
+                            progress_error = Some(err.into());
                             break;
                         }
                     }
                 }
                 thread::park_timeout(PROGRESS_UPDATE_INTERVAL);
                 if *IS_TERMINAL && last_progress.elapsed() >= PROGRESS_UPDATE_INTERVAL {
-                    if let Err(error) = progress_buffers.print(
+                    if let Err(err) = progress.print(
                         out,
                         processed.load(Ordering::Relaxed),
                         requested_count,
                         start_time.elapsed(),
                     ) {
                         cancelled.store(true, Ordering::Relaxed);
-                        progress_error = Some(error);
+                        progress_error = Some(err);
                         break;
                     }
                     last_progress = Instant::now();
                 }
             }
-            let rng_guard = DropGuard::new(rng, |active_rng| {
-                active_rng.set_pending_read_interruption(false);
-            });
+            let rng_guard =
+                DropGuard::new(rng, |active| active.set_pending_read_interruption(false));
             rng_guard.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
             let (mut combined, mut worker_panic, mut worker_error) = (None, None, None);
-            for handle in worker_handles {
+            for handle in handles {
                 match handle.join() {
                     Ok(Ok(Some(failure))) => {
                         record_failure(&mut combined, failure.count, failure.first_error);
                     }
-                    Ok(Err(error)) if worker_error.is_none() => worker_error = Some(error),
-                    Err(panic_payload) if worker_panic.is_none() => {
-                        worker_panic = Some(panic_payload);
-                    }
+                    Ok(Err(err)) if worker_error.is_none() => worker_error = Some(err),
+                    Err(payload) if worker_panic.is_none() => worker_panic = Some(payload),
                     Ok(Ok(None) | Err(_)) | Err(_) => {}
                 }
             }
             drop(rng_guard);
-            if let Some(panic_payload) = worker_panic {
-                resume_unwind(panic_payload);
+            if let Some(payload) = worker_panic {
+                resume_unwind(payload);
             }
-            if let Some(outcome_error) = progress_error.or(worker_error) {
-                return Err(outcome_error);
+            if let Some(err) = progress_error.or(worker_error) {
+                return Err(err);
             }
             Ok((combined, user_cancelled))
         })?;
@@ -266,7 +221,7 @@ pub(super) fn regenerate_with_count(
         requested_count
     };
     if *IS_TERMINAL {
-        progress_buffers.print(out, completed, requested_count, start_time.elapsed())?;
+        progress.print(out, completed, requested_count, start_time.elapsed())?;
     }
     if user_cancelled {
         writeln!(
@@ -281,7 +236,38 @@ pub(super) fn regenerate_with_count(
     }
     out.flush()?;
     if let Some(last_len) = last_recorded_len {
-        write_slice_to_console(last_record_buffer.split_at(last_len).0)?;
+        write_slice_to_console(last_buf.split_at(last_len).0)?;
     }
+    Ok(())
+}
+fn write_worker_chunk(
+    writer_lock: &Mutex<WorkerOutput<'_>>,
+    cancelled: &AtomicBool,
+    processed: &AtomicUsize,
+    chunk: &mut WorkerChunk,
+) -> Result<()> {
+    if chunk.written_len == 0 || cancelled.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    let mut output = writer_lock
+        .lock()
+        .map_err(|_poison| AppError::message("output writer lock 손상"))?;
+    if cancelled.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    let written = chunk.bytes.split_at(chunk.written_len).0;
+    output
+        .writer
+        .write_all(written)
+        .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
+    let last_len = chunk.last_len;
+    or_abort(output.last_record.get_mut(..last_len)).copy_from_slice(or_abort(
+        written.get(chunk.written_len.strict_sub(last_len)..),
+    ));
+    output.last_len = Some(last_len);
+    drop(output);
+    processed.fetch_add(chunk.record_count, Ordering::Relaxed);
+    chunk.record_count = 0;
+    chunk.written_len = 0;
     Ok(())
 }

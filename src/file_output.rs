@@ -16,15 +16,9 @@ cfg_select! {
         use core::ffi::c_void;
         use std::{
             io::Error as IoError,
-            os::windows::{
-                fs::{MetadataExt as _, OpenOptionsExt as _},
-                io::AsRawHandle as _,
-            },
+            os::windows::{fs::{MetadataExt as _, OpenOptionsExt as _}, io::AsRawHandle as _},
         };
-        const _: () = assert!(
-            size_of::<FileStandardInfo>() == 24,
-            "Windows FILE_STANDARD_INFO size mismatch"
-        );
+        const _: () = assert!(size_of::<FileStandardInfo>() == 24, "Windows FILE_STANDARD_INFO size mismatch");
         #[repr(C)]
         #[derive(Default)]
         struct FileStandardInfo {
@@ -36,12 +30,7 @@ cfg_select! {
         }
         unsafe extern "system" {
             #[link_name = "GetFileInformationByHandleEx"]
-            fn get_file_information_by_handle_ex(
-                file: *mut c_void,
-                information_class: i32,
-                information: *mut c_void,
-                buffer_size: u32,
-            ) -> i32;
+            fn get_file_information_by_handle_ex(f: *mut c_void, cls: i32, info: *mut c_void, sz: u32) -> i32;
         }
     }
     any(target_os = "linux", target_os = "macos") => {
@@ -59,6 +48,28 @@ const OPEN_NOFOLLOW_FLAG: i32 = 0x0100;
 pub(super) struct OutputFile {
     file: File,
 }
+impl OutputFile {
+    pub(super) fn clear(&mut self) -> Result<()> {
+        self.file.set_len(0)?;
+        self.file.rewind()?;
+        self.file.write_all(UTF8_BOM).map_err(Into::into)
+    }
+    pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
+        let mut buffer = [0_u8; BUFFER_SIZE];
+        let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File);
+        self.file.write_all(buffer.split_at(file_len).0)?;
+        let out_len = if *IS_TERMINAL {
+            format_data_into_buffer(data, &mut buffer, OutputTarget::Console(file_len))
+        } else {
+            file_len
+        };
+        write_slice_to_console(buffer.split_at(out_len).0).map_err(Into::into)
+    }
+    #[cfg(target_arch = "x86_64")]
+    pub(super) const fn writer(&mut self) -> &mut File {
+        &mut self.file
+    }
+}
 impl TryFrom<&Path> for OutputFile {
     type Error = AppError;
     fn try_from(path: &Path) -> Result<Self> {
@@ -66,9 +77,7 @@ impl TryFrom<&Path> for OutputFile {
         options.read(true).write(true).create(true).truncate(false);
         cfg_select! {
             target_os = "windows" => {
-                options
-                    .custom_flags(0x0020_0000 | 0x0800_0000)
-                    .share_mode(0x0000_0001);
+                options.custom_flags(0x0020_0000 | 0x0800_0000).share_mode(0x0000_0001);
             }
             any(target_os = "linux", target_os = "macos") => {
                 options.custom_flags(OPEN_NOFOLLOW_FLAG).mode(0o600);
@@ -77,37 +86,31 @@ impl TryFrom<&Path> for OutputFile {
         }
         let mut file = match options.open(path) {
             Ok(file) => file,
-            Err(source) => {
+            Err(src) => {
                 #[cfg(target_os = "windows")]
-                if source.raw_os_error() == Some(32_i32) {
+                if src.raw_os_error() == Some(32_i32) {
                     return Err("다른 srg 인스턴스가 출력 파일을 사용 중입니다.".into());
                 }
-                return Err(source.into());
+                return Err(src.into());
             }
         };
-        let metadata = file.metadata()?;
+        let meta = file.metadata()?;
         #[cfg(target_os = "windows")]
-        (metadata.file_attributes() & 0x0000_0400 == 0)
+        (meta.file_attributes() & 0x0000_0400 == 0)
             .ok_or("출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.")?;
-        metadata
-            .is_file()
+        meta.is_file()
             .ok_or("출력 경로는 일반 파일이어야 합니다.")?;
         let link_count = cfg_select! {
             target_os = "windows" => {{
-                let mut standard_info = FileStandardInfo::default();
-                // SAFETY: standard_info is a valid FILE_STANDARD_INFO buffer for the borrowed file handle.
-                let status = unsafe {
-                    get_file_information_by_handle_ex(
-                        file.as_raw_handle(),
-                        1,
-                        (&raw mut standard_info).cast::<c_void>(),
-                        24,
-                    )
+                let mut info = FileStandardInfo::default();
+                // SAFETY: info is a valid FILE_STANDARD_INFO buffer for the borrowed file handle.
+                let ok = unsafe {
+                    get_file_information_by_handle_ex(file.as_raw_handle(), 1, (&raw mut info).cast::<c_void>(), 24)
                 };
-                (status != 0_i32).ok_or_else(|| AppError::from(IoError::last_os_error()))?;
-                u64::from(standard_info.number_of_links)
+                (ok != 0_i32).ok_or_else(|| AppError::from(IoError::last_os_error()))?;
+                u64::from(info.number_of_links)
             }}
-            any(target_os = "linux", target_os = "macos") => metadata.nlink(),
+            any(target_os = "linux", target_os = "macos") => meta.nlink(),
             _ => compile_error!("Output file validation supports only Windows, Linux, and macOS."),
         };
         (link_count == 1).ok_or("출력 파일의 하드 링크 수는 1이어야 합니다.")?;
@@ -122,10 +125,10 @@ impl TryFrom<&Path> for OutputFile {
             }
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        if metadata.mode() & 0o077 != 0 {
-            let mut permissions = metadata.permissions();
-            permissions.set_mode(metadata.mode() & !0o077);
-            file.set_permissions(permissions)?;
+        if meta.mode() & 0o077 != 0 {
+            let mut perms = meta.permissions();
+            perms.set_mode(meta.mode() & !0o077);
+            file.set_permissions(perms)?;
             (file.metadata()?.mode().trailing_zeros() >= 6)
                 .ok_or("출력 파일의 group/other 접근 권한을 제거하지 못했습니다.")?;
         }
@@ -136,74 +139,50 @@ impl TryFrom<&Path> for OutputFile {
             let mut bom = [0_u8; UTF8_BOM.len()];
             file.rewind()?;
             file.read_exact(&mut bom)
-                .map_err(|source| AppError::context("기존 출력 파일 BOM 읽기 실패", source))?;
+                .map_err(|src| AppError::context("기존 출력 파일 BOM 읽기 실패", src))?;
             (&bom == UTF8_BOM).ok_or("기존 출력 파일은 SRG UTF-8 형식이어야 합니다.")?;
             if len != UTF8_BOM.len() as u64 {
-                let tail_len_u64 = len.min(BUFFER_SIZE as u64);
-                let tail_len = usize::try_from(tail_len_u64).unwrap_or_else(|_| process::abort());
-                let mut tail = [0_u8; BUFFER_SIZE];
-                let tail_start = len.strict_sub(tail_len_u64);
+                let tail_u64 = len.min(BUFFER_SIZE as u64);
+                let tail_len = usize::try_from(tail_u64).unwrap_or_else(|_| process::abort());
+                let (mut tail, tail_start) = ([0_u8; BUFFER_SIZE], len.strict_sub(tail_u64));
                 file.seek(SeekFrom::Start(tail_start))?;
-                file.read_exact(tail.get_mut(..tail_len).unwrap_or_else(|| process::abort()))?;
+                file.read_exact(or_abort(tail.get_mut(..tail_len)))?;
                 let content = or_abort(
                     tail.get((if tail_start == 0 { UTF8_BOM.len() } else { 0 })..tail_len),
                 );
-                let record_start = content
+                let rec_start = content
                     .array_windows::<{ FILE_RECORD_START.len() }>()
-                    .rposition(|window| window == FILE_RECORD_START)
+                    .rposition(|win| win == FILE_RECORD_START)
                     .ok_or("기존 출력 파일의 마지막 SRG 레코드를 찾지 못했습니다.")?;
-                (record_start == 0 || content.get(record_start.strict_sub(1)) == Some(&b'\n'))
+                (rec_start == 0 || content.get(rec_start.strict_sub(1)) == Some(&b'\n'))
                     .ok_or("기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.")?;
-                let record = or_abort(content.get(record_start..));
-                str::from_utf8(record).map_err(|source| {
-                    AppError::context("기존 출력 파일이 올바른 UTF-8이 아닙니다.", source)
+                let record = or_abort(content.get(rec_start..));
+                str::from_utf8(record).map_err(|src| {
+                    AppError::context("기존 출력 파일이 올바른 UTF-8이 아닙니다.", src)
                 })?;
-                let body = record
+                let (lines, last) = record
                     .strip_suffix(b"\n")
-                    .ok_or("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")?;
-                let (record_lines, last) = body
+                    .ok_or("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")?
                     .split(|&byte| byte == b'\n')
-                    .fold((0_usize, [].as_slice()), |(count, _), line| {
-                        (count.strict_add(1), line)
+                    .fold((0_usize, [].as_slice()), |(cnt, _), line| {
+                        (cnt.strict_add(1), line)
                     });
                 let final_valid = last
                     .strip_prefix(FILE_RECORD_FINAL_LABEL)
-                    .is_some_and(|value| {
-                        value.len() == 19
-                            && value.iter().enumerate().all(|(index, &byte)| {
-                                if matches!(index, 4 | 9 | 14) {
+                    .is_some_and(|val| {
+                        val.len() == 19
+                            && val.iter().enumerate().all(|(idx, &byte)| {
+                                if matches!(idx, 4 | 9 | 14) {
                                     byte == b':'
                                 } else {
                                     byte.is_ascii_digit() || matches!(byte, b'A'..=b'F')
                                 }
                             })
                     });
-                (record_lines == FILE_RECORD_LINE_COUNT && final_valid)
+                (lines == FILE_RECORD_LINE_COUNT && final_valid)
                     .ok_or("기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.")?;
             }
         }
         Ok(Self { file })
-    }
-}
-impl OutputFile {
-    pub(super) fn clear(&mut self) -> Result<()> {
-        self.file.set_len(0)?;
-        self.file.rewind()?;
-        self.file.write_all(UTF8_BOM).map_err(Into::into)
-    }
-    pub(super) fn persist_and_print(&mut self, data: &RandomDataSet) -> Result<()> {
-        let mut buffer = [0_u8; BUFFER_SIZE];
-        let file_len = format_data_into_buffer(data, &mut buffer, OutputTarget::File);
-        self.file.write_all(buffer.split_at(file_len).0)?;
-        let output_len = if *IS_TERMINAL {
-            format_data_into_buffer(data, &mut buffer, OutputTarget::Console(file_len))
-        } else {
-            file_len
-        };
-        write_slice_to_console(buffer.split_at(output_len).0).map_err(Into::into)
-    }
-    #[cfg(target_arch = "x86_64")]
-    pub(super) const fn writer(&mut self) -> &mut File {
-        &mut self.file
     }
 }
