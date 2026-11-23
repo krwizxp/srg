@@ -80,7 +80,11 @@ impl OutputFormatter<'_, '_, '_> {
         let [galaxy_number_byte, ..] = self.bytes;
         let data = self.data;
         self.write_labeled_line("NMS 은하 번호: ".as_bytes(), |buffer_cur| {
-            buffer_cur.write_u64_dec(u64::from(galaxy_number_byte).strict_add(1));
+            if galaxy_number_byte == u8::MAX {
+                buffer_cur.write_bytes(b"256");
+            } else {
+                buf_write_u8_dec(buffer_cur, galaxy_number_byte.strict_add(1));
+            }
         });
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
             buf_write_u8_dec(buffer_cur, data.planet_number);
@@ -133,7 +137,12 @@ impl OutputFormatter<'_, '_, '_> {
         self.cursor.write_bytes(" (유부호 정수: ".as_bytes());
         if signed_number < 0 {
             self.cursor.write_byte(b'-');
-            self.cursor.write_u64_dec(signed_number.unsigned_abs());
+            self.cursor.write_bytes(
+                signed_number
+                    .unsigned_abs()
+                    .format_into(&mut number_buffer)
+                    .as_bytes(),
+            );
         } else {
             self.cursor.write_bytes(number_text);
         }
@@ -181,7 +190,9 @@ impl OutputFormatter<'_, '_, '_> {
         for (group_out, byte) in groups.chunks_exact_mut(WIDTH.strict_add(1)).zip(self.bytes) {
             let (value_out, separator_out) = group_out.split_at_mut(WIDTH);
             value_out.copy_from_slice(&render_group(byte));
-            separator_out.fill(b' ');
+            if let Some(sep) = separator_out.first_mut() {
+                *sep = b' ';
+            }
         }
         *groups.last_mut().unwrap_or_else(|| process::abort()) = b'\n';
     }

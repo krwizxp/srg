@@ -27,6 +27,7 @@ static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
 pub(super) struct BoundaryCache {
     bytes: usize,
     pages: VecDeque<(usize, CachedPage)>,
+    resident: Vec<u64>,
     scratch: Vec<u8>,
 }
 struct CachedPage {
@@ -42,6 +43,7 @@ struct BoundaryIndex {
     grid_south: f64,
     grid_west: f64,
     inv_divisor: f64,
+    page_count: usize,
     parts: Box<[Part]>,
     polygon_count: usize,
     ring_count: usize,
@@ -52,9 +54,10 @@ struct BoundaryIndex {
     vertex_count: usize,
 }
 struct Tile {
-    count: usize,
-    first: usize,
-    state: u32,
+    atlas_ordinal: u16,
+    count: u32,
+    first: u32,
+    state: u8,
 }
 struct Part {
     bytes: usize,
@@ -82,17 +85,7 @@ pub(super) struct SampleState<'cache> {
     supplemental_reads: usize,
 }
 impl BoundaryIndex {
-    fn covers(&self, point: &Coordinates, cache: &mut BoundaryCache) -> Result<bool> {
-        let [west, south, east, north] = self.bounds;
-        if !(point.longitude >= west
-            && point.longitude <= east
-            && point.latitude >= south
-            && point.latitude <= north)
-        {
-            (point.longitude.is_finite() && point.latitude.is_finite())
-                .ok_or("대한민국 포함 판정 좌표 오류")?;
-            return Ok(false);
-        }
+    fn covers_sample(&self, point: &Coordinates, cache: &mut BoundaryCache) -> Result<bool> {
         let width = usize::from(self.column_count);
         let column = grid_axis_index(
             self.grid_west,
@@ -116,7 +109,10 @@ impl BoundaryIndex {
         if tile.state != 2 {
             return Ok(tile.state == 1);
         }
-        match self.atlas.state(self, point, column, row, tile_number)? {
+        match self
+            .atlas
+            .state(self, point, column, row, tile.atlas_ordinal)?
+        {
             0 => return Ok(false),
             1 => return Ok(true),
             _ => {}
@@ -126,8 +122,9 @@ impl BoundaryIndex {
         let mut chains_started = false;
         let mut last_endpoint = None;
         let mut last_chain = None;
-        for offset in 0..tile.count {
-            let page_number = tile.first.strict_add(offset);
+        let first_page = tile.first as usize;
+        for offset in 0..(tile.count as usize) {
+            let page_number = first_page.strict_add(offset);
             cache.page(self, page_number, tile_number, |page| match page {
                 DecodedPage::Parity { base, endpoints } => {
                     let outcome = (|| -> Result<()> {
@@ -264,8 +261,13 @@ impl BoundaryIndex {
         raw_size: usize,
         scratch: &mut Vec<u8>,
     ) -> Result<CachedPage> {
-        scratch.resize(MAX_PAGE_SIZE, 0);
-        let decoded = InflatedPage::try_from((bytes, scratch.as_mut_slice()))?;
+        if scratch.len() < raw_size {
+            scratch.resize(raw_size, 0);
+        }
+        let target = scratch
+            .get_mut(..raw_size)
+            .ok_or("대한민국 경계 블록 버퍼 범위 오류")?;
+        let decoded = InflatedPage::try_from((bytes, target))?;
         let raw = decoded.as_ref();
         let length = raw.len();
         (length == raw_size
@@ -395,7 +397,7 @@ impl BoundaryIndex {
         part.validated
             .get_or_init(|| self.validate_part(part, bytes))
             .as_ref()
-            .map_err(|source| format!("대한민국 경계 조각 검사 실패: {source}"))?;
+            .map_err(|source| AppError::prefixed_ref("대한민국 경계 조각 검사 실패", source))?;
         let local = page_number
             .checked_sub(part.first)
             .ok_or("대한민국 경계 블록 순번 오류")?;
@@ -515,22 +517,36 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         source_hash.copy_from_slice(bytes.get(96..128).ok_or("대한민국 경계 원본 식별자 오류")?);
         let mut tiles = Vec::with_capacity(tile_count);
         let mut next_page = 0_usize;
+        let mut next_ordinal = 0_u16;
         for tile_number in 0..tile_count {
             let offset = HEADER_SIZE.strict_add(tile_number.strict_mul(12));
-            let state = read_u32(bytes, offset)?;
-            let first = read_count(bytes, offset.strict_add(4))?;
-            let count = read_count(bytes, offset.strict_add(8))?;
-            (state <= 2
+            let state_u32 = read_u32(bytes, offset)?;
+            let first_u32 = read_u32(bytes, offset.strict_add(4))?;
+            let count_u32 = read_u32(bytes, offset.strict_add(8))?;
+            let first = first_u32 as usize;
+            let count = count_u32 as usize;
+            (state_u32 <= 2
                 && first == next_page
-                && ((state == 2 && count > 0) || (state < 2 && count == 0)))
+                && ((state_u32 == 2 && count > 0) || (state_u32 < 2 && count == 0)))
                 .ok_or("대한민국 경계 타일 인덱스 오류")?;
             next_page = next_page
                 .checked_add(count)
                 .ok_or("대한민국 경계 블록 개수 오류")?;
             (next_page <= page_count).ok_or("대한민국 경계 블록 범위 오류")?;
+            let [state, ..] = state_u32.to_le_bytes();
+            let atlas_ordinal = if state == 2 {
+                let assigned = next_ordinal;
+                next_ordinal = next_ordinal
+                    .checked_add(1)
+                    .ok_or("대한민국 세부 격자 개수 오류")?;
+                assigned
+            } else {
+                u16::MAX
+            };
             tiles.push(Tile {
-                count,
-                first,
+                atlas_ordinal,
+                count: count_u32,
+                first: first_u32,
                 state,
             });
         }
@@ -566,7 +582,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         for (word_index, chunk) in KOREA_TILE_BYTES.as_chunks::<8>().0.iter().enumerate() {
             let mut bits = u64::from_le_bytes(*chunk);
             let base = u32::try_from(word_index)
-                .map_err(|source| format!("대한민국 타일 번호 오류: {source}"))?
+                .map_err(|source| AppError::context("대한민국 타일 번호 오류", source))?
                 .strict_mul(64);
             while bits != 0 {
                 selected.push(base | bits.trailing_zeros());
@@ -577,7 +593,12 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         let sampler_tiles = selected.into_boxed_slice();
         Ok(Self {
             area_bounds: BoundaryAreaBounds::try_from(bounds)?,
-            atlas: atlas::Atlas::try_from((atlas::DATA, tiles.as_slice(), source_hash))?,
+            atlas: atlas::Atlas::try_from((
+                atlas::DATA,
+                tiles.len(),
+                usize::from(next_ordinal),
+                source_hash,
+            ))?,
             bounds,
             column_count: u16::try_from(column_count)
                 .ok()
@@ -595,6 +616,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             source_hash,
             tiles: tiles.into_boxed_slice(),
             sampler_tiles,
+            page_count,
             parts: parts.into_boxed_slice(),
         })
     }
@@ -607,11 +629,21 @@ impl BoundaryCache {
         tile_number: usize,
         visit: impl FnOnce(DecodedPage) -> (DecodedPage, Result<T>),
     ) -> Result<T> {
-        let item = if let Some(position) = self
-            .pages
-            .iter()
-            .rposition(|&(number, _)| number == page_number)
-        {
+        if self.resident.is_empty() {
+            self.resident.resize(index.page_count.div_ceil(64), 0);
+        }
+        let word = page_number.div_euclid(64);
+        let bit = 1_u64 << page_number.rem_euclid(64);
+        let resident = self
+            .resident
+            .get(word)
+            .ok_or("대한민국 경계 블록 순번 오류")?;
+        let item = if resident & bit != 0 {
+            let position = self
+                .pages
+                .iter()
+                .rposition(|&(number, _)| number == page_number)
+                .ok_or("대한민국 경계 캐시 위치 오류")?;
             self.pages
                 .remove(position)
                 .ok_or("대한민국 경계 캐시 위치 오류")?
@@ -620,12 +652,22 @@ impl BoundaryCache {
             let additional = decoded.bytes;
             while self.pages.len() >= CACHE_PAGES || self.bytes.strict_add(additional) > CACHE_BYTES
             {
-                let (_, removed) = self
+                let (removed_number, removed) = self
                     .pages
                     .pop_front()
                     .ok_or("대한민국 경계 캐시 용량 오류")?;
+                let removed_word = self
+                    .resident
+                    .get_mut(removed_number.div_euclid(64))
+                    .ok_or("대한민국 경계 캐시 위치 오류")?;
+                *removed_word &= !(1_u64 << removed_number.rem_euclid(64));
                 self.bytes = self.bytes.strict_sub(removed.bytes);
             }
+            let inserted_word = self
+                .resident
+                .get_mut(word)
+                .ok_or("대한민국 경계 블록 순번 오류")?;
+            *inserted_word |= bit;
             self.bytes = self.bytes.strict_add(additional);
             (page_number, decoded)
         };
@@ -660,7 +702,7 @@ impl SampleState<'_> {
     }
     fn try_word(&mut self, value: u64) -> Result<()> {
         let selector = usize::try_from(value >> 42_i32)
-            .map_err(|source| format!("대한민국 타일 선택값 오류: {source}"))?;
+            .map_err(|source| AppError::context("대한민국 타일 선택값 오류", source))?;
         if selector >= KOREA_TILE_COUNT.strict_mul(53) {
             return Ok(());
         }
@@ -675,7 +717,7 @@ impl SampleState<'_> {
         let horizontal = ((tile & 511) << 23_i32) | ((value & 0x1f_ffff) << 2_i32) | 2;
         let mapped = (vertical << 32_u32) | horizontal;
         let point = Coordinates::try_from((mapped, self.index.area_bounds))?;
-        if self.index.covers(&point, self.active_cache)? {
+        if self.index.covers_sample(&point, self.active_cache)? {
             self.point = Some(point);
         }
         Ok(())
@@ -686,7 +728,7 @@ impl<'cache> TryFrom<(u64, &'cache mut BoundaryCache)> for SampleState<'cache> {
     fn try_from((value, active_cache): (u64, &'cache mut BoundaryCache)) -> Result<Self> {
         let index = BOUNDARY
             .as_ref()
-            .map_err(|source| format!("대한민국 경계 초기화 실패: {source}"))?;
+            .map_err(|source| AppError::prefixed_ref("대한민국 경계 초기화 실패", source))?;
         let mut state = Self {
             active_cache,
             index,
@@ -730,7 +772,7 @@ fn read_chunk<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {
 }
 fn read_count(bytes: &[u8], offset: usize) -> Result<usize> {
     usize::try_from(read_u32(bytes, offset)?)
-        .map_err(|source| format!("대한민국 경계 길이 오류: {source}").into())
+        .map_err(|source| AppError::context("대한민국 경계 길이 오류", source))
 }
 fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
     read_chunk::<4>(bytes, offset).map(u32::from_le_bytes)

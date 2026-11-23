@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Display, Write as _},
     result::Result as CoreResult,
 };
-use std::io::Error as IoError;
+use std::{io::Error as IoError, process};
 type BoxError = Box<dyn Error + Send + Sync>;
 pub(super) type Result<T> = CoreResult<T, AppError>;
 pub(super) struct AppError {
@@ -30,6 +30,22 @@ impl AppError {
     pub(super) fn message(message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             message: message.into(),
+            source: None,
+        }
+    }
+    #[cold]
+    #[inline(never)]
+    pub(super) fn prefixed_ref(prefix: &'static str, source: &Self) -> Self {
+        let mut text = String::new();
+        if !prefix.is_empty() {
+            text.push_str(prefix);
+            text.push_str(": ");
+        }
+        if write!(text, "{source}").is_err() {
+            process::abort();
+        }
+        Self {
+            message: Cow::Owned(text),
             source: None,
         }
     }

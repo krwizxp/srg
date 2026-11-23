@@ -55,7 +55,7 @@ impl Bits<'_> {
         }
         self.refill(count);
         (self.bit_count >= count).ok_or("경계 압축 데이터가 잘렸습니다.")?;
-        let mask = (1_u64 << count).strict_sub(1);
+        let mask = (1_u64 << count).wrapping_sub(1);
         let value = low_u32_from_u64(self.bit_buffer & mask);
         self.consume(count);
         Ok(value)
@@ -142,11 +142,10 @@ impl Huffman {
                 let packed = (length << 9_u16) | symbol;
                 let reversed = first.strict_add(offset).reverse_bits()
                     >> u16::BITS.strict_sub(u32::from(length));
-                for slot in (usize::from(reversed)..512).step_by(1_usize << length) {
-                    *result
-                        .quick
-                        .get_mut(slot)
-                        .ok_or("경계 압축 조회 위치 오류")? = packed;
+                if let Some(tail) = result.quick.get_mut(usize::from(reversed)..) {
+                    for slot in tail.iter_mut().step_by(1_usize << length) {
+                        *slot = packed;
+                    }
                 }
             }
             index = index.strict_add(usize::from(count));
@@ -158,15 +157,18 @@ impl Huffman {
     #[inline(never)]
     fn slow_symbol(&self, bits: &mut Bits<'_>) -> Result<u16> {
         bits.refill(15);
+        let mut buf = bits.bit_buffer;
+        let available = bits.bit_count;
         let mut code = 0_u32;
         let mut first = 0_u32;
         let mut index = 0_u32;
-        for &entry_count in self.counts.iter().skip(1) {
-            (bits.bit_count >= 1).ok_or("경계 압축 데이터가 잘렸습니다.")?;
-            code |= low_u32_from_u64(bits.bit_buffer & 1_u64);
-            bits.consume(1);
+        for (len, &entry_count) in (1_u32..).zip(self.counts.iter().skip(1)) {
+            (available >= len).ok_or("경계 압축 데이터가 잘렸습니다.")?;
+            code |= low_u32_from_u64(buf & 1_u64);
+            buf >>= 1_u32;
             let count = u32::from(entry_count);
             if code < first.strict_add(count) {
+                bits.consume(len);
                 let position = usize::try_from(index.strict_add(code.strict_sub(first)))
                     .map_err(|source| AppError::context("경계 압축 코드 위치 오류", source))?;
                 return self
@@ -292,7 +294,9 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                 kind @ (1 | 2) => {
                     let dynamic;
                     let trees = if kind == 1 {
-                        FIXED_TREES.as_ref().map_err(|source| format!("{source}"))?
+                        FIXED_TREES
+                            .as_ref()
+                            .map_err(|source| AppError::prefixed_ref("", source))?
                     } else {
                         dynamic = HuffmanTrees::try_from(&mut bits)?;
                         &dynamic

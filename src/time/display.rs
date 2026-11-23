@@ -7,6 +7,7 @@ use crate::{
     buffmt::{ByteCursor, digit_byte, two_digits},
     numeric::{low_u8_from_u32, low_u32_from_u64},
 };
+use core::fmt::NumBuffer;
 use std::{
     process,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -35,7 +36,8 @@ impl ByteCursor<'_> {
             *self.take_array::<4>() = [h0, h1, l0, l1];
             return;
         }
-        self.write_u64_dec(u64::from(year_value));
+        let mut buffer = NumBuffer::new();
+        self.write_bytes(year_value.format_into(&mut buffer).as_bytes());
     }
 }
 impl ServerTime {

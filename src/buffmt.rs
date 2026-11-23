@@ -1,4 +1,4 @@
-use core::fmt::{self, NumBuffer};
+use core::fmt;
 use std::process;
 const TWO_DIGITS: &[[u8; 2]] = b"00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899".as_chunks::<2>().0;
 pub(super) struct ByteCursor<'buffer> {
@@ -35,10 +35,6 @@ impl<'buffer> ByteCursor<'buffer> {
         if fmt::Write::write_fmt(self, args).is_err() {
             process::abort();
         }
-    }
-    pub(super) fn write_u64_dec(&mut self, value: u64) {
-        let mut buffer = NumBuffer::new();
-        self.write_bytes(value.format_into(&mut buffer).as_bytes());
     }
     pub(super) const fn written_len(self) -> usize {
         self.initial_len.strict_sub(self.remaining.len())

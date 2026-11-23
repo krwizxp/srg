@@ -2851,9 +2851,19 @@
 				township: text(gc.township),
 				residential: text(gc.residential),
 			};
-			const labelParts = label.split(",").map(part => part.trim());
-			const firstPart = labelParts[0];
-			const [p0 = "", p1 = ""] = labelParts.filter(Boolean);
+			let firstPart = "", p0 = "", p1 = "", partIdx = 0;
+			for (let pos = 0; pos <= label.length;) {
+				const comma = label.indexOf(",", pos);
+				const part = (comma === -1 ? label.slice(pos) : label.slice(pos, comma)).trim();
+				if (partIdx === 0) firstPart = part;
+				if (part) {
+					if (!p0) p0 = part;
+					else {p1 = part; break;}
+				}
+				if (comma === -1) break;
+				pos = comma + 1;
+				partIdx++;
+			}
 			const {sido, sigungu, eupmyeon} = getAdmin(
 				fields, country, p0, p1,
 			);
@@ -2895,12 +2905,13 @@
 			if (!btn?.matches("button.map-btn")) return;
 			const r = state.records[Number(btn.dataset.idx)];
 			const {latStr: lat, lonStr: lon} = r;
-			const lat6 = fmtCoord6(lat), lon6 = fmtCoord6(lon);
+			const lat6 = r._lat6 ??= fmtCoord6(lat), lon6 = r._lon6 ??= fmtCoord6(lon);
 			for (let i = 0; i < MAP_NAMES.length; i++)
 				mapAnchors[i].href = MAP_BUILDERS[i](lat, lon, lat6, lon6);
 		});
-		const fmt =
-			new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format;
+		let numberFormat;
+		const fmt = n => n === 0 ? "0" : n > 0 && n < 1000 && Number.isInteger(n)
+			? String(n) : (numberFormat ??= new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0})).format(n);
 		const COORD_DECIMALS = 6;
 		const COORD_POW = 10 ** COORD_DECIMALS;
 		const fmtCoord6 = (v) => {
@@ -2979,17 +2990,19 @@
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
 		const seenCountryFilters = new Set(["", "에러"]);
+		let koCollator;
 		function addCountryFilter(record) {
 			const {result} = record;
 			const kind = result.kind || record.set;
 			if (kind === "에러") return;
-			const value = countryFilterValue(record);
+			const value = record._kind;
 			if (seenCountryFilters.has(value)) return;
 			seenCountryFilters.add(value);
 			const option = new Option(kindLabel(kind, result.countryName), value);
 			option.dataset.country = "true";
+			const collator = koCollator ??= new Intl.Collator("ko");
 			const before = Iterator.from(filterKind.options).find(current =>
-				current.dataset.country === "true" && option.text.localeCompare(current.text, "ko") < 0);
+				current.dataset.country === "true" && collator.compare(option.text, current.text) < 0);
 			filterKind.insertBefore(option, before || filterKind.lastElementChild);
 		}
 		let filterStatus = "all";
@@ -3013,17 +3026,13 @@
 				else if (tokens.length > 1)
 					query = queryIsOr ? tokens : tokens.sort((a, b) => b.length - a.length);
 			}
-			const fields = {
-				kind: filterKind.value,
-				sido: norm(filterSido.value),
-				sigungu: norm(filterSigungu.value),
-				emd: norm(filterEmd.value),
-				tag: norm(filterTag.value),
-				fullAddr: norm(filterFullAddr.value),
-			};
-			const hasFields = Object.values(fields).some(Boolean);
-			return filterStatus === "all" && !query && !hasFields
-				? null : {status: filterStatus, ...fields, query, queryIsOr, hasFields};
+			const kind = filterKind.value;
+			const fieldChecks = [];
+			const rawFields = [norm(filterSido.value), norm(filterSigungu.value), norm(filterEmd.value), norm(filterTag.value), norm(filterFullAddr.value)];
+			for (let i = 0; i < rawFields.length; i++) if (rawFields[i]) fieldChecks.push([i + 1, rawFields[i]]);
+			const hasTextFields = fieldChecks.length > 0;
+			return filterStatus === "all" && !kind && !query && !hasTextFields
+				? null : {status: filterStatus, kind, fieldChecks, hasTextFields, query, queryIsOr};
 		}
 		let filterState = readFilters();
 		function resetCountryFilter() {
@@ -3042,22 +3051,22 @@
 			if (!r.result) return false;
 			if (!f) return true;
 			if (f.status !== "all" && r._status !== f.status) return false;
-			if (!f.hasFields && !f.query) return true;
+			if (f.kind && r._kind !== f.kind) return false;
+			if (!f.hasTextFields && !f.query) return true;
 			const fields = r._search ??= [
-				countryFilterValue(r),
+				r._kind,
 				norm(r.result.addr?.sido),
 				norm(r.result.addr?.sigungu),
 				norm(r.result.addr?.eupmyeon),
 				norm(r.result.addr?.tag),
 				norm(r.result.error || r.result.addr?.fullAddr),
+				null,
 			];
-			if (f.hasFields && !((!f.kind || fields[0] === f.kind) &&
-				(!f.sido || fields[1].includes(f.sido)) &&
-				(!f.sigungu || fields[2].includes(f.sigungu)) &&
-				(!f.emd || fields[3].includes(f.emd)) &&
-				(!f.tag || fields[4].includes(f.tag)) &&
-				(!f.fullAddr || fields[5].includes(f.fullAddr))))
-				return false;
+			if (f.hasTextFields) {
+				const checks = f.fieldChecks;
+				for (let i = 0; i < checks.length; i++)
+					if (!fields[checks[i][0]].includes(checks[i][1])) return false;
+			}
 			const query = f.query;
 			if (!query) return true;
 			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${norm(r.result.countryName)}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
@@ -3130,8 +3139,10 @@
 			const indices = state.visibleIndices;
 			indices.length = 0;
 			const records = state.records;
-			for (let i = 0; i < records.length; i++) {
-				if (matchesFilter(records[i], f)) indices.push(i);
+			if (!f) {
+				for (let i = 0; i < records.length; i++) if (records[i].result) indices.push(i);
+			} else {
+				for (let i = 0; i < records.length; i++) if (matchesFilter(records[i], f)) indices.push(i);
 			}
 			state.page = 0;
 			renderPage(true);
@@ -3364,12 +3375,7 @@
 			srStatus.progressBucket = -1;
 			announceStatus(text || null);
 		}
-		const renderCache = {
-			total: -1,
-			processed: -1,
-			fail: -1,
-			noAddress: -1,
-		};
+		const renderCache = {total: 0, processed: 0, fail: 0, noAddress: 0};
 		function renderFrame() {
 			state.renderReq = null;
 			const {processed, cntFail: fail, cntNoAddress: noAddress} = state;
@@ -3448,19 +3454,21 @@
 			}
 			return fallback * (0.8 + Math.random() * 0.4);
 		}
+		let yieldPort, yieldQueue;
 		const yieldToMain = typeof globalThis.scheduler?.yield === "function"
 			? () => globalThis.scheduler.yield()
-			: (() => {
-				const channel = new MessageChannel();
-				const queue = [];
-				channel.port1.onmessage = () => queue.shift()();
-				return () => {
-					const {promise, resolve} = Promise.withResolvers();
-					queue.push(resolve);
-					channel.port2.postMessage(0);
-					return promise;
-				};
-			})();
+			: () => {
+				if (!yieldPort) {
+					const channel = new MessageChannel();
+					yieldQueue = [];
+					channel.port1.onmessage = () => yieldQueue.shift()();
+					yieldPort = channel.port2;
+				}
+				const {promise, resolve} = Promise.withResolvers();
+				yieldQueue.push(resolve);
+				yieldPort.postMessage(0);
+				return promise;
+			};
 		const cancelReader = (readable) => readable?.cancel().catch(() => { });
 		async function parseFile(file, signal) {
 			if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT)
@@ -3498,32 +3506,37 @@
 					return yieldToMain().then(() => {lastYield = performance.now();});
 			};
 			const consumeLine = (line) => {
-				signal.throwIfAborted();
 				COORD_REGEX.lastIndex = 0;
 				let m;
 				while ((m = COORD_REGEX.exec(line)) !== null) {
 					if (!m[1]) {
 						invalidCount++;
-						continue;
+					} else {
+						const lat = m[2], lon = m[3];
+						const fLat = +lat, fLon = +lon;
+						if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
+							Math.abs(fLat) > 90 || Math.abs(fLon) > 180) {
+							invalidCount++;
+						} else {
+							if (out.length >= CONFIG.BULK_HARD_LIMIT)
+								throw new InputError(
+									`공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
+								);
+							out.push({
+								set: m[1] === "대한민국" ? "KR" : "WORLD",
+								latStr: lat,
+								lonStr: lon,
+								cacheKey: fLat + "," + fLon,
+								result: null,
+								_status: null,
+								_kind: null,
+								_search: null,
+								_lat6: null,
+								_lon6: null,
+							});
+						}
 					}
-					const lat = m[2], lon = m[3];
-					const fLat = +lat, fLon = +lon;
-					if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
-						Math.abs(fLat) > 90 || Math.abs(fLon) > 180) {
-						invalidCount++;
-						continue;
-					}
-					if (out.length >= CONFIG.BULK_HARD_LIMIT)
-						throw new InputError(
-							`공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
-						);
-					out.push({
-						set: m[1] === "대한민국" ? "KR" : "WORLD",
-						latStr: lat,
-						lonStr: lon,
-						cacheKey: fLat + "," + fLon,
-						result: null,
-					});
+					if (COORD_REGEX.lastIndex >= line.length || line.indexOf("위경도", COORD_REGEX.lastIndex) === -1) break;
 				}
 			};
 			try {
@@ -3545,7 +3558,7 @@
 						if (chunk.charCodeAt(0) === 10) start = 1;
 						const matching = line.includes("위경도");
 						const pause = maybeYield(matching);
-						if (pause) await pause;
+						if (pause) {await pause; signal.throwIfAborted();}
 						if (matching) consumeLine(line);
 					}
 					let keywordIndex = chunk.indexOf("위경도", start);
@@ -3575,7 +3588,7 @@
 							if (combined.includes("위경도")) line = combined;
 						}
 						const pause = maybeYield(line !== null);
-						if (pause) await pause;
+						if (pause) {await pause; signal.throwIfAborted();}
 						if (line !== null) consumeLine(line);
 						if (keywordIndex !== -1 && keywordIndex < nextStart)
 							keywordIndex = chunk.indexOf("위경도", nextStart);
@@ -3605,11 +3618,8 @@
 		const CACHE_WRITE_LIMIT = 8;
 		const CACHE_PRUNE_EVERY = 32;
 		let cacheWriters = new Set();
-		const tabId =
-			`${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`;
-		const cacheChannel = new BroadcastChannel(
-			`${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`,
-		);
+		let tabId = null;
+		let cacheChannel = null;
 		let writeSequence = 0;
 		let cacheRowCeiling = null;
 		let writesSincePrune = 0;
@@ -3617,30 +3627,30 @@
 		let dbPromise = null;
 		let cacheRetryAt = 0;
 		const CACHE_OPEN_RETRY_MS = 5_000;
-		cacheChannel.onmessage = ({data}) => {
-			if (!Array.isArray(data) || data.length !== 2) return;
-			const [phase, token] = data;
-			if (typeof token !== "string") return;
-			if (phase === 0) {
-				if (cacheWriters) {
-					if (
-						token.length > 128 ||
-						(cacheWriters.size >= 64 &&
-							!cacheWriters.has(token))
-					)
-						cacheWriters = null;
-					else
-						cacheWriters.add(token);
-				}
-			} else if (phase === 1) {
-				cacheWriters?.delete(token);
-			} else return;
-			cacheRowCeiling = null;
-		};
-		function getMemoryCache(cacheKey) {
+		function ensureCacheChannel() {
+			if (cacheChannel) return cacheChannel;
+			cacheChannel = new BroadcastChannel(`${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`);
+			cacheChannel.onmessage = ({data}) => {
+				if (!Array.isArray(data) || data.length !== 2) return;
+				const [phase, token] = data;
+				if (typeof token !== "string") return;
+				if (phase === 0) {
+					if (cacheWriters) {
+						if (token.length > 128 || (cacheWriters.size >= 64 && !cacheWriters.has(token)))
+							cacheWriters = null;
+						else cacheWriters.add(token);
+					}
+				} else if (phase === 1) {
+					cacheWriters?.delete(token);
+				} else return;
+				cacheRowCeiling = null;
+			};
+			return cacheChannel;
+		}
+		function getMemoryCache(cacheKey, now = Date.now()) {
 			const row = parsedCache.get(cacheKey);
 			if (!row) return;
-			const age = Date.now() - row.savedAt;
+			const age = now - row.savedAt;
 			if (age >= 0 && age <= CONFIG.CACHE_TTL_MS) return row.parsed;
 			parsedCache.delete(cacheKey);
 		}
@@ -3651,6 +3661,7 @@
 				parsedCache.delete(parsedCache.keys().next().value);
 		}
 		function openCacheDb() {
+			ensureCacheChannel();
 			if (dbPromise) return dbPromise;
 			if (Date.now() < cacheRetryAt)
 				return Promise.resolve(null);
@@ -3805,7 +3816,7 @@
 						return;
 					}
 					const req = store.getAll(
-						undefined,
+						IDBKeyRange.bound(CACHE_KEY_PREFIX, CACHE_KEY_PREFIX + "\uffff"),
 						CONFIG.CACHE_MAX + CACHE_PRUNE_EVERY,
 					);
 					req.onsuccess = () => {
@@ -3819,11 +3830,14 @@
 		}
 		async function writeDiskCache(entries, signal) {
 			let syncToken = null;
+			let channel = null;
 			try {
 				const db = await openCacheDb();
 				if (!db || signal.aborted) return;
+				channel = ensureCacheChannel();
+				tabId ??= `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`;
 				syncToken = `${tabId}:${++writeSequence}`;
-				cacheChannel.postMessage([0, syncToken]);
+				channel.postMessage([0, syncToken]);
 				const pendingWrites =
 					writesSincePrune + entries.length;
 				const maintain = pendingWrites >= CACHE_PRUNE_EVERY;
@@ -3851,7 +3865,7 @@
 					console.warn("Reverse geocoding cache write failed.", err);
 			} finally {
 				if (syncToken !== null)
-					cacheChannel.postMessage([1, syncToken]);
+					channel.postMessage([1, syncToken]);
 			}
 		}
 		function pruneCache(store, onRows) {
@@ -3860,6 +3874,7 @@
 			const countReq = store.count();
 			countReq.onsuccess = () => {
 				let remaining = countReq.result;
+				if (remaining === 0) {onRows(0); return;}
 				const cursorReq = index.openKeyCursor();
 				cursorReq.onsuccess = () => {
 					const cursor = cursorReq.result;
@@ -4038,23 +4053,29 @@
 			};
 			const persistentCache = new Map();
 			const unresolved = [];
+			let memNow = Date.now();
+			let memHits = 0;
 			for (let i = 0; i < total && !signal.aborted; i++) {
 				if (state.status === "pausing") {
 					await pauseTask(task);
 					if (signal.aborted) break;
+					memNow = Date.now();
 				}
 				const record = records[i];
 				record.result = null;
 				record._search = null;
 				record._status = null;
-				const parsed = getMemoryCache(record.cacheKey);
+				record._kind = null;
+				const parsed = getMemoryCache(record.cacheKey, memNow);
 				if (parsed === undefined) {
 					persistentCache.set(record.cacheKey, null);
 					unresolved.push(i);
 					continue;
 				}
 				commitResult(i, parsed, false);
-				if (reportProgress() - lastYield >= 8) await yieldAndReset();
+				if ((++memHits & 63) === 0 || state.processed === total) {
+					if (reportProgress() - lastYield >= 8) {await yieldAndReset(); memNow = Date.now();}
+				}
 			}
 			if (persistentCache.size && !signal.aborted) {
 				try {
@@ -4062,6 +4083,7 @@
 				} catch (err) {
 					if (!signal.aborted) throw err;
 				}
+				let diskHits = 0;
 				for (const i of unresolved) {
 					if (signal.aborted) break;
 					if (state.status === "pausing") {
@@ -4073,7 +4095,9 @@
 					if (!row) continue;
 					putMemoryCache(cacheKey, row.parsed, row.savedAt);
 					commitResult(i, row.parsed, false);
-					if (reportProgress() - lastYield >= 8) await yieldAndReset();
+					if ((++diskHits & 63) === 0 || state.processed === total) {
+						if (reportProgress() - lastYield >= 8) await yieldAndReset();
+					}
 				}
 			}
 			queuePage();
@@ -4194,17 +4218,17 @@
 		}
 		function createRow(record, index) {
 			const tr = rowTemplate.cloneNode(true);
-			const cells = tr.cells;
+			const [c0, c1, c2, c3, c4] = tr.children;
 			const result = record.result;
 			const addr = result.addr;
 			const status = record._status;
-			const statusLabel = STATUS_LABELS[status];
 			const kind = kindLabel(result.kind || record.set, result.countryName);
 			const selected = index === selectedIndex;
+			const coordText = `${record.latStr}, ${record.lonStr}`;
 			tr.dataset.record = index;
 			tr.dataset.selected = selected;
-			cells[0].textContent = index + 1;
-			const button = cells[1].firstElementChild;
+			c0.textContent = index + 1;
+			const button = c1.firstElementChild;
 			button.dataset.record = index;
 			button.ariaPressed = selected;
 			const title = resultTitle(result);
@@ -4213,12 +4237,12 @@
 			button.lastElementChild.textContent = subtitle;
 			if (result.error) button.lastElementChild.classList.add("row-error");
 			button.ariaLabel = `${index + 1}. ${title} ${subtitle} - 위치 상세 보기`;
-			button.ariaDescription = `좌표 ${record.latStr}, ${record.lonStr}; 구분 ${kind}; ${statusLabel}`;
-			cells[2].firstElementChild.textContent = record._lat6 ??= fmtCoord6(record.latStr);
-			cells[2].lastElementChild.textContent = record._lon6 ??= fmtCoord6(record.lonStr);
-			cells[2].title = record.latStr + ", " + record.lonStr;
-			cells[3].firstElementChild.textContent = kind;
-			const statusBadge = cells[4].firstElementChild;
+			button.ariaDescription = `좌표 ${coordText}; 구분 ${kind}; ${STATUS_LABELS[status]}`;
+			c2.firstElementChild.textContent = record._lat6 ??= fmtCoord6(record.latStr);
+			c2.lastElementChild.textContent = record._lon6 ??= fmtCoord6(record.lonStr);
+			c2.title = coordText;
+			c3.firstElementChild.textContent = kind;
+			const statusBadge = c4.firstElementChild;
 			statusBadge.dataset.error = !!result.error;
 			if (status !== "done") statusBadge.dataset.status = status;
 			statusBadge.textContent = status === "failed" ? "! 실패" : status === "done" ? "✓ 주소 확인" : "주소 없음";
@@ -4228,6 +4252,7 @@
 			const r = state.records[index];
 			r.result = parsed;
 			const status = r._status = resultStatus(parsed);
+			r._kind = countryFilterValue(r);
 			addCountryFilter(r);
 			state.processed++;
 			if (status === "failed") state.cntFail++;
@@ -4243,11 +4268,15 @@
 		async function handleExport() {
 			if (exportTask) return exportTask;
 			const records = state.records;
-			const rows = [];
-			for (let rowIndex = 0; rowIndex < records.length; rowIndex++) {
-				if (records[rowIndex].result) rows.push(rowIndex);
+			const allDone = state.processed === records.length && records.length > 0;
+			let rows = null;
+			if (!allDone) {
+				rows = [];
+				for (let rowIndex = 0; rowIndex < records.length; rowIndex++) {
+					if (records[rowIndex].result) rows.push(rowIndex);
+				}
 			}
-			const totalRows = rows.length;
+			const totalRows = allDone ? records.length : rows.length;
 			if (!totalRows)
 				return showStatus("내보낼 데이터가 없습니다.", "warn");
 			const sourceFile = state.droppedFile;
@@ -4273,7 +4302,8 @@
 						chunkLines.length = 0;
 					};
 					let exported = 0;
-					for (const rowIndex of rows) {
+					for (let pos = 0; pos < totalRows; pos++) {
+						const rowIndex = allDone ? pos : rows[pos];
 						const r = records[rowIndex];
 						const result = r.result;
 						const lat = r.latStr;
@@ -4281,17 +4311,12 @@
 						const exportKind = (result.kind || r.set) === "WORLD"
 							? kindLabel("WORLD", result.countryName) : result.kind || r.set;
 						const latPrefix = lat[0] === "+" || lat[0] === "-" ? "'" : "";
-						let line = `${csvEsc(exportKind)},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",`;
 						const addr = result.addr;
-						line += (addr
+						const lat6 = r._lat6 ??= fmtCoord6(lat);
+						const lon6 = r._lon6 ??= fmtCoord6(lon);
+						const line = `${csvEsc(exportKind)},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",${addr
 							? `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)}`
-							: ",,,") + "," + csvEsc(result.error || addr.fullAddr);
-						const lat6 = fmtCoord6(lat);
-						const lon6 = fmtCoord6(lon);
-						for (let k = 0; k < MAP_NAMES.length; k++) {
-							const link = MAP_BUILDERS[k](lat, lon, lat6, lon6);
-							line += k === 2 ? "," + link : ",\"" + link + "\"";
-						}
+							: ",,,"},${csvEsc(result.error || addr.fullAddr)},"${MAP_BUILDERS[0](lat, lon, lat6, lon6)}","${MAP_BUILDERS[1](lat, lon, lat6, lon6)}",${MAP_BUILDERS[2](lat, lon, lat6, lon6)},"${MAP_BUILDERS[3](lat, lon, lat6, lon6)}"`;
 						chunkLines.push(line);
 						chunkChars += line.length + 1;
 						exported++;
@@ -4605,7 +4630,7 @@
 			});
 			const inputCount = ({value}) => {
 				let count = 0;
-				for (const _ of u64Tokens(value)) if (++count > GENERATION_LIMIT) break;
+				for (const _ of value.matchAll(RX_U64_TOKEN)) if (++count > GENERATION_LIMIT) break;
 				return count;
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
@@ -4615,9 +4640,11 @@
 						const count = rngCount.valueAsNumber;
 						if (inputCount(input) + count > GENERATION_LIMIT) throw new Error(`입력값은 ${fmt(GENERATION_LIMIT)}개까지 추가할 수 있습니다.`);
 						const values = generateRandomValues(count);
-						input.value = [input.value.trim(), values.join("\n")].filter(Boolean).join("\n");
+						const prev = input.value.trim();
+						const joined = values.join("\n");
+						input.value = prev ? `${prev}\n${joined}` : joined;
 						setInputError(input, "");
-						if (input === num64Input) {autoSupp.checked = true; prepareKorea(parseU64(u64Tokens(input.value).next().value));}
+						if (input === num64Input) {autoSupp.checked = true; prepareKorea(prev ? parseU64(u64Tokens(prev).next().value) : values[0]);}
 					} catch (err) {
 						rngError.textContent = errorMessage(err);
 					}
@@ -5022,6 +5049,7 @@
 		bindTablist(inputTabs, "mode", ["file", "manual"], setInputMode, {wrap: true});
 		function adaptLayout() {
 			const isMobile = mobileMedia.matches;
+			if (isMobile) initSheetDrag();
 			if (settings.open && settings.matches(":modal") !== isMobile) closeSettings();
 			inputView.role = resultsView.role = isMobile ? "tabpanel" : null;
 			inputView.setAttribute("aria-labelledby", isMobile ? "mobile-input-tab" : "input-title");
@@ -5107,8 +5135,10 @@
 				button.ariaPressed = button.dataset.status === status;
 			if (apply) scheduleFilter();
 		}
-		for (const button of statusButtons)
-			on(button, "click", () => setStatusFilter(button.dataset.status));
+		on(statusButtons[0].parentElement, "click", (event) => {
+			const button = event.target.closest("[data-status]");
+			if (button) setStatusFilter(button.dataset.status);
+		});
 		const filterCount = byId("filter-count");
 		function updateFilterSummary() {
 			let count = 0;
@@ -5241,9 +5271,11 @@
 			setMapUi({load: false});
 			mapExternal.href = "about:blank";
 		}
+		let selectedRow = null;
 		function resetInspector() {
 			selectedIndex = -1;
 			selection = null;
+			selectedRow = null;
 			if (detailSheet.open) detailSheet.close();
 			unloadMap();
 			detailContent.hidden = true;
@@ -5251,7 +5283,7 @@
 			mapLinks.disabled = true;
 			copyAddress.disabled = true;
 		}
-		function selectRecord(index, reveal = true) {
+		function selectRecord(index, reveal = true, targetRow = null) {
 			const record = state.records[index];
 			if (!record?.result) return;
 			if (record !== selection) {
@@ -5269,15 +5301,19 @@
 				detailEmpty.hidden = true;
 				detailContent.hidden = false;
 			}
-			for (const row of resultBody.rows) {
-				const selected = String(Number(row.dataset.record) === index);
-				if (row.dataset.selected !== selected) {
-					row.dataset.selected = selected;
-					row.cells[1].firstElementChild.ariaPressed = selected;
-				}
+			const nextRow = targetRow || (selectedRow?.isConnected && Number(selectedRow.dataset.record) === index
+				? selectedRow : query(`tr[data-record="${index}"]`, resultBody));
+			if (selectedRow && selectedRow !== nextRow && selectedRow.isConnected) {
+				selectedRow.dataset.selected = "false";
+				selectedRow.cells[1].firstElementChild.ariaPressed = "false";
 			}
+			if (nextRow && nextRow.dataset.selected !== "true") {
+				nextRow.dataset.selected = "true";
+				nextRow.cells[1].firstElementChild.ariaPressed = "true";
+			}
+			selectedRow = nextRow;
 			if (reveal && compactMedia.matches && !detailSheet.open) {
-				detailFocus = query(`.location-button[data-record="${index}"]`, resultBody);
+				detailFocus = nextRow ? nextRow.cells[1].firstElementChild : query(`.location-button[data-record="${index}"]`, resultBody);
 				detailSheet.append(detailContent);
 				detailSheet.showModal();
 			}
@@ -5285,12 +5321,12 @@
 		function syncSelection() {
 			const first = resultBody.firstElementChild;
 			if (!first) return resetInspector();
-			const selectionOnPage = !!query(`tr[data-record="${selectedIndex}"]`, resultBody);
-			selectRecord(selectionOnPage ? selectedIndex : Number(first.dataset.record), false);
+			const target = query(`tr[data-record="${selectedIndex}"]`, resultBody) || first;
+			selectRecord(Number(target.dataset.record), false, target);
 		}
 		on(resultBody, "click", (event) => {
 			const row = event.target.closest("tr[data-record]");
-			if (row) selectRecord(Number(row.dataset.record));
+			if (row) selectRecord(Number(row.dataset.record), true, row);
 		});
 		on(resultBody, "keydown", (event) => {
 			const k = event.key;
@@ -5298,79 +5334,85 @@
 			const button = event.target.closest(".location-button");
 			if (!button) return;
 			event.preventDefault();
-			const buttons = [...queryAll(".location-button", resultBody)];
-			const position = buttons.indexOf(button);
-			const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 :
-				Math.max(0, Math.min(buttons.length - 1, position + (event.key === "ArrowDown" ? 1 : -1)));
-			buttons[next].focus();
-			selectRecord(Number(buttons[next].dataset.record), false);
+			const rows = resultBody.rows;
+			const last = rows.length - 1;
+			const next = k === "Home" ? 0 : k === "End" ? last :
+				Math.max(0, Math.min(last, button.closest("tr").sectionRowIndex + (k === "ArrowDown" ? 1 : -1)));
+			const nextRow = rows[next];
+			nextRow.cells[1].firstElementChild.focus();
+			selectRecord(Number(nextRow.dataset.record), false, nextRow);
 		});
 		const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
-		let activeDrag = null;
-		on(window, "pointermove", event => {
-			const d = activeDrag;
-			if (!d || event.pointerId !== d.id) return;
-			if (!(event.buttons & 1)) return d.finish(event);
-			d.offset = Math.max(0, d.startOffset + event.clientY - d.y);
-			d.sheet.style.translate = `0 ${d.offset}px`;
-		});
-		on(window, "pointerup", event => {
-			const d = activeDrag;
-			if (!d || event.pointerId !== d.id) return;
-			const dx = event.clientX - d.x, dy = event.clientY - d.y;
-			d.finish(event, dy > 80 && dy > Math.abs(dx) * 1.4);
-		});
-		on(window, "pointercancel", event => activeDrag?.finish(event));
-		for (const ev of ["blur", "resize"]) on(window, ev, () => activeDrag?.reset());
-		function enableSheetDrag(sheet, dismiss = () => sheet.close()) {
-			const heading = query(".sheet-heading", sheet);
-			const popover = sheet.hasAttribute("popover");
-			const isOpen = () => popover ? sheet.matches(":popover-open") : sheet.open;
-			let motion = null;
-			function reset() {
-				const d = activeDrag?.sheet === sheet ? activeDrag : null;
-				if (d) activeDrag = null;
-				motion?.cancel();
-				motion = null;
-				sheet.style.removeProperty("translate");
-				if (d && heading.hasPointerCapture(d.id)) heading.releasePointerCapture(d.id);
-			}
-			function finish(event, shouldDismiss = false) {
-				if (activeDrag?.sheet !== sheet || event.pointerId !== activeDrag.id) return;
-				const offset = activeDrag.offset;
-				reset();
-				if (!isOpen() || !mobileMedia.matches) return;
-				const animation = sheet.animate([
-					{translate: `0 ${offset}px`},
-					{translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`},
-				], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
-				motion = animation;
-				animation.finished.then(() => {
-					if (motion !== animation) return;
-					motion = null;
-					if (shouldDismiss && isOpen()) dismiss();
-				}, () => { });
-			}
-			on(heading, "pointerdown", event => {
-				if (!mobileMedia.matches || !isOpen() || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
-				event.preventDefault();
-				const offset = parseFloat(getComputedStyle(sheet).translate.split(" ")[1]) || 0;
-				activeDrag?.reset();
-				reset();
-				activeDrag = {sheet, id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset, reset, finish};
-				sheet.style.translate = `0 ${offset}px`;
-				heading.setPointerCapture(event.pointerId);
+		let sheetDragInitialized = false;
+		function initSheetDrag() {
+			if (sheetDragInitialized) return;
+			sheetDragInitialized = true;
+			let activeDrag = null;
+			on(window, "pointermove", event => {
+				const d = activeDrag;
+				if (!d || event.pointerId !== d.id) return;
+				if (!(event.buttons & 1)) return d.finish(event);
+				d.offset = Math.max(0, d.startOffset + event.clientY - d.y);
+				d.sheet.style.translate = `0 ${d.offset}px`;
 			});
-			on(heading, "lostpointercapture", finish);
-			for (const ev of ["beforetoggle", "close"]) on(sheet, ev, reset);
+			on(window, "pointerup", event => {
+				const d = activeDrag;
+				if (!d || event.pointerId !== d.id) return;
+				const dx = event.clientX - d.x, dy = event.clientY - d.y;
+				d.finish(event, dy > 80 && dy > Math.abs(dx) * 1.4);
+			});
+			on(window, "pointercancel", event => activeDrag?.finish(event));
+			for (const ev of ["blur", "resize"]) on(window, ev, () => activeDrag?.reset());
+			function enableSheetDrag(sheet, dismiss = () => sheet.close()) {
+				const heading = query(".sheet-heading", sheet);
+				const popover = sheet.hasAttribute("popover");
+				const isOpen = () => popover ? sheet.matches(":popover-open") : sheet.open;
+				let motion = null;
+				function reset() {
+					const d = activeDrag?.sheet === sheet ? activeDrag : null;
+					if (d) activeDrag = null;
+					motion?.cancel();
+					motion = null;
+					sheet.style.removeProperty("translate");
+					if (d && heading.hasPointerCapture(d.id)) heading.releasePointerCapture(d.id);
+				}
+				function finish(event, shouldDismiss = false) {
+					if (activeDrag?.sheet !== sheet || event.pointerId !== activeDrag.id) return;
+					const offset = activeDrag.offset;
+					reset();
+					if (!isOpen() || !mobileMedia.matches) return;
+					const animation = sheet.animate([
+						{translate: `0 ${offset}px`},
+						{translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`},
+					], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
+					motion = animation;
+					animation.finished.then(() => {
+						if (motion !== animation) return;
+						motion = null;
+						if (shouldDismiss && isOpen()) dismiss();
+					}, () => { });
+				}
+				on(heading, "pointerdown", event => {
+					if (!mobileMedia.matches || !isOpen() || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
+					event.preventDefault();
+					const offset = parseFloat(getComputedStyle(sheet).translate.split(" ")[1]) || 0;
+					activeDrag?.reset();
+					reset();
+					activeDrag = {sheet, id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset, reset, finish};
+					sheet.style.translate = `0 ${offset}px`;
+					heading.setPointerCapture(event.pointerId);
+				});
+				on(heading, "lostpointercapture", finish);
+				for (const ev of ["beforetoggle", "close"]) on(sheet, ev, reset);
+			}
+			for (const [sheet, dismiss] of [
+				[detailSheet],
+				[mapPopover, () => mapPopover.hidePopover()],
+				[helpDialog],
+				[settings, closeSettings],
+				[filterDialog],
+			]) enableSheetDrag(sheet, dismiss);
 		}
-		for (const [sheet, dismiss] of [
-			[detailSheet],
-			[mapPopover, () => mapPopover.hidePopover()],
-			[helpDialog],
-			[settings, closeSettings],
-			[filterDialog],
-		]) enableSheetDrag(sheet, dismiss);
 		on(detailSheet, "close", () => {
 			mapPopover.hidePopover();
 			unloadMap();
@@ -5458,7 +5500,6 @@
 		updateFilterSummary();
 		adaptLayout();
 		updateUIState();
-		scheduleRender();
 	</script>
 </body>
 </html>

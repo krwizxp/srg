@@ -1,4 +1,4 @@
-use super::{BoundaryIndex, Tile, axis_edge, grid_axis_index, read_count};
+use super::{BoundaryIndex, axis_edge, grid_axis_index, read_count};
 use crate::{
     diagnostic::{AppError, Result},
     random_data::Coordinates,
@@ -13,7 +13,6 @@ const SUBDIVISION: usize = 16;
 const SUBDIVISION_F64: f64 = 16.0_f64;
 const SUBDIVISION_MAX_CELL: u16 = 15;
 pub(super) struct Atlas<'data> {
-    ordinals: Box<[u16]>,
     states: &'data [u8],
 }
 impl Atlas<'_> {
@@ -23,7 +22,7 @@ impl Atlas<'_> {
         point: &Coordinates,
         column: usize,
         row: usize,
-        tile_number: usize,
+        ordinal: u16,
     ) -> Result<u8> {
         let col_u16 = u16::try_from(column)
             .ok()
@@ -49,11 +48,7 @@ impl Atlas<'_> {
             SUBDIVISION_MAX_CELL,
             point.latitude,
         );
-        let ordinal = *self
-            .ordinals
-            .get(tile_number)
-            .filter(|&&value| value != u16::MAX)
-            .ok_or("대한민국 세부 격자 소유 범위 오류")?;
+        (ordinal != u16::MAX).ok_or("대한민국 세부 격자 소유 범위 오류")?;
         let cell = usize::from(ordinal)
             .strict_mul(SUBDIVISION)
             .strict_add(fine_row)
@@ -66,9 +61,11 @@ impl Atlas<'_> {
         Ok((packed >> ((cell & 3_usize).strict_mul(2))) & 3_u8)
     }
 }
-impl<'data> TryFrom<(&'data [u8], &[Tile], [u8; 32])> for Atlas<'data> {
+impl<'data> TryFrom<(&'data [u8], usize, usize, [u8; 32])> for Atlas<'data> {
     type Error = AppError;
-    fn try_from((bytes, tiles, source_hash): (&'data [u8], &[Tile], [u8; 32])) -> Result<Self> {
+    fn try_from(
+        (bytes, tile_count, actual_mixed_count, source_hash): (&'data [u8], usize, usize, [u8; 32]),
+    ) -> Result<Self> {
         (bytes.len() >= HEADER_SIZE && bytes.starts_with(b"SRGKA001"))
             .ok_or("대한민국 세부 격자 데이터 버전 오류")?;
         let mixed_count = read_count(bytes, 16)?;
@@ -76,9 +73,9 @@ impl<'data> TryFrom<(&'data [u8], &[Tile], [u8; 32])> for Atlas<'data> {
         (read_count(bytes, 8)? == HEADER_SIZE
             && read_count(bytes, 12)? == SUBDIVISION
             && mixed_count > 0
-            && mixed_count <= tiles.len()
-            && tiles.len() <= usize::from(u16::MAX).strict_add(1)
-            && read_count(bytes, 20)? == tiles.len()
+            && mixed_count <= tile_count
+            && tile_count <= usize::from(u16::MAX).strict_add(1)
+            && read_count(bytes, 20)? == tile_count
             && state_bytes == mixed_count.strict_mul(64)
             && bytes.len() == HEADER_SIZE.strict_add(state_bytes)
             && read_count(bytes, 92)? == 0
@@ -92,18 +89,7 @@ impl<'data> TryFrom<(&'data [u8], &[Tile], [u8; 32])> for Atlas<'data> {
             .iter()
             .all(|&value| value & (value >> 1_i32) & 0x55_u8 == 0)
             .ok_or("대한민국 세부 격자 상태 오류")?;
-        let mut next = 0_u16;
-        let mut ordinals = vec![u16::MAX; tiles.len()];
-        for (tile, ordinal) in tiles.iter().zip(&mut ordinals) {
-            if tile.state == 2 {
-                *ordinal = next;
-                next = next.checked_add(1).ok_or("대한민국 세부 격자 개수 오류")?;
-            }
-        }
-        (usize::from(next) == mixed_count).ok_or("대한민국 세부 격자 개수 오류")?;
-        Ok(Self {
-            ordinals: ordinals.into_boxed_slice(),
-            states,
-        })
+        (actual_mixed_count == mixed_count).ok_or("대한민국 세부 격자 개수 오류")?;
+        Ok(Self { states })
     }
 }

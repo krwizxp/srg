@@ -9,6 +9,8 @@ const ECCENTRICITY_SQUARED: f64 = 0.006_694_380_022_900_787_f64;
 pub(super) struct BoundaryAreaBounds {
     area_span: f64,
     east: f64,
+    lat_span: f64,
+    lon_span: f64,
     north: f64,
     south: f64,
     south_area: f64,
@@ -31,6 +33,8 @@ impl TryFrom<[f64; 4]> for BoundaryAreaBounds {
         Ok(Self {
             area_span,
             east,
+            lat_span: north - south,
+            lon_span: east - west,
             north,
             south,
             south_area,
@@ -46,13 +50,13 @@ impl TryFrom<(u64, BoundaryAreaBounds)> for Coordinates {
         let horizontal = (f64::from(lo) + 0.5_f64) / 4_294_967_296.0_f64;
         let area_offset = vertical * bounds.area_span;
         let target = bounds.south_area + area_offset;
-        let latitude_offset = (bounds.north - bounds.south) * vertical;
+        let latitude_offset = bounds.lat_span * vertical;
         let mut latitude = bounds.south + latitude_offset;
         for _ in 0_usize..3_usize {
             let (area, derivative) = cumulative_area_and_derivative(latitude);
             latitude -= (area - target) / derivative;
         }
-        let longitude_offset = horizontal * (bounds.east - bounds.west);
+        let longitude_offset = horizontal * bounds.lon_span;
         let longitude = bounds.west + longitude_offset;
         (latitude > bounds.south
             && latitude < bounds.north
