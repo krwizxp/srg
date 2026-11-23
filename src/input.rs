@@ -56,35 +56,7 @@ pub(super) fn read_ladder_entries(
         out,
         Some(err),
         MAX_LADDER_INPUT_BYTES,
-        |line| {
-            let mut count = 0_usize;
-            for part in line.split(',') {
-                count = count.strict_add(1);
-                match expected_count {
-                    None if count > MAX_LADDER_ENTRIES => {
-                        return Err(Cow::Owned(format!(
-                            "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
-                        )));
-                    }
-                    Some(expected) if count > expected => break,
-                    None | Some(_) => {}
-                }
-                if part.trim().is_empty() {
-                    return Err(Cow::Borrowed(if expected_count.is_none() {
-                        "플레이어 이름은 비워둘 수 없습니다."
-                    } else {
-                        "결과값은 비워둘 수 없습니다."
-                    }));
-                }
-            }
-            match expected_count {
-                None if count < 2 => Err(Cow::Borrowed("플레이어 수는 최소 2명이어야 합니다.")),
-                Some(expected) if count != expected => Err(Cow::Owned(format!(
-                    "결과값의 개수({count})가 플레이어 수({expected})와 일치하지 않습니다.\n"
-                ))),
-                None | Some(_) => Ok(count),
-            }
-        },
+        |line| validate_ladder_csv(line, expected_count),
     )
     .map_err(Into::into)
 }
@@ -185,4 +157,37 @@ pub(super) fn validate_input_line(text: &str, max_bytes: usize) -> IoResult<&str
         ));
     }
     Ok(text.trim())
+}
+#[cfg(target_arch = "x86_64")]
+pub(super) fn validate_ladder_csv(
+    line: &str,
+    expected_count: Option<usize>,
+) -> CoreResult<usize, Cow<'static, str>> {
+    let mut count = 0_usize;
+    for part in line.split(',') {
+        count = count.strict_add(1);
+        match expected_count {
+            None if count > MAX_LADDER_ENTRIES => {
+                return Err(Cow::Owned(format!(
+                    "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
+                )));
+            }
+            Some(expected) if count > expected => break,
+            None | Some(_) => {}
+        }
+        if part.trim().is_empty() {
+            return Err(Cow::Borrowed(if expected_count.is_none() {
+                "플레이어 이름은 비워둘 수 없습니다."
+            } else {
+                "결과값은 비워둘 수 없습니다."
+            }));
+        }
+    }
+    match expected_count {
+        None if count < 2 => Err(Cow::Borrowed("플레이어 수는 최소 2명이어야 합니다.")),
+        Some(expected) if count != expected => Err(Cow::Owned(format!(
+            "결과값의 개수({count})가 플레이어 수({expected})와 일치하지 않습니다.\n"
+        ))),
+        None | Some(_) => Ok(count),
+    }
 }

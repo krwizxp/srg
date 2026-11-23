@@ -296,7 +296,6 @@ impl MenuApp {
             stop_after: None,
         }
         .run_loop(out, err)
-        .map_err(Into::into)
     }
     fn prompt_line<'writer, T, E>(
         &mut self,

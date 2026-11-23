@@ -1,10 +1,9 @@
-use super::super::{ParsedServer, TimeError, UrlScheme};
-use super::{FreshTimeHeaders, Result, TimeSample, error};
-use crate::diagnostic::or_abort;
+use super::super::{ParsedServer, UrlScheme};
+use super::{FreshTimeHeaders, TimeSample, error};
+use crate::diagnostic::{AppError, Result, or_abort};
 use alloc::{borrow::Cow, string::String};
 use core::{
     ffi::{CStr, c_char, c_long, c_uint, c_void},
-    marker::{PhantomData, PhantomPinned},
     mem::DropGuard,
     ptr::{NonNull, null_mut},
     slice, str,
@@ -23,7 +22,7 @@ unsafe extern "C" {
 }
 macro_rules! curl_setopt {
     ($handle:expr, $option:expr, $value:expr, $context:expr $(,)?) => {{
-        // SAFETY: call sites pair each option with a wrapper using its documented libcurl ABI type.
+        // SAFETY: call sites pair each option with its documented libcurl ABI type.
         let code = unsafe { curl_easy_setopt($handle.0.as_ptr(), $option, $value) };
         (code == CURLE_OK).ok_or_else(|| setopt_error($context, code))
     }};
@@ -39,11 +38,6 @@ static CURL_INIT: LazyLock<CurlCode> = LazyLock::new(|| {
     // SAFETY: LazyLock runs this initializer once before any easy handles are used.
     unsafe { curl_global_init(3) }
 });
-#[repr(C)]
-struct Curl {
-    _data: (),
-    _marker: PhantomData<(*mut u8, PhantomPinned)>,
-}
 type CurlCode = c_uint;
 type CurlInfo = c_uint;
 type CurlOption = c_uint;
@@ -52,7 +46,7 @@ type WriteTarget = (*mut CurlCapture, bool);
 pub(in crate::time) struct Client {
     easy_handle: Option<EasyHandle>,
 }
-struct EasyHandle(NonNull<Curl>);
+enum Curl {}
 struct CurlCapture {
     body_bytes: usize,
     completed_block: Option<FreshTimeHeaders>,
@@ -61,6 +55,7 @@ struct CurlCapture {
     header_bytes: usize,
     header_limit: usize,
 }
+struct EasyHandle(NonNull<Curl>);
 impl Drop for EasyHandle {
     fn drop(&mut self) {
         // SAFETY: self.0 is an easy handle returned by libcurl and is closed exactly once here.
@@ -94,9 +89,9 @@ impl Client {
             &mut Some(ref mut handle) => handle,
             empty @ &mut None => {
                 // SAFETY: curl_easy_init has no preconditions after global init.
-                let raw_handle = NonNull::new(unsafe { curl_easy_init() })
+                let raw = NonNull::new(unsafe { curl_easy_init() })
                     .ok_or_else(|| error(context, "curl_easy_init 실패"))?;
-                empty.insert(EasyHandle(raw_handle))
+                empty.insert(EasyHandle(raw))
             }
         };
         let (perform_code, request_start, scheme_result) = {
@@ -112,13 +107,17 @@ impl Client {
                 CurlOption,
                 unsafe extern "C" fn(*mut c_char, usize, usize, *mut c_void) -> usize,
             ); 2] = [(20_011, write_callback), (20_079, write_callback)];
-            for (option, callback) in callbacks {
-                curl_setopt!(handle, option, callback, context)?;
+            for (option, cb) in callbacks {
+                curl_setopt!(handle, option, cb, context)?;
             }
-            let long_opts: [(CurlOption, c_long); 5] =
-                [(156, 5_000), (155, 5_000), (99, 1), (44, 1), (52, 0)];
-            for (option, value) in long_opts {
-                curl_setopt!(handle, option, value, context)?;
+            for (option, value) in [
+                (156_u32, 5_000_i64),
+                (155, 5_000),
+                (99, 1),
+                (44, 1),
+                (52, 0),
+            ] {
+                curl_setopt!(handle, option, c_long::from(value), context)?;
             }
             let (protocol, user_agent) = match server.scheme {
                 UrlScheme::Http => {
@@ -132,15 +131,15 @@ impl Client {
             };
             for (option, value) in [
                 (10_002_u32, server.request_target.as_ptr()),
-                (10_018_u32, user_agent.as_ptr()),
-                (10_318_u32, protocol.as_ptr()),
+                (10_018, user_agent.as_ptr()),
+                (10_318, protocol.as_ptr()),
             ] {
                 curl_setopt!(handle, option, value, context)?;
             }
             for (option, ptr) in [
                 (10_010_u32, error_buffer.as_mut_ptr().cast::<c_void>()),
-                (10_001_u32, (&raw mut body_target).cast::<c_void>()),
-                (10_029_u32, (&raw mut header_target).cast::<c_void>()),
+                (10_001, (&raw mut body_target).cast::<c_void>()),
+                (10_029, (&raw mut header_target).cast::<c_void>()),
             ] {
                 curl_setopt!(handle, option, ptr, context)?;
             }
@@ -155,12 +154,11 @@ impl Client {
                 (info_code == CURLE_OK).ok_or_else(|| {
                     error(context, &curl_error("curl_easy_getinfo scheme", info_code))
                 })?;
-                let Some(scheme_ptr) = NonNull::new(scheme) else {
-                    return Err(error(context, "curl 최종 scheme이 비어 있습니다."));
-                };
+                let scheme_ptr = NonNull::new(scheme)
+                    .ok_or_else(|| error(context, "curl 최종 scheme이 비어 있습니다."))?;
                 // SAFETY: libcurl returns a NUL-terminated scheme string owned by the easy handle.
-                let scheme_bytes = unsafe { CStr::from_ptr(scheme_ptr.as_ptr()) }.to_bytes();
-                scheme_bytes
+                let bytes = unsafe { CStr::from_ptr(scheme_ptr.as_ptr()) }.to_bytes();
+                bytes
                     .eq_ignore_ascii_case(protocol.to_bytes())
                     .ok_or_else(|| {
                         error(
@@ -168,7 +166,7 @@ impl Client {
                             &format!(
                                 "curl 최종 scheme이 {}가 아닙니다: {}",
                                 protocol.to_string_lossy(),
-                                String::from_utf8_lossy(scheme_bytes)
+                                String::from_utf8_lossy(bytes)
                             ),
                         )
                     })
@@ -180,19 +178,18 @@ impl Client {
             return Err(error(context, &callback_error));
         }
         if perform_code != CURLE_OK {
-            let perform_error = if let Ok(message_cstr) = CStr::from_bytes_until_nul(&error_buffer)
-                && !message_cstr.is_empty()
+            let msg = if let Ok(cstr) = CStr::from_bytes_until_nul(&error_buffer)
+                && !cstr.is_empty()
             {
                 format!(
-                    "curl_easy_perform 실패: {} ({})",
-                    message_cstr.to_string_lossy(),
-                    perform_code
+                    "curl_easy_perform 실패: {} ({perform_code})",
+                    cstr.to_string_lossy()
                 )
             } else {
                 curl_error("curl_easy_perform", perform_code)
             };
             self.easy_handle = None;
-            return Err(error(context, &perform_error));
+            return Err(error(context, &msg));
         }
         if let Err(scheme_error) = scheme_result.unwrap_or_else(|| process::abort()) {
             self.easy_handle = None;
@@ -203,26 +200,6 @@ impl Client {
             .ok_or_else(|| error(context, "완료된 HTTP 응답 header block을 찾지 못했습니다."))?
             .finish(request_start, context)
     }
-}
-fn account_bytes(
-    bytes_seen: &mut usize,
-    error_slot: &mut Option<Cow<'static, str>>,
-    len: usize,
-    limit: usize,
-    label: &str,
-) -> bool {
-    let Some(next_len) = bytes_seen.checked_add(len) else {
-        *error_slot = Some(Cow::Owned(format!("HTTP HEAD 응답 {label} 크기 계산 실패")));
-        return false;
-    };
-    if next_len > limit {
-        *error_slot = Some(Cow::Owned(format!(
-            "HTTP HEAD 응답 {label} 크기가 허용 한도({limit} bytes)를 초과했습니다."
-        )));
-        return false;
-    }
-    *bytes_seen = next_len;
-    true
 }
 #[cold]
 #[inline(never)]
@@ -239,7 +216,7 @@ fn curl_error(context: &str, code: CurlCode) -> String {
 }
 #[cold]
 #[inline(never)]
-fn setopt_error(context: &str, code: CurlCode) -> TimeError {
+fn setopt_error(context: &str, code: CurlCode) -> AppError {
     error(context, &curl_error("curl_easy_setopt", code))
 }
 unsafe extern "C" fn write_callback(
@@ -248,10 +225,8 @@ unsafe extern "C" fn write_callback(
     nmemb: usize,
     userdata: *mut c_void,
 ) -> usize {
-    let Some(len) = size.checked_mul(nmemb).filter(|&len| len != 0) else {
-        return 0;
-    };
-    let (Some(payload_head), Some(target_ptr)) = (
+    let (Some(len), Some(payload_head), Some(target_ptr)) = (
+        size.checked_mul(nmemb).filter(|&len| len != 0),
         NonNull::new(ptr.cast::<u8>()),
         NonNull::new(userdata.cast::<WriteTarget>()),
     ) else {
@@ -266,27 +241,24 @@ unsafe extern "C" fn write_callback(
     };
     // SAFETY: capture_raw points to the stack CurlCapture owned by fetch_head for the duration of curl_easy_perform.
     let capture = unsafe { capture_ptr.as_mut() };
-    if !is_header {
-        return if account_bytes(
-            &mut capture.body_bytes,
-            &mut capture.error,
-            bytes.len(),
-            HTTP_HEAD_MAX_BODY_BYTES,
-            "본문",
-        ) {
-            len
-        } else {
-            0
-        };
-    }
-    if !account_bytes(
-        &mut capture.header_bytes,
-        &mut capture.error,
-        bytes.len(),
-        capture.header_limit,
-        "헤더",
-    ) {
+    let (slot, limit, label) = if is_header {
+        (&mut capture.header_bytes, capture.header_limit, "헤더")
+    } else {
+        (&mut capture.body_bytes, HTTP_HEAD_MAX_BODY_BYTES, "본문")
+    };
+    let Some(next_len) = slot.checked_add(bytes.len()) else {
+        capture.error = Some(Cow::Owned(format!("HTTP HEAD 응답 {label} 크기 계산 실패")));
         return 0;
+    };
+    if next_len > limit {
+        capture.error = Some(Cow::Owned(format!(
+            "HTTP HEAD 응답 {label} 크기가 허용 한도({limit} bytes)를 초과했습니다."
+        )));
+        return 0;
+    }
+    *slot = next_len;
+    if !is_header {
+        return len;
     }
     let line = bytes.trim_suffix(b"\n").trim_suffix(b"\r");
     if line.starts_with(b"HTTP/") {
@@ -299,10 +271,10 @@ unsafe extern "C" fn write_callback(
         }
         return len;
     }
-    let Some(current_block) = capture.current_block.as_mut() else {
-        return len;
-    };
-    let Some(colon) = line.iter().position(|byte| *byte == b':') else {
+    let (Some(block), Some(colon)) = (
+        capture.current_block.as_mut(),
+        line.iter().position(|&byte| byte == b':'),
+    ) else {
         return len;
     };
     let (name, tail) = line.split_at(colon);
@@ -321,9 +293,9 @@ unsafe extern "C" fn write_callback(
         }
     };
     if is_age {
-        current_block.capture_age(header_raw);
+        block.capture_age(header_raw);
     } else {
-        current_block.capture_date(header_raw, Instant::now());
+        block.capture_date(header_raw, Instant::now());
     }
     len
 }

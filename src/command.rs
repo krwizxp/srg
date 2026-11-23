@@ -7,11 +7,11 @@ cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
             FILE_NAME,
-            batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
+            batch::regenerate_with_count,
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
-            input::{BATCH_COUNT_INPUT_MAX_BYTES, validate_batch_count},
-            ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
+            input::{BATCH_COUNT_INPUT_MAX_BYTES, parse_regular_f64, validate_batch_count, validate_ladder_csv},
+            ladder::{MAX_LADDER_INPUT_BYTES, write_ladder_results},
             random_number::{FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float, generate_random_integer},
         };
         use std::{io::Write, path::Path};
@@ -80,14 +80,8 @@ impl CliCommand {
                 scheduled_trigger: None,
                 stop_after: Some(Duration::from_secs(seconds)),
             }
-            .run_loop(&mut out, &mut err)
-            .map_err(Into::into),
+            .run_loop(&mut out, &mut err),
         }
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn owned_text(arg: OsString, label: &str) -> Result<String> {
-        arg.into_string()
-            .map_err(|_arg| AppError::message(format!("{label} 값은 유효한 Unicode여야 합니다.")))
     }
     fn parse_arg<T>(arg: &OsStr, label: &str, max_bytes: usize) -> Result<T>
     where
@@ -138,46 +132,36 @@ where
                 let (Some(count_arg), None) = (args.next(), args.next()) else {
                     return Err("사용법: srg generate <count>".into());
                 };
-                let requested_count =
-                    Self::parse_arg::<usize>(&count_arg, "count", BATCH_COUNT_INPUT_MAX_BYTES)?;
-                let count = validate_batch_count(requested_count).map_err(|_menu_error| {
-                    format!("count는 1~{MAX_BATCH_GENERATE_COUNT} 범위여야 합니다.")
-                })?;
+                let count = validate_batch_count(Self::parse_arg::<usize>(
+                    &count_arg,
+                    "count",
+                    BATCH_COUNT_INPUT_MAX_BYTES,
+                )?)
+                .map_err(AppError::message)?;
                 Ok(Self::Generate { count })
             }
             #[cfg(target_arch = "x86_64")]
             "ladder" => {
                 let (players_arg, results_arg) =
                     take_two(&mut args, "ladder <players-csv> <results-csv>")?;
-                let players = Self::owned_text(players_arg, "players-csv")?;
-                let results = Self::owned_text(results_arg, "results-csv")?;
-                validate_input_line(&players, MAX_LADDER_INPUT_BYTES)?;
-                validate_input_line(&results, MAX_LADDER_INPUT_BYTES)?;
-                let csv_shape = |value: &str| {
-                    value
-                        .split(',')
-                        .fold((0_usize, false), |(count, has_empty), entry| {
-                            (count.strict_add(1), has_empty || entry.trim().is_empty())
-                        })
-                };
-                let (player_count, players_have_empty) = csv_shape(&players);
-                let (result_count, results_have_empty) = csv_shape(&results);
-                (2..=MAX_LADDER_ENTRIES)
-                    .contains(&player_count)
-                    .ok_or_else(|| format!("플레이어는 2~{MAX_LADDER_ENTRIES}명이어야 합니다."))?;
-                (player_count == result_count)
-                    .ok_or("결과값 개수는 플레이어 수와 같아야 합니다.")?;
-                (!players_have_empty && !results_have_empty)
-                    .ok_or("플레이어와 결과값은 비워둘 수 없습니다.")?;
+                let players =
+                    Self::parse_arg::<String>(&players_arg, "players-csv", MAX_LADDER_INPUT_BYTES)?;
+                let results =
+                    Self::parse_arg::<String>(&results_arg, "results-csv", MAX_LADDER_INPUT_BYTES)?;
+                let player_count =
+                    validate_ladder_csv(&players, None).map_err(AppError::message)?;
+                validate_ladder_csv(&results, Some(player_count)).map_err(AppError::message)?;
                 Ok(Self::Ladder { players, results })
             }
             #[cfg(target_arch = "x86_64")]
             "random-float" => {
                 let (min_arg, max_arg) = take_two(&mut args, "random-float <min> <max>")?;
-                let min = Self::parse_arg::<f64>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
-                let max = Self::parse_arg::<f64>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
-                (min.is_finite() && !min.is_subnormal() && max.is_finite() && !max.is_subnormal())
-                    .ok_or(FLOAT_INPUT_ERROR)?;
+                let min_raw =
+                    Self::parse_arg::<String>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
+                let max_raw =
+                    Self::parse_arg::<String>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
+                let min = parse_regular_f64(&min_raw).ok_or(FLOAT_INPUT_ERROR)?;
+                let max = parse_regular_f64(&max_raw).ok_or(FLOAT_INPUT_ERROR)?;
                 (max >= min).ok_or("최댓값은 최솟값보다 크거나 같아야 합니다.")?;
                 (max - min)
                     .is_finite()

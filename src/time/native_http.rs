@@ -1,7 +1,8 @@
-use super::{MIN_TRANSFER_TIME, Result, TimeError, TimeErrorKind, TimeSample, http_date::HttpDate};
+use super::{TimeSample, http_date::HttpDate};
+use crate::diagnostic::{AppError, Result};
 #[cfg(target_os = "windows")]
 use core::error::Error;
-use core::result::Result as CoreResult;
+use core::{result::Result as CoreResult, time::Duration};
 use std::time::{Instant, SystemTime};
 cfg_select! {
     any(target_os = "linux", target_os = "macos") => {
@@ -37,7 +38,7 @@ impl FreshTimeHeaders {
     }
     fn capture_date(&mut self, raw: &str, received_at: Instant) {
         self.date_result = Some(if self.date_result.is_some() {
-            Err(TimeError::parse("Date 헤더가 여러 개입니다."))
+            Err(AppError::message("Date 헤더가 여러 개입니다."))
         } else {
             raw.parse::<HttpDate>()
                 .map(|HttpDate(server_time)| (server_time, received_at))
@@ -48,15 +49,12 @@ impl FreshTimeHeaders {
             .transpose()
             .map_err(|message| error(context, message))?;
         let (server_time, response_received_inst) = self.date_result.ok_or_else(|| {
-            TimeError::new(
-                TimeErrorKind::HeaderNotFound,
-                format!("{context} 응답에서 Date"),
-            )
+            AppError::message(format!("{context} 응답에서 Date 헤더를 찾을 수 없음"))
         })??;
         let rtt = response_received_inst
             .checked_duration_since(request_start)
             .ok_or("HTTP 응답 시각이 요청 시작 시각보다 앞섭니다.")?
-            .max(MIN_TRANSFER_TIME);
+            .max(Duration::from_micros(1));
         Ok(TimeSample {
             response_received_inst,
             rtt,
@@ -66,19 +64,18 @@ impl FreshTimeHeaders {
 }
 #[cold]
 #[inline(never)]
-fn error(context: &str, detail: &str) -> TimeError {
-    TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
+fn error(context: &str, detail: &str) -> AppError {
+    AppError::message(format!("native HTTP 요청 실패: {context}: {detail}"))
 }
 #[cfg(target_os = "windows")]
 #[cold]
 #[inline(never)]
-fn error_with_source<E>(context: &str, detail: &str, source: E) -> TimeError
+fn error_with_source<E>(context: &str, detail: &str, source: E) -> AppError
 where
     E: Error + Send + Sync + 'static,
 {
-    TimeError::new_with_source(
-        TimeErrorKind::NativeHttp,
-        format!("{context}: {detail}"),
+    AppError::context(
+        format!("native HTTP 요청 실패: {context}: {detail}"),
         source,
     )
 }

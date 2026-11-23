@@ -49,45 +49,25 @@ const _: () = assert!(
         && offset_of!(CGPoint, y) == 8,
     "CoreGraphics CGPoint layout mismatch"
 );
-struct Event {
-    raw: NonNull<c_void>,
-}
+struct Event(NonNull<c_void>);
 impl Drop for Event {
     fn drop(&mut self) {
-        // SAFETY: raw is a CoreFoundation object returned by CGEventCreate* and released exactly once here.
+        // SAFETY: self.0 is a CoreFoundation object returned by CGEventCreate* and released once here.
         unsafe {
-            CFRelease(self.raw.as_ptr());
+            CFRelease(self.0.as_ptr());
         }
     }
 }
 impl Event {
     fn from_raw(raw_ptr: CGEventRef, context: &str) -> InputResult<Self> {
         NonNull::new(raw_ptr)
-            .map(|raw| Self { raw })
+            .map(Self)
             .ok_or_else(|| format!("{context}: CGEvent 생성 실패"))
     }
-    fn keyboard(virtual_key: CGKeyCode, is_down: bool, context: &str) -> InputResult<Self> {
-        // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
-        Self::from_raw(
-            unsafe { CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) },
-            context,
-        )
-    }
-    fn mouse(
-        mouse_type: CGEventType,
-        mouse_cursor_position: CGPoint,
-        context: &str,
-    ) -> InputResult<Self> {
-        // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
-        Self::from_raw(
-            unsafe { CGEventCreateMouseEvent(null_mut(), mouse_type, mouse_cursor_position, 0) },
-            context,
-        )
-    }
     fn post(&self) {
-        // SAFETY: raw is a live CGEventRef retained by self.
+        // SAFETY: self.0 is a live CGEventRef retained by self.
         unsafe {
-            CGEventPost(0, self.raw.as_ptr());
+            CGEventPost(0, self.0.as_ptr());
         }
     }
 }
@@ -98,26 +78,43 @@ impl TriggerAction {
             return NativeInputSendStatus::FailedBeforeSend;
         }
         let result: InputResult<()> = (|| {
-            match self {
+            let events = match self {
                 Self::LeftClick => {
                     // SAFETY: null asks CoreGraphics to use the default source.
                     let current = Event::from_raw(
                         unsafe { CGEventCreate(null_mut()) },
                         "현재 마우스 위치 조회",
                     )?;
-                    // SAFETY: raw is a live CGEventRef retained by current.
-                    let point = unsafe { CGEventGetLocation(current.raw.as_ptr()) };
-                    let mouse_down = Event::mouse(1, point, "마우스 누름")?;
-                    let mouse_up = Event::mouse(2, point, "마우스 뗌")?;
-                    mouse_down.post();
-                    mouse_up.post();
+                    // SAFETY: current.0 is a live CGEventRef retained by current.
+                    let point = unsafe { CGEventGetLocation(current.0.as_ptr()) };
+                    [
+                        Event::from_raw(
+                            // SAFETY: null uses default source and point came from CoreGraphics.
+                            unsafe { CGEventCreateMouseEvent(null_mut(), 1, point, 0) },
+                            "마우스 누름",
+                        )?,
+                        Event::from_raw(
+                            // SAFETY: null uses default source and point came from CoreGraphics.
+                            unsafe { CGEventCreateMouseEvent(null_mut(), 2, point, 0) },
+                            "마우스 뗌",
+                        )?,
+                    ]
                 }
-                Self::F5Press => {
-                    let key_down = Event::keyboard(96, true, "F5 누름")?;
-                    let key_up = Event::keyboard(96, false, "F5 뗌")?;
-                    key_down.post();
-                    key_up.post();
-                }
+                Self::F5Press => [
+                    Event::from_raw(
+                        // SAFETY: null uses default source and 96 is the F5 key code.
+                        unsafe { CGEventCreateKeyboardEvent(null_mut(), 96, true) },
+                        "F5 누름",
+                    )?,
+                    Event::from_raw(
+                        // SAFETY: null uses default source and 96 is the F5 key code.
+                        unsafe { CGEventCreateKeyboardEvent(null_mut(), 96, false) },
+                        "F5 뗌",
+                    )?,
+                ],
+            };
+            for event in events {
+                event.post();
             }
             Ok(())
         })();
@@ -138,9 +135,6 @@ pub(super) fn post_event_access_granted(request_if_missing: bool) -> bool {
     if unsafe { CGPreflightPostEventAccess() } {
         return true;
     }
-    if !request_if_missing {
-        return false;
-    }
     // SAFETY: CGRequestPostEventAccess has no preconditions.
-    unsafe { CGRequestPostEventAccess() }
+    request_if_missing && unsafe { CGRequestPostEventAccess() }
 }

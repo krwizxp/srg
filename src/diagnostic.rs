@@ -1,11 +1,10 @@
-use crate::time::TimeError;
 use alloc::borrow::Cow;
 use core::{
     error::Error,
     fmt::{self, Display, Write as _},
     result::Result as CoreResult,
 };
-use std::{io::Error as IoError, process};
+use std::{io::Error as IoError, process, time::SystemTimeError};
 pub(super) type Result<T> = CoreResult<T, AppError>;
 pub(super) struct AppError {
     message: Cow<'static, str>,
@@ -105,9 +104,9 @@ impl From<IoError> for AppError {
         Self::context("I/O 오류", source)
     }
 }
-impl From<TimeError> for AppError {
-    fn from(source: TimeError) -> Self {
-        Self::context("시간 처리 오류", source)
+impl From<SystemTimeError> for AppError {
+    fn from(source: SystemTimeError) -> Self {
+        Self::context("시스템 시간 오류", source)
     }
 }
 #[inline]
