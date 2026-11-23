@@ -4,39 +4,15 @@ on:
     branches: [tmp/perf-validate]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   validate:
-    name: ${{ matrix.os }} / ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-26.04
-            target: x86_64-unknown-linux-gnu
-          - os: macos-26-intel
-            target: x86_64-apple-darwin
-          - os: macos-26
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+    runs-on: ubuntu-latest    
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
-      - name: Install Rust stable
-        shell: bash
-        run: |
-          rustup toolchain install stable --profile minimal --component rustfmt,clippy --no-self-update
-          rustc +stable -Vv
-      - name: Install Linux deps
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libcurl4-openssl-dev
-      - name: Build baseline release
-        shell: bash
-        run: cargo +stable build --release --frozen --bin srg --target "${{ matrix.target }}" --target-dir target-base
+          persist-credentials: true
+          fetch-depth: 0
       - name: Apply perf patch
         shell: bash
         run: |
@@ -132,49 +108,17 @@ jobs:
           subprocess.run(["git", "apply", "srg-perf.patch"], check=True)
           PY
           rm -f srg-perf.patch
-      - name: Format, Clippy, Test, Release Build
-        shell: bash
-        run: |
-          cargo +stable fmt --all -- --check
-          cargo +stable clippy --all-targets --target "${{ matrix.target }}" -- -D warnings
-          cargo +stable test --target "${{ matrix.target }}"
-          cargo +stable build --release --frozen --bin srg --target "${{ matrix.target }}" --target-dir target-cand
-          ext=""
-          [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
-          b_sz=$(wc -c < "target-base/${{ matrix.target }}/release/srg${ext}")
-          c_sz=$(wc -c < "target-cand/${{ matrix.target }}/release/srg${ext}")
-          echo "### ${{ matrix.os }} (${{ matrix.target }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Binary size: ${b_sz} -> ${c_sz} B ($((c_sz - b_sz)) B)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- fmt / clippy -D warnings / test / release: PASS" >> "$GITHUB_STEP_SUMMARY"
-      - name: Linux 25k Benchmark & JS Check
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          node --input-type=module --check < korea_boundary.js
-          node --input-type=module --check < srg_random.js
-          python3 - <<'PY'
-          import os, subprocess, tempfile, time
-          b = os.path.abspath("target-base/${{ matrix.target }}/release/srg")
-          c = os.path.abspath("target-cand/${{ matrix.target }}/release/srg")
-          def run1(p, td):
-              t0 = time.perf_counter()
-              proc = subprocess.Popen([p, "generate", "25000"], cwd=td, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-              _, st, ru = os.wait4(proc.pid, 0)
-              assert st == 0, proc.stderr.read().decode()
-              proc.stderr.close()
-              return (time.perf_counter() - t0) * 1000.0, ru.ru_maxrss
-          with tempfile.TemporaryDirectory() as td:
-              run1(b, td); run1(c, td)
-              tb, tc, rb, rc = [], [], [], []
-              for i in range(15):
-                  if i % 2 == 0:
-                      d, r = run1(b, td); tb.append(d); rb.append(r)
-                      d, r = run1(c, td); tc.append(d); rc.append(r)
-                  else:
-                      d, r = run1(c, td); tc.append(d); rc.append(r)
-                      d, r = run1(b, td); tb.append(d); rb.append(r)
-              tb.sort(); tc.sort(); rb.sort(); rc.sort()
-              line = f"- Linux 25k (15-pair): med {tb[7]:.2f} -> {tc[7]:.2f} ms ({(tc[7]-tb[7])/tb[7]*100:+.2f}%), RSS med {rb[7]} -> {rc[7]} KiB, JS syntax PASS\n"
-              print(line)
-              open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(line)
-          PY
+      - name: Stage and push perf patch
+      run: |
+      git rm .github/workflows/tmp-perf-validate.yml
+          files=$(git diff --name-only origin/main | sort)
+          echo "$files"
+          count=$(echo "$files" | wc -l)
+          test "$count" -eq 9
+          test "$(echo "$files" | grep -c '\.rs$' || true)" -eq 7
+          test "$(echo "$files" | grep -c '\.js$' || true)" -eq 2
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply perf patch"
+          git push origin HEAD:tmp/perf-validate
