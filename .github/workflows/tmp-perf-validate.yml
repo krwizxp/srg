@@ -110,7 +110,7 @@ jobs:
           rm -f srg-perf.patch
       - name: Stage and push perf patch
       run: |
-      git rm .github/workflows/tmp-perf-validate.yml
+          git rm .github/workflows/tmp-perf-validate.yml
           files=$(git diff --name-only origin/main | sort)
           echo "$files"
           count=$(echo "$files" | wc -l)
