@@ -5,130 +5,64 @@ on:
       - tmp/web-format-validate
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check blank and whitespace-only lines
-        run: |
-          : > /tmp/blank_table.md
-          for f in revgeo.html korea_boundary.js srg_random.js srg_parallel.js srg_worker.js; do
-            total=$(wc -l < "$f")
-            blank=$(grep -c '^[[:space:]]*$' "$f" || true)
-            echo "$f: total=$total, blank_or_ws=$blank"
-            echo "| \`$f\` | $total | $blank |" >> /tmp/blank_table.md
-          done
-      - name: Install tools and print versions
-        run: |
-          npm install --no-save vscode-html-languageservice vscode-languageserver-textdocument html-validate vnu-jar
-          v1=$(node -p "require('./node_modules/vscode-html-languageservice/package.json').version")
-          v2=$(node -p "require('./node_modules/vscode-languageserver-textdocument/package.json').version")
-          v3=$(node -p "require('./node_modules/html-validate/package.json').version")
-          v4=$(node -p "require('./node_modules/vnu-jar/package.json').version")
-          echo "vscode-html-languageservice: $v1"
-          echo "vscode-languageserver-textdocument: $v2"
-          echo "html-validate: $v3"
-          echo "vnu-jar: $v4"
-          {
-            echo "## 1. Tool Versions"
-            echo "- \`vscode-html-languageservice\`: \`$v1\`"
-            echo "- \`vscode-languageserver-textdocument\`: \`$v2\`"
-            echo "- \`html-validate\`: \`$v3\`"
-            echo "- \`vnu-jar\`: \`$v4\`"
-            echo ""
-            echo "## 2. Blank / Whitespace-only Lines"
-            echo "| File | Total Lines | Blank/Whitespace Lines |"
-            echo "| --- | ---: | ---: |"
-            cat /tmp/blank_table.md
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Format revgeo.html with vscode-html-languageservice
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Install tools
+        run: npm install --no-save vscode-html-languageservice vscode-languageserver-textdocument html-validate vnu-jar
+      - name: Remove blank lines and format revgeo.html
         run: |
           node -e '
-            const fs = require("fs");
-            const { getLanguageService } = require("vscode-html-languageservice");
-            const { TextDocument } = require("vscode-languageserver-textdocument");
-            const content = fs.readFileSync("revgeo.html", "utf8");
-            const doc = TextDocument.create("file:///revgeo.html", "html", 1, content);
-            const ls = getLanguageService();
-            const edits = ls.format(doc, undefined, { tabSize: 4, insertSpaces: false });
-            const formatted = TextDocument.applyEdits(doc, edits);
-            fs.writeFileSync("/tmp/revgeo.formatted.html", formatted, "utf8");
+          const fs = require("fs");
+          const { getLanguageService } = require("vscode-html-languageservice");
+          const { TextDocument } = require("vscode-languageserver-textdocument");
+          const raw = fs.readFileSync("revgeo.html", "utf8");
+          const lines = raw.split(/\r?\n/);
+          const blankBefore = lines.filter(l => /^[ \t]*$/.test(l)).length;
+          console.log("Blank/whitespace lines before:", blankBefore);
+          const cleaned = lines.filter(l => !/^[ \t]*$/.test(l)).join("\n") + "\n";
+          const doc = TextDocument.create("file:///revgeo.html", "html", 1, cleaned);
+          const ls = getLanguageService();
+          const edits = ls.format(doc, undefined, { insertSpaces: false, tabSize: 4 });
+          const formatted = TextDocument.applyEdits(doc, edits);
+          fs.writeFileSync("revgeo.html", formatted, "utf8");
+          const blankAfter = formatted.split(/\r?\n/).slice(0, -1).filter(l => /^[ \t]*$/.test(l)).length;
+          console.log("Blank/whitespace lines after:", blankAfter);
           '
-          orig_lines=$(wc -l < revgeo.html)
-          fmt_lines=$(wc -l < /tmp/revgeo.formatted.html)
-          diff -u revgeo.html /tmp/revgeo.formatted.html > /tmp/revgeo.diff || true
-          diff_lines=$(wc -l < /tmp/revgeo.diff)
-          changed_lines=$(grep -cE '^[+-][^+-]' /tmp/revgeo.diff || true)
-          echo "orig_lines=$orig_lines fmt_lines=$fmt_lines diff_u_lines=$diff_lines changed_lines=$changed_lines"
-          {
-            echo "## 3. VS Code HTML Formatter (insertSpaces: false, tabSize: 4)"
-            echo "- Original \`revgeo.html\` lines (\`wc -l\`): **$orig_lines**"
-            echo "- Formatted \`revgeo.html\` lines (\`wc -l\`): **$fmt_lines**"
-            echo "- \`diff -u\` total lines: **$diff_lines**"
-            echo "- \`diff -u\` changed (+/-) lines: **$changed_lines**"
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Run Nu Html Checker and HTMLValidate
+      - name: Validate revgeo.html
         run: |
-          cp /tmp/revgeo.formatted.html revgeo.formatted.html
-          fmt_lines=$(wc -l < revgeo.formatted.html)
-          fmt_blank=$(grep -c '^[[:space:]]*$' revgeo.formatted.html || true)
           VNU_JAR="$(node -e 'console.log(String(require("vnu-jar")))')"
           set +e
-          java -jar "$VNU_JAR" --stdout --format text revgeo.html > /tmp/vnu.out 2>&1
-          vnu_rc=$?
-          npx html-validate revgeo.html > /tmp/hv.out 2>&1
-          hv_rc=$?
-          java -jar "$VNU_JAR" --stdout --format text revgeo.formatted.html > /tmp/vnu_fmt.out 2>&1
-          vnu_fmt_rc=$?
-          npx html-validate revgeo.formatted.html > /tmp/hv_fmt.out 2>&1
-          hv_fmt_rc=$?
+          VNU_OUT=$(java -jar "$VNU_JAR" --stdout --format text revgeo.html 2>&1)
+          VNU_EXIT=$?
           set -e
-          echo "=== Nu Html Checker (exit: $vnu_rc) ==="
-          cat /tmp/vnu.out
-          echo "=== HTMLValidate (exit: $hv_rc) ==="
-          cat /tmp/hv.out
-          {
-            echo "## 4. HTML Validators"
-            echo "### Nu Html Checker (vnu-jar)"
-            echo "- Exit code: **$vnu_rc**"
-            echo '```text'
-            if [ -s /tmp/vnu.out ]; then cat /tmp/vnu.out; else echo "(no diagnostics)"; fi
-            echo '```'
-            echo "### HTMLValidate"
-            echo "- Exit code: **$hv_rc**"
-            echo '```text'
-            if [ -s /tmp/hv.out ]; then cat /tmp/hv.out; else echo "(no diagnostics)"; fi
-            echo '```'
-           echo "### Formatted File (revgeo.formatted.html)"
-            echo "- \`wc -l\`: **$fmt_lines**"
-            echo "- Blank lines: **$fmt_blank**"
-            echo "### Nu Html Checker (vnu-jar) - revgeo.formatted.html"
-            echo "- Exit code: **$vnu_fmt_rc**"
-            echo '```text'
-            if [ -s /tmp/vnu_fmt.out ]; then cat /tmp/vnu_fmt.out; else echo "(no diagnostics)"; fi
-            echo '```'
-            echo "### HTMLValidate - revgeo.formatted.html"
-            echo "- Exit code: **$hv_fmt_rc**"
-            echo '```text'
-            if [ -s /tmp/hv_fmt.out ]; then cat /tmp/hv_fmt.out; else echo "(no diagnostics)"; fi
-            echo '```'
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Run node --check on JS files
+          echo "$VNU_OUT"
+          OTHER_ERRORS=$(echo "$VNU_OUT" | grep -i "error:" | grep -v "field-sizing" || true)
+          if [ -n "$OTHER_ERRORS" ]; then
+            echo "Unexpected vnu errors:"
+            echo "$OTHER_ERRORS"
+            exit 1
+          fi
+          npx html-validate revgeo.html
+      - name: Remove tmp workflow and verify diff
         run: |
-          {
-            echo "## 5. JS Syntax Check (node --check)"
-            for f in korea_boundary.js srg_random.js srg_parallel.js srg_worker.js; do
-              if node --check "$f" 2> /tmp/nodecheck.err; then
-                echo "- \`$f\`: OK (exit 0)"
-              else
-                rc=$?
-                echo "- \`$f\`: FAIL (exit $rc)"
-                cat /tmp/nodecheck.err
-              fi
-            done
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          git rm .github/workflows/tmp-web-validate.yml
+          CHANGED=$(git diff --name-only origin/main)
+          echo "Changed files vs origin/main: $CHANGED"
+          if [ "$CHANGED" != "revgeo.html" ]; then
+            echo "Expected only revgeo.html, got: $CHANGED"
+            exit 1
+          fi
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add revgeo.html
+          git commit -m "Format revgeo.html with VS Code HTML formatter"
+          git push origin HEAD:tmp/web-format-validate
