@@ -73,11 +73,19 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Run Nu Html Checker and HTMLValidate
         run: |
+          cp /tmp/revgeo.formatted.html revgeo.formatted.html
+          fmt_lines=$(wc -l < revgeo.formatted.html)
+          fmt_blank=$(grep -c '^[[:space:]]*$' revgeo.formatted.html || true)
+          VNU_JAR="$(node -e 'console.log(String(require("vnu-jar")))')"
           set +e
-          java -jar "$(node -p 'require("vnu-jar")')" revgeo.html > /tmp/vnu.out 2>&1
+          java -jar "$VNU_JAR" --stdout --format text revgeo.html > /tmp/vnu.out 2>&1
           vnu_rc=$?
           npx html-validate revgeo.html > /tmp/hv.out 2>&1
           hv_rc=$?
+          java -jar "$VNU_JAR" --stdout --format text revgeo.formatted.html > /tmp/vnu_fmt.out 2>&1
+          vnu_fmt_rc=$?
+          npx html-validate revgeo.formatted.html > /tmp/hv_fmt.out 2>&1
+          hv_fmt_rc=$?
           set -e
           echo "=== Nu Html Checker (exit: $vnu_rc) ==="
           cat /tmp/vnu.out
@@ -94,6 +102,19 @@ jobs:
             echo "- Exit code: **$hv_rc**"
             echo '```text'
             if [ -s /tmp/hv.out ]; then cat /tmp/hv.out; else echo "(no diagnostics)"; fi
+            echo '```'
+           echo "### Formatted File (revgeo.formatted.html)"
+            echo "- \`wc -l\`: **$fmt_lines**"
+            echo "- Blank lines: **$fmt_blank**"
+            echo "### Nu Html Checker (vnu-jar) - revgeo.formatted.html"
+            echo "- Exit code: **$vnu_fmt_rc**"
+            echo '```text'
+            if [ -s /tmp/vnu_fmt.out ]; then cat /tmp/vnu_fmt.out; else echo "(no diagnostics)"; fi
+            echo '```'
+            echo "### HTMLValidate - revgeo.formatted.html"
+            echo "- Exit code: **$hv_fmt_rc**"
+            echo '```text'
+            if [ -s /tmp/hv_fmt.out ]; then cat /tmp/hv_fmt.out; else echo "(no diagnostics)"; fi
             echo '```'
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
