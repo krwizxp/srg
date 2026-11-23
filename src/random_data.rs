@@ -165,11 +165,14 @@ impl RandomDataBuildState<'_> {
     }
 }
 impl RandomDataSet {
-    pub(super) fn populate(
+    pub(super) fn populate<NextSupp>(
         self,
-        next_supp: &mut dyn FnMut(&'static str) -> Result<u64>,
+        mut next_supp: NextSupp,
         boundary_cache: &mut korea_boundary::BoundaryCache,
-    ) -> Result<Self> {
+    ) -> Result<Self>
+    where
+        NextSupp: FnMut(&'static str) -> Result<u64>,
+    {
         let initial = self.num_64;
         let mut fields = RandomDataBuildState {
             korea: korea_boundary::SampleState::try_from((initial, boundary_cache))?,
@@ -235,6 +238,7 @@ const fn mix_bounded<const MODULUS: u64>(value: u64, salt: u64) -> Option<u64> {
         Some(mixed.rem_euclid(MODULUS))
     }
 }
+#[inline]
 fn unrank_combination_into(mut rank: u32, max_n: u8, out: &mut [u8]) {
     let Some((first_slot, tail)) = out.split_first_mut() else {
         return;

@@ -87,12 +87,7 @@ impl OutputFormatter<'_, '_, '_> {
                         .get(usize::from(low_u8_from_u64((bits >> 44_u32) & 0xF)))
                         .copied(),
                 );
-                let [b0, b1, b2, b3] = glyph;
-                if b3 != 0 {
-                    *cur.take_array::<4>() = glyph;
-                } else {
-                    *cur.take_array::<3>() = [b0, b1, b2];
-                }
+                cur.write_array_advance(glyph, 3_usize.strict_add(usize::from(glyph[3] != 0)));
                 bits <<= 4_u32;
             }
             cur.write_byte(b')');

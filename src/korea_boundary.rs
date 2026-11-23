@@ -5,7 +5,6 @@ use crate::{
     numeric::{low_u16_from_u64, low_u32_from_u64},
     random_data::Coordinates,
 };
-use alloc::collections::VecDeque;
 use core::{array, cmp::Ordering};
 use std::sync::{LazyLock, OnceLock};
 macro_rules! boundary_parts {
@@ -46,9 +45,10 @@ const TILE_OUTSIDE: u16 = u16::MAX - 1;
 #[derive(Default)]
 pub(super) struct BoundaryCache {
     bytes: usize,
-    pages: VecDeque<(u32, CachedPage)>,
-    resident: Vec<u64>,
+    hand: usize,
+    pages: Vec<(u32, bool, CachedPage)>,
     scratch: Vec<u8>,
+    slots: Vec<u16>,
 }
 struct BoundaryIndex {
     area_bounds: BoundaryAreaBounds,
@@ -85,6 +85,7 @@ enum DecodedPageRef<'page> {
     Chain(u32, u32, u32, u32, &'page [[f64; 2]]),
     Parity(bool, &'page [f64]),
 }
+struct ExactOrient2d([f64; 6]);
 struct MixedTile {
     count: u32,
     first: u32,
@@ -108,53 +109,71 @@ impl BoundaryCache {
         page_num: u32,
         tile_num: usize,
     ) -> Result<DecodedPageRef<'_>> {
-        if self.resident.is_empty() {
-            self.resident.resize(index.page_count.div_ceil(64), 0);
+        if self.slots.is_empty() {
+            self.slots.resize(index.page_count, 0);
         }
         let page_idx = page_num as usize;
-        let (word, bit) = (page_idx.div_euclid(64), 1_u64 << page_idx.rem_euclid(64));
-        let res = *self
-            .resident
-            .get(word)
+        let existing = *self
+            .slots
+            .get(page_idx)
             .ok_or("대한민국 경계 블록 순번 오류")?;
-        if res & bit != 0 {
-            if self.pages.back().is_none_or(|&(num, _)| num != page_num) {
-                let pos = self
-                    .pages
-                    .iter()
-                    .rposition(|&(num, _)| num == page_num)
-                    .ok_or("대한민국 경계 캐시 위치 오류")?;
-                let item = self
-                    .pages
-                    .remove(pos)
-                    .ok_or("대한민국 경계 캐시 위치 오류")?;
-                self.pages.push_back(item);
-            }
+        let slot_idx = if existing != 0 {
+            let idx = usize::from(existing.strict_sub(1));
+            let &mut (_, ref mut used, _) = self
+                .pages
+                .get_mut(idx)
+                .ok_or("대한민국 경계 캐시 위치 오류")?;
+            *used = true;
+            idx
         } else {
             let decoded = index.page(page_idx, tile_num, &mut self.scratch)?;
             let add = decoded.bytes as usize;
             while self.pages.len() >= CACHE_PAGES || self.bytes.strict_add(add) > CACHE_BYTES {
-                let (rm_num, rm) = self
-                    .pages
-                    .pop_front()
-                    .ok_or("대한민국 경계 캐시 용량 오류")?;
-                let rm_idx = rm_num as usize;
+                if self.hand >= self.pages.len() {
+                    self.hand = 0;
+                }
+                let evict = loop {
+                    let &mut (_, ref mut used, _) = self
+                        .pages
+                        .get_mut(self.hand)
+                        .ok_or("대한민국 경계 캐시 용량 오류")?;
+                    if *used {
+                        *used = false;
+                        self.hand = self.hand.strict_add(1);
+                        if self.hand >= self.pages.len() {
+                            self.hand = 0;
+                        }
+                    } else {
+                        break self.hand;
+                    }
+                };
+                let (rm_num, _, rm) = self.pages.swap_remove(evict);
                 *self
-                    .resident
-                    .get_mut(rm_idx.div_euclid(64))
-                    .ok_or("대한민국 경계 캐시 위치 오류")? &= !(1_u64 << rm_idx.rem_euclid(64));
+                    .slots
+                    .get_mut(rm_num as usize)
+                    .ok_or("대한민국 경계 캐시 위치 오류")? = 0;
                 self.bytes = self.bytes.strict_sub(rm.bytes as usize);
+                if let Some(&(moved_num, _, _)) = self.pages.get(evict) {
+                    let [s0, s1, ..] = evict.strict_add(1).to_le_bytes();
+                    *self
+                        .slots
+                        .get_mut(moved_num as usize)
+                        .ok_or("대한민국 경계 캐시 위치 오류")? = u16::from_le_bytes([s0, s1]);
+                }
             }
+            let idx = self.pages.len();
+            let [s0, s1, ..] = idx.strict_add(1).to_le_bytes();
             *self
-                .resident
-                .get_mut(word)
-                .ok_or("대한민국 경계 블록 순번 오류")? |= bit;
+                .slots
+                .get_mut(page_idx)
+                .ok_or("대한민국 경계 블록 순번 오류")? = u16::from_le_bytes([s0, s1]);
             self.bytes = self.bytes.strict_add(add);
-            self.pages.push_back((page_num, decoded));
-        }
-        let &mut (_, ref mut cached) = self
+            self.pages.push((page_num, true, decoded));
+            idx
+        };
+        let &mut (_, _, ref mut cached) = self
             .pages
-            .back_mut()
+            .get_mut(slot_idx)
             .ok_or("대한민국 경계 캐시 위치 오류")?;
         Ok(match cached.decoded {
             DecodedPage::Parity(base, ref mut eps) => DecodedPageRef::Parity(base, eps),
@@ -276,30 +295,7 @@ impl BoundaryIndex {
                         {
                             approx
                         } else {
-                            let (mut exp, mut len) = ([0.0_f64; 4], 0_usize);
-                            for mut val in
-                                [dx.mul_add(py, -left), left, -dy.mul_add(px, -right), -right]
-                            {
-                                let (mut cnt, prev) = (0_usize, exp);
-                                for entry in prev.into_iter().take(len) {
-                                    let total = val + entry;
-                                    let vval = total - val;
-                                    let err = (val - (total - vval)) + (entry - vval);
-                                    if err != 0.0_f64 {
-                                        *exp.get_mut(cnt)
-                                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = err;
-                                        cnt = cnt.strict_add(1);
-                                    }
-                                    val = total;
-                                }
-                                if val != 0.0_f64 || cnt == 0 {
-                                    *exp.get_mut(cnt)
-                                        .ok_or("대한민국 경계 좌표 누산 범위 오류")? = val;
-                                    cnt = cnt.strict_add(1);
-                                }
-                                len = cnt;
-                            }
-                            exp.iter().take(len).sum()
+                            ExactOrient2d([dx, dy, px, py, left, right]).det()?
                         };
                         let side = det.partial_cmp(&0.0_f64);
                         boundary |= side == Some(Ordering::Equal);
@@ -699,6 +695,35 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             tile_states: tile_states.into_boxed_slice(),
             vertex_count: vert_cnt,
         })
+    }
+}
+impl ExactOrient2d {
+    #[cold]
+    #[inline(never)]
+    fn det(self) -> Result<f64> {
+        let [dx, dy, px, py, left, right] = self.0;
+        let (mut exp, mut len) = ([0.0_f64; 4], 0_usize);
+        for mut val in [dx.mul_add(py, -left), left, -dy.mul_add(px, -right), -right] {
+            let (mut cnt, prev) = (0_usize, exp);
+            for entry in prev.into_iter().take(len) {
+                let total = val + entry;
+                let vval = total - val;
+                let err = (val - (total - vval)) + (entry - vval);
+                if err != 0.0_f64 {
+                    *exp.get_mut(cnt)
+                        .ok_or("대한민국 경계 좌표 누산 범위 오류")? = err;
+                    cnt = cnt.strict_add(1);
+                }
+                val = total;
+            }
+            if val != 0.0_f64 || cnt == 0 {
+                *exp.get_mut(cnt)
+                    .ok_or("대한민국 경계 좌표 누산 범위 오류")? = val;
+                cnt = cnt.strict_add(1);
+            }
+            len = cnt;
+        }
+        Ok(exp.iter().take(len).sum())
     }
 }
 impl SampleState<'_> {

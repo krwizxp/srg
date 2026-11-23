@@ -43,10 +43,12 @@ impl Bits<'_> {
         self.bit_buffer >>= drop_bits;
         self.bit_count = self.bit_count.strict_sub(drop_bits);
     }
+    #[inline]
     const fn consume(&mut self, count: u32) {
         self.bit_buffer >>= count;
         self.bit_count = self.bit_count.wrapping_sub(count);
     }
+    #[inline]
     fn read(&mut self, count: u32) -> Result<u32> {
         if count == 0 {
             return Ok(0);
@@ -60,6 +62,7 @@ impl Bits<'_> {
     fn read_usize(&mut self, count: u32) -> Result<usize> {
         Ok(self.read(count)? as usize)
     }
+    #[inline]
     fn refill(&mut self, needed: u32) {
         if self.bit_count >= needed {
             return;
@@ -171,6 +174,7 @@ impl Huffman {
         }
         Err("경계 압축 허프먼 코드 오류".into())
     }
+    #[inline]
     fn symbol(&self, bits: &mut Bits<'_>) -> Result<u16> {
         bits.refill(9);
         let packed = *self
@@ -312,7 +316,14 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             .ok_or("경계 압축 참조 위치 오류")?;
                         let end = written.strict_add(length);
                         (end <= output.len()).ok_or("경계 압축 출력 한도 오류")?;
-                        if backward >= length {
+                        if backward == 1 {
+                            let fill = *output.get(src).ok_or("경계 압축 참조 위치 오류")?;
+                            output
+                                .get_mut(written..end)
+                                .ok_or("경계 압축 출력 한도 오류")?
+                                .fill(fill);
+                            written = end;
+                        } else if backward >= length {
                             output.copy_within(src..src.wrapping_add(length), written);
                             written = end;
                         } else {
@@ -365,6 +376,7 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
         Ok(Self(out_slice))
     }
 }
+#[inline]
 fn decode_extra(
     is_distance: bool,
     index: u32,

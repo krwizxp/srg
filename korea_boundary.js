@@ -167,9 +167,21 @@ function inflate(input, maximum = 32768) {
                 const backward = INFLATE_DISTANCE_BASE[distanceIndex] + bits.read(INFLATE_DISTANCE_EXTRA[distanceIndex]);
                 inflateRequire(backward <= written, "경계 압축 참조 위치 오류");
                 inflateRequire(written + length <= maximum, "경계 압축 출력 한도 오류");
-                for (let index = 0; index < length; index++) {
-                    output[written] = output[written - backward];
-                    written++;
+                if (backward === 1) {
+                    output.fill(output[written - 1], written, written + length);
+                    written += length;
+                } else if (backward >= length) {
+                    output.copyWithin(written, written - backward, written - backward + length);
+                    written += length;
+                } else {
+                    const start = written - backward;
+                    let copied = 0;
+                    while (copied < length) {
+                        const step = Math.min(Math.max(backward, copied), length - copied);
+                        output.copyWithin(written, start, start + step);
+                        written += step;
+                        copied += step;
+                    }
                 }
             }
         } else {
@@ -209,9 +221,9 @@ function productError(a, b, product) {
     const bh = splitB - (splitB - b), bl = b - bh;
     return ((ah * bh - product) + ah * bl + al * bh) + al * bl;
 }
-function orientation(start, end, point) {
-    const a = end[0] - start[0], b = end[1] - start[1];
-    const c = point[0] - start[0], d = point[1] - start[1];
+function orientation(startX, startY, endX, endY, pointX, pointY) {
+    const a = endX - startX, b = endY - startY;
+    const c = pointX - startX, d = pointY - startY;
     const left = a * d, right = b * c;
     const approximate = left - right;
     if (Math.abs(approximate) > 3.3306690738754716e-16 * (Math.abs(left) + Math.abs(right))) return approximate;
@@ -234,26 +246,14 @@ function orientation(start, end, point) {
     for (let index = 0; index < length; index++) result += expansion[index];
     return result;
 }
-const SINE_COEFFS = [-2.505210838544172e-8, 2.7557319223985893e-6, -0.0001984126984126984, 0.008333333333333333, -0.16666666666666666, 1];
-const COSINE_COEFFS = [2.08767569878681e-9, -2.755731922398589e-7, 2.48015873015873e-5, -0.001388888888888889, 0.041666666666666664, -0.5, 1];
-const AREA_COEFFS = [9 / 17, 8 / 15, 7 / 13, 6 / 11, 5 / 9, 4 / 7, 3 / 5, 2 / 3, 1];
-function horner(x, coeffs) {
-    let acc = coeffs[0];
-    for (let i = 1; i < coeffs.length; i++) acc = coeffs[i] + x * acc;
-    return acc;
-}
-function cumulativeArea(latitude, withDerivative = false) {
+function cumulativeArea(latitude) {
     const delta = (latitude - 36) * DEGREES;
     const square = delta * delta;
-    const sineDelta = delta * horner(square, SINE_COEFFS);
-    const cosineDelta = horner(square, COSINE_COEFFS);
+    const sineDelta = delta * (1 + square * (-0.16666666666666666 + square * (0.008333333333333333 + square * (-0.0001984126984126984 + square * (2.7557319223985893e-6 + square * -2.505210838544172e-8)))));
+    const cosineDelta = 1 + square * (-0.5 + square * (0.041666666666666664 + square * (-0.001388888888888889 + square * (2.48015873015873e-5 + square * (-2.755731922398589e-7 + square * 2.08767569878681e-9)))));
     const sine = 0.5877852522924731 * cosineDelta + 0.8090169943749475 * sineDelta;
     const squareEccentricSine = ECCENTRICITY_SQUARED * sine * sine;
-    const area = sine * horner(squareEccentricSine, AREA_COEFFS);
-    if (!withDerivative) return area;
-    const cosine = 0.8090169943749475 * cosineDelta - 0.5877852522924731 * sineDelta;
-    const denominator = 1 - squareEccentricSine;
-    return [area, DEGREES * cosine / (denominator * denominator)];
+    return sine * (1 + squareEccentricSine * (2 / 3 + squareEccentricSine * (3 / 5 + squareEccentricSine * (4 / 7 + squareEccentricSine * (5 / 9 + squareEccentricSine * (6 / 11 + squareEccentricSine * (7 / 13 + squareEccentricSine * (8 / 15 + squareEccentricSine * (9 / 17)))))))));
 }
 function candidate([verticalWord, horizontalWord], boundary) {
     const [west, south, east, north] = boundary.bounds;
@@ -262,8 +262,16 @@ function candidate([verticalWord, horizontalWord], boundary) {
     const target = boundary.southArea + vertical * (boundary.northArea - boundary.southArea);
     let latitude = south + (north - south) * vertical;
     for (let iteration = 0; iteration < 3; iteration++) {
-        const [area, derivative] = cumulativeArea(latitude, true);
-        latitude -= (area - target) / derivative;
+        const delta = (latitude - 36) * DEGREES;
+        const square = delta * delta;
+        const sineDelta = delta * (1 + square * (-0.16666666666666666 + square * (0.008333333333333333 + square * (-0.0001984126984126984 + square * (2.7557319223985893e-6 + square * -2.505210838544172e-8)))));
+        const cosineDelta = 1 + square * (-0.5 + square * (0.041666666666666664 + square * (-0.001388888888888889 + square * (2.48015873015873e-5 + square * (-2.755731922398589e-7 + square * 2.08767569878681e-9)))));
+        const sine = 0.5877852522924731 * cosineDelta + 0.8090169943749475 * sineDelta;
+        const squareEccentricSine = ECCENTRICITY_SQUARED * sine * sine;
+        const area = sine * (1 + squareEccentricSine * (2 / 3 + squareEccentricSine * (3 / 5 + squareEccentricSine * (4 / 7 + squareEccentricSine * (5 / 9 + squareEccentricSine * (6 / 11 + squareEccentricSine * (7 / 13 + squareEccentricSine * (8 / 15 + squareEccentricSine * (9 / 17)))))))));
+        const cosine = 0.8090169943749475 * cosineDelta - 0.5877852522924731 * sineDelta;
+        const denominator = 1 - squareEccentricSine;
+        latitude -= (area - target) / (DEGREES * cosine / (denominator * denominator));
     }
     const longitude = west + horizontal * (east - west);
     requireBoundary(latitude > south && latitude < north && longitude > west && longitude < east, "대한민국 등면적 좌표 역산 오류");
@@ -280,8 +288,9 @@ const SUPPLEMENT_LIMIT = 1024;
 let boundaryPromise, preparation, requestedPreparation;
 const parts = {entries: new Map(), bytes: 0, pending: 0, entryLimit: 8, byteLimit: 4194304, pendingLimit: 8, reservation: MAX_PART_BYTES};
 const pages = {entries: new Map(), bytes: 0, pending: 0, entryLimit: 4096, byteLimit: 4194304, pendingLimit: 256, reservation: MAX_PAGE_BYTES};
+const MAGIC_DECODER = new TextDecoder();
 function magic(bytes, expected) {
-    return bytes.length >= 8 && new TextDecoder().decode(bytes.subarray(0, 8)) === expected;
+    return bytes.length >= 8 && MAGIC_DECODER.decode(bytes.subarray(0, 8)) === expected;
 }
 async function boundedBytes(response, maximum) {
     requireBoundary(response.body !== null, "대한민국 경계 응답 본문 오류");
@@ -582,7 +591,6 @@ async function covers(boundary, point, tile) {
         const refined = atlasState(boundary, point, tile);
         if (refined !== 2) return refined === 1;
     }
-    const location = [longitude, latitude];
     let parity = false, boundaryHit = false;
     for await (const page of tilePages(boundary, tile)) {
         if (page.kind === 0) {
@@ -604,7 +612,7 @@ async function covers(boundary, point, tile) {
                 const spansLatitude = (startY > latitude) !== (endY > latitude);
                 if (spansLatitude && longitude < minX) parity = !parity;
                 else if (longitude <= maxX) {
-                    const side = orientation([startX, startY], [endX, endY], location);
+                    const side = orientation(startX, startY, endX, endY, longitude, latitude);
                     if (side === 0 && longitude >= minX) boundaryHit = true;
                     if (spansLatitude) parity = parity !== (endY > startY ? side > 0 : side < 0);
                 }

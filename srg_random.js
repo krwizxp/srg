@@ -10,6 +10,8 @@ const EURO_MAIN_COMB = BigInt(binomial(50, 5));
 const LOTTO_COMB = BigInt(binomial(45, 6));
 const LOTTO7_COMB = BigInt(binomial(37, 7));
 const EURO_LUCKY_COMB = BigInt(binomial(12, 2));
+const LOTTO_COMB_NUM = Number(LOTTO_COMB);
+const EURO_LUCKY_COMB_NUM = Number(EURO_LUCKY_COMB);
 const LOTTO_BUNDLE_MODULUS = LOTTO_COMB * LOTTO7_COMB * EURO_LUCKY_COMB * 6n;
 const EURO_PIN_NMS_MODULUS = EURO_MAIN_COMB * 1000000n * 767n;
 const HANGUL_QUAD_MODULUS = HANGUL_MODULUS ** 4n;
@@ -141,12 +143,12 @@ function fillWord(value, data) {
 		if (mixed >= 0n) {
 			data.planet = Number(mixed % 6n) + 1;
 			let remainder = Number(mixed / 6n);
-			const euroLucky = remainder % Number(EURO_LUCKY_COMB);
-			remainder = (remainder - euroLucky) / Number(EURO_LUCKY_COMB);
-			const lotto = remainder % Number(LOTTO_COMB);
+			const euroLucky = remainder % EURO_LUCKY_COMB_NUM;
+			remainder = (remainder - euroLucky) / EURO_LUCKY_COMB_NUM;
+			const lotto = remainder % LOTTO_COMB_NUM;
 			data.euroLucky.values = unrankCombination(euroLucky, 12, 2);
 			data.lotto.values = unrankCombination(lotto, 45, 6);
-			data.lotto7.values = unrankCombination((remainder - lotto) / Number(LOTTO_COMB), 37, 7);
+			data.lotto7.values = unrankCombination((remainder - lotto) / LOTTO_COMB_NUM, 37, 7);
 		}
 	}
 	if (!data.system) {
