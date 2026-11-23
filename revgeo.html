@@ -2712,7 +2712,7 @@
 					],
 					"구", sido, cityLike,
 				);
-				sigungu = [cityLike, districtName].filter(Boolean).join(" ");
+				sigungu = joinPair(cityLike, districtName);
 				sigungu ||= pickAdmin(
 					[county, level6, cityDistrict, primary, p0, p1],
 					"시구군", sido,
@@ -2756,7 +2756,7 @@
 				],
 				0, sido, cityLike,
 			);
-			let sigungu = [cityLike, districtName].filter(Boolean).join(" ") ||
+			let sigungu = joinPair(cityLike, districtName) ||
 				fields.level6 || fields.level8 || city || fields.town ||
 				county || fields.district || fields.municipality;
 			if ((!sigungu || sigungu === sido) &&
@@ -2913,9 +2913,9 @@
 			return normalized === "-0" ? "0" : normalized;
 		}
 		const [fileInput, themeToggle, exportBtn, statusText] = ["file", "theme-toggle", "export", "status"].map(byId);
-		const [countTotal, countSuccess, countFail, countRemain] = ["cnt-total", "cnt-success", "cnt-fail", "cnt-remain"].map(byId);
-		const [progressBar, percentText] = ["prog", "progress-percent"].map(byId);
-		const [summaryTotal, summarySuccess, summaryFail, summaryRemain] = ["summary-total", "summary-success", "summary-fail", "summary-remain"].map(byId);
+		const [countTotal, countSuccess, countFail, countRemain, countNoAddress] = ["cnt-total", "cnt-success", "cnt-fail", "cnt-remain", "cnt-no-address"].map(byId);
+		const [progressBar, percentText, progressIndicator] = ["prog", "progress-percent", "progress-indicator"].map(byId);
+		const [summaryTotal, summarySuccess, summaryFail, summaryRemain, summaryNoAddress, summaryProcessed] = ["summary-total", "summary-success", "summary-fail", "summary-remain", "summary-no-address", "summary-processed"].map(byId);
 		const coordsCount = byId("coords-count");
 		const coordsPanel = query(".coords-panel");
 		const [lineNumbers, resultsCount, pageNumbers, elapsed] = ["coord-line-numbers", "results-count", "page-numbers", "elapsed"].map(byId);
@@ -2926,12 +2926,16 @@
 		const coordsContent = query("#coords .code-content");
 		const [parseBtn, startBtn, pauseBtn, resumeBtn, stopBtn] = ["parse", "start", "pause", "resume", "stop"].map(byId);
 		const [filterQuery, filterControls, filterKind, filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr] = ["filter-q", "filters", "filter-kind", "filter-sido", "filter-sigungu", "filter-emd", "filter-tag", "filter-fulladdr"].map(byId);
-		const [pageNav, pagePrev, pageNext, pageStatus] = ["result-pages", "page-prev", "page-next", "page-status"].map(byId);
+		const [pageNav, pagePrev, pageNext, pageStatus, pageSizeSelect, helpDialog, resultsView, activeFilterSummary] = ["result-pages", "page-prev", "page-next", "page-status", "page-size", "help-dialog", "results-view", "active-filter-summary"].map(byId);
 		const root = document.documentElement;
 		const pageScheme = query('meta[name="color-scheme"]');
 		const themeColors = queryAll('meta[name="theme-color"]');
 		const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
 		const [appearance, useOutput, coordsExpand, bulkDialog] = ["appearance", "useOutput", "coords-expand", "bulk-dialog"].map(byId);
+		const startBtnLabel = startBtn.lastElementChild;
+		const exportBtnLabel = exportBtn.lastElementChild;
+		const UI_CONTROLS = [parseBtn, startBtn, pauseBtn, resumeBtn, stopBtn, fileInput, useOutput];
+		const DETAIL_FILTERS = [filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr];
 		const PREFERENCE_KEY = "srg-revgeo-display";
 		let preferences = {};
 		try {
@@ -3037,7 +3041,7 @@
 		function matchesFilter(r, f) {
 			if (!r.result) return false;
 			if (!f) return true;
-			if (f.status !== "all" && resultStatus(r.result) !== f.status) return false;
+			if (f.status !== "all" && r._status !== f.status) return false;
 			if (!f.hasFields && !f.query) return true;
 			const fields = r._search ??= [
 				countryFilterValue(r),
@@ -3064,7 +3068,7 @@
 			return !isOr;
 		}
 		let pageSize = [10, 25, 50, 100].includes(preferences.pageSize) ? preferences.pageSize : 10;
-		byId("page-size").value = String(pageSize);
+		pageSizeSelect.value = String(pageSize);
 		preferences = null;
 		let filterTimer = null;
 		let pageFrame = null;
@@ -3261,7 +3265,8 @@
 				return this.task?.status ?? "idle";
 			},
 			get isRunning() {
-				return ["running", "paused", "pausing"].includes(this.status);
+				const s = this.status;
+				return s === "running" || s === "paused" || s === "pausing";
 			},
 			get isStopping() {
 				return this.status === "stopping";
@@ -3312,13 +3317,11 @@
 		};
 		function updateUIState() {
 			const active = document.activeElement;
-			const controls = [parseBtn, startBtn, pauseBtn,
-				resumeBtn, stopBtn, fileInput, useOutput];
-			const ownedFocus = controls.includes(active);
+			const ownedFocus = UI_CONTROLS.includes(active);
 			const s = statusRow.dataset.state = state.status;
 			if (s === "idle") stopElapsed();
 			const isBusy = state.task !== null;
-			byId("progress-indicator").hidden = !isBusy;
+			progressIndicator.hidden = !isBusy;
 			percentText.hidden = s === "parsing";
 			if (s === "parsing") progressBar.removeAttribute("value");
 			else progressBar.value = state.records.length ? Math.round(state.processed / state.records.length * 100) : 0;
@@ -3326,7 +3329,7 @@
 			tableWrap.ariaBusy = String(state.isRunning);
 			parseBtn.disabled = fileInput.disabled = isBusy;
 			startBtn.disabled = isBusy || !state.records.length;
-			query("span", startBtn).textContent = state.processed ? "처음부터 다시 조회" : "주소 조회 시작";
+			startBtnLabel.textContent = state.processed ? "처음부터 다시 조회" : "주소 조회 시작";
 			pauseBtn.disabled = s !== "running";
 			resumeBtn.disabled = resumeBtn.hidden = s !== "paused";
 			stopBtn.disabled = !(state.isRunning || s === "parsing");
@@ -3361,19 +3364,6 @@
 			srStatus.progressBucket = -1;
 			announceStatus(text || null);
 		}
-		function showProgress(processed, total) {
-			paintStatus("조회 중…", "info");
-			const pct = Math.round((processed / total) * 100);
-			const bucket = total <= 10 || pct === 100 ? pct : Math.floor(pct / 10) * 10;
-			if (
-				bucket === srStatus.progressBucket && processed !== total
-			) return;
-			srStatus.progressBucket = bucket;
-			announceStatus(
-				`진행 ${pct}%`,
-			);
-		}
-		const FILE_READY_HINT = "좌표 추출 대기";
 		const renderCache = {
 			total: -1,
 			processed: -1,
@@ -3390,7 +3380,8 @@
 			const noAddressChanged = renderCache.noAddress !== noAddress;
 			if (!(totalChanged || doneChanged || failChanged || noAddressChanged)) return;
 			updateWorkflowStep();
-			Object.assign(renderCache, {total, processed, fail, noAddress});
+			renderCache.total = total; renderCache.processed = processed;
+			renderCache.fail = fail; renderCache.noAddress = noAddress;
 			const remaining = total - processed;
 			if (totalChanged) {
 				countTotal.textContent = summaryTotal.textContent =
@@ -3403,7 +3394,7 @@
 			if (doneChanged || failChanged || noAddressChanged)
 				countSuccess.textContent = summarySuccess.textContent = fmt(processed - fail - noAddress);
 			if (noAddressChanged)
-				byId("cnt-no-address").textContent = byId("summary-no-address").textContent = fmt(noAddress);
+				countNoAddress.textContent = summaryNoAddress.textContent = fmt(noAddress);
 			if (failChanged)
 				countFail.textContent = summaryFail.textContent = fmt(fail);
 			if (totalChanged || doneChanged) {
@@ -3414,8 +3405,9 @@
 				percentText.textContent = `${pct}%`;
 			}
 			if (doneChanged) {
-				byId("summary-processed").textContent = fmt(processed);
-				query("span", exportBtn).textContent = processed ? `전체 결과 CSV (${fmt(processed)}건)` : "전체 결과 CSV";
+				const processedText = fmt(processed);
+				summaryProcessed.textContent = processedText;
+				exportBtnLabel.textContent = processed ? `전체 결과 CSV (${processedText}건)` : "전체 결과 CSV";
 				exportBtn.disabled = processed === 0 || exportTask !== null;
 			}
 		}
@@ -3625,7 +3617,6 @@
 		let dbPromise = null;
 		let cacheRetryAt = 0;
 		const CACHE_OPEN_RETRY_MS = 5_000;
-		const NO_CACHE_DB = Promise.resolve(null);
 		cacheChannel.onmessage = ({data}) => {
 			if (!Array.isArray(data) || data.length !== 2) return;
 			const [phase, token] = data;
@@ -3662,7 +3653,7 @@
 		function openCacheDb() {
 			if (dbPromise) return dbPromise;
 			if (Date.now() < cacheRetryAt)
-				return NO_CACHE_DB;
+				return Promise.resolve(null);
 			const attempt = new Promise((resolve) => {
 				let settled = false;
 				const finish = (db) => {
@@ -3708,7 +3699,13 @@
 					};
 					if (!finish(db))
 						dbPromise = Promise.resolve(db);
-					setTimeout(() => startCachePrune(db), 0);
+					setTimeout(() => {
+						let prunedRows = null;
+						cacheTransaction(db, "readwrite", null, store => pruneCache(store, rows => prunedRows = rows))
+							.then(() => {
+								if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;
+							}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
+					}, 0);
 				};
 				req.onerror = () =>
 					fail("Reverse geocoding cache is unavailable.", req.error);
@@ -3856,13 +3853,6 @@
 				if (syncToken !== null)
 					cacheChannel.postMessage([1, syncToken]);
 			}
-		}
-		function startCachePrune(db) {
-			let prunedRows = null;
-			cacheTransaction(db, "readwrite", null, store => pruneCache(store, rows => prunedRows = rows))
-				.then(() => {
-					if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;
-				}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
 		}
 		function pruneCache(store, onRows) {
 			const index = store.index("savedAt");
@@ -4026,7 +4016,13 @@
 				const now = performance.now();
 				if (force || now - lastStatusAt >= 200) {
 					lastStatusAt = now;
-					showProgress(state.processed, total);
+					paintStatus("조회 중…", "info");
+					const pct = Math.round((state.processed / total) * 100);
+					const bucket = total <= 10 || pct === 100 ? pct : Math.floor(pct / 10) * 10;
+					if (bucket !== srStatus.progressBucket || state.processed === total) {
+						srStatus.progressBucket = bucket;
+						announceStatus(`진행 ${pct}%`);
+					}
 				}
 				return now;
 			};
@@ -4050,6 +4046,7 @@
 				const record = records[i];
 				record.result = null;
 				record._search = null;
+				record._status = null;
 				const parsed = getMemoryCache(record.cacheKey);
 				if (parsed === undefined) {
 					persistentCache.set(record.cacheKey, null);
@@ -4184,25 +4181,23 @@
 		function errorMessage(err) {
 			return String(err?.message || err);
 		}
-		function hasAddress(result) {
-			const addr = result?.addr;
-			return !!(addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag));
-		}
-		const resultStatus = result => result.error ? "failed" : hasAddress(result) ? "done" : "missing";
+		const resultStatus = ({addr, error}) => error ? "failed"
+			: addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag) ? "done" : "missing";
 		const KIND_LABELS = {KR: "대한민국", KP: "북한", 에러: "조회 실패"};
 		const kindLabel = (kind, countryName) =>
 			kind === "WORLD" ? countryName || "국가 미확인" : KIND_LABELS[kind] || kind;
 		const STATUS_LABELS = {done: "주소 확인", missing: "주소 없음", failed: "조회 실패"};
+		const joinPair = (a, b) => a && b ? `${a} ${b}` : a || b || "";
 		function resultTitle({addr, error}) {
 			return error ? "조회 실패" :
-				[addr.sido, addr.sigungu].filter(Boolean).join(" ") || addr.fullAddr || "주소 정보 없음";
+				joinPair(addr.sido, addr.sigungu) || addr.fullAddr || "주소 정보 없음";
 		}
 		function createRow(record, index) {
 			const tr = rowTemplate.cloneNode(true);
 			const cells = tr.cells;
 			const result = record.result;
 			const addr = result.addr;
-			const status = resultStatus(result);
+			const status = record._status;
 			const statusLabel = STATUS_LABELS[status];
 			const kind = kindLabel(result.kind || record.set, result.countryName);
 			const selected = index === selectedIndex;
@@ -4219,8 +4214,8 @@
 			if (result.error) button.lastElementChild.classList.add("row-error");
 			button.ariaLabel = `${index + 1}. ${title} ${subtitle} - 위치 상세 보기`;
 			button.ariaDescription = `좌표 ${record.latStr}, ${record.lonStr}; 구분 ${kind}; ${statusLabel}`;
-			cells[2].firstElementChild.textContent = fmtCoord6(record.latStr);
-			cells[2].lastElementChild.textContent = fmtCoord6(record.lonStr);
+			cells[2].firstElementChild.textContent = record._lat6 ??= fmtCoord6(record.latStr);
+			cells[2].lastElementChild.textContent = record._lon6 ??= fmtCoord6(record.lonStr);
 			cells[2].title = record.latStr + ", " + record.lonStr;
 			cells[3].firstElementChild.textContent = kind;
 			const statusBadge = cells[4].firstElementChild;
@@ -4232,10 +4227,11 @@
 		function commitResult(index, parsed, render) {
 			const r = state.records[index];
 			r.result = parsed;
+			const status = r._status = resultStatus(parsed);
 			addCountryFilter(r);
 			state.processed++;
-			if (parsed.error) state.cntFail++;
-			else if (!hasAddress(parsed)) state.cntNoAddress++;
+			if (status === "failed") state.cntFail++;
+			else if (status === "missing") state.cntNoAddress++;
 			let visibleIndex = -1;
 			if (matchesFilter(r, filterState)) {
 				visibleIndex = state.visibleIndices.length;
@@ -4409,7 +4405,7 @@
 				"HTTPS 연결에서 사용할 수 있습니다.",
 			);
 		});
-		on(byId("page-size"), "change", (event) => {
+		on(pageSizeSelect, "change", (event) => {
 			const size = Number(event.target.value);
 			if (![10, 25, 50, 100].includes(size)) return;
 			pageSize = size;
@@ -4421,12 +4417,12 @@
 		on(filterControls, "input", scheduleFilter);
 		on(document, "keydown", (e) => {
 			if (
+				e.key !== "/" ||
 				state.processed === 0 ||
 				e.defaultPrevented ||
-				query("dialog:open") ||
 				e.altKey || e.shiftKey || e.ctrlKey || e.metaKey ||
-				(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable], .manual-rng")) ||
-				e.key !== "/"
+				query("dialog:open") ||
+				(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable], .manual-rng"))
 			) return;
 			e.preventDefault();
 			setMobileView("results");
@@ -4535,7 +4531,7 @@
 			}
 			state.pendingFile = file;
 			void openCacheDb();
-			if (!state.records.length) emptyHint.textContent = FILE_READY_HINT;
+			if (!state.records.length) emptyHint.textContent = "좌표 추출 대기";
 			byId("file-analysis").textContent = "";
 			showStatus(state.records.length ? "새 파일 선택됨 · 기존 결과 유지" : "좌표 추출 대기");
 			byId("drop-filename").textContent = file.name;
@@ -5016,7 +5012,7 @@
 			const manual = mode === "manual";
 			filePane.hidden = manual;
 			manualPanel.hidden = !manual;
-			syncTabs(queryAll("[role=tab]", inputTabs), "mode", mode);
+			syncTabs(inputTabs.children, "mode", mode);
 			if (manual && !manualLoaded) {
 				loadManualRng();
 				manualLoaded = true;
@@ -5025,17 +5021,14 @@
 		}
 		bindTablist(inputTabs, "mode", ["file", "manual"], setInputMode, {wrap: true});
 		function adaptLayout() {
-			if (settings.open && settings.matches(":modal") !== mobileMedia.matches) closeSettings();
-			for (const [panel, tab, heading] of [
-				[inputView, "mobile-input-tab", "input-title"],
-				[byId("results-view"), "mobile-results-tab", "results-title"],
-			]) {
-				panel.role = mobileMedia.matches ? "tabpanel" : null;
-				panel.setAttribute("aria-labelledby", mobileMedia.matches ? tab : heading);
-			}
+			const isMobile = mobileMedia.matches;
+			if (settings.open && settings.matches(":modal") !== isMobile) closeSettings();
+			inputView.role = resultsView.role = isMobile ? "tabpanel" : null;
+			inputView.setAttribute("aria-labelledby", isMobile ? "mobile-input-tab" : "input-title");
+			resultsView.setAttribute("aria-labelledby", isMobile ? "mobile-results-tab" : "results-title");
 			const active = document.activeElement === document.body ? layoutFocus : document.activeElement;
 			const restoreFocus = active && jobPanel.contains(active);
-			const jobSlot = mobileMedia.matches && document.body.dataset.mobiletab === "results"
+			const jobSlot = isMobile && document.body.dataset.mobiletab === "results"
 				? mobileSlot : inputSlot;
 			if (jobPanel.parentElement !== jobSlot) jobSlot.append(jobPanel);
 			if (!compactMedia.matches && detailSheet.open) detailSheet.close();
@@ -5118,21 +5111,21 @@
 			on(button, "click", () => setStatusFilter(button.dataset.status));
 		const filterCount = byId("filter-count");
 		function updateFilterSummary() {
-			const count = [filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr]
-				.filter(input => input.value.trim()).length;
-			filterCount.textContent = fmt(count);
+			let count = 0;
+			for (const input of DETAIL_FILTERS) if (input.value.trim()) count++;
+			const countText = String(count);
+			filterCount.textContent = countText;
 			filterCount.hidden = count === 0;
 			filterTrigger.dataset.active = String(count > 0);
-			filterTrigger.ariaLabel = count
-				? `상세 필터 ${fmt(count)}`
-				: "상세 필터";
-			filterTrigger.ariaDescription = count ? `${fmt(count)}개의 상세 조건이 적용 중입니다.` : null;
+			filterTrigger.ariaLabel = count ? `상세 필터 ${countText}` : "상세 필터";
+			filterTrigger.ariaDescription = count ? `${countText}개의 상세 조건이 적용 중입니다.` : null;
 			const conditions = [];
-			if (filterQuery.value.trim()) conditions.push(`검색: ${filterQuery.value.trim().slice(0, 80)}`);
+			const q = filterQuery.value.trim();
+			if (q) conditions.push(`검색: ${q.slice(0, 80)}`);
 			if (filterKind.value) conditions.push(filterKind.selectedOptions[0].textContent.trim());
 			if (filterStatus !== "all") conditions.push(STATUS_LABELS[filterStatus]);
-			if (count) conditions.push(`상세 조건 ${fmt(count)}개`);
-			byId("active-filter-summary").textContent = conditions.join(" · ") || "적용된 검색·필터 조건이 없습니다.";
+			if (count) conditions.push(`상세 조건 ${countText}개`);
+			activeFilterSummary.textContent = conditions.join(" · ") || "적용된 검색·필터 조건이 없습니다.";
 		}
 		const filterViewport = window.visualViewport;
 		let filterViewportFrame = null;
@@ -5268,17 +5261,8 @@
 				unloadMap();
 				mapPopover.hidePopover();
 				const title = resultTitle(record.result);
-				const fields = {
-					"detail-title": title,
-					"detail-town": addr?.eupmyeon || "",
-					"detail-full": error || addr?.fullAddr || "주소 정보가 없습니다.",
-					"detail-province": addr?.sido || "—",
-					"detail-district": addr?.sigungu || "—",
-					"detail-town2": addr?.eupmyeon || "—",
-					"detail-tag": addr?.tag || "—",
-					"detail-coordinates": record.latStr + ", " + record.lonStr,
-				};
-				for (const [id, value] of Object.entries(fields)) byId(id).textContent = value;
+				const vals = [title, addr?.eupmyeon || "", error || addr?.fullAddr || "주소 정보가 없습니다.", addr?.sido || "—", addr?.sigungu || "—", addr?.eupmyeon || "—", addr?.tag || "—", `${record.latStr}, ${record.lonStr}`];
+				(selectRecord.els ??= ["detail-title", "detail-town", "detail-full", "detail-province", "detail-district", "detail-town2", "detail-tag", "detail-coordinates"].map(byId)).forEach((el, i) => el.textContent = vals[i]);
 				mapLinks.dataset.idx = index;
 				mapLinks.disabled = false;
 				copyAddress.disabled = !addr?.fullAddr;
@@ -5309,8 +5293,10 @@
 			if (row) selectRecord(Number(row.dataset.record));
 		});
 		on(resultBody, "keydown", (event) => {
+			const k = event.key;
+			if (k !== "ArrowUp" && k !== "ArrowDown" && k !== "Home" && k !== "End") return;
 			const button = event.target.closest(".location-button");
-			if (!button || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+			if (!button) return;
 			event.preventDefault();
 			const buttons = [...queryAll(".location-button", resultBody)];
 			const position = buttons.indexOf(button);
@@ -5381,7 +5367,7 @@
 		for (const [sheet, dismiss] of [
 			[detailSheet],
 			[mapPopover, () => mapPopover.hidePopover()],
-			[byId("help-dialog")],
+			[helpDialog],
 			[settings, closeSettings],
 			[filterDialog],
 		]) enableSheetDrag(sheet, dismiss);
@@ -5459,7 +5445,7 @@
 		});
 		const helpTrigger = byId("show-help");
 		on(helpTrigger, "click", () => closeSettings(false));
-		on(byId("help-dialog"), "close", () => {
+		on(helpDialog, "close", () => {
 			if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL);
 		});
 		on(window, "pagehide", () => {

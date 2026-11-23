@@ -27,16 +27,16 @@ const BINOMIAL_VALUES: [[u32; 50]; 6] = {
     }
     values
 };
-const EURO_LUCKY_COMB: u64 = binomial(EURO_LUCKY_MAX, 2) as u64;
-const EURO_LUCKY_MAX: u32 = 12;
-const EURO_MAIN_COMB: u64 = binomial(EURO_MAIN_MAX, 5) as u64;
-const EURO_MAIN_MAX: u32 = 50;
+const EURO_LUCKY_COMB: u64 = binomial(EURO_LUCKY_MAX as u32, 2) as u64;
+const EURO_LUCKY_MAX: u8 = 12;
+const EURO_MAIN_COMB: u64 = binomial(EURO_MAIN_MAX as u32, 5) as u64;
+const EURO_MAIN_MAX: u8 = 50;
 const EURO_MILLIONS_LUCKY_COUNT: usize = 2;
 const EURO_MILLIONS_MAIN_COUNT: usize = 5;
 const EURO_PIN_NMS_MODULUS: u64 = EURO_MAIN_COMB
     .strict_mul(NUMERIC_PASSWORD_MODULUS)
     .strict_mul(NMS_SOLAR_SYSTEM_MODULUS);
-const HANGUL_BASE_CODE_POINT: u32 = 0xAC00;
+const HANGUL_BASE_CODE_POINT: u16 = 0xAC00;
 const HANGUL_QUAD_MODULUS: u64 = HANGUL_SYLLABLE_MODULUS.strict_pow(4);
 const HANGUL_SYLLABLE_COUNT: usize = 4;
 const HANGUL_SYLLABLE_MODULUS: u64 = 11_172;
@@ -44,12 +44,12 @@ const LOTTO_BUNDLE_MODULUS: u64 = LOTTO_COMB
     .strict_mul(LOTTO7_COMB)
     .strict_mul(EURO_LUCKY_COMB)
     .strict_mul(NMS_PLANET_MODULUS);
-const LOTTO_COMB: u64 = binomial(LOTTO_MAX, 6) as u64;
+const LOTTO_COMB: u64 = binomial(LOTTO_MAX as u32, 6) as u64;
 const LOTTO_COUNT: usize = 6;
-const LOTTO_MAX: u32 = 45;
-const LOTTO7_COMB: u64 = binomial(LOTTO7_MAX, 7) as u64;
+const LOTTO_MAX: u8 = 45;
+const LOTTO7_COMB: u64 = binomial(LOTTO7_MAX as u32, 7) as u64;
 const LOTTO7_COUNT: usize = 7;
-const LOTTO7_MAX: u32 = 37;
+const LOTTO7_MAX: u8 = 37;
 const MIX_MUL_A: u64 = 0xBF58_476D_1CE4_E5B9;
 const MIX_MUL_B: u64 = 0x94D0_49BB_1331_11EB;
 const MIX_SALT_EURO: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -76,7 +76,7 @@ pub(super) struct RandomDataSet {
     pub galaxy_x: u16,
     pub galaxy_y: u16,
     pub galaxy_z: u16,
-    pub hangul_syllables: [char; HANGUL_SYLLABLE_COUNT],
+    pub hangul_syllables: [u16; HANGUL_SYLLABLE_COUNT],
     pub kor_coords: Coordinates,
     pub lotto7_numbers: [u8; LOTTO7_COUNT],
     pub lotto_numbers: [u8; LOTTO_COUNT],
@@ -98,18 +98,14 @@ impl RandomDataSet {
     pub(super) fn populate<F>(
         self,
         next_supp: &mut F,
-        boundary_cache: Option<&mut korea_boundary::BoundaryCache>,
+        boundary_cache: &mut korea_boundary::BoundaryCache,
     ) -> Result<Self>
     where
         F: FnMut(&'static str) -> Result<u64>,
     {
         let initial = self.num_64;
-        let mut local_cache = korea_boundary::BoundaryCache::default();
         let mut fields = RandomDataBuildState {
-            korea: korea_boundary::SampleState::try_from((
-                initial,
-                boundary_cache.unwrap_or(&mut local_cache),
-            ))?,
+            korea: korea_boundary::SampleState::try_from((initial, boundary_cache))?,
             data: self,
         };
         fields.fill_coords();
@@ -127,7 +123,7 @@ impl RandomDataBuildState<'_> {
     fn check_complete(&self) -> Result<()> {
         self.is_basic_complete()
             .ok_or("기본 필드 보완 난수 시도 횟수를 초과했습니다.")?;
-        (!matches!(self.data.hangul_syllables, ['\0', ..]))
+        (!matches!(self.data.hangul_syllables, [0, ..]))
             .ok_or("한글 음절 보완 난수 시도 횟수를 초과했습니다.")
             .map_err(Into::into)
     }
@@ -166,7 +162,7 @@ impl RandomDataBuildState<'_> {
         );
     }
     fn fill_hangul_from_u64(&mut self, value: u64) {
-        if !matches!(self.data.hangul_syllables, ['\0', ..]) {
+        if !matches!(self.data.hangul_syllables, [0, ..]) {
             return;
         }
         let Some(rem) = mix_bounded::<HANGUL_QUAD_MODULUS>(value, MIX_SALT_HANGUL) else {
@@ -183,8 +179,7 @@ impl RandomDataBuildState<'_> {
             hi.div_euclid(base_mod),
         ];
         for (slot, offset) in self.data.hangul_syllables.iter_mut().zip(offsets) {
-            let point = HANGUL_BASE_CODE_POINT.strict_add(offset);
-            *slot = char::from_u32(point).unwrap_or_else(|| process::abort());
+            *slot = HANGUL_BASE_CODE_POINT.strict_add(low_u16_from_u64(u64::from(offset)));
         }
     }
     fn fill_lotto_bundle_from_u64(&mut self, value: u64) {
@@ -241,7 +236,7 @@ impl RandomDataBuildState<'_> {
     }
     const fn is_complete(&self) -> bool {
         self.is_basic_complete()
-            && !matches!(self.data.hangul_syllables, ['\0', ..])
+            && !matches!(self.data.hangul_syllables, [0, ..])
             && self.korea.is_complete()
     }
     fn offer_word(&mut self, value: u64, initial: bool) -> Result<()> {
@@ -276,7 +271,7 @@ const fn galaxy_coord<const OFFSET: u16, const MASK: u16>(value: u16) -> u16 {
 #[cfg(target_arch = "x86_64")]
 pub(super) fn generate_random_data_with_rng(
     rng: &HardwareRng,
-    boundary_cache: Option<&mut korea_boundary::BoundaryCache>,
+    boundary_cache: &mut korea_boundary::BoundaryCache,
 ) -> Result<RandomDataSet> {
     let mut next_supp = |reason: &'static str| -> Result<u64> {
         rng.next_u64()
@@ -300,11 +295,11 @@ const fn mix_bounded<const MODULUS: u64>(value: u64, salt: u64) -> Option<u64> {
         Some(mixed.rem_euclid(MODULUS))
     }
 }
-fn unrank_combination_into(mut rank: u32, max_n: u32, out: &mut [u8]) {
+fn unrank_combination_into(mut rank: u32, max_n: u8, out: &mut [u8]) {
     let Some((first_slot, tail)) = out.split_first_mut() else {
         return;
     };
-    let mut upper = usize::try_from(max_n).unwrap_or_else(|_| process::abort());
+    let mut upper = usize::from(max_n);
     for (tail_idx, slot) in tail.iter_mut().enumerate().rev() {
         let lower = tail_idx.strict_add(1);
         let row = BINOMIAL_VALUES
@@ -315,8 +310,8 @@ fn unrank_combination_into(mut rank: u32, max_n: u32, out: &mut [u8]) {
         let combinations = *row.get(offset).unwrap_or_else(|| process::abort());
         rank = rank.strict_sub(combinations);
         let value = lower.strict_add(offset);
-        let value_u32 = u32::try_from(value).unwrap_or_else(|_| process::abort());
-        *slot = low_u8_from_u32(value_u32.strict_add(1));
+        let [low, ..] = value.to_le_bytes();
+        *slot = low.strict_add(1);
         upper = value;
     }
     *first_slot = low_u8_from_u32(rank.strict_add(1));

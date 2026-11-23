@@ -6,6 +6,7 @@ use crate::{
         DEFAULT_INPUT_LINE_MAX_BYTES, get_validated_input, read_line_reuse_limited,
         read_u64_hex_input,
     },
+    korea_boundary::BoundaryCache,
     random_data::RandomDataSet,
     time::{ParsedServer, ServerTimeSession, TargetTimeOfDay, TriggerAction},
 };
@@ -190,11 +191,12 @@ impl MenuApp {
                 err,
             )
         };
+        let mut boundary_cache = BoundaryCache::default();
         let data = RandomDataSet {
             num_64: manual_num_64,
             ..Default::default()
         }
-        .populate(&mut next_supp, None)?;
+        .populate(&mut next_supp, &mut boundary_cache)?;
         self.output_file.persist_and_print(&data)
     }
     #[cfg(target_arch = "x86_64")]

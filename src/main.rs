@@ -5,6 +5,7 @@ use self::{file_output::OutputFile, menu_app::MenuApp};
 #[cfg(target_arch = "x86_64")]
 use self::{
     hardware_rng::{HardwareRandomSource, HardwareRng},
+    korea_boundary::BoundaryCache,
     random_data::generate_random_data_with_rng,
 };
 use core::fmt;
@@ -104,7 +105,8 @@ fn main() -> Result<()> {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
                     let mut err = stderr().lock();
                     rng.write_initial_source_notice(&mut err)?;
-                    let data = generate_random_data_with_rng(&rng, None)?;
+                    let mut boundary_cache = BoundaryCache::default();
+                    let data = generate_random_data_with_rng(&rng, &mut boundary_cache)?;
                     rng.write_rdseed_fallback_notice(&mut err)?;
                     output_file.persist_and_print(&data)?;
                 }

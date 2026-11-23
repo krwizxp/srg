@@ -22,8 +22,23 @@ static HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 const NIBBLE_MASK_U64: u64 = 0xF;
 const NMS_GLYPH_COUNT: usize = 12;
 const NMS_GLYPH_TOP_SHIFT: u32 = 44;
-static NMS_GLYPHS: [&str; 16] = [
-    "🌅", "🐦", "👫", "🦕", "🌘", "🎈", "⛵", "🕷", "🦋", "🌀", "🧊", "🐟", "⛺", "🚀", "🌳", "🔯",
+static NMS_GLYPHS: [[u8; 4]; 16] = [
+    [0xF0, 0x9F, 0x8C, 0x85],
+    [0xF0, 0x9F, 0x90, 0xA6],
+    [0xF0, 0x9F, 0x91, 0xAB],
+    [0xF0, 0x9F, 0xA6, 0x95],
+    [0xF0, 0x9F, 0x8C, 0x98],
+    [0xF0, 0x9F, 0x8E, 0x88],
+    [0xE2, 0x9B, 0xB5, 0x00],
+    [0xF0, 0x9F, 0x95, 0xB7],
+    [0xF0, 0x9F, 0xA6, 0x8B],
+    [0xF0, 0x9F, 0x8C, 0x80],
+    [0xF0, 0x9F, 0xA7, 0x8A],
+    [0xF0, 0x9F, 0x90, 0x9F],
+    [0xE2, 0x9B, 0xBA, 0x00],
+    [0xF0, 0x9F, 0x9A, 0x80],
+    [0xF0, 0x9F, 0x8C, 0xB3],
+    [0xF0, 0x9F, 0x94, 0xAF],
 ];
 const OCTAL_DIGIT_MASK: u64 = 7;
 const OCTAL_SHIFT_BITS: u32 = 3;
@@ -90,7 +105,9 @@ impl OutputFormatter<'_, '_, '_> {
                     .get(index)
                     .copied()
                     .unwrap_or_else(|| process::abort());
-                buffer_cur.write_bytes(glyph.as_bytes());
+                let [_, _, _, last] = glyph;
+                let len = 3_usize.strict_add(usize::from(last != 0));
+                buffer_cur.write_bytes(glyph.split_at(len).0);
                 glyph_bits <<= 4_u32;
             }
             buffer_cur.write_byte(b')');
@@ -197,7 +214,7 @@ impl OutputFormatter<'_, '_, '_> {
         self.write_labeled_line("한글 음절 4글자: ".as_bytes(), |buffer_cur| {
             let (chunks, _) = buffer_cur.take(12).as_chunks_mut::<3>();
             for (&ch, chunk) in data.hangul_syllables.iter().zip(chunks) {
-                let [b0, b1, ..] = u32::from(ch).to_le_bytes();
+                let [b0, b1] = ch.to_le_bytes();
                 *chunk = [
                     0xE0_u8 | (b1 >> 4_u8),
                     0x80_u8 | ((b1 & 0x0F_u8) << 2_u8) | (b0 >> 6_u8),
