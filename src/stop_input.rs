@@ -1,30 +1,12 @@
+#[cfg(target_os = "macos")]
+use core::ffi::c_uint;
+#[cfg(target_os = "linux")]
+use core::ffi::c_ulong;
 use std::io;
 cfg_select! {
     target_os = "windows" => {
         use core::{ffi::{c_int, c_void}, ptr::null_mut};
         use std::io::{IsTerminal as _, stdin};
-    }
-    any(target_os = "linux", target_os = "macos") => {
-        use core::ffi::{c_int, c_short, c_void};
-    }
-    _ => {}
-}
-cfg_select! {
-    target_os = "linux" => {
-        use core::ffi::c_ulong;
-    }
-    target_os = "macos" => {
-        use core::ffi::c_uint;
-    }
-    _ => {}
-}
-cfg_select! {
-    target_os = "windows" => {
-        const ENTER_KEY: c_int = 13;
-        const FILE_TYPE_DISK: u32 = 1;
-        const FILE_TYPE_PIPE: u32 = 3;
-        const MAX_CONSOLE_KEYS_PER_POLL: usize = 64;
-        const STD_INPUT_HANDLE: i32 = -10;
         #[link(name = "kernel32")]
         unsafe extern "system" {
             fn GetFileType(file: *mut c_void) -> u32;
@@ -54,8 +36,7 @@ cfg_select! {
         }
     }
     any(target_os = "linux", target_os = "macos") => {
-        const POLL_DESCRIPTOR_COUNT: PollDescriptorCount = 1;
-        const POLL_ERROR_EVENTS: c_short = POLLERR | POLLNVAL;
+        use core::ffi::{c_int, c_short, c_void};
         pub(crate) const POLLERR: c_short = 0x0008;
         pub(crate) const POLLHUP: c_short = 0x0010;
         pub(crate) const POLLIN: c_short = 0x0001;
@@ -116,15 +97,15 @@ impl TryFrom<Option<usize>> for StopInput {
             StopInputBackend::Console
         } else {
             // SAFETY: GetStdHandle returns the process standard input handle.
-            let file = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
+            let file = unsafe { GetStdHandle(-10) };
             (!file.is_null() && file.addr() != usize::MAX).ok_or_else(io::Error::last_os_error)?;
             // SAFETY: file is the process standard input handle.
             let file_type = unsafe { GetFileType(file) };
-            matches!(file_type, FILE_TYPE_DISK | FILE_TYPE_PIPE)
+            matches!(file_type, 1 | 3)
                 .ok_or_else(|| io::Error::other("지원하지 않는 Windows 표준 입력 유형입니다."))?;
             StopInputBackend::Stream {
                 file,
-                pipe: file_type == FILE_TYPE_PIPE,
+                pipe: file_type == 3,
             }
         };
         Ok(Self {
@@ -138,150 +119,111 @@ impl StopInput {
     pub(crate) fn poll(&mut self) -> io::Result<bool> {
         cfg_select! {
             target_os = "windows" => {
-                self.poll_windows()
+                match self.backend {
+                    StopInputBackend::Console => {
+                        for _ in 0..64_usize {
+                            // SAFETY: _kbhit reads only the calling process console input state.
+                            if unsafe { console_key_available() } == 0_i32 {
+                                return Ok(false);
+                            }
+                            // SAFETY: _kbhit reported an available console key for _getch to consume.
+                            let key = unsafe { read_console_key() };
+                            if key == 13_i32 {
+                                return Ok(true);
+                            }
+                            if matches!(key, 0 | 224) {
+                                // SAFETY: this checks whether an extended-key byte is available.
+                                if unsafe { console_key_available() } != 0_i32 {
+                                    // SAFETY: _kbhit reported the second byte of an extended key.
+                                    unsafe {
+                                        read_console_key();
+                                    }
+                                }
+                                continue;
+                            }
+                            self.record_non_newline()?;
+                        }
+                        Ok(false)
+                    }
+                    StopInputBackend::Stream { file, pipe } => loop {
+                        if pipe {
+                            let mut available = 0_u32;
+                            // SAFETY: file is a pipe handle and available is a writable DWORD.
+                            if unsafe {
+                                PeekNamedPipe(file, null_mut(), 0, null_mut(), &raw mut available, null_mut())
+                            } == 0_i32
+                            {
+                                return pipe_failure(io::Error::last_os_error());
+                            }
+                            if available == 0 {
+                                return Ok(false);
+                            }
+                        }
+                        let mut byte = 0_u8;
+                        let mut read = 0_u32;
+                        // SAFETY: file is a readable standard input handle and byte is writable.
+                        if unsafe {
+                            ReadFile(file, (&raw mut byte).cast::<c_void>(), 1, &raw mut read, null_mut())
+                        } == 0_i32
+                        {
+                            let source = io::Error::last_os_error();
+                            return if pipe { pipe_failure(source) } else { Err(source) };
+                        }
+                        if read == 0 || byte == b'\n' {
+                            return Ok(true);
+                        }
+                        self.record_non_newline()?;
+                    },
+                }
             }
             any(target_os = "linux", target_os = "macos") => {
-                self.poll_unix()
+                loop {
+                    let mut descriptor = PollFd { fd: 0_i32, events: POLLIN, revents: 0 };
+                    // SAFETY: descriptor is one writable pollfd and the count is exactly one.
+                    let status = unsafe { poll_stdin(&raw mut descriptor, 1, 0_i32) };
+                    if status < 0_i32 {
+                        let source = io::Error::last_os_error();
+                        if source.kind() == io::ErrorKind::Interrupted {
+                            continue;
+                        }
+                        return Err(source);
+                    }
+                    if status == 0_i32 {
+                        return Ok(false);
+                    }
+                    if descriptor.revents & POLLIN != 0 {
+                        let mut byte = 0_u8;
+                        // SAFETY: byte is a writable one-byte buffer and fd 0 is standard input.
+                        let read = unsafe { read_stdin(0_i32, (&raw mut byte).cast::<c_void>(), 1) };
+                        if read < 0 {
+                            let source = io::Error::last_os_error();
+                            if source.kind() == io::ErrorKind::Interrupted {
+                                continue;
+                            }
+                            return Err(source);
+                        }
+                        if read == 0 || byte == b'\n' {
+                            return Ok(true);
+                        }
+                        self.record_non_newline()?;
+                        continue;
+                    }
+                    if descriptor.revents & POLLHUP != 0 {
+                        return Ok(true);
+                    }
+                    if descriptor.revents & (POLLERR | POLLNVAL) != 0 {
+                        return Err(io::Error::other(format!(
+                            "표준 입력 poll 오류: revents={:#06x}",
+                            descriptor.revents
+                        )));
+                    }
+                    return Ok(false);
+                }
             }
             _ => {
                 compile_error!("Stop input supports only Windows, Linux, and macOS.");
             }
         }
-    }
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn poll_unix(&mut self) -> io::Result<bool> {
-        loop {
-            let mut descriptor = PollFd {
-                fd: 0_i32,
-                events: POLLIN,
-                revents: 0,
-            };
-            // SAFETY: descriptor is one writable pollfd and the count is exactly one.
-            let status = unsafe { poll_stdin(&raw mut descriptor, POLL_DESCRIPTOR_COUNT, 0_i32) };
-            if status < 0_i32 {
-                let source = io::Error::last_os_error();
-                if source.kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(source);
-            }
-            if status == 0_i32 {
-                return Ok(false);
-            }
-            if descriptor.revents & POLLIN != 0 {
-                let mut byte = 0_u8;
-                // SAFETY: byte is a writable one-byte buffer and fd 0 is standard input.
-                let read = unsafe { read_stdin(0_i32, (&raw mut byte).cast::<c_void>(), 1) };
-                if read < 0 {
-                    let source = io::Error::last_os_error();
-                    if source.kind() == io::ErrorKind::Interrupted {
-                        continue;
-                    }
-                    return Err(source);
-                }
-                if read == 0 {
-                    return Ok(true);
-                }
-                if self.record_byte(byte)? {
-                    return Ok(true);
-                }
-                continue;
-            }
-            if descriptor.revents & POLLHUP != 0 {
-                return Ok(true);
-            }
-            if descriptor.revents & POLL_ERROR_EVENTS != 0 {
-                return Err(io::Error::other(format!(
-                    "표준 입력 poll 오류: revents={:#06x}",
-                    descriptor.revents
-                )));
-            }
-            return Ok(false);
-        }
-    }
-    #[cfg(target_os = "windows")]
-    fn poll_windows(&mut self) -> io::Result<bool> {
-        match self.backend {
-            StopInputBackend::Console => {
-                for _ in 0..MAX_CONSOLE_KEYS_PER_POLL {
-                    // SAFETY: _kbhit reads only the calling process console input state.
-                    if unsafe { console_key_available() } == 0_i32 {
-                        return Ok(false);
-                    }
-                    // SAFETY: _kbhit reported an available console key for _getch to consume.
-                    let key = unsafe { read_console_key() };
-                    if key == ENTER_KEY {
-                        return Ok(true);
-                    }
-                    if matches!(key, 0 | 224) {
-                        // SAFETY: this checks whether an extended-key byte is available.
-                        if unsafe { console_key_available() } != 0_i32 {
-                            // SAFETY: _kbhit reported the second byte of an extended key.
-                            unsafe {
-                                read_console_key();
-                            }
-                        }
-                        continue;
-                    }
-                    self.record_non_newline()?;
-                }
-                Ok(false)
-            }
-            StopInputBackend::Stream { file, pipe } => loop {
-                if pipe {
-                    let mut available = 0_u32;
-                    // SAFETY: file is a pipe handle and available is a writable DWORD.
-                    let status = unsafe {
-                        PeekNamedPipe(
-                            file,
-                            null_mut(),
-                            0,
-                            null_mut(),
-                            &raw mut available,
-                            null_mut(),
-                        )
-                    };
-                    if status == 0_i32 {
-                        return pipe_failure(io::Error::last_os_error());
-                    }
-                    if available == 0 {
-                        return Ok(false);
-                    }
-                }
-                let mut byte = 0_u8;
-                let mut read = 0_u32;
-                // SAFETY: file is a readable standard input handle and byte is writable.
-                let status = unsafe {
-                    ReadFile(
-                        file,
-                        (&raw mut byte).cast::<c_void>(),
-                        1,
-                        &raw mut read,
-                        null_mut(),
-                    )
-                };
-                if status == 0_i32 {
-                    let source = io::Error::last_os_error();
-                    if pipe {
-                        return pipe_failure(source);
-                    }
-                    return Err(source);
-                }
-                if read == 0 {
-                    return Ok(true);
-                }
-                if self.record_byte(byte)? {
-                    return Ok(true);
-                }
-            },
-        }
-    }
-    fn record_byte(&mut self, byte: u8) -> io::Result<bool> {
-        if byte == b'\n' {
-            return Ok(true);
-        }
-        self.record_non_newline()?;
-        Ok(false)
     }
     fn record_non_newline(&mut self) -> io::Result<()> {
         let Some(remaining) = self.input_bytes_remaining.as_mut() else {

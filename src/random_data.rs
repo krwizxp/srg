@@ -1,13 +1,12 @@
 #[cfg(target_arch = "x86_64")]
 use super::{diagnostic::AppError, hardware_rng::HardwareRng};
 use crate::{
-    diagnostic::Result,
+    diagnostic::{Result, or_abort},
     korea_boundary,
     numeric::{
         low_u8_from_u32, low_u8_from_u64, low_u16_from_u64, low_u32_from_u64, split_u64_be_u32,
     },
 };
-use std::process;
 const ASCII_PRINTABLE_LEN: u64 = 94;
 const ASCII_PRINTABLE_START: u8 = 33;
 const BINOMIAL_VALUES: [[u32; 50]; 6] = {
@@ -296,15 +295,13 @@ fn unrank_combination_into(mut rank: u32, max_n: u8, out: &mut [u8]) {
     let Some((first_slot, tail)) = out.split_first_mut() else {
         return;
     };
-    let rows = BINOMIAL_VALUES
-        .get(..tail.len())
-        .unwrap_or_else(|| process::abort());
+    let rows = or_abort(BINOMIAL_VALUES.get(..tail.len()));
     let mut upper = usize::from(max_n);
     for (tail_idx, (slot, values)) in tail.iter_mut().zip(rows).enumerate().rev() {
         let lower = tail_idx.strict_add(1);
-        let row = values.get(lower..upper).unwrap_or_else(|| process::abort());
+        let row = or_abort(values.get(lower..upper));
         let offset = row.partition_point(|&comb| comb <= rank).strict_sub(1);
-        let combinations = *row.get(offset).unwrap_or_else(|| process::abort());
+        let combinations = *or_abort(row.get(offset));
         rank = rank.strict_sub(combinations);
         let value = lower.strict_add(offset);
         let [low, ..] = value.to_le_bytes();

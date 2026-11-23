@@ -67,11 +67,7 @@ impl FreshTimeHeaders {
 #[cold]
 #[inline(never)]
 fn error(context: &str, detail: &str) -> TimeError {
-    let mut message = String::with_capacity(context.len().strict_add(detail.len()).strict_add(2));
-    message.push_str(context);
-    message.push_str(": ");
-    message.push_str(detail);
-    TimeError::new(TimeErrorKind::NativeHttp, message)
+    TimeError::new(TimeErrorKind::NativeHttp, format!("{context}: {detail}"))
 }
 #[cfg(target_os = "windows")]
 #[cold]
@@ -80,9 +76,9 @@ fn error_with_source<E>(context: &str, detail: &str, source: E) -> TimeError
 where
     E: Error + Send + Sync + 'static,
 {
-    let mut message = String::with_capacity(context.len().strict_add(detail.len()).strict_add(2));
-    message.push_str(context);
-    message.push_str(": ");
-    message.push_str(detail);
-    TimeError::new_with_source(TimeErrorKind::NativeHttp, message, source)
+    TimeError::new_with_source(
+        TimeErrorKind::NativeHttp,
+        format!("{context}: {detail}"),
+        source,
+    )
 }

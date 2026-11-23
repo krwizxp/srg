@@ -16,9 +16,10 @@ static FIXED_TREES: LazyLock<Result<HuffmanTrees>> = LazyLock::new(|| {
         .get_mut(256..280)
         .ok_or("경계 고정 코드 오류")?
         .fill(7);
-    let literal = Huffman::new(&lengths, false)?;
-    let distance = Huffman::new(&[5; 32], false)?;
-    Ok(HuffmanTrees { distance, literal })
+    Ok(HuffmanTrees {
+        distance: Huffman::new(&[5; 32], false)?,
+        literal: Huffman::new(&lengths, false)?,
+    })
 });
 struct Bits<'data> {
     bit_buffer: u64,
@@ -46,17 +47,13 @@ impl Bits<'_> {
         self.bit_buffer >>= count;
         self.bit_count = self.bit_count.wrapping_sub(count);
     }
-    const fn is_exhausted(&self) -> bool {
-        self.cursor == self.bytes.len() && self.bit_count < 8
-    }
     fn read(&mut self, count: u32) -> Result<u32> {
         if count == 0 {
             return Ok(0);
         }
         self.refill(count);
         (self.bit_count >= count).ok_or("경계 압축 데이터가 잘렸습니다.")?;
-        let mask = (1_u64 << count).wrapping_sub(1);
-        let value = low_u32_from_u64(self.bit_buffer & mask);
+        let value = low_u32_from_u64(self.bit_buffer & (1_u64 << count).wrapping_sub(1));
         self.consume(count);
         Ok(value)
     }
@@ -71,8 +68,8 @@ impl Bits<'_> {
             if self.bit_count <= 16
                 && let Some(&chunk) = tail.first_chunk::<8>()
             {
-                let refill = u64::from_le_bytes(chunk) & 0x0000_ffff_ffff_ffff;
-                self.bit_buffer |= refill << self.bit_count;
+                self.bit_buffer |=
+                    (u64::from_le_bytes(chunk) & 0x0000_ffff_ffff_ffff) << self.bit_count;
                 self.cursor = self.cursor.wrapping_add(6);
                 self.bit_count = self.bit_count.wrapping_add(48);
                 return;
@@ -109,9 +106,7 @@ impl Huffman {
                 .ok_or("경계 압축 코드 길이 오류")?;
             *count = count.strict_add(1);
         }
-        let mut remaining = 1_u32;
-        let mut offsets = [0_u16; 16];
-        let mut next_offset = 0_u16;
+        let (mut remaining, mut offsets, mut next_offset) = (1_u32, [0_u16; 16], 0_u16);
         for (&length_count, offset_slot) in
             result.counts.iter().skip(1).zip(offsets.iter_mut().skip(1))
         {
@@ -138,8 +133,7 @@ impl Huffman {
                 .ok_or("경계 압축 코드 위치 오류")? = u16::from_le_bytes([s0, s1]);
             *offset = offset.strict_add(1);
         }
-        let mut first = 0_u16;
-        let mut index = 0_usize;
+        let (mut first, mut index) = (0_u16, 0_usize);
         for (length, &count) in (1_u16..=9).zip(result.counts.iter().skip(1)) {
             for offset in 0..count {
                 let symbol = *result
@@ -164,11 +158,8 @@ impl Huffman {
     #[inline(never)]
     fn slow_symbol(&self, bits: &mut Bits<'_>) -> Result<u16> {
         bits.refill(15);
-        let mut buf = bits.bit_buffer;
-        let available = bits.bit_count;
-        let mut code = 0_u32;
-        let mut first = 0_u32;
-        let mut index = 0_u32;
+        let (mut buf, available) = (bits.bit_buffer, bits.bit_count);
+        let (mut code, mut first, mut index) = (0_u32, 0_u32, 0_u32);
         for (len, &entry_count) in (1_u32..).zip(self.counts.iter().skip(1)) {
             (available >= len).ok_or("경계 압축 데이터가 잘렸습니다.")?;
             code |= low_u32_from_u64(buf & 1_u64);
@@ -177,11 +168,10 @@ impl Huffman {
             if code < first.strict_add(count) {
                 bits.consume(len);
                 let position = index.strict_add(code.strict_sub(first)) as usize;
-                return self
+                return Ok(*self
                     .symbols
                     .get(position)
-                    .copied()
-                    .ok_or_else(|| "경계 압축 코드 위치 오류".into());
+                    .ok_or("경계 압축 코드 위치 오류")?);
             }
             index = index.strict_add(count);
             first = first.strict_add(count).strict_mul(2);
@@ -191,10 +181,9 @@ impl Huffman {
     }
     fn symbol(&self, bits: &mut Bits<'_>) -> Result<u16> {
         bits.refill(9);
-        let prefix = low_u16_from_u64(bits.bit_buffer) & 0x01FF;
         let packed = *self
             .quick
-            .get(usize::from(prefix))
+            .get(usize::from(low_u16_from_u64(bits.bit_buffer) & 0x01FF))
             .ok_or("경계 압축 조회 위치 오류")?;
         let length = u32::from(packed >> 9_u32);
         if length != 0 && length <= bits.bit_count {
@@ -224,8 +213,7 @@ impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
         }
         let codes = Huffman::new(&code_lengths, true)?;
         let total = literal_count.strict_add(distance_count);
-        let mut lengths = [0_u8; 318];
-        let mut filled = 0_usize;
+        let (mut lengths, mut filled) = ([0_u8; 318], 0_usize);
         while filled < total {
             let symbol = codes.symbol(bits)?;
             let (value, count) = match symbol {
@@ -256,9 +244,10 @@ impl TryFrom<&mut Bits<'_>> for HuffmanTrees {
             .get(..total)
             .ok_or("경계 압축 코드 개수 오류")?
             .split_at(literal_count);
-        let literal = Huffman::new(literal_lengths, false)?;
-        let distance = Huffman::new(distance_lengths, false)?;
-        Ok(Self { distance, literal })
+        Ok(Self {
+            distance: Huffman::new(distance_lengths, false)?,
+            literal: Huffman::new(literal_lengths, false)?,
+        })
     }
 }
 impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
@@ -318,10 +307,9 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                             &mut bits,
                             "경계 압축 길이 코드 오류",
                         )?;
-                        let distance_index = u32::from(trees.distance.symbol(&mut bits)?);
                         let backward = decode_extra(
                             true,
-                            distance_index,
+                            u32::from(trees.distance.symbol(&mut bits)?),
                             &mut bits,
                             "경계 압축 거리 코드 오류",
                         )?;
@@ -364,9 +352,9 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
                 break;
             }
         }
-        bits.is_exhausted().ok_or("경계 압축 잔여 데이터 오류")?;
-        let mut first = 1_u32;
-        let mut second = 0_u32;
+        (bits.cursor == bits.bytes.len() && bits.bit_count < 8)
+            .ok_or("경계 압축 잔여 데이터 오류")?;
+        let (mut first, mut second) = (1_u32, 0_u32);
         for chunk in output
             .get(..written)
             .ok_or("경계 압축 출력 오류")?
@@ -375,8 +363,7 @@ impl<'output> TryFrom<(&[u8], &'output mut [u8])> for InflatedPage<'output> {
             let (blocks, remainder) = chunk.as_chunks::<16>();
             for block in blocks {
                 second = second.wrapping_add(first.wrapping_mul(16));
-                let mut sum = 0_u32;
-                let mut weighted = 0_u32;
+                let (mut sum, mut weighted) = (0_u32, 0_u32);
                 for (weight, &byte) in (1_u32..=16_u32).rev().zip(block) {
                     let value = u32::from(byte);
                     sum = sum.wrapping_add(value);
@@ -432,9 +419,9 @@ fn decode_extra(
             )
         }
     };
-    let base_usize = base as usize;
-    if extra_bits == 0 {
-        return Ok(base_usize);
-    }
-    Ok(base_usize.strict_add(bits.read_usize(extra_bits)?))
+    Ok((base as usize).strict_add(if extra_bits == 0 {
+        0
+    } else {
+        bits.read_usize(extra_bits)?
+    }))
 }

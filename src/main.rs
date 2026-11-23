@@ -1,7 +1,5 @@
 extern crate alloc;
-use self::command::CliCommand;
-use self::diagnostic::Result;
-use self::{file_output::OutputFile, menu_app::MenuApp};
+use self::{command::CliCommand, diagnostic::Result, file_output::OutputFile, menu_app::MenuApp};
 #[cfg(target_arch = "x86_64")]
 use self::{
     hardware_rng::{HardwareRandomSource, HardwareRng},
@@ -50,8 +48,7 @@ const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " ",
     env!("CARGO_PKG_VERSION"),
-    "\n난수 데이터 생성 및 서버 시간 동기화 도구\n\n",
-    "사용법:\n  ",
+    "\n난수 데이터 생성 및 서버 시간 동기화 도구\n\n사용법:\n  ",
     env!("CARGO_PKG_NAME"),
     "\n  ",
     env!("CARGO_PKG_NAME"),
@@ -65,10 +62,8 @@ const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " random-float <min> <max>\n  ",
     env!("CARGO_PKG_NAME"),
-    " time-observe <host> <seconds>\n\n",
-    "옵션:\n",
-    "  -h, --help               도움말\n",
-    "  --version                버전\n"
+    " time-observe <host> <seconds>\n\n옵션:\n",
+    "  -h, --help               도움말\n  --version                버전\n"
 );
 fn write_line_best_effort(output: &mut dyn io::Write, args: fmt::Arguments<'_>) {
     match writeln!(output, "{args}") {
@@ -97,39 +92,35 @@ fn main() -> Result<()> {
         return CliCommand::try_from((first, args))?.execute();
     }
     let input_buffer = String::new();
+    let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
     let mut app = cfg_select! {
         target_arch = "x86_64" => {{
-            let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+            let mut output_file = output_file;
             let rng = HardwareRng::new();
+            let mut err = stderr().lock();
             match rng.source() {
                 HardwareRandomSource::RdSeed | HardwareRandomSource::RdRand => {
-                    let mut err = stderr().lock();
                     rng.write_initial_source_notice(&mut err)?;
                     let mut boundary_cache = BoundaryCache::default();
                     let data = generate_random_data_with_rng(&rng, &mut boundary_cache)?;
                     rng.write_rdseed_fallback_notice(&mut err)?;
                     output_file.persist_and_print(&data)?;
                 }
-                HardwareRandomSource::None => {
-                    let mut err = stderr().lock();
-                    err.write_all(
-                        "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
-                            .as_bytes(),
-                    )?;
-                }
+                HardwareRandomSource::None => err.write_all(
+                    "[경고] RDSEED/RDRAND를 지원하지 않아 하드웨어 RNG 기능(메뉴 1~4)을 비활성화합니다. 메뉴 5/7은 사용 가능합니다.\n"
+                        .as_bytes(),
+                )?,
             }
-            let ladder_results_storage = String::new();
             MenuApp {
                 input_buffer,
-                ladder_results_storage,
+                ladder_results_storage: String::new(),
                 output_file,
                 rng,
             }
         }}
-        _ => {{
-            let output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
+        _ => {
             MenuApp { input_buffer, output_file }
-        }}
+        }
     };
     app.run()
 }

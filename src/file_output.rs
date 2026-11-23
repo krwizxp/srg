@@ -1,7 +1,7 @@
-use crate::diagnostic::{AppError, Result};
 use crate::{
     BUFFER_SIZE, FILE_RECORD_FINAL_LABEL, FILE_RECORD_LINE_COUNT, FILE_RECORD_START, IS_TERMINAL,
     UTF8_BOM,
+    diagnostic::{AppError, Result, or_abort},
     output::{OutputTarget, format_data_into_buffer, write_slice_to_console},
     random_data::RandomDataSet,
 };
@@ -21,13 +21,6 @@ cfg_select! {
                 io::AsRawHandle as _,
             },
         };
-        const ERROR_SHARING_VIOLATION_CODE: i32 = 32;
-        const FILE_ATTRIBUTE_REPARSE_POINT_FLAG: u32 = 0x0000_0400;
-        const FILE_FLAG_OPEN_REPARSE_POINT_FLAG: u32 = 0x0020_0000;
-        const FILE_FLAG_SEQUENTIAL_SCAN: u32 = 0x0800_0000;
-        const FILE_SHARE_READ_FLAG: u32 = 0x0000_0001;
-        const FILE_STANDARD_INFO_CLASS: i32 = 1;
-        const FILE_STANDARD_INFO_SIZE: u32 = 24;
         const _: () = assert!(
             size_of::<FileStandardInfo>() == 24,
             "Windows FILE_STANDARD_INFO size mismatch"
@@ -52,8 +45,10 @@ cfg_select! {
         }
     }
     any(target_os = "linux", target_os = "macos") => {
-        use std::fs::TryLockError;
-        use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
+        use std::{
+            fs::TryLockError,
+            os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _},
+        };
     }
     _ => {}
 }
@@ -72,8 +67,8 @@ impl TryFrom<&Path> for OutputFile {
         cfg_select! {
             target_os = "windows" => {
                 options
-                    .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT_FLAG | FILE_FLAG_SEQUENTIAL_SCAN)
-                    .share_mode(FILE_SHARE_READ_FLAG);
+                    .custom_flags(0x0020_0000 | 0x0800_0000)
+                    .share_mode(0x0000_0001);
             }
             any(target_os = "linux", target_os = "macos") => {
                 options.custom_flags(OPEN_NOFOLLOW_FLAG).mode(0o600);
@@ -84,7 +79,7 @@ impl TryFrom<&Path> for OutputFile {
             Ok(file) => file,
             Err(source) => {
                 #[cfg(target_os = "windows")]
-                if source.raw_os_error() == Some(ERROR_SHARING_VIOLATION_CODE) {
+                if source.raw_os_error() == Some(32_i32) {
                     return Err("다른 srg 인스턴스가 출력 파일을 사용 중입니다.".into());
                 }
                 return Err(source.into());
@@ -92,9 +87,8 @@ impl TryFrom<&Path> for OutputFile {
         };
         let metadata = file.metadata()?;
         #[cfg(target_os = "windows")]
-        (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT_FLAG == 0).ok_or_else(|| {
-            AppError::message("출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.")
-        })?;
+        (metadata.file_attributes() & 0x0000_0400 == 0)
+            .ok_or("출력 파일은 일반 파일이어야 하며 리파스 포인트는 허용되지 않습니다.")?;
         metadata
             .is_file()
             .ok_or("출력 경로는 일반 파일이어야 합니다.")?;
@@ -105,20 +99,16 @@ impl TryFrom<&Path> for OutputFile {
                 let status = unsafe {
                     get_file_information_by_handle_ex(
                         file.as_raw_handle(),
-                        FILE_STANDARD_INFO_CLASS,
+                        1,
                         (&raw mut standard_info).cast::<c_void>(),
-                        FILE_STANDARD_INFO_SIZE,
+                        24,
                     )
                 };
                 (status != 0_i32).ok_or_else(|| AppError::from(IoError::last_os_error()))?;
                 u64::from(standard_info.number_of_links)
             }}
-            any(target_os = "linux", target_os = "macos") => {
-                metadata.nlink()
-            }
-            _ => {
-                compile_error!("Output file validation supports only Windows, Linux, and macOS.")
-            }
+            any(target_os = "linux", target_os = "macos") => metadata.nlink(),
+            _ => compile_error!("Output file validation supports only Windows, Linux, and macOS."),
         };
         (link_count == 1).ok_or("출력 파일의 하드 링크 수는 1이어야 합니다.")?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -136,9 +126,8 @@ impl TryFrom<&Path> for OutputFile {
             let mut permissions = metadata.permissions();
             permissions.set_mode(metadata.mode() & !0o077);
             file.set_permissions(permissions)?;
-            if file.metadata()?.mode() & 0o077 != 0 {
-                return Err("출력 파일의 group/other 접근 권한을 제거하지 못했습니다.".into());
-            }
+            (file.metadata()?.mode().trailing_zeros() >= 6)
+                .ok_or("출력 파일의 group/other 접근 권한을 제거하지 못했습니다.")?;
         }
         let len = file.seek(SeekFrom::End(0))?;
         if len == 0 {
@@ -148,9 +137,7 @@ impl TryFrom<&Path> for OutputFile {
             file.rewind()?;
             file.read_exact(&mut bom)
                 .map_err(|source| AppError::context("기존 출력 파일 BOM 읽기 실패", source))?;
-            (&bom == UTF8_BOM).ok_or_else(|| {
-                AppError::message("기존 출력 파일은 SRG UTF-8 형식이어야 합니다.")
-            })?;
+            (&bom == UTF8_BOM).ok_or("기존 출력 파일은 SRG UTF-8 형식이어야 합니다.")?;
             if len != UTF8_BOM.len() as u64 {
                 let tail_len_u64 = len.min(BUFFER_SIZE as u64);
                 let tail_len = usize::try_from(tail_len_u64).unwrap_or_else(|_| process::abort());
@@ -158,56 +145,41 @@ impl TryFrom<&Path> for OutputFile {
                 let tail_start = len.strict_sub(tail_len_u64);
                 file.seek(SeekFrom::Start(tail_start))?;
                 file.read_exact(tail.get_mut(..tail_len).unwrap_or_else(|| process::abort()))?;
-                let content_start = if tail_start == 0 { UTF8_BOM.len() } else { 0 };
-                let content = tail
-                    .get(content_start..tail_len)
-                    .unwrap_or_else(|| process::abort());
+                let content = or_abort(
+                    tail.get((if tail_start == 0 { UTF8_BOM.len() } else { 0 })..tail_len),
+                );
                 let record_start = content
                     .array_windows::<{ FILE_RECORD_START.len() }>()
                     .rposition(|window| window == FILE_RECORD_START)
-                    .ok_or_else(|| {
-                        AppError::message("기존 출력 파일의 마지막 SRG 레코드를 찾지 못했습니다.")
-                    })?;
-                if record_start != 0
-                    && content
-                        .get(record_start.strict_sub(1))
-                        .is_none_or(|&byte| byte != b'\n')
-                {
-                    return Err(
-                        "기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.".into(),
-                    );
-                }
-                let record = content
-                    .get(record_start..)
-                    .unwrap_or_else(|| process::abort());
+                    .ok_or("기존 출력 파일의 마지막 SRG 레코드를 찾지 못했습니다.")?;
+                (record_start == 0 || content.get(record_start.strict_sub(1)) == Some(&b'\n'))
+                    .ok_or("기존 출력 파일의 마지막 SRG 레코드 경계가 올바르지 않습니다.")?;
+                let record = or_abort(content.get(record_start..));
                 str::from_utf8(record).map_err(|source| {
                     AppError::context("기존 출력 파일이 올바른 UTF-8이 아닙니다.", source)
                 })?;
-                let body = record.strip_suffix(b"\n").ok_or_else(|| {
-                    AppError::message("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")
-                })?;
-                let (record_line_count, last) = body
+                let body = record
+                    .strip_suffix(b"\n")
+                    .ok_or("기존 출력 파일의 마지막 SRG 레코드가 완전하지 않습니다.")?;
+                let (record_lines, last) = body
                     .split(|&byte| byte == b'\n')
                     .fold((0_usize, [].as_slice()), |(count, _), line| {
                         (count.strict_add(1), line)
                     });
-                let final_value_is_valid =
-                    last.strip_prefix(FILE_RECORD_FINAL_LABEL)
-                        .is_some_and(|value| {
-                            value.len() == 19
-                                && value.iter().enumerate().all(|(index, &byte)| {
-                                    if matches!(index, 4 | 9 | 14) {
-                                        byte == b':'
-                                    } else {
-                                        byte.is_ascii_digit() || matches!(byte, b'A'..=b'F')
-                                    }
-                                })
-                        });
-                if record_line_count != FILE_RECORD_LINE_COUNT || !final_value_is_valid {
-                    return Err(
-                        "기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.".into(),
-                    );
-                }
+                let final_valid = last
+                    .strip_prefix(FILE_RECORD_FINAL_LABEL)
+                    .is_some_and(|value| {
+                        value.len() == 19
+                            && value.iter().enumerate().all(|(index, &byte)| {
+                                if matches!(index, 4 | 9 | 14) {
+                                    byte == b':'
+                                } else {
+                                    byte.is_ascii_digit() || matches!(byte, b'A'..=b'F')
+                                }
+                            })
+                    });
+                (record_lines == FILE_RECORD_LINE_COUNT && final_valid)
+                    .ok_or("기존 출력 파일의 마지막 SRG 레코드 형식이 올바르지 않습니다.")?;
             }
         }
         Ok(Self { file })

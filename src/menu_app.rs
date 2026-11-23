@@ -12,9 +12,11 @@ use crate::{
 };
 #[cfg(target_arch = "x86_64")]
 use crate::{
-    batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
+    batch::regenerate_with_count,
     hardware_rng::{HardwareRandomSource, HardwareRng},
-    input::{BATCH_COUNT_INPUT_MAX_BYTES, LadderEntryMode, parse_regular_f64, read_ladder_entries},
+    input::{
+        BATCH_COUNT_INPUT_MAX_BYTES, parse_regular_f64, read_ladder_entries, validate_batch_count,
+    },
     ladder::write_ladder_results,
     random_number::{
         FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float,
@@ -74,9 +76,10 @@ impl MenuApp {
         }
         cfg_select! {
             target_arch = "x86_64" => {
-                if matches!(command, b'1'..=b'4')
-                    && self.rng.source() == HardwareRandomSource::None
-                {
+                if !matches!(command, b'1'..=b'4') {
+                    return Ok(false);
+                }
+                if self.rng.source() == HardwareRandomSource::None {
                     writeln!(
                         out,
                         "이 기능은 RDSEED/RDRAND를 지원하는 CPU에서만 사용할 수 있습니다."
@@ -84,7 +87,26 @@ impl MenuApp {
                     return Ok(true);
                 }
                 match command {
-                    b'1' => self.handle_ladder_command(out, err)?,
+                    b'1' => {
+                        let count = read_ladder_entries(
+                            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
+                            (&mut *out, &mut *err),
+                            &mut self.input_buffer,
+                            None,
+                        )?;
+                        read_ladder_entries(
+                            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {count}개 필요): "),
+                            (&mut *out, &mut *err),
+                            &mut self.ladder_results_storage,
+                            Some(count),
+                        )?;
+                        write_ladder_results(
+                            self.input_buffer.split(',').map(str::trim),
+                            self.ladder_results_storage.split(',').map(str::trim),
+                            &self.rng,
+                            out,
+                        )?;
+                    }
                     b'2' => self.handle_random_number_command(out, err)?,
                     b'3' | b'4' => {
                         let requested_count = if command == b'3' {
@@ -96,15 +118,10 @@ impl MenuApp {
                                 out,
                                 Some(err),
                                 BATCH_COUNT_INPUT_MAX_BYTES,
-                                |raw| match raw.parse::<usize>().ok() {
-                                    Some(0) => Err(Cow::Borrowed("1 이상의 값을 입력해 주세요.")),
-                                    Some(count) if count > MAX_BATCH_GENERATE_COUNT => Err(Cow::Owned(
-                                        format!(
-                                            "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
-                                        ),
-                                    )),
-                                    Some(count) => Ok(count),
-                                    None => Err(Cow::Borrowed("유효한 숫자를 입력해 주세요.")),
+                                |raw| {
+                                    raw.parse::<usize>()
+                                        .map_err(|_parse| Cow::Borrowed("유효한 숫자를 입력해 주세요."))
+                                        .and_then(validate_batch_count)
                                 },
                             )?
                         };
@@ -122,40 +139,17 @@ impl MenuApp {
                 Ok(true)
             }
             _ => {
-                match command {
-                    b'1'..=b'4' => writeln!(
-                        out,
-                        "{}번 메뉴: 이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.",
-                        char::from(command),
-                    )?,
-                    _ => return Ok(false),
+                if !matches!(command, b'1'..=b'4') {
+                    return Ok(false);
                 }
+                writeln!(
+                    out,
+                    "{}번 메뉴: 이 기능은 x86_64 전용이라 현재 플랫폼에서는 비활성화되어 있습니다.",
+                    char::from(command),
+                )?;
                 Ok(true)
             }
         }
-    }
-    #[cfg(target_arch = "x86_64")]
-    fn handle_ladder_command(&mut self, out: &mut dyn Write, err: &mut dyn Write) -> Result<()> {
-        let players_storage = &mut self.input_buffer;
-        let results_storage = &mut self.ladder_results_storage;
-        let n = read_ladder_entries(
-            format_args!("\n사다리타기 플레이어를 입력해 주세요 (쉼표(,)로 구분, 2~512명): "),
-            (&mut *out, &mut *err),
-            players_storage,
-            LadderEntryMode::Players,
-        )?;
-        read_ladder_entries(
-            format_args!("사다리타기 결과값을 입력해 주세요 (쉼표(,)로 구분, {n}개 필요): "),
-            (&mut *out, &mut *err),
-            results_storage,
-            LadderEntryMode::Results { expected_count: n },
-        )?;
-        write_ladder_results(
-            players_storage.split(',').map(str::trim),
-            results_storage.split(',').map(str::trim),
-            &self.rng,
-            out,
-        )
     }
     fn handle_manual_input_command(
         &mut self,
@@ -172,19 +166,13 @@ impl MenuApp {
             out,
             err,
         )?;
-        let mut supp_input_count = 0_usize;
+        let mut supp_count = 0_usize;
         let mut next_supp = |reason: &'static str| -> Result<u64> {
-            supp_input_count = supp_input_count.strict_add(1);
+            supp_count = supp_count.strict_add(1);
             read_u64_hex_input(
                 format_args!(
-                    concat!(
-                        "supp 값 #{} 입력 ({}, 최소값 예: 0 또는 0x0, ",
-                        "최대값 예: {} 또는 0x{:X}): "
-                    ),
-                    supp_input_count,
-                    reason,
-                    u64::MAX,
-                    u64::MAX
+                    "supp 값 #{supp_count} 입력 ({reason}, 최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}): ",
+                    max_u64 = u64::MAX
                 ),
                 &mut self.input_buffer,
                 out,
@@ -274,9 +262,7 @@ impl MenuApp {
                     .ok_or("실수 범위가 너무 커서 안전하게 계산할 수 없습니다.")?;
                 generate_random_float(min_value, max_value, out, &self.rng)?;
             }
-            _ => {
-                writeln!(out, "무작위 숫자 생성을 취소합니다.")?;
-            }
+            _ => writeln!(out, "무작위 숫자 생성을 취소합니다.")?,
         }
         Ok(())
     }
@@ -293,11 +279,10 @@ impl MenuApp {
             &mut *out,
             None,
             DEFAULT_INPUT_LINE_MAX_BYTES,
-            |raw_input| -> CoreResult<ParsedServer, Cow<'static, str>> {
-                (!raw_input.is_empty()).ok_or(Cow::Borrowed("서버 주소를 비워둘 수 없습니다."))?;
-                raw_input.parse::<ParsedServer>().map_err(|source| {
-                    Cow::Owned(format!("서버 주소가 올바르지 않습니다: {source}"))
-                })
+            |raw| -> CoreResult<ParsedServer, Cow<'static, str>> {
+                (!raw.is_empty()).ok_or("서버 주소를 비워둘 수 없습니다.")?;
+                raw.parse::<ParsedServer>()
+                    .map_err(|source| format!("서버 주소가 올바르지 않습니다: {source}").into())
             },
         )?;
         let requested_target_time = get_validated_input(
@@ -306,11 +291,12 @@ impl MenuApp {
             &mut *out,
             None,
             DEFAULT_INPUT_LINE_MAX_BYTES,
-            |raw_input| -> CoreResult<Option<TargetTimeOfDay>, &'static str> {
-                if raw_input.is_empty() {
-                    return Ok(None);
+            |raw| {
+                if raw.is_empty() {
+                    Ok(None)
+                } else {
+                    raw.parse::<TargetTimeOfDay>().map(Some)
                 }
-                raw_input.parse::<TargetTimeOfDay>().map(Some)
             },
         )?;
         let scheduled_trigger = match requested_target_time {
@@ -322,12 +308,10 @@ impl MenuApp {
                     &mut *out,
                     None,
                     DEFAULT_INPUT_LINE_MAX_BYTES,
-                    |selection| -> CoreResult<TriggerAction, &'static str> {
-                        match selection.as_bytes() {
-                            b"1" => Ok(TriggerAction::LeftClick),
-                            b"2" => Ok(TriggerAction::F5Press),
-                            _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
-                        }
+                    |selection| match selection.as_bytes() {
+                        b"1" => Ok(TriggerAction::LeftClick),
+                        b"2" => Ok(TriggerAction::F5Press),
+                        _ => Err("잘못된 입력입니다. 1 또는 2를 입력해주세요."),
                     },
                 )?,
             )),
@@ -342,39 +326,34 @@ impl MenuApp {
         .map_err(Into::into)
     }
     pub(super) fn run(&mut self) -> Result<()> {
-        let menu_prompt = format_args!("{MENU}");
         let mut out = stdout().lock();
         let mut err = stderr();
         loop {
             let command = match read_line_reuse_limited(
-                menu_prompt,
+                format_args!("{MENU}"),
                 &mut self.input_buffer,
                 &mut out,
                 MENU_SELECTION_INPUT_MAX_BYTES,
             ) {
-                Ok(command_str) if let &[command @ b'1'..=b'7'] = command_str.as_bytes() => command,
+                Ok(text) if let &[cmd @ b'1'..=b'7'] = text.as_bytes() => cmd,
                 Ok(_) => 0,
                 Err(read_err) if read_err.kind() == io::ErrorKind::UnexpectedEof => return Ok(()),
                 Err(read_err) => return Err(read_err.into()),
             };
-            let keep_running = match self.execute_command(command, &mut out, &mut err) {
-                Ok(keep_running) => keep_running,
+            match self.execute_command(command, &mut out, &mut err) {
+                Ok(true) => {}
+                Ok(false) => return Ok(()),
                 Err(command_err) => {
-                    let root_error: &(dyn Error + 'static) = &command_err;
-                    let unexpected_eof = successors(Some(root_error), |error| (*error).source())
-                        .any(|error| {
-                            error.downcast_ref::<io::Error>().is_some_and(|io_error| {
-                                io_error.kind() == io::ErrorKind::UnexpectedEof
-                            })
-                        });
-                    if unexpected_eof {
+                    let root: &(dyn Error + 'static) = &command_err;
+                    if successors(Some(root), |error| (*error).source()).any(|error| {
+                        error
+                            .downcast_ref::<io::Error>()
+                            .is_some_and(|io_err| io_err.kind() == io::ErrorKind::UnexpectedEof)
+                    }) {
                         return Ok(());
                     }
                     return Err(command_err);
                 }
-            };
-            if !keep_running {
-                return Ok(());
             }
         }
     }

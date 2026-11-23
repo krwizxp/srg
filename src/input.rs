@@ -1,6 +1,9 @@
 use crate::diagnostic::Result;
 #[cfg(target_arch = "x86_64")]
-use crate::ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES};
+use crate::{
+    batch::MAX_BATCH_GENERATE_COUNT,
+    ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES},
+};
 #[cfg(target_arch = "x86_64")]
 use alloc::borrow::Cow;
 use core::{fmt::Arguments, mem, result::Result as CoreResult};
@@ -8,13 +11,6 @@ use std::io::{self, BufRead as _, Error as IoError, Result as IoResult, Write, s
 #[cfg(target_arch = "x86_64")]
 pub(super) const BATCH_COUNT_INPUT_MAX_BYTES: usize = 64;
 pub(super) const DEFAULT_INPUT_LINE_MAX_BYTES: usize = 4096;
-const HEX_INPUT_LINE_MAX_BYTES: usize = 256;
-#[cfg(target_arch = "x86_64")]
-#[derive(Clone, Copy)]
-pub(super) enum LadderEntryMode {
-    Players,
-    Results { expected_count: usize },
-}
 pub(super) fn validate_input_line(text: &str, max_bytes: usize) -> IoResult<&str> {
     if text.len() > max_bytes {
         return Err(IoError::new(
@@ -50,12 +46,11 @@ pub(super) fn read_line_reuse_limited<'buffer>(
             break;
         }
         let line_end = available.iter().position(|&byte| byte == b'\n');
-        let reached_line_end = line_end.is_some();
         let take_len = line_end.map_or(available.len(), |index| index.strict_add(1));
         let (segment, _) = available.split_at(take_len);
         if segment.len() > max_bytes.strict_add(2).strict_sub(bytes.len()) {
             stdin_lock.consume(take_len);
-            if !reached_line_end {
+            if line_end.is_none() {
                 stdin_lock.skip_until(b'\n')?;
             }
             return Err(IoError::new(
@@ -66,7 +61,7 @@ pub(super) fn read_line_reuse_limited<'buffer>(
         bytes.try_reserve(segment.len()).map_err(IoError::other)?;
         bytes.extend_from_slice(segment);
         stdin_lock.consume(take_len);
-        if reached_line_end {
+        if line_end.is_some() {
             break;
         }
     }
@@ -84,29 +79,22 @@ pub(super) fn read_u64_hex_input(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<u64> {
-    get_validated_input(
-        prompt,
-        input_buffer,
-        out,
-        Some(err),
-        HEX_INPUT_LINE_MAX_BYTES,
-        |raw| {
-            let parsed_value = match raw
-                .strip_prefix('0')
-                .and_then(|body| body.strip_prefix(['x', 'X']))
-            {
-                Some(hex) if !hex.starts_with('+') => u64::from_str_radix(hex, 16).ok(),
-                Some(_) => None,
-                None => raw.parse::<u64>().ok(),
-            };
-            parsed_value.ok_or_else(|| {
-                format!(
-                    "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
-                    max_u64 = u64::MAX
-                )
-            })
-        },
-    )
+    get_validated_input(prompt, input_buffer, out, Some(err), 256, |raw| {
+        let parsed = match raw
+            .strip_prefix('0')
+            .and_then(|body| body.strip_prefix(['x', 'X']))
+        {
+            Some(hex) if !hex.starts_with('+') => u64::from_str_radix(hex, 16).ok(),
+            Some(_) => None,
+            None => raw.parse::<u64>().ok(),
+        };
+        parsed.ok_or_else(|| {
+            format!(
+                "유효한 u64 형식이 아닙니다 (최소값 예: 0 또는 0x0, 최대값 예: {max_u64} 또는 0x{max_u64:X}).",
+                max_u64 = u64::MAX
+            )
+        })
+    })
     .map_err(Into::into)
 }
 pub(super) fn get_validated_input<'writer, T, E>(
@@ -129,10 +117,7 @@ where
                 if !err_text.is_empty() {
                     let target = err_out.as_mut().map_or(&mut *out, |writer| &mut **writer);
                     target.write_all(err_text.as_bytes())?;
-                    target.write_all(
-                        b"
-",
-                    )?;
+                    target.write_all(b"\n")?;
                 }
             }
         }
@@ -145,55 +130,64 @@ pub(super) fn parse_regular_f64(raw: &str) -> Option<f64> {
         .filter(|value| value.is_finite() && !value.is_subnormal())
 }
 #[cfg(target_arch = "x86_64")]
+pub(super) fn validate_batch_count(count: usize) -> CoreResult<usize, Cow<'static, str>> {
+    if count == 0 {
+        Err(Cow::Borrowed("1 이상의 값을 입력해 주세요."))
+    } else if count > MAX_BATCH_GENERATE_COUNT {
+        Err(Cow::Owned(format!(
+            "대량 생성 개수는 최대 {MAX_BATCH_GENERATE_COUNT}건까지 입력할 수 있습니다."
+        )))
+    } else {
+        Ok(count)
+    }
+}
+#[cfg(target_arch = "x86_64")]
+fn validate_ladder_csv(
+    line: &str,
+    expected_count: Option<usize>,
+) -> CoreResult<usize, Cow<'static, str>> {
+    let mut count = 0_usize;
+    for part in line.split(',') {
+        count = count.strict_add(1);
+        match expected_count {
+            None if count > MAX_LADDER_ENTRIES => {
+                return Err(Cow::Owned(format!(
+                    "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
+                )));
+            }
+            Some(expected) if count > expected => break,
+            None | Some(_) => {}
+        }
+        if part.trim().is_empty() {
+            return Err(Cow::Borrowed(if expected_count.is_none() {
+                "플레이어 이름은 비워둘 수 없습니다."
+            } else {
+                "결과값은 비워둘 수 없습니다."
+            }));
+        }
+    }
+    match expected_count {
+        None if count < 2 => Err(Cow::Borrowed("플레이어 수는 최소 2명이어야 합니다.")),
+        Some(expected) if count != expected => Err(Cow::Owned(format!(
+            "결과값의 개수({count})가 플레이어 수({expected})와 일치하지 않습니다.\n"
+        ))),
+        None | Some(_) => Ok(count),
+    }
+}
+#[cfg(target_arch = "x86_64")]
 pub(super) fn read_ladder_entries(
     prompt: Arguments<'_>,
-    io: (&mut dyn Write, &mut dyn Write),
+    (out, err): (&mut dyn Write, &mut dyn Write),
     storage: &mut String,
-    mode: LadderEntryMode,
+    expected_count: Option<usize>,
 ) -> Result<usize> {
-    let (out, err) = io;
     get_validated_input(
         prompt,
         storage,
         out,
         Some(err),
         MAX_LADDER_INPUT_BYTES,
-        |line| -> CoreResult<usize, Cow<'static, str>> {
-            let mut count = 0_usize;
-            for part in line.split(',') {
-                count = count.strict_add(1);
-                match mode {
-                    LadderEntryMode::Players if count > MAX_LADDER_ENTRIES => {
-                        return Err(Cow::Owned(format!(
-                            "플레이어 수가 최대 {MAX_LADDER_ENTRIES}명을 초과했습니다."
-                        )));
-                    }
-                    LadderEntryMode::Results { expected_count } if count > expected_count => break,
-                    LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {}
-                }
-                if part.trim().is_empty() {
-                    return Err(Cow::Borrowed(match mode {
-                        LadderEntryMode::Players => "플레이어 이름은 비워둘 수 없습니다.",
-                        LadderEntryMode::Results { expected_count: _ } => {
-                            "결과값은 비워둘 수 없습니다."
-                        }
-                    }));
-                }
-            }
-            match mode {
-                LadderEntryMode::Players if count < 2 => {
-                    Err(Cow::Borrowed("플레이어 수는 최소 2명이어야 합니다."))
-                }
-                LadderEntryMode::Results { expected_count } if count != expected_count => {
-                    Err(Cow::Owned(format!(
-                        "결과값의 개수({count})가 플레이어 수({expected_count})와 일치하지 않습니다.\n"
-                    )))
-                }
-                LadderEntryMode::Players | LadderEntryMode::Results { expected_count: _ } => {
-                    Ok(count)
-                }
-            }
-        },
+        |line| validate_ladder_csv(line, expected_count),
     )
     .map_err(Into::into)
 }

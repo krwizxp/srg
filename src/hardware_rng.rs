@@ -6,9 +6,6 @@ use core::{
     time::Duration,
 };
 use std::{io::Write, is_x86_feature_detected, thread::yield_now, time::Instant};
-const HARDWARE_RANDOM_RETRY_COUNT: u8 = 10;
-const RDSEED_SPIN_BURST_RETRY_COUNT: u16 = 256;
-const RDSEED_TIMEOUT: Duration = Duration::from_mins(5);
 pub(super) struct HardwareRng {
     fallback_notice_pending: AtomicBool,
     rdrand_supported: bool,
@@ -23,11 +20,10 @@ pub(super) enum HardwareRandomSource {
 }
 impl HardwareRng {
     pub(super) fn new() -> Self {
-        let rdseed_supported = is_x86_feature_detected!("rdseed");
         Self {
             fallback_notice_pending: AtomicBool::new(false),
             rdrand_supported: is_x86_feature_detected!("rdrand"),
-            rdseed_active: AtomicBool::new(rdseed_supported),
+            rdseed_active: AtomicBool::new(is_x86_feature_detected!("rdseed")),
             stop_pending: AtomicBool::new(false),
         }
     }
@@ -47,7 +43,7 @@ impl HardwareRng {
     }
     fn rdrand_random() -> Result<u64> {
         let mut value = 0_u64;
-        for _ in 0_u8..HARDWARE_RANDOM_RETRY_COUNT {
+        for _ in 0_u8..10 {
             // SAFETY: callers only use this after confirming `rdrand` support.
             if unsafe { _rdrand64_step(&mut value) } == 1_i32 {
                 return Ok(value);
@@ -71,13 +67,14 @@ impl HardwareRng {
             HardwareRandomSource::RdRand => return Self::rdrand_random(),
             HardwareRandomSource::None => return Err("RDSEED·RDRAND 모두 미지원합니다.".into()),
         }
-        let retry_started_at = Instant::now();
-        while Instant::now().saturating_duration_since(retry_started_at) < RDSEED_TIMEOUT {
+        let started_at = Instant::now();
+        while Instant::now().saturating_duration_since(started_at) < Duration::from_mins(5) {
             if self.stop_pending.load(Ordering::Relaxed) {
-                if self.rdrand_supported {
-                    return Self::rdrand_random();
-                }
-                return Err("RDSEED 재시도 중단, RDRAND 미지원".into());
+                return if self.rdrand_supported {
+                    Self::rdrand_random()
+                } else {
+                    Err("RDSEED 재시도 중단, RDRAND 미지원".into())
+                };
             }
             if Self::try_rdseed(&mut value) {
                 return Ok(value);
@@ -118,7 +115,7 @@ impl HardwareRng {
         Some(fallback)
     }
     fn try_rdseed(value: &mut u64) -> bool {
-        for _ in 0_u16..RDSEED_SPIN_BURST_RETRY_COUNT {
+        for _ in 0_u16..256 {
             // SAFETY: callers only use this after confirming `rdseed` support.
             if unsafe { _rdseed64_step(value) } == 1_i32 {
                 return true;
@@ -141,14 +138,15 @@ impl HardwareRng {
     }
     pub(super) fn write_rdseed_fallback_notice(&self, err: &mut dyn Write) -> Result<()> {
         if self.fallback_notice_pending.swap(false, Ordering::Acquire) {
-            if self.source() == HardwareRandomSource::RdSeed {
-                writeln!(
-                    err,
+            writeln!(
+                err,
+                "{}",
+                if self.source() == HardwareRandomSource::RdSeed {
                     "RDSEED 일시 재시도 중 RDRAND를 사용했습니다. 다음 호출은 RDSEED를 우선 시도합니다."
-                )?;
-            } else {
-                writeln!(err, "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다.")?;
-            }
+                } else {
+                    "RDSEED 5분 타임아웃으로 RDRAND로 전환했습니다."
+                }
+            )?;
         }
         Ok(())
     }

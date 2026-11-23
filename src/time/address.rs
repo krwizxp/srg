@@ -1,60 +1,50 @@
-use super::{
-    HTTP_SCHEME_PREFIX, HTTP_SCHEME_PREFIX_LEN, HTTPS_SCHEME_PREFIX, HTTPS_SCHEME_PREFIX_LEN,
-    ParsedServer, Result, TimeError, UrlScheme,
-};
+use super::{HTTP_SCHEME_PREFIX, HTTPS_SCHEME_PREFIX, ParsedServer, Result, TimeError, UrlScheme};
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use alloc::ffi::CString;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use core::fmt::NumBuffer;
 use core::{num::IntErrorKind, str::FromStr};
 use std::net;
-const ERR_EMPTY: &str = "서버 주소를 비워둘 수 없습니다.";
 const ERR_HOST: &str = "서버 주소 파싱 실패: 호스트 값이 비어있거나 형식이 올바르지 않습니다.";
-const ERR_PATH: &str = "서버 주소에는 path/query/fragment를 사용할 수 없습니다.";
 const ERR_PORT: &str = "서버 주소 파싱 실패: 포트 번호가 유효하지 않습니다 (1~65535).";
-const DEFAULT_HTTP_PORT: u16 = 80;
-const DEFAULT_HTTPS_PORT: u16 = 443;
 impl FromStr for ParsedServer {
     type Err = TimeError;
     fn from_str(host: &str) -> Result<Self> {
-        let trimmed_input = host.trim();
-        (!trimmed_input.is_empty()).ok_or(ERR_EMPTY)?;
+        let trimmed = host.trim();
+        (!trimmed.is_empty()).ok_or("서버 주소를 비워둘 수 없습니다.")?;
         let (scheme, after_scheme) = if let Some((prefix, rest)) =
-            trimmed_input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
+            trimmed.split_at_checked(HTTPS_SCHEME_PREFIX.len())
             && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
         {
             (UrlScheme::Https, rest)
-        } else if let Some((prefix, rest)) = trimmed_input.split_at_checked(HTTP_SCHEME_PREFIX_LEN)
+        } else if let Some((prefix, rest)) = trimmed.split_at_checked(HTTP_SCHEME_PREFIX.len())
             && prefix.eq_ignore_ascii_case(HTTP_SCHEME_PREFIX)
         {
             (UrlScheme::Http, rest)
         } else {
-            (UrlScheme::Https, trimmed_input)
+            (UrlScheme::Https, trimmed)
         };
-        let (has_path, invalid_host_char, colon_count) = after_scheme.chars().fold(
-            (false, false, 0_usize),
-            |(has_path, invalid_host_char, colon_count), ch| {
-                (
-                    has_path || matches!(ch, '/' | '\\' | '?' | '#'),
-                    invalid_host_char
-                        || matches!(ch, '@' | '%')
-                        || ch.is_control()
-                        || ch.is_whitespace(),
-                    colon_count.strict_add(usize::from(ch == ':')),
-                )
-            },
-        );
-        (!has_path).ok_or(ERR_PATH)?;
-        (!after_scheme.is_empty() && !invalid_host_char).ok_or(ERR_HOST)?;
+        let (has_path, invalid_char, colon_count) =
+            after_scheme
+                .chars()
+                .fold((false, false, 0_usize), |(path, invalid, colons), ch| {
+                    (
+                        path || matches!(ch, '/' | '\\' | '?' | '#'),
+                        invalid || matches!(ch, '@' | '%') || ch.is_control() || ch.is_whitespace(),
+                        colons.strict_add(usize::from(ch == ':')),
+                    )
+                });
+        (!has_path).ok_or("서버 주소에는 path/query/fragment를 사용할 수 없습니다.")?;
+        (!after_scheme.is_empty() && !invalid_char).ok_or(ERR_HOST)?;
         let (host_part, explicit_port, bracketed) =
             if let Some(bracketed_host) = after_scheme.strip_prefix('[') {
                 let (host_part, rem) = bracketed_host.split_once(']').ok_or(ERR_HOST)?;
-                if rem.is_empty() {
-                    (host_part, None, true)
+                let port = if rem.is_empty() {
+                    None
                 } else {
-                    let port_part = rem.strip_prefix(':').ok_or(ERR_HOST)?;
-                    (host_part, Some(parse_port(port_part)?), true)
-                }
+                    Some(parse_port(rem.strip_prefix(':').ok_or(ERR_HOST)?)?)
+                };
+                (host_part, port, true)
             } else if colon_count == 1
                 && let Some((host_part, port_part)) = after_scheme.split_once(':')
             {
@@ -63,8 +53,8 @@ impl FromStr for ParsedServer {
                 (after_scheme, None, false)
             };
         let port = explicit_port.unwrap_or(match scheme {
-            UrlScheme::Http => DEFAULT_HTTP_PORT,
-            UrlScheme::Https => DEFAULT_HTTPS_PORT,
+            UrlScheme::Http => 80,
+            UrlScheme::Https => 443,
         });
         (!host_part.is_empty() && !host_part.contains(['[', ']'])).ok_or(ERR_HOST)?;
         let host_is_ipv6 = colon_count > 1 && host_part.parse::<net::Ipv6Addr>().is_ok();
@@ -76,30 +66,32 @@ impl FromStr for ParsedServer {
                 UrlScheme::Http => HTTP_SCHEME_PREFIX,
                 UrlScheme::Https => HTTPS_SCHEME_PREFIX,
             };
-            let (opening, closing) = if host_is_ipv6 { ("[", "]") } else { ("", "") };
-            let mut port_buffer = NumBuffer::new();
-            let (separator, port_text) = if explicit_port.is_some() {
-                (":", port.format_into(&mut port_buffer))
+            let (open, close) = if host_is_ipv6 { ("[", "]") } else { ("", "") };
+            let mut port_buf = NumBuffer::new();
+            let (sep, port_text) = if explicit_port.is_some() {
+                (":", port.format_into(&mut port_buf))
             } else {
                 ("", "")
             };
-            let parts = [prefix, opening, host_part, closing, separator, port_text];
-            let capacity = parts
-                .iter()
-                .fold(1_usize, |len, part| len.strict_add(part.len()));
-            let mut request_target_text = String::with_capacity(capacity);
-            request_target_text.extend(parts);
-            CString::new(request_target_text).map_err(|source| {
+            let parts = [prefix, open, host_part, close, sep, port_text];
+            let mut text = String::with_capacity(
+                parts
+                    .iter()
+                    .fold(1_usize, |len, part| len.strict_add(part.len())),
+            );
+            text.extend(parts);
+            CString::new(text).map_err(|source| {
                 TimeError::parse_with_source("서버 HTTP 요청 대상 변환 실패", source)
             })?
         };
         #[cfg(target_os = "windows")]
         let host_wide = {
-            let capacity = host_part.len().strict_add(1);
             let mut value = Vec::new();
-            value.try_reserve_exact(capacity).map_err(|source| {
-                TimeError::parse_with_source("서버 host UTF-16 메모리 확보 실패", source)
-            })?;
+            value
+                .try_reserve_exact(host_part.len().strict_add(1))
+                .map_err(|source| {
+                    TimeError::parse_with_source("서버 host UTF-16 메모리 확보 실패", source)
+                })?;
             value.extend(host_part.encode_utf16());
             value.push(0);
             value

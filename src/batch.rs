@@ -1,10 +1,10 @@
 use crate::{
     BUFFER_SIZE, FILE_NAME, IS_TERMINAL,
-    diagnostic::{AppError, Result},
+    diagnostic::{AppError, Result, or_abort},
     file_output::OutputFile,
     hardware_rng::HardwareRng,
     korea_boundary::BoundaryCache,
-    output::{self, OutputTarget, format_data_into_buffer, write_slice_to_console},
+    output::{OutputTarget, ProgressBuffers, format_data_into_buffer, write_slice_to_console},
     random_data::generate_random_data_with_rng,
     stop_input::StopInput,
 };
@@ -69,14 +69,13 @@ fn write_worker_chunk(
         .write_all(written)
         .inspect_err(|_| cancelled.store(true, Ordering::Relaxed))?;
     let last_len = chunk.last_len;
-    let last_slice = written
-        .get(chunk.written_len.strict_sub(last_len)..)
-        .unwrap_or_else(|| process::abort());
     output
         .last_record
         .get_mut(..last_len)
         .unwrap_or_else(|| process::abort())
-        .copy_from_slice(last_slice);
+        .copy_from_slice(or_abort(
+            written.get(chunk.written_len.strict_sub(last_len)..),
+        ));
     output.last_len = Some(last_len);
     drop(output);
     processed.fetch_add(chunk.record_count, Ordering::Relaxed);
@@ -106,9 +105,12 @@ pub(super) fn regenerate_with_count(
     };
     let thread_count = requested_count.min(available_parallelism()?.get());
     let (cancelled, processed) = (AtomicBool::new(false), AtomicUsize::new(0));
-    let base_count = requested_count.div_euclid(thread_count);
-    let remainder = requested_count.rem_euclid(thread_count);
+    let (base_count, remainder) = (
+        requested_count.div_euclid(thread_count),
+        requested_count.rem_euclid(thread_count),
+    );
     let mut last_record_buffer = [0_u8; BUFFER_SIZE];
+    let mut progress_buffers = ProgressBuffers::EMPTY;
     let writer_lock = Mutex::new(WorkerOutput {
         last_len: None,
         last_record: &mut last_record_buffer,
@@ -124,20 +126,17 @@ pub(super) fn regenerate_with_count(
             let mut progress_error = None;
             for worker_idx in 0..thread_count {
                 let loop_count = base_count.strict_add(usize::from(worker_idx < remainder));
-                let (writer, stop, done) = (&writer_lock, &cancelled, &processed);
-                let wake = &coordinator;
+                let (writer, stop, done, wake) =
+                    (&writer_lock, &cancelled, &processed, &coordinator);
                 let worker = thread::Builder::new().spawn_scoped(scope_ctx, move || {
                     let result = (|| {
                         let mut chunk = WorkerChunk::default();
-                        let chunk_capacity =
+                        let capacity =
                             WORKER_CHUNK_CAPACITY.min(loop_count.strict_mul(BUFFER_SIZE));
-                        chunk
-                            .bytes
-                            .try_reserve_exact(chunk_capacity)
-                            .map_err(|source| {
-                                AppError::context("작업자 출력 버퍼 메모리 확보 실패", source)
-                            })?;
-                        chunk.bytes.resize(chunk_capacity, 0);
+                        chunk.bytes.try_reserve_exact(capacity).map_err(|source| {
+                            AppError::context("작업자 출력 버퍼 메모리 확보 실패", source)
+                        })?;
+                        chunk.bytes.resize(capacity, 0);
                         let mut outcome = None;
                         let mut boundary_cache = BoundaryCache::default();
                         for _ in 0..loop_count {
@@ -151,17 +150,21 @@ pub(super) fn regenerate_with_count(
                             {
                                 Ok(data) => data,
                                 Err(source) => {
-                                    let error = AppError::context("난수 생성 실패", source);
-                                    record_failure(&mut outcome, 1, error);
+                                    record_failure(
+                                        &mut outcome,
+                                        1,
+                                        AppError::context("난수 생성 실패", source),
+                                    );
                                     done.fetch_add(1, Ordering::Relaxed);
                                     continue;
                                 }
                             };
-                            let buffer = chunk
-                                .bytes
-                                .get_mut(chunk.written_len..)
-                                .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>())
-                                .unwrap_or_else(|| process::abort());
+                            let buffer = or_abort(
+                                chunk
+                                    .bytes
+                                    .get_mut(chunk.written_len..)
+                                    .and_then(|tail| tail.first_chunk_mut::<BUFFER_SIZE>()),
+                            );
                             let len = format_data_into_buffer(&data, buffer, OutputTarget::File);
                             chunk.written_len = chunk.written_len.strict_add(len);
                             chunk.record_count = chunk.record_count.strict_add(1);
@@ -183,7 +186,6 @@ pub(super) fn regenerate_with_count(
                     }
                 }
             }
-            let mut progress_buffers = output::progress::ProgressBuffers::new();
             let mut last_progress = start_time;
             let mut user_cancelled = false;
             while !cancelled.load(Ordering::Relaxed)
@@ -223,17 +225,13 @@ pub(super) fn regenerate_with_count(
                 active_rng.set_pending_read_interruption(false);
             });
             rng_guard.set_pending_read_interruption(cancelled.load(Ordering::Relaxed));
-            let mut combined = None;
-            let mut worker_panic = None;
-            let mut worker_error = None;
+            let (mut combined, mut worker_panic, mut worker_error) = (None, None, None);
             for handle in worker_handles {
                 match handle.join() {
                     Ok(Ok(Some(failure))) => {
                         record_failure(&mut combined, failure.count, failure.first_error);
                     }
-                    Ok(Err(error)) if worker_error.is_none() => {
-                        worker_error = Some(error);
-                    }
+                    Ok(Err(error)) if worker_error.is_none() => worker_error = Some(error),
                     Err(panic_payload) if worker_panic.is_none() => {
                         worker_panic = Some(panic_payload);
                     }
@@ -262,19 +260,18 @@ pub(super) fn regenerate_with_count(
             failure.first_error,
         ));
     }
-    let completed_count = if user_cancelled {
+    let completed = if user_cancelled {
         processed.load(Ordering::Relaxed)
     } else {
         requested_count
     };
     if *IS_TERMINAL {
-        let mut buffers = output::progress::ProgressBuffers::new();
-        buffers.print(out, completed_count, requested_count, start_time.elapsed())?;
+        progress_buffers.print(out, completed, requested_count, start_time.elapsed())?;
     }
     if user_cancelled {
         writeln!(
             out,
-            "\nEnter 입력으로 작업을 중단했습니다. 총 {completed_count}건이 {FILE_NAME}에 기록되었습니다.\n"
+            "\nEnter 입력으로 작업을 중단했습니다. 총 {completed}건이 {FILE_NAME}에 기록되었습니다.\n"
         )?;
     } else {
         writeln!(
@@ -283,9 +280,8 @@ pub(super) fn regenerate_with_count(
         )?;
     }
     out.flush()?;
-    let Some(last_len) = last_recorded_len else {
-        return Ok(());
-    };
-    write_slice_to_console(last_record_buffer.split_at(last_len).0)?;
+    if let Some(last_len) = last_recorded_len {
+        write_slice_to_console(last_record_buffer.split_at(last_len).0)?;
+    }
     Ok(())
 }

@@ -6,13 +6,13 @@ use crate::{
 cfg_select! {
     target_arch = "x86_64" => {
         use crate::{
+            FILE_NAME,
             batch::{MAX_BATCH_GENERATE_COUNT, regenerate_with_count},
             file_output::OutputFile,
             hardware_rng::{HardwareRandomSource, HardwareRng},
             input::BATCH_COUNT_INPUT_MAX_BYTES,
             ladder::{MAX_LADDER_ENTRIES, MAX_LADDER_INPUT_BYTES, write_ladder_results},
             random_number::{FLOAT_INPUT_ERROR, MIN_ALLOWED_INTEGER_VALUE, generate_random_float, generate_random_integer},
-            FILE_NAME,
         };
         use std::{io::Write, path::Path};
     }
@@ -123,20 +123,20 @@ where
 {
     type Error = AppError;
     fn try_from((raw_command, mut args): (OsString, I)) -> Result<Self> {
-        const INVALID_COMMAND_NAME: &str = "명령 이름은 유효한 Unicode여야 합니다.";
-        let take_two_args = |iterator: &mut I, usage: &str| -> Result<(OsString, OsString)> {
-            let (Some(first), Some(second), None) =
-                (iterator.next(), iterator.next(), iterator.next())
-            else {
-                return Err(AppError::message(format!("사용법: srg {usage}")));
-            };
-            Ok((first, second))
+        let take_two = |iter: &mut I, usage: &str| -> Result<(OsString, OsString)> {
+            match (iter.next(), iter.next(), iter.next()) {
+                (Some(first), Some(second), None) => Ok((first, second)),
+                _ => Err(AppError::message(format!("사용법: srg {usage}"))),
+            }
         };
-        match raw_command.to_str().ok_or(INVALID_COMMAND_NAME)? {
+        match raw_command
+            .to_str()
+            .ok_or("명령 이름은 유효한 Unicode여야 합니다.")?
+        {
             #[cfg(target_arch = "x86_64")]
             "generate" => {
                 let (Some(count_arg), None) = (args.next(), args.next()) else {
-                    return Err(AppError::message("사용법: srg generate <count>"));
+                    return Err("사용법: srg generate <count>".into());
                 };
                 let count =
                     Self::parse_arg::<usize>(&count_arg, "count", BATCH_COUNT_INPUT_MAX_BYTES)?;
@@ -150,7 +150,7 @@ where
             #[cfg(target_arch = "x86_64")]
             "ladder" => {
                 let (players_arg, results_arg) =
-                    take_two_args(&mut args, "ladder <players-csv> <results-csv>")?;
+                    take_two(&mut args, "ladder <players-csv> <results-csv>")?;
                 let players = Self::owned_text(players_arg, "players-csv")?;
                 let results = Self::owned_text(results_arg, "results-csv")?;
                 validate_input_line(&players, MAX_LADDER_INPUT_BYTES)?;
@@ -175,7 +175,7 @@ where
             }
             #[cfg(target_arch = "x86_64")]
             "random-float" => {
-                let (min_arg, max_arg) = take_two_args(&mut args, "random-float <min> <max>")?;
+                let (min_arg, max_arg) = take_two(&mut args, "random-float <min> <max>")?;
                 let min = Self::parse_arg::<f64>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 let max = Self::parse_arg::<f64>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 (min.is_finite() && !min.is_subnormal() && max.is_finite() && !max.is_subnormal())
@@ -188,7 +188,7 @@ where
             }
             #[cfg(target_arch = "x86_64")]
             "random-integer" => {
-                let (min_arg, max_arg) = take_two_args(&mut args, "random-integer <min> <max>")?;
+                let (min_arg, max_arg) = take_two(&mut args, "random-integer <min> <max>")?;
                 let min = Self::parse_arg::<i64>(&min_arg, "min", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 let max = Self::parse_arg::<i64>(&max_arg, "max", DEFAULT_INPUT_LINE_MAX_BYTES)?;
                 (min >= MIN_ALLOWED_INTEGER_VALUE).ok_or_else(|| {
@@ -202,8 +202,7 @@ where
                 Err("이 명령은 x86_64의 RDSEED/RDRAND 지원 환경에서만 사용할 수 있습니다.".into())
             }
             "time-observe" => {
-                let (host_arg, seconds_arg) =
-                    take_two_args(&mut args, "time-observe <host> <seconds>")?;
+                let (host_arg, seconds_arg) = take_two(&mut args, "time-observe <host> <seconds>")?;
                 let host = Self::parse_arg::<ParsedServer>(
                     &host_arg,
                     "host",

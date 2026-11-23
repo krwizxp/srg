@@ -6,11 +6,10 @@ use core::{
     result::Result as CoreResult,
 };
 use std::{io::Error as IoError, process};
-type BoxError = Box<dyn Error + Send + Sync>;
 pub(super) type Result<T> = CoreResult<T, AppError>;
 pub(super) struct AppError {
     message: Cow<'static, str>,
-    source: Option<BoxError>,
+    source: Option<Box<dyn Error + Send + Sync>>,
 }
 struct ControlEscapingWriter<'formatter, 'output>(&'formatter mut fmt::Formatter<'output>);
 impl AppError {
@@ -36,43 +35,30 @@ impl AppError {
     #[cold]
     #[inline(never)]
     pub(super) fn prefixed_ref(prefix: &'static str, source: &Self) -> Self {
-        let mut text = String::new();
-        if !prefix.is_empty() {
-            text.push_str(prefix);
-            text.push_str(": ");
-        }
-        if write!(text, "{source}").is_err() {
-            process::abort();
-        }
-        Self {
-            message: Cow::Owned(text),
-            source: None,
-        }
+        Self::message(if prefix.is_empty() {
+            format!("{source}")
+        } else {
+            format!("{prefix}: {source}")
+        })
     }
 }
 impl Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", terminal_safe(self.message.as_ref()))?;
         if let Some(source) = self.source.as_ref() {
-            f.write_str(": ")?;
-            write!(f, "{}", terminal_safe(source))?;
+            write!(f, ": {}", terminal_safe(source))?;
         }
         Ok(())
     }
 }
 impl fmt::Write for ControlEscapingWriter<'_, '_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let mut remaining = s;
-        let mut consumed = 0;
+        let (mut remaining, mut consumed) = (s, 0_usize);
         for (index, character) in s.char_indices() {
             if character.is_control()
                 || matches!(
                     character,
-                    '\u{061c}'
-                        | '\u{200e}'
-                        | '\u{200f}'
-                        | '\u{202a}'..='\u{202e}'
-                        | '\u{2066}'..='\u{2069}'
+                    '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'
                 )
             {
                 let (plain, escaped_tail) = remaining.split_at(index.strict_sub(consumed));
@@ -123,6 +109,10 @@ impl From<TimeError> for AppError {
     fn from(source: TimeError) -> Self {
         Self::context("시간 처리 오류", source)
     }
+}
+#[inline]
+pub(super) fn or_abort<T>(value: Option<T>) -> T {
+    value.unwrap_or_else(|| process::abort())
 }
 pub(super) const fn terminal_safe<T>(value: &T) -> impl Display + '_
 where

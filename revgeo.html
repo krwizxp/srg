@@ -82,36 +82,22 @@
 		:root[data-theme=dark] {
 			color-scheme: dark
 		}
-		*,
-		::after,
-		::before {
+		*, ::after, ::before {
 			box-sizing: border-box
 		}
-		body,
-		dd,
-		dl,
-		h1,
-		h2,
-		p,
-		pre {
+		body, dd, dl, h1, h2, p, pre, .steps, #auto-supp {
 			margin: 0
 		}
-		button,
-		input,
-		select,
-		textarea {
+		button, input, select, textarea {
 			font: inherit
 		}
-		button,
-		select,
-		.drop-zone input {
+		button, select, .drop-zone input {
 			cursor: pointer
 		}
 		button {
 			color: inherit
 		}
-		.map-links a,
-		button {
+		.map-links a, button {
 			-webkit-tap-highlight-color: transparent;
 			transition: border-color .15s
 		}
@@ -133,9 +119,7 @@
 		[hidden] {
 			display: none !important
 		}
-		.drop-zone:focus-within,
-		.map-preview:has(:focus-visible),
-		:is(button, input, textarea, select, a, [tabindex]):focus-visible {
+		.drop-zone:focus-within, .map-preview:has(:focus-visible), :is(button, input, textarea, select, a, [tabindex]):focus-visible {
 			outline: 2px solid var(--focus);
 			outline-offset: 3px
 		}
@@ -143,8 +127,7 @@
 			background: var(--tint);
 			color: var(--fg)
 		}
-		body,
-		html {
+		body, html {
 			background: var(--page)
 		}
 		html {
@@ -159,59 +142,28 @@
 			word-break: keep-all;
 			min-height: 100dvh
 		}
-		.coords-empty,
-		.coords-head,
-		.drop-zone,
-		.elapsed-time,
-		.filterbar,
-		.full-address,
-		.header-inner,
-		.header-tools,
-		.map-feedback,
-		.map-links a,
-		.map-load,
-		.page-numbers,
-		.progress-heading,
-		.result-pages,
-		.results-footer,
-		.results-heading,
-		.sheet-heading,
-		.site-brand,
-		.steps li,
-		.ui-notice {
-			display: flex;
+		.coords-empty, .coords-head, .drop-zone, .elapsed-time, .filterbar, .full-address, .header-inner, .header-tools, .map-feedback, .map-links a, .map-load, .page-numbers, .progress-heading, .result-pages, .results-footer, .results-heading, .sheet-heading, .site-brand, .steps li, .ui-notice, .input-actions, .map-recovery, .status-row, .steps, .tool-capsule, .segmented, .rng-generator .check-label, .field {
+			display: flex
+		}
+		.coords-empty, .coords-head, .drop-zone, .elapsed-time, .filterbar, .full-address, .header-inner, .header-tools, .map-feedback, .map-links a, .map-load, .page-numbers, .progress-heading, .result-pages, .results-footer, .results-heading, .sheet-heading, .site-brand, .steps li, .ui-notice, .button, .copyright, .credits a, .rng-generator .check-label, .table-hint {
 			align-items: center
 		}
-		.coords-head,
-		.header-inner,
-		.progress-heading,
-		.results-footer,
-		.results-heading,
-		.sheet-heading {
+		.coords-head, .header-inner, .progress-heading, .results-footer, .results-heading, .sheet-heading {
 			justify-content: space-between
 		}
-		.input-actions,
-		.map-recovery,
-		.status-row {
-			display: flex;
-			flex-wrap: wrap;
+		.input-actions, .map-recovery, .status-row, .button, .map-links a, .coords-head, .coords-tools, .field, .confirm-actions, .rng-actions, .map-feedback, .full-address, .detail-fields>div {
 			gap: 8px
 		}
-		.filters :is(input, select),
-		.rng-generator input[type=number],
-		.settings select,
-		textarea {
-			background: var(--surface);
+		.input-actions, .map-recovery, .status-row, .coords-head, .results-heading, .filterbar, .results-footer, .page-numbers, .result-pages {
+			flex-wrap: wrap
+		}
+		.filters :is(input, select), .rng-generator input[type=number], .settings select, textarea, #output, .coords-panel, .job-panel, .map-popover, .map-preview, .results-card, dialog, .input-tabs::before, .drop-zone, .rng-generator .check-label {
+			background: var(--surface)
+		}
+		.filters :is(input, select), .rng-generator input[type=number], .settings select, textarea {
 			border: 1px solid var(--control)
 		}
-		#output,
-		.coords-panel,
-		.job-panel,
-		.map-popover,
-		.map-preview,
-		.results-card,
-		dialog {
-			background: var(--surface);
+		#output, .coords-panel, .job-panel, .map-popover, .map-preview, .results-card, dialog, .steps span, .tool-capsule, .mobile-nav, .rng-generator .check-label {
 			border: 1px solid var(--line)
 		}
 		:is(input, textarea)[aria-invalid=true] {
@@ -220,76 +172,36 @@
 		#coords:focus-visible {
 			outline-offset: -3px
 		}
-		#counts,
-		#detail-town,
-		#results-count,
-		.address-sub,
-		.coords-empty,
-		.coords-head,
-		.detail-label,
-		.inspector-empty,
-		.inspector-eyebrow,
-		.map-feedback,
-		.note,
-		.page-footer,
-		.remaining-note,
-		.table-hint {
-			font-size: var(--text-secondary);
+		#counts, #detail-town, #results-count, .address-sub, .coords-empty, .coords-head, .detail-label, .inspector-empty, .inspector-eyebrow, .map-feedback, .note, .page-footer, .remaining-note, .table-hint, .coords-cell, .segmented button, .step-label, .steps li, th, #coord-line-numbers, .status, .elapsed-time {
 			color: var(--muted)
 		}
-		.coords-cell,
-		.segmented button,
-		.step-label,
-		.steps li,
-		th {
+		#counts, #detail-town, #results-count, .address-sub, .coords-empty, .coords-head, .detail-label, .inspector-empty, .inspector-eyebrow, .map-feedback, .note, .page-footer, .remaining-note, .table-hint {
+			font-size: var(--text-secondary)
+		}
+		.coords-cell, .segmented button, .step-label, .steps li, th {
 			font-size: var(--text-meta);
-			line-height: 1.5;
-			color: var(--muted)
+			line-height: 1.5
 		}
-		#detail-coordinates,
-		#detail-tag,
-		#detail-title,
-		#detail-town,
-		#drop-filename,
-		.address-main,
-		.address-sub,
-		.credits a,
-		.full-address,
-		.note,
-		.site-brand h1,
-		.status,
-		dd,
-		td {
+		#detail-coordinates, #detail-tag, #detail-title, #detail-town, #drop-filename, .address-main, .address-sub, .credits a, .full-address, .note, .site-brand h1, .status, dd, td, .coords-tools .button, .filter-empty-hint .button {
 			overflow-wrap: anywhere
 		}
-		.drop-zone input,
-		.track>progress {
+		.drop-zone input, .track>progress {
 			position: absolute;
 			inset: 0;
 			width: 100%;
 			height: 100%;
 			opacity: 0
 		}
-		.button,
-		.copyright,
-		.credits a {
-			display: inline-flex;
-			align-items: center
+		.button, .copyright, .credits a {
+			display: inline-flex
 		}
-		.button,
-		.copyright,
-		.table-hint,
-		[role=alertdialog] .sheet-heading {
+		.button, .copyright, .table-hint, [role=alertdialog] .sheet-heading, .coords-empty, .drop-zone, .map-load, .page-numbers, .result-pages, .map-feedback {
 			justify-content: center
 		}
-		.coords-empty,
-		.drop-zone,
-		.map-load {
-			justify-content: center;
+		.coords-empty, .drop-zone, .map-load, .header-tools, .site-brand, .rng-generator, .rng-generator .check-label, .filterbar, .filters, .filter-grid, .filter-empty-hint, .results-footer {
 			gap: 12px
 		}
-		.site-header,
-		.mobile-nav {
+		.site-header, .mobile-nav {
 			background: var(--glass);
 			-webkit-backdrop-filter: blur(20px) saturate(1.8);
 			backdrop-filter: blur(20px) saturate(1.8)
@@ -307,25 +219,20 @@
 			margin: auto;
 			padding-block: max(16px, env(safe-area-inset-top)) 16px
 		}
-		.header-tools,
-		.site-brand {
-			gap: 12px
+		.site-brand, .icon-button, .segmented button, .button, .map-links a, .rng-generator .check-label {
+			min-height: 44px
 		}
 		.site-brand {
 			text-decoration: none;
 			color: var(--fg);
-			min-width: 44px;
-			min-height: 44px
+			min-width: 44px
 		}
 		.brand-mark {
 			width: 42px;
 			height: 42px;
 			flex: none
 		}
-		.input-card,
-		.results,
-		.site-brand h1,
-		.table-zone {
+		.input-card, .results, .site-brand h1, .table-zone, .segmented button, .coords-panel, .field, .filters :is(input, select), .rng-generator input[type=number], .settings select, .search-field, .inspector {
 			min-width: 0
 		}
 		.site-brand h1 {
@@ -333,52 +240,47 @@
 			letter-spacing: 0
 		}
 		.steps {
-			display: flex;
 			gap: 24px;
 			padding: 0;
-			margin: 0;
 			list-style: none
 		}
-		.step-label,
-		.theme-toggle :is(.theme-moon, .theme-sun) {
+		.step-label, .theme-toggle :is(.theme-moon, .theme-sun), .coords-tools, .progress-pending {
 			display: none
 		}
 		.steps li {
 			gap: 8px
 		}
+		.steps span, .icon-button, #app, #coords, .rng-fields, .rng-generator {
+			display: grid
+		}
 		.steps span {
-			display: grid;
 			place-items: center;
 			width: 24px;
 			height: 24px;
-			border: 1px solid var(--line);
 			border-radius: 50%;
 			font-size: .75rem
 		}
 		.steps [aria-current=step] span {
 			border-color: var(--button-fill)
 		}
+		.tool-capsule, .segmented, .segmented button, .button, .map-links a, .track, #auto-supp, #filter-count, .kind-badge, .ui-notice {
+			border-radius: var(--radius-pill)
+		}
 		.tool-capsule {
-			display: flex;
 			padding: 3px;
-			border: 1px solid var(--line);
-			border-radius: var(--radius-pill);
 			background: var(--panel)
 		}
 		.mobile-nav {
 			isolation: isolate;
-			border: 1px solid var(--line);
 			box-shadow: var(--glass-shadow)
 		}
 		.icon-button {
 			border: 0;
 			border-radius: 50%;
 			background: 0 0;
-			display: grid;
 			place-items: center;
 			width: 44px;
 			min-width: 44px;
-			min-height: 44px;
 			padding: 0
 		}
 		:is(.icon-button, .segmented button):active:not(:disabled) {
@@ -389,7 +291,6 @@
 			cursor: not-allowed
 		}
 		#app {
-			display: grid;
 			grid-template-columns: 304px minmax(0, 1fr);
 			align-items: start;
 			gap: 24px;
@@ -401,14 +302,16 @@
 			font-weight: 600;
 			letter-spacing: -.022em
 		}
+		.segmented, .drop-zone, .track, #auto-supp, .search-field, .filter-trigger, .table-wrap {
+			position: relative
+		}
+		.segmented, .elapsed-time, .page-numbers, .result-pages {
+			gap: 4px
+		}
 		.segmented {
-			position: relative;
 			isolation: isolate;
-			display: flex;
 			align-items: stretch;
-			gap: 4px;
 			padding: 4px;
-			border-radius: var(--radius-pill);
 			background: var(--press-bg)
 		}
 		.input-tabs::before {
@@ -417,7 +320,6 @@
 			inset: 4px auto 4px 4px;
 			width: calc(50% - 6px);
 			border-radius: inherit;
-			background: var(--surface);
 			box-shadow: 0 1px 4px #00000014;
 			transform: translateX(0);
 			transition: transform .24s var(--spring);
@@ -429,10 +331,7 @@
 		}
 		.segmented button {
 			flex: 1;
-			min-width: 0;
-			min-height: 44px;
 			border: 0;
-			border-radius: var(--radius-pill);
 			padding: 8px;
 			color: var(--fg);
 			background: 0 0;
@@ -455,17 +354,14 @@
 			margin: 18px 0
 		}
 		.drop-zone {
-			position: relative;
 			flex-direction: column;
 			text-align: center;
 			padding: 24px 18px;
 			min-height: 168px;
-			background: var(--surface);
 			border: 1px dashed var(--control);
 			border-radius: var(--radius-card)
 		}
-		.drop-zone.is-dragging,
-		.drop-zone:active:not(:has(input:disabled)) {
+		.drop-zone.is-dragging, .drop-zone:active:not(:has(input:disabled)) {
 			border-color: var(--accent);
 			background: var(--tint)
 		}
@@ -475,38 +371,25 @@
 		.drop-zone input:disabled {
 			cursor: not-allowed
 		}
+		.drop-text>svg, .button, .map-links a, .coords-head svg, .coords-empty svg, .status.info {
+			color: var(--accent)
+		}
 		.drop-text>svg {
 			display: block;
 			width: 30px;
 			height: 30px;
-			margin: 0 auto 14px;
-			color: var(--accent)
+			margin: 0 auto 14px
 		}
 		#drop-filename {
 			font-size: 1rem
 		}
-		#detail-tag,
-		#progress-percent,
-		.code-view,
-		.detail-fields>div,
-		.file-cue,
-		.full-address,
-		.label,
-		.progress-pending,
-		.status-row,
-		.ui-notice,
-		td {
+		#detail-tag, #progress-percent, .code-view, .detail-fields>div, .file-cue, .full-address, .label, .progress-pending, .status-row, .ui-notice, td {
 			font-size: .875rem
 		}
-		.button,
-		.map-links a {
-			gap: 8px;
+		.button, .map-links a {
 			min-width: 44px;
-			min-height: 44px;
 			padding: 11px 20px;
 			border: 1px solid transparent;
-			border-radius: var(--radius-pill);
-			color: var(--accent);
 			background: var(--tint);
 			font-size: .875rem;
 			font-weight: 500;
@@ -519,10 +402,7 @@
 			background: var(--tint-active);
 			color: var(--accent-active)
 		}
-		.steps [aria-current=step] span,
-		.primary,
-		#filter-count,
-		.page-number[aria-current=page] {
+		.steps [aria-current=step] span, .primary, #filter-count, .page-number[aria-current=page] {
 			background: var(--button-fill);
 			color: #fff
 		}
@@ -530,9 +410,7 @@
 			background: var(--button-active);
 			color: #fff
 		}
-		#progress-percent,
-		.file-cue,
-		.steps [aria-current=step] {
+		#progress-percent, .file-cue, .steps [aria-current=step] {
 			color: var(--accent);
 			font-weight: 600
 		}
@@ -549,20 +427,16 @@
 			width: 100%;
 			margin-top: 12px
 		}
-		.coords-panel,
-		.job-panel {
+		.coords-panel, .job-panel {
 			margin-top: 20px;
 			border-radius: var(--radius-card)
 		}
 		.coords-panel {
-			min-width: 0;
 			overflow: hidden
 		}
 		.coords-head {
-			flex-wrap: wrap;
 			padding: 13px 16px;
-			border-bottom: 1px solid var(--line);
-			gap: 8px
+			border-bottom: 1px solid var(--line)
 		}
 		.label {
 			font-weight: 600;
@@ -571,7 +445,6 @@
 		.coords-head svg {
 			width: 16px;
 			height: 16px;
-			color: var(--accent);
 			margin-right: 4px
 		}
 		.coords-panel[data-empty=true] .coords-head {
@@ -584,8 +457,7 @@
 		}
 		.coords-empty svg {
 			width: 22px;
-			height: 22px;
-			color: var(--accent)
+			height: 22px
 		}
 		.code-view {
 			overflow: auto;
@@ -593,8 +465,6 @@
 			font-family: var(--mono)
 		}
 		.coords-tools {
-			display: none;
-			gap: 8px;
 			padding: 8px 16px 14px
 		}
 		.coords-panel[data-empty=false] .coords-tools {
@@ -602,16 +472,16 @@
 		}
 		.coords-tools .button {
 			flex: 1;
-			padding-inline: 12px;
-			overflow-wrap: anywhere
+			padding-inline: 12px
+		}
+		.code-content, .job-panel:has(.status-row[data-state=idle]):has(#start:disabled) .progress-pending, .fill, #counts, textarea, .location-button, .address-main, .address-sub {
+			display: block
 		}
 		.code-content {
-			display: block;
 			padding: 12px;
 			font: inherit
 		}
 		#coords {
-			display: grid;
 			grid-template-columns: 34px minmax(0, 1fr);
 			height: 172px
 		}
@@ -624,58 +494,41 @@
 			padding: 10px 0;
 			line-height: 1.625rem;
 			text-align: center;
-			color: var(--muted);
 			user-select: none
 		}
 		.job-panel {
 			padding: 18px
 		}
 		.progress-pending {
-			display: none;
 			font-weight: 600;
 			margin-bottom: 8px
-		}
-		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) .progress-pending {
-			display: block
 		}
 		.track {
 			--pct: 0;
 			height: 6px;
-			border-radius: var(--radius-pill);
 			background: var(--line);
-			overflow: hidden;
-			position: relative
+			overflow: hidden
 		}
 		.track>progress:not([value]) {
 			opacity: 1;
 			accent-color: var(--accent)
 		}
 		.fill {
-			display: block;
 			width: calc(var(--pct)*1%);
 			height: 100%;
 			background: var(--accent);
 			border-radius: inherit
 		}
 		#counts {
-			display: block;
 			margin-top: 10px
 		}
 		.status {
 			flex-basis: 100%;
 			font-size: var(--text-address);
-			line-height: 1.6;
-			color: var(--muted)
-		}
-		.status.info {
-			color: var(--accent)
+			line-height: 1.6
 		}
 		.status.warn {
 			color: var(--warning)
-		}
-		.elapsed-time {
-			color: var(--muted);
-			gap: 4px
 		}
 		.elapsed-time svg {
 			width: 14px;
@@ -688,39 +541,26 @@
 			flex: 1
 		}
 		.rng-fields {
-			display: grid;
 			grid-template-columns: minmax(0, 1fr);
 			gap: 16px
 		}
-		.rng-generator {
-			display: grid;
-			gap: 12px
+		.rng-generator .check-label, #auto-supp, .search-field>input::-webkit-search-cancel-button, #help-dialog summary {
+			cursor: pointer
 		}
 		.rng-generator .check-label {
-			display: flex;
-			align-items: center;
 			justify-content: space-between;
-			gap: 12px;
-			min-height: 44px;
 			padding: 6px 14px;
-			border: 1px solid var(--line);
 			border-radius: var(--radius-control);
-			background: var(--surface);
-			cursor: pointer;
 			user-select: none
 		}
 		#auto-supp {
 			appearance: none;
-			position: relative;
 			width: 51px;
 			height: 31px;
 			flex: none;
-			margin: 0;
 			border: 1px solid transparent;
-			border-radius: var(--radius-pill);
 			background: var(--control);
-			transition: background-color .2s var(--spring);
-			cursor: pointer
+			transition: background-color .2s var(--spring)
 		}
 		#auto-supp::before {
 			content: "";
@@ -740,14 +580,12 @@
 			transform: translateX(20px)
 		}
 		.field {
-			display: flex;
-			flex-direction: column;
-			gap: 8px;
-			min-width: 0
+			flex-direction: column
+		}
+		textarea, .filters :is(input, select), .rng-generator input[type=number], .settings select, .filter-grid {
+			width: 100%
 		}
 		textarea {
-			display: block;
-			width: 100%;
 			field-sizing: content;
 			resize: vertical;
 			min-height: 120px;
@@ -756,8 +594,7 @@
 			font-family: var(--mono);
 			line-height: 1.75
 		}
-		input::placeholder,
-		textarea::placeholder {
+		input::placeholder, textarea::placeholder {
 			color: var(--muted);
 			opacity: 1
 		}
@@ -765,24 +602,20 @@
 			line-height: 1.6;
 			white-space: pre-wrap
 		}
-		.confirm-actions,
-		.rng-actions {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 8px
+		.confirm-actions, .rng-actions, .filters, #filter-count, .filter-grid, .filter-grid label, .results-grid {
+			display: grid
 		}
-		#runBtn,
-		#useOutput,
-		.supp-form .rng-actions button[type=submit] {
+		.confirm-actions, .rng-actions {
+			grid-template-columns: repeat(2, minmax(0, 1fr))
+		}
+		#runBtn, #useOutput, .supp-form .rng-actions button[type=submit] {
 			grid-column: 1/-1
 		}
-		.secondary,
-		.manual-rng:has(#useOutput:not(:disabled)) #runBtn {
+		.secondary, .manual-rng:has(#useOutput:not(:disabled)) #runBtn {
 			color: var(--fg);
 			background: var(--press-bg)
 		}
-		.secondary:active:not(:disabled),
-		.manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
+		.secondary:active:not(:disabled), .manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
 			color: var(--fg);
 			background: var(--secondary-active)
 		}
@@ -804,13 +637,10 @@
 			border-radius: var(--radius-large)
 		}
 		.results-heading {
-			flex-wrap: wrap;
 			gap: 16px;
 			padding: 26px 28px 18px
 		}
 		.filterbar {
-			flex-wrap: wrap;
-			gap: 12px;
 			padding: 0 28px 18px
 		}
 		.filterbar .segmented {
@@ -824,30 +654,20 @@
 			margin-left: auto
 		}
 		.filters {
-			display: grid;
 			grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
-			gap: 12px;
 			align-items: start;
 			padding: 0 28px 20px
 		}
-		.filters :is(input, select),
-		.rng-generator input[type=number],
-		.settings select {
-			width: 100%;
+		.filters :is(input, select), .rng-generator input[type=number], .settings select {
 			min-height: 44px;
 			height: max(44px, calc(1.5em + 18px));
 			line-height: 1.5;
-			min-width: 0;
 			padding: 8px 12px
 		}
 		:is(.filters, .settings) select {
 			appearance: none;
 			padding-right: 34px;
 			background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E") right 10px center / 16px 16px no-repeat
-		}
-		.search-field {
-			position: relative;
-			min-width: 0
 		}
 		.search-field>svg {
 			position: absolute;
@@ -859,19 +679,11 @@
 			background: var(--panel);
 			border-color: transparent
 		}
-		.search-field>input::-webkit-search-cancel-button {
-			cursor: pointer
-		}
-		.filter-trigger {
-			position: relative
-		}
 		#filter-count {
-			display: grid;
 			place-items: center;
 			min-width: 20px;
 			height: 20px;
 			padding-inline: 4px;
-			border-radius: var(--radius-pill);
 			font-size: .75rem;
 			font-weight: 600
 		}
@@ -883,27 +695,18 @@
 			inset-block: var(--filter-viewport-top) calc(100% - var(--filter-viewport-top) - var(--filter-viewport-height));
 			max-height: calc(var(--filter-viewport-height) - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)))
 		}
-		#filter-dialog .sheet-heading,
-		.settings .sheet-heading {
+		#filter-dialog .sheet-heading, .settings .sheet-heading {
 			margin-bottom: 18px
 		}
-		.filter-grid {
-			display: grid;
-			gap: 12px;
-			width: 100%
-		}
 		.filter-grid label {
-			display: grid;
 			gap: 8px;
 			font-size: .8125rem
 		}
 		.results-grid {
-			display: grid;
 			grid-template-columns: minmax(0, 1fr) 280px;
 			border-top: 1px solid var(--line)
 		}
 		.table-wrap {
-			position: relative;
 			overflow: auto;
 			min-height: 520px;
 			max-height: 720px;
@@ -919,8 +722,7 @@
 			table-layout: fixed;
 			text-align: left
 		}
-		td,
-		th {
+		td, th {
 			border-bottom: 1px solid var(--line);
 			padding: 10px
 		}
@@ -935,8 +737,7 @@
 		td {
 			height: 76px
 		}
-		td:first-child,
-		th:first-child {
+		td:first-child, th:first-child {
 			text-align: center;
 			color: var(--muted)
 		}
@@ -957,7 +758,6 @@
 			color: var(--accent)
 		}
 		.location-button {
-			display: block;
 			border: 0;
 			border-radius: 8px;
 			background: 0 0;
@@ -968,9 +768,7 @@
 			text-align: left;
 			line-height: 1.6
 		}
-		.address-main,
-		.address-sub {
-			display: block;
+		.address-main, .address-sub {
 			unicode-bidi: plaintext
 		}
 		.location-button::after {
@@ -994,8 +792,7 @@
 			font-weight: 600
 		}
 		@media screen {
-			.location-button :is(.address-main, .address-sub),
-			#detail-title {
+			.location-button :is(.address-main, .address-sub), #detail-title {
 				display: -webkit-box;
 				-webkit-box-orient: vertical;
 				-webkit-line-clamp: 2;
@@ -1006,17 +803,13 @@
 				unicode-bidi: plaintext
 			}
 		}
-		.note[role=alert],
-		.result-state[data-error=true],
-		.status.err,
-		.row-error {
+		.note[role=alert], .result-state[data-error=true], .status.err, .row-error {
 			color: var(--danger)
 		}
 		.coords-cell {
 			font-family: var(--mono)
 		}
-		.kind-badge,
-		.result-state {
+		.kind-badge, .result-state {
 			display: inline-block;
 			max-width: 100%;
 			font-size: .8125rem;
@@ -1024,15 +817,13 @@
 		}
 		.kind-badge {
 			padding: 3px 8px;
-			border-radius: var(--radius-pill);
 			border: 1px solid transparent;
 			background: var(--press-bg);
 			font-weight: 500;
 			word-break: normal;
 			overflow-wrap: normal
 		}
-		.status.success,
-		.result-state {
+		.status.success, .result-state {
 			color: var(--success)
 		}
 		.table-hint {
@@ -1040,33 +831,26 @@
 			position: absolute;
 			inset: 44px 0 0;
 			padding: 32px;
-			align-items: center;
 			text-align: center
 		}
 		.filter-empty-hint {
 			position: static;
 			min-height: 240px;
-			flex-direction: column;
-			gap: 12px
+			flex-direction: column
 		}
 		.filter-empty-hint .button {
-			max-width: 100%;
-			overflow-wrap: anywhere
+			max-width: 100%
 		}
 		.table-wrap.has-results:has(tbody:empty) {
 			min-height: 240px
 		}
-		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions),
-		.track:has(progress:not([value]))>.fill,
-		.table-wrap.has-results:has(tbody:empty) table {
+		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions), .track:has(progress:not([value]))>.fill, .table-wrap.has-results:has(tbody:empty) table {
 			display: none
 		}
-		.table-wrap.has-results:has(tbody:empty) .filter-empty-hint,
-		.table-wrap:not(.has-results) .empty-hint {
+		.table-wrap.has-results:has(tbody:empty) .filter-empty-hint, .table-wrap:not(.has-results) .empty-hint, .page-footer, .credits {
 			display: flex
 		}
-		.map-feedback[data-loading=true]::before,
-		.table-wrap[data-running]:not(.has-results) .empty-hint::before {
+		.map-feedback[data-loading=true]::before, .table-wrap[data-running]:not(.has-results) .empty-hint::before {
 			content: "";
 			width: 16px;
 			height: 16px;
@@ -1079,15 +863,7 @@
 			margin-right: 12px
 		}
 		.results-footer {
-			flex-wrap: wrap;
-			gap: 12px;
 			padding: 14px 18px
-		}
-		.page-numbers,
-		.result-pages {
-			justify-content: center;
-			flex-wrap: wrap;
-			gap: 4px
 		}
 		.result-pages .button {
 			padding: 8px
@@ -1095,21 +871,16 @@
 		.page-number[aria-current=page] {
 			font-weight: 600
 		}
-		.result-state[data-status=missing],
-		.credits a,
-		.page-ellipsis,
-		dt {
+		.result-state[data-status=missing], .credits a, .page-ellipsis, dt {
 			color: var(--muted)
 		}
 		.inspector {
-			min-width: 0;
 			padding: 20px;
 			border-left: 1px solid transparent;
 			background: var(--panel);
 			border-bottom-right-radius: var(--radius-large)
 		}
-		.progress-heading,
-		.inspector-eyebrow {
+		.progress-heading, .inspector-eyebrow {
 			margin-bottom: 12px
 		}
 		#detail-title {
@@ -1117,8 +888,7 @@
 			font-weight: 600;
 			letter-spacing: -.016em
 		}
-		.address-sub,
-		#detail-town {
+		.address-sub, #detail-town {
 			margin-top: 3px
 		}
 		.inspector-empty {
@@ -1148,8 +918,7 @@
 			padding: 16px;
 			font-size: .875rem
 		}
-		tr[data-record][data-selected=true],
-		.map-load:active:not(:disabled) {
+		tr[data-record][data-selected=true], .map-load:active:not(:disabled) {
 			background: var(--tint)
 		}
 		.map-load svg {
@@ -1160,16 +929,16 @@
 			z-index: 1;
 			background: var(--surface);
 			overflow: auto;
-			padding: 16px;
-			justify-content: center;
-			gap: 8px
+			padding: 16px
 		}
 		.map-recovery {
 			margin: 8px 0 18px
 		}
-		.map-recovery>* {
-			flex: 1 1 10rem;
+		.map-recovery>*, .map-links a, .sheet-heading h2, #ui-notice-text, .confirm-actions .button {
 			overflow-wrap: anywhere
+		}
+		.map-recovery>* {
+			flex: 1 1 10rem
 		}
 		#detail-map {
 			border: 0;
@@ -1178,8 +947,7 @@
 			display: block
 		}
 		.full-address {
-			margin-top: 6px;
-			gap: 8px
+			margin-top: 6px
 		}
 		#detail-full {
 			flex: 1;
@@ -1192,7 +960,6 @@
 		.detail-fields>div {
 			display: grid;
 			grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
-			gap: 8px;
 			margin: 10px 0
 		}
 		@media (max-width:420px) {
@@ -1207,8 +974,7 @@
 		dd {
 			text-align: right
 		}
-		.detail-fields,
-		.detail-tags {
+		.detail-fields, .detail-tags {
 			margin-top: 18px
 		}
 		#detail-tag {
@@ -1224,7 +990,6 @@
 			margin-top: 18px
 		}
 		.page-footer {
-			display: flex;
 			gap: 8px;
 			align-items: start;
 			max-width: 1680px;
@@ -1251,13 +1016,11 @@
 			min-width: 44px;
 			justify-content: center
 		}
-		.credits,
-		.usage-policy {
+		.credits, .usage-policy {
 			flex-wrap: wrap;
 			align-items: baseline
 		}
 		.credits {
-			display: flex;
 			gap: 0 .65rem;
 			min-width: 0
 		}
@@ -1265,12 +1028,10 @@
 			display: inline-flex;
 			column-gap: .35em
 		}
-		td:nth-child(4),
-		.usage-policy>a {
+		td:nth-child(4), .usage-policy>a {
 			white-space: nowrap
 		}
-		.map-popover,
-		dialog {
+		.map-popover, dialog {
 			--overlay-start: 22px;
 			--overlay-end: 22px;
 			max-width: calc(100vw - 2*max(16px, env(safe-area-inset-left), env(safe-area-inset-right)));
@@ -1282,8 +1043,7 @@
 			border-radius: var(--radius-large);
 			box-shadow: 0 20px 60px #0003
 		}
-		.map-popover,
-		.settings {
+		.map-popover, .settings {
 			position: fixed;
 			inset: auto;
 			margin: 0;
@@ -1310,8 +1070,7 @@
 			max-height: calc(100dvh - 24px)
 		}
 		@media (min-width:801px) {
-			.map-popover,
-			.settings {
+			.map-popover, .settings {
 				margin: 8px 0 12px 12px;
 				max-width: min(calc(100vw - 24px), calc(100% - 12px));
 				min-height: min(12rem, calc(100dvh - 24px));
@@ -1333,15 +1092,13 @@
 				bottom: 12px;
 				z-index: 30
 			}
-			body:has(#display-settings:open) .settings-button,
-			#detail-map-links:has(+ #map-popover:popover-open) {
+			body:has(#display-settings:open) .settings-button, #detail-map-links:has(+ #map-popover:popover-open) {
 				background: var(--tint);
 				border-color: var(--accent);
 				color: var(--accent);
 				box-shadow: 0 0 0 2px var(--tint)
 			}
-			#display-settings:open,
-			#map-popover:popover-open {
+			#display-settings:open, #map-popover:popover-open {
 				background: var(--glass);
 				-webkit-backdrop-filter: blur(20px) saturate(1.8);
 				backdrop-filter: blur(20px) saturate(1.8)
@@ -1354,11 +1111,7 @@
 			display: block;
 			margin: 16px 0 8px
 		}
-		textarea,
-		.filters :is(input, select),
-		.rng-generator input[type=number],
-		.settings select,
-		.map-links a {
+		textarea, .filters :is(input, select), .rng-generator input[type=number], .settings select, .map-links a {
 			border-radius: var(--radius-control);
 			color: var(--fg);
 			font-size: 1rem
@@ -1368,8 +1121,7 @@
 			min-width: 0;
 			padding: 12px 14px;
 			background: 0 0;
-			text-align: start;
-			overflow-wrap: anywhere
+			text-align: start
 		}
 		.map-links a:active {
 			background: var(--secondary-active)
@@ -1399,11 +1151,9 @@
 			font-size: 1.25rem;
 			font-weight: 600;
 			min-width: 0;
-			overflow-wrap: anywhere;
 			unicode-bidi: plaintext
 		}
-		:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading,
-		.supp-form>.sheet-heading {
+		:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading, .supp-form>.sheet-heading {
 			position: sticky;
 			top: -22px;
 			z-index: 2;
@@ -1414,8 +1164,7 @@
 			background: var(--surface);
 			border-bottom: 1px solid var(--line)
 		}
-		#copy-address,
-		.sheet-heading .icon-button {
+		#copy-address, .sheet-heading .icon-button {
 			flex: none;
 			background: var(--press-bg)
 		}
@@ -1433,7 +1182,6 @@
 			line-height: 1.6
 		}
 		#help-dialog summary {
-			cursor: pointer;
 			font-weight: 600
 		}
 		.ui-notice {
@@ -1444,7 +1192,6 @@
 			max-width: calc(100vw - 32px);
 			width: max-content;
 			padding: 6px 8px 6px 18px;
-			border-radius: var(--radius-pill);
 			background: light-dark(#1d1d1f, #f5f5f7);
 			color: light-dark(#f5f5f7, #1d1d1f);
 			border: 1px solid light-dark(#424245, #d2d2d7);
@@ -1452,8 +1199,7 @@
 			gap: 12px
 		}
 		#ui-notice-text {
-			min-width: 0;
-			overflow-wrap: anywhere
+			min-width: 0
 		}
 		.ui-notice .icon-button:active:not(:disabled) {
 			background: light-dark(#424245, #d2d2d7)
@@ -1473,8 +1219,7 @@
 			margin-top: 24px
 		}
 		.confirm-actions .button {
-			padding-inline: 12px;
-			overflow-wrap: anywhere
+			padding-inline: 12px
 		}
 		[role=alertdialog] {
 			position: fixed;
@@ -1483,33 +1228,19 @@
 			width: min(320px, calc(100vw - 32px));
 			text-align: center
 		}
-		#detail-full[dir=auto],
-		.address-main[dir=auto],
-		.address-sub[dir=auto] {
+		#detail-full[dir=auto], .address-main[dir=auto], .address-sub[dir=auto] {
 			text-align: start
 		}
 		[role=alertdialog]>p {
 			line-height: 1.6
 		}
-		.status-row,
-		#help-dialog li+li,
-		#bulk-dialog p {
+		.status-row, #help-dialog li+li, #bulk-dialog p {
 			margin-top: 12px
 		}
-		.coords-panel[data-empty=true] #coords,
-		.coords-panel[data-empty=true] .coords-head>span:last-child,
-		.coords-panel[data-empty=false] .coords-empty,
-		#coords-expand,
-		.note:empty,
-		.mobile-bottom,
-		.mobile-job-slot {
+		.coords-panel[data-empty=true] #coords, .coords-panel[data-empty=true] .coords-head>span:last-child, .coords-panel[data-empty=false] .coords-empty, #coords-expand, .note:empty, .mobile-bottom, .mobile-job-slot {
 			display: none
 		}
-		.theme-toggle[data-next-theme=dark] .theme-moon,
-		.theme-toggle[data-next-theme=light] .theme-sun,
-		.file-cue,
-		.coords-cell span,
-		.mobile-job-slot:not(:empty) {
+		.theme-toggle[data-next-theme=dark] .theme-moon, .theme-toggle[data-next-theme=light] .theme-sun, .file-cue, .coords-cell span, .mobile-job-slot:not(:empty) {
 			display: block
 		}
 		.sr-only {
@@ -1527,8 +1258,7 @@
 			:root {
 				--page-gutter: 20px
 			}
-			.steps,
-			.inspector {
+			.steps, .inspector {
 				display: none
 			}
 			.step-label {
@@ -1541,9 +1271,7 @@
 			.results-grid {
 				grid-template-columns: 1fr
 			}
-			.filterbar,
-			.results-heading,
-			search {
+			.filterbar, .results-heading, search {
 				padding-inline: 22px
 			}
 			.filters {
@@ -1566,10 +1294,7 @@
 				width: 32px;
 				height: 32px
 			}
-			#app,
-			.results-grid,
-			table,
-			.location-button::after {
+			#app, .results-grid, table, .location-button::after {
 				display: block
 			}
 			.drop-zone {
@@ -1578,15 +1303,7 @@
 			.drop-zone .drop-text>svg {
 				margin-bottom: 10px
 			}
-			.step-label,
-			.filter-trigger>span:not(#filter-count),
-			body[data-mobiletab=input] .results,
-			body[data-mobiletab=results] .input-card,
-			colgroup,
-			td:nth-child(1),
-			.table-wrap:not(:has(tbody>tr))+.results-footer,
-			:is(#page-prev, #page-next)>span,
-			.mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
+			.step-label, .filter-trigger>span:not(#filter-count), body[data-mobiletab=input] .results, body[data-mobiletab=results] .input-card, colgroup, td:nth-child(1), .table-wrap:not(:has(tbody>tr))+.results-footer, :is(#page-prev, #page-next)>span, .mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
 				display: none
 			}
 			.header-tools {
@@ -1704,8 +1421,7 @@
 			td:nth-child(3) {
 				grid-area: 2/1
 			}
-			td:nth-child(4),
-			td:nth-child(5) {
+			td:nth-child(4), td:nth-child(5) {
 				text-align: right
 			}
 			td:nth-child(4) {
@@ -1715,8 +1431,7 @@
 				grid-area: 2/2;
 				align-self: end
 			}
-			.site-brand h1,
-			.address-main {
+			.site-brand h1, .address-main {
 				font-size: 1rem
 			}
 			.location-button {
@@ -1726,9 +1441,7 @@
 				direction: ltr;
 				unicode-bidi: isolate
 			}
-			.coords-cell,
-			.kind-badge,
-			.result-state {
+			.coords-cell, .kind-badge, .result-state {
 				font-size: .875rem
 			}
 			.coords-cell span {
@@ -1760,8 +1473,7 @@
 				padding-block: 6px max(6px, env(safe-area-inset-bottom));
 				isolation: isolate
 			}
-			.mobile-nav,
-			.mobile-nav button {
+			.mobile-nav, .mobile-nav button {
 				position: relative;
 				display: flex;
 				border-radius: var(--radius-pill)
@@ -1824,8 +1536,7 @@
 			.mobile-job-slot .job-panel {
 				margin: 0 0 18px
 			}
-			:is(dialog, #detail-sheet):not([role=alertdialog]),
-			.map-popover {
+			:is(dialog, #detail-sheet):not([role=alertdialog]), .map-popover {
 				inset: auto 0 0;
 				max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
 				margin: 0;
@@ -1872,8 +1583,7 @@
 			:root {
 				--page-gutter: 12px
 			}
-			.site-brand,
-			.mobile-bottom {
+			.site-brand, .mobile-bottom {
 				gap: 8px
 			}
 			.site-brand h1 {
@@ -1889,8 +1599,7 @@
 			.mobile-nav button {
 				padding-inline: 6px
 			}
-			.page-numbers,
-			.result-pages {
+			.page-numbers, .result-pages {
 				gap: 1px
 			}
 		}
@@ -1902,24 +1611,16 @@
 				flex-wrap: wrap
 			}
 		}
-		#app,
-		.header-inner,
-		.mobile-bottom,
-		.page-footer {
+		#app, .header-inner, .mobile-bottom, .page-footer {
 			padding-inline: max(var(--page-gutter), env(safe-area-inset-left)) max(var(--page-gutter), env(safe-area-inset-right))
 		}
 		@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-			.site-header,
-			.mobile-nav,
-			#display-settings:open,
-			#map-popover:popover-open {
+			.site-header, .mobile-nav, #display-settings:open, #map-popover:popover-open {
 				background: var(--surface)
 			}
 		}
 		@media (hover:hover) and (pointer:fine) {
-			:is(.icon-button, .segmented button):hover:not(:active):not(:disabled),
-			.mobile-nav button:hover:not(:active):not(:disabled),
-			.map-links a:hover:not(:active) {
+			:is(.icon-button, .segmented button):hover:not(:active):not(:disabled), .mobile-nav button:hover:not(:active):not(:disabled), .map-links a:hover:not(:active) {
 				background: var(--press-bg)
 			}
 			.segmented :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
@@ -1928,8 +1629,7 @@
 			.input-tabs [aria-selected=true]:hover:not(:active):not(:disabled) {
 				background: 0 0
 			}
-			.drop-zone:hover:not(:active):not(:has(input:disabled)),
-			.map-load:hover:not(:active):not(:disabled) {
+			.drop-zone:hover:not(:active):not(:has(input:disabled)), .map-load:hover:not(:active):not(:disabled) {
 				background: var(--tint)
 			}
 			.drop-zone:hover:not(:active):not(:has(input:disabled)) {
@@ -1944,8 +1644,7 @@
 			.danger:hover:not(:active):not(:disabled) {
 				background: var(--danger-hover)
 			}
-			.secondary:hover:not(:active):not(:disabled),
-			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
+			.secondary:hover:not(:active):not(:disabled), .manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
 				background: var(--secondary-hover)
 			}
 			#clearBtn:hover:not(:active):not(:disabled) {
@@ -1972,25 +1671,18 @@
 				transform: none
 			}
 		}
-		dialog:open,
-		.map-popover:popover-open {
+		dialog:open, .map-popover:popover-open {
 			animation: overlay-appear .22s var(--spring)
 		}
 		@media (prefers-reduced-motion:reduce) {
-			*,
-			::after,
-			::before {
+			*, ::after, ::before {
 				animation: none !important;
 				transition: none !important;
 				scroll-behavior: auto !important
 			}
 		}
-		@media (prefers-reduced-transparency:reduce),
-		(prefers-contrast:more) {
-			.site-header,
-			.mobile-nav,
-			#display-settings:open,
-			#map-popover:popover-open {
+		@media (prefers-reduced-transparency:reduce), (prefers-contrast:more) {
+			.site-header, .mobile-nav, #display-settings:open, #map-popover:popover-open {
 				background: var(--surface);
 				-webkit-backdrop-filter: none;
 				backdrop-filter: none
@@ -2002,15 +1694,7 @@
 				--control: var(--fg);
 				--muted: var(--fg)
 			}
-			.mobile-nav,
-			.tool-capsule,
-			.coords-panel,
-			.job-panel,
-			.kind-badge,
-			.inspector,
-			.rng-generator .check-label,
-			#auto-supp,
-			tr[data-record] {
+			.mobile-nav, .tool-capsule, .coords-panel, .job-panel, .kind-badge, .inspector, .rng-generator .check-label, #auto-supp, tr[data-record] {
 				border-color: var(--fg)
 			}
 			tr[data-record][data-selected=true] {
@@ -2018,10 +1702,7 @@
 			}
 		}
 		@media (forced-colors:active) {
-			.mobile-nav,
-			.tool-capsule,
-			.rng-generator .check-label,
-			#auto-supp {
+			.mobile-nav, .tool-capsule, .rng-generator .check-label, #auto-supp {
 				border-color: ButtonText
 			}
 			#auto-supp::before {
@@ -2037,14 +1718,11 @@
 			.fill {
 				background: Highlight
 			}
-			.mobile-nav [aria-selected=true],
-			.segmented :is([aria-selected=true], [aria-pressed=true]),
-			tr[data-selected=true] {
+			.mobile-nav [aria-selected=true], .segmented :is([aria-selected=true], [aria-pressed=true]), tr[data-selected=true] {
 				outline: 2px solid Highlight
 			}
 		}
-		@media (max-width:800px),
-		(hover:none) and (pointer:coarse) {
+		@media (max-width:800px), (hover:none) and (pointer:coarse) {
 			.site-header {
 				background: var(--page);
 				-webkit-backdrop-filter: none;
@@ -2052,27 +1730,14 @@
 			}
 		}
 		@media print {
-			:root,
-			:root[data-theme] {
+			:root, :root[data-theme] {
 				color-scheme: light;
 				--page: #fff
 			}
-			#export,
-			.filterbar,
-			.input-card,
-			.inspector,
-			.mobile-bottom,
-			.mobile-job-slot,
-			.results-footer,
-			.site-header,
-			.ui-notice,
-			search {
+			#export, .filterbar, .input-card, .inspector, .mobile-bottom, .mobile-job-slot, .results-footer, .site-header, .ui-notice, search {
 				display: none !important
 			}
-			#app,
-			.results,
-			.results-grid,
-			body[data-mobiletab=input] .results {
+			#app, .results, .results-grid, body[data-mobiletab=input] .results {
 				display: block;
 				margin: 0;
 				padding: 0
@@ -2274,10 +1939,9 @@
 							<strong id="cnt-fail">0</strong>건 실패, <strong id="cnt-remain">0</strong>건 미처리</output>
 					</div>
 					<div class="status-row" data-state="idle"><output aria-live="off" class="status" id="status"
-							tabindex="-1">SRG
-							TXT 파일을 불러오거나 난수를 입력해 주세요.</output><span aria-atomic="true" class="sr-only"
-							id="status-announcement" role="status"></span><span class="elapsed-time"><svg
-								aria-hidden="true" viewBox="0 0 24 24">
+							tabindex="-1">SRG TXT 파일을 불러오거나 난수를 입력해 주세요.</output><span aria-atomic="true"
+							class="sr-only" id="status-announcement" role="status"></span><span
+							class="elapsed-time"><svg aria-hidden="true" viewBox="0 0 24 24">
 								<circle cx="12" cy="12" r="9" />
 								<path d="M12 7v5l3 2" />
 							</svg><span>경과 시간 <time id="elapsed">00:00:00</time></span></span></div>
@@ -2361,8 +2025,8 @@
 								inputmode="search" placeholder="시·도, 주 등" type="search"></label><label>도시·행정구역<input
 								enterkeyhint="search" id="filter-sigungu" inputmode="search" placeholder="시·군·구 등"
 								type="search"></label><label>세부 지역<input enterkeyhint="search" id="filter-emd"
-								inputmode="search" placeholder="읍·면·동·리 등" type="search"></label><label>지물
-							태그<input enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그"
+								inputmode="search" placeholder="읍·면·동·리 등" type="search"></label><label>지물 태그<input
+								enterkeyhint="search" id="filter-tag" inputmode="search" placeholder="지물 태그"
 								type="search"></label><label>전체주소<input enterkeyhint="search" id="filter-fulladdr"
 								inputmode="search" placeholder="전체주소" type="search"></label><button
 							class="button secondary" command="--filter-clear" commandfor="app" id="filter-clear"
@@ -2437,8 +2101,7 @@
 								title="선택한 좌표의 OpenStreetMap 지도"></iframe>
 						</div>
 						<div class="map-recovery" hidden id="map-recovery"><button class="button" id="retry-map"
-								type="button">다시
-								시도</button><a class="button" href="about:blank" id="map-external"
+								type="button">다시 시도</button><a class="button" href="about:blank" id="map-external"
 								rel="noopener noreferrer" target="_blank">OpenStreetMap에서 열기</a></div>
 						<p class="detail-label">전체 주소</p>
 						<div class="full-address"><span dir="auto" id="detail-full"></span><button aria-label="주소 복사"
@@ -2579,23 +2242,17 @@
 		</div>
 		<ol>
 			<li><strong>파일 불러오기:</strong> SRG에서 생성한 <code>random_data.txt</code>를 선택하거나 끌어다 놓은 후 <strong>좌표 추출</strong>을
-				누르세요.
-			</li>
+				누르세요. </li>
 			<li><strong>난수 직접 입력:</strong> 64비트 정수(10진수 또는 <code>0x</code> 16진수)를 입력하거나 <strong>기본 난수 생성</strong>을 누른 뒤
-				<strong>좌표로 변환</strong> →
-				<strong>이 좌표로
-					조회 준비</strong>를 누르세요.
-			</li>
+				<strong>좌표로 변환</strong> → <strong>이 좌표로 조회 준비</strong>를 누르세요. </li>
 			<li><strong>주소 조회:</strong> 추출된 좌표를 확인한 후 <strong>주소 조회 시작</strong>을 누르세요. 진행 중에는 일시정지·재개·중지할 수 있습니다.</li>
 			<li><strong>결과 확인:</strong> 검색·필터로 결과를 찾고 항목을 눌러 상세 위치와 지도를 확인하세요. <strong>전체 결과 CSV</strong>에는 필터와 관계없이 모든
-				조회 결과가
-				포함됩니다.</li>
+				조회 결과가 포함됩니다.</li>
 		</ol>
 		<details>
 			<summary>파일 형식·데이터 처리</summary>
 			<p>UTF-8 TXT 파일(최대 64 MiB)에서 <code>대한민국 위경도: 37.5,127.0</code> 또는 <code>세계 위경도: 37.5,127.0</code> 형식의 좌표를
-				읽습니다.
-			</p>
+				읽습니다. </p>
 			<p>파일은 브라우저에서 분석하고, 주소 조회 시에는 좌표를 Nominatim에 전송합니다. 조회 결과는 브라우저에 최대 30일간 저장되며 설정에 따라 더 일찍 삭제될 수 있습니다.</p>
 			<p>좌표 미리보기는 최대 200개이며, <strong>전체 좌표 복사</strong>로 모든 좌표를 가져올 수 있습니다.</p>
 		</details>
@@ -2677,100 +2334,48 @@
 			TEXT_HARD_LIMIT: 4_096,
 		};
 		class InputError extends Error { }
-		const TEXT_LIMIT_MESSAGE = "역지오코딩 문자열이 허용 길이 " +
-			CONFIG.TEXT_HARD_LIMIT + "자를 초과했습니다.";
-		const boundedText = (value) =>
-			typeof value === "string" &&
-			value.length <= CONFIG.TEXT_HARD_LIMIT;
+		const TEXT_LIMIT_MESSAGE = `역지오코딩 문자열이 허용 길이 ${CONFIG.TEXT_HARD_LIMIT}자를 초과했습니다.`;
+		const boundedText = value => typeof value === "string" && value.length <= CONFIG.TEXT_HARD_LIMIT;
 		function text(value) {
 			if (typeof value !== "string") return "";
-			if (value.length > CONFIG.TEXT_HARD_LIMIT)
-				throw new InputError(TEXT_LIMIT_MESSAGE);
+			if (value.length > CONFIG.TEXT_HARD_LIMIT) throw new InputError(TEXT_LIMIT_MESSAGE);
 			return value;
 		}
-		function pickAdmin(candidates, suffixes, ...excluded) {
-			return candidates.find(name => name && !excluded.includes(name) &&
-				(!suffixes || suffixes.includes(name.at(-1)))) || "";
-		}
-		function parseKoreanAdmin(fields, p0, p1, primary, cityDistrict) {
-			const level6 = fields.level6 || fields.level7;
-			const {city, county} = fields;
-			let sido = fields.level4 || fields.state;
-			let sigungu = "";
-			if (!sido && city && CONFIG.SPECIAL_CITIES.test(city)) sido = city;
+		const pickAdmin = (candidates, suffixes, ...excluded) =>
+			candidates.find(name => name && !excluded.includes(name) && (!suffixes || suffixes.includes(name.at(-1)))) || "";
+		const GC_FIELDS = ["country", "name", "street", "type", "district", "suburb", "city", "county", "state", "region", "province", "town", "locality", "village", "neighbourhood", "municipality", "quarter", "hamlet", "township", "residential"];
+		function parseKoreanAdmin(f, p0, p1, primary, cityDistrict) {
+			const level6 = f.level6 || f.level7;
+			let sido = f.level4 || f.state, sigungu = "";
+			if (!sido && f.city && CONFIG.SPECIAL_CITIES.test(f.city)) sido = f.city;
 			if (sido && CONFIG.SPECIAL_CITIES.test(sido)) {
-				const candidates = [cityDistrict, level6, county, primary, p0, p1];
-				sigungu = pickAdmin(candidates, "구군", sido) ||
-					candidates.find(name => name && name !== sido && name.at(-1) === "시" && !CONFIG.SPECIAL_CITIES.test(name)) || "";
+				const cands = [cityDistrict, level6, f.county, primary, p0, p1];
+				sigungu = pickAdmin(cands, "구군", sido) || cands.find(n => n && n !== sido && n.at(-1) === "시" && !CONFIG.SPECIAL_CITIES.test(n)) || "";
 			} else {
-				const cityLike = pickAdmin(
-					[city, county, level6, primary, p1, p0], "시군", sido,
-				);
-				const districtName = pickAdmin(
-					[
-						cityDistrict, fields.level8, fields.level9,
-						fields.town, fields.locality, fields.village,
-					],
-					"구", sido, cityLike,
-				);
-				sigungu = joinPair(cityLike, districtName);
-				sigungu ||= pickAdmin(
-					[county, level6, cityDistrict, primary, p0, p1],
-					"시구군", sido,
-				);
+				const cityLike = pickAdmin([f.city, f.county, level6, primary, p1, p0], "시군", sido);
+				const districtName = pickAdmin([cityDistrict, f.level8, f.level9, f.town, f.locality, f.village], "구", sido, cityLike);
+				sigungu = joinPair(cityLike, districtName) || pickAdmin([f.county, level6, cityDistrict, primary, p0, p1], "시구군", sido);
 			}
 			const eupmyeon = [];
-			for (const name of [
-				fields.level8, fields.level9, fields.level10, fields.town,
-				fields.village, fields.locality, fields.suburb, primary, p0, p1,
-			]) {
-				if (!name || name === sido || name === sigungu) continue;
-				if (eupmyeon.includes(name)) continue;
-				if ("읍면동리".includes(name.at(-1)) ||
-					(name.endsWith("가") && "0123456789".includes(name.at(-2))))
-					eupmyeon.push(name);
+			for (const name of [f.level8, f.level9, f.level10, f.town, f.village, f.locality, f.suburb, primary, p0, p1]) {
+				if (!name || name === sido || name === sigungu || eupmyeon.includes(name)) continue;
+				if ("읍면동리".includes(name.at(-1)) || (name.endsWith("가") && "0123456789".includes(name.at(-2)))) eupmyeon.push(name);
 			}
 			return {sido, sigungu, eupmyeon: eupmyeon.join(" ")};
 		}
 		function removeDistrict(sigungu, district) {
 			if (!sigungu || sigungu === district) return "";
 			const cut = sigungu.length - district.length;
-			if (cut > 0 && sigungu.endsWith(district) &&
-				sigungu.charCodeAt(cut - 1) === 32)
-				return sigungu.slice(0, cut - 1).trim();
-			return (` ${sigungu.replace(/\s+/gu, " ").trim()} `)
-				.replaceAll(` ${district.replace(/\s+/gu, " ").trim()} `, " ").trim();
+			if (cut > 0 && sigungu.endsWith(district) && sigungu.charCodeAt(cut - 1) === 32) return sigungu.slice(0, cut - 1).trim();
+			return (` ${sigungu.replace(/\s+/gu, " ").trim()} `).replaceAll(` ${district.replace(/\s+/gu, " ").trim()} `, " ").trim();
 		}
-		function parseGlobalAdmin(fields, p0, p1, primary, cityDistrict) {
-			const {city, county} = fields;
-			const sido = fields.level4 || fields.state || fields.region ||
-				fields.province || county || city;
-			const cityLike = pickAdmin(
-				[city, county, fields.level6, fields.level7, primary, p1, p0],
-				0, sido,
-			);
-			const districtName = pickAdmin(
-				[
-					cityDistrict, fields.level8, fields.level9, fields.town,
-					fields.locality, fields.village, fields.suburb,
-					fields.neighbourhood,
-				],
-				0, sido, cityLike,
-			);
-			let sigungu = joinPair(cityLike, districtName) ||
-				fields.level6 || fields.level8 || city || fields.town ||
-				county || fields.district || fields.municipality;
-			if ((!sigungu || sigungu === sido) &&
-				(fields.type === "city" || fields.type === "county"))
-				sigungu = primary || city || county;
-			let eupmyeon = pickAdmin(
-				[
-					fields.locality, fields.level10, fields.town, fields.village,
-					fields.suburb, fields.neighbourhood, fields.quarter, fields.hamlet,
-					fields.township, fields.residential, fields.name, p0, p1,
-				],
-				0, sido, cityLike, districtName,
-			);
+		function parseGlobalAdmin(f, p0, p1, primary, cityDistrict) {
+			const sido = f.level4 || f.state || f.region || f.province || f.county || f.city;
+			const cityLike = pickAdmin([f.city, f.county, f.level6, f.level7, primary, p1, p0], 0, sido);
+			const districtName = pickAdmin([cityDistrict, f.level8, f.level9, f.town, f.locality, f.village, f.suburb, f.neighbourhood], 0, sido, cityLike);
+			let sigungu = joinPair(cityLike, districtName) || f.level6 || f.level8 || f.city || f.town || f.county || f.district || f.municipality;
+			if ((!sigungu || sigungu === sido) && (f.type === "city" || f.type === "county")) sigungu = primary || f.city || f.county;
+			let eupmyeon = pickAdmin([f.locality, f.level10, f.town, f.village, f.suburb, f.neighbourhood, f.quarter, f.hamlet, f.township, f.residential, f.name, p0, p1], 0, sido, cityLike, districtName);
 			if (eupmyeon === sigungu) eupmyeon = "";
 			if (!eupmyeon && districtName) {
 				eupmyeon = districtName;
@@ -2779,17 +2384,11 @@
 			return {sido, sigungu, eupmyeon};
 		}
 		function getAdmin(fields, country, p0, p1) {
-			const adminCountry = fields.level2;
-			const countryLabel = fields.country || adminCountry;
+			const adminCountry = fields.level2, countryLabel = fields.country || adminCountry;
 			let lowerCountry, lowerAdmin;
-			const korean = country === "kr" || country === "kp" ||
-				countryLabel === "대한민국" ||
-				countryLabel === "조선민주주의인민공화국" ||
-				(lowerCountry = countryLabel.toLowerCase()).includes("korea") ||
-				(lowerAdmin = adminCountry.toLowerCase()).includes("korea");
-			const primary = fields.name || p0;
-			const cityDistrict = fields.cityDistrict || fields.district || fields.suburb;
-			const result = (korean ? parseKoreanAdmin : parseGlobalAdmin)(fields, p0, p1, primary, cityDistrict);
+			const korean = country === "kr" || country === "kp" || countryLabel === "대한민국" || countryLabel === "조선민주주의인민공화국"
+				|| (lowerCountry = countryLabel.toLowerCase()).includes("korea") || (lowerAdmin = adminCountry.toLowerCase()).includes("korea");
+			const result = (korean ? parseKoreanAdmin : parseGlobalAdmin)(fields, p0, p1, fields.name || p0, fields.cityDistrict || fields.district || fields.suburb);
 			if (!korean) {
 				lowerAdmin ??= adminCountry.toLowerCase();
 				for (const key of ["sido", "sigungu", "eupmyeon"]) {
@@ -2802,55 +2401,20 @@
 		}
 		function isValidGeocode(parsed) {
 			const addr = parsed?.addr;
-			return !!addr && typeof parsed === "object" && typeof addr === "object" &&
-				boundedText(addr.sido) && boundedText(addr.sigungu) && boundedText(addr.eupmyeon) &&
-				boundedText(addr.tag) && boundedText(addr.fullAddr) &&
-				(parsed.kind === undefined || boundedText(parsed.kind)) &&
-				(parsed.countryCode === undefined || boundedText(parsed.countryCode)) &&
-				(parsed.countryName === undefined || boundedText(parsed.countryName));
+			return Boolean(addr && typeof parsed === "object" && typeof addr === "object"
+				&& ["sido", "sigungu", "eupmyeon", "tag", "fullAddr"].every(k => boundedText(addr[k]))
+				&& ["kind", "countryCode", "countryName"].every(k => parsed[k] === undefined || boundedText(parsed[k])));
 		}
 		let countryNames = null;
 		function parseGeocode(data) {
-			const gc = Array.isArray(data?.features)
-				? data.features[0]?.properties?.geocoding : null;
-			if (!gc)
-				return {
-					addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""},
-				};
-			const label = text(gc.label);
-			const country = text(gc.country_code).toLowerCase();
+			const gc = Array.isArray(data?.features) ? data.features[0]?.properties?.geocoding : null;
+			if (!gc) return {addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""}};
+			const label = text(gc.label), country = text(gc.country_code).toLowerCase();
 			const countryCode = /^[a-z]{2}$/.test(country) ? country : "";
 			const admin = typeof gc.admin === "object" ? gc.admin : null;
-			const fields = {
-				cityDistrict: text(gc.city_district),
-				level2: text(admin?.level2),
-				level4: text(admin?.level4),
-				level6: text(admin?.level6),
-				level7: text(admin?.level7),
-				level8: text(admin?.level8),
-				level9: text(admin?.level9),
-				level10: text(admin?.level10),
-				country: text(gc.country),
-				name: text(gc.name),
-				street: text(gc.street),
-				type: text(gc.type),
-				district: text(gc.district),
-				suburb: text(gc.suburb),
-				city: text(gc.city),
-				county: text(gc.county),
-				state: text(gc.state),
-				region: text(gc.region),
-				province: text(gc.province),
-				town: text(gc.town),
-				locality: text(gc.locality),
-				village: text(gc.village),
-				neighbourhood: text(gc.neighbourhood),
-				municipality: text(gc.municipality),
-				quarter: text(gc.quarter),
-				hamlet: text(gc.hamlet),
-				township: text(gc.township),
-				residential: text(gc.residential),
-			};
+			const fields = {cityDistrict: text(gc.city_district)};
+			for (const lvl of [2, 4, 6, 7, 8, 9, 10]) fields[`level${lvl}`] = text(admin?.[`level${lvl}`]);
+			for (const key of GC_FIELDS) fields[key] = text(gc[key]);
 			let firstPart = "", p0 = "", p1 = "", partIdx = 0;
 			for (let pos = 0; pos <= label.length;) {
 				const comma = label.indexOf(",", pos);
@@ -2858,36 +2422,28 @@
 				if (partIdx === 0) firstPart = part;
 				if (part) {
 					if (!p0) p0 = part;
-					else {p1 = part; break;}
+					else {
+						p1 = part;
+						break;
+					}
 				}
 				if (comma === -1) break;
 				pos = comma + 1;
 				partIdx++;
 			}
-			const {sido, sigungu, eupmyeon} = getAdmin(
-				fields, country, p0, p1,
-			);
+			const {sido, sigungu, eupmyeon} = getAdmin(fields, country, p0, p1);
 			let tag = fields.name || firstPart || fields.street || fields.city;
-			const tagType = fields.type;
-			if (tagType) tag = tag ? tag + ", " + tagType : tagType;
-			const kind = country === "kr" ? "KR" :
-				country === "kp" ? "KP" :
-					country ? "WORLD" : undefined;
-			if (sigungu.length > CONFIG.TEXT_HARD_LIMIT ||
-				eupmyeon.length > CONFIG.TEXT_HARD_LIMIT ||
-				tag.length > CONFIG.TEXT_HARD_LIMIT)
-				throw new InputError(TEXT_LIMIT_MESSAGE);
+			if (fields.type) tag = tag ? `${tag}, ${fields.type}` : fields.type;
+			const kind = country === "kr" ? "KR" : country === "kp" ? "KP" : country ? "WORLD" : undefined;
+			if ([sigungu, eupmyeon, tag].some(v => v.length > CONFIG.TEXT_HARD_LIMIT)) throw new InputError(TEXT_LIMIT_MESSAGE);
 			return {
 				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
 				kind,
 				countryCode: kind === "WORLD" ? countryCode : "",
-				countryName: kind === "WORLD"
-					? fields.country || (countryCode ? (countryNames ??= new Intl.DisplayNames("ko", {type: "region"})).of(countryCode.toUpperCase()) : "")
-					: "",
+				countryName: kind === "WORLD" ? fields.country || (countryCode ? (countryNames ??= new Intl.DisplayNames("ko", {type: "region"})).of(countryCode.toUpperCase()) : "") : "",
 			};
 		}
-		const CACHE_KEY_PREFIX =
-			`geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
+		const CACHE_KEY_PREFIX = `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
 		const mapPopover = byId("map-popover");
 		const mapAnchors = queryAll("#map-popover-links a");
 		const MAP_BUILDERS = [
@@ -2985,21 +2541,17 @@
 			setTheme(currentTheme() === "dark" ? "light" : "dark");
 		});
 		const seenCountryFilters = new Set(["", "에러"]);
-		let koCollator;
+		let koCollator, filterStatus = "all", filterTimer = null, pageFrame = null, pageKey = "";
 		function addCountryFilter(record) {
-			const {result} = record;
-			const kind = result.kind || record.set;
-			const value = record._kind;
+			const {result} = record, kind = result.kind || record.set, value = record._kind;
 			if (seenCountryFilters.has(value)) return;
 			seenCountryFilters.add(value);
 			const option = new Option(kindLabel(kind, result.countryName), value);
 			option.dataset.country = "true";
 			const collator = koCollator ??= new Intl.Collator("ko");
-			const before = Iterator.from(filterKind.options).find(current =>
-				current.dataset.country === "true" && collator.compare(option.text, current.text) < 0);
+			const before = Iterator.from(filterKind.options).find(c => c.dataset.country === "true" && collator.compare(option.text, c.text) < 0);
 			filterKind.insertBefore(option, before || filterKind.lastElementChild);
 		}
-		let filterStatus = "all";
 		const rowTemplate = query("tr", byId("tmpl-row").content);
 		const RX_COMMA_WS = /\s*,\s*/g;
 		const norm = s => {const t = s ? s.trim().toLowerCase() : ""; return t.includes(",") ? t.replace(RX_COMMA_WS, ",") : t;};
@@ -3008,27 +2560,20 @@
 				? "country:" + (result.countryCode || norm(result.countryName))
 				: (result.kind || set).toLowerCase();
 		function readFilters() {
-			const q = norm(filterQuery.value);
-			let query = null;
-			let queryIsOr = false;
+			const q = norm(filterQuery.value), kind = filterKind.value, fieldChecks = [];
+			let queryVal = null, queryIsOr = false;
 			if (q) {
 				queryIsOr = q.includes("|");
-				const tokens = [...new Set(
-					q.split(queryIsOr ? "|" : /\s+/u).map(token => token.trim()).filter(Boolean),
-				)];
-				if (tokens.length === 1) query = tokens[0];
-				else if (tokens.length > 1)
-					query = queryIsOr ? tokens : tokens.sort((a, b) => b.length - a.length);
+				const tokens = [...new Set(q.split(queryIsOr ? "|" : /\s+/u).map(t => t.trim()).filter(Boolean))];
+				if (tokens.length === 1) queryVal = tokens[0];
+				else if (tokens.length > 1) queryVal = queryIsOr ? tokens : tokens.sort((a, b) => b.length - a.length);
 			}
-			const kind = filterKind.value;
-			const fieldChecks = [];
 			for (let i = 0; i < DETAIL_FILTERS.length; i++) {
 				const v = norm(DETAIL_FILTERS[i].value);
 				if (v) fieldChecks.push(i + 1, v);
 			}
 			const hasTextFields = fieldChecks.length > 0;
-			return filterStatus === "all" && !kind && !query && !hasTextFields
-				? null : {status: filterStatus, kind, fieldChecks, hasTextFields, query, queryIsOr};
+			return filterStatus === "all" && !kind && !queryVal && !hasTextFields ? null : {status: filterStatus, kind, fieldChecks, hasTextFields, query: queryVal, queryIsOr};
 		}
 		let filterState = readFilters();
 		function resetCountryFilter() {
@@ -3046,67 +2591,44 @@
 		function matchesFilter(r, f) {
 			if (!r.result) return false;
 			if (!f) return true;
-			if (f.status !== "all" && r._status !== f.status) return false;
-			if (f.kind && r._kind !== f.kind) return false;
+			if ((f.status !== "all" && r._status !== f.status) || (f.kind && r._kind !== f.kind)) return false;
 			if (!f.hasTextFields && !f.query) return true;
-			const res = r.result;
-			const addr = res.addr;
-			const fields = r._search ??= [
-				r._kind,
-				addr ? norm(addr.sido) : "",
-				addr ? norm(addr.sigungu) : "",
-				addr ? norm(addr.eupmyeon) : "",
-				addr ? norm(addr.tag) : "",
-				norm(res.error || addr?.fullAddr),
-				null,
-			];
+			const res = r.result, addr = res.addr;
+			const fields = r._search ??= [r._kind, addr ? norm(addr.sido) : "", addr ? norm(addr.sigungu) : "", addr ? norm(addr.eupmyeon) : "", addr ? norm(addr.tag) : "", norm(res.error || addr?.fullAddr), null];
 			if (f.hasTextFields) {
-				const checks = f.fieldChecks;
-				for (let i = 0; i < checks.length; i += 2)
-					if (!fields[checks[i]].includes(checks[i + 1])) return false;
+				for (let i = 0; i < f.fieldChecks.length; i += 2) if (!fields[f.fieldChecks[i]].includes(f.fieldChecks[i + 1])) return false;
 			}
-			const query = f.query;
-			if (!query) return true;
-			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${norm(r.result.countryName)}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
-			if (typeof query === "string") return hay.includes(query);
-			const isOr = f.queryIsOr;
-			for (let i = 0; i < query.length; i++)
-				if (hay.includes(query[i]) === isOr) return isOr;
-			return !isOr;
+			const q = f.query;
+			if (!q) return true;
+			const hay = fields[6] ??= `${fields[5]}\u0000${fields[0]}\u0000${norm(res.countryName)}\u0000${fields[4]}\u0000${fields[3]}\u0000${fields[2]}\u0000${fields[1]}\u0000${r.latStr},${r.lonStr}`;
+			if (typeof q === "string") return hay.includes(q);
+			for (let i = 0; i < q.length; i++) if (hay.includes(q[i]) === f.queryIsOr) return f.queryIsOr;
+			return !f.queryIsOr;
 		}
 		let pageSize = [10, 25, 50, 100].includes(preferences.pageSize) ? preferences.pageSize : 10;
 		if (pageSize !== 10) pageSizeSelect.value = String(pageSize);
 		preferences = null;
-		let filterTimer = null;
-		let pageFrame = null;
-		let pageKey = "";
 		function updatePages(visibleCount) {
-			const active = document.activeElement;
-			const numberFocus = pageNumbers.contains(active);
-			const focusedPage = numberFocus ? active.dataset.page : null;
-			const edgeFocus = active === pagePrev || active === pageNext;
+			const active = document.activeElement, numberFocus = pageNumbers.contains(active);
+			const focusedPage = numberFocus ? active.dataset.page : null, edgeFocus = active === pagePrev || active === pageNext;
 			const pageCount = totalPages(visibleCount);
 			if (state.page >= pageCount) state.page = pageCount - 1;
 			pageNav.hidden = visibleCount === 0;
 			pagePrev.disabled = state.page === 0;
 			pageNext.disabled = state.page + 1 >= pageCount;
 			const shown = Math.min(pageSize, Math.max(0, visibleCount - state.page * pageSize));
-			resultsCount.textContent =
-				`${fmt(shown)} / ${fmt(visibleCount)}개 표시`;
+			resultsCount.textContent = `${fmt(shown)} / ${fmt(visibleCount)}개 표시`;
 			const key = `${state.page}:${pageCount}`;
 			if (pageNav.hidden && (numberFocus || edgeFocus)) byId("results-title").focus(NO_SCROLL);
 			if (key === pageKey) {
-				if (!pageNav.hidden && edgeFocus && active.disabled)
-					query('[aria-current="page"]', pageNumbers)?.focus(NO_SCROLL);
+				if (!pageNav.hidden && edgeFocus && active.disabled) query('[aria-current="page"]', pageNumbers)?.focus(NO_SCROLL);
 				return;
 			}
 			pageKey = key;
 			const current = state.page + 1;
-			const numbers = pageCount <= 7
-				? Array.from({length: pageCount}, (_, i) => i + 1)
+			const numbers = pageCount <= 7 ? Array.from({length: pageCount}, (_, i) => i + 1)
 				: current <= 4 ? [1, 2, 3, 4, 5, 0, pageCount]
-					: current >= pageCount - 3
-						? [1, 0, pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
+					: current >= pageCount - 3 ? [1, 0, pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
 						: [1, 0, current - 1, current, current + 1, 0, pageCount];
 			const fragment = document.createDocumentFragment();
 			for (const page of numbers) {
@@ -3118,35 +2640,24 @@
 					el.dataset.page = page - 1;
 					el.ariaLabel = el.textContent + " 페이지";
 					if (page === current) el.ariaCurrent = "page";
-				} else {
-					el.ariaHidden = "true";
-				}
+				} else el.ariaHidden = "true";
 				fragment.append(el);
 			}
 			pageNumbers.replaceChildren(fragment);
-			if (!pageNav.hidden && (numberFocus || edgeFocus && active.disabled))
-				(query(`[data-page="${focusedPage}"]`, pageNumbers) ||
-					query('[aria-current="page"]', pageNumbers))?.focus(NO_SCROLL);
+			if (!pageNav.hidden && (numberFocus || (edgeFocus && active.disabled)))
+				(query(`[data-page="${focusedPage}"]`, pageNumbers) || query('[aria-current="page"]', pageNumbers))?.focus(NO_SCROLL);
 		}
 		function applyFilters() {
-			const f = filterState;
-			const indices = state.visibleIndices;
+			const f = filterState, indices = state.visibleIndices, records = state.records;
 			indices.length = 0;
 			if (state.processed > 0) {
-				const records = state.records;
-				if (!f) {
-					for (let i = 0; i < records.length; i++) if (records[i].result) indices.push(i);
-				} else {
-					for (let i = 0; i < records.length; i++) if (matchesFilter(records[i], f)) indices.push(i);
-				}
+				for (let i = 0; i < records.length; i++) if (f ? matchesFilter(records[i], f) : records[i].result) indices.push(i);
 			}
 			state.page = 0;
 			renderPage(true);
 			announcePage();
 		}
-		function announcePage() {
-			pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(totalPages())} 페이지 · ${fmt(state.visibleIndices.length)}건`;
-		}
+		const announcePage = () => {pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(totalPages())} 페이지 · ${fmt(state.visibleIndices.length)}건`;};
 		function revealPage() {
 			renderPage(true);
 			announcePage();
@@ -3159,16 +2670,13 @@
 		function renderPage(resetScroll = false) {
 			pageFrame = null;
 			mapPopover.hidePopover();
-			const indices = state.visibleIndices;
-			const visibleCount = indices.length;
+			const indices = state.visibleIndices, visibleCount = indices.length;
 			updatePages(visibleCount);
-			const start = state.page * pageSize;
-			const end = Math.min(visibleCount, start + pageSize);
+			const start = state.page * pageSize, end = Math.min(visibleCount, start + pageSize);
 			const fragment = document.createDocumentFragment();
 			let matchedRow = null;
 			for (let position = start; position < end; position++) {
-				const rowIndex = indices[position];
-				const tr = createRow(state.records[rowIndex], rowIndex);
+				const rowIndex = indices[position], tr = createRow(state.records[rowIndex], rowIndex);
 				if (rowIndex === selectedIndex) matchedRow = tr;
 				fragment.append(tr);
 			}
@@ -3183,32 +2691,23 @@
 			if (visibleIndex < 0) return;
 			const visibleCount = state.visibleIndices.length;
 			updatePages(visibleCount);
-			const start = state.page * pageSize;
-			const end = Math.min(visibleCount, start + pageSize);
+			const start = state.page * pageSize, end = Math.min(visibleCount, start + pageSize);
 			if (visibleIndex < start || visibleIndex >= end) return;
-			if (resultBody.children.length !== (visibleIndex - start)) {
-				queuePage();
-				return;
-			}
-			resultBody.append(
-				createRow(state.records[index], index),
-			);
+			if (resultBody.children.length !== (visibleIndex - start)) return queuePage();
+			resultBody.append(createRow(state.records[index], index));
 			if (selectedIndex < 0) selectRecord(index, false);
 		}
-		function queuePage() {
-			pageFrame ??= requestAnimationFrame(() => renderPage());
-		}
+		const queuePage = () => {pageFrame ??= requestAnimationFrame(() => renderPage());};
 		function scheduleFilter() {
 			filterState = readFilters();
 			updateFilterSummary();
-			if (filterTimer !== null) {clearTimeout(filterTimer); filterTimer = null;}
+			if (filterTimer !== null) clearTimeout(filterTimer);
 			filterTimer = setTimeout(() => {
 				filterTimer = null;
 				applyFilters();
 			}, 80);
 		}
-		let downloadUrl = null;
-		let exportTask = null;
+		let downloadUrl = null, exportTask = null, elapsedStart = 0, elapsedTimer = 0;
 		function revokeDownloadUrl() {
 			if (!downloadUrl) return;
 			URL.revokeObjectURL(downloadUrl);
@@ -3216,14 +2715,11 @@
 		}
 		function downloadBlob(blob, filename) {
 			revokeDownloadUrl();
-			const url = URL.createObjectURL(blob);
-			downloadUrl = url;
-			const a = document.createElement("a");
+			const url = downloadUrl = URL.createObjectURL(blob), a = document.createElement("a");
 			a.href = url;
 			a.download = filename;
-			try {
-				a.click();
-			} catch (err) {
+			try {a.click();}
+			catch (err) {
 				revokeDownloadUrl();
 				throw err;
 			}
@@ -3232,12 +2728,9 @@
 				if (downloadUrl === url) downloadUrl = null;
 			}, 60_000);
 		}
-		let elapsedStart = 0;
-		let elapsedTimer = 0;
 		function updateElapsed() {
 			const seconds = elapsedStart ? Math.floor((performance.now() - elapsedStart) / 1000) : 0;
-			elapsed.textContent = [seconds / 3600, seconds / 60 % 60, seconds % 60]
-				.map(n => String(Math.floor(n)).padStart(2, "0")).join(":");
+			elapsed.textContent = [seconds / 3600, seconds / 60 % 60, seconds % 60].map(n => String(Math.floor(n)).padStart(2, "0")).join(":");
 		}
 		function stopElapsed(reset = false) {
 			if (!elapsedTimer && !reset) return;
@@ -3252,44 +2745,21 @@
 			elapsedTimer = setInterval(updateElapsed, 1000);
 		}
 		const state = {
-			records: [],
-			droppedFile: null,
-			pendingFile: null,
-			task: null,
-			renderReq: null,
-			processed: 0,
-			cntFail: 0,
-			cntNoAddress: 0,
-			visibleIndices: [],
-			page: 0,
-			bulkConfirmed: true,
-			generation: 0,
-			get status() {
-				return this.task?.status ?? "idle";
-			},
+			records: [], droppedFile: null, pendingFile: null, task: null, renderReq: null,
+			processed: 0, cntFail: 0, cntNoAddress: 0, visibleIndices: [], page: 0, bulkConfirmed: true, generation: 0,
+			get status() {return this.task?.status ?? "idle";},
 			get isRunning() {
 				const s = this.status;
 				return s === "running" || s === "paused" || s === "pausing";
 			},
-			get isStopping() {
-				return this.status === "stopping";
-			},
+			get isStopping() {return this.status === "stopping";},
 			reset(status) {
 				this.generation++;
 				this.task?.resume?.();
 				this.task?.controller.abort();
-				this.processed = 0;
-				this.cntFail = 0;
-				this.cntNoAddress = 0;
+				this.processed = this.cntFail = this.cntNoAddress = this.page = 0;
 				this.visibleIndices = [];
-				this.page = 0;
-				this.task = status === "idle"
-					? null
-					: {
-						status,
-						controller: new AbortController(),
-						resume: null,
-					};
+				this.task = status === "idle" ? null : {status, controller: new AbortController(), resume: null};
 				cancelAnimationFrame(this.renderReq);
 				this.renderReq = null;
 				cancelAnimationFrame(pageFrame);
@@ -3302,24 +2772,19 @@
 				stopElapsed(true);
 				this.records = records;
 				resetCountryFilter();
-				this.bulkConfirmed =
-					records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
+				this.bulkConfirmed = records.length <= CONFIG.BULK_CONFIRM_THRESHOLD;
 				this.reset("idle");
 			},
 			setStatus(status) {
-				if (status === "idle")
-					this.task = null;
-				else
-					this.task.status = status;
+				if (status === "idle") this.task = null;
+				else this.task.status = status;
 				updateUIState();
 			},
 		};
 		function updateUIState() {
-			const active = document.activeElement;
-			const ownedFocus = UI_CONTROLS.includes(active);
-			const s = statusRow.dataset.state = state.status;
+			const active = document.activeElement, ownedFocus = UI_CONTROLS.includes(active);
+			const s = statusRow.dataset.state = state.status, isBusy = state.task !== null;
 			if (s === "idle" && elapsedTimer) stopElapsed();
-			const isBusy = state.task !== null;
 			progressIndicator.hidden = !isBusy;
 			percentText.hidden = s === "parsing";
 			if (s === "parsing") progressBar.removeAttribute("value");
@@ -3333,20 +2798,16 @@
 			resumeBtn.disabled = resumeBtn.hidden = s !== "paused";
 			stopBtn.disabled = !(state.isRunning || s === "parsing");
 			startBtn.hidden = isBusy;
-			pauseBtn.hidden = s !== "running" && s !== "pausing";
 			stopBtn.hidden = !isBusy;
+			pauseBtn.hidden = s !== "running" && s !== "pausing";
 			useOutput.disabled = isBusy || !outputReady;
 			updateWorkflowStep();
 			if (ownedFocus && (active.disabled || active.hidden)) {
-				const next = s === "running" ? pauseBtn
-					: s === "paused" ? resumeBtn
-						: isBusy ? stopBtn
-							: state.records.length ? startBtn : parseBtn;
+				const next = s === "running" ? pauseBtn : s === "paused" ? resumeBtn : isBusy ? stopBtn : state.records.length ? startBtn : parseBtn;
 				(next.disabled ? statusText : next).focus(NO_SCROLL);
 			}
 		}
-		const srStatus = {msg: null, progressBucket: -1};
-		const statusAnnouncement = byId("status-announcement");
+		const srStatus = {msg: null, progressBucket: -1}, statusAnnouncement = byId("status-announcement");
 		function announceStatus(text) {
 			if (srStatus.msg === text) return;
 			srStatus.msg = text;
@@ -3359,38 +2820,28 @@
 		function showStatus(msg, type = "info") {
 			const nextMsg = String(msg ?? "");
 			paintStatus(nextMsg, type);
-			const text = nextMsg.trim();
 			srStatus.progressBucket = -1;
-			announceStatus(text || null);
+			announceStatus(nextMsg.trim() || null);
 		}
 		const renderCache = {total: 0, processed: 0, fail: 0, noAddress: 0};
 		function renderFrame() {
 			state.renderReq = null;
-			const {processed, cntFail: fail, cntNoAddress: noAddress} = state;
-			const total = state.records.length;
-			const totalChanged = renderCache.total !== total;
-			const doneChanged = renderCache.processed !== processed;
-			const failChanged = renderCache.fail !== fail;
-			const noAddressChanged = renderCache.noAddress !== noAddress;
+			const {processed, cntFail: fail, cntNoAddress: noAddress} = state, total = state.records.length;
+			const totalChanged = renderCache.total !== total, doneChanged = renderCache.processed !== processed;
+			const failChanged = renderCache.fail !== fail, noAddressChanged = renderCache.noAddress !== noAddress;
 			if (!(totalChanged || doneChanged || failChanged || noAddressChanged)) return;
 			updateWorkflowStep();
-			renderCache.total = total; renderCache.processed = processed;
-			renderCache.fail = fail; renderCache.noAddress = noAddress;
-			const remaining = total - processed;
+			Object.assign(renderCache, {total, processed, fail, noAddress});
 			if (totalChanged) {
-				countTotal.textContent = summaryTotal.textContent =
-					coordsCount.textContent = fmt(total);
+				countTotal.textContent = summaryTotal.textContent = coordsCount.textContent = fmt(total);
 				coordsPanel.dataset.empty = total === 0;
 				setCoordsExpanded(false);
 			}
-			if (doneChanged || failChanged || noAddressChanged)
-				countSuccess.textContent = summarySuccess.textContent = fmt(processed - fail - noAddress);
-			if (noAddressChanged)
-				countNoAddress.textContent = summaryNoAddress.textContent = fmt(noAddress);
-			if (failChanged)
-				countFail.textContent = summaryFail.textContent = fmt(fail);
+			if (doneChanged || failChanged || noAddressChanged) countSuccess.textContent = summarySuccess.textContent = fmt(processed - fail - noAddress);
+			if (noAddressChanged) countNoAddress.textContent = summaryNoAddress.textContent = fmt(noAddress);
+			if (failChanged) countFail.textContent = summaryFail.textContent = fmt(fail);
 			if (totalChanged || doneChanged) {
-				countRemain.textContent = summaryRemain.textContent = fmt(remaining);
+				countRemain.textContent = summaryRemain.textContent = fmt(total - processed);
 				const pct = total ? Math.round((processed / total) * 100) : 0;
 				if (state.status !== "parsing") progressBar.value = pct;
 				progressBar.parentElement.style.setProperty("--pct", pct);
@@ -3403,16 +2854,16 @@
 				exportBtn.disabled = processed === 0 || exportTask !== null;
 			}
 		}
-		function scheduleRender() {
-			state.renderReq ??= requestAnimationFrame(renderFrame);
-		}
+		const scheduleRender = () => {state.renderReq ??= requestAnimationFrame(renderFrame);};
 		function clearTable() {
-			if (filterTimer !== null) {clearTimeout(filterTimer); filterTimer = null;}
+			if (filterTimer !== null) {
+				clearTimeout(filterTimer);
+				filterTimer = null;
+			}
 			mapPopover.hidePopover();
 			resultBody.replaceChildren();
 			resetInspector();
-			tableWrap.scrollTop = 0;
-			tableWrap.scrollLeft = 0;
+			tableWrap.scrollTop = tableWrap.scrollLeft = 0;
 			tableWrap.classList.remove("has-results");
 			pageNav.hidden = true;
 			resultsCount.textContent = "결과 없음";
@@ -3422,45 +2873,35 @@
 				signal.throwIfAborted();
 				return Promise.resolve();
 			}
-			return new Promise((resolve) => {
-				on((AbortSignal.any([signal, AbortSignal.timeout(ms)])), "abort", resolve, {once: true});
-			}).then(() => {
-				signal.throwIfAborted();
-			});
+			return new Promise(resolve => on(AbortSignal.any([signal, AbortSignal.timeout(ms)]), "abort", resolve, {once: true})).then(() => signal.throwIfAborted());
 		}
 		function retryDelay(response, attempt) {
 			const fallback = CONFIG.RATE_LIMIT_DELAY_MS * attempt;
 			const value = response.status === 429 ? response.headers.get("retry-after") : null;
 			if (value) {
-				const seconds = Number(value);
-				const delay = Number.isFinite(seconds)
-					? seconds * 1_000 : Date.parse(value) - Date.now();
-				return Math.min(CONFIG.MAX_RETRY_DELAY_MS,
-					Math.max(fallback, Number.isFinite(delay) ? delay : 0));
+				const seconds = Number(value), delay = Number.isFinite(seconds) ? seconds * 1_000 : Date.parse(value) - Date.now();
+				return Math.min(CONFIG.MAX_RETRY_DELAY_MS, Math.max(fallback, Number.isFinite(delay) ? delay : 0));
 			}
 			return fallback * (0.8 + Math.random() * 0.4);
 		}
 		let yieldPort, yieldQueue;
-		const yieldToMain = typeof globalThis.scheduler?.yield === "function"
-			? () => globalThis.scheduler.yield()
-			: () => {
-				if (!yieldPort) {
-					const channel = new MessageChannel();
-					yieldQueue = [];
-					channel.port1.onmessage = () => yieldQueue.shift()();
-					yieldPort = channel.port2;
-				}
-				const {promise, resolve} = Promise.withResolvers();
-				yieldQueue.push(resolve);
-				yieldPort.postMessage(0);
-				return promise;
-			};
-		const cancelReader = (readable) => readable?.cancel().catch(() => { });
+		const yieldToMain = typeof globalThis.scheduler?.yield === "function" ? () => globalThis.scheduler.yield() : () => {
+			if (!yieldPort) {
+				const channel = new MessageChannel();
+				yieldQueue = [];
+				channel.port1.onmessage = () => yieldQueue.shift()();
+				yieldPort = channel.port2;
+			}
+			const {promise, resolve} = Promise.withResolvers();
+			yieldQueue.push(resolve);
+			yieldPort.postMessage(0);
+			return promise;
+		};
+		const cancelReader = readable => readable?.cancel().catch(() => { });
 		async function parseFile(file, signal) {
-			if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT)
-				throw new InputError(
-					"입력 파일은 최대 64 MiB입니다. 파일을 나누어 다시 불러와 주세요.",
-				);
+			if (file.size > CONFIG.INPUT_FILE_HARD_LIMIT) throw new InputError(
+				"입력 파일은 최대 64 MiB입니다. 파일을 나누어 다시 불러와 주세요.",
+			);
 			const out = [];
 			let invalidCount = 0;
 			let lastYield = performance.now();
@@ -3474,8 +2915,7 @@
 			const append = part => {
 				if (!part) return;
 				length += part.length;
-				if (length > CONFIG.INPUT_LINE_HARD_LIMIT)
-					throw new InputError(lineLimitMessage);
+				if (length > CONFIG.INPUT_LINE_HARD_LIMIT) throw new InputError(lineLimitMessage);
 				parts.push(part);
 			};
 			const emit = () => {
@@ -3490,8 +2930,7 @@
 					let p = kw;
 					while (p > from && isInlineWs(text[p - 1])) p--;
 					let set = null;
-					if (p >= from + 4 && text.charCodeAt(p - 1) === 0xad6d && text.startsWith("대한민국", p - 4))
-						set = "KR";
+					if (p >= from + 4 && text.charCodeAt(p - 1) === 0xad6d && text.startsWith("대한민국", p - 4)) set = "KR";
 					else if (p >= from + 2 && text.charCodeAt(p - 1) === 0xacc4 && text.charCodeAt(p - 2) === 0xc138)
 						set = "WORLD";
 					if (!set) {kw = text.indexOf("위경도", kw + 3); continue;}
@@ -3504,10 +2943,9 @@
 						const lat = m[1], lon = m[2], fLat = +lat, fLon = +lon;
 						if (!(Math.abs(fLat) <= 90 && Math.abs(fLon) <= 180)) invalidCount++;
 						else {
-							if (out.length >= CONFIG.BULK_HARD_LIMIT)
-								throw new InputError(
-									`공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
-								);
+							if (out.length >= CONFIG.BULK_HARD_LIMIT) throw new InputError(
+								`공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
+							);
 							out.push({
 								set, latStr: lat, lonStr: lon, cacheKey: fLat + "," + fLon,
 								result: null, _status: null, _kind: null, _search: null, _lat6: null, _lon6: null,
@@ -3599,32 +3037,21 @@
 		}
 		const parsedCache = new Map();
 		const CACHE_PRUNE_EVERY = 32;
-		let cacheWriters = null;
-		let tabId = null;
-		let cacheChannel = null;
-		let writeSequence = 0;
-		let cacheRowCeiling = null;
-		let writesSincePrune = 0;
-		let lastFetchAt = 0;
-		let dbPromise = null;
-		let cacheRetryAt = 0;
+		let cacheWriters = null, tabId = null, cacheChannel = null, writeSequence = 0, cacheRowCeiling = null, writesSincePrune = 0, lastFetchAt = 0, dbPromise = null, cacheRetryAt = 0;
 		function ensureCacheChannel() {
 			if (cacheChannel) return cacheChannel;
 			cacheWriters = new Set();
 			cacheChannel = new BroadcastChannel(`${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`);
 			cacheChannel.onmessage = ({data}) => {
-				if (!Array.isArray(data) || data.length !== 2) return;
+				if (!Array.isArray(data) || data.length !== 2 || typeof data[1] !== "string") return;
 				const [phase, token] = data;
-				if (typeof token !== "string") return;
 				if (phase === 0) {
 					if (cacheWriters) {
-						if (token.length > 128 || (cacheWriters.size >= 64 && !cacheWriters.has(token)))
-							cacheWriters = null;
+						if (token.length > 128 || (cacheWriters.size >= 64 && !cacheWriters.has(token))) cacheWriters = null;
 						else cacheWriters.add(token);
 					}
-				} else if (phase === 1) {
-					cacheWriters?.delete(token);
-				} else return;
+				} else if (phase === 1) cacheWriters?.delete(token);
+				else return;
 				cacheRowCeiling = null;
 			};
 			return cacheChannel;
@@ -3639,18 +3066,16 @@
 		function putMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
 			parsedCache.delete(cacheKey);
 			parsedCache.set(cacheKey, {parsed, savedAt});
-			if (parsedCache.size > 5_000)
-				parsedCache.delete(parsedCache.keys().next().value);
+			if (parsedCache.size > 5_000) parsedCache.delete(parsedCache.keys().next().value);
 		}
 		function openCacheDb() {
 			ensureCacheChannel();
 			if (dbPromise) return dbPromise;
-			if (Date.now() < cacheRetryAt)
-				return Promise.resolve(null);
+			if (Date.now() < cacheRetryAt) return Promise.resolve(null);
 			let syncFailed = false;
-			const attempt = new Promise((resolve) => {
+			const attempt = new Promise(resolve => {
 				let settled = false;
-				const finish = (db) => {
+				const finish = db => {
 					if (settled) return false;
 					settled = true;
 					resolve(db);
@@ -3664,26 +3089,15 @@
 					console.warn(message, detail);
 				};
 				let req;
-				try {
-					req = indexedDB.open(
-						CONFIG.CACHE_DB_NAME,
-						CONFIG.CACHE_DB_VERSION,
-					);
-				} catch (err) {
-					fail("Reverse geocoding cache is unavailable.", err);
-					return;
-				}
-				req.onupgradeneeded = (event) => {
+				try {req = indexedDB.open(CONFIG.CACHE_DB_NAME, CONFIG.CACHE_DB_VERSION);}
+				catch (err) {return fail("Reverse geocoding cache is unavailable.", err);}
+				req.onupgradeneeded = event => {
 					const db = req.result;
-					let store;
-					if (!db.objectStoreNames.contains(CONFIG.CACHE_STORE))
-						store = db.createObjectStore(CONFIG.CACHE_STORE, {keyPath: "key"});
-					else
-						store = req.transaction.objectStore(CONFIG.CACHE_STORE);
-					if (event.oldVersion < 3)
-						store.clear();
-					if (!store.indexNames.contains("savedAt"))
-						store.createIndex("savedAt", "savedAt");
+					const store = db.objectStoreNames.contains(CONFIG.CACHE_STORE)
+						? req.transaction.objectStore(CONFIG.CACHE_STORE)
+						: db.createObjectStore(CONFIG.CACHE_STORE, {keyPath: "key"});
+					if (event.oldVersion < 3) store.clear();
+					if (!store.indexNames.contains("savedAt")) store.createIndex("savedAt", "savedAt");
 				};
 				req.onsuccess = () => {
 					const db = req.result;
@@ -3692,20 +3106,15 @@
 						db.close();
 						dbPromise = null;
 					};
-					if (!finish(db))
-						dbPromise = Promise.resolve(db);
+					if (!finish(db)) dbPromise = Promise.resolve(db);
 					setTimeout(() => {
 						let prunedRows = null;
 						cacheTransaction(db, "readwrite", null, store => pruneCache(store, rows => prunedRows = rows))
-							.then(() => {
-								if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;
-							}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
+							.then(() => {if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
 					}, 0);
 				};
-				req.onerror = () =>
-					fail("Reverse geocoding cache is unavailable.", req.error);
-				req.onblocked = () =>
-					fail("Reverse geocoding cache upgrade is blocked.");
+				req.onerror = () => fail("Reverse geocoding cache is unavailable.", req.error);
+				req.onblocked = () => fail("Reverse geocoding cache upgrade is blocked.");
 			});
 			if (!syncFailed) dbPromise = attempt;
 			return attempt;
@@ -3713,44 +3122,28 @@
 		function cacheTransaction(db, mode, signal, operation) {
 			signal?.throwIfAborted();
 			return new Promise((resolve, reject) => {
-				let settled = false;
-				let tx;
-				const finish = (callback, value) => {
+				let settled = false, tx;
+				const finish = (cb, val) => {
 					if (settled) return;
 					settled = true;
 					signal?.removeEventListener("abort", onAbort);
-					callback(value);
+					cb(val);
 				};
-				const abortTransaction = () => {
-					try {
-						tx?.abort();
-					} catch (err) {
-						console.warn("Reverse geocoding cache abort failed.", err);
-					}
-				};
+				const abortTx = () => {try {tx?.abort();} catch (err) {console.warn("Reverse geocoding cache abort failed.", err);} };
 				const onAbort = () => {
-					abortTransaction();
+					abortTx();
 					finish(reject, signal.reason);
 				};
 				try {
 					tx = db.transaction(CONFIG.CACHE_STORE, mode);
 					tx.oncomplete = () => finish(resolve);
-					tx.onerror = () => finish(
-						reject,
-						tx.error ?? new Error("Reverse geocoding cache transaction failed."),
-					);
-					tx.onabort = () => finish(
-						reject,
-						signal?.aborted
-							? signal.reason
-							: tx.error ??
-							new Error("Reverse geocoding cache transaction aborted."),
-					);
+					tx.onerror = () => finish(reject, tx.error ?? new Error("Reverse geocoding cache transaction failed."));
+					tx.onabort = () => finish(reject, signal?.aborted ? signal.reason : tx.error ?? new Error("Reverse geocoding cache transaction aborted."));
 					if (signal) on(signal, "abort", onAbort, {once: true});
 					if (signal?.aborted) onAbort();
 					else operation(tx.objectStore(CONFIG.CACHE_STORE));
 				} catch (err) {
-					abortTransaction();
+					abortTx();
 					finish(reject, err);
 				}
 			});
@@ -3760,10 +3153,9 @@
 			const db = await openCacheDb();
 			signal.throwIfAborted();
 			if (!db) return;
-			const now = Date.now();
+			const now = Date.now(), prefixLen = CACHE_KEY_PREFIX.length, ttl = CONFIG.CACHE_TTL_MS;
 			try {
-				await cacheTransaction(db, "readonly", signal, (store) => {
-					const prefixLen = CACHE_KEY_PREFIX.length, ttl = CONFIG.CACHE_TTL_MS;
+				await cacheTransaction(db, "readonly", signal, store => {
 					const acceptRow = (row, knownKey) => {
 						let cacheKey = knownKey;
 						if (cacheKey === undefined) {
@@ -3773,11 +3165,9 @@
 							if (!results.has(cacheKey)) return;
 						}
 						const age = now - row.savedAt;
-						if (Number.isFinite(row.savedAt) && age >= 0 && age <= ttl && isValidGeocode(row.parsed))
-							results.set(cacheKey, row);
+						if (Number.isFinite(row.savedAt) && age >= 0 && age <= ttl && isValidGeocode(row.parsed)) results.set(cacheKey, row);
 					};
-					const scanCache = results.size > 2_000 ||
-						(results.size >= 1_000 && cacheRowCeiling !== null && cacheRowCeiling <= results.size * 2);
+					const scanCache = results.size > 2_000 || (results.size >= 1_000 && cacheRowCeiling !== null && cacheRowCeiling <= results.size * 2);
 					if (!scanCache) {
 						for (const cacheKey of results.keys()) {
 							const req = store.get(CACHE_KEY_PREFIX + cacheKey);
@@ -3785,13 +3175,8 @@
 						}
 						return;
 					}
-					const req = store.getAll(
-						IDBKeyRange.bound(CACHE_KEY_PREFIX, CACHE_KEY_PREFIX + "\uffff"),
-						CONFIG.CACHE_MAX + CACHE_PRUNE_EVERY,
-					);
-					req.onsuccess = () => {
-						for (const row of req.result) acceptRow(row);
-					};
+					const req = store.getAll(IDBKeyRange.bound(CACHE_KEY_PREFIX, CACHE_KEY_PREFIX + "\uffff"), CONFIG.CACHE_MAX + CACHE_PRUNE_EVERY);
+					req.onsuccess = () => {for (const row of req.result) acceptRow(row);};
 				});
 			} catch (err) {
 				signal.throwIfAborted();
@@ -3799,8 +3184,7 @@
 			}
 		}
 		async function writeDiskCache(entries, signal) {
-			let syncToken = null;
-			let channel = null;
+			let syncToken = null, channel = null;
 			try {
 				const db = await openCacheDb();
 				if (!db || signal.aborted) return;
@@ -3808,51 +3192,34 @@
 				tabId ??= `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`;
 				syncToken = `${tabId}:${++writeSequence}`;
 				channel.postMessage([0, syncToken]);
-				const pendingWrites =
-					writesSincePrune + entries.length;
-				const maintain = pendingWrites >= CACHE_PRUNE_EVERY;
+				const pendingWrites = writesSincePrune + entries.length, maintain = pendingWrites >= CACHE_PRUNE_EVERY;
 				let prunedRows = null;
-				await cacheTransaction(
-					db,
-					"readwrite",
-					signal,
-					(store) => {
-						const savedAt = Date.now();
-						for (const {cacheKey, parsed} of entries)
-							store.put({key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed});
-						if (maintain) pruneCache(store, rows => prunedRows = rows);
-					},
-				);
+				await cacheTransaction(db, "readwrite", signal, store => {
+					const savedAt = Date.now();
+					for (const {cacheKey, parsed} of entries) store.put({key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed});
+					if (maintain) pruneCache(store, rows => prunedRows = rows);
+				});
 				if (cacheWriters?.size === 0) {
-					if (prunedRows !== null)
-						cacheRowCeiling = prunedRows;
-					else if (cacheRowCeiling !== null)
-						cacheRowCeiling += entries.length;
+					if (prunedRows !== null) cacheRowCeiling = prunedRows;
+					else if (cacheRowCeiling !== null) cacheRowCeiling += entries.length;
 				}
 				writesSincePrune = maintain ? pendingWrites % CACHE_PRUNE_EVERY : pendingWrites;
 			} catch (err) {
-				if (!signal.aborted)
-					console.warn("Reverse geocoding cache write failed.", err);
+				if (!signal.aborted) console.warn("Reverse geocoding cache write failed.", err);
 			} finally {
-				if (syncToken !== null)
-					channel.postMessage([1, syncToken]);
+				if (syncToken !== null) channel.postMessage([1, syncToken]);
 			}
 		}
 		function pruneCache(store, onRows) {
-			const index = store.index("savedAt");
-			const expiresBefore = Date.now() - CONFIG.CACHE_TTL_MS;
+			const index = store.index("savedAt"), expiresBefore = Date.now() - CONFIG.CACHE_TTL_MS;
 			const countReq = store.count();
 			countReq.onsuccess = () => {
 				let remaining = countReq.result;
-				if (remaining === 0) {onRows(0); return;}
+				if (remaining === 0) return onRows(0);
 				const cursorReq = index.openKeyCursor();
 				cursorReq.onsuccess = () => {
 					const cursor = cursorReq.result;
-					if (!cursor || (remaining <= CONFIG.CACHE_MAX &&
-						indexedDB.cmp(cursor.key, expiresBefore) >= 0)) {
-						onRows(remaining);
-						return;
-					}
+					if (!cursor || (remaining <= CONFIG.CACHE_MAX && indexedDB.cmp(cursor.key, expiresBefore) >= 0)) return onRows(remaining);
 					store.delete(cursor.primaryKey);
 					remaining--;
 					cursor.continue();
@@ -3868,23 +3235,17 @@
 				throw limitError();
 			}
 			if (!response.body) return "";
-			const decoder = new TextDecoder("utf-8", {fatal: true});
-			const reader = response.body.getReader();
-			const parts = [];
+			const decoder = new TextDecoder("utf-8", {fatal: true}), reader = response.body.getReader(), parts = [];
 			let bytesRead = 0;
 			try {
 				for (; ;) {
 					const {value, done} = await reader.read();
 					if (!done) {
 						signal.throwIfAborted();
-						bytesRead += value.byteLength;
-						if (bytesRead > limit) throw limitError();
+						if ((bytesRead += value.byteLength) > limit) throw limitError();
 					}
-					try {
-						parts.push(decoder.decode(value, {stream: !done}));
-					} catch (err) {
-						throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});
-					}
+					try {parts.push(decoder.decode(value, {stream: !done}));}
+					catch (err) {throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});}
 					if (done) break;
 				}
 				return parts.join("");
@@ -3894,8 +3255,7 @@
 			}
 		}
 		async function fetchWithRetry(url, userSignal, report) {
-			const maxRetry = CONFIG.MAX_RETRY;
-			const baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
+			const maxRetry = CONFIG.MAX_RETRY, baseDelayMs = CONFIG.RATE_LIMIT_DELAY_MS;
 			let attempt = 0;
 			while (++attempt <= maxRetry) {
 				userSignal.throwIfAborted();
@@ -3908,27 +3268,16 @@
 					}
 				}
 				lastFetchAt = now;
-				const requestSignal = AbortSignal.any([
-					userSignal,
-					AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS),
-				]);
+				const requestSignal = AbortSignal.any([userSignal, AbortSignal.timeout(CONFIG.REQUEST_TIMEOUT_MS)]);
 				let res;
 				try {
 					report(attempt === 1 ? "조회 중…" : `재시도 ${attempt}/${maxRetry}`);
-					res = await fetch(url, {
-						headers: {Accept: "application/json"},
-						referrerPolicy: "strict-origin-when-cross-origin",
-						signal: requestSignal,
-					});
+					res = await fetch(url, {headers: {Accept: "application/json"}, referrerPolicy: "strict-origin-when-cross-origin", signal: requestSignal});
 				} catch (e) {
 					userSignal.throwIfAborted();
-					if (attempt >= maxRetry)
-						throw new Error(
-							requestSignal.reason?.name === "TimeoutError"
-								? "주소 조회 응답 시간이 초과되었습니다. 잠시 후 다시 조회해 주세요."
-								: "주소 조회 서버에 연결하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 조회해 주세요.",
-							{cause: e},
-						);
+					if (attempt >= maxRetry) throw new Error(requestSignal.reason?.name === "TimeoutError"
+						? "주소 조회 응답 시간이 초과되었습니다. 잠시 후 다시 조회해 주세요."
+						: "주소 조회 서버에 연결하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 조회해 주세요.", {cause: e});
 					report("재연결 대기…", true);
 					await sleep(baseDelayMs * attempt, userSignal);
 					continue;
@@ -3936,47 +3285,29 @@
 				if (res.ok) {
 					try {
 						const body = await readResponse(res, requestSignal);
-						try {
-							return JSON.parse(body);
-						} catch (err) {
-							throw new SyntaxError(
-								"역지오코딩 응답이 올바른 JSON 형식이 아닙니다.",
-								{cause: err},
-							);
-						}
+						try {return JSON.parse(body);}
+						catch (err) {throw new SyntaxError("역지오코딩 응답이 올바른 JSON 형식이 아닙니다.", {cause: err});}
 					} catch (e) {
 						userSignal.throwIfAborted();
-						if (
-							e instanceof RangeError ||
-							e instanceof SyntaxError ||
-							attempt >= maxRetry
-						)
-							throw e;
+						if (e instanceof RangeError || e instanceof SyntaxError || attempt >= maxRetry) throw e;
 					}
 				} else if (res.status !== 429 && res.status < 500) {
 					await cancelReader(res.body);
-					throw new Error(
-						res.status === 403
-							? "주소 조회 서버가 요청을 허용하지 않았습니다. Nominatim 사용 정책을 확인해 주세요. (HTTP 403)"
-							: `주소 조회 요청을 처리할 수 없습니다. 좌표를 확인한 뒤 다시 조회해 주세요. (HTTP ${res.status})`,
-					);
+					throw new Error(res.status === 403
+						? "주소 조회 서버가 요청을 허용하지 않았습니다. Nominatim 사용 정책을 확인해 주세요. (HTTP 403)"
+						: `주소 조회 요청을 처리할 수 없습니다. 좌표를 확인한 뒤 다시 조회해 주세요. (HTTP ${res.status})`);
 				} else {
 					await cancelReader(res.body);
-					if (attempt >= maxRetry)
-						throw new Error(
-							res.status === 429
-								? "주소 조회 요청이 일시적으로 제한되었습니다. 잠시 후 다시 조회해 주세요. (HTTP 429)"
-								: `주소 조회 서버에 문제가 있습니다. 잠시 후 다시 조회해 주세요. (HTTP ${res.status})`,
-						);
+					if (attempt >= maxRetry) throw new Error(res.status === 429
+						? "주소 조회 요청이 일시적으로 제한되었습니다. 잠시 후 다시 조회해 주세요. (HTTP 429)"
+						: `주소 조회 서버에 문제가 있습니다. 잠시 후 다시 조회해 주세요. (HTTP ${res.status})`);
 				}
 				const delay = retryDelay(res, attempt);
 				report(`재시도까지 ${Math.ceil(delay / 1000)}초`, true);
 				await sleep(delay, userSignal);
 			}
 		}
-		async function pauseTask(
-			task, message = "일시정지됨", type = "stopped",
-		) {
+		async function pauseTask(task, message = "일시정지됨", type = "stopped") {
 			state.setStatus("paused");
 			showStatus(message, type);
 			const {promise, resolve} = Promise.withResolvers();
@@ -3986,12 +3317,8 @@
 			task.resume = null;
 		}
 		async function processRecords(task) {
-			const records = state.records;
-			const total = records.length;
-			const totalDisp = fmt(total);
-			const signal = task.controller.signal;
-			let lastStatusAt = 0;
-			let lastYield = performance.now();
+			const records = state.records, total = records.length, totalDisp = fmt(total), signal = task.controller.signal;
+			let lastStatusAt = 0, lastYield = performance.now();
 			const reportProgress = (force = false) => {
 				const now = performance.now();
 				if (force || now - lastStatusAt >= 200) {
@@ -4006,7 +3333,7 @@
 				}
 				return now;
 			};
-			const cacheBatch = [];
+			const cacheBatch = [], persistentCache = new Map(), unresolved = [];
 			const flushCache = async () => {
 				if (!cacheBatch.length) return;
 				await writeDiskCache(cacheBatch, signal);
@@ -4016,10 +3343,7 @@
 				await yieldToMain();
 				lastYield = performance.now();
 			};
-			const persistentCache = new Map();
-			const unresolved = [];
-			let memNow = Date.now();
-			let memHits = 0;
+			let memNow = Date.now(), memHits = 0;
 			for (let i = 0; i < total && !signal.aborted; i++) {
 				if (state.status === "pausing") {
 					await pauseTask(task);
@@ -4027,10 +3351,7 @@
 					memNow = Date.now();
 				}
 				const record = records[i];
-				record.result = null;
-				record._search = null;
-				record._status = null;
-				record._kind = null;
+				record.result = record._search = record._status = record._kind = null;
 				const parsed = getMemoryCache(record.cacheKey, memNow);
 				if (parsed === undefined) {
 					persistentCache.set(record.cacheKey, null);
@@ -4038,16 +3359,14 @@
 					continue;
 				}
 				commitResult(i, parsed, false);
-				if ((++memHits & 63) === 0 || state.processed === total) {
-					if (reportProgress() - lastYield >= 8) {await yieldAndReset(); memNow = Date.now();}
+				if (((++memHits & 63) === 0 || state.processed === total) && reportProgress() - lastYield >= 8) {
+					await yieldAndReset();
+					memNow = Date.now();
 				}
 			}
 			if (persistentCache.size && !signal.aborted) {
-				try {
-					await readDiskCache(persistentCache, signal);
-				} catch (err) {
-					if (!signal.aborted) throw err;
-				}
+				try {await readDiskCache(persistentCache, signal);}
+				catch (err) {if (!signal.aborted) throw err;}
 				let diskHits = 0;
 				for (const i of unresolved) {
 					if (signal.aborted) break;
@@ -4055,14 +3374,11 @@
 						await pauseTask(task);
 						if (signal.aborted) break;
 					}
-					const cacheKey = records[i].cacheKey;
-					const row = persistentCache.get(cacheKey);
+					const cacheKey = records[i].cacheKey, row = persistentCache.get(cacheKey);
 					if (!row) continue;
 					putMemoryCache(cacheKey, row.parsed, row.savedAt);
 					commitResult(i, row.parsed, false);
-					if ((++diskHits & 63) === 0 || state.processed === total) {
-						if (reportProgress() - lastYield >= 8) await yieldAndReset();
-					}
+					if (((++diskHits & 63) === 0 || state.processed === total) && reportProgress() - lastYield >= 8) await yieldAndReset();
 				}
 			}
 			queuePage();
@@ -4072,13 +3388,7 @@
 				try {
 					if (state.status === "pausing" || !navigator.onLine) {
 						const offline = !navigator.onLine;
-						await pauseTask(
-							task,
-							offline
-								? '네트워크가 오프라인입니다. 연결 후 "재개"를 눌러주세요.'
-								: undefined,
-							offline ? "warn" : "stopped",
-						);
+						await pauseTask(task, offline ? '네트워크가 오프라인입니다. 연결 후 "재개"를 눌러주세요.' : undefined, offline ? "warn" : "stopped");
 						if (signal.aborted) break;
 						if (offline && !navigator.onLine) {
 							i--;
@@ -4087,62 +3397,42 @@
 						if (!state.isStopping) showStatus("재개합니다…");
 					}
 					if (state.task !== task || !state.isRunning) break;
-					const r = records[i];
-					const cacheKey = r.cacheKey;
+					const r = records[i], cacheKey = r.cacheKey;
 					let parsed = getMemoryCache(cacheKey);
 					const cacheHit = parsed !== undefined;
 					try {
 						if (!cacheHit) {
 							const url = `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko&lat=${r.latStr}&lon=${r.lonStr}`;
-							parsed = parseGeocode(
-								await fetchWithRetry(url, signal, (message, announce) => {
-									if (state.task !== task || state.status !== "running" || signal.aborted) return;
-									paintStatus(message, "info");
-									if (announce) announceStatus(message);
-								}),
-							);
+							parsed = parseGeocode(await fetchWithRetry(url, signal, (message, announce) => {
+								if (state.task !== task || state.status !== "running" || signal.aborted) return;
+								paintStatus(message, "info");
+								if (announce) announceStatus(message);
+							}));
 							signal.throwIfAborted();
 							putMemoryCache(cacheKey, parsed);
 							cacheBatch.push({cacheKey, parsed});
-							if (cacheBatch.length >= 8)
-								await flushCache();
+							if (cacheBatch.length >= 8) await flushCache();
 						}
 					} catch (err) {
 						if (signal.aborted && err?.name === "AbortError") break;
 						if (!navigator.onLine) {
-							await pauseTask(
-								task,
-								'네트워크 연결이 끊겼습니다. 연결 후 "재개"를 눌러주세요.',
-								"warn",
-							);
+							await pauseTask(task, '네트워크 연결이 끊겼습니다. 연결 후 "재개"를 눌러주세요.', "warn");
 							if (signal.aborted) break;
 							i--;
 							continue;
 						}
-						parsed = {
-							addr: null,
-							error: errorMessage(err),
-							kind: "에러",
-						};
+						parsed = {addr: null, error: errorMessage(err), kind: "에러"};
 					}
 					if (signal.aborted) break;
 					commitResult(i, parsed, true);
 					const now = reportProgress(state.processed === total);
-					if (parsed.error && !state.isStopping)
-						showStatus(
-							`조회 실패: (${fmt(i1)}/${totalDisp}) ${parsed.error}`,
-							"error",
-						);
+					if (parsed.error && !state.isStopping) showStatus(`조회 실패: (${fmt(i1)}/${totalDisp}) ${parsed.error}`, "error");
 					if (cacheHit && now - lastYield >= 8) await yieldAndReset();
 				} catch (err) {
 					if (signal.aborted && err?.name === "AbortError") break;
 					console.error(err);
 					task.resume = null;
-					finishTask(
-						`오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${errorMessage(err)
-						}`,
-						"error",
-					);
+					finishTask(`오류로 중단됨: (${fmt(i1)}/${totalDisp}) ${errorMessage(err)}`, "error");
 					break;
 				}
 			}
@@ -4152,55 +3442,37 @@
 				cancelAnimationFrame(pageFrame);
 				renderPage();
 			}
-			if (state.isStopping)
-				finishTask("중지됨", "stopped");
+			if (state.isStopping) finishTask("중지됨", "stopped");
 			else if (state.processed >= total) {
-				const failed = state.cntFail;
-				const noAddress = state.cntNoAddress;
-				finishTask(
-					failed ? `조회 완료 · 실패 ${fmt(failed)}건` : "조회 완료",
-					failed === total ? "error" : failed || noAddress ? "warn" : "success",
-				);
+				const failed = state.cntFail, noAddress = state.cntNoAddress;
+				finishTask(failed ? `조회 완료 · 실패 ${fmt(failed)}건` : "조회 완료", failed === total ? "error" : failed || noAddress ? "warn" : "success");
 			}
 		}
 		function finishTask(message, type = "info") {
 			state.setStatus("idle");
 			showStatus(message, type);
 		}
-		function errorMessage(err) {
-			return String(err?.message || err);
-		}
+		const errorMessage = err => String(err?.message || err);
 		const resultStatus = ({addr, error}) => error ? "failed"
 			: addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag) ? "done" : "missing";
 		const KIND_LABELS = {KR: "대한민국", KP: "북한", 에러: "조회 실패"};
-		const kindLabel = (kind, countryName) =>
-			kind === "WORLD" ? countryName || "국가 미확인" : KIND_LABELS[kind] || kind;
+		const kindLabel = (kind, countryName) => kind === "WORLD" ? countryName || "국가 미확인" : KIND_LABELS[kind] || kind;
 		const STATUS_LABELS = {done: "주소 확인", missing: "주소 없음", failed: "조회 실패"};
 		const joinPair = (a, b) => a && b ? `${a} ${b}` : a || b || "";
-		function resultTitle({addr, error}) {
-			return error ? "조회 실패" :
-				joinPair(addr.sido, addr.sigungu) || addr.fullAddr || "주소 정보 없음";
-		}
+		const resultTitle = ({addr, error}) => error ? "조회 실패" : joinPair(addr.sido, addr.sigungu) || addr.fullAddr || "주소 정보 없음";
 		function createRow(record, index) {
-			const tr = rowTemplate.cloneNode(true);
-			const kids = tr.children;
-			const c0 = kids[0], c1 = kids[1], c2 = kids[2], c3 = kids[3], c4 = kids[4];
-			const result = record.result;
-			const addr = result.addr;
-			const status = record._status;
-			const kind = kindLabel(result.kind || record.set, result.countryName);
-			const selected = index === selectedIndex;
-			const coordText = `${record.latStr}, ${record.lonStr}`;
+			const tr = rowTemplate.cloneNode(true), [c0, c1, c2, c3, c4] = tr.children;
+			const {result, _status: status} = record, addr = result.addr;
+			const kind = kindLabel(result.kind || record.set, result.countryName), selected = index === selectedIndex;
+			const coordText = `${record.latStr}, ${record.lonStr}`, title = resultTitle(result);
+			const subtitle = result.error || addr.eupmyeon || addr.tag || "상세 정보 보기";
 			tr.dataset.record = index;
 			tr.dataset.selected = selected;
 			c0.textContent = index + 1;
-			const button = c1.firstElementChild;
+			const button = c1.firstElementChild, subEl = button.lastElementChild;
 			button.dataset.record = index;
 			button.ariaPressed = selected;
-			const title = resultTitle(result);
 			button.firstElementChild.textContent = title;
-			const subtitle = result.error || addr.eupmyeon || addr.tag || "상세 정보 보기";
-			const subEl = button.lastElementChild;
 			subEl.textContent = subtitle;
 			if (result.error) subEl.classList.add("row-error");
 			button.ariaLabel = `${index + 1}. ${title} ${subtitle} - 위치 상세 보기`;
@@ -4234,24 +3506,12 @@
 		}
 		async function handleExport() {
 			if (exportTask) return exportTask;
-			const records = state.records;
-			const allDone = state.processed === records.length && records.length > 0;
-			let rows = null;
-			if (!allDone) {
-				rows = [];
-				for (let rowIndex = 0; rowIndex < records.length; rowIndex++) {
-					if (records[rowIndex].result) rows.push(rowIndex);
-				}
-			}
+			const records = state.records, allDone = state.processed === records.length && records.length > 0;
+			const rows = allDone ? null : records.reduce((acc, r, i) => (r.result && acc.push(i), acc), []);
 			const totalRows = allDone ? records.length : rows.length;
-			if (!totalRows)
-				return showStatus("내보낼 데이터가 없습니다.", "warn");
-			const sourceFile = state.droppedFile;
-			const appEpoch = state.generation;
-			const ensureCurrent = () => {
-				if (state.generation !== appEpoch)
-					throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");
-			};
+			if (!totalRows) return showStatus("내보낼 데이터가 없습니다.", "warn");
+			const sourceFile = state.droppedFile, appEpoch = state.generation;
+			const ensureCurrent = () => {if (state.generation !== appEpoch) throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");};
 			exportBtn.disabled = true;
 			exportTask = (async () => {
 				try {
@@ -4259,32 +3519,20 @@
 					await yieldToMain();
 					ensureCurrent();
 					const parts = ["\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,지도링크(Google),지도링크(OSM),지도링크(Naver),지도링크(Kakao)"];
-					const totalDisp = fmt(totalRows);
-					let chunkLines = [];
-					let chunkChars = 0;
+					const totalDisp = fmt(totalRows), chunkLines = [];
+					let chunkChars = 0, exported = 0;
 					const flushChunk = () => {
 						if (!chunkLines.length) return;
 						parts.push("\n", chunkLines.join("\n"));
-						chunkChars = 0;
-						chunkLines.length = 0;
+						chunkChars = chunkLines.length = 0;
 					};
-					let exported = 0;
 					for (let pos = 0; pos < totalRows; pos++) {
-						const rowIndex = allDone ? pos : rows[pos];
-						const r = records[rowIndex];
-						const result = r.result;
-						const lat = r.latStr;
-						const lon = r.lonStr;
-						const rawKind = result.kind || r.set;
-						const exportKind = csvEsc(rawKind === "WORLD" ? kindLabel("WORLD", result.countryName) : rawKind);
-						const latC0 = lat.charCodeAt(0);
-						const latPrefix = latC0 === 43 || latC0 === 45 ? "'" : "";
-						const addr = result.addr;
-						const lat6 = r._lat6 ??= fmtCoord6(lat);
-						const lon6 = r._lon6 ??= fmtCoord6(lon);
-						const line = `${exportKind},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",${addr
-							? `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)}`
-							: ",,,"},${csvEsc(result.error || addr.fullAddr)},"${MAP_BUILDERS[0](lat, lon, lat6, lon6)}","${MAP_BUILDERS[1](lat, lon, lat6, lon6)}",${MAP_BUILDERS[2](lat, lon, lat6, lon6)},"${MAP_BUILDERS[3](lat, lon, lat6, lon6)}"`;
+						const rowIndex = allDone ? pos : rows[pos], r = records[rowIndex], {result, latStr: lat, lonStr: lon} = r;
+						const rawKind = result.kind || r.set, exportKind = csvEsc(rawKind === "WORLD" ? kindLabel("WORLD", result.countryName) : rawKind);
+						const latC0 = lat.charCodeAt(0), latPrefix = latC0 === 43 || latC0 === 45 ? "'" : "";
+						const addr = result.addr, lat6 = r._lat6 ??= fmtCoord6(lat), lon6 = r._lon6 ??= fmtCoord6(lon);
+						const addrCols = addr ? `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)}` : ",,,";
+						const line = `${exportKind},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",${addrCols},${csvEsc(result.error || addr.fullAddr)},"${MAP_BUILDERS[0](lat, lon, lat6, lon6)}","${MAP_BUILDERS[1](lat, lon, lat6, lon6)}",${MAP_BUILDERS[2](lat, lon, lat6, lon6)},"${MAP_BUILDERS[3](lat, lon, lat6, lon6)}"`;
 						chunkLines.push(line);
 						chunkChars += line.length + 1;
 						exported++;
@@ -4297,11 +3545,7 @@
 					}
 					flushChunk();
 					ensureCurrent();
-					downloadBlob(
-						new Blob(parts, {type: "text/csv;charset=utf-8"}),
-						`${sourceFile.name.replace(/\.[^.]+$/, "")
-						}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`,
-					);
+					downloadBlob(new Blob(parts, {type: "text/csv;charset=utf-8"}), `${sourceFile.name.replace(/\.[^.]+$/, "")}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
 					showStatus("CSV 저장 요청", "success");
 				} catch (err) {
 					if (err?.name === "AbortError") return;
@@ -4317,12 +3561,14 @@
 		async function handleParse() {
 			const file = state.pendingFile || state.droppedFile;
 			if (!file) return showStatus("파일을 선택해 주세요.", "warn");
-			const task = {status: "parsing", controller: new AbortController(), resume: null};
-			state.task = task;
+			const task = state.task = {status: "parsing", controller: new AbortController(), resume: null};
 			updateUIState();
 			showStatus("좌표 추출 중…");
 			const analysis = byId("file-analysis");
-			const fail = (msg, type) => {finishTask(`${msg} 기존 결과는 유지됩니다.`, type); return false;};
+			const fail = (msg, type) => {
+				finishTask(`${msg} 기존 결과는 유지됩니다.`, type);
+				return false;
+			};
 			try {
 				const {records, invalidCount} = await parseFile(file, task.controller.signal);
 				if (state.task !== task) return;
@@ -4333,15 +3579,10 @@
 				state.droppedFile = file;
 				state.setRecords(records);
 				emptyHint.textContent = "주소 조회 대기";
-				const MAX_DISP = 200;
-				const disp = records
-					.slice(0, MAX_DISP)
-					.map((record) => `${record.latStr}, ${record.lonStr}`);
-				if (records.length > MAX_DISP)
-					disp.push(`… 외 ${fmt(records.length - MAX_DISP)}개`);
+				const MAX_DISP = 200, disp = records.slice(0, MAX_DISP).map(r => `${r.latStr}, ${r.lonStr}`);
+				if (records.length > MAX_DISP) disp.push(`… 외 ${fmt(records.length - MAX_DISP)}개`);
 				coordsContent.textContent = disp.join("\n");
-				lineNumbers.textContent = disp.map((_, i) =>
-					i < MAX_DISP ? String(i + 1) : "…").join("\n");
+				lineNumbers.textContent = disp.map((_, i) => i < MAX_DISP ? String(i + 1) : "…").join("\n");
 				showStatus("좌표 추출 완료", invalidCount ? "warn" : "success");
 				return true;
 			} catch (err) {
@@ -4353,7 +3594,7 @@
 				return fail("파일을 읽지 못했습니다. 다시 선택하세요.", "error");
 			}
 		}
-		on(pageNumbers, "click", (event) => {
+		on(pageNumbers, "click", event => {
 			const button = event.target.closest("button[data-page]");
 			if (!button) return;
 			const page = Number(button.dataset.page);
@@ -4378,16 +3619,10 @@
 			}
 		}
 		on(byId("coords-copy"), "click", () => {
-			const generation = state.generation;
-			void copyTextWithNotice(
-				() => state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"),
-				() => generation === state.generation,
-				"좌표 복사됨",
-				"좌표 복사 실패",
-				"HTTPS 연결에서 사용할 수 있습니다.",
-			);
+			const gen = state.generation;
+			void copyTextWithNotice(() => state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"), () => gen === state.generation, "좌표 복사됨", "좌표 복사 실패", "HTTPS 연결에서 사용할 수 있습니다.");
 		});
-		on(pageSizeSelect, "change", (event) => {
+		on(pageSizeSelect, "change", event => {
 			const size = Number(event.target.value);
 			if (![10, 25, 50, 100].includes(size)) return;
 			pageSize = size;
@@ -4397,15 +3632,8 @@
 			announcePage();
 		});
 		on(filterControls, "input", scheduleFilter);
-		on(document, "keydown", (e) => {
-			if (
-				e.key !== "/" ||
-				state.processed === 0 ||
-				e.defaultPrevented ||
-				e.altKey || e.shiftKey || e.ctrlKey || e.metaKey ||
-				query("dialog:open") ||
-				(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable], .manual-rng"))
-			) return;
+		on(document, "keydown", e => {
+			if (e.key !== "/" || state.processed === 0 || e.defaultPrevented || e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || query("dialog:open") || (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable], .manual-rng"))) return;
 			e.preventDefault();
 			setMobileView("results");
 			filterQuery.focus();
@@ -4420,26 +3648,17 @@
 		const COMMANDS = {
 			"--parse": handleParse,
 			"--start": async () => {
-				if (location.protocol !== "https:" && location.protocol !== "http:") {
-					showStatus(
-						"Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.",
-						"warn",
-					);
-					return;
-				}
+				if (location.protocol !== "https:" && location.protocol !== "http:")
+					return showStatus("Nominatim 요청 출처 식별을 위해 file:// 대신 HTTP(S)로 연 뒤 조회해 주세요.", "warn");
 				const count = state.records.length;
 				if (count > CONFIG.BULK_CONFIRM_THRESHOLD && !state.bulkConfirmed) {
-					byId("bulk-description").textContent =
-						`${fmt(count)}개 좌표 조회`;
+					byId("bulk-description").textContent = `${fmt(count)}개 좌표 조회`;
 					state.bulkConfirmed = await new Promise(resolve => {
 						bulkDialog.returnValue = "";
 						on(bulkDialog, "close", () => resolve(bulkDialog.returnValue === "confirm"), {once: true});
 						bulkDialog.showModal();
 					});
-					if (!state.bulkConfirmed) {
-						showStatus("조회 취소", "stopped");
-						return;
-					}
+					if (!state.bulkConfirmed) return showStatus("조회 취소", "stopped");
 				}
 				const task = state.reset("running");
 				startElapsed();
@@ -4447,13 +3666,10 @@
 				showStatus("조회 중…");
 				emptyHint.textContent = "조회 중…";
 				setMobileView("results");
-				void processRecords(task).catch((err) => {
+				void processRecords(task).catch(err => {
 					if (state.task !== task) return;
 					console.error(err);
-					finishTask(
-						`오류로 중단됨: ${errorMessage(err)}`,
-						"error",
-					);
+					finishTask(`오류로 중단됨: ${errorMessage(err)}`, "error");
 				});
 			},
 			"--pause": () => {
@@ -4486,10 +3702,10 @@
 			"--page-prev": () => shiftPage(-1),
 			"--page-next": () => shiftPage(1),
 		};
-		on(byId("app"), "command", (e) => {
+		on(byId("app"), "command", e => {
 			const cmd = COMMANDS[e.command];
 			if (!cmd) return;
-			Promise.try(cmd).catch((err) => {
+			Promise.try(cmd).catch(err => {
 				if (err?.name === "AbortError") return;
 				console.error(err);
 				showStatus(`명령 실행 중 오류: ${errorMessage(err)}`, "error");
@@ -4497,18 +3713,12 @@
 		});
 		function acceptInputFile(file) {
 			if (!file) return false;
-			if (
-				!file.name.toLowerCase().endsWith(".txt") &&
-				file.type !== "text/plain"
-			) {
+			if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
 				showStatus("텍스트 파일(.txt)만 불러올 수 있습니다.", "warn");
 				return false;
 			}
 			if (state.task !== null) {
-				showStatus(
-					"조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.",
-					"warn",
-				);
+				showStatus("조회/파싱 중에는 파일을 변경할 수 없습니다. 중지 후 다시 선택해 주세요.", "warn");
 				return false;
 			}
 			state.pendingFile = file;
@@ -4527,18 +3737,13 @@
 		let koreaModulePromise, randomModulePromise;
 		const loadKoreaModule = () => koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => {koreaModulePromise = null; throw error;});
 		const loadRandomModule = () => randomModulePromise ??= import("./srg_random.js?v=1").catch(error => {randomModulePromise = null; throw error;});
-		function prepareKorea(value) {
-			void loadKoreaModule().then(module => module.prepareKorea(value)).catch(() => { });
-		}
+		const prepareKorea = value => {void loadKoreaModule().then(m => m.prepareKorea(value)).catch(() => { });};
 		const GENERATION_LIMIT = 10_000;
 		const u64Tokens = raw => raw.matchAll(/[^\s,]+/gu).map(match => match[0]);
 		function outputBlob(chunks, includeBom) {
 			const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
-			if (chunks.length && !chunks.at(-1).endsWith("\n"))
-				parts.push("\n");
-			return new Blob(parts, {
-				type: includeBom ? "text/plain;charset=utf-8" : "text/plain",
-			});
+			if (chunks.length && !chunks.at(-1).endsWith("\n")) parts.push("\n");
+			return new Blob(parts, {type: includeBom ? "text/plain;charset=utf-8" : "text/plain"});
 		}
 		function setInputError(input, message, error = `${input.id}-error`) {
 			byId(error).textContent = message;
@@ -4551,27 +3756,17 @@
 			}
 		}
 		function generateRandomValues(count) {
-			if (!Number.isInteger(count) || count < 1 || count > GENERATION_LIMIT)
-				throw new Error(`생성 개수는 1~${fmt(GENERATION_LIMIT)} 사이의 정수여야 합니다.`);
-			if (typeof globalThis.crypto?.getRandomValues !== "function")
-				throw new Error("암호화 난수 생성을 지원하지 않는 브라우저입니다.");
+			if (!Number.isInteger(count) || count < 1 || count > GENERATION_LIMIT) throw new Error(`생성 개수는 1~${fmt(GENERATION_LIMIT)} 사이의 정수여야 합니다.`);
+			if (typeof globalThis.crypto?.getRandomValues !== "function") throw new Error("암호화 난수 생성을 지원하지 않는 브라우저입니다.");
 			const values = new BigUint64Array(count);
-			// Generate on the client only. Web Crypto permits 65,536 bytes per call.
-			for (let offset = 0; offset < count; offset += 8192)
-				crypto.getRandomValues(values.subarray(offset, Math.min(offset + 8192, count)));
+			for (let offset = 0; offset < count; offset += 8192) crypto.getRandomValues(values.subarray(offset, Math.min(offset + 8192, count)));
 			return values;
 		}
 		function loadManualRng() {
-			const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn,
-				output, error, meta, suppDialog, suppForm, suppValues] = [
-					"num64", "suppValues", "runBtn", "clearBtn", "saveOutput", "copyOutput",
-					"output", "error", "meta", "supp-dialog", "supp-form",
-					"supp-values",
-				].map(byId);
+			const [num64Input, suppInput, runBtn, clearBtn, saveBtn, copyBtn, output, error, meta, suppDialog, suppForm, suppValues, rngCount, generateNum, generateSupp, autoSupp, rngError, generateDialog] =
+				["num64", "suppValues", "runBtn", "clearBtn", "saveOutput", "copyOutput", "output", "error", "meta", "supp-dialog", "supp-form", "supp-values", "rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-error", "generate-supp-dialog"].map(byId);
 			const outputContent = query(".code-content", output);
-			const [rngCount, generateNum, generateSupp, autoSupp, rngError, generateDialog] =
-				["rng-count", "generate-num64", "generate-supp", "auto-supp", "rng-error", "generate-supp-dialog"].map(byId);
-			let prepareTimer;
+			let prepareTimer, suppRequest = null, returnFocus = null, chunks = [], manualBusy = false, copying = false, outputEpoch = 0, activeWorkerController = null;
 			on(num64Input, "input", () => {
 				clearTimeout(prepareTimer);
 				prepareTimer = setTimeout(() => {
@@ -4584,15 +3779,13 @@
 				for (const _ of value.matchAll(/[^\s,]+/gu)) if (++count > GENERATION_LIMIT) break;
 				return count;
 			};
-			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
+			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]]) {
 				on(button, "click", async () => {
 					rngError.textContent = "";
 					try {
 						const count = rngCount.valueAsNumber;
 						if (inputCount(input) + count > GENERATION_LIMIT) throw new Error(`입력값은 ${fmt(GENERATION_LIMIT)}개까지 추가할 수 있습니다.`);
-						const values = generateRandomValues(count);
-						const prev = input.value.trim();
-						const joined = values.join("\n");
+						const values = generateRandomValues(count), prev = input.value.trim(), joined = values.join("\n");
 						input.value = prev ? `${prev}\n${joined}` : joined;
 						setInputError(input, "");
 						if (input === num64Input) {
@@ -4611,29 +3804,20 @@
 						rngError.textContent = errorMessage(err);
 					}
 				});
+			}
+			const setSupplementError = message => setInputError(suppValues, message, "supp-error");
 			on(generateDialog, "click", () => {
 				if (!suppRequest) return;
 				setSupplementError("");
-				try {
-					finishSupplement(generateRandomValues(32));
-				} catch (err) {
-					setSupplementError(errorMessage(err));
-				}
+				try {finishSupplement(generateRandomValues(32));}
+				catch (err) {setSupplementError(errorMessage(err));}
 			});
 			const clearInputErrors = () => {
 				error.textContent = rngError.textContent = "";
 				for (const input of [num64Input, suppInput]) setInputError(input, "");
 			};
-			for (const input of [num64Input, suppInput])
-				on(input, "input", () => {
-					if (input.ariaInvalid === "true") clearInputErrors();
-				});
-			const setSupplementError = message => setInputError(suppValues, message, "supp-error");
-			on(suppValues, "input", () => {
-				if (suppValues.ariaInvalid === "true") setSupplementError("");
-			});
-			let suppRequest = null;
-			let returnFocus = null;
+			for (const input of [num64Input, suppInput]) on(input, "input", () => {if (input.ariaInvalid === "true") clearInputErrors();});
+			on(suppValues, "input", () => {if (suppValues.ariaInvalid === "true") setSupplementError("");});
 			function finishSupplement(values) {
 				if (!suppRequest) return;
 				const {resolve} = suppRequest;
@@ -4645,18 +3829,14 @@
 			function requestSupplements(parseU64) {
 				if (!returnFocus) {
 					const active = document.activeElement;
-					returnFocus = active instanceof HTMLElement &&
-						active !== document.body
-						? active
-						: runBtn;
+					returnFocus = active instanceof HTMLElement && active !== document.body ? active : runBtn;
 				}
 				const {promise, resolve} = Promise.withResolvers();
 				suppRequest = {resolve, parseU64};
 				suppValues.value = "";
 				setSupplementError("");
-				try {
-					suppDialog.showModal();
-				} catch (err) {
+				try {suppDialog.showModal();}
+				catch (err) {
 					suppRequest = null;
 					throw err;
 				}
@@ -4670,17 +3850,12 @@
 				}
 				return values;
 			};
-			on(suppForm, "submit", (event) => {
+			on(suppForm, "submit", event => {
 				event.preventDefault();
 				if (!suppRequest) return;
 				try {
-					const values = parseU64List(
-						suppValues.value,
-						`보조 난수값은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 입력할 수 있습니다.`,
-						suppRequest.parseU64,
-					);
-					if (!values.length)
-						throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
+					const values = parseU64List(suppValues.value, `보조 난수값은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 입력할 수 있습니다.`, suppRequest.parseU64);
+					if (!values.length) throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
 					setSupplementError("");
 					finishSupplement(values);
 				} catch (err) {
@@ -4689,14 +3864,11 @@
 					suppValues.closest(".field").scrollIntoView({block: "center"});
 				}
 			});
-			on(suppDialog, "cancel", (event) => {
+			on(suppDialog, "cancel", event => {
 				event.preventDefault();
 				finishSupplement(null);
 			});
-			let chunks = [];
-			let manualBusy = false;
-			let copying = false;
-			const setBusy = (busy) => {
+			const setBusy = busy => {
 				manualBusy = busy;
 				const hasOutput = chunks.length > 0;
 				for (const control of [rngCount, generateNum, generateSupp, autoSupp, runBtn]) control.disabled = busy;
@@ -4705,54 +3877,40 @@
 				saveBtn.disabled = busy || !hasOutput;
 				copyBtn.disabled = saveBtn.disabled || copying;
 			};
-			let outputEpoch = 0;
-			let activeWorkerController = null;
 			on(window, "pagehide", () => {
 				clearTimeout(prepareTimer);
 				activeWorkerController?.abort();
 			});
 			setBusy(false);
 			on(runBtn, "click", async () => {
-				const epoch = ++outputEpoch;
-				clearInputErrors();
+				const epoch = ++outputEpoch, nextChunks = [], previousMeta = meta.textContent;
 				let invalidInput = null;
-				const nextChunks = [];
-				const previousMeta = meta.textContent;
+				clearInputErrors();
 				meta.textContent = "변환 중…";
 				setBusy(true);
 				try {
 					const {convertNumber, formatOutput, parseU64} = await loadRandomModule();
 					if (epoch !== outputEpoch) return;
-					let supplements = u64Tokens(suppInput.value).map(parseU64);
-					let processed = 0;
-					let sampleKorea;
-					let suppCount = 0;
-					const updateProgress = (state) => {
+					let supplements = u64Tokens(suppInput.value).map(parseU64), processed = 0, sampleKorea, suppCount = 0;
+					const updateProgress = phase => {
 						const count = Math.min(nextChunks.length, 100);
-						if (
-							state !== "처리 중" && nextChunks.length
-						) {
+						if (phase !== "처리 중" && nextChunks.length) {
 							let preview = nextChunks.slice(0, count).join("");
 							const omitted = nextChunks.length - count;
 							if (omitted > 0) preview += `\n\n… 외 ${fmt(omitted)}개`;
 							outputContent.textContent = preview;
 						}
-						meta.textContent = `변환 ${state} · ${fmt(processed)}개${suppCount ? ` (보조 ${fmt(suppCount)}개)` : ""}`;
+						meta.textContent = `변환 ${phase} · ${fmt(processed)}개${suppCount ? ` (보조 ${fmt(suppCount)}개)` : ""}`;
 					};
-					let lastYieldAt = performance.now();
-					let lastMetaAt = lastYieldAt;
-					let cancelled = false;
+					let lastYieldAt = performance.now(), lastMetaAt = lastYieldAt, cancelled = false, convertedInWorkers = false, parsedWords = null;
 					const limitMessage = `기본 난수 변환은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 가능합니다.`;
 					const appendBlock = block => nextChunks.push(nextChunks.length ? `\n${block}` : block);
-					let convertedInWorkers = false;
-					let parsedWords = null;
 					if (autoSupp.checked && !suppInput.value.trim() && typeof Worker === "function") {
 						invalidInput = num64Input;
 						const words = parsedWords = parseU64List(num64Input.value, limitMessage, parseU64);
 						invalidInput = null;
 						if (words.length >= 512) {
-							const controller = new AbortController();
-							activeWorkerController = controller;
+							const controller = activeWorkerController = new AbortController();
 							try {
 								const {convertParallel} = await import("./srg_parallel.js?v=1");
 								if (epoch !== outputEpoch || controller.signal.aborted) return;
@@ -4798,9 +3956,8 @@
 							sampleKorea ??= (await loadKoreaModule()).sampleKorea;
 							if (epoch !== outputEpoch) return;
 							const conversion = convertNumber(num, sampleKorea);
-							let step = await conversion.next();
+							let step = await conversion.next(), used = 0;
 							if (epoch !== outputEpoch) return;
-							let used = 0;
 							while (!step.done) {
 								if (performance.now() - lastYieldAt >= 12) {
 									await yieldToMain();
@@ -4814,9 +3971,7 @@
 								let supplied = supplements.next();
 								invalidInput = null;
 								if (supplied.done) {
-									const values = autoSupp.checked
-										? generateRandomValues(32)
-										: await requestSupplements(parseU64);
+									const values = autoSupp.checked ? generateRandomValues(32) : await requestSupplements(parseU64);
 									if (epoch !== outputEpoch) return;
 									if (values === null) {
 										cancelled = true;
@@ -4844,8 +3999,7 @@
 									lastMetaAt = now;
 								}
 								await yieldToMain();
-								if (epoch !== outputEpoch)
-									return;
+								if (epoch !== outputEpoch) return;
 								lastYieldAt = performance.now();
 							}
 						}
@@ -4856,8 +4010,7 @@
 					}
 					if (nextChunks.length) chunks = nextChunks;
 					updateProgress(cancelled ? "중단" : "완료");
-					if (cancelled && !nextChunks.length && chunks.length)
-						meta.textContent = previousMeta || "변환 중단";
+					if (cancelled && !nextChunks.length && chunks.length) meta.textContent = previousMeta || "변환 중단";
 					output.scrollTop = 0;
 				} catch (err) {
 					if (epoch === outputEpoch) {
@@ -4866,17 +4019,15 @@
 						if (invalidInput) {
 							setInputError(invalidInput, message);
 							returnFocus = invalidInput;
-						} else error.textContent = message;
+						}
+						else error.textContent = message;
 					}
 				} finally {
 					if (epoch === outputEpoch) {
 						setBusy(false);
 						const focusTarget = returnFocus;
 						returnFocus = null;
-						if (
-							focusTarget?.isConnected &&
-							!focusTarget.matches(":disabled")
-						) {
+						if (focusTarget?.isConnected && !focusTarget.matches(":disabled")) {
 							focusTarget.focus(NO_SCROLL);
 							if (focusTarget.ariaInvalid === "true") focusTarget.closest(".field").scrollIntoView({block: "center"});
 						}
@@ -4894,28 +4045,18 @@
 			});
 			on(saveBtn, "click", () => {
 				clearInputErrors();
-				try {
-					downloadBlob(
-						outputBlob(chunks, true),
-						"random_data.txt",
-					);
-				} catch (err) {
-					error.textContent = `저장 실패: ${errorMessage(err)}`;
-				}
+				try {downloadBlob(outputBlob(chunks, true), "random_data.txt");}
+				catch (err) {error.textContent = `저장 실패: ${errorMessage(err)}`;}
 			});
 			on(copyBtn, "click", async () => {
 				if (copying) return;
-				const epoch = outputEpoch;
-				const snapshot = chunks;
-				const ownedFocus = document.activeElement === copyBtn;
+				const epoch = outputEpoch, snapshot = chunks, ownedFocus = document.activeElement === copyBtn;
 				clearInputErrors();
 				copying = true;
 				setBusy(manualBusy);
-				let message = "복사됨";
-				let type = "info";
+				let message = "복사됨", type = "info";
 				try {
-					if (!window.isSecureContext)
-						throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
+					if (!window.isSecureContext) throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
 					await navigator.clipboard.write([new ClipboardItem({"text/plain": outputBlob(snapshot, false)})]);
 				} catch (err) {
 					message = err instanceof Error ? err.message : "클립보드 복사에 실패했습니다.";
@@ -4925,8 +4066,7 @@
 					setBusy(manualBusy);
 				}
 				if (epoch !== outputEpoch || snapshot !== chunks) return;
-				if (ownedFocus && document.activeElement === document.body && document.hasFocus() && canFocus(copyBtn))
-					copyBtn.focus(NO_SCROLL);
+				if (ownedFocus && document.activeElement === document.body && document.hasFocus() && canFocus(copyBtn)) copyBtn.focus(NO_SCROLL);
 				showNotice(message, type);
 			});
 			const clearDialog = byId("clear-dialog");
@@ -4941,40 +4081,20 @@
 				clearInputErrors();
 				setBusy(false);
 			};
-			on(clearBtn, "click", () => {
-				if (chunks.length || outputContent.textContent) clearDialog.showModal();
-				else clearOutput();
-			});
+			on(clearBtn, "click", () => (chunks.length || outputContent.textContent ? clearDialog.showModal() : clearOutput()));
 			on(byId("clear-confirm"), "click", () => {
 				clearDialog.close();
 				clearOutput();
 			});
 		}
-		const mobileMedia = matchMedia("(max-width: 800px)");
-		const compactMedia = matchMedia("(max-width: 1230px)");
-		const inputTabs = query(".input-tabs");
-		const [inputView, filePane, manualPanel] = ["input-view", "file-pane", "manual-pane"].map(byId);
-		const mobileButtons = queryAll("[data-mobile]");
-		const statusButtons = queryAll("[data-status]");
-		const steps = queryAll("[data-step]");
-		const jobPanel = query(".job-panel");
-		const [inputSlot, mobileSlot] = ["input-job-slot", "mobile-job-slot"].map(byId);
-		const [filterDialog, filterTrigger] = ["filter-dialog", "advanced-filters"].map(byId);
-		const [inspector, detailEmpty, detailContent, detailSheet] = ["inspector", "inspector-empty", "inspector-content", "detail-sheet"].map(byId);
-		const [detailMap, loadMap, mapLinks, copyAddress, retryMap] = ["detail-map", "load-map", "detail-map-links", "copy-address", "retry-map"].map(byId);
-		const notice = byId("ui-notice");
+		const mobileMedia = matchMedia("(max-width: 800px)"), compactMedia = matchMedia("(max-width: 1230px)");
+		const inputTabs = query(".input-tabs"), jobPanel = query(".job-panel");
+		const [inputView, filePane, manualPanel, inputSlot, mobileSlot, filterDialog, filterTrigger, inspector, detailEmpty, detailContent, detailSheet, detailMap, loadMap, mapLinks, copyAddress, retryMap, notice] =
+			["input-view", "file-pane", "manual-pane", "input-job-slot", "mobile-job-slot", "filter-dialog", "advanced-filters", "inspector", "inspector-empty", "inspector-content", "detail-sheet", "detail-map", "load-map", "detail-map-links", "copy-address", "retry-map", "ui-notice"].map(byId);
+		const mobileButtons = queryAll("[data-mobile]"), statusButtons = queryAll("[data-status]"), steps = queryAll("[data-step]");
 		const noticeHome = notice.parentElement;
-		let manualLoaded = false;
-		let outputReady = false;
-		let selectedIndex = -1;
-		let selection = null;
-		let noticeOwner = null;
-		let noticeFocus = null;
-		let detailFocus = null;
-		let layoutFocus = null;
-		on(document, "focusin", ({target}) => {
-			layoutFocus = jobPanel.contains(target) ? target : null;
-		});
+		let manualLoaded = false, outputReady = false, selectedIndex = -1, selection = null, noticeOwner = null, noticeFocus = null, detailFocus = null, layoutFocus = null;
+		on(document, "focusin", ({target}) => {layoutFocus = jobPanel.contains(target) ? target : null;});
 		on(window, "blur", () => {layoutFocus = null;});
 		function syncTabs(tabs, attr, value) {
 			for (const tab of tabs) {
@@ -4993,10 +4113,7 @@
 				const tab = event.target.closest("[role=tab]");
 				if (!tab) return;
 				event.preventDefault();
-				const next = event.key === "Home" ? first
-					: event.key === "End" ? second
-						: wrap ? (tab.dataset[attr] === first ? second : first)
-							: event.key === "ArrowRight" ? second : first;
+				const next = event.key === "Home" ? first : event.key === "End" ? second : wrap ? (tab.dataset[attr] === first ? second : first) : event.key === "ArrowRight" ? second : first;
 				onSelect(next);
 				query(`[data-${attr}="${next}"]`, container)?.focus(focusOpt);
 			});
@@ -5023,25 +4140,21 @@
 			resultsView.setAttribute("aria-labelledby", isMobile ? "mobile-results-tab" : "results-title");
 			const active = document.activeElement === document.body ? layoutFocus : document.activeElement;
 			const restoreFocus = active && jobPanel.contains(active);
-			const jobSlot = isMobile && document.body.dataset.mobiletab === "results"
-				? mobileSlot : inputSlot;
+			const jobSlot = isMobile && document.body.dataset.mobiletab === "results" ? mobileSlot : inputSlot;
 			if (jobPanel.parentElement !== jobSlot) jobSlot.append(jobPanel);
 			if (!compactMedia.matches && detailSheet.open) detailSheet.close();
 			if (restoreFocus && canFocus(active)) active.focus(NO_SCROLL);
 		}
-		const settings = byId("display-settings");
-		const settingsBtn = query(".settings-button");
+		const settings = byId("display-settings"), settingsBtn = query(".settings-button");
 		function closeSettings(restoreFocus = true) {
 			if (!settings.open) return;
-			const ownedFocus = settings.contains(document.activeElement) ||
-				document.activeElement === settingsBtn;
+			const ownedFocus = settings.contains(document.activeElement) || document.activeElement === settingsBtn;
 			settings.close();
 			if (restoreFocus && ownedFocus && canFocus(settingsBtn)) settingsBtn.focus(NO_SCROLL);
 		}
 		on(settingsBtn, "click", () => {
 			if (settings.open) return closeSettings();
-			if (mobileMedia.matches) settings.showModal();
-			else settings.show();
+			mobileMedia.matches ? settings.showModal() : settings.show();
 			settingsBtn.ariaExpanded = "true";
 		});
 		on(settings, "close", () => {settingsBtn.ariaExpanded = "false";});
@@ -5051,9 +4164,7 @@
 		});
 		on(document, "pointerdown", event => {
 			layoutFocus = null;
-			if (settings.open && !settings.matches(":modal") &&
-				!settings.contains(event.target) && !settingsBtn.contains(event.target))
-				closeSettings(false);
+			if (settings.open && !settings.matches(":modal") && !settings.contains(event.target) && !settingsBtn.contains(event.target)) closeSettings(false);
 		}, {passive: true});
 		on(settings, "keydown", event => {
 			if (event.key === "Escape" && !settings.matches(":modal")) {
@@ -5065,20 +4176,13 @@
 		function setMobileView(view) {
 			const nextView = view === "results" ? "results" : "input";
 			if (mobileMedia.matches) mobileScroll[document.body.dataset.mobiletab] = window.scrollY;
-			const active = document.activeElement;
-			const focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .job-panel");
+			const active = document.activeElement, focusInView = active instanceof HTMLElement && !!active.closest("#input-view, #results-view, .job-panel");
 			document.body.dataset.mobiletab = nextView;
 			syncTabs(mobileButtons, "mobile", nextView);
 			adaptLayout();
 			if (mobileMedia.matches) {
-				requestAnimationFrame(() => {
-					if (document.body.dataset.mobiletab === nextView) window.scrollTo(0, mobileScroll[nextView]);
-				});
-				if (focusInView) {
-					const next = canFocus(active) ? active
-						: byId(view === "results" ? "results-title" : "input-title");
-					next.focus(NO_SCROLL);
-				}
+				requestAnimationFrame(() => {if (document.body.dataset.mobiletab === nextView) window.scrollTo(0, mobileScroll[nextView]);});
+				if (focusInView) (canFocus(active) ? active : byId(view === "results" ? "results-title" : "input-title")).focus(NO_SCROLL);
 			}
 		}
 		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, {focusOpt: NO_SCROLL});
@@ -5086,31 +4190,25 @@
 		const stepLabel = byId("step-label");
 		let lastWorkflowStep = "input";
 		function updateWorkflowStep() {
-			const step = state.isRunning || state.isStopping ? "lookup" :
-				state.processed ? "results" : "input";
+			const step = state.isRunning || state.isStopping ? "lookup" : state.processed ? "results" : "input";
 			if (step === lastWorkflowStep) return;
 			lastWorkflowStep = step;
-			for (const item of steps)
-				item.ariaCurrent = item.dataset.step === step ? "step" : null;
-			stepLabel.textContent =
-				step === "lookup" ? "2/3 · 주소 조회" :
-					step === "results" ? "3/3 · 결과 확인" : "1/3 · 데이터 입력";
+			for (const item of steps) item.ariaCurrent = item.dataset.step === step ? "step" : null;
+			stepLabel.textContent = step === "lookup" ? "2/3 · 주소 조회" : step === "results" ? "3/3 · 결과 확인" : "1/3 · 데이터 입력";
 		}
 		function setStatusFilter(status, apply = true) {
 			filterStatus = status;
-			for (const button of statusButtons)
-				button.ariaPressed = button.dataset.status === status;
+			for (const button of statusButtons) button.ariaPressed = button.dataset.status === status;
 			if (apply) scheduleFilter();
 		}
-		on(statusButtons[0].parentElement, "click", (event) => {
+		on(statusButtons[0].parentElement, "click", event => {
 			const button = event.target.closest("[data-status]");
 			if (button) setStatusFilter(button.dataset.status);
 		});
 		const filterCount = byId("filter-count");
 		let lastDetailCount = -1;
 		function updateFilterSummary() {
-			const count = filterState ? filterState.fieldChecks.length >> 1 : 0;
-			const countText = String(count);
+			const count = filterState ? filterState.fieldChecks.length >> 1 : 0, countText = String(count);
 			if (count !== lastDetailCount) {
 				lastDetailCount = count;
 				filterCount.textContent = countText;
@@ -5119,8 +4217,7 @@
 				filterTrigger.ariaLabel = count ? `상세 필터 ${countText}` : "상세 필터";
 				filterTrigger.ariaDescription = count ? `${countText}개의 상세 조건이 적용 중입니다.` : null;
 			}
-			const conditions = [];
-			const q = filterQuery.value.trim();
+			const conditions = [], q = filterQuery.value.trim();
 			if (q) conditions.push(`검색: ${q.slice(0, 80)}`);
 			if (filterKind.value) conditions.push(filterKind.selectedOptions[0].textContent.trim());
 			if (filterStatus !== "all") conditions.push(STATUS_LABELS[filterStatus]);
@@ -5128,9 +4225,7 @@
 			activeFilterSummary.textContent = conditions.join(" · ") || "적용된 검색·필터 조건이 없습니다.";
 		}
 		const filterViewport = window.visualViewport;
-		let filterViewportFrame = null;
-		let filterViewportState = "";
-		let filterViewportPaused = false;
+		let filterViewportFrame = null, filterViewportState = "", filterViewportPaused = false;
 		function clearFilterViewport() {
 			if (filterViewportFrame !== null) cancelAnimationFrame(filterViewportFrame);
 			filterViewportFrame = null;
@@ -5143,19 +4238,13 @@
 		function syncFilterViewport() {
 			filterViewportFrame = null;
 			const active = document.activeElement;
-			const editing = active instanceof HTMLInputElement && active.type === "search" &&
-				!active.disabled && !active.readOnly && active.closest("dialog") === filterDialog;
+			const editing = active instanceof HTMLInputElement && active.type === "search" && !active.disabled && !active.readOnly && active.closest("dialog") === filterDialog;
 			const retaining = filterViewportState && (filterDialog.contains(active) || active === document.body);
-			if (filterViewportPaused || !filterDialog.open ||
-				!filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
-			const {width, height, offsetLeft, offsetTop, scale} = filterViewport;
-			const layoutWidth = innerWidth, layoutHeight = innerHeight;
-			if (!(width > 0 && height > 0 && scale > 0 && layoutWidth > 0 && layoutHeight > 0 &&
-				Number.isFinite(scale) && Number.isFinite(offsetTop) && Number.isFinite(layoutHeight) &&
-				Math.abs(width - layoutWidth) <= 1 && Math.abs(offsetLeft) <= 1 &&
-				height < layoutHeight - 1)) return clearFilterViewport();
-			const top = `${offsetTop}px`, size = `${height}px`;
-			const next = `${top}/${size}`;
+			if (filterViewportPaused || !filterDialog.open || !filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
+			const {width, height, offsetLeft, offsetTop, scale} = filterViewport, layoutWidth = innerWidth, layoutHeight = innerHeight;
+			if (!(width > 0 && height > 0 && scale > 0 && layoutWidth > 0 && layoutHeight > 0 && Number.isFinite(scale) && Number.isFinite(offsetTop) && Number.isFinite(layoutHeight) && Math.abs(width - layoutWidth) <= 1 && Math.abs(offsetLeft) <= 1 && height < layoutHeight - 1))
+				return clearFilterViewport();
+			const top = `${offsetTop}px`, size = `${height}px`, next = `${top}/${size}`;
 			if (next === filterViewportState) return;
 			filterDialog.style.setProperty("--filter-viewport-top", top);
 			filterDialog.style.setProperty("--filter-viewport-height", size);
@@ -5168,8 +4257,7 @@
 		}
 		if (filterViewport) {
 			for (const event of ["focusin", "focusout"]) on(filterDialog, event, scheduleFilterViewport);
-			for (const event of ["resize", "scroll"])
-				on(filterViewport, event, scheduleFilterViewport, {passive: true});
+			for (const event of ["resize", "scroll"]) on(filterViewport, event, scheduleFilterViewport, {passive: true});
 			on(window, "resize", scheduleFilterViewport, {passive: true});
 			on(window, "pageshow", () => {
 				filterViewportPaused = false;
@@ -5177,35 +4265,26 @@
 			});
 		}
 		on(filterDialog, "close", clearFilterViewport);
-		if (!("closedBy" in HTMLDialogElement.prototype))
-			on(filterDialog, "click", event => {
-				if (event.target !== filterDialog) return;
-				const r = filterDialog.getBoundingClientRect();
-				if (event.clientX < r.left || event.clientX > r.right ||
-					event.clientY < r.top || event.clientY > r.bottom) filterDialog.close();
-			});
-		const noticeText = byId("ui-notice-text");
-		const noticeClose = byId("ui-notice-close");
+		if (!("closedBy" in HTMLDialogElement.prototype)) on(filterDialog, "click", event => {
+			if (event.target !== filterDialog) return;
+			const r = filterDialog.getBoundingClientRect();
+			if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) filterDialog.close();
+		});
+		const [noticeText, noticeClose, mapFeedback, mapRecovery, mapExternal] = ["ui-notice-text", "ui-notice-close", "map-feedback", "map-recovery", "map-external"].map(byId);
 		function dismissNotice(restoreFocus = true) {
-			const ownedFocus = notice.contains(document.activeElement);
-			const target = noticeFocus;
+			const ownedFocus = notice.contains(document.activeElement), target = noticeFocus;
 			notice.hidden = true;
 			noticeText.textContent = "";
 			noticeOwner = noticeFocus = null;
 			if (notice.parentElement !== noticeHome) noticeHome.append(notice);
 			const modal = query("dialog:modal");
-			if (restoreFocus && ownedFocus && canFocus(target) && !target.closest("[inert]") &&
-				(!modal || modal.contains(target))) target.focus(NO_SCROLL);
+			if (restoreFocus && ownedFocus && canFocus(target) && !target.closest("[inert]") && (!modal || modal.contains(target))) target.focus(NO_SCROLL);
 		}
 		on(noticeClose, "click", () => dismissNotice());
-		on(document, "close", event => {
-			if (event.target === noticeOwner && !noticeOwner.open) dismissNotice(false);
-		}, true);
+		on(document, "close", event => {if (event.target === noticeOwner && !noticeOwner.open) dismissNotice(false);}, true);
 		function showNotice(message, type = "info") {
-			const active = document.activeElement;
-			const ownedFocus = notice.contains(active);
-			if (!ownedFocus)
-				noticeFocus = active instanceof HTMLElement && active !== document.body ? active : null;
+			const active = document.activeElement, ownedFocus = notice.contains(active);
+			if (!ownedFocus) noticeFocus = active instanceof HTMLElement && active !== document.body ? active : null;
 			noticeOwner = query("dialog:modal");
 			const parent = noticeOwner || noticeHome;
 			if (notice.parentElement !== parent) {
@@ -5218,8 +4297,7 @@
 			notice.hidden = false;
 			if (ownedFocus && document.activeElement !== noticeClose) noticeClose.focus(NO_SCROLL);
 		}
-		const [mapFeedback, mapRecovery, mapExternal] = ["map-feedback", "map-recovery", "map-external"].map(byId);
-		let mapLoadTimer = 0;
+		let mapLoadTimer = 0, selectedRow = null, sheetDragInitialized = false;
 		function setMapUi({map = true, load = true, loading = false, feedback = true, recovery = true}) {
 			clearTimeout(mapLoadTimer);
 			mapLoadTimer = 0;
@@ -5241,17 +4319,13 @@
 			setMapUi({load: false});
 			mapExternal.href = "about:blank";
 		}
-		let selectedRow = null;
 		function resetInspector() {
 			selectedIndex = -1;
-			selection = null;
-			selectedRow = null;
+			selection = selectedRow = null;
 			if (detailSheet.open) detailSheet.close();
 			unloadMap();
-			detailContent.hidden = true;
+			detailContent.hidden = mapLinks.disabled = copyAddress.disabled = true;
 			detailEmpty.hidden = false;
-			mapLinks.disabled = true;
-			copyAddress.disabled = true;
 		}
 		function selectRecord(index, reveal = true, targetRow = null) {
 			const record = state.records[index];
@@ -5262,17 +4336,14 @@
 				const {addr, error} = record.result;
 				unloadMap();
 				mapPopover.hidePopover();
-				const title = resultTitle(record.result);
-				const vals = [title, addr?.eupmyeon || "", error || addr?.fullAddr || "주소 정보가 없습니다.", addr?.sido || "—", addr?.sigungu || "—", addr?.eupmyeon || "—", addr?.tag || "—", `${record.latStr}, ${record.lonStr}`];
+				const vals = [resultTitle(record.result), addr?.eupmyeon || "", error || addr?.fullAddr || "주소 정보가 없습니다.", addr?.sido || "—", addr?.sigungu || "—", addr?.eupmyeon || "—", addr?.tag || "—", `${record.latStr}, ${record.lonStr}`];
 				(selectRecord.els ??= ["detail-title", "detail-town", "detail-full", "detail-province", "detail-district", "detail-town2", "detail-tag", "detail-coordinates"].map(byId)).forEach((el, i) => el.textContent = vals[i]);
 				mapLinks.dataset.idx = index;
-				mapLinks.disabled = false;
+				mapLinks.disabled = detailContent.hidden = false;
 				copyAddress.disabled = !addr?.fullAddr;
 				detailEmpty.hidden = true;
-				detailContent.hidden = false;
 			}
-			const nextRow = targetRow || (selectedRow?.isConnected && Number(selectedRow.dataset.record) === index
-				? selectedRow : query(`tr[data-record="${index}"]`, resultBody));
+			const nextRow = targetRow || (selectedRow?.isConnected && Number(selectedRow.dataset.record) === index ? selectedRow : query(`tr[data-record="${index}"]`, resultBody));
 			if (selectedRow && selectedRow !== nextRow && selectedRow.isConnected) {
 				selectedRow.dataset.selected = "false";
 				selectedRow.cells[1].firstElementChild.ariaPressed = "false";
@@ -5294,25 +4365,22 @@
 			const target = matchedRow || first;
 			selectRecord(Number(target.dataset.record), false, target);
 		}
-		on(resultBody, "click", (event) => {
+		on(resultBody, "click", event => {
 			const row = event.target.closest("tr[data-record]");
 			if (row) selectRecord(Number(row.dataset.record), true, row);
 		});
-		on(resultBody, "keydown", (event) => {
+		on(resultBody, "keydown", event => {
 			const k = event.key;
-			if (k !== "ArrowUp" && k !== "ArrowDown" && k !== "Home" && k !== "End") return;
+			if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(k)) return;
 			const button = event.target.closest(".location-button");
 			if (!button) return;
 			event.preventDefault();
-			const rows = resultBody.rows;
-			const last = rows.length - 1;
-			const next = k === "Home" ? 0 : k === "End" ? last :
-				Math.max(0, Math.min(last, button.closest("tr").sectionRowIndex + (k === "ArrowDown" ? 1 : -1)));
+			const rows = resultBody.rows, last = rows.length - 1;
+			const next = k === "Home" ? 0 : k === "End" ? last : Math.max(0, Math.min(last, button.closest("tr").sectionRowIndex + (k === "ArrowDown" ? 1 : -1)));
 			const nextRow = rows[next];
 			nextRow.cells[1].firstElementChild.focus();
 			selectRecord(Number(nextRow.dataset.record), false, nextRow);
 		});
-		let sheetDragInitialized = false;
 		function initSheetDrag() {
 			if (sheetDragInitialized) return;
 			sheetDragInitialized = true;
@@ -5334,8 +4402,7 @@
 			on(window, "pointercancel", event => activeDrag?.finish(event));
 			for (const ev of ["blur", "resize"]) on(window, ev, () => activeDrag?.reset());
 			function enableSheetDrag(sheet, dismiss = () => sheet.close()) {
-				const heading = query(".sheet-heading", sheet);
-				const popover = sheet.hasAttribute("popover");
+				const heading = query(".sheet-heading", sheet), popover = sheet.hasAttribute("popover");
 				const isOpen = () => popover ? sheet.matches(":popover-open") : sheet.open;
 				let motion = null;
 				function reset() {
@@ -5351,11 +4418,7 @@
 					const offset = activeDrag.offset;
 					reset();
 					if (!isOpen() || !mobileMedia.matches) return;
-					const animation = sheet.animate([
-						{translate: `0 ${offset}px`},
-						{translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`},
-					], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
-					motion = animation;
+					const animation = motion = sheet.animate([{translate: `0 ${offset}px`}, {translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`}], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
 					animation.finished.then(() => {
 						if (motion !== animation) return;
 						motion = null;
@@ -5375,13 +4438,8 @@
 				on(heading, "lostpointercapture", finish);
 				for (const ev of ["beforetoggle", "close"]) on(sheet, ev, reset);
 			}
-			for (const [sheet, dismiss] of [
-				[detailSheet],
-				[mapPopover, () => mapPopover.hidePopover()],
-				[helpDialog],
-				[settings, closeSettings],
-				[filterDialog],
-			]) enableSheetDrag(sheet, dismiss);
+			for (const [sheet, dismiss] of [[detailSheet], [mapPopover, () => mapPopover.hidePopover()], [helpDialog], [settings, closeSettings], [filterDialog]])
+				enableSheetDrag(sheet, dismiss);
 		}
 		on(detailSheet, "close", () => {
 			mapPopover.hidePopover();
@@ -5391,41 +4449,27 @@
 			detailFocus = null;
 		});
 		on(copyAddress, "click", () => {
-			const record = selection;
-			const address = record?.result.addr?.fullAddr;
+			const record = selection, address = record?.result.addr?.fullAddr;
 			if (!address) return;
-			void copyTextWithNotice(
-				() => address,
-				() => selection === record,
-				"주소 복사됨",
-				"복사 실패",
-				"복사는 HTTPS 또는 localhost에서 사용할 수 있습니다.",
-			);
+			void copyTextWithNotice(() => address, () => selection === record, "주소 복사됨", "복사 실패", "복사는 HTTPS 또는 localhost에서 사용할 수 있습니다.");
 		});
 		function startMapLoad() {
 			const record = selection;
 			if (!record) return;
-			const lat = Number(record.latStr), lon = Number(record.lonStr);
-			const polar = Math.abs(lat) > 85;
+			const lat = Number(record.latStr), lon = Number(record.lonStr), polar = Math.abs(lat) > 85;
 			mapExternal.href = MAP_BUILDERS[1](record.latStr, record.lonStr);
 			retryMap.disabled = polar;
 			if (polar) return showMapFailure("극지방 좌표는 외부 지도 링크에서 확인해 주세요.");
-			if (!navigator.onLine) {
-				return showMapFailure("네트워크 연결이 없습니다. 연결 후 다시 시도해 주세요.");
-			}
+			if (!navigator.onLine) return showMapFailure("네트워크 연결이 없습니다. 연결 후 다시 시도해 주세요.");
 			const ownedFocus = [loadMap, retryMap, mapFeedback].includes(document.activeElement);
 			mapFeedback.textContent = "OpenStreetMap 지도를 불러오는 중…";
 			const box = [Math.max(-180, lon - .01), Math.max(-85, lat - .006), Math.min(180, lon + .01), Math.min(85, lat + .006)];
 			const url = new URL("https://www.openstreetmap.org/export/embed.html");
-			url.search = new URLSearchParams({
-				bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon,
-			});
+			url.search = new URLSearchParams({bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon});
 			detailMap.src = url.href;
 			setMapUi({map: false, loading: true, feedback: false});
 			if (ownedFocus) mapFeedback.focus(NO_SCROLL);
-			mapLoadTimer = setTimeout(() => showMapFailure(
-				"지도 표시가 지연되고 있습니다. 다시 시도하거나 외부 지도에서 확인하세요.",
-			), 12000);
+			mapLoadTimer = setTimeout(() => showMapFailure("지도 표시가 지연되고 있습니다. 다시 시도하거나 외부 지도에서 확인하세요."), 12000);
 		}
 		for (const btn of [loadMap, retryMap]) on(btn, "click", startMapLoad);
 		on(detailMap, "load", () => {
@@ -5435,31 +4479,24 @@
 			if (ownedFocus) detailMap.focus(NO_SCROLL);
 		});
 		on(detailMap, "error", () => {
-			if (!detailMap.hidden && detailMap.getAttribute("src"))
-				showMapFailure("지도를 불러오지 못했습니다. 다시 시도하거나 외부 지도에서 확인하세요.");
+			if (!detailMap.hidden && detailMap.getAttribute("src")) showMapFailure("지도를 불러오지 못했습니다. 다시 시도하거나 외부 지도에서 확인하세요.");
 		});
-		on(window, "offline", () => {
-			if (!detailMap.hidden) showMapFailure("네트워크 연결이 끊어졌습니다. 외부 지도로 확인하세요.");
-		});
+		on(window, "offline", () => {if (!detailMap.hidden) showMapFailure("네트워크 연결이 끊어졌습니다. 외부 지도로 확인하세요.");});
 		const dropZone = query(".drop-zone");
-		on(dropZone, "dragover", (event) => {
+		on(dropZone, "dragover", event => {
 			event.preventDefault();
 			if (state.task === null) dropZone.classList.add("is-dragging");
 			if (event.dataTransfer) event.dataTransfer.dropEffect = state.task === null ? "copy" : "none";
 		});
-		on(dropZone, "dragleave", (event) => {
-			if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("is-dragging");
-		});
-		on(dropZone, "drop", (event) => {
+		on(dropZone, "dragleave", event => {if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("is-dragging");});
+		on(dropZone, "drop", event => {
 			event.preventDefault();
 			dropZone.classList.remove("is-dragging");
 			acceptInputFile(event.dataTransfer?.files[0]);
 		});
 		const helpTrigger = byId("show-help");
 		on(helpTrigger, "click", () => closeSettings(false));
-		on(helpDialog, "close", () => {
-			if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL);
-		});
+		on(helpDialog, "close", () => {if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL);});
 		on(window, "pagehide", () => {
 			revokeDownloadUrl();
 			filterViewportPaused = true;

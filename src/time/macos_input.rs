@@ -6,12 +6,29 @@ use core::{
     ptr::{NonNull, null_mut},
 };
 use std::io::Write;
-mod sys;
-const EVENT_LEFT_MOUSE_DOWN: CGEventType = 1;
-const EVENT_LEFT_MOUSE_UP: CGEventType = 2;
-const HID_EVENT_TAP: CGEventTapLocation = 0;
-const KEY_CODE_F5: CGKeyCode = 96;
-const MOUSE_BUTTON_LEFT: CGMouseButton = 0;
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFRelease(cf: *const c_void);
+}
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGEventCreate(source: CGEventSourceRef) -> CGEventRef;
+    fn CGEventCreateKeyboardEvent(
+        source: CGEventSourceRef,
+        virtual_key: CGKeyCode,
+        key_down: bool,
+    ) -> CGEventRef;
+    fn CGEventCreateMouseEvent(
+        source: CGEventSourceRef,
+        mouse_type: CGEventType,
+        mouse_cursor_position: CGPoint,
+        mouse_button: CGMouseButton,
+    ) -> CGEventRef;
+    fn CGEventGetLocation(event: CGEventRef) -> CGPoint;
+    fn CGEventPost(tap: CGEventTapLocation, event: CGEventRef);
+    fn CGPreflightPostEventAccess() -> bool;
+    fn CGRequestPostEventAccess() -> bool;
+}
 type CGEventRef = *mut c_void;
 type CGEventSourceRef = *mut c_void;
 type CGEventTapLocation = u32;
@@ -39,25 +56,22 @@ impl Drop for Event {
     fn drop(&mut self) {
         // SAFETY: raw is a CoreFoundation object returned by CGEventCreate* and released exactly once here.
         unsafe {
-            sys::CFRelease(self.raw.as_ptr());
+            CFRelease(self.raw.as_ptr());
         }
     }
 }
 impl Event {
     fn from_raw(raw_ptr: CGEventRef, context: &str) -> InputResult<Self> {
-        let Some(raw) = NonNull::new(raw_ptr) else {
-            return Err(format!("{context}: CGEvent 생성 실패"));
-        };
-        Ok(Self { raw })
+        NonNull::new(raw_ptr)
+            .map(|raw| Self { raw })
+            .ok_or_else(|| format!("{context}: CGEvent 생성 실패"))
     }
     fn keyboard(virtual_key: CGKeyCode, is_down: bool, context: &str) -> InputResult<Self> {
         // SAFETY: null asks CoreGraphics to use the default source and the key code is a validated constant.
-        let raw_ptr = unsafe { sys::CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) };
-        Self::from_raw(raw_ptr, context)
-    }
-    fn location(&self) -> CGPoint {
-        // SAFETY: raw is a live CGEventRef retained by self.
-        unsafe { sys::CGEventGetLocation(self.raw.as_ptr()) }
+        Self::from_raw(
+            unsafe { CGEventCreateKeyboardEvent(null_mut(), virtual_key, is_down) },
+            context,
+        )
     }
     fn mouse(
         mouse_type: CGEventType,
@@ -65,20 +79,15 @@ impl Event {
         context: &str,
     ) -> InputResult<Self> {
         // SAFETY: null asks CoreGraphics to use the default source and the point comes from CoreGraphics.
-        let raw_ptr = unsafe {
-            sys::CGEventCreateMouseEvent(
-                null_mut(),
-                mouse_type,
-                mouse_cursor_position,
-                MOUSE_BUTTON_LEFT,
-            )
-        };
-        Self::from_raw(raw_ptr, context)
+        Self::from_raw(
+            unsafe { CGEventCreateMouseEvent(null_mut(), mouse_type, mouse_cursor_position, 0) },
+            context,
+        )
     }
     fn post(&self) {
         // SAFETY: raw is a live CGEventRef retained by self.
         unsafe {
-            sys::CGEventPost(HID_EVENT_TAP, self.raw.as_ptr());
+            CGEventPost(0, self.raw.as_ptr());
         }
     }
 }
@@ -93,18 +102,19 @@ impl TriggerAction {
                 Self::LeftClick => {
                     // SAFETY: null asks CoreGraphics to use the default source.
                     let current = Event::from_raw(
-                        unsafe { sys::CGEventCreate(null_mut()) },
+                        unsafe { CGEventCreate(null_mut()) },
                         "현재 마우스 위치 조회",
                     )?;
-                    let point = current.location();
-                    let mouse_down = Event::mouse(EVENT_LEFT_MOUSE_DOWN, point, "마우스 누름")?;
-                    let mouse_up = Event::mouse(EVENT_LEFT_MOUSE_UP, point, "마우스 뗌")?;
+                    // SAFETY: raw is a live CGEventRef retained by current.
+                    let point = unsafe { CGEventGetLocation(current.raw.as_ptr()) };
+                    let mouse_down = Event::mouse(1, point, "마우스 누름")?;
+                    let mouse_up = Event::mouse(2, point, "마우스 뗌")?;
                     mouse_down.post();
                     mouse_up.post();
                 }
                 Self::F5Press => {
-                    let key_down = Event::keyboard(KEY_CODE_F5, true, "F5 누름")?;
-                    let key_up = Event::keyboard(KEY_CODE_F5, false, "F5 뗌")?;
+                    let key_down = Event::keyboard(96, true, "F5 누름")?;
+                    let key_up = Event::keyboard(96, false, "F5 뗌")?;
                     key_down.post();
                     key_up.post();
                 }
@@ -125,12 +135,12 @@ impl TriggerAction {
 }
 pub(super) fn post_event_access_granted(request_if_missing: bool) -> bool {
     // SAFETY: CGPreflightPostEventAccess has no preconditions.
-    if unsafe { sys::CGPreflightPostEventAccess() } {
+    if unsafe { CGPreflightPostEventAccess() } {
         return true;
     }
     if !request_if_missing {
         return false;
     }
     // SAFETY: CGRequestPostEventAccess has no preconditions.
-    unsafe { sys::CGRequestPostEventAccess() }
+    unsafe { CGRequestPostEventAccess() }
 }

@@ -7,60 +7,62 @@ use core::{
     result::Result as CoreResult,
     str,
 };
-use std::{process, time::Instant};
-mod sys;
-const DWORD_BYTE_SIZE: u32 = 4;
-const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
-const ERROR_WINHTTP_HEADER_NOT_FOUND: u32 = 12_150;
-const WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY: u32 = 4;
-const WINHTTP_ACCESS_TYPE_NO_PROXY: u32 = 1;
-const WINHTTP_FLAG_SECURE: u32 = 0x0080_0000;
-const WINHTTP_OPTION_DISABLE_FEATURE: u32 = 63;
-const WINHTTP_OPTION_SECURE_PROTOCOLS: u32 = 84;
-const WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE: u32 = 91;
-const WINHTTP_OPTION_DISABLE_SECURE_PROTOCOL_FALLBACK: u32 = 144;
-const WINHTTP_OPTION_IPV6_FAST_FALLBACK: u32 = 140;
-const WINHTTP_OPTION_DISABLE_GLOBAL_POOLING: u32 = 195;
-const WINHTTP_SESSION_OPTIONS: [(u32, &str, Option<u32>); 3] = [
-    (
-        WINHTTP_OPTION_DISABLE_SECURE_PROTOCOL_FALLBACK,
-        "WinHttpSetOption DISABLE_SECURE_PROTOCOL_FALLBACK",
-        None,
-    ),
-    (
-        WINHTTP_OPTION_DISABLE_GLOBAL_POOLING,
-        "WinHttpSetOption DISABLE_GLOBAL_POOLING",
-        Some(ERROR_WINHTTP_INVALID_OPTION),
-    ),
-    (
-        WINHTTP_OPTION_IPV6_FAST_FALLBACK,
-        "WinHttpSetOption IPV6_FAST_FALLBACK",
-        None,
-    ),
-];
-const WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2: u32 = 0x0000_0800;
-const WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3: u32 = 0x0000_2000;
-const WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2: u32 =
-    WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
-const WINHTTP_DISABLE_AUTHENTICATION: u32 = 0x0000_0004;
-const WINHTTP_DISABLE_COOKIES: u32 = 0x0000_0001;
-const WINHTTP_DISABLE_REDIRECTS: u32 = 0x0000_0002;
-const ERROR_INVALID_PARAMETER: u32 = 87;
-const ERROR_WINHTTP_INVALID_OPTION: u32 = 12_009;
-const WINHTTP_QUERY_AGE: u32 = 48;
-const WINHTTP_QUERY_DATE: u32 = 9;
+use std::time::Instant;
+#[link(name = "winhttp")]
+unsafe extern "system" {
+    fn WinHttpCloseHandle(h: HInternet) -> i32;
+    fn WinHttpConnect(s: HInternet, host: *const u16, port: u16, res: u32) -> HInternet;
+    fn WinHttpOpen(
+        ua: *const u16,
+        access: u32,
+        proxy: *const u16,
+        bypass: *const u16,
+        flags: u32,
+    ) -> HInternet;
+    fn WinHttpOpenRequest(
+        c: HInternet,
+        verb: *const u16,
+        path: *const u16,
+        ver: *const u16,
+        ref_: *const u16,
+        accept: *const *const u16,
+        flags: u32,
+    ) -> HInternet;
+    fn WinHttpQueryHeaders(
+        r: HInternet,
+        lvl: u32,
+        name: *const u16,
+        buf: *mut c_void,
+        len: *mut u32,
+        idx: *mut u32,
+    ) -> i32;
+    fn WinHttpReceiveResponse(r: HInternet, res: *mut c_void) -> i32;
+    fn WinHttpSendRequest(
+        r: HInternet,
+        hdrs: *const u16,
+        hlen: u32,
+        opt: *const c_void,
+        olen: u32,
+        tlen: u32,
+        ctx: usize,
+    ) -> i32;
+    fn WinHttpSetOption(h: HInternet, opt: u32, buf: *const c_void, len: u32) -> i32;
+    fn WinHttpSetTimeouts(h: HInternet, res: i32, con: i32, snd: i32, rcv: i32) -> i32;
+}
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetLastError() -> u32;
+}
 const HTTP_HEAD_MAX_HEADER_BYTES: usize = 64 * 1024;
-const HTTP_HEAD_MAX_HEADER_BYTES_DWORD: u32 = 64 * 1024;
 const METHOD_HEAD_WIDE: [u16; 5] = [0x48, 0x45, 0x41, 0x44, 0];
 const PATH_ROOT_WIDE: [u16; 2] = [0x2F, 0];
-const WINHTTP_TIMEOUT_MILLIS: i32 = 5_000;
 const USER_AGENT_CAPACITY: usize = {
-    let primary = "Rust-Time-Sync".len();
-    let fallback = concat!("srg/", env!("CARGO_PKG_VERSION")).len();
-    (if primary > fallback {
-        primary
+    let http_len = "Rust-Time-Sync".len();
+    let https_len = concat!("srg/", env!("CARGO_PKG_VERSION")).len();
+    (if http_len > https_len {
+        http_len
     } else {
-        fallback
+        https_len
     })
     .strict_add(1)
 };
@@ -68,20 +70,17 @@ enum WinHttpHandle {}
 type HInternet = *mut WinHttpHandle;
 #[derive(Default)]
 pub(in crate::time) struct Client {
+    connect: Option<Handle>,
     header_buffer: Vec<u16>,
     header_line_buffer: Vec<u8>,
-    session_cache: Option<SessionCache>,
+    session: Option<Handle>,
 }
 struct Handle(NonNull<WinHttpHandle>);
-struct SessionCache {
-    connect: Option<Handle>,
-    session: Handle,
-}
 impl Drop for Handle {
     fn drop(&mut self) {
         // SAFETY: self.0 is a WinHTTP handle returned by WinHTTP and is closed exactly once here.
         unsafe {
-            sys::WinHttpCloseHandle(self.0.as_ptr());
+            WinHttpCloseHandle(self.0.as_ptr());
         }
     }
 }
@@ -91,55 +90,36 @@ impl Client {
         server: &ParsedServer,
         context: &str,
     ) -> Result<NonNull<WinHttpHandle>> {
-        let cache = if let Some(ref mut cache) = self.session_cache {
-            cache
+        if let Some(connect) = self.connect.as_ref() {
+            return Ok(connect.0);
+        }
+        let session = if let Some(session) = self.session.as_ref() {
+            session
         } else {
-            let user_agent_text = match server.scheme {
+            let ua_text = match server.scheme {
                 UrlScheme::Http => "Rust-Time-Sync",
                 UrlScheme::Https => concat!("srg/", env!("CARGO_PKG_VERSION")),
             };
-            let mut user_agent = [0_u16; USER_AGENT_CAPACITY];
-            for (slot, unit) in user_agent.iter_mut().zip(user_agent_text.encode_utf16()) {
+            let mut ua = [0_u16; USER_AGENT_CAPACITY];
+            for (slot, unit) in ua.iter_mut().zip(ua_text.encode_utf16()) {
                 *slot = unit;
             }
-            // SAFETY: user_agent is NUL-terminated and optional proxy pointers are intentionally null.
-            let raw_session = unsafe {
-                sys::WinHttpOpen(
-                    user_agent.as_ptr(),
-                    match server.scheme {
-                        UrlScheme::Http => WINHTTP_ACCESS_TYPE_NO_PROXY,
-                        UrlScheme::Https => WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                    },
-                    null(),
-                    null(),
-                    0,
-                )
+            let access = match server.scheme {
+                UrlScheme::Http => 1,
+                UrlScheme::Https => 4,
             };
+            // SAFETY: ua is NUL-terminated and optional proxy pointers are intentionally null.
+            let raw_session = unsafe { WinHttpOpen(ua.as_ptr(), access, null(), null(), 0) };
             let session = Self::non_null_handle(raw_session, "WinHttpOpen", context)?;
             // SAFETY: session is a valid WinHTTP session handle.
-            let timeout_ok = unsafe {
-                sys::WinHttpSetTimeouts(
-                    session.0.as_ptr(),
-                    WINHTTP_TIMEOUT_MILLIS,
-                    WINHTTP_TIMEOUT_MILLIS,
-                    WINHTTP_TIMEOUT_MILLIS,
-                    WINHTTP_TIMEOUT_MILLIS,
-                )
-            };
+            let timeout_ok =
+                unsafe { WinHttpSetTimeouts(session.0.as_ptr(), 5_000, 5_000, 5_000, 5_000) };
             (timeout_ok != 0_i32).ok_or_else(|| Self::last_error("WinHttpSetTimeouts", context))?;
-            if let Err(code) = Self::try_set_dword_option(
-                &session,
-                WINHTTP_OPTION_SECURE_PROTOCOLS,
-                WINHTTP_SECURE_PROTOCOLS_MIN_TLS_1_2,
-            ) {
-                if matches!(code, ERROR_INVALID_PARAMETER | ERROR_WINHTTP_INVALID_OPTION) {
-                    Self::set_dword_option(
-                        &session,
-                        WINHTTP_OPTION_SECURE_PROTOCOLS,
-                        WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2,
-                        "WinHttpSetOption SECURE_PROTOCOLS",
-                        context,
-                    )?;
+            if let Err(code) = Self::try_set_dword_option(&session, 84, 0x0000_0800 | 0x0000_2000) {
+                if matches!(code, 87 | 12_009) {
+                    Self::try_set_dword_option(&session, 84, 0x0000_0800).map_err(|err_code| {
+                        Self::windows_error("WinHttpSetOption SECURE_PROTOCOLS", err_code, context)
+                    })?;
                 } else {
                     return Err(Self::windows_error(
                         "WinHttpSetOption SECURE_PROTOCOLS",
@@ -148,25 +128,31 @@ impl Client {
                     ));
                 }
             }
-            for (option, operation, ignored_error) in WINHTTP_SESSION_OPTIONS {
+            for (option, operation, ignored) in [
+                (
+                    144_u32,
+                    "WinHttpSetOption DISABLE_SECURE_PROTOCOL_FALLBACK",
+                    None,
+                ),
+                (
+                    195,
+                    "WinHttpSetOption DISABLE_GLOBAL_POOLING",
+                    Some(12_009_u32),
+                ),
+                (140, "WinHttpSetOption IPV6_FAST_FALLBACK", None),
+            ] {
                 if let Err(code) = Self::try_set_dword_option(&session, option, 1)
-                    && ignored_error != Some(code)
+                    && ignored != Some(code)
                 {
                     return Err(Self::windows_error(operation, code, context));
                 }
             }
-            self.session_cache.insert(SessionCache {
-                connect: None,
-                session,
-            })
+            self.session.insert(session)
         };
-        if let Some(connect) = cache.connect.as_ref() {
-            return Ok(connect.0);
-        }
-        // SAFETY: host_wide is NUL-terminated and cache.session is a valid session handle.
+        // SAFETY: host_wide is NUL-terminated and session is a valid session handle.
         let raw_connect = unsafe {
-            sys::WinHttpConnect(
-                cache.session.0.as_ptr(),
+            WinHttpConnect(
+                session.0.as_ptr(),
                 server.host_wide.as_ptr(),
                 server.port,
                 0,
@@ -174,7 +160,7 @@ impl Client {
         };
         let handle = Self::non_null_handle(raw_connect, "WinHttpConnect", context)?;
         let connect = handle.0;
-        cache.connect = Some(handle);
+        self.connect = Some(handle);
         Ok(connect)
     }
     pub(in crate::time) fn fetch_head(
@@ -184,87 +170,57 @@ impl Client {
     ) -> Result<TimeSample> {
         let connect = self.cached_connect(server, context)?;
         let (request, request_start, response_received) = (|| -> Result<_> {
+            let flags = match server.scheme {
+                UrlScheme::Http => 0,
+                UrlScheme::Https => 0x0080_0000,
+            };
             // SAFETY: method and path are NUL-terminated and connect is valid.
             let raw_request = unsafe {
-                sys::WinHttpOpenRequest(
+                WinHttpOpenRequest(
                     connect.as_ptr(),
                     METHOD_HEAD_WIDE.as_ptr(),
                     PATH_ROOT_WIDE.as_ptr(),
                     null(),
                     null(),
                     null(),
-                    match server.scheme {
-                        UrlScheme::Http => 0,
-                        UrlScheme::Https => WINHTTP_FLAG_SECURE,
-                    },
+                    flags,
                 )
             };
             let request = Self::non_null_handle(raw_request, "WinHttpOpenRequest", context)?;
             for (option, value, operation) in [
-                (
-                    WINHTTP_OPTION_DISABLE_FEATURE,
-                    WINHTTP_DISABLE_COOKIES
-                        | WINHTTP_DISABLE_REDIRECTS
-                        | WINHTTP_DISABLE_AUTHENTICATION,
-                    "WinHttpSetOption DISABLE_FEATURE",
-                ),
-                (
-                    WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,
-                    HTTP_HEAD_MAX_HEADER_BYTES_DWORD,
-                    "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE",
-                ),
+                (63_u32, 0x0007_u32, "WinHttpSetOption DISABLE_FEATURE"),
+                (91, 64 * 1024, "WinHttpSetOption MAX_RESPONSE_HEADER_SIZE"),
             ] {
-                Self::set_dword_option(&request, option, value, operation, context)?;
+                Self::try_set_dword_option(&request, option, value)
+                    .map_err(|code| Self::windows_error(operation, code, context))?;
             }
             let request_start = Instant::now();
             // SAFETY: request is valid and no additional request body or headers are needed for HEAD.
             let sent =
-                unsafe { sys::WinHttpSendRequest(request.0.as_ptr(), null(), 0, null(), 0, 0, 0) };
+                unsafe { WinHttpSendRequest(request.0.as_ptr(), null(), 0, null(), 0, 0, 0) };
             (sent != 0_i32).ok_or_else(|| Self::last_error("WinHttpSendRequest", context))?;
             // SAFETY: request is a valid request handle and no reserved pointer is required.
-            let received = unsafe { sys::WinHttpReceiveResponse(request.0.as_ptr(), null_mut()) };
+            let received = unsafe { WinHttpReceiveResponse(request.0.as_ptr(), null_mut()) };
             (received != 0_i32)
                 .ok_or_else(|| Self::last_error("WinHttpReceiveResponse", context))?;
-            let response_received = Instant::now();
-            Ok((request, request_start, response_received))
+            Ok((request, request_start, Instant::now()))
         })()
-        .inspect_err(|_| self.session_cache = None)?;
-        self.query_server_time(&request, request_start, response_received, context)
-    }
-    #[cold]
-    #[inline(never)]
-    fn last_error(operation: &str, context: &str) -> TimeError {
-        let code = Self::last_error_code();
-        Self::windows_error(operation, code, context)
-    }
-    fn last_error_code() -> u32 {
-        // SAFETY: GetLastError has no preconditions.
-        unsafe { sys::GetLastError() }
-    }
-    fn non_null_handle(handle: HInternet, operation: &str, context: &str) -> Result<Handle> {
-        NonNull::new(handle)
-            .map(Handle)
-            .ok_or_else(|| Self::last_error(operation, context))
-    }
-    fn query_server_time(
-        &mut self,
-        request: &Handle,
-        request_start: Instant,
-        response_received: Instant,
-        context: &str,
-    ) -> Result<TimeSample> {
+        .inspect_err(|_| {
+            self.connect = None;
+            self.session = None;
+        })?;
         let mut time_headers = FreshTimeHeaders::default();
         Self::read_header_values(
-            request,
-            WINHTTP_QUERY_DATE,
+            &request,
+            9,
             "Date",
             context,
             (&mut self.header_buffer, &mut self.header_line_buffer),
             &mut |value| time_headers.capture_date(value, response_received),
         )?;
         Self::read_header_values(
-            request,
-            WINHTTP_QUERY_AGE,
+            &request,
+            48,
             "Age",
             context,
             (&mut self.header_buffer, &mut self.header_line_buffer),
@@ -272,37 +228,58 @@ impl Client {
         )?;
         time_headers.finish(request_start, context)
     }
+    #[cold]
+    #[inline(never)]
+    fn last_error(operation: &str, context: &str) -> TimeError {
+        // SAFETY: GetLastError has no preconditions.
+        Self::windows_error(operation, unsafe { GetLastError() }, context)
+    }
+    fn non_null_handle(handle: HInternet, operation: &str, context: &str) -> Result<Handle> {
+        NonNull::new(handle)
+            .map(Handle)
+            .ok_or_else(|| Self::last_error(operation, context))
+    }
     fn read_header_values(
         request: &Handle,
         query: u32,
         name: &str,
         context: &str,
-        buffers: (&mut Vec<u16>, &mut Vec<u8>),
+        (wide_buffer, ascii_buffer): (&mut Vec<u16>, &mut Vec<u8>),
         capture: &mut dyn FnMut(&str),
     ) -> Result<()> {
-        let (wide_buffer, ascii_buffer) = buffers;
+        let ensure_wide = |buf: &mut Vec<u16>, min_len: usize| -> Result<()> {
+            if buf.len() < min_len {
+                buf.try_reserve_exact(min_len.strict_sub(buf.len()))
+                    .map_err(|source| {
+                        error_with_source(context, "응답 헤더 메모리 확보 실패", source)
+                    })?;
+                buf.resize(min_len, 0);
+            }
+            Ok(())
+        };
+        ensure_wide(wide_buffer, 64)?;
         let mut index = 0_u32;
         loop {
             let current_index = index;
-            let mut short_buffer = [0_u16; 64];
-            let mut bytes = 128_u32;
-            // SAFETY: request is valid and short_buffer provides bytes writable bytes for this indexed header.
+            let mut bytes = u32::try_from(wide_buffer.len().strict_mul(2)).unwrap_or(u32::MAX);
+            // SAFETY: request is valid and wide_buffer provides bytes writable bytes for this indexed header.
             let fetched = unsafe {
-                sys::WinHttpQueryHeaders(
+                WinHttpQueryHeaders(
                     request.0.as_ptr(),
                     query,
                     null(),
-                    short_buffer.as_mut_ptr().cast::<c_void>(),
+                    wide_buffer.as_mut_ptr().cast::<c_void>(),
                     &raw mut bytes,
                     &raw mut index,
                 )
             };
-            let fetch_error = (fetched == 0_i32).then(Self::last_error_code);
-            if fetch_error == Some(ERROR_WINHTTP_HEADER_NOT_FOUND) {
+            // SAFETY: GetLastError has no preconditions.
+            let fetch_error = (fetched == 0_i32).then(|| unsafe { GetLastError() });
+            if fetch_error == Some(12_150) {
                 return Ok(());
             }
             if let Some(code) = fetch_error
-                && code != ERROR_INSUFFICIENT_BUFFER
+                && code != 122
             {
                 return Err(Self::windows_error(
                     "WinHttpQueryHeaders header size",
@@ -326,16 +303,12 @@ impl Client {
                 )
             })?;
             let units = header_bytes.div_euclid(2);
-            let mut header = if fetch_error.is_none() {
-                short_buffer
-                    .get(..units)
-                    .unwrap_or_else(|| process::abort())
-            } else {
-                prepare_buffer(wide_buffer, units, context, "응답 헤더 메모리 확보 실패")?;
+            if fetch_error.is_some() {
+                ensure_wide(wide_buffer, units)?;
                 index = current_index;
-                // SAFETY: wide_buffer has the probed size and request is valid.
+                // SAFETY: wide_buffer has at least bytes writable bytes and request is valid.
                 let long_fetched = unsafe {
-                    sys::WinHttpQueryHeaders(
+                    WinHttpQueryHeaders(
                         request.0.as_ptr(),
                         query,
                         null(),
@@ -346,35 +319,31 @@ impl Client {
                 };
                 (long_fetched != 0_i32)
                     .ok_or_else(|| Self::last_error("WinHttpQueryHeaders header", context))?;
-                wide_buffer.as_slice()
-            };
+            }
             (index > current_index).ok_or_else(|| {
                 error(
                     context,
                     &format!("{name} 헤더 index가 진행되지 않았습니다."),
                 )
             })?;
+            let mut header = wide_buffer
+                .get(..units)
+                .ok_or_else(|| error(context, &format!("{name} 헤더 길이가 올바르지 않습니다.")))?;
             while let Some((&0, rest)) = header.split_last() {
                 header = rest;
             }
-            let mut short_ascii = [0_u8; 64];
-            let dest = if let Some(inline) = short_ascii.get_mut(..header.len()) {
-                inline
-            } else {
-                prepare_buffer(
-                    ascii_buffer,
-                    header.len(),
-                    context,
-                    "응답 헤더 ASCII 메모리 확보 실패",
-                )?
-            };
-            for (slot, &unit) in dest.iter_mut().zip(header) {
-                *slot = u8::try_from(unit).map_err(|source| {
-                    error_with_source(context, &format!("{name} 헤더 ASCII 변환 실패"), source)
+            ascii_buffer.clear();
+            ascii_buffer
+                .try_reserve_exact(header.len())
+                .map_err(|source| {
+                    error_with_source(context, "응답 헤더 ASCII 메모리 확보 실패", source)
                 })?;
+            for &unit in header {
+                ascii_buffer.push(u8::try_from(unit).map_err(|source| {
+                    error_with_source(context, &format!("{name} 헤더 ASCII 변환 실패"), source)
+                })?);
             }
-            let ascii_slice: &[u8] = dest;
-            let value = str::from_utf8(ascii_slice)
+            let value = str::from_utf8(ascii_buffer)
                 .map(str::trim_ascii)
                 .map_err(|source| {
                     error_with_source(context, &format!("{name} 헤더 UTF-8 변환 실패"), source)
@@ -382,47 +351,22 @@ impl Client {
             capture(value);
         }
     }
-    fn set_dword_option(
-        handle: &Handle,
-        option: u32,
-        value: u32,
-        operation: &str,
-        context: &str,
-    ) -> Result<()> {
-        Self::try_set_dword_option(handle, option, value)
-            .map_err(|code| Self::windows_error(operation, code, context))
-    }
     fn try_set_dword_option(handle: &Handle, option: u32, value: u32) -> CoreResult<(), u32> {
         // SAFETY: handle is a valid WinHTTP handle and value points to a DWORD option value.
         let ok = unsafe {
-            sys::WinHttpSetOption(
+            WinHttpSetOption(
                 handle.0.as_ptr(),
                 option,
                 (&raw const value).cast::<c_void>(),
-                DWORD_BYTE_SIZE,
+                4,
             )
         };
-        (ok != 0_i32).ok_or_else(Self::last_error_code)
+        // SAFETY: GetLastError has no preconditions.
+        (ok != 0_i32).ok_or_else(|| unsafe { GetLastError() })
     }
     #[cold]
     #[inline(never)]
     fn windows_error(operation: &str, code: u32, context: &str) -> TimeError {
         error(context, &format!("{operation} 실패: Windows error {code}"))
     }
-}
-fn prepare_buffer<'buf, T>(
-    buffer: &'buf mut Vec<T>,
-    len: usize,
-    context: &str,
-    err_msg: &'static str,
-) -> Result<&'buf mut [T]>
-where
-    T: Copy + Default,
-{
-    buffer.clear();
-    buffer
-        .try_reserve_exact(len)
-        .map_err(|source| error_with_source(context, err_msg, source))?;
-    buffer.resize(len, T::default());
-    Ok(buffer.as_mut_slice())
 }
