@@ -139,9 +139,6 @@ impl EasyHandle {
     fn setopt_long(&self, option: CurlOption, value: c_long, context: &str) -> Result<()> {
         curl_setopt!(self, option, value, context)
     }
-    fn setopt_ptr(&self, option: CurlOption, value: *mut c_void, context: &str) -> Result<()> {
-        curl_setopt!(self, option, value, context)
-    }
     fn setopt_str(&self, option: CurlOption, value: *const c_char, context: &str) -> Result<()> {
         curl_setopt!(self, option, value, context)
     }
@@ -187,26 +184,15 @@ impl Client {
             });
             handle.setopt_callback(CURLOPT_WRITEFUNCTION, write_callback, context)?;
             handle.setopt_callback(CURLOPT_HEADERFUNCTION, write_callback, context)?;
-            handle.setopt_str(CURLOPT_URL, server.request_target.as_ptr(), context)?;
-            handle.setopt_str(
-                CURLOPT_USERAGENT,
-                match server.scheme {
-                    UrlScheme::Http => HTTP_USER_AGENT,
-                    UrlScheme::Https => HTTPS_USER_AGENT,
-                }
-                .as_ptr(),
-                context,
-            )?;
-            handle.setopt_ptr(
-                CURLOPT_ERRORBUFFER,
-                error_buffer.as_mut_ptr().cast::<c_void>(),
-                context,
-            )?;
-            handle.setopt_long(CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
-            handle.setopt_long(CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS, context)?;
-            handle.setopt_long(CURLOPT_NOSIGNAL, 1, context)?;
-            handle.setopt_long(CURLOPT_NOBODY, 1, context)?;
-            handle.setopt_long(CURLOPT_FOLLOWLOCATION, 0, context)?;
+            for (option, value) in [
+                (CURLOPT_CONNECTTIMEOUT_MS, TCP_TIMEOUT_MILLIS),
+                (CURLOPT_TIMEOUT_MS, TCP_TIMEOUT_MILLIS),
+                (CURLOPT_NOSIGNAL, 1),
+                (CURLOPT_NOBODY, 1),
+                (CURLOPT_FOLLOWLOCATION, 0),
+            ] {
+                handle.setopt_long(option, value, context)?;
+            }
             let protocol = match server.scheme {
                 UrlScheme::Http => {
                     handle.setopt_str(CURLOPT_NOPROXY, NO_PROXY.as_ptr(), context)?;
@@ -221,11 +207,29 @@ impl Client {
                     HTTPS_PROTOCOL
                 }
             };
-            handle.setopt_str(CURLOPT_PROTOCOLS_STR, protocol.as_ptr(), context)?;
+            let user_agent = match server.scheme {
+                UrlScheme::Http => HTTP_USER_AGENT,
+                UrlScheme::Https => HTTPS_USER_AGENT,
+            };
+            for (option, value) in [
+                (CURLOPT_URL, server.request_target.as_ptr()),
+                (CURLOPT_USERAGENT, user_agent.as_ptr()),
+                (CURLOPT_PROTOCOLS_STR, protocol.as_ptr()),
+            ] {
+                handle.setopt_str(option, value, context)?;
+            }
             let body_data = (&raw mut body_target).cast::<c_void>();
             let header_data = (&raw mut header_target).cast::<c_void>();
-            handle.setopt_ptr(CURLOPT_WRITEDATA, body_data, context)?;
-            handle.setopt_ptr(CURLOPT_HEADERDATA, header_data, context)?;
+            for (option, ptr) in [
+                (
+                    CURLOPT_ERRORBUFFER,
+                    error_buffer.as_mut_ptr().cast::<c_void>(),
+                ),
+                (CURLOPT_WRITEDATA, body_data),
+                (CURLOPT_HEADERDATA, header_data),
+            ] {
+                curl_setopt!(handle, option, ptr, context)?;
+            }
             let request_start = Instant::now();
             let code = handle.perform();
             let scheme_result = (code == CURLE_OK).then(|| handle.ensure_scheme(protocol, context));

@@ -165,16 +165,19 @@ fn parse_http_month(month_str: &str) -> Result<HttpMonth> {
         .ok_or_else(|| TimeError::parse("HTTP Date 파싱 실패: 알 수 없는 월 형식"))
 }
 fn parse_http_weekday(weekday_str: &str) -> Option<u32> {
-    match weekday_str {
-        "Sun" | "Sunday" => Some(0),
-        "Mon" | "Monday" => Some(1),
-        "Tue" | "Tuesday" => Some(2),
-        "Wed" | "Wednesday" => Some(3),
-        "Thu" | "Thursday" => Some(4),
-        "Fri" | "Friday" => Some(5),
-        "Sat" | "Saturday" => Some(6),
-        _ => None,
-    }
+    const NAMES: [&str; 7] = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ];
+    NAMES.iter().enumerate().find_map(|(idx, &name)| {
+        (name == weekday_str || name.get(..3) == Some(weekday_str))
+            .then(|| u32::try_from(idx).unwrap_or(0))
+    })
 }
 fn parse_u32_token(raw: &str, err: &'static str) -> Result<u32> {
     parse_u32_digits(raw).ok_or_else(|| TimeError::parse(err))

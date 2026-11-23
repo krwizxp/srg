@@ -2647,8 +2647,10 @@
 		const NO_SCROLL = {preventScroll: true};
 		const canFocus = el => Boolean(el?.isConnected && !el.disabled && el.getClientRects().length);
 		const totalPages = (count = state.visibleIndices.length) => Math.max(1, Math.ceil(count / pageSize));
-		const COORD_REGEX =
-			/(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])|(?:대한민국|세계)\s*위경도/g;
+		const COORD_TAIL =
+			/[^\S\r\n]*[:：][^\S\r\n]*([+-]?\d+(?:\.\d+)?)[^\S\r\n]*[,，][^\S\r\n]*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])/y;
+		const RX_INLINE_WS = /[^\S\r\n]/;
+		const isInlineWs = ch => ch === " " || ch === "\t" || (ch !== "\n" && ch !== "\r" && RX_INLINE_WS.test(ch));
 		const RX_CSV_QUOTE = /[",\r\n]/;
 		const csvEsc = s => {
 			if (!s) return "";
@@ -2892,7 +2894,6 @@
 			`geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
 		const mapPopover = byId("map-popover");
 		const mapAnchors = queryAll("#map-popover-links a");
-		const MAP_NAMES = ["Google", "OSM", "Naver", "Kakao"];
 		const MAP_BUILDERS = [
 			(lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`,
 			(lat, lon) => `https://www.openstreetmap.org/search?query=${lat},${lon}&zoom=16#map=16/${lat}/${lon}`,
@@ -2906,7 +2907,7 @@
 			const r = state.records[Number(btn.dataset.idx)];
 			const {latStr: lat, lonStr: lon} = r;
 			const lat6 = r._lat6 ??= fmtCoord6(lat), lon6 = r._lon6 ??= fmtCoord6(lon);
-			for (let i = 0; i < MAP_NAMES.length; i++)
+			for (let i = 0; i < MAP_BUILDERS.length; i++)
 				mapAnchors[i].href = MAP_BUILDERS[i](lat, lon, lat6, lon6);
 		});
 		let numberFormat;
@@ -3217,8 +3218,7 @@
 			}, 80);
 		}
 		const CSV_HEADER =
-			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소" +
-			MAP_NAMES.map((key) => "," + `지도링크(${key})`).join("");
+			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,지도링크(Google),지도링크(OSM),지도링크(Naver),지도링크(Kakao)";
 		let downloadUrl = null;
 		let exportTask = null;
 		function revokeDownloadUrl() {
@@ -3251,19 +3251,15 @@
 			elapsed.textContent = [seconds / 3600, seconds / 60 % 60, seconds % 60]
 				.map(n => String(Math.floor(n)).padStart(2, "0")).join(":");
 		}
-		function stopElapsed() {
-			if (!elapsedTimer) return;
+		function stopElapsed(reset = false) {
+			if (!elapsedTimer && !reset) return;
 			clearInterval(elapsedTimer);
 			elapsedTimer = 0;
-			updateElapsed();
-		}
-		function resetElapsed() {
-			stopElapsed();
-			elapsedStart = 0;
+			if (reset) elapsedStart = 0;
 			updateElapsed();
 		}
 		function startElapsed() {
-			resetElapsed();
+			stopElapsed(true);
 			elapsedStart = performance.now();
 			elapsedTimer = setInterval(updateElapsed, 1000);
 		}
@@ -3306,20 +3302,16 @@
 						controller: new AbortController(),
 						resume: null,
 					};
-				if (this.renderReq !== null) {
-					cancelAnimationFrame(this.renderReq);
-					this.renderReq = null;
-				}
-				if (pageFrame !== null) {
-					cancelAnimationFrame(pageFrame);
-					pageFrame = null;
-				}
+				cancelAnimationFrame(this.renderReq);
+				this.renderReq = null;
+				cancelAnimationFrame(pageFrame);
+				pageFrame = null;
 				updateUIState();
 				scheduleRender();
 				return this.task;
 			},
 			setRecords(records) {
-				resetElapsed();
+				stopElapsed(true);
 				this.records = records;
 				resetCountryFilter();
 				this.bulkConfirmed =
@@ -3401,9 +3393,7 @@
 				countTotal.textContent = summaryTotal.textContent =
 					coordsCount.textContent = fmt(total);
 				coordsPanel.dataset.empty = total === 0;
-				coordsPanel.dataset.expanded = "false";
-				coordsExpand.ariaExpanded = "false";
-				coordsExpand.textContent = "미리보기 펼치기";
+				setCoordsExpanded(false);
 			}
 			if (doneChanged || failChanged || noAddressChanged)
 				countSuccess.textContent = summarySuccess.textContent = fmt(processed - fail - noAddress);
@@ -3486,8 +3476,6 @@
 			const out = [];
 			let invalidCount = 0;
 			let lastYield = performance.now();
-			let linesSinceYield = 0;
-			let skippedLines = 0;
 			const reader = file.stream().getReader();
 			const decoder = new TextDecoder("utf-8", {fatal: true});
 			const abort = () => {void cancelReader(reader);};
@@ -3508,42 +3496,37 @@
 				length = 0;
 				return line;
 			};
-			const maybeYield = (matching) => {
-				if (matching ? ++linesSinceYield % 128 !== 0 : ++skippedLines % 1000 !== 0) return;
-				if (performance.now() - lastYield >= 8)
-					return yieldToMain().then(() => {lastYield = performance.now();});
-			};
-			const consumeLine = (line, single = false) => {
-				COORD_REGEX.lastIndex = 0;
-				let m;
-				while ((m = COORD_REGEX.exec(line)) !== null) {
-					if (!m[1]) {
+			const consumeText = (text, from = 0, to = text.length) => {
+				let kw = text.indexOf("위경도", from);
+				while (kw !== -1 && kw + 3 <= to) {
+					let p = kw;
+					while (p > from && isInlineWs(text[p - 1])) p--;
+					let set = null;
+					if (p >= from + 4 && text.charCodeAt(p - 1) === 0xad6d && text.startsWith("대한민국", p - 4))
+						set = "KR";
+					else if (p >= from + 2 && text.charCodeAt(p - 1) === 0xacc4 && text.charCodeAt(p - 2) === 0xc138)
+						set = "WORLD";
+					if (!set) {kw = text.indexOf("위경도", kw + 3); continue;}
+					COORD_TAIL.lastIndex = kw + 3;
+					const m = COORD_TAIL.exec(text);
+					if (!m || COORD_TAIL.lastIndex > to) {
 						invalidCount++;
+						kw = text.indexOf("위경도", kw + 3);
 					} else {
-						const lat = m[2], lon = m[3];
-						const fLat = +lat, fLon = +lon;
-						if (!(Math.abs(fLat) <= 90 && Math.abs(fLon) <= 180)) {
-							invalidCount++;
-						} else {
+						const lat = m[1], lon = m[2], fLat = +lat, fLon = +lon;
+						if (!(Math.abs(fLat) <= 90 && Math.abs(fLon) <= 180)) invalidCount++;
+						else {
 							if (out.length >= CONFIG.BULK_HARD_LIMIT)
 								throw new InputError(
 									`공용 Nominatim 보호를 위해 한 번에 ${fmt(CONFIG.BULK_HARD_LIMIT)}개까지만 조회할 수 있습니다. 더 큰 작업은 자체 Nominatim 또는 상용 지오코딩 서비스를 사용해 주세요.`,
 								);
 							out.push({
-								set: m[1] === "대한민국" ? "KR" : "WORLD",
-								latStr: lat,
-								lonStr: lon,
-								cacheKey: fLat + "," + fLon,
-								result: null,
-								_status: null,
-								_kind: null,
-								_search: null,
-								_lat6: null,
-								_lon6: null,
+								set, latStr: lat, lonStr: lon, cacheKey: fLat + "," + fLon,
+								result: null, _status: null, _kind: null, _search: null, _lat6: null, _lon6: null,
 							});
 						}
+						kw = text.indexOf("위경도", COORD_TAIL.lastIndex);
 					}
-					if (single || COORD_REGEX.lastIndex >= line.length || line.indexOf("위경도", COORD_REGEX.lastIndex) === -1) break;
 				}
 			};
 			try {
@@ -3560,59 +3543,65 @@
 					if (!chunk && !done) continue;
 					let start = 0;
 					if (trailingCr) {
-						const line = emit();
 						trailingCr = false;
 						if (chunk.charCodeAt(0) === 10) start = 1;
-						const matching = line.includes("위경도");
-						const pause = maybeYield(matching);
-						if (pause) {await pause; signal.throwIfAborted();}
-						if (matching) consumeLine(line);
+						consumeText(emit());
 					}
-					let keywordIndex = chunk.indexOf("위경도", start);
-					let nextLf = chunk.indexOf("\n", start);
-					let nextCr = chunk.indexOf("\r", start);
-					while (nextLf !== -1 || nextCr !== -1) {
-						const useCr = nextCr !== -1 && (nextLf === -1 || nextCr < nextLf);
-						const end = useCr ? nextCr : nextLf;
+					if (parts.length > 0) {
+						const firstLf = chunk.indexOf("\n", start);
+						const firstCr = chunk.indexOf("\r", start);
+						if (firstLf === -1 && firstCr === -1) {
+							append(chunk.slice(start));
+							if (done) break;
+							continue;
+						}
+						const useCr = firstCr !== -1 && (firstLf === -1 || firstCr < firstLf);
+						const end = useCr ? firstCr : firstLf;
 						const nextStart = useCr
 							? (end + 1 < chunk.length && chunk.charCodeAt(end + 1) === 10 ? end + 2 : end + 1)
 							: end + 1;
-						if (useCr && nextStart === chunk.length) {
-							append(chunk.slice(start, end));
-							start = nextStart;
-							trailingCr = true;
-							break;
-						}
-						let line = null, single = false;
-						if (parts.length === 0) {
-							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
-								throw new InputError(lineLimitMessage);
-							if (keywordIndex !== -1 && keywordIndex < end) {
-								line = chunk.slice(start, end);
-								keywordIndex = chunk.indexOf("위경도", keywordIndex + 3);
-								single = keywordIndex === -1 || keywordIndex >= end;
-							}
-						} else {
-							append(chunk.slice(start, end));
-							const combined = emit();
-							if (combined.includes("위경도")) line = combined;
-						}
-						const pause = maybeYield(line !== null);
-						if (pause) {await pause; signal.throwIfAborted();}
-						if (line !== null) consumeLine(line, single);
-						if (keywordIndex !== -1 && keywordIndex < nextStart)
-							keywordIndex = chunk.indexOf("위경도", nextStart);
+						append(chunk.slice(start, end));
 						start = nextStart;
-						if (nextLf !== -1 && nextLf < start) nextLf = chunk.indexOf("\n", start);
-						if (nextCr !== -1 && nextCr < start) nextCr = chunk.indexOf("\r", start);
+						if (useCr && nextStart === chunk.length) {
+							trailingCr = true;
+							if (done) break;
+							continue;
+						}
+						consumeText(emit());
 					}
-					append(chunk.slice(start));
+					const lastCr = chunk.lastIndexOf("\r");
+					const lastNl = Math.max(chunk.lastIndexOf("\n"), lastCr);
+					trailingCr = lastCr >= start && lastCr === chunk.length - 1;
+					const bodyEnd = trailingCr
+						? (lastCr === 0 ? -1 : Math.max(chunk.lastIndexOf("\n", lastCr - 1), chunk.lastIndexOf("\r", lastCr - 1)))
+						: lastNl;
+					if (bodyEnd - start > CONFIG.INPUT_LINE_HARD_LIMIT) {
+						const lineBreak = /[\r\n]/g;
+						lineBreak.lastIndex = start;
+						let end;
+						while ((end = lineBreak.exec(chunk)) && end.index <= bodyEnd) {
+							if (end.index - start > CONFIG.INPUT_LINE_HARD_LIMIT) throw new InputError(lineLimitMessage);
+							consumeText(chunk, start, end.index);
+							start = lineBreak.lastIndex;
+							if (performance.now() - lastYield >= 8) {
+								await yieldToMain();
+								signal.throwIfAborted();
+								lastYield = performance.now();
+							}
+						}
+					} else if (bodyEnd >= start) {
+						consumeText(chunk, start, bodyEnd);
+						start = bodyEnd + 1;
+					}
+					append(chunk.slice(start, trailingCr ? lastCr : chunk.length));
 					if (done) break;
+					if (performance.now() - lastYield >= 8) {
+						await yieldToMain();
+						signal.throwIfAborted();
+						lastYield = performance.now();
+					}
 				}
-				if (trailingCr || length) {
-					const line = emit();
-					if (line.includes("위경도")) consumeLine(line);
-				}
+				if (trailingCr || length) consumeText(emit());
 			} finally {
 				signal.removeEventListener("abort", abort);
 				await cancelReader(reader);
@@ -3675,6 +3664,7 @@
 			if (dbPromise) return dbPromise;
 			if (Date.now() < cacheRetryAt)
 				return Promise.resolve(null);
+			let syncFailed = false;
 			const attempt = new Promise((resolve) => {
 				let settled = false;
 				const finish = (db) => {
@@ -3685,8 +3675,9 @@
 				};
 				const fail = (message, detail) => {
 					if (!finish(null)) return;
-					cacheRetryAt =
-						Date.now() + CACHE_OPEN_RETRY_MS;
+					syncFailed = true;
+					if (dbPromise === attempt) dbPromise = null;
+					cacheRetryAt = Date.now() + CACHE_OPEN_RETRY_MS;
 					console.warn(message, detail);
 				};
 				let req;
@@ -3733,13 +3724,8 @@
 				req.onblocked = () =>
 					fail("Reverse geocoding cache upgrade is blocked.");
 			});
-			const shared = attempt.then((db) => {
-				if (!db && dbPromise === shared)
-					dbPromise = null;
-				return db;
-			});
-			dbPromise = shared;
-			return shared;
+			if (!syncFailed) dbPromise = attempt;
+			return attempt;
 		}
 		function cacheTransaction(db, mode, signal, operation) {
 			signal?.throwIfAborted();
@@ -3908,21 +3894,18 @@
 			let bytesRead = 0;
 			try {
 				for (; ;) {
-					const read = await reader.read();
-					if (read.done) break;
-					signal.throwIfAborted();
-					bytesRead += read.value.byteLength;
-					if (bytesRead > limit) throw limitError();
+					const {value, done} = await reader.read();
+					if (!done) {
+						signal.throwIfAborted();
+						bytesRead += value.byteLength;
+						if (bytesRead > limit) throw limitError();
+					}
 					try {
-						parts.push(decoder.decode(read.value, {stream: true}));
+						parts.push(decoder.decode(value, {stream: !done}));
 					} catch (err) {
 						throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});
 					}
-				}
-				try {
-					parts.push(decoder.decode());
-				} catch (err) {
-					throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});
+					if (done) break;
 				}
 				return parts.join("");
 			} finally {
@@ -4358,18 +4341,14 @@
 			state.task = task;
 			updateUIState();
 			showStatus("좌표 추출 중…");
+			const analysis = byId("file-analysis");
+			const fail = (msg, type) => {finishTask(`${msg} 기존 결과는 유지됩니다.`, type); return false;};
 			try {
-				const {records, invalidCount} = await parseFile(
-					file,
-					task.controller.signal,
-				);
+				const {records, invalidCount} = await parseFile(file, task.controller.signal);
 				if (state.task !== task) return;
 				task.controller.signal.throwIfAborted();
-				byId("file-analysis").textContent = invalidCount ? `${fmt(invalidCount)}개 제외 · 형식·좌표 범위 확인` : "";
-				if (!records.length) {
-					finishTask("좌표가 없습니다. 형식을 확인하세요. 기존 결과는 유지됩니다.", "warn");
-					return false;
-				}
+				analysis.textContent = invalidCount ? `${fmt(invalidCount)}개 제외 · 형식·좌표 범위 확인` : "";
+				if (!records.length) return fail("좌표가 없습니다. 형식을 확인하세요.", "warn");
 				clearTable();
 				state.droppedFile = file;
 				state.setRecords(records);
@@ -4387,18 +4366,11 @@
 				return true;
 			} catch (err) {
 				if (state.task !== task) return;
-				if (err && err.name === "AbortError") {
-					finishTask("파일 분석을 중지했습니다. 기존 결과는 유지됩니다.", "stopped");
-					return false;
-				}
-				byId("file-analysis").textContent = "";
-				if (err instanceof InputError) {
-					finishTask(`${err.message} 기존 결과는 유지됩니다.`, "warn");
-					return false;
-				}
+				if (err?.name === "AbortError") return fail("파일 분석을 중지했습니다.", "stopped");
+				analysis.textContent = "";
+				if (err instanceof InputError) return fail(err.message, "warn");
 				console.error(err);
-				finishTask("파일을 읽지 못했습니다. 다시 선택하세요. 기존 결과는 유지됩니다.", "error");
-				return false;
+				return fail("파일을 읽지 못했습니다. 다시 선택하세요.", "error");
 			}
 		}
 		on(pageNumbers, "click", (event) => {
@@ -4410,12 +4382,12 @@
 			revealPage();
 			if (!mobileMedia.matches) query('[aria-current="page"]', pageNumbers)?.focus(NO_SCROLL);
 		});
-		on(coordsExpand, "click", () => {
-			const expanded = coordsPanel.dataset.expanded !== "true";
+		function setCoordsExpanded(expanded) {
 			coordsPanel.dataset.expanded = expanded;
 			coordsExpand.ariaExpanded = expanded;
 			coordsExpand.textContent = expanded ? "미리보기 접기" : "미리보기 펼치기";
-		});
+		}
+		on(coordsExpand, "click", () => setCoordsExpanded(coordsPanel.dataset.expanded !== "true"));
 		async function copyTextWithNotice(getText, isCurrent, okMsg, errPrefix, insecureMsg) {
 			try {
 				if (!isSecureContext || !navigator.clipboard) throw new Error(insecureMsg);

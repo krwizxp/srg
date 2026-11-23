@@ -54,12 +54,12 @@ impl CliCommand {
         let mut err = io::stderr();
         match self {
             #[cfg(target_arch = "x86_64")]
-            Self::Generate { count } => Self::run_with_rng(&mut err, |rng| {
+            Self::Generate { count } => Self::run_with_rng(&mut err, &mut |rng| {
                 let mut output_file = OutputFile::try_from(Path::new(FILE_NAME))?;
                 regenerate_with_count(&mut output_file, rng, count, false, &mut out)
             }),
             #[cfg(target_arch = "x86_64")]
-            Self::Ladder { players, results } => Self::run_with_rng(&mut err, |rng| {
+            Self::Ladder { players, results } => Self::run_with_rng(&mut err, &mut |rng| {
                 write_ladder_results(
                     players.split(',').map(str::trim),
                     results.split(',').map(str::trim),
@@ -68,11 +68,11 @@ impl CliCommand {
                 )
             }),
             #[cfg(target_arch = "x86_64")]
-            Self::RandomFloat { max, min } => Self::run_with_rng(&mut err, |rng| {
+            Self::RandomFloat { max, min } => Self::run_with_rng(&mut err, &mut |rng| {
                 generate_random_float(min, max, &mut out, rng)
             }),
             #[cfg(target_arch = "x86_64")]
-            Self::RandomInteger { max, min } => Self::run_with_rng(&mut err, |rng| {
+            Self::RandomInteger { max, min } => Self::run_with_rng(&mut err, &mut |rng| {
                 generate_random_integer(min, max, &mut out, rng)
             }),
             Self::TimeObserve { host, seconds } => ServerTimeSession {
@@ -104,9 +104,10 @@ impl CliCommand {
             })
     }
     #[cfg(target_arch = "x86_64")]
+    #[inline(never)]
     fn run_with_rng(
         err: &mut dyn Write,
-        run: impl FnOnce(&HardwareRng) -> Result<()>,
+        run: &mut dyn FnMut(&HardwareRng) -> Result<()>,
     ) -> Result<()> {
         let rng = HardwareRng::new();
         (rng.source() != HardwareRandomSource::None)

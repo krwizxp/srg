@@ -19,34 +19,28 @@ impl Atlas<'_> {
         &self,
         boundary: &BoundaryIndex,
         point: &Coordinates,
-        column: usize,
-        row: usize,
+        column: u16,
+        row: u16,
         ordinal: u16,
     ) -> Result<u8> {
-        let col_u16 = u16::try_from(column)
-            .ok()
-            .ok_or("대한민국 세부 격자 열 범위 오류")?;
-        let row_u16 = u16::try_from(row)
-            .ok()
-            .ok_or("대한민국 세부 격자 행 범위 오류")?;
-        let west = axis_edge(boundary.grid_west, boundary.inv_divisor, col_u16);
-        let south = axis_edge(boundary.grid_south, boundary.inv_divisor, row_u16);
+        let west = axis_edge(boundary.grid_west, boundary.inv_divisor, column);
+        let south = axis_edge(boundary.grid_south, boundary.inv_divisor, row);
         let divisor = boundary.fine_divisor;
         let inv_divisor = boundary.fine_inv_divisor;
-        let fine_column = grid_axis_index(
+        let fine_column = usize::from(grid_axis_index(
             west,
             divisor,
             inv_divisor,
             SUBDIVISION_MAX_CELL,
             point.longitude,
-        );
-        let fine_row = grid_axis_index(
+        ));
+        let fine_row = usize::from(grid_axis_index(
             south,
             divisor,
             inv_divisor,
             SUBDIVISION_MAX_CELL,
             point.latitude,
-        );
+        ));
         (ordinal != u16::MAX).ok_or("대한민국 세부 격자 소유 범위 오류")?;
         let cell = usize::from(ordinal)
             .strict_mul(SUBDIVISION)

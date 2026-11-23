@@ -3,7 +3,7 @@ use crate::{
     boundary_inflate::InflatedPage,
     diagnostic::{AppError, Result},
     geo_uniform::BoundaryAreaBounds,
-    numeric::low_u16_from_u64,
+    numeric::{low_u16_from_u64, low_u32_from_u64},
     random_data::Coordinates,
 };
 use alloc::collections::VecDeque;
@@ -28,12 +28,12 @@ static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
 #[derive(Default)]
 pub(super) struct BoundaryCache {
     bytes: usize,
-    pages: VecDeque<(usize, CachedPage)>,
+    pages: VecDeque<(u32, CachedPage)>,
     resident: Vec<u64>,
     scratch: Vec<u8>,
 }
 struct CachedPage {
-    bytes: usize,
+    bytes: u32,
     decoded: DecodedPage,
 }
 struct BoundaryIndex {
@@ -70,15 +70,29 @@ struct Part {
 }
 enum DecodedPage {
     Chain {
-        ring: usize,
-        owner: usize,
+        first: u32,
         hole: u32,
-        first: usize,
+        owner: u32,
+        ring: u32,
         vertices: Box<[[f64; 2]]>,
     },
     Parity {
         base: bool,
         endpoints: Box<[f64]>,
+    },
+}
+#[derive(Clone, Copy)]
+enum DecodedPageRef<'page> {
+    Chain {
+        first: u32,
+        hole: u32,
+        owner: u32,
+        ring: u32,
+        vertices: &'page [[f64; 2]],
+    },
+    Parity {
+        base: bool,
+        endpoints: &'page [f64],
     },
 }
 pub(super) struct SampleState<'cache> {
@@ -104,7 +118,9 @@ impl BoundaryIndex {
             self.row_count.strict_sub(1),
             point.latitude,
         );
-        let tile_number = row.strict_mul(width).strict_add(column);
+        let tile_number = usize::from(row)
+            .strict_mul(width)
+            .strict_add(usize::from(column));
         let tile_state = *self
             .tile_states
             .get(tile_number)
@@ -126,133 +142,112 @@ impl BoundaryIndex {
         let mut chains_started = false;
         let mut last_endpoint = None;
         let mut last_chain = None;
-        let first_page = tile.first as usize;
-        for offset in 0..(tile.count as usize) {
+        let first_page = tile.first;
+        for offset in 0..tile.count {
             let page_number = first_page.strict_add(offset);
-            cache.page(self, page_number, tile_number, |page| match page {
-                DecodedPage::Parity { base, endpoints } => {
-                    let outcome = (|| -> Result<()> {
-                        (!chains_started
-                            && (offset == 0 || !base)
-                            && last_endpoint
-                                .zip(endpoints.first())
-                                .is_none_or(|(previous, next)| previous < *next))
-                        .ok_or("대한민국 경계 교차 블록 순서 오류")?;
-                        parity ^= base
-                            ^ !endpoints
-                                .partition_point(|edge| *edge <= point.latitude)
-                                .is_multiple_of(2);
-                        if let Some(&last) = endpoints.last() {
-                            last_endpoint = Some(last);
-                        }
-                        Ok(())
-                    })();
-                    (DecodedPage::Parity { base, endpoints }, outcome)
+            match cache.page(self, page_number, tile_number)? {
+                DecodedPageRef::Parity { base, endpoints } => {
+                    (!chains_started
+                        && (offset == 0 || !base)
+                        && last_endpoint
+                            .zip(endpoints.first())
+                            .is_none_or(|(previous, next)| previous < *next))
+                    .ok_or("대한민국 경계 교차 블록 순서 오류")?;
+                    parity ^= base
+                        ^ !endpoints
+                            .partition_point(|edge| *edge <= point.latitude)
+                            .is_multiple_of(2);
+                    if let Some(&last) = endpoints.last() {
+                        last_endpoint = Some(last);
+                    }
                 }
-                DecodedPage::Chain {
-                    ring,
-                    owner,
-                    hole,
+                DecodedPageRef::Chain {
                     first,
+                    hole,
+                    owner,
+                    ring,
                     vertices,
                 } => {
-                    let outcome = (|| -> Result<()> {
-                        if let Some((previous_ring, previous_owner, previous_hole, previous_end)) =
-                            last_chain
+                    if let Some((previous_ring, previous_owner, previous_hole, previous_end)) =
+                        last_chain
+                    {
+                        (ring > previous_ring
+                            || (ring == previous_ring
+                                && owner == previous_owner
+                                && hole == previous_hole
+                                && first >= previous_end))
+                            .ok_or("대한민국 경계 링 순서 오류")?;
+                    }
+                    let [b0, b1, b2, b3, ..] = vertices.len().strict_sub(1).to_le_bytes();
+                    let span = u32::from_le_bytes([b0, b1, b2, b3]);
+                    last_chain = Some((ring, owner, hole, first.strict_add(span)));
+                    (offset > 0).ok_or("대한민국 경계 교차 블록 누락")?;
+                    chains_started = true;
+                    for &[start, end] in vertices.array_windows::<2>() {
+                        if (point.latitude < start[1] && point.latitude < end[1])
+                            || (point.latitude > start[1] && point.latitude > end[1])
+                            || (point.longitude > start[0] && point.longitude > end[0])
                         {
-                            (ring > previous_ring
-                                || (ring == previous_ring
-                                    && owner == previous_owner
-                                    && hole == previous_hole
-                                    && first >= previous_end))
-                                .ok_or("대한민국 경계 링 순서 오류")?;
+                            continue;
                         }
-                        last_chain = Some((
-                            ring,
-                            owner,
-                            hole,
-                            first.strict_add(vertices.len().strict_sub(1)),
-                        ));
-                        (offset > 0).ok_or("대한민국 경계 교차 블록 누락")?;
-                        chains_started = true;
-                        for &[start, end] in vertices.array_windows::<2>() {
-                            if (point.latitude < start[1] && point.latitude < end[1])
-                                || (point.latitude > start[1] && point.latitude > end[1])
-                                || (point.longitude > start[0] && point.longitude > end[0])
+                        let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
+                        if point.longitude < start[0] && point.longitude < end[0] {
+                            parity ^= crosses;
+                            continue;
+                        }
+                        let dx = end[0] - start[0];
+                        let dy = end[1] - start[1];
+                        let px = point.longitude - start[0];
+                        let py = point.latitude - start[1];
+                        let left = dx * py;
+                        let right = dy * px;
+                        let approximate = left - right;
+                        let determinant: f64 = if approximate.abs()
+                            > 3.330_669_073_875_471_6e-16_f64 * (left.abs() + right.abs())
+                        {
+                            approximate
+                        } else {
+                            let mut expansion = [0.0_f64; 4];
+                            let mut length = 0_usize;
+                            for mut value in
+                                [dx.mul_add(py, -left), left, -dy.mul_add(px, -right), -right]
                             {
-                                continue;
-                            }
-                            let crosses = (start[1] > point.latitude) != (end[1] > point.latitude);
-                            if point.longitude < start[0] && point.longitude < end[0] {
-                                parity ^= crosses;
-                                continue;
-                            }
-                            let dx = end[0] - start[0];
-                            let dy = end[1] - start[1];
-                            let px = point.longitude - start[0];
-                            let py = point.latitude - start[1];
-                            let left = dx * py;
-                            let right = dy * px;
-                            let approximate = left - right;
-                            let determinant: f64 = if approximate.abs()
-                                > 3.330_669_073_875_471_6e-16_f64 * (left.abs() + right.abs())
-                            {
-                                approximate
-                            } else {
-                                let mut expansion = [0.0_f64; 4];
-                                let mut length = 0_usize;
-                                for mut value in
-                                    [dx.mul_add(py, -left), left, -dy.mul_add(px, -right), -right]
-                                {
-                                    let mut count = 0_usize;
-                                    let previous = expansion;
-                                    for entry in previous.into_iter().take(length) {
-                                        let total = value + entry;
-                                        let virtual_value = total - value;
-                                        let error = (value - (total - virtual_value))
-                                            + (entry - virtual_value);
-                                        if error != 0.0_f64 {
-                                            *expansion
-                                                .get_mut(count)
-                                                .ok_or("대한민국 경계 좌표 누산 범위 오류")? =
-                                                error;
-                                            count = count.strict_add(1);
-                                        }
-                                        value = total;
-                                    }
-                                    if value != 0.0_f64 || count == 0 {
+                                let mut count = 0_usize;
+                                let previous = expansion;
+                                for entry in previous.into_iter().take(length) {
+                                    let total = value + entry;
+                                    let virtual_value = total - value;
+                                    let error =
+                                        (value - (total - virtual_value)) + (entry - virtual_value);
+                                    if error != 0.0_f64 {
                                         *expansion
                                             .get_mut(count)
-                                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = value;
+                                            .ok_or("대한민국 경계 좌표 누산 범위 오류")? = error;
                                         count = count.strict_add(1);
                                     }
-                                    length = count;
+                                    value = total;
                                 }
-                                expansion.iter().take(length).sum()
+                                if value != 0.0_f64 || count == 0 {
+                                    *expansion
+                                        .get_mut(count)
+                                        .ok_or("대한민국 경계 좌표 누산 범위 오류")? = value;
+                                    count = count.strict_add(1);
+                                }
+                                length = count;
+                            }
+                            expansion.iter().take(length).sum()
+                        };
+                        let side = determinant.partial_cmp(&0.0_f64);
+                        boundary |= side == Some(Ordering::Equal);
+                        parity ^= crosses
+                            && if end[1] > start[1] {
+                                side == Some(Ordering::Greater)
+                            } else {
+                                side == Some(Ordering::Less)
                             };
-                            let side = determinant.partial_cmp(&0.0_f64);
-                            boundary |= side == Some(Ordering::Equal);
-                            parity ^= crosses
-                                && if end[1] > start[1] {
-                                    side == Some(Ordering::Greater)
-                                } else {
-                                    side == Some(Ordering::Less)
-                                };
-                        }
-                        Ok(())
-                    })();
-                    (
-                        DecodedPage::Chain {
-                            ring,
-                            owner,
-                            hole,
-                            first,
-                            vertices,
-                        },
-                        outcome,
-                    )
+                    }
                 }
-            })?;
+            }
         }
         chains_started.ok_or("대한민국 경계 링 누락")?;
         Ok(boundary || parity)
@@ -311,12 +306,13 @@ impl BoundaryIndex {
                     endpoints.push(value);
                     previous = value;
                 }
-                let retained_bytes = endpoints
+                let [b0, b1, b2, b3, ..] = endpoints
                     .len()
                     .strict_mul(8)
-                    .strict_add(size_of::<(usize, CachedPage)>());
+                    .strict_add(size_of::<(u32, CachedPage)>())
+                    .to_le_bytes();
                 Ok(CachedPage {
-                    bytes: retained_bytes,
+                    bytes: u32::from_le_bytes([b0, b1, b2, b3]),
                     decoded: DecodedPage::Parity {
                         base: field_a == 1,
                         endpoints: endpoints.into_boxed_slice(),
@@ -324,7 +320,8 @@ impl BoundaryIndex {
                 })
             }
             1 => {
-                let first = read_count(raw, 32)?;
+                let first_u32 = read_u32(raw, 32)?;
+                let first = first_u32 as usize;
                 let hole = read_u32(raw, 36)?;
                 (count > 0
                     && count <= 1024
@@ -362,17 +359,20 @@ impl BoundaryIndex {
                         .ok_or("대한민국 경계 정점 범위 오류")?;
                     vertices.push([lon, lat]);
                 }
-                let retained_bytes = vertices
+                let [b0, b1, b2, b3, ..] = vertices
                     .len()
                     .strict_mul(16)
-                    .strict_add(size_of::<(usize, CachedPage)>());
+                    .strict_add(size_of::<(u32, CachedPage)>())
+                    .to_le_bytes();
+                let [r0, r1, r2, r3, ..] = field_a.to_le_bytes();
+                let [o0, o1, o2, o3, ..] = field_b.to_le_bytes();
                 Ok(CachedPage {
-                    bytes: retained_bytes,
+                    bytes: u32::from_le_bytes([b0, b1, b2, b3]),
                     decoded: DecodedPage::Chain {
-                        ring: field_a,
-                        owner: field_b,
+                        first: first_u32,
                         hole,
-                        first,
+                        owner: u32::from_le_bytes([o0, o1, o2, o3]),
+                        ring: u32::from_le_bytes([r0, r1, r2, r3]),
                         vertices: vertices.into_boxed_slice(),
                     },
                 })
@@ -585,9 +585,8 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         let mut selected = Vec::with_capacity(KOREA_TILE_COUNT);
         for (word_index, chunk) in KOREA_TILE_BYTES.as_chunks::<8>().0.iter().enumerate() {
             let mut bits = u64::from_le_bytes(*chunk);
-            let base = u32::try_from(word_index)
-                .map_err(|source| AppError::context("대한민국 타일 번호 오류", source))?
-                .strict_mul(64);
+            let [w0, w1, w2, w3, ..] = word_index.to_le_bytes();
+            let base = u32::from_le_bytes([w0, w1, w2, w3]).strict_mul(64);
             while bits != 0 {
                 let [low, mid, high, _] = (base | bits.trailing_zeros()).to_le_bytes();
                 selected.push([low, mid, high]);
@@ -630,46 +629,55 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
     }
 }
 impl BoundaryCache {
-    fn page<T>(
+    fn page(
         &mut self,
         index: &BoundaryIndex,
-        page_number: usize,
+        page_number: u32,
         tile_number: usize,
-        visit: impl FnOnce(DecodedPage) -> (DecodedPage, Result<T>),
-    ) -> Result<T> {
+    ) -> Result<DecodedPageRef<'_>> {
         if self.resident.is_empty() {
             self.resident.resize(index.page_count.div_ceil(64), 0);
         }
-        let word = page_number.div_euclid(64);
-        let bit = 1_u64 << page_number.rem_euclid(64);
-        let resident = self
+        let page_index = page_number as usize;
+        let word = page_index.div_euclid(64);
+        let bit = 1_u64 << page_index.rem_euclid(64);
+        let resident = *self
             .resident
             .get(word)
             .ok_or("대한민국 경계 블록 순번 오류")?;
-        let item = if resident & bit != 0 {
-            let position = self
+        if resident & bit != 0 {
+            if self
                 .pages
-                .iter()
-                .rposition(|&(number, _)| number == page_number)
-                .ok_or("대한민국 경계 캐시 위치 오류")?;
-            self.pages
-                .remove(position)
-                .ok_or("대한민국 경계 캐시 위치 오류")?
+                .back()
+                .is_none_or(|&(number, _)| number != page_number)
+            {
+                let position = self
+                    .pages
+                    .iter()
+                    .rposition(|&(number, _)| number == page_number)
+                    .ok_or("대한민국 경계 캐시 위치 오류")?;
+                let item = self
+                    .pages
+                    .remove(position)
+                    .ok_or("대한민국 경계 캐시 위치 오류")?;
+                self.pages.push_back(item);
+            }
         } else {
-            let decoded = index.page(page_number, tile_number, &mut self.scratch)?;
-            let additional = decoded.bytes;
+            let decoded = index.page(page_index, tile_number, &mut self.scratch)?;
+            let additional = decoded.bytes as usize;
             while self.pages.len() >= CACHE_PAGES || self.bytes.strict_add(additional) > CACHE_BYTES
             {
                 let (removed_number, removed) = self
                     .pages
                     .pop_front()
                     .ok_or("대한민국 경계 캐시 용량 오류")?;
+                let removed_idx = removed_number as usize;
                 let removed_word = self
                     .resident
-                    .get_mut(removed_number.div_euclid(64))
+                    .get_mut(removed_idx.div_euclid(64))
                     .ok_or("대한민국 경계 캐시 위치 오류")?;
-                *removed_word &= !(1_u64 << removed_number.rem_euclid(64));
-                self.bytes = self.bytes.strict_sub(removed.bytes);
+                *removed_word &= !(1_u64 << removed_idx.rem_euclid(64));
+                self.bytes = self.bytes.strict_sub(removed.bytes as usize);
             }
             let inserted_word = self
                 .resident
@@ -677,18 +685,31 @@ impl BoundaryCache {
                 .ok_or("대한민국 경계 블록 순번 오류")?;
             *inserted_word |= bit;
             self.bytes = self.bytes.strict_add(additional);
-            (page_number, decoded)
-        };
-        let (number, CachedPage { bytes, decoded }) = item;
-        let (page, result) = visit(decoded);
-        self.pages.push_back((
-            number,
-            CachedPage {
-                bytes,
-                decoded: page,
+            self.pages.push_back((page_number, decoded));
+        }
+        let &mut (_, ref mut cached) = self
+            .pages
+            .back_mut()
+            .ok_or("대한민국 경계 캐시 위치 오류")?;
+        Ok(match cached.decoded {
+            DecodedPage::Parity {
+                base,
+                ref mut endpoints,
+            } => DecodedPageRef::Parity { base, endpoints },
+            DecodedPage::Chain {
+                first,
+                hole,
+                owner,
+                ring,
+                ref mut vertices,
+            } => DecodedPageRef::Chain {
+                first,
+                hole,
+                owner,
+                ring,
+                vertices,
             },
-        ));
-        result
+        })
     }
 }
 impl SampleState<'_> {
@@ -709,15 +730,14 @@ impl SampleState<'_> {
             .map_err(Into::into)
     }
     fn try_word(&mut self, value: u64) -> Result<()> {
-        let selector = usize::try_from(value >> 42_i32)
-            .map_err(|source| AppError::context("대한민국 타일 선택값 오류", source))?;
-        if selector >= KOREA_TILE_COUNT.strict_mul(53) {
+        let selector = low_u32_from_u64(value >> 42_i32);
+        if (selector as usize) >= KOREA_TILE_COUNT.strict_mul(53) {
             return Ok(());
         }
         let &[low, mid, high] = self
             .index
             .sampler_tiles
-            .get(selector.div_euclid(53))
+            .get(selector.div_euclid(53) as usize)
             .ok_or("대한민국 좌표 타일 선택 범위 오류")?;
         let tile = u64::from(u32::from_le_bytes([low, mid, high, 0]));
         let vertical = ((tile >> 9_i32) << 23_i32) | (((value >> 21_i32) & 0x1f_ffff) << 2_i32) | 2;
@@ -756,18 +776,18 @@ fn grid_axis_index(
     inv_divisor: f64,
     max_cell: u16,
     coordinate: f64,
-) -> usize {
+) -> u16 {
     let scaled = ((coordinate - origin) * divisor)
         .floor()
         .clamp(0.0_f64, MAX_GRID_DIMENSION_F64);
     let aligned_bits = (scaled + IEEE_F64_MANTISSA_ALIGN).to_bits() & 0x1FFF_u64;
     let approx = low_u16_from_u64(aligned_bits).min(max_cell);
     if axis_edge(origin, inv_divisor, approx.strict_add(1)) <= coordinate {
-        usize::from(approx.strict_add(1).min(max_cell))
+        approx.strict_add(1).min(max_cell)
     } else if approx > 0 && axis_edge(origin, inv_divisor, approx) > coordinate {
-        usize::from(approx.strict_sub(1))
+        approx.strict_sub(1)
     } else {
-        usize::from(approx)
+        approx
     }
 }
 fn read_chunk<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {
@@ -778,8 +798,7 @@ fn read_chunk<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {
         .ok_or_else(|| "대한민국 경계 데이터 구조 오류".into())
 }
 fn read_count(bytes: &[u8], offset: usize) -> Result<usize> {
-    usize::try_from(read_u32(bytes, offset)?)
-        .map_err(|source| AppError::context("대한민국 경계 길이 오류", source))
+    Ok(read_u32(bytes, offset)? as usize)
 }
 fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
     read_chunk::<4>(bytes, offset).map(u32::from_le_bytes)

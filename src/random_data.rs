@@ -95,14 +95,11 @@ struct RandomDataBuildState<'cache> {
     korea: korea_boundary::SampleState<'cache>,
 }
 impl RandomDataSet {
-    pub(super) fn populate<F>(
+    pub(super) fn populate(
         self,
-        next_supp: &mut F,
+        next_supp: &mut dyn FnMut(&'static str) -> Result<u64>,
         boundary_cache: &mut korea_boundary::BoundaryCache,
-    ) -> Result<Self>
-    where
-        F: FnMut(&'static str) -> Result<u64>,
-    {
+    ) -> Result<Self> {
         let initial = self.num_64;
         let mut fields = RandomDataBuildState {
             korea: korea_boundary::SampleState::try_from((initial, boundary_cache))?,

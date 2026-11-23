@@ -128,7 +128,11 @@ where
                 let err_text = err.as_ref();
                 if !err_text.is_empty() {
                     let target = err_out.as_mut().map_or(&mut *out, |writer| &mut **writer);
-                    writeln!(target, "{err_text}")?;
+                    target.write_all(err_text.as_bytes())?;
+                    target.write_all(
+                        b"
+",
+                    )?;
                 }
             }
         }
