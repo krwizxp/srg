@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
 	<meta charset="utf-8">
 	<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
@@ -32,7 +31,6 @@
 				transform: rotate(360deg)
 			}
 		}
-
 		:root {
 			color-scheme: light dark;
 			--page: light-dark(#f5f5f7, #000);
@@ -78,61 +76,42 @@
 			scrollbar-width: thin;
 			scrollbar-color: var(--control) transparent
 		}
-
 		:root[data-theme=light] {
 			color-scheme: light
 		}
-
 		:root[data-theme=dark] {
 			color-scheme: dark
 		}
-
 		*,
 		::after,
 		::before {
 			box-sizing: border-box
 		}
-
-		body,
-		dd,
-		dl,
-		h1,
-		h2,
-		p,
-		pre,
+		:is(body, dd, dl, h1, h2, p, pre),
 		.steps,
 		#auto-supp {
 			margin: 0
 		}
-
-		button,
-		input,
-		select,
-		textarea {
+		:is(button, input, select, textarea) {
 			font: inherit
 		}
-
 		button,
 		select,
 		.drop-zone input {
 			cursor: pointer
 		}
-
 		button {
 			color: inherit
 		}
-
 		.map-links a,
 		button {
 			-webkit-tap-highlight-color: transparent;
 			transition: border-color .15s
 		}
-
 		a {
 			color: var(--accent);
 			text-underline-offset: 3px
 		}
-
 		svg {
 			flex-shrink: 0;
 			vertical-align: middle;
@@ -144,33 +123,26 @@
 			fill: none;
 			stroke: currentColor
 		}
-
 		[hidden] {
 			display: none !important
 		}
-
 		.drop-zone:focus-within,
 		.map-preview:has(:focus-visible),
 		:is(button, input, textarea, select, a, [tabindex]):focus-visible {
 			outline: 2px solid var(--focus);
 			outline-offset: 3px
 		}
-
 		::selection {
 			background: var(--tint);
 			color: var(--fg)
 		}
-
-		body,
-		html {
+		:is(body, html) {
 			background: var(--page)
 		}
-
 		html {
 			min-width: 320px;
 			-webkit-text-size-adjust: 100%
 		}
-
 		body {
 			color: var(--fg);
 			font-size: var(--text-body);
@@ -179,7 +151,6 @@
 			word-break: keep-all;
 			min-height: 100dvh
 		}
-
 		.coords-empty,
 		.coords-head,
 		.drop-zone,
@@ -200,45 +171,25 @@
 		.site-brand,
 		.steps li,
 		.ui-notice,
+		.rng-generator .check-label {
+			display: flex;
+			align-items: center
+		}
 		.input-actions,
 		.map-recovery,
 		.status-row,
 		.steps,
 		.tool-capsule,
 		.segmented,
-		.rng-generator .check-label,
 		.field {
 			display: flex
 		}
-
-		.coords-empty,
-		.coords-head,
-		.drop-zone,
-		.elapsed-time,
-		.filterbar,
-		.full-address,
-		.header-inner,
-		.header-tools,
-		.map-feedback,
-		.map-links a,
-		.map-load,
-		.page-numbers,
-		.progress-heading,
-		.result-pages,
-		.results-footer,
-		.results-heading,
-		.sheet-heading,
-		.site-brand,
-		.steps li,
-		.ui-notice,
 		.button,
 		.copyright,
 		.credits a,
-		.rng-generator .check-label,
 		.table-hint {
 			align-items: center
 		}
-
 		.coords-head,
 		.header-inner,
 		.progress-heading,
@@ -247,7 +198,6 @@
 		.sheet-heading {
 			justify-content: space-between
 		}
-
 		.input-actions,
 		.map-recovery,
 		.status-row,
@@ -263,7 +213,6 @@
 		.detail-fields>div {
 			gap: 8px
 		}
-
 		.input-actions,
 		.map-recovery,
 		.status-row,
@@ -275,7 +224,6 @@
 		.result-pages {
 			flex-wrap: wrap
 		}
-
 		.filters :is(input, select),
 		.rng-generator input[type=number],
 		.settings select,
@@ -292,14 +240,12 @@
 		.rng-generator .check-label {
 			background: var(--surface)
 		}
-
 		.filters :is(input, select),
 		.rng-generator input[type=number],
 		.settings select,
 		textarea {
 			border: 1px solid var(--control)
 		}
-
 		#output,
 		.coords-panel,
 		.job-panel,
@@ -313,40 +259,12 @@
 		.rng-generator .check-label {
 			border: 1px solid var(--line)
 		}
-
 		:is(input, textarea)[aria-invalid=true] {
 			border-color: var(--danger)
 		}
-
 		#coords:focus-visible {
 			outline-offset: -3px
 		}
-
-		#counts,
-		#detail-town,
-		#results-count,
-		.address-sub,
-		.coords-empty,
-		.coords-head,
-		.detail-label,
-		.inspector-empty,
-		.inspector-eyebrow,
-		.map-feedback,
-		.note,
-		.page-footer,
-		.remaining-note,
-		.table-hint,
-		.coords-cell,
-		.segmented button,
-		.step-label,
-		.steps li,
-		th,
-		#coord-line-numbers,
-		.status,
-		.elapsed-time {
-			color: var(--muted)
-		}
-
 		#counts,
 		#detail-town,
 		#results-count,
@@ -361,18 +279,23 @@
 		.page-footer,
 		.remaining-note,
 		.table-hint {
+			color: var(--muted);
 			font-size: var(--text-secondary)
 		}
-
 		.coords-cell,
 		.segmented button,
 		.step-label,
 		.steps li,
 		th {
+			color: var(--muted);
 			font-size: var(--text-meta);
 			line-height: 1.5
 		}
-
+		#coord-line-numbers,
+		.status,
+		.elapsed-time {
+			color: var(--muted)
+		}
 		#detail-coordinates,
 		#detail-tag,
 		#detail-title,
@@ -391,22 +314,18 @@
 		.filter-empty-hint .button {
 			overflow-wrap: anywhere
 		}
-
-		.drop-zone input,
-		.track>progress {
+		:is(.drop-zone input, .track>progress) {
 			position: absolute;
 			inset: 0;
 			width: 100%;
 			height: 100%;
 			opacity: 0
 		}
-
 		.button,
 		.copyright,
 		.credits a {
 			display: inline-flex
 		}
-
 		.button,
 		.copyright,
 		.table-hint,
@@ -419,7 +338,6 @@
 		.map-feedback {
 			justify-content: center
 		}
-
 		.coords-empty,
 		.drop-zone,
 		.map-load,
@@ -434,21 +352,18 @@
 		.results-footer {
 			gap: 12px
 		}
-
 		.site-header,
 		.mobile-nav {
 			background: var(--glass);
 			-webkit-backdrop-filter: blur(20px) saturate(1.8);
 			backdrop-filter: blur(20px) saturate(1.8)
 		}
-
 		.site-header {
 			position: sticky;
 			top: 0;
 			z-index: 30;
 			border-bottom: 1px solid var(--line)
 		}
-
 		.header-inner {
 			gap: 24px;
 			min-height: 88px;
@@ -456,7 +371,6 @@
 			margin: auto;
 			padding-block: max(16px, env(safe-area-inset-top)) 16px
 		}
-
 		.site-brand,
 		.icon-button,
 		.segmented button,
@@ -465,19 +379,16 @@
 		.rng-generator .check-label {
 			min-height: 44px
 		}
-
 		.site-brand {
 			text-decoration: none;
 			color: var(--fg);
 			min-width: 44px
 		}
-
 		.brand-mark {
 			width: 42px;
 			height: 42px;
 			flex: none
 		}
-
 		.input-card,
 		.results,
 		.site-brand h1,
@@ -492,29 +403,24 @@
 		.inspector {
 			min-width: 0
 		}
-
 		.site-brand h1 {
 			font-size: 1.2rem;
 			letter-spacing: 0
 		}
-
 		.steps {
 			gap: 24px;
 			padding: 0;
 			list-style: none
 		}
-
 		.step-label,
 		.theme-toggle :is(.theme-moon, .theme-sun),
 		.coords-tools,
 		.progress-pending {
 			display: none
 		}
-
 		.steps li {
 			gap: 8px
 		}
-
 		.steps span,
 		.icon-button,
 		#app,
@@ -523,7 +429,6 @@
 		.rng-generator {
 			display: grid
 		}
-
 		.steps span {
 			place-items: center;
 			width: 24px;
@@ -531,11 +436,9 @@
 			border-radius: 50%;
 			font-size: .75rem
 		}
-
 		.steps [aria-current=step] span {
 			border-color: var(--button-fill)
 		}
-
 		.tool-capsule,
 		.segmented,
 		.segmented button,
@@ -548,17 +451,14 @@
 		.ui-notice {
 			border-radius: var(--radius-pill)
 		}
-
 		.tool-capsule {
 			padding: 3px;
 			background: var(--panel)
 		}
-
 		.mobile-nav {
 			isolation: isolate;
 			box-shadow: var(--glass-shadow)
 		}
-
 		.icon-button {
 			border: 0;
 			border-radius: 50%;
@@ -568,16 +468,13 @@
 			min-width: 44px;
 			padding: 0
 		}
-
 		:is(.icon-button, .segmented button):active:not(:disabled) {
 			background: var(--secondary-active)
 		}
-
 		button:disabled {
 			opacity: .42;
 			cursor: not-allowed
 		}
-
 		#app {
 			grid-template-columns: 304px minmax(0, 1fr);
 			align-items: start;
@@ -585,13 +482,11 @@
 			max-width: 1680px;
 			margin: 26px auto 0
 		}
-
 		.card-label {
 			font-size: 1.75rem;
 			font-weight: 600;
 			letter-spacing: -.022em
 		}
-
 		.segmented,
 		.drop-zone,
 		.track,
@@ -601,21 +496,18 @@
 		.table-wrap {
 			position: relative
 		}
-
 		.segmented,
 		.elapsed-time,
 		.page-numbers,
 		.result-pages {
 			gap: 4px
 		}
-
 		.segmented {
 			isolation: isolate;
 			align-items: stretch;
 			padding: 4px;
 			background: var(--press-bg)
 		}
-
 		.input-tabs::before {
 			content: "";
 			position: absolute;
@@ -628,11 +520,9 @@
 			z-index: -1;
 			pointer-events: none
 		}
-
 		.input-tabs:has(#manual-tab[aria-selected=true])::before {
 			transform: translateX(calc(100% + 4px))
 		}
-
 		.segmented button {
 			flex: 1;
 			border: 0;
@@ -641,27 +531,22 @@
 			background: 0 0;
 			transition: background-color .18s var(--spring), color .18s var(--spring), box-shadow .18s var(--spring)
 		}
-
 		.segmented :is([aria-selected=true], [aria-pressed=true]) {
 			background: var(--surface);
 			color: var(--fg);
 			font-weight: 600;
 			box-shadow: 0 1px 4px #00000014
 		}
-
 		.segmented :is([aria-selected=true], [aria-pressed=true]):active:not(:disabled) {
 			background: var(--surface)
 		}
-
 		.input-tabs [aria-selected=true] {
 			background: 0 0;
 			box-shadow: none
 		}
-
 		.input-tabs {
 			margin: 18px 0
 		}
-
 		.drop-zone {
 			flex-direction: column;
 			text-align: center;
@@ -670,21 +555,17 @@
 			border: 1px dashed var(--control);
 			border-radius: var(--radius-card)
 		}
-
 		.drop-zone.is-dragging,
 		.drop-zone:active:not(:has(input:disabled)) {
 			border-color: var(--accent);
 			background: var(--tint)
 		}
-
 		.drop-zone:has(input:disabled) {
 			opacity: .55
 		}
-
 		.drop-zone input:disabled {
 			cursor: not-allowed
 		}
-
 		.drop-text>svg,
 		.button,
 		.map-links a,
@@ -693,18 +574,15 @@
 		.status.info {
 			color: var(--accent)
 		}
-
 		.drop-text>svg {
 			display: block;
 			width: 30px;
 			height: 30px;
 			margin: 0 auto 14px
 		}
-
 		#drop-filename {
 			font-size: 1rem
 		}
-
 		#detail-tag,
 		#progress-percent,
 		.code-view,
@@ -718,7 +596,6 @@
 		td {
 			font-size: .875rem
 		}
-
 		.button,
 		.map-links a {
 			min-width: 44px;
@@ -732,12 +609,10 @@
 			text-decoration: none;
 			transition: background-color .16s var(--spring), border-color .16s var(--spring), color .16s var(--spring)
 		}
-
 		.button:active:not(:disabled) {
 			background: var(--tint-active);
 			color: var(--accent-active)
 		}
-
 		.steps [aria-current=step] span,
 		.primary,
 		#filter-count,
@@ -745,95 +620,77 @@
 			background: var(--button-fill);
 			color: #fff
 		}
-
 		:is(.primary, .page-number[aria-current=page]):active:not(:disabled) {
 			background: var(--button-active);
 			color: #fff
 		}
-
 		#progress-percent,
 		.file-cue,
 		.steps [aria-current=step] {
 			color: var(--accent);
 			font-weight: 600
 		}
-
 		.danger {
 			color: var(--danger);
 			background: var(--danger-bg);
 			border-color: var(--danger)
 		}
-
 		.danger:active:not(:disabled) {
 			color: var(--danger);
 			background: var(--danger-active)
 		}
-
 		#parse {
 			width: 100%;
 			margin-top: 12px
 		}
-
 		.coords-panel,
 		.job-panel {
 			margin-top: 20px;
 			border-radius: var(--radius-card)
 		}
-
 		.coords-panel {
 			overflow: hidden
 		}
-
 		.coords-head {
 			padding: 13px 16px;
 			border-bottom: 1px solid var(--line)
 		}
-
 		.label {
 			font-weight: 600;
 			color: var(--fg)
 		}
-
 		.coords-head svg {
 			width: 16px;
 			height: 16px;
 			margin-right: 4px
 		}
-
 		.coords-panel[data-empty=true] .coords-head {
 			border-bottom: 0
 		}
-
 		.coords-empty {
 			min-height: 72px;
 			padding: 12px 18px 18px;
 			text-align: center
 		}
-
 		.coords-empty svg {
 			width: 22px;
 			height: 22px
 		}
-
 		.code-view {
 			overflow: auto;
 			scrollbar-width: thin;
 			font-family: var(--mono)
 		}
-
 		.coords-tools {
 			padding: 8px 16px 14px
 		}
-
 		.coords-panel[data-empty=false] .coords-tools {
 			display: flex
 		}
-
 		.coords-tools .button {
 			flex: 1;
 			padding-inline: 12px
 		}
-
 		.code-content,
 		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) .progress-pending,
 		.fill,
@@ -844,104 +701,85 @@
 		.address-sub {
 			display: block
 		}
-
 		.code-content {
 			padding: 12px;
 			font: inherit
 		}
-
 		#coords {
 			grid-template-columns: 34px minmax(0, 1fr);
 			height: 172px
 		}
-
 		#coords .code-content {
 			min-width: max-content;
 			padding: 10px 8px;
 			line-height: 1.625rem
 		}
-
 		#coord-line-numbers {
 			padding: 10px 0;
 			line-height: 1.625rem;
 			text-align: center;
 			user-select: none
 		}
-
 		.job-panel {
 			padding: 18px
 		}
-
 		.progress-pending {
 			font-weight: 600;
 			margin-bottom: 8px
 		}
-
 		.track {
 			--pct: 0;
 			height: 6px;
 			background: var(--line);
 			overflow: hidden
 		}
-
 		.track>progress:not([value]) {
 			opacity: 1;
 			accent-color: var(--accent)
 		}
-
 		.fill {
 			width: calc(var(--pct)*1%);
 			height: 100%;
 			background: var(--accent);
 			border-radius: inherit
 		}
-
 		#counts {
 			margin-top: 10px
 		}
-
 		.status {
 			flex-basis: 100%;
 			font-size: var(--text-address);
 			line-height: 1.6
 		}
-
 		.status.warn {
 			color: var(--warning)
 		}
-
 		.elapsed-time svg {
 			width: 14px;
 			height: 14px
 		}
-
 		.input-actions {
 			margin-top: 16px
 		}
-
 		.input-actions .button {
 			flex: 1
 		}
-
 		.rng-fields {
 			grid-template-columns: minmax(0, 1fr);
 			gap: 16px
 		}
-
 		.rng-generator .check-label,
 		#auto-supp,
 		.search-field>input::-webkit-search-cancel-button,
 		#help-dialog summary {
 			cursor: pointer
 		}
-
 		.rng-generator .check-label {
 			justify-content: space-between;
 			padding: 6px 14px;
 			border-radius: var(--radius-control);
 			user-select: none
 		}
-
 		#auto-supp {
 			appearance: none;
 			width: 51px;
@@ -951,7 +789,6 @@
 			background: var(--control);
 			transition: background-color .2s var(--spring)
 		}
-
 		#auto-supp::before {
 			content: "";
 			position: absolute;
@@ -963,19 +800,15 @@
 			box-shadow: 0 1px 3px #0004;
 			transition: transform .2s var(--spring)
 		}
-
 		#auto-supp:checked {
 			background: var(--button-fill)
 		}
-
 		#auto-supp:checked::before {
 			transform: translateX(20px)
 		}
-
 		.field {
 			flex-direction: column
 		}
-
 		textarea,
 		.filters :is(input, select),
 		.rng-generator input[type=number],
@@ -983,7 +816,6 @@
 		.filter-grid {
 			width: 100%
 		}
-
 		textarea {
 			field-sizing: content;
 			resize: vertical;
@@ -993,18 +825,15 @@
 			font-family: var(--mono);
 			line-height: 1.75
 		}
-
 		input::placeholder,
 		textarea::placeholder {
 			color: var(--muted);
 			opacity: 1
 		}
-
 		.note {
 			line-height: 1.6;
 			white-space: pre-wrap
 		}
-
 		.confirm-actions,
 		.rng-actions,
 		.filters,
@@ -1014,79 +843,64 @@
 		.results-grid {
 			display: grid
 		}
-
 		.confirm-actions,
 		.rng-actions {
 			grid-template-columns: repeat(2, minmax(0, 1fr))
 		}
-
 		#runBtn,
 		#useOutput,
 		.supp-form .rng-actions button[type=submit] {
 			grid-column: 1/-1
 		}
-
 		.secondary,
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn {
 			color: var(--fg);
 			background: var(--press-bg)
 		}
-
 		.secondary:active:not(:disabled),
 		.manual-rng:has(#useOutput:not(:disabled)) #runBtn:active:not(:disabled) {
 			color: var(--fg);
 			background: var(--secondary-active)
 		}
-
 		#clearBtn {
 			justify-self: start;
 			padding-inline: 12px;
 			background: transparent;
 			border-color: transparent
 		}
-
 		#clearBtn:active:not(:disabled) {
 			background: var(--danger-hover)
 		}
-
 		#output {
 			margin-top: 8px;
 			height: 172px;
 			border-radius: var(--radius-control)
 		}
-
 		.results-card {
 			border-radius: var(--radius-large)
 		}
-
 		.results-heading {
 			gap: 16px;
 			padding: 26px 28px 18px
 		}
-
 		.filterbar {
 			padding: 0 28px 18px
 		}
-
 		.filterbar .segmented {
 			min-width: 300px
 		}
-
 		.segmented strong {
 			font-weight: 500;
 			margin-left: 3px
 		}
-
 		.remaining-note {
 			margin-left: auto
 		}
-
 		.filters {
 			grid-template-columns: minmax(0, 1fr) minmax(7rem, max-content) auto;
 			align-items: start;
 			padding: 0 28px 20px
 		}
-
 		.filters :is(input, select),
 		.rng-generator input[type=number],
 		.settings select {
@@ -1095,25 +909,21 @@
 			line-height: 1.5;
 			padding: 8px 12px
 		}
-
 		:is(.filters, .settings) select {
 			appearance: none;
 			padding-right: 34px;
 			background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5.25 6.25 2.75-2.75 2.75 2.75m-5.5 3.5 2.75 2.75 2.75-2.75'/%3E%3C/svg%3E") right 10px center / 16px 16px no-repeat
 		}
-
 		.search-field>svg {
 			position: absolute;
 			inset: 12px auto auto 12px;
 			color: var(--muted)
 		}
-
 		.search-field>input {
 			padding-left: 40px;
 			background: var(--panel);
 			border-color: transparent
 		}
-
 		#filter-count {
 			place-items: center;
 			min-width: 20px;
@@ -1122,32 +932,26 @@
 			font-size: .75rem;
 			font-weight: 600
 		}
-
 		#filter-dialog {
 			width: min(380px, calc(100vw - 24px))
 		}
-
 		#filter-dialog:modal[data-edit-viewport] {
 			position: fixed;
 			inset-block: var(--filter-viewport-top) calc(100% - var(--filter-viewport-top) - var(--filter-viewport-height));
 			max-height: calc(var(--filter-viewport-height) - 2*max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)))
 		}
-
 		#filter-dialog .sheet-heading,
 		.settings .sheet-heading {
 			margin-bottom: 18px
 		}
-
 		.filter-grid label {
 			gap: 8px;
 			font-size: .8125rem
 		}
-
 		.results-grid {
 			grid-template-columns: minmax(0, 1fr) 280px;
 			border-top: 1px solid var(--line)
 		}
-
 		.table-wrap {
 			overflow: auto;
 			min-height: 520px;
@@ -1155,24 +959,20 @@
 			scroll-margin-top: 16px;
 			scrollbar-width: thin
 		}
-
 		.table-wrap:not(.has-results) {
 			min-height: 280px
 		}
-
 		table {
 			border-spacing: 0;
 			width: 100%;
 			table-layout: fixed;
 			text-align: left
 		}
-
 		td,
 		th {
 			border-bottom: 1px solid var(--line);
 			padding: 10px
 		}
-
 		th {
 			position: sticky;
 			top: 0;
@@ -1181,38 +981,30 @@
 			font-weight: 500;
 			background: var(--panel)
 		}
-
 		td {
 			height: 76px
 		}
-
 		td:first-child,
 		th:first-child {
 			text-align: center;
 			color: var(--muted)
 		}
-
 		col:nth-child(1) {
 			width: 44px
 		}
-
 		col:nth-child(3) {
 			width: 26%
 		}
-
 		col:nth-child(4) {
 			width: 102px
 		}
-
 		col:nth-child(5) {
 			width: 98px
 		}
-
 		tr[data-selected=true] td:first-child {
 			box-shadow: inset 3px 0 var(--accent);
 			color: var(--accent)
 		}
-
 		.location-button {
 			border: 0;
 			border-radius: 8px;
@@ -1224,12 +1016,10 @@
 			text-align: left;
 			line-height: 1.6
 		}
-
 		.address-main,
 		.address-sub {
 			unicode-bidi: plaintext
 		}
-
 		.location-button::after {
 			content: "";
 			display: none;
@@ -1243,18 +1033,14 @@
 			color: var(--muted);
 			transform: rotate(45deg)
 		}
-
 		.location-button:dir(rtl)::after {
 			transform: rotate(-45deg)
 		}
-
 		.address-main {
 			font-size: var(--text-address);
 			font-weight: 600
 		}
-
 		@media screen {
-
 			.location-button :is(.address-main, .address-sub),
 			#detail-title {
 				display: -webkit-box;
@@ -1262,24 +1048,20 @@
 				-webkit-line-clamp: 2;
 				overflow: hidden
 			}
-
 			#detail-title {
 				-webkit-line-clamp: 3;
 				unicode-bidi: plaintext
 			}
 		}
-
 		.note[role=alert],
 		.result-state[data-error=true],
 		.status.err,
 		.row-error {
 			color: var(--danger)
 		}
-
 		.coords-cell {
 			font-family: var(--mono)
 		}
-
 		.kind-badge,
 		.result-state {
 			display: inline-block;
@@ -1287,7 +1069,6 @@
 			font-size: .8125rem;
 			white-space: normal
 		}
-
 		.kind-badge {
 			padding: 3px 8px;
 			border: 1px solid transparent;
@@ -1296,12 +1077,10 @@
 			word-break: normal;
 			overflow-wrap: normal
 		}
-
 		.status.success,
 		.result-state {
 			color: var(--success)
 		}
-
 		.table-hint {
 			display: none;
 			position: absolute;
@@ -1309,34 +1088,28 @@
 			padding: 32px;
 			text-align: center
 		}
-
 		.filter-empty-hint {
 			position: static;
 			min-height: 240px;
 			flex-direction: column
 		}
-
 		.filter-empty-hint .button {
 			max-width: 100%
 		}
-
 		.table-wrap.has-results:has(tbody:empty) {
 			min-height: 240px
 		}
-
 		.job-panel:has(.status-row[data-state=idle]):has(#start:disabled) :is(.row-progress, .elapsed-time, .input-actions),
 		.track:has(progress:not([value]))>.fill,
 		.table-wrap.has-results:has(tbody:empty) table {
 			display: none
 		}
-
 		.table-wrap.has-results:has(tbody:empty) .filter-empty-hint,
 		.table-wrap:not(.has-results) .empty-hint,
 		.page-footer,
 		.credits {
 			display: flex
 		}
-
 		.map-feedback[data-loading=true]::before,
 		.table-wrap[data-running]:not(.has-results) .empty-hint::before {
 			content: "";
@@ -1347,60 +1120,49 @@
 			border-radius: 50%;
 			animation: spin 1s linear infinite
 		}
-
 		.table-wrap[data-running]:not(.has-results) .empty-hint::before {
 			margin-right: 12px
 		}
-
 		.results-footer {
 			padding: 14px 18px
 		}
-
 		.result-pages .button {
 			padding: 8px
 		}
-
 		.page-number[aria-current=page] {
 			font-weight: 600
 		}
-
 		.result-state[data-status=missing],
 		.credits a,
 		.page-ellipsis,
 		dt {
 			color: var(--muted)
 		}
-
 		.inspector {
 			padding: 20px;
 			border-left: 1px solid transparent;
 			background: var(--panel);
 			border-bottom-right-radius: var(--radius-large)
 		}
-
 		.progress-heading,
 		.inspector-eyebrow {
 			margin-bottom: 12px
 		}
-
 		#detail-title {
 			font-size: 1.25rem;
 			font-weight: 600;
 			letter-spacing: -.016em
 		}
-
 		.address-sub,
 		#detail-town {
 			margin-top: 3px
 		}
-
 		.inspector-empty {
 			max-width: 20ch;
 			margin-inline: auto;
 			padding-top: 64px;
 			text-align: center
 		}
-
 		.map-preview {
 			display: grid;
 			grid-template-rows: 190px;
@@ -1408,13 +1170,11 @@
 			border-radius: var(--radius-control);
 			overflow: hidden
 		}
-
 		.map-preview>* {
 			grid-area: 1/1;
 			min-width: 0;
 			min-height: 0
 		}
-
 		.map-load {
 			flex-direction: column;
 			width: 100%;
@@ -1424,28 +1184,23 @@
 			padding: 16px;
 			font-size: .875rem
 		}
-
 		tr[data-record][data-selected=true],
 		.map-load:active:not(:disabled) {
 			background: var(--tint)
 		}
-
 		.map-load svg {
 			width: 32px;
 			height: 32px
 		}
-
 		.map-feedback {
 			z-index: 1;
 			background: var(--surface);
 			overflow: auto;
 			padding: 16px
 		}
-
 		.map-recovery {
 			margin: 8px 0 18px
 		}
-
 		.map-recovery>*,
 		.map-links a,
 		.sheet-heading h2,
@@ -1453,73 +1208,59 @@
 		.confirm-actions .button {
 			overflow-wrap: anywhere
 		}
-
 		.map-recovery>* {
 			flex: 1 1 10rem
 		}
-
 		#detail-map {
 			border: 0;
 			width: 100%;
 			height: 100%;
 			display: block
 		}
-
 		.full-address {
 			margin-top: 6px
 		}
-
 		#detail-full {
 			flex: 1;
 			min-width: 0
 		}
-
 		.detail-fields {
 			padding: 12px 0;
 			border-block: 1px solid var(--line)
 		}
-
 		.detail-fields>div {
 			display: grid;
 			grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
 			margin: 10px 0
 		}
-
 		@media (max-width:420px) {
 			.detail-fields>div {
 				grid-template-columns: 1fr;
 				gap: 2px
 			}
-
 			.detail-fields dd {
 				text-align: start
 			}
 		}
-
 		dd {
 			text-align: right
 		}
-
 		.detail-fields,
 		.detail-tags {
 			margin-top: 18px
 		}
-
 		#detail-tag {
 			margin-top: 7px
 		}
-
 		#detail-coordinates {
 			margin-top: 12px;
 			font: .875rem/1.7 var(--mono);
 			color: var(--muted)
 		}
-
 		.open-map {
 			width: 100%;
 			margin-top: 18px
 		}
-
 		.page-footer {
 			gap: 8px;
 			align-items: start;
@@ -1527,7 +1268,6 @@
 			padding-block: 18px 24px;
 			margin: auto
 		}
-
 		.copyright {
 			flex: none;
 			min-width: 1em;
@@ -1535,44 +1275,36 @@
 			font-size: 1rem;
 			line-height: 1.5
 		}
-
 		.credits a {
 			min-height: 44px;
 			max-width: 100%;
 			text-decoration-color: var(--control)
 		}
-
 		.credits a:focus-visible {
 			color: var(--accent);
 			text-decoration-color: currentColor
 		}
-
 		.credits a[href*="opendatacommons.org/licenses/odbl"] {
 			min-width: 44px;
 			justify-content: center
 		}
-
 		.credits,
 		.usage-policy {
 			flex-wrap: wrap;
 			align-items: baseline
 		}
-
 		.credits {
 			gap: 0 .65rem;
 			min-width: 0
 		}
-
 		.usage-policy {
 			display: inline-flex;
 			column-gap: .35em
 		}
-
 		td:nth-child(4),
 		.usage-policy>a {
 			white-space: nowrap
 		}
-
 		.map-popover,
 		dialog {
 			--overlay-start: 22px;
@@ -1586,7 +1318,6 @@
 			border-radius: var(--radius-large);
 			box-shadow: 0 20px 60px #0003
 		}
-
 		.map-popover,
 		.settings {
 			position: fixed;
@@ -1594,23 +1325,18 @@
 			margin: 0;
 			z-index: 40
 		}
-
 		.settings {
 			width: min(300px, calc(100vw - 24px))
 		}
-
 		.map-popover {
 			width: min(340px, calc(100vw - 24px))
 		}
-
 		.settings-button {
 			anchor-name: --settings-trigger
 		}
-
 		#detail-map-links {
 			anchor-name: --map-trigger
 		}
-
 		@position-try --popover-viewport {
 			position-anchor: auto;
 			position-area: none;
@@ -1619,9 +1345,7 @@
 			max-width: calc(100vw - 24px);
 			max-height: calc(100dvh - 24px)
 		}
-
 		@media (min-width:801px) {
-
 			.map-popover,
 			.settings {
 				margin: 8px 0 12px 12px;
@@ -1631,24 +1355,20 @@
 				overscroll-behavior: contain;
 				position-try-fallbacks: flip-block, --popover-viewport
 			}
-
 			.settings {
 				position-anchor: --settings-trigger;
 				position-area: bottom span-left
 			}
-
 			.map-popover {
 				position-anchor: --map-trigger;
 				position-area: top span-left;
 				margin-block: 12px 8px
 			}
-
 			#detail-map-links:has(+ #map-popover:popover-open) {
 				position: sticky;
 				bottom: 12px;
 				z-index: 30
 			}
-
 			body:has(#display-settings:open) .settings-button,
 			#detail-map-links:has(+ #map-popover:popover-open) {
 				background: var(--tint);
@@ -1656,24 +1376,20 @@
 				color: var(--accent);
 				box-shadow: 0 0 0 2px var(--tint)
 			}
-
 			#display-settings:open,
 			#map-popover:popover-open {
 				background: var(--glass);
 				-webkit-backdrop-filter: blur(20px) saturate(1.8);
 				backdrop-filter: blur(20px) saturate(1.8)
 			}
-
 			:is(#display-settings:open, #map-popover:popover-open)>.sheet-heading {
 				background: 0 0
 			}
 		}
-
 		.settings label {
 			display: block;
 			margin: 16px 0 8px
 		}
-
 		textarea,
 		.filters :is(input, select),
 		.rng-generator input[type=number],
@@ -1683,7 +1399,6 @@
 			color: var(--fg);
 			font-size: 1rem
 		}
-
 		.map-links a {
 			justify-content: flex-start;
 			min-width: 0;
@@ -1691,45 +1406,36 @@
 			background: 0 0;
 			text-align: start
 		}
-
 		.map-links a:active {
 			background: var(--secondary-active)
 		}
-
 		.map-links {
 			display: grid;
 			grid-template-columns: 1fr;
 			gap: 4px
 		}
-
 		#supp-dialog {
 			width: 560px
 		}
-
 		.supp-form {
 			display: grid;
 			gap: 16px
 		}
-
 		dialog::backdrop {
 			background: #0006
 		}
-
 		#detail-sheet {
 			width: min(440px, calc(100vw - 24px))
 		}
-
 		.sheet-heading {
 			margin-bottom: 8px
 		}
-
 		.sheet-heading h2 {
 			font-size: 1.25rem;
 			font-weight: 600;
 			min-width: 0;
 			unicode-bidi: plaintext
 		}
-
 		:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading,
 		.supp-form>.sheet-heading {
 			position: sticky;
@@ -1742,33 +1448,27 @@
 			background: var(--surface);
 			border-bottom: 1px solid var(--line)
 		}
-
 		#copy-address,
 		.sheet-heading .icon-button {
 			flex: none;
 			background: var(--press-bg)
 		}
-
 		#help-dialog {
 			width: 480px
 		}
-
 		#help-dialog ol {
 			padding-left: 24px;
 			line-height: 1.6
 		}
-
 		#help-dialog details {
 			margin-top: 16px;
 			padding-top: 12px;
 			border-top: 1px solid var(--line);
 			line-height: 1.6
 		}
-
 		#help-dialog summary {
 			font-weight: 600
 		}
-
 		.ui-notice {
 			position: fixed;
 			inset: auto auto 24px 50%;
@@ -1783,19 +1483,15 @@
 			box-shadow: 0 8px 24px #0002;
 			gap: 12px
 		}
-
 		#ui-notice-text {
 			min-width: 0
 		}
-
 		.ui-notice .icon-button:active:not(:disabled) {
 			background: light-dark(#424245, #d2d2d7)
 		}
-
 		.ui-notice .icon-button:focus-visible {
 			outline-color: currentColor
 		}
-
 		dialog .ui-notice {
 			position: static;
 			transform: none;
@@ -1804,15 +1500,12 @@
 			max-width: none;
 			box-shadow: none
 		}
-
 		.confirm-actions {
 			margin-top: 24px
 		}
-
 		.confirm-actions .button {
 			padding-inline: 12px
 		}
-
 		[role=alertdialog] {
 			position: fixed;
 			inset: 0;
@@ -1820,23 +1513,19 @@
 			width: min(320px, calc(100vw - 32px));
 			text-align: center
 		}
-
 		#detail-full[dir=auto],
 		.address-main[dir=auto],
 		.address-sub[dir=auto] {
 			text-align: start
 		}
-
 		[role=alertdialog]>p {
 			line-height: 1.6
 		}
-
 		.status-row,
 		#help-dialog li+li,
 		#bulk-dialog p {
 			margin-top: 12px
 		}
-
 		.coords-panel[data-empty=true] #coords,
 		.coords-panel[data-empty=true] .coords-head>span:last-child,
 		.coords-panel[data-empty=false] .coords-empty,
@@ -1846,7 +1535,6 @@
 		.mobile-job-slot {
 			display: none
 		}
-
 		.theme-toggle[data-next-theme=dark] .theme-moon,
 		.theme-toggle[data-next-theme=light] .theme-sun,
 		.file-cue,
@@ -1854,7 +1542,6 @@
 		.mobile-job-slot:not(:empty) {
 			display: block
 		}
-
 		.sr-only {
 			position: absolute !important;
 			width: 1px !important;
@@ -1866,76 +1553,61 @@
 			white-space: nowrap !important;
 			border: 0 !important
 		}
-
 		@media (max-width:1230px) {
 			:root {
 				--page-gutter: 20px
 			}
-
 			.steps,
 			.inspector {
 				display: none
 			}
-
 			.step-label {
 				display: block
 			}
-
 			#app {
 				grid-template-columns: 280px minmax(0, 1fr);
 				gap: 20px
 			}
-
 			.results-grid {
 				grid-template-columns: 1fr
 			}
-
 			.filterbar,
 			.results-heading,
 			search {
 				padding-inline: 22px
 			}
-
 			.filters {
 				grid-template-columns: minmax(0, 1fr) auto
 			}
-
 			.search-field {
 				grid-column: 1/-1
 			}
-
 			.remaining-note {
 				margin-left: 0
 			}
 		}
-
 		@media (max-width:800px) {
 			.header-inner {
 				min-height: 68px;
 				padding-block: max(10px, env(safe-area-inset-top)) 10px;
 				gap: 12px
 			}
-
 			.brand-mark {
 				width: 32px;
 				height: 32px
 			}
-
 			#app,
 			.results-grid,
 			table,
 			.location-button::after {
 				display: block
 			}
-
 			.drop-zone {
 				border-style: solid
 			}
-
 			.drop-zone .drop-text>svg {
 				margin-bottom: 10px
 			}
-
 			.step-label,
 			.filter-trigger>span:not(#filter-count),
 			body[data-mobiletab=input] .results,
@@ -1947,57 +1619,45 @@
 			.mobile-job-slot .job-panel:has([data-state=idle]):has(#start:disabled) {
 				display: none
 			}
-
 			.header-tools {
 				gap: 4px
 			}
-
 			#app {
 				margin-top: 10px
 			}
-
 			.coords-head {
 				padding-inline: 18px
 			}
-
 			#coords-expand {
 				display: inline-flex
 			}
-
 			.coords-panel[data-expanded=false] #coords {
 				height: 100px;
 				overflow: hidden
 			}
-
 			.coords-panel[data-expanded=true] #coords {
 				height: min(320px, 50dvh);
 				overflow: auto
 			}
-
 			.job-panel {
 				padding: 18px 20px
 			}
-
 			.results-card {
 				border: 0;
 				border-radius: 0;
 				background: 0 0
 			}
-
 			.results-heading {
 				gap: 12px;
 				padding: 0 0 18px
 			}
-
 			#export {
 				margin-left: auto
 			}
-
 			.filterbar {
 				padding: 0 0 16px;
 				gap: 8px
 			}
-
 			.filterbar .segmented {
 				display: grid;
 				grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2005,25 +1665,20 @@
 				width: 100%;
 				border-radius: var(--radius-card)
 			}
-
 			.search-field>input {
 				border-radius: var(--radius-pill)
 			}
-
 			.filterbar .segmented button {
 				border-radius: calc(var(--radius-card) - 4px)
 			}
-
 			.filters {
 				grid-template-columns: minmax(0, 1fr) 44px;
 				gap: 8px;
 				padding: 0 0 18px
 			}
-
 			.filter-trigger {
 				padding: 10px
 			}
-
 			#filter-count {
 				position: absolute;
 				inset: -6px -6px auto auto;
@@ -2031,21 +1686,17 @@
 				min-width: 22px;
 				height: 22px
 			}
-
 			.results-grid {
 				border: 0
 			}
-
 			.table-wrap {
 				overflow: visible;
 				min-height: 280px;
 				max-height: none
 			}
-
 			.table-wrap:not(:has(tbody>tr)) {
 				min-height: 96px
 			}
-
 			thead {
 				position: absolute;
 				width: 1px;
@@ -2053,12 +1704,10 @@
 				overflow: hidden;
 				clip-path: inset(50%)
 			}
-
 			tbody {
 				display: grid;
 				gap: 12px
 			}
-
 			tr[data-record] {
 				display: grid;
 				grid-template-columns: minmax(0, 1fr) auto;
@@ -2068,84 +1717,67 @@
 				border: 1px solid transparent;
 				border-radius: var(--radius-card)
 			}
-
 			tr[data-record][data-selected=true] {
 				border-color: var(--accent);
 				box-shadow: 0 0 0 1px var(--accent)
 			}
-
 			td {
 				display: block;
 				padding: 0;
 				height: auto;
 				border: 0
 			}
-
 			td:nth-child(2) {
 				grid-area: 1/1;
 				min-width: 0
 			}
-
 			td:nth-child(3) {
 				grid-area: 2/1
 			}
-
 			td:nth-child(4),
 			td:nth-child(5) {
 				text-align: right
 			}
-
 			td:nth-child(4) {
 				grid-area: 1/2
 			}
-
 			td:nth-child(5) {
 				grid-area: 2/2;
 				align-self: end
 			}
-
 			.site-brand h1,
 			.address-main {
 				font-size: 1rem
 			}
-
 			.location-button {
 				padding-inline-end: 22px
 			}
-
 			.coords-cell {
 				direction: ltr;
 				unicode-bidi: isolate
 			}
-
 			.coords-cell,
 			.kind-badge,
 			.result-state {
 				font-size: .875rem
 			}
-
 			.coords-cell span {
 				display: inline
 			}
-
 			.coords-cell span:first-child::after {
 				content: ", "
 			}
-
 			.table-hint {
 				inset: 0
 			}
-
 			.results-footer {
 				padding: 16px 0;
 				justify-content: center
 			}
-
 			#results-count {
 				text-align: center;
 				width: 100%
 			}
-
 			.mobile-bottom {
 				position: fixed;
 				z-index: 25;
@@ -2158,14 +1790,12 @@
 				padding-block: 6px max(6px, env(safe-area-inset-bottom));
 				isolation: isolate
 			}
-
 			.mobile-nav,
 			.mobile-nav button {
 				position: relative;
 				display: flex;
 				border-radius: var(--radius-pill)
 			}
-
 			.mobile-nav {
 				flex: 0 1 220px;
 				min-width: 0;
@@ -2173,7 +1803,6 @@
 				gap: 2px;
 				padding: 4px
 			}
-
 			.mobile-nav::before {
 				content: "";
 				position: absolute;
@@ -2185,11 +1814,9 @@
 				transform: translateX(var(--selection-x, 0px));
 				transition: transform .24s var(--spring)
 			}
-
 			body[data-mobiletab=results] .mobile-nav::before {
 				--selection-x: calc(100% + 2px)
 			}
-
 			.mobile-nav button {
 				flex: 1;
 				min-width: 44px;
@@ -2206,34 +1833,27 @@
 				color: var(--fg);
 				background: 0 0
 			}
-
 			.mobile-nav button svg {
 				width: 26px;
 				height: 26px;
 				fill: currentColor;
 				stroke: none
 			}
-
 			.mobile-nav [aria-selected=true] {
 				color: var(--accent)
 			}
-
 			.mobile-nav button:active:not(:disabled) {
 				background: var(--press-bg)
 			}
-
 			.page-footer {
 				padding-block: 22px calc(7rem + env(safe-area-inset-bottom))
 			}
-
 			.ui-notice {
 				bottom: calc(7rem + env(safe-area-inset-bottom))
 			}
-
 			.mobile-job-slot .job-panel {
 				margin: 0 0 18px
 			}
-
 			:is(dialog, #detail-sheet):not([role=alertdialog]),
 			.map-popover {
 				inset: auto 0 0;
@@ -2244,34 +1864,28 @@
 				padding-bottom: max(22px, env(safe-area-inset-bottom));
 				border-radius: var(--radius-large) var(--radius-large) 0 0
 			}
-
 			.map-popover {
 				width: auto;
 				max-width: none
 			}
-
 			:is(dialog, #detail-sheet):not([role=alertdialog]) {
 				position: fixed;
 				width: 100%;
 				max-width: 100%;
 				overscroll-behavior: contain
 			}
-
 			#filter-dialog:modal[data-edit-viewport] {
 				top: auto;
 				max-height: calc(var(--filter-viewport-height) - max(16px, env(safe-area-inset-top)))
 			}
-
 			#detail-sheet {
 				max-height: min(84dvh, calc(100dvh - env(safe-area-inset-top)))
 			}
-
 			:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading {
 				touch-action: none;
 				user-select: none;
 				cursor: grab
 			}
-
 			:is(dialog:not([role=alertdialog]), .map-popover)>.sheet-heading::before {
 				content: "";
 				position: absolute;
@@ -2284,59 +1898,47 @@
 				pointer-events: none
 			}
 		}
-
 		@media (max-width:374px) {
 			:root {
 				--page-gutter: 12px
 			}
-
 			.site-brand,
 			.mobile-bottom {
 				gap: 8px
 			}
-
 			.site-brand h1 {
 				font-size: .875rem
 			}
-
 			.tool-capsule {
 				padding: 1px
 			}
-
 			.brand-mark {
 				width: 28px;
 				height: 28px
 			}
-
 			.mobile-nav button {
 				padding-inline: 6px
 			}
-
 			.page-numbers,
 			.result-pages {
 				gap: 1px
 			}
 		}
-
 		@media (max-width:319px) {
 			html {
 				min-width: 0
 			}
-
 			.header-inner {
 				flex-wrap: wrap
 			}
 		}
-
 		#app,
 		.header-inner,
 		.mobile-bottom,
 		.page-footer {
 			padding-inline: max(var(--page-gutter), env(safe-area-inset-left)) max(var(--page-gutter), env(safe-area-inset-right))
 		}
-
 		@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-
 			.site-header,
 			.mobile-nav,
 			#display-settings:open,
@@ -2344,86 +1946,67 @@
 				background: var(--surface)
 			}
 		}
-
 		@media (hover:hover) and (pointer:fine) {
-
 			:is(.icon-button, .segmented button):hover:not(:active):not(:disabled),
 			.mobile-nav button:hover:not(:active):not(:disabled),
 			.map-links a:hover:not(:active) {
 				background: var(--press-bg)
 			}
-
 			.segmented :is([aria-selected=true], [aria-pressed=true]):hover:not(:active):not(:disabled) {
 				background: var(--surface)
 			}
-
 			.input-tabs [aria-selected=true]:hover:not(:active):not(:disabled) {
 				background: 0 0
 			}
-
 			.drop-zone:hover:not(:active):not(:has(input:disabled)),
 			.map-load:hover:not(:active):not(:disabled) {
 				background: var(--tint)
 			}
-
 			.drop-zone:hover:not(:active):not(:has(input:disabled)) {
 				border-color: var(--accent)
 			}
-
 			.button:hover:not(:active):not(:disabled) {
 				background: var(--tint-hover)
 			}
-
 			:is(.primary, .page-number[aria-current=page]):hover:not(:active):not(:disabled) {
 				background: var(--button-hover)
 			}
-
 			.danger:hover:not(:active):not(:disabled) {
 				background: var(--danger-hover)
 			}
-
 			.secondary:hover:not(:active):not(:disabled),
 			.manual-rng:has(#useOutput:not(:disabled)) #runBtn:hover:not(:active):not(:disabled) {
 				background: var(--secondary-hover)
 			}
-
 			#clearBtn:hover:not(:active):not(:disabled) {
 				background: var(--danger-bg)
 			}
-
 			tr[data-record]:hover:not(:active):not([data-selected=true]) {
 				background: var(--panel)
 			}
-
 			.credits a:hover:not(:active) {
 				color: var(--accent);
 				text-decoration-color: currentColor
 			}
-
 			.ui-notice .icon-button:hover:not(:active):not(:disabled) {
 				background: light-dark(#424245, #d2d2d7)
 			}
 		}
-
 		@keyframes overlay-appear {
 			from {
 				opacity: 0;
 				transform: translateY(8px) scale(.98)
 			}
-
 			to {
 				opacity: 1;
 				transform: none
 			}
 		}
-
 		dialog:open,
 		.map-popover:popover-open {
 			animation: overlay-appear .22s var(--spring)
 		}
-
 		@media (prefers-reduced-motion:reduce) {
-
 			*,
 			::after,
 			::before {
@@ -2432,10 +2015,8 @@
 				scroll-behavior: auto !important
 			}
 		}
-
 		@media (prefers-reduced-transparency:reduce),
 		(prefers-contrast:more) {
-
 			.site-header,
 			.mobile-nav,
 			#display-settings:open,
@@ -2445,14 +2026,12 @@
 				backdrop-filter: none
 			}
 		}
-
 		@media (prefers-contrast:more) {
 			:root {
 				--line: var(--control);
 				--control: var(--fg);
 				--muted: var(--fg)
 			}
-
 			.mobile-nav,
 			.tool-capsule,
 			.coords-panel,
@@ -2464,45 +2043,36 @@
 			tr[data-record] {
 				border-color: var(--fg)
 			}
-
 			tr[data-record][data-selected=true] {
 				border-color: var(--accent)
 			}
 		}
-
 		@media (forced-colors:active) {
-
 			.mobile-nav,
 			.tool-capsule,
 			.rng-generator .check-label,
 			#auto-supp {
 				border-color: ButtonText
 			}
-
 			#auto-supp::before {
 				background: ButtonText
 			}
-
 			#auto-supp:checked {
 				background: Highlight;
 				border-color: Highlight
 			}
-
 			#auto-supp:checked::before {
 				background: HighlightText
 			}
-
 			.fill {
 				background: Highlight
 			}
-
 			.mobile-nav [aria-selected=true],
 			.segmented :is([aria-selected=true], [aria-pressed=true]),
 			tr[data-selected=true] {
 				outline: 2px solid Highlight
 			}
 		}
-
 		@media (max-width:800px),
 		(hover:none) and (pointer:coarse) {
 			.site-header {
@@ -2511,15 +2081,12 @@
 				backdrop-filter: none
 			}
 		}
-
 		@media print {
-
 			:root,
 			:root[data-theme] {
 				color-scheme: light;
 				--page: #fff
 			}
-
 			#export,
 			.filterbar,
 			.input-card,
@@ -2532,7 +2099,6 @@
 			search {
 				display: none !important
 			}
-
 			#app,
 			.results,
 			.results-grid,
@@ -2541,24 +2107,19 @@
 				margin: 0;
 				padding: 0
 			}
-
 			.results-card {
 				border: 0
 			}
-
 			.table-wrap {
 				overflow: visible;
 				max-height: none
 			}
-
 			table {
 				display: table
 			}
-
 			colgroup {
 				display: table-column-group
 			}
-
 			thead {
 				display: table-header-group;
 				position: static;
@@ -2567,32 +2128,26 @@
 				overflow: visible;
 				clip-path: none
 			}
-
 			tbody {
 				display: table-row-group
 			}
-
 			tbody tr[data-record] {
 				display: table-row
 			}
-
 			tbody td {
 				display: table-cell;
 				border-bottom: 1px solid #ccc;
 				padding: 8px
 			}
-
 			tbody td:first-child {
 				display: table-cell
 			}
-
 			.page-footer {
 				padding: 20px
 			}
 		}
 	</style>
 </head>
-
 <body data-mobiletab="input">
 	<header class="site-header">
 		<div class="header-inner">
@@ -5320,5 +4875,4 @@
 		updateUIState();
 	</script>
 </body>
-
 </html>
