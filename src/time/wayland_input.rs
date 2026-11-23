@@ -311,7 +311,7 @@ impl EiSession {
                 }
                 // SAFETY: device came from a live event and is retained for the session.
                 let retained = NonNull::new(unsafe { (self.api.device_ref)(device.as_ptr()) })
-                    .ok_or(Cow::Borrowed("libei device 참조에 실패했습니다."))?;
+                    .ok_or("libei device 참조에 실패했습니다.")?;
                 self.device = Some(DeviceState {
                     active: false,
                     raw: retained,
@@ -354,13 +354,13 @@ impl EiSession {
             EI_EVENT_PONG => {
                 // SAFETY: event is an EI_EVENT_PONG event.
                 let ping = NonNull::new(unsafe { (self.api.event_pong_get_ping)(event.as_ptr()) })
-                    .ok_or(Cow::Borrowed("libei PONG 이벤트에 ping이 없습니다."))?;
+                    .ok_or("libei PONG 이벤트에 ping이 없습니다.")?;
                 return Ok(Some(ping));
             }
             EI_EVENT_SEAT_ADDED => {
                 // SAFETY: event is an EI_EVENT_SEAT_ADDED event.
                 let seat = NonNull::new(unsafe { (self.api.event_get_seat)(event.as_ptr()) })
-                    .ok_or(Cow::Borrowed("libei seat 추가 이벤트에 seat가 없습니다."))?;
+                    .ok_or("libei seat 추가 이벤트에 seat가 없습니다.")?;
                 self.api.bind_action(self.action, seat);
             }
             _ => {}
@@ -415,7 +415,7 @@ impl EiSession {
                     "예상하지 못한 libei PONG 이벤트가 발생했습니다.",
                 ));
             }
-            (!connection_closed).ok_or(Cow::Borrowed("libei poll 연결이 종료되었습니다."))?;
+            (!connection_closed).ok_or("libei poll 연결이 종료되었습니다.")?;
             let now = Instant::now();
             (now < deadline).ok_or(Cow::Borrowed(
                 "Wayland 입력 전달 확인 시간이 초과되었습니다.",
@@ -488,7 +488,7 @@ impl PortalSession {
             match event {
                 OEFFIS_EVENT_NONE => return Ok(connected),
                 OEFFIS_EVENT_CONNECTED_TO_EIS => {
-                    (!connected).ok_or(Cow::Borrowed("중복 EIS 연결 이벤트가 발생했습니다."))?;
+                    (!connected).ok_or("중복 EIS 연결 이벤트가 발생했습니다.")?;
                     connected = true;
                 }
                 OEFFIS_EVENT_CLOSED => {
@@ -560,13 +560,7 @@ impl PreparedInput {
         if let Some(prepared) = self.prepared.as_mut()
             && let Err(source) = prepared.dispatch(0)
         {
-            write_line_best_effort(
-                err,
-                format_args!(
-                    "[경고] Wayland 입력 세션 유지 실패: {}",
-                    terminal_safe(&source)
-                ),
-            );
+            warn_wayland(err, "Wayland 입력 세션 유지 실패", &source);
             self.prepared = None;
         }
     }
@@ -590,10 +584,10 @@ impl PreparedInput {
             let ei_api = EiApi::try_from(Library::load(LIBEI, "libei")?)?;
             let deadline = Instant::now()
                 .checked_add(PREPARE_TIMEOUT)
-                .ok_or(Cow::Borrowed("Wayland 입력 준비 제한 시간 계산 실패"))?;
+                .ok_or("Wayland 입력 준비 제한 시간 계산 실패")?;
             // SAFETY: null user data is permitted by oeffis_new.
-            let portal_context = NonNull::new(unsafe { (portal_api.new)(null_mut()) })
-                .ok_or(Cow::Borrowed("oeffis_new 실패"))?;
+            let portal_context =
+                NonNull::new(unsafe { (portal_api.new)(null_mut()) }).ok_or("oeffis_new 실패")?;
             let mut portal = PortalSession {
                 api: portal_api,
                 context: portal_context,
@@ -646,13 +640,7 @@ impl PreparedInput {
             }
             Ok(None) => true,
             Err(source) => {
-                write_line_best_effort(
-                    err,
-                    format_args!(
-                        "[경고] Wayland 입력 사전 준비 실패: {}",
-                        terminal_safe(&source)
-                    ),
-                );
+                warn_wayland(err, "Wayland 입력 사전 준비 실패", &source);
                 false
             }
         }
@@ -672,20 +660,11 @@ impl PreparedInput {
         match send_result {
             Ok(()) => NativeInputSendStatus::Sent,
             Err(SendError::Before(source)) => {
-                write_line_best_effort(
-                    err,
-                    format_args!("[경고] Wayland 입력 실패: {}", terminal_safe(&source)),
-                );
+                warn_wayland(err, "Wayland 입력 실패", &source);
                 NativeInputSendStatus::FailedBeforeSend
             }
             Err(SendError::Partial(source)) => {
-                write_line_best_effort(
-                    err,
-                    format_args!(
-                        "[경고] Wayland 입력 전송 상태 불확실: {}",
-                        terminal_safe(&source)
-                    ),
-                );
+                warn_wayland(err, "Wayland 입력 전송 상태 불확실", &source);
                 NativeInputSendStatus::PartialOrUnknown
             }
         }
@@ -703,7 +682,7 @@ impl WaylandInput {
         ei_poll.ensure_valid("libei poll descriptor가 무효화되었습니다.")?;
         if portal_poll.has_events() {
             let connected = self.portal.dispatch()?;
-            (!connected).ok_or(Cow::Borrowed("예상하지 못한 추가 EIS 연결이 발생했습니다."))?;
+            (!connected).ok_or("예상하지 못한 추가 EIS 연결이 발생했습니다.")?;
         }
         portal_poll.ensure_open("liboeffis poll 연결이 종료되었습니다.")?;
         if ei_poll.has_events() {
@@ -777,4 +756,13 @@ fn poll_fds(fds: &mut [PollFd], timeout: c_int) -> InputResult<()> {
         return Ok(());
     }
     Err(format!("poll 실패: {source}").into())
+}
+
+#[cold]
+#[inline(never)]
+fn warn_wayland(err: &mut dyn io::Write, prefix: &str, source: &str) {
+    write_line_best_effort(
+        err,
+        format_args!("[경고] {prefix}: {}", terminal_safe(source)),
+    );
 }

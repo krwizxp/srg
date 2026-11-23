@@ -2638,8 +2638,6 @@
 	</template>
 	<noscript>이 도구는 자바스크립트가 필요합니다.</noscript>
 	<script type="module">
-		import {convertNumber, formatOutput, parseU64} from "./srg_random.js?v=1";
-		import {convertParallel} from "./srg_parallel.js?v=1";
 		const byId = id => document.getElementById(id);
 		const on = (target, event, listener, options) => target.addEventListener(event, listener, options);
 		const query = (selector, within = document) => within.querySelector(selector);
@@ -2888,8 +2886,6 @@
 					: "",
 			};
 		}
-		const REVERSE_URL =
-			`https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko`;
 		const CACHE_KEY_PREFIX =
 			`geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
 		const mapPopover = byId("map-popover");
@@ -2913,13 +2909,11 @@
 		let numberFormat;
 		const fmt = n => n === 0 ? "0" : n > 0 && n < 1000 && Number.isInteger(n)
 			? String(n) : (numberFormat ??= new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0})).format(n);
-		const COORD_DECIMALS = 6;
-		const COORD_POW = 10 ** COORD_DECIMALS;
 		const fmtCoord6 = (v) => {
 			const dot = v.indexOf(".");
 			if (dot < 0) return v === "-0" ? "0" : v;
-			const rounded = v.length - dot - 1 > COORD_DECIMALS
-				? (Math.round(Number(v) * COORD_POW) * (1 / COORD_POW)).toFixed(COORD_DECIMALS)
+			const rounded = v.length - dot - 1 > 6
+				? (Math.round(Number(v) * 1e6) * 1e-6).toFixed(6)
 				: v;
 			const normalized = rounded.charCodeAt(rounded.length - 1) === 48 ? rounded.replace(/\.?0+$/, "") : rounded;
 			return normalized === "-0" ? "0" : normalized;
@@ -2937,7 +2931,7 @@
 		const resultBody = byId("tbl").tBodies[0];
 		const coordsContent = query("#coords .code-content");
 		const [parseBtn, startBtn, pauseBtn, resumeBtn, stopBtn] = ["parse", "start", "pause", "resume", "stop"].map(byId);
-		const [filterQuery, filterControls, filterKind, filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr] = ["filter-q", "filters", "filter-kind", "filter-sido", "filter-sigungu", "filter-emd", "filter-tag", "filter-fulladdr"].map(byId);
+		const [filterQuery, filterControls, filterKind] = ["filter-q", "filters", "filter-kind"].map(byId);
 		const [pageNav, pagePrev, pageNext, pageStatus, pageSizeSelect, helpDialog, resultsView, activeFilterSummary] = ["result-pages", "page-prev", "page-next", "page-status", "page-size", "help-dialog", "results-view", "active-filter-summary"].map(byId);
 		const root = document.documentElement;
 		const pageScheme = query('meta[name="color-scheme"]');
@@ -2947,7 +2941,7 @@
 		const startBtnLabel = startBtn.lastElementChild;
 		const exportBtnLabel = exportBtn.lastElementChild;
 		const UI_CONTROLS = [parseBtn, startBtn, pauseBtn, resumeBtn, stopBtn, fileInput, useOutput];
-		const DETAIL_FILTERS = [filterSido, filterSigungu, filterEmd, filterTag, filterFullAddr];
+		const DETAIL_FILTERS = ["filter-sido", "filter-sigungu", "filter-emd", "filter-tag", "filter-fulladdr"].map(byId);
 		const PREFERENCE_KEY = "srg-revgeo-display";
 		let preferences = {};
 		try {
@@ -3081,14 +3075,10 @@
 			return !isOr;
 		}
 		let pageSize = [10, 25, 50, 100].includes(preferences.pageSize) ? preferences.pageSize : 10;
-		pageSizeSelect.value = String(pageSize);
+		if (pageSize !== 10) pageSizeSelect.value = String(pageSize);
 		preferences = null;
 		let filterTimer = null;
 		let pageFrame = null;
-		function cancelFilterTimer() {
-			if (filterTimer !== null) clearTimeout(filterTimer);
-			filterTimer = null;
-		}
 		let pageKey = "";
 		function updatePages(visibleCount) {
 			const active = document.activeElement;
@@ -3211,14 +3201,12 @@
 		function scheduleFilter() {
 			filterState = readFilters();
 			updateFilterSummary();
-			cancelFilterTimer();
+			if (filterTimer !== null) {clearTimeout(filterTimer); filterTimer = null;}
 			filterTimer = setTimeout(() => {
 				filterTimer = null;
 				applyFilters();
 			}, 80);
 		}
-		const CSV_HEADER =
-			"\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,지도링크(Google),지도링크(OSM),지도링크(Naver),지도링크(Kakao)";
 		let downloadUrl = null;
 		let exportTask = null;
 		function revokeDownloadUrl() {
@@ -3330,7 +3318,7 @@
 			const active = document.activeElement;
 			const ownedFocus = UI_CONTROLS.includes(active);
 			const s = statusRow.dataset.state = state.status;
-			if (s === "idle") stopElapsed();
+			if (s === "idle" && elapsedTimer) stopElapsed();
 			const isBusy = state.task !== null;
 			progressIndicator.hidden = !isBusy;
 			percentText.hidden = s === "parsing";
@@ -3419,7 +3407,7 @@
 			state.renderReq ??= requestAnimationFrame(renderFrame);
 		}
 		function clearTable() {
-			cancelFilterTimer();
+			if (filterTimer !== null) {clearTimeout(filterTimer); filterTimer = null;}
 			mapPopover.hidePopover();
 			resultBody.replaceChildren();
 			resetInspector();
@@ -3610,13 +3598,8 @@
 			return {records: out, invalidCount};
 		}
 		const parsedCache = new Map();
-		const PARSED_CACHE_MAX = 5_000;
-		const CACHE_KEY_LIMIT = 2_000;
-		const CACHE_SCAN_MIN = 1_000;
-		const CACHE_SCAN_RATIO = 2;
-		const CACHE_WRITE_LIMIT = 8;
 		const CACHE_PRUNE_EVERY = 32;
-		let cacheWriters = new Set();
+		let cacheWriters = null;
 		let tabId = null;
 		let cacheChannel = null;
 		let writeSequence = 0;
@@ -3625,9 +3608,9 @@
 		let lastFetchAt = 0;
 		let dbPromise = null;
 		let cacheRetryAt = 0;
-		const CACHE_OPEN_RETRY_MS = 5_000;
 		function ensureCacheChannel() {
 			if (cacheChannel) return cacheChannel;
+			cacheWriters = new Set();
 			cacheChannel = new BroadcastChannel(`${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`);
 			cacheChannel.onmessage = ({data}) => {
 				if (!Array.isArray(data) || data.length !== 2) return;
@@ -3656,7 +3639,7 @@
 		function putMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
 			parsedCache.delete(cacheKey);
 			parsedCache.set(cacheKey, {parsed, savedAt});
-			if (parsedCache.size > PARSED_CACHE_MAX)
+			if (parsedCache.size > 5_000)
 				parsedCache.delete(parsedCache.keys().next().value);
 		}
 		function openCacheDb() {
@@ -3677,7 +3660,7 @@
 					if (!finish(null)) return;
 					syncFailed = true;
 					if (dbPromise === attempt) dbPromise = null;
-					cacheRetryAt = Date.now() + CACHE_OPEN_RETRY_MS;
+					cacheRetryAt = Date.now() + 5_000;
 					console.warn(message, detail);
 				};
 				let req;
@@ -3793,11 +3776,8 @@
 						if (Number.isFinite(row.savedAt) && age >= 0 && age <= ttl && isValidGeocode(row.parsed))
 							results.set(cacheKey, row);
 					};
-					const scanCache =
-						results.size > CACHE_KEY_LIMIT ||
-						(results.size >= CACHE_SCAN_MIN &&
-							cacheRowCeiling !== null &&
-							cacheRowCeiling <= results.size * CACHE_SCAN_RATIO);
+					const scanCache = results.size > 2_000 ||
+						(results.size >= 1_000 && cacheRowCeiling !== null && cacheRowCeiling <= results.size * 2);
 					if (!scanCache) {
 						for (const cacheKey of results.keys()) {
 							const req = store.get(CACHE_KEY_PREFIX + cacheKey);
@@ -4113,7 +4093,7 @@
 					const cacheHit = parsed !== undefined;
 					try {
 						if (!cacheHit) {
-							const url = `${REVERSE_URL}&lat=${r.latStr}&lon=${r.lonStr}`;
+							const url = `https://nominatim.openstreetmap.org/reverse?format=geocodejson&zoom=${CONFIG.REVERSE_ZOOM}&accept-language=ko&lat=${r.latStr}&lon=${r.lonStr}`;
 							parsed = parseGeocode(
 								await fetchWithRetry(url, signal, (message, announce) => {
 									if (state.task !== task || state.status !== "running" || signal.aborted) return;
@@ -4124,7 +4104,7 @@
 							signal.throwIfAborted();
 							putMemoryCache(cacheKey, parsed);
 							cacheBatch.push({cacheKey, parsed});
-							if (cacheBatch.length >= CACHE_WRITE_LIMIT)
+							if (cacheBatch.length >= 8)
 								await flushCache();
 						}
 					} catch (err) {
@@ -4278,7 +4258,7 @@
 					showStatus("CSV 생성 중…");
 					await yieldToMain();
 					ensureCurrent();
-					const parts = [CSV_HEADER];
+					const parts = ["\uFEFF구분,순번,\"좌표 (위도,경도)\",시·도,시·군·구,읍·면·동·리,지물 태그,전체주소,지도링크(Google),지도링크(OSM),지도링크(Naver),지도링크(Kakao)"];
 					const totalDisp = fmt(totalRows);
 					let chunkLines = [];
 					let chunkChars = 0;
@@ -4544,21 +4524,14 @@
 			fileInput.value = "";
 			acceptInputFile(file);
 		});
-		let koreaModulePromise;
-		function loadKoreaModule() {
-			return koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => {koreaModulePromise = null; throw error;});
-		}
+		let koreaModulePromise, randomModulePromise;
+		const loadKoreaModule = () => koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => {koreaModulePromise = null; throw error;});
+		const loadRandomModule = () => randomModulePromise ??= import("./srg_random.js?v=1").catch(error => {randomModulePromise = null; throw error;});
 		function prepareKorea(value) {
 			void loadKoreaModule().then(module => module.prepareKorea(value)).catch(() => { });
 		}
 		const GENERATION_LIMIT = 10_000;
-		const PREVIEW_LIMIT = 100;
-		const YIELD_INTERVAL_MS = 12;
-		const META_INTERVAL_MS = 150;
-		const RX_U64_TOKEN = /[^\s,]+/gu;
-		function u64Tokens(raw) {
-			return raw.matchAll(RX_U64_TOKEN).map((match) => match[0]);
-		}
+		const u64Tokens = raw => raw.matchAll(/[^\s,]+/gu).map(match => match[0]);
 		function outputBlob(chunks, includeBom) {
 			const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
 			if (chunks.length && !chunks.at(-1).endsWith("\n"))
@@ -4602,16 +4575,17 @@
 			on(num64Input, "input", () => {
 				clearTimeout(prepareTimer);
 				prepareTimer = setTimeout(() => {
-					try {const token = u64Tokens(num64Input.value).next(); if (!token.done) prepareKorea(parseU64(token.value));} catch { }
+					const token = u64Tokens(num64Input.value).next();
+					if (!token.done) void loadRandomModule().then(({parseU64}) => prepareKorea(parseU64(token.value))).catch(() => { });
 				}, 200);
 			});
 			const inputCount = ({value}) => {
 				let count = 0;
-				for (const _ of value.matchAll(RX_U64_TOKEN)) if (++count > GENERATION_LIMIT) break;
+				for (const _ of value.matchAll(/[^\s,]+/gu)) if (++count > GENERATION_LIMIT) break;
 				return count;
 			};
 			for (const [button, input] of [[generateNum, num64Input], [generateSupp, suppInput]])
-				on(button, "click", () => {
+				on(button, "click", async () => {
 					rngError.textContent = "";
 					try {
 						const count = rngCount.valueAsNumber;
@@ -4621,7 +4595,18 @@
 						const joined = values.join("\n");
 						input.value = prev ? `${prev}\n${joined}` : joined;
 						setInputError(input, "");
-						if (input === num64Input) {autoSupp.checked = true; prepareKorea(prev ? parseU64(u64Tokens(prev).next().value) : values[0]);}
+						if (input === num64Input) {
+							autoSupp.checked = true;
+							if (prev) {
+								const value = input.value;
+								try {
+									const {parseU64} = await loadRandomModule();
+									if (input.value === value) prepareKorea(parseU64(u64Tokens(prev).next().value));
+								} catch (err) {
+									if (input.value === value) rngError.textContent = errorMessage(err);
+								}
+							} else prepareKorea(values[0]);
+						}
 					} catch (err) {
 						rngError.textContent = errorMessage(err);
 					}
@@ -4651,13 +4636,13 @@
 			let returnFocus = null;
 			function finishSupplement(values) {
 				if (!suppRequest) return;
-				const resolve = suppRequest;
+				const {resolve} = suppRequest;
 				suppRequest = null;
 				if (values === null) returnFocus = clearBtn;
 				suppDialog.close();
 				resolve(values);
 			}
-			function requestSupplements() {
+			function requestSupplements(parseU64) {
 				if (!returnFocus) {
 					const active = document.activeElement;
 					returnFocus = active instanceof HTMLElement &&
@@ -4666,7 +4651,7 @@
 						: runBtn;
 				}
 				const {promise, resolve} = Promise.withResolvers();
-				suppRequest = resolve;
+				suppRequest = {resolve, parseU64};
 				suppValues.value = "";
 				setSupplementError("");
 				try {
@@ -4677,7 +4662,7 @@
 				}
 				return promise;
 			}
-			const parseU64List = (raw, limitMessage) => {
+			const parseU64List = (raw, limitMessage, parseU64) => {
 				const values = [];
 				for (const token of u64Tokens(raw)) {
 					if (values.length >= GENERATION_LIMIT) throw new InputError(limitMessage);
@@ -4692,6 +4677,7 @@
 					const values = parseU64List(
 						suppValues.value,
 						`보조 난수값은 한 번에 ${fmt(GENERATION_LIMIT)}개까지 입력할 수 있습니다.`,
+						suppRequest.parseU64,
 					);
 					if (!values.length)
 						throw new Error("보조 난수값을 하나 이상 입력해 주세요.");
@@ -4735,12 +4721,14 @@
 				meta.textContent = "변환 중…";
 				setBusy(true);
 				try {
+					const {convertNumber, formatOutput, parseU64} = await loadRandomModule();
+					if (epoch !== outputEpoch) return;
 					let supplements = u64Tokens(suppInput.value).map(parseU64);
 					let processed = 0;
 					let sampleKorea;
 					let suppCount = 0;
 					const updateProgress = (state) => {
-						const count = Math.min(nextChunks.length, PREVIEW_LIMIT);
+						const count = Math.min(nextChunks.length, 100);
 						if (
 							state !== "처리 중" && nextChunks.length
 						) {
@@ -4760,12 +4748,14 @@
 					let parsedWords = null;
 					if (autoSupp.checked && !suppInput.value.trim() && typeof Worker === "function") {
 						invalidInput = num64Input;
-						const words = parsedWords = parseU64List(num64Input.value, limitMessage);
+						const words = parsedWords = parseU64List(num64Input.value, limitMessage, parseU64);
 						invalidInput = null;
 						if (words.length >= 512) {
 							const controller = new AbortController();
 							activeWorkerController = controller;
 							try {
+								const {convertParallel} = await import("./srg_parallel.js?v=1");
+								if (epoch !== outputEpoch || controller.signal.aborted) return;
 								const result = await convertParallel(words, {
 									workers: Math.min(4, navigator.hardwareConcurrency || 2),
 									signal: controller.signal,
@@ -4774,7 +4764,7 @@
 										processed = done;
 										suppCount = used;
 										const now = performance.now();
-										if (now - lastMetaAt >= META_INTERVAL_MS) {
+										if (now - lastMetaAt >= 150) {
 											updateProgress("처리 중");
 											lastMetaAt = now;
 										}
@@ -4786,7 +4776,7 @@
 								suppCount = result.supplements;
 								convertedInWorkers = true;
 							} catch (workerError) {
-								if (epoch !== outputEpoch) return;
+								if (epoch !== outputEpoch || controller.signal.aborted) return;
 								console.warn("Web Worker를 사용할 수 없어 일반 변환으로 전환합니다.", workerError);
 								processed = suppCount = 0;
 							} finally {
@@ -4812,7 +4802,7 @@
 							if (epoch !== outputEpoch) return;
 							let used = 0;
 							while (!step.done) {
-								if (performance.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+								if (performance.now() - lastYieldAt >= 12) {
 									await yieldToMain();
 									if (epoch !== outputEpoch) {
 										await conversion.return();
@@ -4826,7 +4816,7 @@
 								if (supplied.done) {
 									const values = autoSupp.checked
 										? generateRandomValues(32)
-										: await requestSupplements();
+										: await requestSupplements(parseU64);
 									if (epoch !== outputEpoch) return;
 									if (values === null) {
 										cancelled = true;
@@ -4848,8 +4838,8 @@
 							appendBlock(formatOutput(step.value));
 							processed++;
 							const now = performance.now();
-							if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
-								if (now - lastMetaAt >= META_INTERVAL_MS) {
+							if (now - lastYieldAt >= 12) {
+								if (now - lastMetaAt >= 150) {
 									updateProgress("처리 중");
 									lastMetaAt = now;
 								}
@@ -4960,7 +4950,6 @@
 				clearOutput();
 			});
 		}
-		const TAB_KEYS = ["ArrowLeft", "ArrowRight", "Home", "End"];
 		const mobileMedia = matchMedia("(max-width: 800px)");
 		const compactMedia = matchMedia("(max-width: 1230px)");
 		const inputTabs = query(".input-tabs");
@@ -5000,7 +4989,7 @@
 				if (tab) onSelect(tab.dataset[attr]);
 			});
 			on(container, "keydown", event => {
-				if (!TAB_KEYS.includes(event.key)) return;
+				if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 				const tab = event.target.closest("[role=tab]");
 				if (!tab) return;
 				event.preventDefault();
@@ -5020,6 +5009,7 @@
 			if (manual && !manualLoaded) {
 				loadManualRng();
 				manualLoaded = true;
+				void loadRandomModule().catch(() => { });
 				prepareKorea();
 			}
 		}
@@ -5322,11 +5312,11 @@
 			nextRow.cells[1].firstElementChild.focus();
 			selectRecord(Number(nextRow.dataset.record), false, nextRow);
 		});
-		const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
 		let sheetDragInitialized = false;
 		function initSheetDrag() {
 			if (sheetDragInitialized) return;
 			sheetDragInitialized = true;
+			const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
 			let activeDrag = null;
 			on(window, "pointermove", event => {
 				const d = activeDrag;

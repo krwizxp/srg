@@ -18,7 +18,7 @@ impl FromStr for ParsedServer {
     type Err = TimeError;
     fn from_str(host: &str) -> Result<Self> {
         let trimmed_input = host.trim();
-        (!trimmed_input.is_empty()).ok_or(TimeError::parse(ERR_EMPTY))?;
+        (!trimmed_input.is_empty()).ok_or(ERR_EMPTY)?;
         let (scheme, after_scheme) = if let Some((prefix, rest)) =
             trimmed_input.split_at_checked(HTTPS_SCHEME_PREFIX_LEN)
             && prefix.eq_ignore_ascii_case(HTTPS_SCHEME_PREFIX)
@@ -44,20 +44,15 @@ impl FromStr for ParsedServer {
                 )
             },
         );
-        (!has_path).ok_or_else(|| TimeError::parse(ERR_PATH))?;
-        (!after_scheme.is_empty() && !invalid_host_char)
-            .ok_or_else(|| TimeError::parse(ERR_HOST))?;
+        (!has_path).ok_or(ERR_PATH)?;
+        (!after_scheme.is_empty() && !invalid_host_char).ok_or(ERR_HOST)?;
         let (host_part, explicit_port, bracketed) =
             if let Some(bracketed_host) = after_scheme.strip_prefix('[') {
-                let (host_part, rem) = bracketed_host
-                    .split_once(']')
-                    .ok_or_else(|| TimeError::parse(ERR_HOST))?;
+                let (host_part, rem) = bracketed_host.split_once(']').ok_or(ERR_HOST)?;
                 if rem.is_empty() {
                     (host_part, None, true)
                 } else {
-                    let port_part = rem
-                        .strip_prefix(':')
-                        .ok_or_else(|| TimeError::parse(ERR_HOST))?;
+                    let port_part = rem.strip_prefix(':').ok_or(ERR_HOST)?;
                     (host_part, Some(parse_port(port_part)?), true)
                 }
             } else if colon_count == 1
@@ -71,11 +66,10 @@ impl FromStr for ParsedServer {
             UrlScheme::Http => DEFAULT_HTTP_PORT,
             UrlScheme::Https => DEFAULT_HTTPS_PORT,
         });
-        (!host_part.is_empty() && !host_part.contains(['[', ']']))
-            .ok_or(TimeError::parse(ERR_HOST))?;
+        (!host_part.is_empty() && !host_part.contains(['[', ']'])).ok_or(ERR_HOST)?;
         let host_is_ipv6 = colon_count > 1 && host_part.parse::<net::Ipv6Addr>().is_ok();
         (!bracketed && (explicit_port.is_some() || colon_count == 0) || host_is_ipv6)
-            .ok_or(TimeError::parse(ERR_HOST))?;
+            .ok_or(ERR_HOST)?;
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         let request_target = {
             let prefix = match scheme {
@@ -132,6 +126,6 @@ fn parse_port(port_part: &str) -> Result<u16> {
         }
         Ok(_) | Err(_) => return Err(TimeError::parse(ERR_PORT)),
     };
-    (port != 0).ok_or(TimeError::parse(ERR_PORT))?;
+    (port != 0).ok_or(ERR_PORT)?;
     Ok(port)
 }

@@ -289,7 +289,7 @@ impl TargetTimeOfDay {
         let kst_epoch_secs = since_epoch
             .as_secs()
             .checked_add(KST_OFFSET_SECS_U64)
-            .ok_or_else(|| TimeError::parse("KST 현재 시각 계산 중 overflow가 발생했습니다."))?;
+            .ok_or("KST 현재 시각 계산 중 overflow가 발생했습니다.")?;
         let current_kst_second = u32::try_from(kst_epoch_secs.rem_euclid(KST_SECONDS_PER_DAY_U64))
             .map_err(|source| TimeError::parse_with_source("KST 초 변환 실패", source))?;
         let current_kst_day = kst_epoch_secs.div_euclid(KST_SECONDS_PER_DAY_U64);
@@ -303,13 +303,13 @@ impl TargetTimeOfDay {
         let target_kst_epoch_secs = target_day
             .checked_mul(KST_SECONDS_PER_DAY_U64)
             .and_then(|day_start| day_start.checked_add(u64::from(target_second)))
-            .ok_or_else(|| TimeError::parse("목표 시각 계산 중 overflow가 발생했습니다."))?;
+            .ok_or("목표 시각 계산 중 overflow가 발생했습니다.")?;
         let target_utc_epoch_secs = target_kst_epoch_secs
             .checked_sub(KST_OFFSET_SECS_U64)
-            .ok_or_else(|| TimeError::parse("목표 UTC 시각 계산 중 underflow가 발생했습니다."))?;
+            .ok_or("목표 UTC 시각 계산 중 underflow가 발생했습니다.")?;
         let target_system_time = UNIX_EPOCH
             .checked_add(Duration::from_secs(target_utc_epoch_secs))
-            .ok_or_else(|| TimeError::parse("목표 절대 시각 계산 중 범위 오류가 발생했습니다."))?;
+            .ok_or("목표 절대 시각 계산 중 범위 오류가 발생했습니다.")?;
         let day_index = i32::try_from(target_day)
             .map_err(|source| TimeError::parse_with_source("목표 날짜 변환 실패", source))?;
         let CivilDate { day, month, year } = http_date::civil_from_days(day_index);
@@ -330,12 +330,9 @@ impl TriggerTimingPolicy {
         effective_rtt: Duration,
         server_time: ServerTime,
     ) -> Result<()> {
-        (sample.rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(TimeError::parse(
-            "최종 샘플 RTT가 허용 범위를 벗어났습니다.",
-        ))?;
-        (effective_rtt <= MAX_FINAL_SAMPLE_RTT).ok_or(TimeError::parse(
-            "액션에 사용하는 RTT가 허용 범위를 벗어났습니다.",
-        ))?;
+        (sample.rtt <= MAX_FINAL_SAMPLE_RTT).ok_or("최종 샘플 RTT가 허용 범위를 벗어났습니다.")?;
+        (effective_rtt <= MAX_FINAL_SAMPLE_RTT)
+            .ok_or("액션에 사용하는 RTT가 허용 범위를 벗어났습니다.")?;
         let &mut Self::UnauthenticatedHttp(ref mut guard) = self else {
             return Ok(());
         };
@@ -366,10 +363,10 @@ impl TriggerTimingPolicy {
         };
         let last_sample_at = guard
             .last_valid_sample_at
-            .ok_or_else(|| TimeError::parse("HTTP 최신 유효 샘플이 없습니다."))?;
+            .ok_or("HTTP 최신 유효 샘플이 없습니다.")?;
         let sample_age = now
             .checked_duration_since(last_sample_at)
-            .ok_or_else(|| TimeError::parse("HTTP 샘플 단조 시각 순서가 유효하지 않습니다."))?;
+            .ok_or("HTTP 샘플 단조 시각 순서가 유효하지 않습니다.")?;
         (sample_age <= HTTP_SAMPLE_FRESHNESS)
             .ok_or(TimeError::parse("HTTP 최신 샘플이 만료되었습니다."))
     }
@@ -427,7 +424,7 @@ impl TimeError {
             source: Some(Box::new(source)),
         }
     }
-    fn parse(detail: impl Into<Cow<'static, str>>) -> Self {
+    fn parse(detail: &'static str) -> Self {
         Self::new(TimeErrorKind::Parse, detail)
     }
     fn parse_with_source(
@@ -435,6 +432,11 @@ impl TimeError {
         source: impl Error + Send + Sync + 'static,
     ) -> Self {
         Self::new_with_source(TimeErrorKind::Parse, detail, source)
+    }
+}
+impl From<&'static str> for TimeError {
+    fn from(detail: &'static str) -> Self {
+        Self::parse(detail)
     }
 }
 impl From<io::Error> for TimeError {
@@ -645,7 +647,7 @@ impl AppState<'_> {
         let anchor_instant = current_sample
             .response_received_inst
             .checked_sub(one_way_delay)
-            .ok_or_else(|| TimeError::parse("정밀 보정 기준 단조 시각 계산 실패"))?;
+            .ok_or("정밀 보정 기준 단조 시각 계산 실패")?;
         self.last_full_sync_at = current_sample.response_received_inst;
         Ok(Some(ServerTime {
             anchor_instant,
@@ -669,7 +671,7 @@ impl AppState<'_> {
     ) -> Result<Option<TimeSample>> {
         let next_sample_at = now
             .checked_add(interval)
-            .ok_or_else(|| TimeError::parse("카운트다운 다음 샘플 시각 계산 실패"))?;
+            .ok_or("카운트다운 다음 샘플 시각 계산 실패")?;
         if countdown.sample_interval != interval {
             countdown.sample_interval = interval;
             if countdown.pending_sample_generation.is_none() {
@@ -1078,7 +1080,7 @@ impl AppState<'_> {
             ObservationStop::Deadline(
                 Instant::now()
                     .checked_add(duration)
-                    .ok_or_else(|| TimeError::parse("관찰 종료 시각 계산 실패"))?,
+                    .ok_or("관찰 종료 시각 계산 실패")?,
             )
         } else {
             stop_input = StopInput::try_from(Some(ENTER_BUFFER_CAPACITY))

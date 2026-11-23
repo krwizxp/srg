@@ -193,10 +193,10 @@ impl Client {
             ] {
                 handle.setopt_long(option, value, context)?;
             }
-            let protocol = match server.scheme {
+            let (protocol, user_agent) = match server.scheme {
                 UrlScheme::Http => {
                     handle.setopt_str(CURLOPT_NOPROXY, NO_PROXY.as_ptr(), context)?;
-                    HTTP_PROTOCOL
+                    (HTTP_PROTOCOL, HTTP_USER_AGENT)
                 }
                 UrlScheme::Https => {
                     handle.setopt_long(
@@ -204,12 +204,8 @@ impl Client {
                         CURL_SSLVERSION_TLSV1_2 | CURL_SSLVERSION_MAX_DEFAULT,
                         context,
                     )?;
-                    HTTPS_PROTOCOL
+                    (HTTPS_PROTOCOL, HTTPS_USER_AGENT)
                 }
-            };
-            let user_agent = match server.scheme {
-                UrlScheme::Http => HTTP_USER_AGENT,
-                UrlScheme::Https => HTTPS_USER_AGENT,
             };
             for (option, value) in [
                 (CURLOPT_URL, server.request_target.as_ptr()),
