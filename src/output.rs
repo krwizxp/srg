@@ -87,7 +87,7 @@ impl OutputFormatter<'_, '_, '_> {
             }
         });
         self.write_labeled_line("NMS 포탈 주소: ".as_bytes(), |buffer_cur| {
-            buf_write_u8_dec(buffer_cur, data.planet_number);
+            buffer_cur.write_byte(digit_byte(data.planet_number));
             buffer_cur.write_byte(b' ');
             buf_write_hex_u16_3(buffer_cur, data.solar_system_index);
             buffer_cur.write_byte(b' ');
@@ -109,9 +109,12 @@ impl OutputFormatter<'_, '_, '_> {
                     .get(index)
                     .copied()
                     .unwrap_or_else(|| process::abort());
-                let [_, _, _, last] = glyph;
-                let len = 3_usize.strict_add(usize::from(last != 0));
-                buffer_cur.write_bytes(glyph.split_at(len).0);
+                let [b0, b1, b2, b3] = glyph;
+                if b3 != 0 {
+                    *buffer_cur.take_array::<4>() = glyph;
+                } else {
+                    *buffer_cur.take_array::<3>() = [b0, b1, b2];
+                }
                 glyph_bits <<= 4_u32;
             }
             buffer_cur.write_byte(b')');
@@ -233,14 +236,13 @@ impl OutputFormatter<'_, '_, '_> {
                 ];
             }
         });
-        for (label, coords) in [
-            ("대한민국 위경도: ", &data.kor_coords),
-            ("세계 위경도: ", &data.world_coords),
-        ] {
-            self.cursor.write_bytes(label.as_bytes());
-            self.cursor
-                .write_format(format_args!("{}, {}\n", coords.latitude, coords.longitude));
-        }
+        self.cursor.write_format(format_args!(
+            "대한민국 위경도: {}, {}\n세계 위경도: {}, {}\n",
+            data.kor_coords.latitude,
+            data.kor_coords.longitude,
+            data.world_coords.latitude,
+            data.world_coords.longitude,
+        ));
     }
 }
 pub(super) fn format_data_into_buffer(

@@ -299,13 +299,13 @@ fn unrank_combination_into(mut rank: u32, max_n: u8, out: &mut [u8]) {
     let Some((first_slot, tail)) = out.split_first_mut() else {
         return;
     };
+    let rows = BINOMIAL_VALUES
+        .get(..tail.len())
+        .unwrap_or_else(|| process::abort());
     let mut upper = usize::from(max_n);
-    for (tail_idx, slot) in tail.iter_mut().enumerate().rev() {
+    for (tail_idx, (slot, values)) in tail.iter_mut().zip(rows).enumerate().rev() {
         let lower = tail_idx.strict_add(1);
-        let row = BINOMIAL_VALUES
-            .get(tail_idx)
-            .and_then(|values| values.get(lower..upper))
-            .unwrap_or_else(|| process::abort());
+        let row = values.get(lower..upper).unwrap_or_else(|| process::abort());
         let offset = row.partition_point(|&comb| comb <= rank).strict_sub(1);
         let combinations = *row.get(offset).unwrap_or_else(|| process::abort());
         rank = rank.strict_sub(combinations);

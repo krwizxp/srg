@@ -10,7 +10,6 @@ const INDEX_HASH: [u8; 32] = [
     0x99, 0x2E, 0xB3, 0x02, 0x9A, 0x77, 0x2D, 0xA3, 0xA7, 0x1A, 0x55, 0xD3, 0xF5, 0x03, 0xBF, 0x17,
 ];
 const SUBDIVISION: usize = 16;
-const SUBDIVISION_F64: f64 = 16.0_f64;
 const SUBDIVISION_MAX_CELL: u16 = 15;
 pub(super) struct Atlas<'data> {
     states: &'data [u8],
@@ -32,8 +31,8 @@ impl Atlas<'_> {
             .ok_or("대한민국 세부 격자 행 범위 오류")?;
         let west = axis_edge(boundary.grid_west, boundary.inv_divisor, col_u16);
         let south = axis_edge(boundary.grid_south, boundary.inv_divisor, row_u16);
-        let divisor = boundary.divisor * SUBDIVISION_F64;
-        let inv_divisor = boundary.inv_divisor * (1.0_f64 / SUBDIVISION_F64);
+        let divisor = boundary.fine_divisor;
+        let inv_divisor = boundary.fine_inv_divisor;
         let fine_column = grid_axis_index(
             west,
             divisor,
@@ -86,8 +85,13 @@ impl<'data> TryFrom<(&'data [u8], usize, usize, [u8; 32])> for Atlas<'data> {
             .get(HEADER_SIZE..)
             .ok_or("대한민국 세부 격자 상태 누락")?;
         states
+            .as_chunks::<8>()
+            .0
             .iter()
-            .all(|&value| value & (value >> 1_i32) & 0x55_u8 == 0)
+            .all(|chunk| {
+                let word = u64::from_le_bytes(*chunk);
+                word & (word >> 1_u32) & 0x5555_5555_5555_5555_u64 == 0
+            })
             .ok_or("대한민국 세부 격자 상태 오류")?;
         (actual_mixed_count == mixed_count).ok_or("대한민국 세부 격자 개수 오류")?;
         Ok(Self { states })

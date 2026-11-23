@@ -11,7 +11,7 @@ use core::cmp::Ordering;
 use std::sync::{LazyLock, OnceLock};
 mod atlas;
 mod data;
-const CACHE_BYTES: usize = 0x0010_0000;
+const CACHE_BYTES: usize = 896 * 1024;
 const CACHE_PAGES: usize = 4096;
 const HEADER_SIZE: usize = 128;
 const IEEE_F64_MANTISSA_ALIGN: f64 = 4_503_599_627_370_496.0_f64;
@@ -21,6 +21,8 @@ const KOREA_TILE_COUNT: usize = 79113;
 const MAX_GRID_DIMENSION_F64: f64 = 4096.0_f64;
 const MAX_PAGE_SIZE: usize = 0x8000;
 const MAX_PART_SIZE: usize = 0x0008_0000;
+const TILE_INSIDE: u16 = u16::MAX;
+const TILE_OUTSIDE: u16 = u16::MAX - 1;
 static BOUNDARY: LazyLock<Result<BoundaryIndex>> =
     LazyLock::new(|| BoundaryIndex::try_from((DATA, PARTS.len())));
 #[derive(Default)]
@@ -40,24 +42,25 @@ struct BoundaryIndex {
     bounds: [f64; 4],
     column_count: u16,
     divisor: f64,
+    fine_divisor: f64,
+    fine_inv_divisor: f64,
     grid_south: f64,
     grid_west: f64,
     inv_divisor: f64,
+    mixed_tiles: Box<[MixedTile]>,
     page_count: usize,
     parts: Box<[Part]>,
     polygon_count: usize,
     ring_count: usize,
     row_count: u16,
-    sampler_tiles: Box<[u32]>,
+    sampler_tiles: Box<[[u8; 3]]>,
     source_hash: [u8; 32],
-    tiles: Box<[Tile]>,
+    tile_states: Box<[u16]>,
     vertex_count: usize,
 }
-struct Tile {
-    atlas_ordinal: u16,
+struct MixedTile {
     count: u32,
     first: u32,
-    state: u8,
 }
 struct Part {
     bytes: usize,
@@ -102,21 +105,22 @@ impl BoundaryIndex {
             point.latitude,
         );
         let tile_number = row.strict_mul(width).strict_add(column);
-        let tile = self
-            .tiles
+        let tile_state = *self
+            .tile_states
             .get(tile_number)
             .ok_or("대한민국 경계 타일 선택 오류")?;
-        if tile.state != 2 {
-            return Ok(tile.state == 1);
+        if tile_state >= TILE_OUTSIDE {
+            return Ok(tile_state == TILE_INSIDE);
         }
-        match self
-            .atlas
-            .state(self, point, column, row, tile.atlas_ordinal)?
-        {
+        match self.atlas.state(self, point, column, row, tile_state)? {
             0 => return Ok(false),
             1 => return Ok(true),
             _ => {}
         }
+        let tile = self
+            .mixed_tiles
+            .get(usize::from(tile_state))
+            .ok_or("대한민국 경계 혼합 타일 선택 오류")?;
         let mut parity = false;
         let mut boundary = false;
         let mut chains_started = false;
@@ -515,7 +519,8 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
         let inv_divisor = 1.0_f64 / divisor;
         let mut source_hash = [0_u8; 32];
         source_hash.copy_from_slice(bytes.get(96..128).ok_or("대한민국 경계 원본 식별자 오류")?);
-        let mut tiles = Vec::with_capacity(tile_count);
+        let mut tile_states = Vec::with_capacity(tile_count);
+        let mut mixed_tiles = Vec::new();
         let mut next_page = 0_usize;
         let mut next_ordinal = 0_u16;
         for tile_number in 0..tile_count {
@@ -533,22 +538,21 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
                 .checked_add(count)
                 .ok_or("대한민국 경계 블록 개수 오류")?;
             (next_page <= page_count).ok_or("대한민국 경계 블록 범위 오류")?;
-            let [state, ..] = state_u32.to_le_bytes();
-            let atlas_ordinal = if state == 2 {
-                let assigned = next_ordinal;
-                next_ordinal = next_ordinal
-                    .checked_add(1)
-                    .ok_or("대한민국 세부 격자 개수 오류")?;
-                assigned
-            } else {
-                u16::MAX
+            let tile_state = match state_u32 {
+                0 => TILE_OUTSIDE,
+                1 => TILE_INSIDE,
+                _ => {
+                    (next_ordinal < TILE_OUTSIDE).ok_or("대한민국 세부 격자 개수 오류")?;
+                    let assigned = next_ordinal;
+                    next_ordinal = next_ordinal.strict_add(1);
+                    mixed_tiles.push(MixedTile {
+                        count: count_u32,
+                        first: first_u32,
+                    });
+                    assigned
+                }
             };
-            tiles.push(Tile {
-                atlas_ordinal,
-                count: count_u32,
-                first: first_u32,
-                state,
-            });
+            tile_states.push(tile_state);
         }
         (next_page == page_count).ok_or("대한민국 경계 타일 블록 개수 오류")?;
         next_page = 0;
@@ -585,7 +589,8 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
                 .map_err(|source| AppError::context("대한민국 타일 번호 오류", source))?
                 .strict_mul(64);
             while bits != 0 {
-                selected.push(base | bits.trailing_zeros());
+                let [low, mid, high, _] = (base | bits.trailing_zeros()).to_le_bytes();
+                selected.push([low, mid, high]);
                 bits &= bits.wrapping_sub(1);
             }
         }
@@ -595,8 +600,8 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             area_bounds: BoundaryAreaBounds::try_from(bounds)?,
             atlas: atlas::Atlas::try_from((
                 atlas::DATA,
-                tiles.len(),
-                usize::from(next_ordinal),
+                tile_states.len(),
+                mixed_tiles.len(),
                 source_hash,
             ))?,
             bounds,
@@ -604,9 +609,12 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
                 .ok()
                 .ok_or("대한민국 경계 격자 열 범위 오류")?,
             divisor,
+            fine_divisor: divisor * 16.0_f64,
+            fine_inv_divisor: inv_divisor * (1.0_f64 / 16.0_f64),
             grid_south,
             grid_west,
             inv_divisor,
+            mixed_tiles: mixed_tiles.into_boxed_slice(),
             row_count: u16::try_from(row_count)
                 .ok()
                 .ok_or("대한민국 경계 격자 행 범위 오류")?,
@@ -614,7 +622,7 @@ impl TryFrom<(&[u8], usize)> for BoundaryIndex {
             ring_count,
             vertex_count,
             source_hash,
-            tiles: tiles.into_boxed_slice(),
+            tile_states: tile_states.into_boxed_slice(),
             sampler_tiles,
             page_count,
             parts: parts.into_boxed_slice(),
@@ -706,13 +714,12 @@ impl SampleState<'_> {
         if selector >= KOREA_TILE_COUNT.strict_mul(53) {
             return Ok(());
         }
-        let tile = u64::from(
-            *self
-                .index
-                .sampler_tiles
-                .get(selector.div_euclid(53))
-                .ok_or("대한민국 좌표 타일 선택 범위 오류")?,
-        );
+        let &[low, mid, high] = self
+            .index
+            .sampler_tiles
+            .get(selector.div_euclid(53))
+            .ok_or("대한민국 좌표 타일 선택 범위 오류")?;
+        let tile = u64::from(u32::from_le_bytes([low, mid, high, 0]));
         let vertical = ((tile >> 9_i32) << 23_i32) | (((value >> 21_i32) & 0x1f_ffff) << 2_i32) | 2;
         let horizontal = ((tile & 511) << 23_i32) | ((value & 0x1f_ffff) << 2_i32) | 2;
         let mapped = (vertical << 32_u32) | horizontal;

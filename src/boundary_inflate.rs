@@ -67,15 +67,22 @@ impl Bits<'_> {
         if self.bit_count >= needed {
             return;
         }
-        if let Some(&chunk) = self
-            .bytes
-            .get(self.cursor..)
-            .and_then(|tail| tail.first_chunk::<4>())
-        {
-            self.bit_buffer |= u64::from(u32::from_le_bytes(chunk)) << self.bit_count;
-            self.cursor = self.cursor.wrapping_add(4);
-            self.bit_count = self.bit_count.wrapping_add(32);
-            return;
+        if let Some(tail) = self.bytes.get(self.cursor..) {
+            if self.bit_count <= 16
+                && let Some(&chunk) = tail.first_chunk::<8>()
+            {
+                let refill = u64::from_le_bytes(chunk) & 0x0000_ffff_ffff_ffff;
+                self.bit_buffer |= refill << self.bit_count;
+                self.cursor = self.cursor.wrapping_add(6);
+                self.bit_count = self.bit_count.wrapping_add(48);
+                return;
+            }
+            if let Some(&chunk) = tail.first_chunk::<4>() {
+                self.bit_buffer |= u64::from(u32::from_le_bytes(chunk)) << self.bit_count;
+                self.cursor = self.cursor.wrapping_add(4);
+                self.bit_count = self.bit_count.wrapping_add(32);
+                return;
+            }
         }
         while self.bit_count < needed {
             let Some(&byte) = self.bytes.get(self.cursor) else {
@@ -437,5 +444,8 @@ fn decode_extra(
     };
     let base_usize =
         usize::try_from(base).map_err(|source| AppError::context(range_err, source))?;
+    if extra_bits == 0 {
+        return Ok(base_usize);
+    }
     Ok(base_usize.strict_add(bits.read_usize(extra_bits, range_err)?))
 }

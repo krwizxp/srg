@@ -2649,10 +2649,11 @@
 		const totalPages = (count = state.visibleIndices.length) => Math.max(1, Math.ceil(count / pageSize));
 		const COORD_REGEX =
 			/(대한민국|세계)\s*위경도\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*[,，]\s*([+-]?\d+(?:\.\d+)?)(?![\d.eE+-])|(?:대한민국|세계)\s*위경도/g;
-		const RX_CSV_FORMULA = /^[\t\n\r=+\-@]/, RX_CSV_QUOTE = /[",\r\n]/;
+		const RX_CSV_QUOTE = /[",\r\n]/;
 		const csvEsc = s => {
 			if (!s) return "";
-			if (RX_CSV_FORMULA.test(s)) s = "'" + s;
+			const c = s.charCodeAt(0);
+			if (c <= 64 && (c === 61 || c === 43 || c === 45 || c === 64 || c === 9 || c === 10 || c === 13)) s = "'" + s;
 			return RX_CSV_QUOTE.test(s) ? "\"" + s.replaceAll("\"", "\"\"") + "\"" : s;
 		};
 		const CONFIG = {
@@ -2780,21 +2781,20 @@
 		function getAdmin(fields, country, p0, p1) {
 			const adminCountry = fields.level2;
 			const countryLabel = fields.country || adminCountry;
-			const lowerCountry = countryLabel.toLowerCase();
-			const lowerAdmin = adminCountry.toLowerCase();
+			let lowerCountry, lowerAdmin;
 			const korean = country === "kr" || country === "kp" ||
 				countryLabel === "대한민국" ||
 				countryLabel === "조선민주주의인민공화국" ||
-				lowerCountry.includes("korea") || lowerAdmin.includes("korea");
+				(lowerCountry = countryLabel.toLowerCase()).includes("korea") ||
+				(lowerAdmin = adminCountry.toLowerCase()).includes("korea");
 			const primary = fields.name || p0;
 			const cityDistrict = fields.cityDistrict || fields.district || fields.suburb;
 			const result = (korean ? parseKoreanAdmin : parseGlobalAdmin)(fields, p0, p1, primary, cityDistrict);
 			if (!korean) {
+				lowerAdmin ??= adminCountry.toLowerCase();
 				for (const key of ["sido", "sigungu", "eupmyeon"]) {
 					const value = result[key].toLowerCase();
-					if (value && (
-						value === lowerCountry || value === lowerAdmin
-					)) result[key] = "";
+					if (value && (value === lowerCountry || value === lowerAdmin)) result[key] = "";
 				}
 			}
 			if (result.sido && result.sido === result.sigungu) result.sigungu = "";
@@ -2994,7 +2994,6 @@
 		function addCountryFilter(record) {
 			const {result} = record;
 			const kind = result.kind || record.set;
-			if (kind === "에러") return;
 			const value = record._kind;
 			if (seenCountryFilters.has(value)) return;
 			seenCountryFilters.add(value);
@@ -3028,8 +3027,10 @@
 			}
 			const kind = filterKind.value;
 			const fieldChecks = [];
-			const rawFields = [norm(filterSido.value), norm(filterSigungu.value), norm(filterEmd.value), norm(filterTag.value), norm(filterFullAddr.value)];
-			for (let i = 0; i < rawFields.length; i++) if (rawFields[i]) fieldChecks.push([i + 1, rawFields[i]]);
+			for (let i = 0; i < DETAIL_FILTERS.length; i++) {
+				const v = norm(DETAIL_FILTERS[i].value);
+				if (v) fieldChecks.push(i + 1, v);
+			}
 			const hasTextFields = fieldChecks.length > 0;
 			return filterStatus === "all" && !kind && !query && !hasTextFields
 				? null : {status: filterStatus, kind, fieldChecks, hasTextFields, query, queryIsOr};
@@ -3053,19 +3054,21 @@
 			if (f.status !== "all" && r._status !== f.status) return false;
 			if (f.kind && r._kind !== f.kind) return false;
 			if (!f.hasTextFields && !f.query) return true;
+			const res = r.result;
+			const addr = res.addr;
 			const fields = r._search ??= [
 				r._kind,
-				norm(r.result.addr?.sido),
-				norm(r.result.addr?.sigungu),
-				norm(r.result.addr?.eupmyeon),
-				norm(r.result.addr?.tag),
-				norm(r.result.error || r.result.addr?.fullAddr),
+				addr ? norm(addr.sido) : "",
+				addr ? norm(addr.sigungu) : "",
+				addr ? norm(addr.eupmyeon) : "",
+				addr ? norm(addr.tag) : "",
+				norm(res.error || addr?.fullAddr),
 				null,
 			];
 			if (f.hasTextFields) {
 				const checks = f.fieldChecks;
-				for (let i = 0; i < checks.length; i++)
-					if (!fields[checks[i][0]].includes(checks[i][1])) return false;
+				for (let i = 0; i < checks.length; i += 2)
+					if (!fields[checks[i]].includes(checks[i + 1])) return false;
 			}
 			const query = f.query;
 			if (!query) return true;
@@ -3138,11 +3141,13 @@
 			const f = filterState;
 			const indices = state.visibleIndices;
 			indices.length = 0;
-			const records = state.records;
-			if (!f) {
-				for (let i = 0; i < records.length; i++) if (records[i].result) indices.push(i);
-			} else {
-				for (let i = 0; i < records.length; i++) if (matchesFilter(records[i], f)) indices.push(i);
+			if (state.processed > 0) {
+				const records = state.records;
+				if (!f) {
+					for (let i = 0; i < records.length; i++) if (records[i].result) indices.push(i);
+				} else {
+					for (let i = 0; i < records.length; i++) if (matchesFilter(records[i], f)) indices.push(i);
+				}
 			}
 			state.page = 0;
 			renderPage(true);
@@ -3169,12 +3174,15 @@
 			const start = state.page * pageSize;
 			const end = Math.min(visibleCount, start + pageSize);
 			const fragment = document.createDocumentFragment();
+			let matchedRow = null;
 			for (let position = start; position < end; position++) {
 				const rowIndex = indices[position];
-				fragment.append(createRow(state.records[rowIndex], rowIndex));
+				const tr = createRow(state.records[rowIndex], rowIndex);
+				if (rowIndex === selectedIndex) matchedRow = tr;
+				fragment.append(tr);
 			}
 			resultBody.replaceChildren(fragment);
-			syncSelection();
+			syncSelection(matchedRow);
 			tableWrap.classList.toggle("has-results", state.processed > 0);
 			if (resetScroll) tableWrap.scrollTop = 0;
 		}
@@ -3200,8 +3208,8 @@
 			pageFrame ??= requestAnimationFrame(() => renderPage());
 		}
 		function scheduleFilter() {
-			updateFilterSummary();
 			filterState = readFilters();
+			updateFilterSummary();
 			cancelFilterTimer();
 			filterTimer = setTimeout(() => {
 				filterTimer = null;
@@ -3505,7 +3513,7 @@
 				if (performance.now() - lastYield >= 8)
 					return yieldToMain().then(() => {lastYield = performance.now();});
 			};
-			const consumeLine = (line) => {
+			const consumeLine = (line, single = false) => {
 				COORD_REGEX.lastIndex = 0;
 				let m;
 				while ((m = COORD_REGEX.exec(line)) !== null) {
@@ -3514,8 +3522,7 @@
 					} else {
 						const lat = m[2], lon = m[3];
 						const fLat = +lat, fLon = +lon;
-						if (!Number.isFinite(fLat) || !Number.isFinite(fLon) ||
-							Math.abs(fLat) > 90 || Math.abs(fLon) > 180) {
+						if (!(Math.abs(fLat) <= 90 && Math.abs(fLon) <= 180)) {
 							invalidCount++;
 						} else {
 							if (out.length >= CONFIG.BULK_HARD_LIMIT)
@@ -3536,7 +3543,7 @@
 							});
 						}
 					}
-					if (COORD_REGEX.lastIndex >= line.length || line.indexOf("위경도", COORD_REGEX.lastIndex) === -1) break;
+					if (single || COORD_REGEX.lastIndex >= line.length || line.indexOf("위경도", COORD_REGEX.lastIndex) === -1) break;
 				}
 			};
 			try {
@@ -3576,12 +3583,15 @@
 							trailingCr = true;
 							break;
 						}
-						let line = null;
+						let line = null, single = false;
 						if (parts.length === 0) {
 							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
 								throw new InputError(lineLimitMessage);
-							if (keywordIndex !== -1 && keywordIndex < end)
+							if (keywordIndex !== -1 && keywordIndex < end) {
 								line = chunk.slice(start, end);
+								keywordIndex = chunk.indexOf("위경도", keywordIndex + 3);
+								single = keywordIndex === -1 || keywordIndex >= end;
+							}
 						} else {
 							append(chunk.slice(start, end));
 							const combined = emit();
@@ -3589,7 +3599,7 @@
 						}
 						const pause = maybeYield(line !== null);
 						if (pause) {await pause; signal.throwIfAborted();}
-						if (line !== null) consumeLine(line);
+						if (line !== null) consumeLine(line, single);
 						if (keywordIndex !== -1 && keywordIndex < nextStart)
 							keywordIndex = chunk.indexOf("위경도", nextStart);
 						start = nextStart;
@@ -3784,34 +3794,28 @@
 			const now = Date.now();
 			try {
 				await cacheTransaction(db, "readonly", signal, (store) => {
-					const acceptRow = (row) => {
-						const storedKey = row?.key;
-						if (
-							typeof storedKey !== "string" ||
-							!storedKey.startsWith(CACHE_KEY_PREFIX)
-						) return;
-						const cacheKey = storedKey.slice(
-							CACHE_KEY_PREFIX.length,
-						);
+					const prefixLen = CACHE_KEY_PREFIX.length, ttl = CONFIG.CACHE_TTL_MS;
+					const acceptRow = (row, knownKey) => {
+						let cacheKey = knownKey;
+						if (cacheKey === undefined) {
+							const storedKey = row?.key;
+							if (typeof storedKey !== "string" || !storedKey.startsWith(CACHE_KEY_PREFIX)) return;
+							cacheKey = storedKey.slice(prefixLen);
+							if (!results.has(cacheKey)) return;
+						}
 						const age = now - row.savedAt;
-						if (
-							results.has(cacheKey) &&
-							Number.isFinite(row.savedAt) &&
-							age >= 0 &&
-							age <= CONFIG.CACHE_TTL_MS &&
-							isValidGeocode(row.parsed)
-						) results.set(cacheKey, row);
+						if (Number.isFinite(row.savedAt) && age >= 0 && age <= ttl && isValidGeocode(row.parsed))
+							results.set(cacheKey, row);
 					};
 					const scanCache =
 						results.size > CACHE_KEY_LIMIT ||
 						(results.size >= CACHE_SCAN_MIN &&
 							cacheRowCeiling !== null &&
-							cacheRowCeiling <=
-							results.size * CACHE_SCAN_RATIO);
+							cacheRowCeiling <= results.size * CACHE_SCAN_RATIO);
 					if (!scanCache) {
 						for (const cacheKey of results.keys()) {
 							const req = store.get(CACHE_KEY_PREFIX + cacheKey);
-							req.onsuccess = () => acceptRow(req.result);
+							req.onsuccess = () => {if (req.result) acceptRow(req.result, cacheKey);};
 						}
 						return;
 					}
@@ -3889,16 +3893,6 @@
 				};
 			};
 		}
-		function decodeResponse(decoder, value, stream) {
-			try {
-				return decoder.decode(value, {stream});
-			} catch (err) {
-				throw new SyntaxError(
-					"역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.",
-					{cause: err},
-				);
-			}
-		}
 		async function readResponse(response, signal) {
 			const limit = CONFIG.RESPONSE_MAX_BYTES;
 			const limitError = () => new RangeError(`응답 본문이 허용 한도(${fmt(limit)} bytes)를 초과했습니다.`);
@@ -3919,9 +3913,17 @@
 					signal.throwIfAborted();
 					bytesRead += read.value.byteLength;
 					if (bytesRead > limit) throw limitError();
-					parts.push(decodeResponse(decoder, read.value, true));
+					try {
+						parts.push(decoder.decode(read.value, {stream: true}));
+					} catch (err) {
+						throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});
+					}
 				}
-				parts.push(decodeResponse(decoder, undefined, false));
+				try {
+					parts.push(decoder.decode());
+				} catch (err) {
+					throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});
+				}
 				return parts.join("");
 			} finally {
 				await cancelReader(reader);
@@ -4218,7 +4220,8 @@
 		}
 		function createRow(record, index) {
 			const tr = rowTemplate.cloneNode(true);
-			const [c0, c1, c2, c3, c4] = tr.children;
+			const kids = tr.children;
+			const c0 = kids[0], c1 = kids[1], c2 = kids[2], c3 = kids[3], c4 = kids[4];
 			const result = record.result;
 			const addr = result.addr;
 			const status = record._status;
@@ -4234,8 +4237,9 @@
 			const title = resultTitle(result);
 			button.firstElementChild.textContent = title;
 			const subtitle = result.error || addr.eupmyeon || addr.tag || "상세 정보 보기";
-			button.lastElementChild.textContent = subtitle;
-			if (result.error) button.lastElementChild.classList.add("row-error");
+			const subEl = button.lastElementChild;
+			subEl.textContent = subtitle;
+			if (result.error) subEl.classList.add("row-error");
 			button.ariaLabel = `${index + 1}. ${title} ${subtitle} - 위치 상세 보기`;
 			button.ariaDescription = `좌표 ${coordText}; 구분 ${kind}; ${STATUS_LABELS[status]}`;
 			c2.firstElementChild.textContent = record._lat6 ??= fmtCoord6(record.latStr);
@@ -4253,7 +4257,7 @@
 			r.result = parsed;
 			const status = r._status = resultStatus(parsed);
 			r._kind = countryFilterValue(r);
-			addCountryFilter(r);
+			if (!seenCountryFilters.has(r._kind)) addCountryFilter(r);
 			state.processed++;
 			if (status === "failed") state.cntFail++;
 			else if (status === "missing") state.cntNoAddress++;
@@ -4308,13 +4312,14 @@
 						const result = r.result;
 						const lat = r.latStr;
 						const lon = r.lonStr;
-						const exportKind = (result.kind || r.set) === "WORLD"
-							? kindLabel("WORLD", result.countryName) : result.kind || r.set;
-						const latPrefix = lat[0] === "+" || lat[0] === "-" ? "'" : "";
+						const rawKind = result.kind || r.set;
+						const exportKind = csvEsc(rawKind === "WORLD" ? kindLabel("WORLD", result.countryName) : rawKind);
+						const latC0 = lat.charCodeAt(0);
+						const latPrefix = latC0 === 43 || latC0 === 45 ? "'" : "";
 						const addr = result.addr;
 						const lat6 = r._lat6 ??= fmtCoord6(lat);
 						const lon6 = r._lon6 ??= fmtCoord6(lon);
-						const line = `${csvEsc(exportKind)},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",${addr
+						const line = `${exportKind},${rowIndex + 1},"${latPrefix}${lat}, ${lon}",${addr
 							? `${csvEsc(addr.sido)},${csvEsc(addr.sigungu)},${csvEsc(addr.eupmyeon)},${csvEsc(addr.tag)}`
 							: ",,,"},${csvEsc(result.error || addr.fullAddr)},"${MAP_BUILDERS[0](lat, lon, lat6, lon6)}","${MAP_BUILDERS[1](lat, lon, lat6, lon6)}",${MAP_BUILDERS[2](lat, lon, lat6, lon6)},"${MAP_BUILDERS[3](lat, lon, lat6, lon6)}"`;
 						chunkLines.push(line);
@@ -5117,7 +5122,7 @@
 		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, {focusOpt: NO_SCROLL});
 		for (const media of [mobileMedia, compactMedia]) on(media, "change", adaptLayout);
 		const stepLabel = byId("step-label");
-		let lastWorkflowStep = "";
+		let lastWorkflowStep = "input";
 		function updateWorkflowStep() {
 			const step = state.isRunning || state.isStopping ? "lookup" :
 				state.processed ? "results" : "input";
@@ -5140,15 +5145,18 @@
 			if (button) setStatusFilter(button.dataset.status);
 		});
 		const filterCount = byId("filter-count");
+		let lastDetailCount = -1;
 		function updateFilterSummary() {
-			let count = 0;
-			for (const input of DETAIL_FILTERS) if (input.value.trim()) count++;
+			const count = filterState ? filterState.fieldChecks.length >> 1 : 0;
 			const countText = String(count);
-			filterCount.textContent = countText;
-			filterCount.hidden = count === 0;
-			filterTrigger.dataset.active = String(count > 0);
-			filterTrigger.ariaLabel = count ? `상세 필터 ${countText}` : "상세 필터";
-			filterTrigger.ariaDescription = count ? `${countText}개의 상세 조건이 적용 중입니다.` : null;
+			if (count !== lastDetailCount) {
+				lastDetailCount = count;
+				filterCount.textContent = countText;
+				filterCount.hidden = count === 0;
+				filterTrigger.dataset.active = String(count > 0);
+				filterTrigger.ariaLabel = count ? `상세 필터 ${countText}` : "상세 필터";
+				filterTrigger.ariaDescription = count ? `${countText}개의 상세 조건이 적용 중입니다.` : null;
+			}
 			const conditions = [];
 			const q = filterQuery.value.trim();
 			if (q) conditions.push(`검색: ${q.slice(0, 80)}`);
@@ -5180,10 +5188,10 @@
 				!filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
 			const {width, height, offsetLeft, offsetTop, scale} = filterViewport;
 			const layoutWidth = innerWidth, layoutHeight = innerHeight;
-			if (![width, height, offsetLeft, offsetTop, scale, layoutWidth, layoutHeight].every(Number.isFinite) ||
-				width <= 0 || height <= 0 || scale <= 0 || layoutWidth <= 0 || layoutHeight <= 0 ||
-				Math.abs(width - layoutWidth) > 1 || Math.abs(offsetLeft) > 1 ||
-				height >= layoutHeight - 1) return clearFilterViewport();
+			if (!(width > 0 && height > 0 && scale > 0 && layoutWidth > 0 && layoutHeight > 0 &&
+				Number.isFinite(scale) && Number.isFinite(offsetTop) && Number.isFinite(layoutHeight) &&
+				Math.abs(width - layoutWidth) <= 1 && Math.abs(offsetLeft) <= 1 &&
+				height < layoutHeight - 1)) return clearFilterViewport();
 			const top = `${offsetTop}px`, size = `${height}px`;
 			const next = `${top}/${size}`;
 			if (next === filterViewportState) return;
@@ -5318,10 +5326,10 @@
 				detailSheet.showModal();
 			}
 		}
-		function syncSelection() {
+		function syncSelection(matchedRow = null) {
 			const first = resultBody.firstElementChild;
 			if (!first) return resetInspector();
-			const target = query(`tr[data-record="${selectedIndex}"]`, resultBody) || first;
+			const target = matchedRow || first;
 			selectRecord(Number(target.dataset.record), false, target);
 		}
 		on(resultBody, "click", (event) => {
