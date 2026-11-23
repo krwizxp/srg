@@ -2665,7 +2665,7 @@
 		const on = (target, event, listener, options) => target.addEventListener(event, listener, options);
 		const query = (selector, within = document) => within.querySelector(selector);
 		const queryAll = (selector, within = document) => within.querySelectorAll(selector);
-		const NO_SCROLL = {preventScroll: true};
+		const NO_SCROLL = { preventScroll: true };
 		const canFocus = el => Boolean(el?.isConnected && !el.disabled && el.getClientRects().length);
 		const totalPages = (count = state.visibleIndices.length) => Math.max(1, Math.ceil(count / pageSize));
 		const COORD_TAIL =
@@ -2727,7 +2727,7 @@
 				if (!name || name === sido || name === sigungu || eupmyeon.includes(name)) continue;
 				if ("읍면동리".includes(name.at(-1)) || (name.endsWith("가") && "0123456789".includes(name.at(-2)))) eupmyeon.push(name);
 			}
-			return {sido, sigungu, eupmyeon: eupmyeon.join(" ")};
+			return { sido, sigungu, eupmyeon: eupmyeon.join(" ") };
 		}
 		function removeDistrict(sigungu, district) {
 			if (!sigungu || sigungu === district) return "";
@@ -2747,7 +2747,7 @@
 				eupmyeon = districtName;
 				sigungu = removeDistrict(sigungu, districtName);
 			}
-			return {sido, sigungu, eupmyeon};
+			return { sido, sigungu, eupmyeon };
 		}
 		function getAdmin(fields, country, p0, p1) {
 			const adminCountry = fields.level2, countryLabel = fields.country || adminCountry;
@@ -2774,11 +2774,11 @@
 		let countryNames = null;
 		function parseGeocode(data) {
 			const gc = Array.isArray(data?.features) ? data.features[0]?.properties?.geocoding : null;
-			if (!gc) return {addr: {sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: ""}};
+			if (!gc) return { addr: { sido: "", sigungu: "", eupmyeon: "", tag: "", fullAddr: "" } };
 			const label = text(gc.label), country = text(gc.country_code).toLowerCase();
 			const countryCode = /^[a-z]{2}$/.test(country) ? country : "";
 			const admin = typeof gc.admin === "object" ? gc.admin : null;
-			const fields = {cityDistrict: text(gc.city_district)};
+			const fields = { cityDistrict: text(gc.city_district) };
 			for (const lvl of [2, 4, 6, 7, 8, 9, 10]) fields[`level${lvl}`] = text(admin?.[`level${lvl}`]);
 			for (const key of GC_FIELDS) fields[key] = text(gc[key]);
 			let firstPart = "", p0 = "", p1 = "", partIdx = 0;
@@ -2797,16 +2797,16 @@
 				pos = comma + 1;
 				partIdx++;
 			}
-			const {sido, sigungu, eupmyeon} = getAdmin(fields, country, p0, p1);
+			const { sido, sigungu, eupmyeon } = getAdmin(fields, country, p0, p1);
 			let tag = fields.name || firstPart || fields.street || fields.city;
 			if (fields.type) tag = tag ? `${tag}, ${fields.type}` : fields.type;
 			const kind = country === "kr" ? "KR" : country === "kp" ? "KP" : country ? "WORLD" : undefined;
 			if ([sigungu, eupmyeon, tag].some(v => v.length > CONFIG.TEXT_HARD_LIMIT)) throw new InputError(TEXT_LIMIT_MESSAGE);
 			return {
-				addr: {sido, sigungu, eupmyeon, tag, fullAddr: label},
+				addr: { sido, sigungu, eupmyeon, tag, fullAddr: label },
 				kind,
 				countryCode: kind === "WORLD" ? countryCode : "",
-				countryName: kind === "WORLD" ? fields.country || (countryCode ? (countryNames ??= new Intl.DisplayNames("ko", {type: "region"})).of(countryCode.toUpperCase()) : "") : "",
+				countryName: kind === "WORLD" ? fields.country || (countryCode ? (countryNames ??= new Intl.DisplayNames("ko", { type: "region" })).of(countryCode.toUpperCase()) : "") : "",
 			};
 		}
 		const CACHE_KEY_PREFIX = `geocodejson:zoom=${CONFIG.REVERSE_ZOOM}:lang=ko:${CONFIG.CACHE_PARSER_VERSION}:`;
@@ -2823,14 +2823,14 @@
 			const btn = e.source;
 			if (!btn?.matches("button.map-btn")) return;
 			const r = state.records[Number(btn.dataset.idx)];
-			const {latStr: lat, lonStr: lon} = r;
+			const { latStr: lat, lonStr: lon } = r;
 			const lat6 = r._lat6 ??= fmtCoord6(lat), lon6 = r._lon6 ??= fmtCoord6(lon);
 			for (let i = 0; i < MAP_BUILDERS.length; i++)
 				mapAnchors[i].href = MAP_BUILDERS[i](lat, lon, lat6, lon6);
 		});
 		let numberFormat;
 		const fmt = n => n === 0 ? "0" : n > 0 && n < 1000 && Number.isInteger(n)
-			? String(n) : (numberFormat ??= new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0})).format(n);
+			? String(n) : (numberFormat ??= new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 })).format(n);
 		const fmtCoord6 = (v) => {
 			const dot = v.indexOf(".");
 			if (dot < 0) return v === "-0" ? "0" : v;
@@ -2909,7 +2909,7 @@
 		const seenCountryFilters = new Set(["", "에러"]);
 		let koCollator, filterStatus = "all", filterTimer = null, pageFrame = null, pageKey = "";
 		function addCountryFilter(record) {
-			const {result} = record, kind = result.kind || record.set, value = record._kind;
+			const { result } = record, kind = result.kind || record.set, value = record._kind;
 			if (seenCountryFilters.has(value)) return;
 			seenCountryFilters.add(value);
 			const option = new Option(kindLabel(kind, result.countryName), value);
@@ -2920,8 +2920,8 @@
 		}
 		const rowTemplate = query("tr", byId("tmpl-row").content);
 		const RX_COMMA_WS = /\s*,\s*/g;
-		const norm = s => {const t = s ? s.trim().toLowerCase() : ""; return t.includes(",") ? t.replace(RX_COMMA_WS, ",") : t;};
-		const countryFilterValue = ({result, set}) =>
+		const norm = s => { const t = s ? s.trim().toLowerCase() : ""; return t.includes(",") ? t.replace(RX_COMMA_WS, ",") : t; };
+		const countryFilterValue = ({ result, set }) =>
 			result.kind === "WORLD" && (result.countryCode || result.countryName)
 				? "country:" + (result.countryCode || norm(result.countryName))
 				: (result.kind || set).toLowerCase();
@@ -2939,7 +2939,7 @@
 				if (v) fieldChecks.push(i + 1, v);
 			}
 			const hasTextFields = fieldChecks.length > 0;
-			return filterStatus === "all" && !kind && !queryVal && !hasTextFields ? null : {status: filterStatus, kind, fieldChecks, hasTextFields, query: queryVal, queryIsOr};
+			return filterStatus === "all" && !kind && !queryVal && !hasTextFields ? null : { status: filterStatus, kind, fieldChecks, hasTextFields, query: queryVal, queryIsOr };
 		}
 		let filterState = readFilters();
 		function resetCountryFilter() {
@@ -2992,7 +2992,7 @@
 			}
 			pageKey = key;
 			const current = state.page + 1;
-			const numbers = pageCount <= 7 ? Array.from({length: pageCount}, (_, i) => i + 1)
+			const numbers = pageCount <= 7 ? Array.from({ length: pageCount }, (_, i) => i + 1)
 				: current <= 4 ? [1, 2, 3, 4, 5, 0, pageCount]
 					: current >= pageCount - 3 ? [1, 0, pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
 						: [1, 0, current - 1, current, current + 1, 0, pageCount];
@@ -3023,13 +3023,13 @@
 			renderPage(true);
 			announcePage();
 		}
-		const announcePage = () => {pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(totalPages())} 페이지 · ${fmt(state.visibleIndices.length)}건`;};
+		const announcePage = () => { pageStatus.textContent = `${fmt(state.page + 1)} / ${fmt(totalPages())} 페이지 · ${fmt(state.visibleIndices.length)}건`; };
 		function revealPage() {
 			renderPage(true);
 			announcePage();
 			if (mobileMedia.matches && document.body.dataset.mobiletab === "results") {
 				query(".location-button", resultBody)?.focus(NO_SCROLL);
-				tableWrap.scrollIntoView({block: "start"});
+				tableWrap.scrollIntoView({ block: "start" });
 				mobileScroll.results = window.scrollY;
 			}
 		}
@@ -3063,7 +3063,7 @@
 			resultBody.append(createRow(state.records[index], index));
 			if (selectedIndex < 0) selectRecord(index, false);
 		}
-		const queuePage = () => {pageFrame ??= requestAnimationFrame(() => renderPage());};
+		const queuePage = () => { pageFrame ??= requestAnimationFrame(() => renderPage()); };
 		function scheduleFilter() {
 			filterState = readFilters();
 			updateFilterSummary();
@@ -3084,7 +3084,7 @@
 			const url = downloadUrl = URL.createObjectURL(blob), a = document.createElement("a");
 			a.href = url;
 			a.download = filename;
-			try {a.click();}
+			try { a.click(); }
 			catch (err) {
 				revokeDownloadUrl();
 				throw err;
@@ -3113,19 +3113,19 @@
 		const state = {
 			records: [], droppedFile: null, pendingFile: null, task: null, renderReq: null,
 			processed: 0, cntFail: 0, cntNoAddress: 0, visibleIndices: [], page: 0, bulkConfirmed: true, generation: 0,
-			get status() {return this.task?.status ?? "idle";},
+			get status() { return this.task?.status ?? "idle"; },
 			get isRunning() {
 				const s = this.status;
 				return s === "running" || s === "paused" || s === "pausing";
 			},
-			get isStopping() {return this.status === "stopping";},
+			get isStopping() { return this.status === "stopping"; },
 			reset(status) {
 				this.generation++;
 				this.task?.resume?.();
 				this.task?.controller.abort();
 				this.processed = this.cntFail = this.cntNoAddress = this.page = 0;
 				this.visibleIndices = [];
-				this.task = status === "idle" ? null : {status, controller: new AbortController(), resume: null};
+				this.task = status === "idle" ? null : { status, controller: new AbortController(), resume: null };
 				cancelAnimationFrame(this.renderReq);
 				this.renderReq = null;
 				cancelAnimationFrame(pageFrame);
@@ -3173,7 +3173,7 @@
 				(next.disabled ? statusText : next).focus(NO_SCROLL);
 			}
 		}
-		const srStatus = {msg: null, progressBucket: -1}, statusAnnouncement = byId("status-announcement");
+		const srStatus = { msg: null, progressBucket: -1 }, statusAnnouncement = byId("status-announcement");
 		function announceStatus(text) {
 			if (srStatus.msg === text) return;
 			srStatus.msg = text;
@@ -3189,15 +3189,15 @@
 			srStatus.progressBucket = -1;
 			announceStatus(nextMsg.trim() || null);
 		}
-		const renderCache = {total: 0, processed: 0, fail: 0, noAddress: 0};
+		const renderCache = { total: 0, processed: 0, fail: 0, noAddress: 0 };
 		function renderFrame() {
 			state.renderReq = null;
-			const {processed, cntFail: fail, cntNoAddress: noAddress} = state, total = state.records.length;
+			const { processed, cntFail: fail, cntNoAddress: noAddress } = state, total = state.records.length;
 			const totalChanged = renderCache.total !== total, doneChanged = renderCache.processed !== processed;
 			const failChanged = renderCache.fail !== fail, noAddressChanged = renderCache.noAddress !== noAddress;
 			if (!(totalChanged || doneChanged || failChanged || noAddressChanged)) return;
 			updateWorkflowStep();
-			Object.assign(renderCache, {total, processed, fail, noAddress});
+			Object.assign(renderCache, { total, processed, fail, noAddress });
 			if (totalChanged) {
 				countTotal.textContent = summaryTotal.textContent = coordsCount.textContent = fmt(total);
 				coordsPanel.dataset.empty = total === 0;
@@ -3220,7 +3220,7 @@
 				exportBtn.disabled = processed === 0 || exportTask !== null;
 			}
 		}
-		const scheduleRender = () => {state.renderReq ??= requestAnimationFrame(renderFrame);};
+		const scheduleRender = () => { state.renderReq ??= requestAnimationFrame(renderFrame); };
 		function clearTable() {
 			if (filterTimer !== null) {
 				clearTimeout(filterTimer);
@@ -3239,7 +3239,7 @@
 				signal.throwIfAborted();
 				return Promise.resolve();
 			}
-			return new Promise(resolve => on(AbortSignal.any([signal, AbortSignal.timeout(ms)]), "abort", resolve, {once: true})).then(() => signal.throwIfAborted());
+			return new Promise(resolve => on(AbortSignal.any([signal, AbortSignal.timeout(ms)]), "abort", resolve, { once: true })).then(() => signal.throwIfAborted());
 		}
 		function retryDelay(response, attempt) {
 			const fallback = CONFIG.RATE_LIMIT_DELAY_MS * attempt;
@@ -3258,7 +3258,7 @@
 				channel.port1.onmessage = () => yieldQueue.shift()();
 				yieldPort = channel.port2;
 			}
-			const {promise, resolve} = Promise.withResolvers();
+			const { promise, resolve } = Promise.withResolvers();
 			yieldQueue.push(resolve);
 			yieldPort.postMessage(0);
 			return promise;
@@ -3272,9 +3272,9 @@
 			let invalidCount = 0;
 			let lastYield = performance.now();
 			const reader = file.stream().getReader();
-			const decoder = new TextDecoder("utf-8", {fatal: true});
-			const abort = () => {void cancelReader(reader);};
-			on(signal, "abort", abort, {once: true});
+			const decoder = new TextDecoder("utf-8", { fatal: true });
+			const abort = () => { void cancelReader(reader); };
+			on(signal, "abort", abort, { once: true });
 			const parts = [];
 			let length = 0, trailingCr = false;
 			const lineLimitMessage = `입력 파일의 한 줄이 허용 길이 ${fmt(CONFIG.INPUT_LINE_HARD_LIMIT)}자를 초과했습니다.`;
@@ -3299,7 +3299,7 @@
 					if (p >= from + 4 && text.charCodeAt(p - 1) === 0xad6d && text.startsWith("대한민국", p - 4)) set = "KR";
 					else if (p >= from + 2 && text.charCodeAt(p - 1) === 0xacc4 && text.charCodeAt(p - 2) === 0xc138)
 						set = "WORLD";
-					if (!set) {kw = text.indexOf("위경도", kw + 3); continue;}
+					if (!set) { kw = text.indexOf("위경도", kw + 3); continue; }
 					COORD_TAIL.lastIndex = kw + 3;
 					const m = COORD_TAIL.exec(text);
 					if (!m || COORD_TAIL.lastIndex > to) {
@@ -3324,13 +3324,13 @@
 			try {
 				for (; ;) {
 					signal.throwIfAborted();
-					const {value, done} = await reader.read();
+					const { value, done } = await reader.read();
 					signal.throwIfAborted();
 					let chunk;
 					try {
-						chunk = decoder.decode(value, {stream: !done});
+						chunk = decoder.decode(value, { stream: !done });
 					} catch (err) {
-						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", {cause: err});
+						throw new InputError("입력 파일을 UTF-8 텍스트로 저장한 뒤 다시 불러와 주세요.", { cause: err });
 					}
 					if (!chunk && !done) continue;
 					let start = 0;
@@ -3399,7 +3399,7 @@
 				await cancelReader(reader);
 				reader.releaseLock();
 			}
-			return {records: out, invalidCount};
+			return { records: out, invalidCount };
 		}
 		const parsedCache = new Map();
 		const CACHE_PRUNE_EVERY = 32;
@@ -3408,7 +3408,7 @@
 			if (cacheChannel) return cacheChannel;
 			cacheWriters = new Set();
 			cacheChannel = new BroadcastChannel(`${CONFIG.CACHE_DB_NAME}:v${CONFIG.CACHE_DB_VERSION}`);
-			cacheChannel.onmessage = ({data}) => {
+			cacheChannel.onmessage = ({ data }) => {
 				if (!Array.isArray(data) || data.length !== 2 || typeof data[1] !== "string") return;
 				const [phase, token] = data;
 				if (phase === 0) {
@@ -3431,7 +3431,7 @@
 		}
 		function putMemoryCache(cacheKey, parsed, savedAt = Date.now()) {
 			parsedCache.delete(cacheKey);
-			parsedCache.set(cacheKey, {parsed, savedAt});
+			parsedCache.set(cacheKey, { parsed, savedAt });
 			if (parsedCache.size > 5_000) parsedCache.delete(parsedCache.keys().next().value);
 		}
 		function openCacheDb() {
@@ -3455,13 +3455,13 @@
 					console.warn(message, detail);
 				};
 				let req;
-				try {req = indexedDB.open(CONFIG.CACHE_DB_NAME, CONFIG.CACHE_DB_VERSION);}
-				catch (err) {return fail("Reverse geocoding cache is unavailable.", err);}
+				try { req = indexedDB.open(CONFIG.CACHE_DB_NAME, CONFIG.CACHE_DB_VERSION); }
+				catch (err) { return fail("Reverse geocoding cache is unavailable.", err); }
 				req.onupgradeneeded = event => {
 					const db = req.result;
 					const store = db.objectStoreNames.contains(CONFIG.CACHE_STORE)
 						? req.transaction.objectStore(CONFIG.CACHE_STORE)
-						: db.createObjectStore(CONFIG.CACHE_STORE, {keyPath: "key"});
+						: db.createObjectStore(CONFIG.CACHE_STORE, { keyPath: "key" });
 					if (event.oldVersion < 3) store.clear();
 					if (!store.indexNames.contains("savedAt")) store.createIndex("savedAt", "savedAt");
 				};
@@ -3476,7 +3476,7 @@
 					setTimeout(() => {
 						let prunedRows = null;
 						cacheTransaction(db, "readwrite", null, store => pruneCache(store, rows => prunedRows = rows))
-							.then(() => {if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows;}, err => console.warn("Reverse geocoding cache maintenance failed.", err));
+							.then(() => { if (prunedRows !== null && cacheWriters?.size === 0) cacheRowCeiling = prunedRows; }, err => console.warn("Reverse geocoding cache maintenance failed.", err));
 					}, 0);
 				};
 				req.onerror = () => fail("Reverse geocoding cache is unavailable.", req.error);
@@ -3495,7 +3495,7 @@
 					signal?.removeEventListener("abort", onAbort);
 					cb(val);
 				};
-				const abortTx = () => {try {tx?.abort();} catch (err) {console.warn("Reverse geocoding cache abort failed.", err);} };
+				const abortTx = () => { try { tx?.abort(); } catch (err) { console.warn("Reverse geocoding cache abort failed.", err); } };
 				const onAbort = () => {
 					abortTx();
 					finish(reject, signal.reason);
@@ -3505,7 +3505,7 @@
 					tx.oncomplete = () => finish(resolve);
 					tx.onerror = () => finish(reject, tx.error ?? new Error("Reverse geocoding cache transaction failed."));
 					tx.onabort = () => finish(reject, signal?.aborted ? signal.reason : tx.error ?? new Error("Reverse geocoding cache transaction aborted."));
-					if (signal) on(signal, "abort", onAbort, {once: true});
+					if (signal) on(signal, "abort", onAbort, { once: true });
 					if (signal?.aborted) onAbort();
 					else operation(tx.objectStore(CONFIG.CACHE_STORE));
 				} catch (err) {
@@ -3537,12 +3537,12 @@
 					if (!scanCache) {
 						for (const cacheKey of results.keys()) {
 							const req = store.get(CACHE_KEY_PREFIX + cacheKey);
-							req.onsuccess = () => {if (req.result) acceptRow(req.result, cacheKey);};
+							req.onsuccess = () => { if (req.result) acceptRow(req.result, cacheKey); };
 						}
 						return;
 					}
 					const req = store.getAll(IDBKeyRange.bound(CACHE_KEY_PREFIX, CACHE_KEY_PREFIX + "\uffff"), CONFIG.CACHE_MAX + CACHE_PRUNE_EVERY);
-					req.onsuccess = () => {for (const row of req.result) acceptRow(row);};
+					req.onsuccess = () => { for (const row of req.result) acceptRow(row); };
 				});
 			} catch (err) {
 				signal.throwIfAborted();
@@ -3562,7 +3562,7 @@
 				let prunedRows = null;
 				await cacheTransaction(db, "readwrite", signal, store => {
 					const savedAt = Date.now();
-					for (const {cacheKey, parsed} of entries) store.put({key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed});
+					for (const { cacheKey, parsed } of entries) store.put({ key: CACHE_KEY_PREFIX + cacheKey, savedAt, parsed });
 					if (maintain) pruneCache(store, rows => prunedRows = rows);
 				});
 				if (cacheWriters?.size === 0) {
@@ -3601,17 +3601,17 @@
 				throw limitError();
 			}
 			if (!response.body) return "";
-			const decoder = new TextDecoder("utf-8", {fatal: true}), reader = response.body.getReader(), parts = [];
+			const decoder = new TextDecoder("utf-8", { fatal: true }), reader = response.body.getReader(), parts = [];
 			let bytesRead = 0;
 			try {
 				for (; ;) {
-					const {value, done} = await reader.read();
+					const { value, done } = await reader.read();
 					if (!done) {
 						signal.throwIfAborted();
 						if ((bytesRead += value.byteLength) > limit) throw limitError();
 					}
-					try {parts.push(decoder.decode(value, {stream: !done}));}
-					catch (err) {throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", {cause: err});}
+					try { parts.push(decoder.decode(value, { stream: !done })); }
+					catch (err) { throw new SyntaxError("역지오코딩 응답 본문이 올바른 UTF-8이 아닙니다.", { cause: err }); }
 					if (done) break;
 				}
 				return parts.join("");
@@ -3638,12 +3638,12 @@
 				let res;
 				try {
 					report(attempt === 1 ? "조회 중…" : `재시도 ${attempt}/${maxRetry}`);
-					res = await fetch(url, {headers: {Accept: "application/json"}, referrerPolicy: "strict-origin-when-cross-origin", signal: requestSignal});
+					res = await fetch(url, { headers: { Accept: "application/json" }, referrerPolicy: "strict-origin-when-cross-origin", signal: requestSignal });
 				} catch (e) {
 					userSignal.throwIfAborted();
 					if (attempt >= maxRetry) throw new Error(requestSignal.reason?.name === "TimeoutError"
 						? "주소 조회 응답 시간이 초과되었습니다. 잠시 후 다시 조회해 주세요."
-						: "주소 조회 서버에 연결하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 조회해 주세요.", {cause: e});
+						: "주소 조회 서버에 연결하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 조회해 주세요.", { cause: e });
 					report("재연결 대기…", true);
 					await sleep(baseDelayMs * attempt, userSignal);
 					continue;
@@ -3651,8 +3651,8 @@
 				if (res.ok) {
 					try {
 						const body = await readResponse(res, requestSignal);
-						try {return JSON.parse(body);}
-						catch (err) {throw new SyntaxError("역지오코딩 응답이 올바른 JSON 형식이 아닙니다.", {cause: err});}
+						try { return JSON.parse(body); }
+						catch (err) { throw new SyntaxError("역지오코딩 응답이 올바른 JSON 형식이 아닙니다.", { cause: err }); }
 					} catch (e) {
 						userSignal.throwIfAborted();
 						if (e instanceof RangeError || e instanceof SyntaxError || attempt >= maxRetry) throw e;
@@ -3676,7 +3676,7 @@
 		async function pauseTask(task, message = "일시정지됨", type = "stopped") {
 			state.setStatus("paused");
 			showStatus(message, type);
-			const {promise, resolve} = Promise.withResolvers();
+			const { promise, resolve } = Promise.withResolvers();
 			task.resume = resolve;
 			scheduleRender();
 			await promise;
@@ -3731,8 +3731,8 @@
 				}
 			}
 			if (persistentCache.size && !signal.aborted) {
-				try {await readDiskCache(persistentCache, signal);}
-				catch (err) {if (!signal.aborted) throw err;}
+				try { await readDiskCache(persistentCache, signal); }
+				catch (err) { if (!signal.aborted) throw err; }
 				let diskHits = 0;
 				for (const i of unresolved) {
 					if (signal.aborted) break;
@@ -3776,7 +3776,7 @@
 							}));
 							signal.throwIfAborted();
 							putMemoryCache(cacheKey, parsed);
-							cacheBatch.push({cacheKey, parsed});
+							cacheBatch.push({ cacheKey, parsed });
 							if (cacheBatch.length >= 8) await flushCache();
 						}
 					} catch (err) {
@@ -3787,7 +3787,7 @@
 							i--;
 							continue;
 						}
-						parsed = {addr: null, error: errorMessage(err), kind: "에러"};
+						parsed = { addr: null, error: errorMessage(err), kind: "에러" };
 					}
 					if (signal.aborted) break;
 					commitResult(i, parsed, true);
@@ -3819,16 +3819,16 @@
 			showStatus(message, type);
 		}
 		const errorMessage = err => String(err?.message || err);
-		const resultStatus = ({addr, error}) => error ? "failed"
+		const resultStatus = ({ addr, error }) => error ? "failed"
 			: addr && (addr.fullAddr || addr.sido || addr.sigungu || addr.eupmyeon || addr.tag) ? "done" : "missing";
-		const KIND_LABELS = {KR: "대한민국", KP: "북한", 에러: "조회 실패"};
+		const KIND_LABELS = { KR: "대한민국", KP: "북한", 에러: "조회 실패" };
 		const kindLabel = (kind, countryName) => kind === "WORLD" ? countryName || "국가 미확인" : KIND_LABELS[kind] || kind;
-		const STATUS_LABELS = {done: "주소 확인", missing: "주소 없음", failed: "조회 실패"};
+		const STATUS_LABELS = { done: "주소 확인", missing: "주소 없음", failed: "조회 실패" };
 		const joinPair = (a, b) => a && b ? `${a} ${b}` : a || b || "";
-		const resultTitle = ({addr, error}) => error ? "조회 실패" : joinPair(addr.sido, addr.sigungu) || addr.fullAddr || "주소 정보 없음";
+		const resultTitle = ({ addr, error }) => error ? "조회 실패" : joinPair(addr.sido, addr.sigungu) || addr.fullAddr || "주소 정보 없음";
 		function createRow(record, index) {
 			const tr = rowTemplate.cloneNode(true), [c0, c1, c2, c3, c4] = tr.children;
-			const {result, _status: status} = record, addr = result.addr;
+			const { result, _status: status } = record, addr = result.addr;
 			const kind = kindLabel(result.kind || record.set, result.countryName), selected = index === selectedIndex;
 			const coordText = `${record.latStr}, ${record.lonStr}`, title = resultTitle(result);
 			const subtitle = result.error || addr.eupmyeon || addr.tag || "상세 정보 보기";
@@ -3877,7 +3877,7 @@
 			const totalRows = allDone ? records.length : rows.length;
 			if (!totalRows) return showStatus("내보낼 데이터가 없습니다.", "warn");
 			const sourceFile = state.droppedFile, appEpoch = state.generation;
-			const ensureCurrent = () => {if (state.generation !== appEpoch) throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError");};
+			const ensureCurrent = () => { if (state.generation !== appEpoch) throw new DOMException("CSV 내보내기가 취소되었습니다.", "AbortError"); };
 			exportBtn.disabled = true;
 			exportTask = (async () => {
 				try {
@@ -3893,7 +3893,7 @@
 						chunkChars = chunkLines.length = 0;
 					};
 					for (let pos = 0; pos < totalRows; pos++) {
-						const rowIndex = allDone ? pos : rows[pos], r = records[rowIndex], {result, latStr: lat, lonStr: lon} = r;
+						const rowIndex = allDone ? pos : rows[pos], r = records[rowIndex], { result, latStr: lat, lonStr: lon } = r;
 						const rawKind = result.kind || r.set, exportKind = csvEsc(rawKind === "WORLD" ? kindLabel("WORLD", result.countryName) : rawKind);
 						const latC0 = lat.charCodeAt(0), latPrefix = latC0 === 43 || latC0 === 45 ? "'" : "";
 						const addr = result.addr, lat6 = r._lat6 ??= fmtCoord6(lat), lon6 = r._lon6 ??= fmtCoord6(lon);
@@ -3911,7 +3911,7 @@
 					}
 					flushChunk();
 					ensureCurrent();
-					downloadBlob(new Blob(parts, {type: "text/csv;charset=utf-8"}), `${sourceFile.name.replace(/\.[^.]+$/, "")}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
+					downloadBlob(new Blob(parts, { type: "text/csv;charset=utf-8" }), `${sourceFile.name.replace(/\.[^.]+$/, "")}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
 					showStatus("CSV 저장 요청", "success");
 				} catch (err) {
 					if (err?.name === "AbortError") return;
@@ -3927,7 +3927,7 @@
 		async function handleParse() {
 			const file = state.pendingFile || state.droppedFile;
 			if (!file) return showStatus("파일을 선택해 주세요.", "warn");
-			const task = state.task = {status: "parsing", controller: new AbortController(), resume: null};
+			const task = state.task = { status: "parsing", controller: new AbortController(), resume: null };
 			updateUIState();
 			showStatus("좌표 추출 중…");
 			const analysis = byId("file-analysis");
@@ -3936,7 +3936,7 @@
 				return false;
 			};
 			try {
-				const {records, invalidCount} = await parseFile(file, task.controller.signal);
+				const { records, invalidCount } = await parseFile(file, task.controller.signal);
 				if (state.task !== task) return;
 				task.controller.signal.throwIfAborted();
 				analysis.textContent = invalidCount ? `${fmt(invalidCount)}개 제외 · 형식·좌표 범위 확인` : "";
@@ -3986,7 +3986,7 @@
 		}
 		on(byId("coords-copy"), "click", () => {
 			const gen = state.generation;
-			void copyTextWithNotice(() => state.records.map(({latStr, lonStr}) => `${latStr}, ${lonStr}`).join("\n"), () => gen === state.generation, "좌표 복사됨", "좌표 복사 실패", "HTTPS 연결에서 사용할 수 있습니다.");
+			void copyTextWithNotice(() => state.records.map(({ latStr, lonStr }) => `${latStr}, ${lonStr}`).join("\n"), () => gen === state.generation, "좌표 복사됨", "좌표 복사 실패", "HTTPS 연결에서 사용할 수 있습니다.");
 		});
 		on(pageSizeSelect, "change", event => {
 			const size = Number(event.target.value);
@@ -4021,7 +4021,7 @@
 					byId("bulk-description").textContent = `${fmt(count)}개 좌표 조회`;
 					state.bulkConfirmed = await new Promise(resolve => {
 						bulkDialog.returnValue = "";
-						on(bulkDialog, "close", () => resolve(bulkDialog.returnValue === "confirm"), {once: true});
+						on(bulkDialog, "close", () => resolve(bulkDialog.returnValue === "confirm"), { once: true });
 						bulkDialog.showModal();
 					});
 					if (!state.bulkConfirmed) return showStatus("조회 취소", "stopped");
@@ -4101,15 +4101,15 @@
 			acceptInputFile(file);
 		});
 		let koreaModulePromise, randomModulePromise;
-		const loadKoreaModule = () => koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => {koreaModulePromise = null; throw error;});
-		const loadRandomModule = () => randomModulePromise ??= import("./srg_random.js?v=1").catch(error => {randomModulePromise = null; throw error;});
-		const prepareKorea = value => {void loadKoreaModule().then(m => m.prepareKorea(value)).catch(() => { });};
+		const loadKoreaModule = () => koreaModulePromise ??= import("./korea_boundary.js?v=6").catch(error => { koreaModulePromise = null; throw error; });
+		const loadRandomModule = () => randomModulePromise ??= import("./srg_random.js?v=1").catch(error => { randomModulePromise = null; throw error; });
+		const prepareKorea = value => { void loadKoreaModule().then(m => m.prepareKorea(value)).catch(() => { }); };
 		const GENERATION_LIMIT = 10_000;
 		const u64Tokens = raw => raw.matchAll(/[^\s,]+/gu).map(match => match[0]);
 		function outputBlob(chunks, includeBom) {
 			const parts = includeBom ? ["\uFEFF", ...chunks] : [...chunks];
 			if (chunks.length && !chunks.at(-1).endsWith("\n")) parts.push("\n");
-			return new Blob(parts, {type: includeBom ? "text/plain;charset=utf-8" : "text/plain"});
+			return new Blob(parts, { type: includeBom ? "text/plain;charset=utf-8" : "text/plain" });
 		}
 		function setInputError(input, message, error = `${input.id}-error`) {
 			byId(error).textContent = message;
@@ -4137,10 +4137,10 @@
 				clearTimeout(prepareTimer);
 				prepareTimer = setTimeout(() => {
 					const token = u64Tokens(num64Input.value).next();
-					if (!token.done) void loadRandomModule().then(({parseU64}) => prepareKorea(parseU64(token.value))).catch(() => { });
+					if (!token.done) void loadRandomModule().then(({ parseU64 }) => prepareKorea(parseU64(token.value))).catch(() => { });
 				}, 200);
 			});
-			const inputCount = ({value}) => {
+			const inputCount = ({ value }) => {
 				let count = 0;
 				for (const _ of value.matchAll(/[^\s,]+/gu)) if (++count > GENERATION_LIMIT) break;
 				return count;
@@ -4159,7 +4159,7 @@
 							if (prev) {
 								const value = input.value;
 								try {
-									const {parseU64} = await loadRandomModule();
+									const { parseU64 } = await loadRandomModule();
 									if (input.value === value) prepareKorea(parseU64(u64Tokens(prev).next().value));
 								} catch (err) {
 									if (input.value === value) rngError.textContent = errorMessage(err);
@@ -4175,18 +4175,18 @@
 			on(generateDialog, "click", () => {
 				if (!suppRequest) return;
 				setSupplementError("");
-				try {finishSupplement(generateRandomValues(32));}
-				catch (err) {setSupplementError(errorMessage(err));}
+				try { finishSupplement(generateRandomValues(32)); }
+				catch (err) { setSupplementError(errorMessage(err)); }
 			});
 			const clearInputErrors = () => {
 				error.textContent = rngError.textContent = "";
 				for (const input of [num64Input, suppInput]) setInputError(input, "");
 			};
-			for (const input of [num64Input, suppInput]) on(input, "input", () => {if (input.ariaInvalid === "true") clearInputErrors();});
-			on(suppValues, "input", () => {if (suppValues.ariaInvalid === "true") setSupplementError("");});
+			for (const input of [num64Input, suppInput]) on(input, "input", () => { if (input.ariaInvalid === "true") clearInputErrors(); });
+			on(suppValues, "input", () => { if (suppValues.ariaInvalid === "true") setSupplementError(""); });
 			function finishSupplement(values) {
 				if (!suppRequest) return;
-				const {resolve} = suppRequest;
+				const { resolve } = suppRequest;
 				suppRequest = null;
 				if (values === null) returnFocus = clearBtn;
 				suppDialog.close();
@@ -4197,11 +4197,11 @@
 					const active = document.activeElement;
 					returnFocus = active instanceof HTMLElement && active !== document.body ? active : runBtn;
 				}
-				const {promise, resolve} = Promise.withResolvers();
-				suppRequest = {resolve, parseU64};
+				const { promise, resolve } = Promise.withResolvers();
+				suppRequest = { resolve, parseU64 };
 				suppValues.value = "";
 				setSupplementError("");
-				try {suppDialog.showModal();}
+				try { suppDialog.showModal(); }
 				catch (err) {
 					suppRequest = null;
 					throw err;
@@ -4227,7 +4227,7 @@
 				} catch (err) {
 					setSupplementError(errorMessage(err));
 					suppValues.focus(NO_SCROLL);
-					suppValues.closest(".field").scrollIntoView({block: "center"});
+					suppValues.closest(".field").scrollIntoView({ block: "center" });
 				}
 			});
 			on(suppDialog, "cancel", event => {
@@ -4255,7 +4255,7 @@
 				meta.textContent = "변환 중…";
 				setBusy(true);
 				try {
-					const {convertNumber, formatOutput, parseU64} = await loadRandomModule();
+					const { convertNumber, formatOutput, parseU64 } = await loadRandomModule();
 					if (epoch !== outputEpoch) return;
 					let supplements = u64Tokens(suppInput.value).map(parseU64), processed = 0, sampleKorea, suppCount = 0;
 					const updateProgress = phase => {
@@ -4278,7 +4278,7 @@
 						if (words.length >= 512) {
 							const controller = activeWorkerController = new AbortController();
 							try {
-								const {convertParallel} = await import("./srg_parallel.js?v=1");
+								const { convertParallel } = await import("./srg_parallel.js?v=1");
 								if (epoch !== outputEpoch || controller.signal.aborted) return;
 								const result = await convertParallel(words, {
 									workers: Math.min(4, navigator.hardwareConcurrency || 2),
@@ -4347,7 +4347,7 @@
 									supplied = supplements.next();
 								}
 								used++;
-								step = await conversion.next({value: supplied.value, bitsRemaining: 64});
+								step = await conversion.next({ value: supplied.value, bitsRemaining: 64 });
 								if (epoch !== outputEpoch) return;
 							}
 							if (cancelled) {
@@ -4395,14 +4395,14 @@
 						returnFocus = null;
 						if (focusTarget?.isConnected && !focusTarget.matches(":disabled")) {
 							focusTarget.focus(NO_SCROLL);
-							if (focusTarget.ariaInvalid === "true") focusTarget.closest(".field").scrollIntoView({block: "center"});
+							if (focusTarget.ariaInvalid === "true") focusTarget.closest(".field").scrollIntoView({ block: "center" });
 						}
 					}
 				}
 			});
 			on(useOutput, "click", async () => {
 				if (!outputReady || state.task !== null) return;
-				const file = new File([outputBlob(chunks, false)], "random_data.txt", {type: "text/plain"});
+				const file = new File([outputBlob(chunks, false)], "random_data.txt", { type: "text/plain" });
 				if (!acceptInputFile(file)) return;
 				if (await handleParse()) {
 					setInputMode("file");
@@ -4411,8 +4411,8 @@
 			});
 			on(saveBtn, "click", () => {
 				clearInputErrors();
-				try {downloadBlob(outputBlob(chunks, true), "random_data.txt");}
-				catch (err) {error.textContent = `저장 실패: ${errorMessage(err)}`;}
+				try { downloadBlob(outputBlob(chunks, true), "random_data.txt"); }
+				catch (err) { error.textContent = `저장 실패: ${errorMessage(err)}`; }
 			});
 			on(copyBtn, "click", async () => {
 				if (copying) return;
@@ -4423,7 +4423,7 @@
 				let message = "복사됨", type = "info";
 				try {
 					if (!window.isSecureContext) throw new Error("클립보드 API를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해 주세요.");
-					await navigator.clipboard.write([new ClipboardItem({"text/plain": outputBlob(snapshot, false)})]);
+					await navigator.clipboard.write([new ClipboardItem({ "text/plain": outputBlob(snapshot, false) })]);
 				} catch (err) {
 					message = err instanceof Error ? err.message : "클립보드 복사에 실패했습니다.";
 					type = "error";
@@ -4460,8 +4460,8 @@
 		const mobileButtons = queryAll("[data-mobile]"), statusButtons = queryAll("[data-status]"), steps = queryAll("[data-step]");
 		const noticeHome = notice.parentElement;
 		let manualLoaded = false, outputReady = false, selectedIndex = -1, selection = null, noticeOwner = null, noticeFocus = null, detailFocus = null, layoutFocus = null;
-		on(document, "focusin", ({target}) => {layoutFocus = jobPanel.contains(target) ? target : null;});
-		on(window, "blur", () => {layoutFocus = null;});
+		on(document, "focusin", ({ target }) => { layoutFocus = jobPanel.contains(target) ? target : null; });
+		on(window, "blur", () => { layoutFocus = null; });
 		function syncTabs(tabs, attr, value) {
 			for (const tab of tabs) {
 				const selected = tab.dataset[attr] === value;
@@ -4469,7 +4469,7 @@
 				tab.tabIndex = selected ? 0 : -1;
 			}
 		}
-		function bindTablist(container, attr, [first, second], onSelect, {wrap = false, focusOpt} = {}) {
+		function bindTablist(container, attr, [first, second], onSelect, { wrap = false, focusOpt } = {}) {
 			on(container, "click", event => {
 				const tab = event.target.closest("[role=tab]");
 				if (tab) onSelect(tab.dataset[attr]);
@@ -4496,7 +4496,7 @@
 				prepareKorea();
 			}
 		}
-		bindTablist(inputTabs, "mode", ["file", "manual"], setInputMode, {wrap: true});
+		bindTablist(inputTabs, "mode", ["file", "manual"], setInputMode, { wrap: true });
 		function adaptLayout() {
 			const isMobile = mobileMedia.matches;
 			if (isMobile) initSheetDrag();
@@ -4523,7 +4523,7 @@
 			mobileMedia.matches ? settings.showModal() : settings.show();
 			settingsBtn.ariaExpanded = "true";
 		});
-		on(settings, "close", () => {settingsBtn.ariaExpanded = "false";});
+		on(settings, "close", () => { settingsBtn.ariaExpanded = "false"; });
 		on(settings, "cancel", event => {
 			event.preventDefault();
 			closeSettings();
@@ -4531,14 +4531,14 @@
 		on(document, "pointerdown", event => {
 			layoutFocus = null;
 			if (settings.open && !settings.matches(":modal") && !settings.contains(event.target) && !settingsBtn.contains(event.target)) closeSettings(false);
-		}, {passive: true});
+		}, { passive: true });
 		on(settings, "keydown", event => {
 			if (event.key === "Escape" && !settings.matches(":modal")) {
 				event.preventDefault();
 				closeSettings();
 			}
 		});
-		const mobileScroll = {input: 0, results: 0};
+		const mobileScroll = { input: 0, results: 0 };
 		function setMobileView(view) {
 			const nextView = view === "results" ? "results" : "input";
 			if (mobileMedia.matches) mobileScroll[document.body.dataset.mobiletab] = window.scrollY;
@@ -4547,11 +4547,11 @@
 			syncTabs(mobileButtons, "mobile", nextView);
 			adaptLayout();
 			if (mobileMedia.matches) {
-				requestAnimationFrame(() => {if (document.body.dataset.mobiletab === nextView) window.scrollTo(0, mobileScroll[nextView]);});
+				requestAnimationFrame(() => { if (document.body.dataset.mobiletab === nextView) window.scrollTo(0, mobileScroll[nextView]); });
 				if (focusInView) (canFocus(active) ? active : byId(view === "results" ? "results-title" : "input-title")).focus(NO_SCROLL);
 			}
 		}
-		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, {focusOpt: NO_SCROLL});
+		bindTablist(query(".mobile-nav"), "mobile", ["input", "results"], setMobileView, { focusOpt: NO_SCROLL });
 		for (const media of [mobileMedia, compactMedia]) on(media, "change", adaptLayout);
 		const stepLabel = byId("step-label");
 		let lastWorkflowStep = "input";
@@ -4607,7 +4607,7 @@
 			const editing = active instanceof HTMLInputElement && active.type === "search" && !active.disabled && !active.readOnly && active.closest("dialog") === filterDialog;
 			const retaining = filterViewportState && (filterDialog.contains(active) || active === document.body);
 			if (filterViewportPaused || !filterDialog.open || !filterDialog.matches(":modal") || (!editing && !retaining)) return clearFilterViewport();
-			const {width, height, offsetLeft, offsetTop, scale} = filterViewport, layoutWidth = innerWidth, layoutHeight = innerHeight;
+			const { width, height, offsetLeft, offsetTop, scale } = filterViewport, layoutWidth = innerWidth, layoutHeight = innerHeight;
 			if (!(width > 0 && height > 0 && scale > 0 && layoutWidth > 0 && layoutHeight > 0 && Number.isFinite(scale) && Number.isFinite(offsetTop) && Number.isFinite(layoutHeight) && Math.abs(width - layoutWidth) <= 1 && Math.abs(offsetLeft) <= 1 && height < layoutHeight - 1))
 				return clearFilterViewport();
 			const top = `${offsetTop}px`, size = `${height}px`, next = `${top}/${size}`;
@@ -4623,8 +4623,8 @@
 		}
 		if (filterViewport) {
 			for (const event of ["focusin", "focusout"]) on(filterDialog, event, scheduleFilterViewport);
-			for (const event of ["resize", "scroll"]) on(filterViewport, event, scheduleFilterViewport, {passive: true});
-			on(window, "resize", scheduleFilterViewport, {passive: true});
+			for (const event of ["resize", "scroll"]) on(filterViewport, event, scheduleFilterViewport, { passive: true });
+			on(window, "resize", scheduleFilterViewport, { passive: true });
 			on(window, "pageshow", () => {
 				filterViewportPaused = false;
 				scheduleFilterViewport();
@@ -4647,7 +4647,7 @@
 			if (restoreFocus && ownedFocus && canFocus(target) && !target.closest("[inert]") && (!modal || modal.contains(target))) target.focus(NO_SCROLL);
 		}
 		on(noticeClose, "click", () => dismissNotice());
-		on(document, "close", event => {if (event.target === noticeOwner && !noticeOwner.open) dismissNotice(false);}, true);
+		on(document, "close", event => { if (event.target === noticeOwner && !noticeOwner.open) dismissNotice(false); }, true);
 		function showNotice(message, type = "info") {
 			const active = document.activeElement, ownedFocus = notice.contains(active);
 			if (!ownedFocus) noticeFocus = active instanceof HTMLElement && active !== document.body ? active : null;
@@ -4664,7 +4664,7 @@
 			if (ownedFocus && document.activeElement !== noticeClose) noticeClose.focus(NO_SCROLL);
 		}
 		let mapLoadTimer = 0, selectedRow = null, sheetDragInitialized = false;
-		function setMapUi({map = true, load = true, loading = false, feedback = true, recovery = true}) {
+		function setMapUi({ map = true, load = true, loading = false, feedback = true, recovery = true }) {
 			clearTimeout(mapLoadTimer);
 			mapLoadTimer = 0;
 			detailMap.hidden = map;
@@ -4676,13 +4676,13 @@
 		function showMapFailure(message) {
 			const ownedFocus = [loadMap, retryMap, mapFeedback, detailMap].includes(document.activeElement);
 			mapFeedback.textContent = message;
-			setMapUi({feedback: false, recovery: false});
+			setMapUi({ feedback: false, recovery: false });
 			if (ownedFocus) (retryMap.disabled ? mapExternal : retryMap).focus(NO_SCROLL);
 		}
 		function unloadMap() {
 			detailMap.removeAttribute("src");
 			retryMap.disabled = false;
-			setMapUi({load: false});
+			setMapUi({ load: false });
 			mapExternal.href = "about:blank";
 		}
 		function resetInspector() {
@@ -4699,7 +4699,7 @@
 			if (record !== selection) {
 				selectedIndex = index;
 				selection = record;
-				const {addr, error} = record.result;
+				const { addr, error } = record.result;
 				unloadMap();
 				mapPopover.hidePopover();
 				const vals = [resultTitle(record.result), addr?.eupmyeon || "", error || addr?.fullAddr || "주소 정보가 없습니다.", addr?.sido || "—", addr?.sigungu || "—", addr?.eupmyeon || "—", addr?.tag || "—", `${record.latStr}, ${record.lonStr}`];
@@ -4784,7 +4784,7 @@
 					const offset = activeDrag.offset;
 					reset();
 					if (!isOpen() || !mobileMedia.matches) return;
-					const animation = motion = sheet.animate([{translate: `0 ${offset}px`}, {translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px`}], {duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)"});
+					const animation = motion = sheet.animate([{ translate: `0 ${offset}px` }, { translate: `0 ${shouldDismiss ? sheet.offsetHeight : 0}px` }], { duration: reducedMotionMedia.matches ? 0 : 220, easing: "cubic-bezier(.22, 1, .36, 1)" });
 					animation.finished.then(() => {
 						if (motion !== animation) return;
 						motion = null;
@@ -4797,7 +4797,7 @@
 					const offset = parseFloat(getComputedStyle(sheet).translate.split(" ")[1]) || 0;
 					activeDrag?.reset();
 					reset();
-					activeDrag = {sheet, id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset, reset, finish};
+					activeDrag = { sheet, id: event.pointerId, x: event.clientX, y: event.clientY, startOffset: offset, offset, reset, finish };
 					sheet.style.translate = `0 ${offset}px`;
 					heading.setPointerCapture(event.pointerId);
 				});
@@ -4831,9 +4831,9 @@
 			mapFeedback.textContent = "OpenStreetMap 지도를 불러오는 중…";
 			const box = [Math.max(-180, lon - .01), Math.max(-85, lat - .006), Math.min(180, lon + .01), Math.min(85, lat + .006)];
 			const url = new URL("https://www.openstreetmap.org/export/embed.html");
-			url.search = new URLSearchParams({bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon});
+			url.search = new URLSearchParams({ bbox: box.join(","), layer: "mapnik", marker: lat + "," + lon });
 			detailMap.src = url.href;
-			setMapUi({map: false, loading: true, feedback: false});
+			setMapUi({ map: false, loading: true, feedback: false });
 			if (ownedFocus) mapFeedback.focus(NO_SCROLL);
 			mapLoadTimer = setTimeout(() => showMapFailure("지도 표시가 지연되고 있습니다. 다시 시도하거나 외부 지도에서 확인하세요."), 12000);
 		}
@@ -4841,20 +4841,20 @@
 		on(detailMap, "load", () => {
 			if (detailMap.hidden || !detailMap.getAttribute("src")) return;
 			const ownedFocus = document.activeElement === mapFeedback;
-			setMapUi({map: false});
+			setMapUi({ map: false });
 			if (ownedFocus) detailMap.focus(NO_SCROLL);
 		});
 		on(detailMap, "error", () => {
 			if (!detailMap.hidden && detailMap.getAttribute("src")) showMapFailure("지도를 불러오지 못했습니다. 다시 시도하거나 외부 지도에서 확인하세요.");
 		});
-		on(window, "offline", () => {if (!detailMap.hidden) showMapFailure("네트워크 연결이 끊어졌습니다. 외부 지도로 확인하세요.");});
+		on(window, "offline", () => { if (!detailMap.hidden) showMapFailure("네트워크 연결이 끊어졌습니다. 외부 지도로 확인하세요."); });
 		const dropZone = query(".drop-zone");
 		on(dropZone, "dragover", event => {
 			event.preventDefault();
 			if (state.task === null) dropZone.classList.add("is-dragging");
 			if (event.dataTransfer) event.dataTransfer.dropEffect = state.task === null ? "copy" : "none";
 		});
-		on(dropZone, "dragleave", event => {if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("is-dragging");});
+		on(dropZone, "dragleave", event => { if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("is-dragging"); });
 		on(dropZone, "drop", event => {
 			event.preventDefault();
 			dropZone.classList.remove("is-dragging");
@@ -4862,7 +4862,7 @@
 		});
 		const helpTrigger = byId("show-help");
 		on(helpTrigger, "click", () => closeSettings(false));
-		on(helpDialog, "close", () => {if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL);});
+		on(helpDialog, "close", () => { if (canFocus(helpTrigger)) helpTrigger.focus(NO_SCROLL); });
 		on(window, "pagehide", () => {
 			revokeDownloadUrl();
 			filterViewportPaused = true;

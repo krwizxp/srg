@@ -1,7 +1,7 @@
-const BINOMIAL_VALUES = Uint32Array.from({length: 408}, (_, index) => binomial(Math.floor(index / 8), index % 8));
-const BYTE_BIN = Array.from({length: 256}, (_, index) => index.toString(2).padStart(8, "0"));
-const BYTE_HEX = Array.from({length: 256}, (_, index) => index.toString(16).toUpperCase().padStart(2, "0"));
-const ASCII_CHARS = Array.from({length: 94}, (_, index) => String.fromCodePoint(33 + index));
+const BINOMIAL_VALUES = Uint32Array.from({ length: 408 }, (_, index) => binomial(Math.floor(index / 8), index % 8));
+const BYTE_BIN = Array.from({ length: 256 }, (_, index) => index.toString(2).padStart(8, "0"));
+const BYTE_HEX = Array.from({ length: 256 }, (_, index) => index.toString(16).toUpperCase().padStart(2, "0"));
+const ASCII_CHARS = Array.from({ length: 94 }, (_, index) => String.fromCodePoint(33 + index));
 const U64_MAX = (1n << 64n) - 1n;
 const U32_MAX_INV = 1 / 4294967295;
 const HANGUL_BASE = 0xac00;
@@ -62,7 +62,7 @@ function affineF64(ratio, scale, scalePower, offset, offsetPower, addend) {
 	if (!Number.isFinite(value) || Math.abs(value) < 2 ** -1022) throw new RangeError("좌표값이 normal finite f64 범위를 벗어났습니다.");
 	return value;
 }
-const decimalFormatter = new Intl.NumberFormat("en-US", {useGrouping: false, maximumSignificantDigits: 21}).format;
+const decimalFormatter = new Intl.NumberFormat("en-US", { useGrouping: false, maximumSignificantDigits: 21 }).format;
 function formatCoordinate(value) {
 	const str = Object.is(value, -0) ? "-0" : String(value);
 	return str.includes("e") ? decimalFormatter(value) : str;
@@ -190,7 +190,7 @@ function finishNmsGlyphs(num, data) {
 }
 async function* convertNumber(num, sampleKorea) {
 	const data = {
-		number: num, lotto: {values: []}, lotto7: {values: []}, euroMain: {values: []}, euroLucky: {values: []},
+		number: num, lotto: { values: [] }, lotto7: { values: [] }, euroMain: { values: [] }, euroLucky: { values: [] },
 		pin: 0, password: [], hangul: [], planet: 0, system: 0,
 	};
 	fillFixedCoordinates(num, data);

@@ -63,7 +63,7 @@ function inflateHuffman(lengths, complete = false) {
         index += counts[length];
         first = (first + counts[length]) * 2;
     }
-    return {counts, symbols, quick};
+    return { counts, symbols, quick };
 }
 function inflateSymbol(tree, bits) {
     if (bits.position + 9 <= bits.length) {
@@ -134,7 +134,7 @@ function inflate(input, maximum = 32768) {
     const bits = new InflateBits(input.subarray(2, tail));
     const output = new Uint8Array(maximum);
     let written = 0;
-    for (;;) {
+    for (; ;) {
         const finalBlock = bits.read(1) !== 0;
         const kind = bits.read(2);
         if (kind === 0) {
@@ -151,7 +151,7 @@ function inflate(input, maximum = 32768) {
                 inflateFixedTrees = [inflateHuffman(lengths), inflateHuffman(new Uint8Array(32).fill(5))];
             }
             const [literal, distance] = kind === 1 ? inflateFixedTrees : inflateDynamic(bits);
-            for (;;) {
+            for (; ;) {
                 const symbol = inflateSymbol(literal, bits);
                 if (symbol === 256) break;
                 if (symbol < 256) {
@@ -209,8 +209,8 @@ const DEGREES = 0.017453292519943295;
 const ECCENTRICITY_SQUARED = 0.006694380022900787;
 const u32 = (view, offset) => view.getUint32(offset, true);
 const f64 = (view, offset) => view.getFloat64(offset, true);
-const u32s = (view, offset, count) => Array.from({length: count}, (_, i) => view.getUint32(offset + i * 4, true));
-const f64s = (view, offset, count) => Array.from({length: count}, (_, i) => view.getFloat64(offset + i * 8, true));
+const u32s = (view, offset, count) => Array.from({ length: count }, (_, i) => view.getUint32(offset + i * 4, true));
+const f64s = (view, offset, count) => Array.from({ length: count }, (_, i) => view.getFloat64(offset + i * 8, true));
 const requireBoundary = inflateRequire;
 const isU64 = value => typeof value === "bigint" && value >= 0n && value <= MAX_U64;
 const inBounds = (lat, lon, [west, south, east, north]) => Number.isFinite(lat) && Number.isFinite(lon) && lon >= west && lon <= east && lat >= south && lat <= north;
@@ -286,8 +286,8 @@ const MAX_PART_BYTES = 524288;
 const MAX_PAGE_BYTES = 32768;
 const SUPPLEMENT_LIMIT = 1024;
 let boundaryPromise, preparation, requestedPreparation;
-const parts = {entries: new Map(), bytes: 0, pending: 0, entryLimit: 8, byteLimit: 4194304, pendingLimit: 8, reservation: MAX_PART_BYTES};
-const pages = {entries: new Map(), bytes: 0, pending: 0, entryLimit: 4096, byteLimit: 4194304, pendingLimit: 256, reservation: MAX_PAGE_BYTES};
+const parts = { entries: new Map(), bytes: 0, pending: 0, entryLimit: 8, byteLimit: 4194304, pendingLimit: 8, reservation: MAX_PART_BYTES };
+const pages = { entries: new Map(), bytes: 0, pending: 0, entryLimit: 4096, byteLimit: 4194304, pendingLimit: 256, reservation: MAX_PAGE_BYTES };
 const MAGIC_DECODER = new TextDecoder();
 function magic(bytes, expected) {
     return bytes.length >= 8 && MAGIC_DECODER.decode(bytes.subarray(0, 8)) === expected;
@@ -298,15 +298,15 @@ async function boundedBytes(response, maximum) {
     const chunks = [];
     let size = 0;
     try {
-        for (;;) {
-            const {value, done} = await reader.read();
+        for (; ;) {
+            const { value, done } = await reader.read();
             if (done) break;
             size += value.length;
             requireBoundary(size <= maximum, "대한민국 경계 데이터 크기 한도를 초과했습니다.");
             chunks.push(value);
         }
     } catch (error) {
-        await reader.cancel().catch(() => {});
+        await reader.cancel().catch(() => { });
         throw error;
     } finally {
         reader.releaseLock();
@@ -322,12 +322,12 @@ async function boundedBytes(response, maximum) {
 async function download(name, maximum, version) {
     const url = new URL("./data/korea-boundary-v4/" + name, import.meta.url);
     url.searchParams.set("sha256", version);
-    const response = await fetch(url, {signal: AbortSignal.timeout(30000)});
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     requireBoundary(response.ok, "대한민국 경계 데이터 불러오기 실패: HTTP " + response.status);
     return boundedBytes(response, maximum);
 }
 async function cached(cache, key, load, byteLength) {
-    for (;;) {
+    for (; ;) {
         const present = cache.entries.get(key);
         if (present) {
             cache.entries.delete(key);
@@ -339,9 +339,9 @@ async function cached(cache, key, load, byteLength) {
         if (oldest.settled) {
             cache.entries.delete(oldestKey);
             cache.bytes -= oldest.bytes;
-        } else await oldest.promise.catch(() => {});
+        } else await oldest.promise.catch(() => { });
     }
-    const entry = {settled: false, promise: null, bytes: cache.reservation};
+    const entry = { settled: false, promise: null, bytes: cache.reservation };
     cache.bytes += entry.bytes;
     cache.pending++;
     entry.promise = Promise.resolve().then(load).then(value => {
@@ -409,10 +409,10 @@ function decodeAtlas(bytes, boundary) {
         }
     }
     requireBoundary(ordinal === mixedCount, "대한민국 세부 격자 개수 오류");
-    return {subdivision, states, mixedOrdinal};
+    return { subdivision, states, mixedOrdinal };
 }
 function atlasState(boundary, point, tile) {
-    const {subdivision, states, mixedOrdinal} = boundary.atlas;
+    const { subdivision, states, mixedOrdinal } = boundary.atlas;
     const lower = mixedOrdinal[tile];
     requireBoundary(lower !== 65535, "대한민국 세부 격자 소유 범위 오류");
     const row = Math.floor(tile / boundary.columns), column = tile % boundary.columns;
@@ -475,7 +475,7 @@ async function loadBoundary() {
             nextPage += count;
         }
         requireBoundary(nextPage === pageCount, "대한민국 경계 조각 페이지 누락");
-        return {bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, tileIndex, tileCount, partCount, partOffset, pageCount, pagePart, southArea, northArea, polygons, rings, vertices, atlas: null, atlasRequested: false, atlasUnavailable: false, mixedChecks: 0};
+        return { bytes, data, bounds, gridWest, gridSouth, scale, columns, rows, tileIndex, tileCount, partCount, partOffset, pageCount, pagePart, southArea, northArea, polygons, rings, vertices, atlas: null, atlasRequested: false, atlasUnavailable: false, mixedChecks: 0 };
     })().catch(error => {
         boundaryPromise = null;
         throw error;
@@ -506,7 +506,7 @@ async function loadPart(boundary, number) {
             offset += length;
         }
         requireBoundary(offset === bytes.length, "대한민국 경계 조각 끝 위치 오류");
-        return {bytes, data, first: expectedFirst};
+        return { bytes, data, first: expectedFirst };
     }, part => part.bytes.length);
 }
 function tilePosition(boundary, point) {
@@ -536,7 +536,7 @@ async function loadPage(boundary, tile, pageNumber) {
                 requireBoundary(Number.isFinite(value) && value > previous && value <= north, "대한민국 경계 패리티 이벤트 범위 오류");
                 previous = value;
             }
-            return {tile, kind, count, base: fieldA, data};
+            return { tile, kind, count, base: fieldA, data };
         }
         requireBoundary(kind === 1 && count > 0 && count <= 1024 && fieldA < boundary.rings && fieldB < boundary.polygons && raw.length === 40 + (count + 1) * 16, "대한민국 경계 링 페이지 오류");
         const [first, hole] = u32s(data, 32, 2);
@@ -554,7 +554,7 @@ async function loadPage(boundary, tile, pageNumber) {
             const latitude = coordinates.getFloat64(entry + 8, true);
             requireBoundary(inBounds(latitude, longitude, boundary.bounds), "대한민국 경계 정점 범위 오류");
         }
-        return {tile, kind, count, first, hole, ring: fieldA, polygon: fieldB, data: coordinates};
+        return { tile, kind, count, first, hole, ring: fieldA, polygon: fieldB, data: coordinates };
     }, decoded => decoded.data.byteLength);
     requireBoundary(page.tile === tile, "대한민국 경계 캐시 타일 식별자 오류");
     return page;
