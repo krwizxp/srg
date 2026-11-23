@@ -3500,23 +3500,13 @@
 				length = 0;
 				return line;
 			};
-			const maybeYield = async () => {
-				if (performance.now() - lastYield >= 8) {
-					await yieldToMain();
-					lastYield = performance.now();
-				}
+			const maybeYield = (matching) => {
+				if (matching ? ++linesSinceYield % 128 !== 0 : ++skippedLines % 1000 !== 0) return;
+				if (performance.now() - lastYield >= 8)
+					return yieldToMain().then(() => {lastYield = performance.now();});
 			};
-			const onSkip = () => {
-				if (++skippedLines < 1000) return;
-				skippedLines = 0;
-				return maybeYield();
-			};
-			const consumeLine = async (line) => {
+			const consumeLine = (line) => {
 				signal.throwIfAborted();
-				if (++linesSinceYield >= 128) {
-					linesSinceYield = 0;
-					await maybeYield();
-				}
 				COORD_REGEX.lastIndex = 0;
 				let m;
 				while ((m = COORD_REGEX.exec(line)) !== null) {
@@ -3561,8 +3551,10 @@
 						const line = emit();
 						trailingCr = false;
 						if (chunk.charCodeAt(0) === 10) start = 1;
-						if (line.includes("위경도")) await consumeLine(line);
-						else await onSkip();
+						const matching = line.includes("위경도");
+						const pause = maybeYield(matching);
+						if (pause) await pause;
+						if (matching) consumeLine(line);
 					}
 					let keywordIndex = chunk.indexOf("위경도", start);
 					let nextLf = chunk.indexOf("\n", start);
@@ -3579,21 +3571,22 @@
 							trailingCr = true;
 							break;
 						}
+						let line = null;
 						if (parts.length === 0) {
 							if (end - start > CONFIG.INPUT_LINE_HARD_LIMIT)
 								throw new InputError(lineLimitMessage);
-							if (keywordIndex !== -1 && keywordIndex < end) {
-								await consumeLine(chunk.slice(start, end));
-								keywordIndex = chunk.indexOf("위경도", nextStart);
-							} else await onSkip();
+							if (keywordIndex !== -1 && keywordIndex < end)
+								line = chunk.slice(start, end);
 						} else {
 							append(chunk.slice(start, end));
-							const line = emit();
-							if (line.includes("위경도")) await consumeLine(line);
-							else await onSkip();
-							if (keywordIndex !== -1 && keywordIndex < nextStart)
-								keywordIndex = chunk.indexOf("위경도", nextStart);
+							const combined = emit();
+							if (combined.includes("위경도")) line = combined;
 						}
+						const pause = maybeYield(line !== null);
+						if (pause) await pause;
+						if (line !== null) consumeLine(line);
+						if (keywordIndex !== -1 && keywordIndex < nextStart)
+							keywordIndex = chunk.indexOf("위경도", nextStart);
 						start = nextStart;
 						if (nextLf !== -1 && nextLf < start) nextLf = chunk.indexOf("\n", start);
 						if (nextCr !== -1 && nextCr < start) nextCr = chunk.indexOf("\r", start);
@@ -3603,7 +3596,7 @@
 				}
 				if (trailingCr || length) {
 					const line = emit();
-					if (line.includes("위경도")) await consumeLine(line);
+					if (line.includes("위경도")) consumeLine(line);
 				}
 			} finally {
 				signal.removeEventListener("abort", abort);

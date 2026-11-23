@@ -289,9 +289,8 @@ impl BoundaryIndex {
                     .ok()
                     .filter(|&value| value < self.row_count)
                     .ok_or("대한민국 타일 행 오류")?;
-                let south = f64::from(row_u16).mul_add(self.inv_divisor, self.grid_south);
-                let north =
-                    f64::from(row_u16.strict_add(1)).mul_add(self.inv_divisor, self.grid_south);
+                let south = axis_edge(self.grid_south, self.inv_divisor, row_u16);
+                let north = axis_edge(self.grid_south, self.inv_divisor, row_u16.strict_add(1));
                 let mut previous = south;
                 let mut endpoints = Vec::with_capacity(count);
                 for chunk in raw
@@ -698,6 +697,10 @@ impl<'cache> TryFrom<(u64, &'cache mut BoundaryCache)> for SampleState<'cache> {
         Ok(state)
     }
 }
+fn axis_edge(origin: f64, inv_divisor: f64, index: u16) -> f64 {
+    let offset = f64::from(index) * inv_divisor;
+    origin + offset
+}
 fn grid_axis_index(
     origin: f64,
     divisor: f64,
@@ -710,9 +713,9 @@ fn grid_axis_index(
         .clamp(0.0_f64, MAX_GRID_DIMENSION_F64);
     let aligned_bits = (scaled + IEEE_F64_MANTISSA_ALIGN).to_bits() & 0x1FFF_u64;
     let approx = low_u16_from_u64(aligned_bits).min(max_cell);
-    if f64::from(approx.strict_add(1)).mul_add(inv_divisor, origin) <= coordinate {
+    if axis_edge(origin, inv_divisor, approx.strict_add(1)) <= coordinate {
         usize::from(approx.strict_add(1).min(max_cell))
-    } else if approx > 0 && f64::from(approx).mul_add(inv_divisor, origin) > coordinate {
+    } else if approx > 0 && axis_edge(origin, inv_divisor, approx) > coordinate {
         usize::from(approx.strict_sub(1))
     } else {
         usize::from(approx)

@@ -1,4 +1,4 @@
-use super::{BoundaryIndex, Tile, grid_axis_index, read_count};
+use super::{BoundaryIndex, Tile, axis_edge, grid_axis_index, read_count};
 use crate::{
     diagnostic::{AppError, Result},
     random_data::Coordinates,
@@ -31,8 +31,8 @@ impl Atlas<'_> {
         let row_u16 = u16::try_from(row)
             .ok()
             .ok_or("대한민국 세부 격자 행 범위 오류")?;
-        let west = f64::from(col_u16).mul_add(boundary.inv_divisor, boundary.grid_west);
-        let south = f64::from(row_u16).mul_add(boundary.inv_divisor, boundary.grid_south);
+        let west = axis_edge(boundary.grid_west, boundary.inv_divisor, col_u16);
+        let south = axis_edge(boundary.grid_south, boundary.inv_divisor, row_u16);
         let divisor = boundary.divisor * SUBDIVISION_F64;
         let inv_divisor = boundary.inv_divisor * (1.0_f64 / SUBDIVISION_F64);
         let fine_column = grid_axis_index(
