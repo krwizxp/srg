@@ -22,6 +22,15 @@ impl<'buffer> ByteCursor<'buffer> {
             .as_mut_array()
             .unwrap_or_else(|| process::abort())
     }
+    pub(super) fn write_array_advance<const N: usize>(&mut self, bytes: [u8; N], advance: usize) {
+        *self
+            .remaining
+            .first_chunk_mut::<N>()
+            .unwrap_or_else(|| process::abort()) = bytes;
+        self.remaining
+            .split_off_mut(..advance)
+            .unwrap_or_else(|| process::abort());
+    }
     pub(super) fn write_byte(&mut self, byte: u8) {
         *self
             .remaining

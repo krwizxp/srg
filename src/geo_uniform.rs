@@ -126,6 +126,7 @@ fn cumulative_area_and_derivative(latitude: f64) -> (f64, f64) {
         (DEGREES * (lon_cos - lon_sin)) / (denom * denom),
     )
 }
+#[inline]
 fn eval_poly(point: f64, initial: f64, coefficients: &[f64]) -> f64 {
     coefficients.iter().fold(initial, |acc, &coeff| {
         let term = point * acc;

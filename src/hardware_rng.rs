@@ -6,6 +6,8 @@ use core::{
     time::Duration,
 };
 use std::{io::Write, is_x86_feature_detected, thread::yield_now, time::Instant};
+#[repr(align(64))]
+struct AlignedAtomicBool(AtomicBool);
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum HardwareRandomSource {
     None,
@@ -13,7 +15,7 @@ pub(super) enum HardwareRandomSource {
     RdSeed,
 }
 pub(super) struct HardwareRng {
-    fallback_notice_pending: AtomicBool,
+    fallback_notice_pending: AlignedAtomicBool,
     rdrand_supported: bool,
     rdseed_active: AtomicBool,
     stop_pending: AtomicBool,
@@ -21,7 +23,7 @@ pub(super) struct HardwareRng {
 impl HardwareRng {
     pub(super) fn new() -> Self {
         Self {
-            fallback_notice_pending: AtomicBool::new(false),
+            fallback_notice_pending: AlignedAtomicBool(AtomicBool::new(false)),
             rdrand_supported: is_x86_feature_detected!("rdrand"),
             rdseed_active: AtomicBool::new(is_x86_feature_detected!("rdseed")),
             stop_pending: AtomicBool::new(false),
@@ -92,7 +94,9 @@ impl HardwareRng {
         }
         self.rdseed_active.store(false, Ordering::Relaxed);
         if self.rdrand_supported {
-            self.fallback_notice_pending.store(true, Ordering::Release);
+            self.fallback_notice_pending
+                .0
+                .store(true, Ordering::Release);
             return Self::rdrand_random();
         }
         Err("RDSEED 5분 타임아웃, RDRAND 미지원".into())
@@ -111,7 +115,11 @@ impl HardwareRng {
     }
     fn try_rdrand_fallback(&self) -> Option<u64> {
         let fallback = self.rdrand_supported.then(Self::rdrand_random)?.ok()?;
-        self.fallback_notice_pending.store(true, Ordering::Release);
+        if !self.fallback_notice_pending.0.load(Ordering::Relaxed) {
+            self.fallback_notice_pending
+                .0
+                .store(true, Ordering::Release);
+        }
         Some(fallback)
     }
     fn try_rdseed(value: &mut u64) -> bool {
@@ -133,7 +141,11 @@ impl HardwareRng {
         writeln!(err, "{msg}").map_err(Into::into)
     }
     pub(super) fn write_rdseed_fallback_notice(&self, err: &mut dyn Write) -> Result<()> {
-        if self.fallback_notice_pending.swap(false, Ordering::Acquire) {
+        if self
+            .fallback_notice_pending
+            .0
+            .swap(false, Ordering::Acquire)
+        {
             writeln!(
                 err,
                 "{}",
